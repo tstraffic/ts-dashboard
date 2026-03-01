@@ -6,7 +6,7 @@
     <h1 class="text-2xl font-bold text-white">Safety & Incidents</h1>
     <p class="text-slate-400 text-sm mt-1">Track and manage all safety incidents and reports</p>
   </div>
-  <a href="/incidents/new" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">+ Report Incident</a>
+  <a href="/incidents/new" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Report Incident</a>
 </div>
 
 <!-- Filter Bar -->
@@ -15,7 +15,7 @@
     <!-- Job -->
     <div class="min-w-[200px] flex-1">
       <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Job</label>
-      <select name="job_id" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+      <select name="job_id" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Jobs</option>
         <% jobs.forEach(j => { %>
           <option value="<%= j.id %>" <%= filters.job_id == j.id ? 'selected' : '' %>><%= j.job_number %> - <%= j.client %></option>
@@ -25,7 +25,7 @@
     <!-- Incident Type -->
     <div class="min-w-[160px]">
       <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Type</label>
-      <select name="incident_type" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+      <select name="incident_type" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Types</option>
         <option value="injury" <%= filters.incident_type === 'injury' ? 'selected' : '' %>>Injury</option>
         <option value="near_miss" <%= filters.incident_type === 'near_miss' ? 'selected' : '' %>>Near Miss</option>
@@ -39,7 +39,7 @@
     <!-- Severity -->
     <div class="min-w-[140px]">
       <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Severity</label>
-      <select name="severity" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+      <select name="severity" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Severities</option>
         <option value="low" <%= filters.severity === 'low' ? 'selected' : '' %>>Low</option>
         <option value="medium" <%= filters.severity === 'medium' ? 'selected' : '' %>>Medium</option>
@@ -50,7 +50,7 @@
     <!-- Status -->
     <div class="min-w-[160px]">
       <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Status</label>
-      <select name="status" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+      <select name="status" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Statuses</option>
         <option value="reported" <%= filters.status === 'reported' ? 'selected' : '' %>>Reported</option>
         <option value="investigating" <%= filters.status === 'investigating' ? 'selected' : '' %>>Investigating</option>
@@ -60,7 +60,7 @@
     </div>
     <!-- Buttons -->
     <div class="flex gap-2">
-      <button type="submit" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">Filter</button>
+      <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Filter</button>
       <a href="/incidents" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Clear</a>
     </div>
   </form>
@@ -71,7 +71,7 @@
   <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 text-center">
     <svg class="w-12 h-12 text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
     <p class="text-slate-500 text-sm">No incidents found matching your filters.</p>
-    <a href="/incidents/new" class="text-amber-400 text-sm hover:underline mt-2 inline-block">Report the first incident</a>
+    <a href="/incidents/new" class="text-brand-400 text-sm hover:underline mt-2 inline-block">Report the first incident</a>
   </div>
 <% } else { %>
 <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
@@ -98,7 +98,7 @@
         <td class="px-4 py-3">
           <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
             <% if (incident.incident_type === 'injury') { %>bg-red-900/60 text-red-300
-            <% } else if (incident.incident_type === 'near_miss') { %>bg-amber-900/60 text-amber-300
+            <% } else if (incident.incident_type === 'near_miss') { %>bg-orange-900/60 text-brand-300
             <% } else if (incident.incident_type === 'hazard') { %>bg-yellow-900/60 text-yellow-300
             <% } else if (incident.incident_type === 'property_damage') { %>bg-orange-900/60 text-orange-300
             <% } else if (incident.incident_type === 'environmental') { %>bg-emerald-900/60 text-emerald-300
@@ -110,7 +110,7 @@
         <td class="px-4 py-3">
           <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
             <% if (incident.severity === 'critical') { %>bg-red-900/60 text-red-300
-            <% } else if (incident.severity === 'high') { %>bg-amber-900/60 text-amber-300
+            <% } else if (incident.severity === 'high') { %>bg-orange-900/60 text-brand-300
             <% } else if (incident.severity === 'medium') { %>bg-blue-900/60 text-blue-300
             <% } else { %>bg-slate-700 text-slate-300<% } %>">
             <%= incident.severity || 'low' %>

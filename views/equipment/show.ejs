@@ -18,7 +18,7 @@
       <h1 class="text-2xl font-bold text-white"><%= item.asset_number %> - <%= item.name %></h1>
       <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
         <% if (item.current_condition === 'new' || item.current_condition === 'good') { %>bg-emerald-900/60 text-emerald-300
-        <% } else if (item.current_condition === 'fair') { %>bg-amber-900/60 text-amber-300
+        <% } else if (item.current_condition === 'fair') { %>bg-orange-900/60 text-brand-300
         <% } else if (item.current_condition === 'poor' || item.current_condition === 'damaged') { %>bg-red-900/60 text-red-300
         <% } else { %>bg-slate-700 text-slate-400<% } %>">
         <%= item.current_condition %>
@@ -27,7 +27,7 @@
         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">Inactive</span>
       <% } %>
     </div>
-    <a href="/equipment/<%= item.id %>/edit" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">Edit</a>
+    <a href="/equipment/<%= item.id %>/edit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Edit</a>
   </div>
 </div>
 
@@ -94,10 +94,10 @@
 <!-- ============================================ -->
 <div class="mb-8">
   <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-    <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
     Current Assignments
     <% if (activeAssignments.length > 0) { %>
-      <span class="text-xs font-medium bg-amber-900/60 text-amber-300 px-2 py-0.5 rounded-full"><%= activeAssignments.length %> active</span>
+      <span class="text-xs font-medium bg-orange-900/60 text-brand-300 px-2 py-0.5 rounded-full"><%= activeAssignments.length %> active</span>
     <% } %>
   </h2>
 
@@ -151,7 +151,7 @@
       <!-- Job -->
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1">Job <span class="text-red-400">*</span></label>
-        <select name="job_id" required class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        <select name="job_id" required class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">Select job...</option>
           <% jobs.forEach(j => { %>
             <option value="<%= j.id %>"><%= j.job_number %> - <%= j.client %></option>
@@ -162,28 +162,28 @@
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1">Assigned Date <span class="text-red-400">*</span></label>
         <input type="date" name="assigned_date" required value="<%= today %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Expected Return -->
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1">Expected Return</label>
         <input type="date" name="expected_return_date"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Quantity -->
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1">Quantity</label>
         <input type="number" name="quantity" min="1" value="1"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Notes -->
       <div class="md:col-span-2">
         <label class="block text-xs font-medium text-slate-400 mb-1">Notes</label>
         <input type="text" name="notes" placeholder="Assignment notes..."
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <div class="flex items-end">
-        <button type="submit" class="w-full px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">Assign</button>
+        <button type="submit" class="w-full px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Assign</button>
       </div>
     </form>
   </div>
@@ -245,7 +245,7 @@
       <!-- Type -->
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1">Type <span class="text-red-400">*</span></label>
-        <select name="maintenance_type" required class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        <select name="maintenance_type" required class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">Select type...</option>
           <option value="inspection">Inspection</option>
           <option value="repair">Repair</option>
@@ -258,37 +258,37 @@
       <div class="md:col-span-2">
         <label class="block text-xs font-medium text-slate-400 mb-1">Description <span class="text-red-400">*</span></label>
         <input type="text" name="description" required placeholder="What was done..."
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Date Performed -->
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1">Date Performed <span class="text-red-400">*</span></label>
         <input type="date" name="performed_date" required value="<%= today %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Performed By -->
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1">Performed By</label>
         <input type="text" name="performed_by" placeholder="Name or company"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Cost -->
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1">Cost ($)</label>
         <input type="number" name="cost" step="0.01" min="0" placeholder="0.00"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Next Due Date -->
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1">Next Due Date</label>
         <input type="date" name="next_due_date"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <p class="text-xs text-slate-500 mt-1">Will update the equipment's next inspection date</p>
       </div>
       <!-- Result -->
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1">Result</label>
-        <select name="result" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        <select name="result" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="pass">Pass</option>
           <option value="fail">Fail</option>
           <option value="conditional">Conditional</option>
@@ -298,7 +298,7 @@
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1">Notes</label>
         <input type="text" name="notes" placeholder="Additional notes..."
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <div class="flex items-end">
         <button type="submit" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">Add Record</button>
@@ -331,7 +331,7 @@
               <% } else if (m.maintenance_type === 'repair') { %>bg-red-900/60 text-red-300
               <% } else if (m.maintenance_type === 'service') { %>bg-purple-900/60 text-purple-300
               <% } else if (m.maintenance_type === 'calibration') { %>bg-teal-900/60 text-teal-300
-              <% } else { %>bg-amber-900/60 text-amber-300<% } %>">
+              <% } else { %>bg-orange-900/60 text-brand-300<% } %>">
               <%= m.maintenance_type %>
             </span>
           </td>
@@ -341,7 +341,7 @@
             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
               <% if (m.result === 'pass') { %>bg-emerald-900/60 text-emerald-300
               <% } else if (m.result === 'fail') { %>bg-red-900/60 text-red-300
-              <% } else { %>bg-amber-900/60 text-amber-300<% } %>">
+              <% } else { %>bg-orange-900/60 text-brand-300<% } %>">
               <%= m.result %>
             </span>
           </td>

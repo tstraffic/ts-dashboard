@@ -18,7 +18,7 @@
     submitted: 'bg-blue-600 text-blue-100',
     approved: 'bg-emerald-600 text-emerald-100',
     rejected: 'bg-red-600 text-red-100',
-    expired: 'bg-amber-600 text-amber-100'
+    expired: 'bg-brand-700 text-brand-100'
   };
   const statusLabels = {
     not_started: 'Not Started',
@@ -33,7 +33,7 @@
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-white">Compliance & Approvals</h1>
-    <a href="/compliance/new" class="inline-flex items-center px-4 py-2 bg-amber-500 text-slate-900 font-semibold rounded-lg hover:bg-amber-400 transition">
+    <a href="/compliance/new" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition">
       <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
       New Item
     </a>
@@ -45,7 +45,7 @@
       <!-- Status -->
       <div>
         <label class="block text-sm font-medium text-slate-400 mb-1">Status</label>
-        <select name="status" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <select name="status" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Statuses</option>
           <option value="not_started" <%= filters.status === 'not_started' ? 'selected' : '' %>>Not Started</option>
           <option value="submitted" <%= filters.status === 'submitted' ? 'selected' : '' %>>Submitted</option>
@@ -58,7 +58,7 @@
       <!-- Item Type -->
       <div>
         <label class="block text-sm font-medium text-slate-400 mb-1">Type</label>
-        <select name="item_type" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <select name="item_type" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Types</option>
           <% Object.keys(typeLabels).forEach(function(key) { %>
             <option value="<%= key %>" <%= filters.item_type === key ? 'selected' : '' %>><%= typeLabels[key] %></option>
@@ -69,7 +69,7 @@
       <!-- Job -->
       <div>
         <label class="block text-sm font-medium text-slate-400 mb-1">Job</label>
-        <select name="job_id" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <select name="job_id" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Jobs</option>
           <% jobs.forEach(function(job) { %>
             <option value="<%= job.id %>" <%= filters.job_id == job.id ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
@@ -117,7 +117,7 @@
                 <td class="px-4 py-3 text-slate-300"><%= formattedType %></td>
                 <td class="px-4 py-3">
                   <% if (item.job_id) { %>
-                    <a href="/jobs/<%= item.job_id %>" class="text-amber-400 hover:text-amber-300"><%= item.job_number %></a>
+                    <a href="/jobs/<%= item.job_id %>" class="text-brand-400 hover:text-brand-300"><%= item.job_number %></a>
                   <% } else { %>
                     <span class="text-slate-500">-</span>
                   <% } %>
@@ -135,7 +135,7 @@
                 </td>
                 <td class="px-4 py-3 text-slate-300"><%= item.approver_name || '-' %></td>
                 <td class="px-4 py-3">
-                  <a href="/compliance/<%= item.id %>/edit" class="text-slate-400 hover:text-amber-400 transition" title="Edit">
+                  <a href="/compliance/<%= item.id %>/edit" class="text-slate-400 hover:text-brand-400 transition" title="Edit">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </a>
                 </td>

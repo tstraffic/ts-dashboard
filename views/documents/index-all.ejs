@@ -27,14 +27,14 @@
         <td class="px-4 py-3">
           <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
             <% if (job.status === 'active') { %>bg-blue-900/60 text-blue-300
-            <% } else if (job.status === 'on_hold') { %>bg-amber-900/60 text-amber-300
+            <% } else if (job.status === 'on_hold') { %>bg-orange-900/60 text-brand-300
             <% } else if (job.status === 'won') { %>bg-emerald-900/60 text-emerald-300
             <% } else { %>bg-slate-700 text-slate-300<% } %>"><%= job.status ? job.status.replace('_', ' ') : '-' %></span>
         </td>
         <td class="px-4 py-3 text-white font-medium"><%= job.doc_count %></td>
         <td class="px-4 py-3 text-slate-400 text-xs"><%= job.last_upload || 'None' %></td>
         <td class="px-4 py-3">
-          <a href="/documents/job/<%= job.id %>" class="text-amber-400 hover:text-amber-300 text-sm font-medium">View &rarr;</a>
+          <a href="/documents/job/<%= job.id %>" class="text-brand-400 hover:text-brand-300 text-sm font-medium">View &rarr;</a>
         </td>
       </tr>
       <% }) %>

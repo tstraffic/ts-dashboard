@@ -18,7 +18,7 @@
         <!-- Username -->
         <div>
           <label for="username" class="block text-sm font-medium text-slate-300 mb-1">Username <span class="text-red-400">*</span></label>
-          <input type="text" id="username" name="username" required value="<%= isEdit ? editUser.username : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Username...">
+          <input type="text" id="username" name="username" required value="<%= isEdit ? editUser.username : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Username...">
         </div>
 
         <!-- Password -->
@@ -27,7 +27,7 @@
             Password
             <% if (!isEdit) { %><span class="text-red-400">*</span><% } %>
           </label>
-          <input type="password" id="password" name="password" <%= !isEdit ? 'required' : '' %> class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="<%= isEdit ? 'Leave blank to keep current password' : 'Password...' %>">
+          <input type="password" id="password" name="password" <%= !isEdit ? 'required' : '' %> class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="<%= isEdit ? 'Leave blank to keep current password' : 'Password...' %>">
           <% if (isEdit) { %>
             <p class="text-xs text-slate-400 mt-1">Leave blank to keep current password.</p>
           <% } %>
@@ -36,19 +36,19 @@
         <!-- Full Name -->
         <div>
           <label for="full_name" class="block text-sm font-medium text-slate-300 mb-1">Full Name <span class="text-red-400">*</span></label>
-          <input type="text" id="full_name" name="full_name" required value="<%= isEdit ? editUser.full_name : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Full name...">
+          <input type="text" id="full_name" name="full_name" required value="<%= isEdit ? editUser.full_name : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Full name...">
         </div>
 
         <!-- Email -->
         <div>
           <label for="email" class="block text-sm font-medium text-slate-300 mb-1">Email</label>
-          <input type="email" id="email" name="email" value="<%= isEdit && editUser.email ? editUser.email : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Email address...">
+          <input type="email" id="email" name="email" value="<%= isEdit && editUser.email ? editUser.email : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Email address...">
         </div>
 
         <!-- Role -->
         <div>
           <label for="role" class="block text-sm font-medium text-slate-300 mb-1">Role</label>
-          <select id="role" name="role" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+          <select id="role" name="role" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="management" <%= isEdit && editUser.role === 'management' ? 'selected' : '' %>>Management</option>
             <option value="operations" <%= isEdit && editUser.role === 'operations' ? 'selected' : '' %>>Operations</option>
             <option value="planning" <%= isEdit && editUser.role === 'planning' ? 'selected' : '' %>>Planning</option>
@@ -60,7 +60,7 @@
         <!-- Active -->
         <div class="flex items-center">
           <input type="hidden" name="active" value="0">
-          <input type="checkbox" id="active" name="active" value="1" <%= (!isEdit || editUser.active) ? 'checked' : '' %> class="w-4 h-4 bg-slate-700 border-slate-600 rounded text-amber-500 focus:ring-amber-500 focus:ring-offset-0 focus:ring-2">
+          <input type="checkbox" id="active" name="active" value="1" <%= (!isEdit || editUser.active) ? 'checked' : '' %> class="w-4 h-4 bg-slate-700 border-slate-600 rounded text-brand-500 focus:ring-brand-500 focus:ring-offset-0 focus:ring-2">
           <label for="active" class="ml-2 text-sm font-medium text-slate-300">Active</label>
         </div>
       </div>
@@ -68,7 +68,7 @@
       <!-- Buttons -->
       <div class="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-slate-700">
         <a href="/admin/users" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition font-medium">Cancel</a>
-        <button type="submit" class="px-6 py-2 bg-amber-500 text-slate-900 rounded-lg hover:bg-amber-400 transition font-semibold">
+        <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold">
           <%= isEdit ? 'Update User' : 'Create User' %>
         </button>
       </div>

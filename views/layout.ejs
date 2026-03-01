@@ -5,6 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= typeof title !== 'undefined' ? title + ' | ' : '' %>T&S Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eeeeff',
+              100: '#d4d4ff',
+              200: '#a8a8ff',
+              300: '#7b7bff',
+              400: '#5555ee',
+              500: '#3333cc',
+              600: '#2020a0',
+              700: '#1a0a78',
+              800: '#120854',
+              900: '#0a0538',
+              950: '#050220',
+            }
+          }
+        }
+      }
+    }
+  </script>
   <link rel="stylesheet" href="/css/custom.css">
 </head>
 <body class="h-full bg-slate-900 text-slate-100">

@@ -4,7 +4,7 @@
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-white">Project Updates</h1>
-    <a href="/updates/new" class="inline-flex items-center px-4 py-2 bg-amber-500 text-slate-900 font-semibold rounded-lg hover:bg-amber-400 transition">
+    <a href="/updates/new" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition">
       <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
       Submit Update
     </a>
@@ -15,7 +15,7 @@
     <div class="flex items-end gap-4">
       <div class="flex-1">
         <label class="block text-sm font-medium text-slate-400 mb-1">Job</label>
-        <select name="job_id" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <select name="job_id" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Jobs</option>
           <% jobs.forEach(function(job) { %>
             <option value="<%= job.id %>" <%= filters.job_id == job.id ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
@@ -41,7 +41,7 @@
           <div class="flex items-start justify-between mb-2">
             <div>
               <div class="flex items-center space-x-2 mb-1">
-                <span class="text-amber-400 font-semibold"><%= update.job_number %></span>
+                <span class="text-brand-400 font-semibold"><%= update.job_number %></span>
                 <span class="text-slate-500">-</span>
                 <span class="text-white font-medium"><%= update.client %></span>
               </div>

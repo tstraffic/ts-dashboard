@@ -21,7 +21,7 @@
           pattern="J-\d{5}" title="Format: J-NNNNN (e.g. J-00123)"
           placeholder="J-00123"
           value="<%= isEdit ? job.job_number : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <p class="text-xs text-slate-500 mt-1">Format: J-NNNNN</p>
       </div>
       <!-- Client -->
@@ -30,7 +30,7 @@
         <input type="text" id="client" name="client" required
           value="<%= isEdit ? job.client : '' %>"
           placeholder="Client name"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
   </div>
@@ -45,7 +45,7 @@
         <input type="text" id="site_address" name="site_address"
           value="<%= isEdit && job.site_address ? job.site_address : '' %>"
           placeholder="Full site address"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Suburb -->
       <div>
@@ -53,7 +53,7 @@
         <input type="text" id="suburb" name="suburb"
           value="<%= isEdit && job.suburb ? job.suburb : '' %>"
           placeholder="Suburb"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
   </div>
@@ -66,7 +66,7 @@
       <div>
         <label for="status" class="block text-sm font-medium text-slate-300 mb-1">Status</label>
         <select id="status" name="status"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="lead" <%= isEdit && job.status === 'lead' ? 'selected' : '' %>>Lead</option>
           <option value="won" <%= isEdit && job.status === 'won' ? 'selected' : '' %>>Won</option>
           <option value="active" <%= isEdit && job.status === 'active' ? 'selected' : '' %>>Active</option>
@@ -79,7 +79,7 @@
       <div>
         <label for="stage" class="block text-sm font-medium text-slate-300 mb-1">Stage</label>
         <select id="stage" name="stage"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="pre_construction" <%= isEdit && job.stage === 'pre_construction' ? 'selected' : '' %>>Pre-Construction</option>
           <option value="mobilisation" <%= isEdit && job.stage === 'mobilisation' ? 'selected' : '' %>>Mobilisation</option>
           <option value="in_progress" <%= isEdit && job.stage === 'in_progress' ? 'selected' : '' %>>In Progress</option>
@@ -92,7 +92,7 @@
       <div>
         <label for="health" class="block text-sm font-medium text-slate-300 mb-1">Health</label>
         <select id="health" name="health"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="green" <%= isEdit && job.health === 'green' ? 'selected' : '' %>>Green</option>
           <option value="amber" <%= isEdit && job.health === 'amber' ? 'selected' : '' %>>Amber</option>
           <option value="red" <%= isEdit && job.health === 'red' ? 'selected' : '' %>>Red</option>
@@ -110,21 +110,21 @@
         <label for="start_date" class="block text-sm font-medium text-slate-300 mb-1">Start Date <span class="text-red-400">*</span></label>
         <input type="date" id="start_date" name="start_date" required
           value="<%= isEdit && job.start_date ? job.start_date : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- End Date -->
       <div>
         <label for="end_date" class="block text-sm font-medium text-slate-300 mb-1">End Date</label>
         <input type="date" id="end_date" name="end_date"
           value="<%= isEdit && job.end_date ? job.end_date : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- % Complete -->
       <div>
         <label for="percent_complete" class="block text-sm font-medium text-slate-300 mb-1">% Complete</label>
         <input type="number" id="percent_complete" name="percent_complete" min="0" max="100"
           value="<%= isEdit ? (job.percent_complete || 0) : 0 %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
   </div>
@@ -137,7 +137,7 @@
       <div>
         <label for="pm_id" class="block text-sm font-medium text-slate-300 mb-1">Project Manager</label>
         <select id="pm_id" name="pm_id"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select --</option>
           <% users.forEach(u => { %>
             <option value="<%= u.id %>" <%= isEdit && job.pm_id == u.id ? 'selected' : '' %>><%= u.full_name %> (<%= u.role %>)</option>
@@ -148,7 +148,7 @@
       <div>
         <label for="ops_id" class="block text-sm font-medium text-slate-300 mb-1">Ops Supervisor</label>
         <select id="ops_id" name="ops_id"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select --</option>
           <% users.forEach(u => { %>
             <option value="<%= u.id %>" <%= isEdit && job.ops_id == u.id ? 'selected' : '' %>><%= u.full_name %> (<%= u.role %>)</option>
@@ -159,7 +159,7 @@
       <div>
         <label for="planning_id" class="block text-sm font-medium text-slate-300 mb-1">Planning Owner</label>
         <select id="planning_id" name="planning_id"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select --</option>
           <% users.forEach(u => { %>
             <option value="<%= u.id %>" <%= isEdit && job.planning_id == u.id ? 'selected' : '' %>><%= u.full_name %> (<%= u.role %>)</option>
@@ -170,7 +170,7 @@
       <div>
         <label for="marketing_id" class="block text-sm font-medium text-slate-300 mb-1">Marketing Owner</label>
         <select id="marketing_id" name="marketing_id"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select --</option>
           <% users.forEach(u => { %>
             <option value="<%= u.id %>" <%= isEdit && job.marketing_id == u.id ? 'selected' : '' %>><%= u.full_name %> (<%= u.role %>)</option>
@@ -181,7 +181,7 @@
       <div>
         <label for="accounts_id" class="block text-sm font-medium text-slate-300 mb-1">Accounts Owner</label>
         <select id="accounts_id" name="accounts_id"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select --</option>
           <% users.forEach(u => { %>
             <option value="<%= u.id %>" <%= isEdit && job.accounts_id == u.id ? 'selected' : '' %>><%= u.full_name %> (<%= u.role %>)</option>
@@ -192,7 +192,7 @@
       <div>
         <label for="accounts_status" class="block text-sm font-medium text-slate-300 mb-1">Accounts Status</label>
         <select id="accounts_status" name="accounts_status"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="na" <%= isEdit && job.accounts_status === 'na' ? 'selected' : '' %>>N/A</option>
           <option value="on_track" <%= isEdit && job.accounts_status === 'on_track' ? 'selected' : '' %>>On Track</option>
           <option value="overdue" <%= isEdit && job.accounts_status === 'overdue' ? 'selected' : '' %>>Overdue</option>
@@ -209,13 +209,13 @@
       <label for="notes" class="block text-sm font-medium text-slate-300 mb-1">Notes</label>
       <textarea id="notes" name="notes" rows="4"
         placeholder="Additional notes about this job..."
-        class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-y"><%= isEdit && job.notes ? job.notes : '' %></textarea>
+        class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && job.notes ? job.notes : '' %></textarea>
     </div>
   </div>
 
   <!-- Actions -->
   <div class="flex items-center gap-3">
-    <button type="submit" class="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold rounded-lg transition-colors">
+    <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
       <%= isEdit ? 'Update Job' : 'Create Job' %>
     </button>
     <a href="/jobs" class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Cancel</a>

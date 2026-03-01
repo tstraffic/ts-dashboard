@@ -17,7 +17,7 @@
       <div>
         <label for="job_id" class="block text-sm font-medium text-slate-300 mb-1">Job <span class="text-red-400">*</span></label>
         <select id="job_id" name="job_id" required
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select Job --</option>
           <% jobs.forEach(j => { %>
             <option value="<%= j.id %>" <%= preselectedJobId == j.id ? 'selected' : '' %>><%= j.job_number %> - <%= j.client %></option>
@@ -29,13 +29,13 @@
         <label for="work_date" class="block text-sm font-medium text-slate-300 mb-1">Work Date <span class="text-red-400">*</span></label>
         <input type="date" id="work_date" name="work_date" required
           value="<%= new Date().toISOString().split('T')[0] %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Shift Type -->
       <div>
         <label for="shift_type" class="block text-sm font-medium text-slate-300 mb-1">Shift Type</label>
         <select id="shift_type" name="shift_type"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="day">Day</option>
           <option value="night">Night</option>
           <option value="split">Split</option>
@@ -48,7 +48,7 @@
   <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide">Crew Entries</h2>
-      <button type="button" id="addEntryBtn" class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-medium rounded-lg transition-colors border border-amber-500/30">
+      <button type="button" id="addEntryBtn" class="px-3 py-1.5 bg-brand-600/20 hover:bg-brand-600/30 text-brand-400 text-xs font-medium rounded-lg transition-colors border border-brand-500/30">
         + Add Another Crew Member
       </button>
     </div>
@@ -65,7 +65,7 @@
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-1">Crew Member <span class="text-red-400">*</span></label>
             <select name="entries[0][crew_member_id]" required
-              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
               <option value="">-- Select --</option>
               <% crew.forEach(c => { %>
                 <option value="<%= c.id %>"><%= c.full_name %> (<%= c.role.replace('_', ' ') %>)</option>
@@ -76,31 +76,31 @@
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-1">Start Time <span class="text-red-400">*</span></label>
             <input type="time" name="entries[0][start_time]" required value="06:00"
-              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           </div>
           <!-- End Time -->
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-1">End Time <span class="text-red-400">*</span></label>
             <input type="time" name="entries[0][end_time]" required value="14:30"
-              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           </div>
           <!-- Break -->
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-1">Break (minutes)</label>
             <input type="number" name="entries[0][break_minutes]" value="30" min="0" max="120"
-              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           </div>
           <!-- Role on Site -->
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-1">Role on Site</label>
             <input type="text" name="entries[0][role_on_site]" placeholder="e.g. TC, Leading Hand"
-              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           </div>
           <!-- Notes -->
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-1">Notes</label>
             <input type="text" name="entries[0][notes]" placeholder="Optional notes"
-              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           </div>
         </div>
       </div>
@@ -109,7 +109,7 @@
 
   <!-- Actions -->
   <div class="flex items-center gap-3">
-    <button type="submit" class="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold rounded-lg transition-colors">
+    <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
       Submit Timesheet
     </button>
     <a href="/timesheets" class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Cancel</a>
@@ -137,34 +137,34 @@
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1">Crew Member <span class="text-red-400">*</span></label>
           <select name="entries[${entryIndex}][crew_member_id]" required
-            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
             ${crewOptions}
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1">Start Time <span class="text-red-400">*</span></label>
           <input type="time" name="entries[${entryIndex}][start_time]" required value="06:00"
-            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1">End Time <span class="text-red-400">*</span></label>
           <input type="time" name="entries[${entryIndex}][end_time]" required value="14:30"
-            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1">Break (minutes)</label>
           <input type="number" name="entries[${entryIndex}][break_minutes]" value="30" min="0" max="120"
-            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1">Role on Site</label>
           <input type="text" name="entries[${entryIndex}][role_on_site]" placeholder="e.g. TC, Leading Hand"
-            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1">Notes</label>
           <input type="text" name="entries[${entryIndex}][notes]" placeholder="Optional notes"
-            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         </div>
       </div>
     `;

@@ -76,7 +76,7 @@
         <td class="px-4 py-3">
           <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
             <% if (b.status === 'active') { %>bg-blue-900/60 text-blue-300
-            <% } else if (b.status === 'on_hold') { %>bg-amber-900/60 text-amber-300
+            <% } else if (b.status === 'on_hold') { %>bg-orange-900/60 text-brand-300
             <% } else if (b.status === 'completed') { %>bg-emerald-900/60 text-emerald-300
             <% } else if (b.status === 'won') { %>bg-teal-900/60 text-teal-300
             <% } else { %>bg-slate-700 text-slate-300<% } %>">
@@ -90,7 +90,7 @@
         <td class="px-4 py-3 text-right">
           <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
             <% if (marginPct > 20) { %>bg-emerald-900/60 text-emerald-300
-            <% } else if (marginPct >= 0) { %>bg-amber-900/60 text-amber-300
+            <% } else if (marginPct >= 0) { %>bg-orange-900/60 text-brand-300
             <% } else { %>bg-red-900/60 text-red-300
             <% } %>">
             <%= marginPct.toFixed(1) %>%

@@ -20,7 +20,7 @@
         <input type="text" id="full_name" name="full_name" required
           value="<%= isEdit ? member.full_name : '' %>"
           placeholder="Full name"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Employee ID -->
       <div>
@@ -28,13 +28,13 @@
         <input type="text" id="employee_id" name="employee_id"
           value="<%= isEdit && member.employee_id ? member.employee_id : '' %>"
           placeholder="e.g. EMP-001"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Role -->
       <div>
         <label for="role" class="block text-sm font-medium text-slate-300 mb-1">Role <span class="text-red-400">*</span></label>
         <select id="role" name="role" required
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="traffic_controller" <%= isEdit && member.role === 'traffic_controller' ? 'selected' : '' %>>Traffic Controller</option>
           <option value="leading_hand" <%= isEdit && member.role === 'leading_hand' ? 'selected' : '' %>>Leading Hand</option>
           <option value="supervisor" <%= isEdit && member.role === 'supervisor' ? 'selected' : '' %>>Supervisor</option>
@@ -50,7 +50,7 @@
         <input type="number" id="hourly_rate" name="hourly_rate" min="0" step="0.01"
           value="<%= isEdit ? (member.hourly_rate || 0) : '' %>"
           placeholder="0.00"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
   </div>
@@ -65,7 +65,7 @@
         <input type="tel" id="phone" name="phone"
           value="<%= isEdit && member.phone ? member.phone : '' %>"
           placeholder="04XX XXX XXX"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Email -->
       <div>
@@ -73,7 +73,7 @@
         <input type="email" id="email" name="email"
           value="<%= isEdit && member.email ? member.email : '' %>"
           placeholder="email@example.com"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
   </div>
@@ -88,21 +88,21 @@
         <input type="text" id="licence_type" name="licence_type"
           value="<%= isEdit && member.licence_type ? member.licence_type : '' %>"
           placeholder="e.g. White Card, TC Licence"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Licence Expiry -->
       <div>
         <label for="licence_expiry" class="block text-sm font-medium text-slate-300 mb-1">Licence Expiry</label>
         <input type="date" id="licence_expiry" name="licence_expiry"
           value="<%= isEdit && member.licence_expiry ? member.licence_expiry : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Induction Date -->
       <div>
         <label for="induction_date" class="block text-sm font-medium text-slate-300 mb-1">Induction Date</label>
         <input type="date" id="induction_date" name="induction_date"
           value="<%= isEdit && member.induction_date ? member.induction_date : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
   </div>
@@ -114,7 +114,7 @@
     <div class="flex items-center gap-3">
       <label class="relative inline-flex items-center cursor-pointer">
         <input type="checkbox" name="active" value="1" <%= member.active ? 'checked' : '' %> class="sr-only peer">
-        <div class="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+        <div class="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
       </label>
       <span class="text-sm font-medium text-slate-300">Active</span>
     </div>
@@ -124,7 +124,7 @@
 
   <!-- Actions -->
   <div class="flex items-center gap-3">
-    <button type="submit" class="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold rounded-lg transition-colors">
+    <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
       <%= isEdit ? 'Update Crew Member' : 'Add Crew Member' %>
     </button>
     <a href="/timesheets/crew" class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Cancel</a>

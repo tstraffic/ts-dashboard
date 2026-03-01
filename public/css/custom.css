@@ -1,5 +1,12 @@
 /* T&S Dashboard Custom Styles */
 
+/* Brand Colors */
+:root {
+  --brand-700: #1a0a78;
+  --brand-600: #2020a0;
+  --brand-500: #3333cc;
+}
+
 /* Hover row highlight for tables */
 .hover\:bg-slate-750:hover {
   background-color: rgb(40, 45, 58);
@@ -16,14 +23,14 @@ a, button, input, select, textarea {
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: rgb(30, 41, 59);
+  background: rgb(15, 15, 30);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgb(71, 85, 105);
+  background: #1a0a78;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(100, 116, 139);
+  background: #2020a0;
 }
 
 /* Line clamp for text truncation */
@@ -49,4 +56,9 @@ a, button, input, select, textarea {
     left: 0;
     bottom: 0;
   }
+}
+
+/* Active sidebar link left border */
+.border-l-2 {
+  border-left-width: 2px;
 }

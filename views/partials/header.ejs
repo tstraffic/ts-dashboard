@@ -1,9 +1,9 @@
-<nav class="bg-slate-900 border-b border-slate-700">
+<nav class="bg-gray-950 border-b border-brand-700/30">
   <div class="max-w-7xl mx-auto px-4 sm:px-6">
     <div class="flex items-center justify-between h-16">
-      <div class="flex items-center space-x-4">
-        <a href="/dashboard" class="flex items-center space-x-2">
-          <div class="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-slate-900 text-sm">T&S</div>
+      <div class="flex items-center space-x-3">
+        <a href="/dashboard" class="flex items-center space-x-3">
+          <img src="/images/logo.jpg" alt="T&S" class="h-10 w-auto rounded">
           <span class="text-white font-semibold text-lg hidden sm:inline">Project Dashboard</span>
         </a>
       </div>
@@ -12,16 +12,16 @@
           <a href="/notifications" class="relative text-slate-400 hover:text-white transition-colors" title="Notifications">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
             <% if (typeof unreadNotifications !== 'undefined' && unreadNotifications > 0) { %>
-              <span class="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-slate-900 text-[10px] font-bold rounded-full flex items-center justify-center"><%= unreadNotifications > 9 ? '9+' : unreadNotifications %></span>
+              <span class="absolute -top-1 -right-1 w-4 h-4 bg-brand-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"><%= unreadNotifications > 9 ? '9+' : unreadNotifications %></span>
             <% } %>
           </a>
           <span class="text-slate-400 text-sm hidden md:inline"><%= user.full_name %></span>
           <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
             <% if (user.role === 'management') { %>bg-purple-900 text-purple-200
-            <% } else if (user.role === 'operations') { %>bg-blue-900 text-blue-200
+            <% } else if (user.role === 'operations') { %>bg-brand-700/60 text-brand-200
             <% } else if (user.role === 'planning') { %>bg-teal-900 text-teal-200
             <% } else if (user.role === 'marketing') { %>bg-pink-900 text-pink-200
-            <% } else if (user.role === 'accounts') { %>bg-amber-900 text-amber-200
+            <% } else if (user.role === 'accounts') { %>bg-brand-800/60 text-brand-300
             <% } %>">
             <%= user.role.charAt(0).toUpperCase() + user.role.slice(1) %>
           </span>
