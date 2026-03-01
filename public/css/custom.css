@@ -1,0 +1,52 @@
+/* T&S Dashboard Custom Styles */
+
+/* Hover row highlight for tables */
+.hover\:bg-slate-750:hover {
+  background-color: rgb(40, 45, 58);
+}
+
+/* Smooth transitions */
+a, button, input, select, textarea {
+  transition: all 0.15s ease;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgb(30, 41, 59);
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(71, 85, 105);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(100, 116, 139);
+}
+
+/* Line clamp for text truncation */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Progress bar animation */
+.progress-bar {
+  transition: width 0.5s ease;
+}
+
+/* Mobile sidebar toggle */
+@media (max-width: 1023px) {
+  .sidebar-open aside {
+    display: block;
+    position: fixed;
+    z-index: 50;
+    top: 64px;
+    left: 0;
+    bottom: 0;
+  }
+}

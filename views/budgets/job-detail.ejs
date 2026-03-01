@@ -1,0 +1,278 @@
+<% locals.currentPage = 'budgets' %>
+
+<%
+  function fmtCurrency(val) {
+    const n = Number(val) || 0;
+    return '$' + n.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  const remaining = totalBudget - totalSpent;
+  const categories = [
+    { key: 'labour', label: 'Labour' },
+    { key: 'materials', label: 'Materials' },
+    { key: 'subcontractors', label: 'Subcontractors' },
+    { key: 'equipment', label: 'Equipment' },
+    { key: 'other', label: 'Other' }
+  ];
+%>
+
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div class="flex items-center gap-3 flex-wrap">
+    <a href="/budgets" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <h1 class="text-2xl font-bold text-white"><%= job.job_number %></h1>
+    <span class="text-lg text-slate-400">&mdash;</span>
+    <span class="text-lg text-slate-300"><%= job.client %></span>
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+      <% if (job.status === 'active') { %>bg-blue-900/60 text-blue-300
+      <% } else if (job.status === 'on_hold') { %>bg-amber-900/60 text-amber-300
+      <% } else if (job.status === 'completed') { %>bg-emerald-900/60 text-emerald-300
+      <% } else if (job.status === 'won') { %>bg-teal-900/60 text-teal-300
+      <% } else { %>bg-slate-700 text-slate-300<% } %>">
+      <%= job.status ? job.status.replace('_', ' ') : '-' %>
+    </span>
+  </div>
+  <a href="/budgets" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Back to Budgets</a>
+</div>
+
+<!-- Summary Row -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+    <p class="text-xs font-medium text-slate-400 uppercase tracking-wide">Contract Value</p>
+    <p class="text-xl font-bold text-white mt-2"><%= fmtCurrency(budget.contract_value) %></p>
+    <% if (budget.variations_approved > 0) { %>
+      <p class="text-xs text-amber-400 mt-1">+<%= fmtCurrency(budget.variations_approved) %> variations</p>
+    <% } %>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+    <p class="text-xs font-medium text-slate-400 uppercase tracking-wide">Total Budget</p>
+    <p class="text-xl font-bold text-white mt-2"><%= fmtCurrency(totalBudget) %></p>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+    <p class="text-xs font-medium text-slate-400 uppercase tracking-wide">Total Spent</p>
+    <p class="text-xl font-bold mt-2 <%= totalSpent > totalBudget ? 'text-red-400' : 'text-amber-400' %>"><%= fmtCurrency(totalSpent) %></p>
+    <% if (totalBudget > 0) { %>
+      <div class="w-full bg-slate-700 rounded-full h-1.5 mt-2">
+        <div class="h-1.5 rounded-full <%= totalSpent > totalBudget ? 'bg-red-500' : 'bg-amber-500' %>" style="width: <%= Math.min((totalSpent / totalBudget) * 100, 100) %>%"></div>
+      </div>
+      <p class="text-xs text-slate-500 mt-1"><%= ((totalSpent / totalBudget) * 100).toFixed(1) %>% used</p>
+    <% } %>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+    <p class="text-xs font-medium text-slate-400 uppercase tracking-wide">Remaining</p>
+    <p class="text-xl font-bold mt-2 <%= remaining < 0 ? 'text-red-400' : 'text-emerald-400' %>"><%= fmtCurrency(remaining) %></p>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+    <p class="text-xs font-medium text-slate-400 uppercase tracking-wide">Margin</p>
+    <p class="text-xl font-bold mt-2
+      <% if (parseFloat(margin) > 20) { %>text-emerald-400
+      <% } else if (parseFloat(margin) >= 0) { %>text-amber-400
+      <% } else { %>text-red-400
+      <% } %>"><%= margin %>%</p>
+  </div>
+</div>
+
+<!-- Budget Breakdown Form -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6">
+  <h2 class="text-lg font-semibold text-white mb-4">Budget Breakdown</h2>
+  <form method="POST" action="/budgets/job/<%= job.id %>">
+    <!-- Contract Value & Variations -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div>
+        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Contract Value ($)</label>
+        <input type="number" step="0.01" name="contract_value" value="<%= budget.contract_value || 0 %>"
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Variations Approved ($)</label>
+        <input type="number" step="0.01" name="variations_approved" value="<%= budget.variations_approved || 0 %>"
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+      </div>
+    </div>
+
+    <!-- Category Breakdown Table -->
+    <div class="overflow-x-auto mb-4">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Category</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wide">Budget ($)</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wide">Spent</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wide">Remaining</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wide">% Used</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+          <% categories.forEach(cat => {
+            const budgetAmt = budget['budget_' + cat.key] || 0;
+            const spentAmt = spentByCategory[cat.key] || 0;
+            const remainAmt = budgetAmt - spentAmt;
+            const pctUsed = budgetAmt > 0 ? (spentAmt / budgetAmt * 100) : 0;
+          %>
+          <tr class="hover:bg-slate-700/30">
+            <td class="px-4 py-3 text-slate-300 font-medium capitalize"><%= cat.label %></td>
+            <td class="px-4 py-3 text-right">
+              <input type="number" step="0.01" name="budget_<%= cat.key %>" value="<%= budgetAmt %>"
+                class="w-32 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            </td>
+            <td class="px-4 py-3 text-right font-mono text-xs <%= spentAmt > budgetAmt && budgetAmt > 0 ? 'text-red-400' : 'text-slate-300' %>"><%= fmtCurrency(spentAmt) %></td>
+            <td class="px-4 py-3 text-right font-mono text-xs <%= remainAmt < 0 ? 'text-red-400' : 'text-emerald-400' %>"><%= fmtCurrency(remainAmt) %></td>
+            <td class="px-4 py-3 text-right">
+              <% if (budgetAmt > 0) { %>
+                <div class="flex items-center justify-end gap-2">
+                  <div class="w-16 bg-slate-700 rounded-full h-1.5">
+                    <div class="h-1.5 rounded-full <%= pctUsed > 100 ? 'bg-red-500' : pctUsed > 80 ? 'bg-amber-500' : 'bg-emerald-500' %>" style="width: <%= Math.min(pctUsed, 100) %>%"></div>
+                  </div>
+                  <span class="text-xs text-slate-400 w-12 text-right"><%= pctUsed.toFixed(0) %>%</span>
+                </div>
+              <% } else { %>
+                <span class="text-xs text-slate-600">-</span>
+              <% } %>
+            </td>
+          </tr>
+          <% }) %>
+          <!-- Totals Row -->
+          <tr class="border-t-2 border-slate-600 bg-slate-700/30">
+            <td class="px-4 py-3 text-white font-semibold">Total</td>
+            <td class="px-4 py-3 text-right font-mono text-sm text-white font-semibold"><%= fmtCurrency(totalBudget) %></td>
+            <td class="px-4 py-3 text-right font-mono text-sm text-white font-semibold"><%= fmtCurrency(totalSpent) %></td>
+            <td class="px-4 py-3 text-right font-mono text-sm font-semibold <%= remaining < 0 ? 'text-red-400' : 'text-emerald-400' %>"><%= fmtCurrency(remaining) %></td>
+            <td class="px-4 py-3 text-right">
+              <% if (totalBudget > 0) { %>
+                <span class="text-xs font-semibold text-slate-300"><%= ((totalSpent / totalBudget) * 100).toFixed(0) %>%</span>
+              <% } %>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Notes -->
+    <div class="mb-4">
+      <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Notes</label>
+      <textarea name="notes" rows="3" placeholder="Budget notes, assumptions, exclusions..."
+        class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"><%= budget.notes || '' %></textarea>
+    </div>
+
+    <div class="flex justify-end">
+      <button type="submit" class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">Save Budget</button>
+    </div>
+  </form>
+</div>
+
+<!-- Cost Entries Section -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+  <h2 class="text-lg font-semibold text-white mb-4">Cost Entries</h2>
+
+  <!-- Add Cost Entry Form -->
+  <form method="POST" action="/budgets/job/<%= job.id %>/costs" class="mb-6">
+    <div class="bg-slate-700/30 border border-slate-600 rounded-lg p-4">
+      <h3 class="text-sm font-medium text-slate-300 mb-3">Add Cost Entry</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Category</label>
+          <select name="category" required
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            <option value="">Select category...</option>
+            <option value="labour">Labour</option>
+            <option value="materials">Materials</option>
+            <option value="subcontractors">Subcontractors</option>
+            <option value="equipment">Equipment</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Description</label>
+          <input type="text" name="description" required placeholder="What was this cost for?"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Amount ($)</label>
+          <input type="number" step="0.01" name="amount" required placeholder="0.00"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Date</label>
+          <input type="date" name="entry_date" required
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Invoice Ref</label>
+          <input type="text" name="invoice_ref" placeholder="INV-XXXX"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Supplier</label>
+          <input type="text" name="supplier" placeholder="Supplier name"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+      </div>
+      <div class="flex justify-end mt-3">
+        <button type="submit" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">+ Add Entry</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- Cost Entries Table -->
+  <% if (costEntries.length === 0) { %>
+    <div class="border border-slate-700 rounded-lg p-8 text-center">
+      <svg class="w-12 h-12 mx-auto text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+      <p class="text-slate-500 text-sm">No cost entries recorded yet.</p>
+      <p class="text-slate-600 text-xs mt-1">Use the form above to add the first cost entry for this job.</p>
+    </div>
+  <% } else { %>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-700">
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Date</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Category</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Description</th>
+          <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wide">Amount</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Invoice Ref</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Supplier</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Entered By</th>
+          <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wide">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-700">
+        <% costEntries.forEach(entry => { %>
+        <tr class="hover:bg-slate-700/50">
+          <td class="px-4 py-3 text-slate-400 text-xs whitespace-nowrap"><%= entry.entry_date %></td>
+          <td class="px-4 py-3">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+              <% if (entry.category === 'labour') { %>bg-blue-900/60 text-blue-300
+              <% } else if (entry.category === 'materials') { %>bg-purple-900/60 text-purple-300
+              <% } else if (entry.category === 'subcontractors') { %>bg-teal-900/60 text-teal-300
+              <% } else if (entry.category === 'equipment') { %>bg-amber-900/60 text-amber-300
+              <% } else { %>bg-slate-700 text-slate-300
+              <% } %>">
+              <%= entry.category %>
+            </span>
+          </td>
+          <td class="px-4 py-3 text-slate-300 max-w-xs truncate"><%= entry.description %></td>
+          <td class="px-4 py-3 text-right font-mono text-xs text-white font-medium"><%= fmtCurrency(entry.amount) %></td>
+          <td class="px-4 py-3 text-slate-400 text-xs"><%= entry.invoice_ref || '-' %></td>
+          <td class="px-4 py-3 text-slate-400 text-xs"><%= entry.supplier || '-' %></td>
+          <td class="px-4 py-3 text-slate-400 text-xs"><%= entry.entered_by_name %></td>
+          <td class="px-4 py-3 text-center">
+            <form method="POST" action="/budgets/job/<%= job.id %>/costs/<%= entry.id %>/delete" class="inline" onsubmit="return confirm('Delete this cost entry?');">
+              <button type="submit" class="text-red-400 hover:text-red-300 text-xs font-medium transition-colors">Delete</button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+      <!-- Table Footer Totals -->
+      <tfoot>
+        <tr class="border-t-2 border-slate-600 bg-slate-700/30">
+          <td class="px-4 py-3 text-white font-semibold" colspan="3">Total (<%= costEntries.length %> entr<%= costEntries.length !== 1 ? 'ies' : 'y' %>)</td>
+          <td class="px-4 py-3 text-right font-mono text-sm text-white font-semibold"><%= fmtCurrency(totalSpent) %></td>
+          <td colspan="4"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <% } %>
+</div>

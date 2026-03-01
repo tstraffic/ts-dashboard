@@ -1,0 +1,138 @@
+<% locals.currentPage = 'incidents' %>
+
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-white">Safety & Incidents</h1>
+    <p class="text-slate-400 text-sm mt-1">Track and manage all safety incidents and reports</p>
+  </div>
+  <a href="/incidents/new" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">+ Report Incident</a>
+</div>
+
+<!-- Filter Bar -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-6">
+  <form method="GET" action="/incidents" class="flex flex-wrap items-end gap-4">
+    <!-- Job -->
+    <div class="min-w-[200px] flex-1">
+      <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Job</label>
+      <select name="job_id" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        <option value="">All Jobs</option>
+        <% jobs.forEach(j => { %>
+          <option value="<%= j.id %>" <%= filters.job_id == j.id ? 'selected' : '' %>><%= j.job_number %> - <%= j.client %></option>
+        <% }) %>
+      </select>
+    </div>
+    <!-- Incident Type -->
+    <div class="min-w-[160px]">
+      <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Type</label>
+      <select name="incident_type" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        <option value="">All Types</option>
+        <option value="injury" <%= filters.incident_type === 'injury' ? 'selected' : '' %>>Injury</option>
+        <option value="near_miss" <%= filters.incident_type === 'near_miss' ? 'selected' : '' %>>Near Miss</option>
+        <option value="hazard" <%= filters.incident_type === 'hazard' ? 'selected' : '' %>>Hazard</option>
+        <option value="property_damage" <%= filters.incident_type === 'property_damage' ? 'selected' : '' %>>Property Damage</option>
+        <option value="environmental" <%= filters.incident_type === 'environmental' ? 'selected' : '' %>>Environmental</option>
+        <option value="vehicle" <%= filters.incident_type === 'vehicle' ? 'selected' : '' %>>Vehicle</option>
+        <option value="other" <%= filters.incident_type === 'other' ? 'selected' : '' %>>Other</option>
+      </select>
+    </div>
+    <!-- Severity -->
+    <div class="min-w-[140px]">
+      <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Severity</label>
+      <select name="severity" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        <option value="">All Severities</option>
+        <option value="low" <%= filters.severity === 'low' ? 'selected' : '' %>>Low</option>
+        <option value="medium" <%= filters.severity === 'medium' ? 'selected' : '' %>>Medium</option>
+        <option value="high" <%= filters.severity === 'high' ? 'selected' : '' %>>High</option>
+        <option value="critical" <%= filters.severity === 'critical' ? 'selected' : '' %>>Critical</option>
+      </select>
+    </div>
+    <!-- Status -->
+    <div class="min-w-[160px]">
+      <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Status</label>
+      <select name="status" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        <option value="">All Statuses</option>
+        <option value="reported" <%= filters.status === 'reported' ? 'selected' : '' %>>Reported</option>
+        <option value="investigating" <%= filters.status === 'investigating' ? 'selected' : '' %>>Investigating</option>
+        <option value="resolved" <%= filters.status === 'resolved' ? 'selected' : '' %>>Resolved</option>
+        <option value="closed" <%= filters.status === 'closed' ? 'selected' : '' %>>Closed</option>
+      </select>
+    </div>
+    <!-- Buttons -->
+    <div class="flex gap-2">
+      <button type="submit" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">Filter</button>
+      <a href="/incidents" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Clear</a>
+    </div>
+  </form>
+</div>
+
+<!-- Incidents Table -->
+<% if (incidents.length === 0) { %>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 text-center">
+    <svg class="w-12 h-12 text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+    <p class="text-slate-500 text-sm">No incidents found matching your filters.</p>
+    <a href="/incidents/new" class="text-amber-400 text-sm hover:underline mt-2 inline-block">Report the first incident</a>
+  </div>
+<% } else { %>
+<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-slate-700">
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Incident #</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Date</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Type</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Severity</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Title</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Job</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Reported By</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-700">
+      <% incidents.forEach(incident => { %>
+      <tr class="hover:bg-slate-700/50 cursor-pointer" onclick="window.location='/incidents/<%= incident.id %>'">
+        <td class="px-4 py-3 font-medium">
+          <a href="/incidents/<%= incident.id %>" class="text-blue-400 hover:text-blue-300 hover:underline"><%= incident.incident_number %></a>
+        </td>
+        <td class="px-4 py-3 text-slate-400 text-xs"><%= incident.incident_date || '-' %></td>
+        <td class="px-4 py-3">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+            <% if (incident.incident_type === 'injury') { %>bg-red-900/60 text-red-300
+            <% } else if (incident.incident_type === 'near_miss') { %>bg-amber-900/60 text-amber-300
+            <% } else if (incident.incident_type === 'hazard') { %>bg-yellow-900/60 text-yellow-300
+            <% } else if (incident.incident_type === 'property_damage') { %>bg-orange-900/60 text-orange-300
+            <% } else if (incident.incident_type === 'environmental') { %>bg-emerald-900/60 text-emerald-300
+            <% } else if (incident.incident_type === 'vehicle') { %>bg-blue-900/60 text-blue-300
+            <% } else { %>bg-slate-700 text-slate-300<% } %>">
+            <%= incident.incident_type ? incident.incident_type.replace(/_/g, ' ') : '-' %>
+          </span>
+        </td>
+        <td class="px-4 py-3">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+            <% if (incident.severity === 'critical') { %>bg-red-900/60 text-red-300
+            <% } else if (incident.severity === 'high') { %>bg-amber-900/60 text-amber-300
+            <% } else if (incident.severity === 'medium') { %>bg-blue-900/60 text-blue-300
+            <% } else { %>bg-slate-700 text-slate-300<% } %>">
+            <%= incident.severity || 'low' %>
+          </span>
+        </td>
+        <td class="px-4 py-3 text-slate-300 font-medium max-w-[200px] truncate"><%= incident.title %></td>
+        <td class="px-4 py-3 text-slate-400 text-xs"><%= incident.job_number %></td>
+        <td class="px-4 py-3 text-slate-300"><%= incident.reported_by_name %></td>
+        <td class="px-4 py-3">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+            <% if (incident.investigation_status === 'reported') { %>bg-slate-700 text-slate-300
+            <% } else if (incident.investigation_status === 'investigating') { %>bg-blue-900/60 text-blue-300
+            <% } else if (incident.investigation_status === 'resolved') { %>bg-emerald-900/60 text-emerald-300
+            <% } else if (incident.investigation_status === 'closed') { %>bg-purple-900/60 text-purple-300
+            <% } else { %>bg-slate-700 text-slate-300<% } %>">
+            <%= incident.investigation_status ? incident.investigation_status.replace(/_/g, ' ') : 'reported' %>
+          </span>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<div class="mt-3 text-xs text-slate-500"><%= incidents.length %> incident<%= incidents.length !== 1 ? 's' : '' %> found</div>
+<% } %>

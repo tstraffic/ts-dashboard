@@ -1,0 +1,256 @@
+<% locals.currentPage = 'incidents' %>
+
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div class="flex items-center gap-3 flex-wrap">
+    <h1 class="text-2xl font-bold text-white"><%= incident.incident_number %></h1>
+    <!-- Severity Badge -->
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+      <% if (incident.severity === 'critical') { %>bg-red-900/60 text-red-300
+      <% } else if (incident.severity === 'high') { %>bg-amber-900/60 text-amber-300
+      <% } else if (incident.severity === 'medium') { %>bg-blue-900/60 text-blue-300
+      <% } else { %>bg-slate-700 text-slate-300<% } %>">
+      <%= incident.severity || 'low' %> severity
+    </span>
+    <!-- Status Badge -->
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+      <% if (incident.investigation_status === 'reported') { %>bg-slate-700 text-slate-300
+      <% } else if (incident.investigation_status === 'investigating') { %>bg-blue-900/60 text-blue-300
+      <% } else if (incident.investigation_status === 'resolved') { %>bg-emerald-900/60 text-emerald-300
+      <% } else if (incident.investigation_status === 'closed') { %>bg-purple-900/60 text-purple-300
+      <% } else { %>bg-slate-700 text-slate-300<% } %>">
+      <%= incident.investigation_status ? incident.investigation_status.replace(/_/g, ' ') : 'reported' %>
+    </span>
+    <% if (incident.notifiable_incident) { %>
+      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-900/60 text-red-300">
+        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        Notifiable
+      </span>
+    <% } %>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/incidents/<%= incident.id %>/edit" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Edit</a>
+    <form method="POST" action="/incidents/<%= incident.id %>/delete" onsubmit="return confirm('Are you sure you want to delete this incident? This cannot be undone.')">
+      <button type="submit" class="px-4 py-2 bg-red-900/50 hover:bg-red-900/70 text-red-300 text-sm font-medium rounded-lg transition-colors border border-red-800">Delete</button>
+    </form>
+  </div>
+</div>
+
+<!-- Incident Title -->
+<div class="mb-6">
+  <h2 class="text-lg text-slate-300"><%= incident.title %></h2>
+</div>
+
+<!-- Info Grid -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6">
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Job</p>
+      <p class="text-sm mt-1">
+        <a href="/jobs/<%= incident.job_id %>" class="text-blue-400 hover:text-blue-300 hover:underline"><%= incident.job_number %></a>
+        <span class="text-slate-500"> - <%= incident.client %></span>
+      </p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Type</p>
+      <p class="text-sm text-slate-300 mt-1 capitalize"><%= incident.incident_type ? incident.incident_type.replace(/_/g, ' ') : '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Severity</p>
+      <p class="text-sm mt-1">
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+          <% if (incident.severity === 'critical') { %>bg-red-900/60 text-red-300
+          <% } else if (incident.severity === 'high') { %>bg-amber-900/60 text-amber-300
+          <% } else if (incident.severity === 'medium') { %>bg-blue-900/60 text-blue-300
+          <% } else { %>bg-slate-700 text-slate-300<% } %>">
+          <%= incident.severity || 'low' %>
+        </span>
+      </p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Date / Time</p>
+      <p class="text-sm text-slate-300 mt-1"><%= incident.incident_date || '-' %><% if (incident.incident_time) { %> at <%= incident.incident_time %><% } %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Location</p>
+      <p class="text-sm text-slate-300 mt-1"><%= incident.location || 'Not specified' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Reported By</p>
+      <p class="text-sm text-slate-300 mt-1"><%= incident.reported_by_name %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Notifiable Incident</p>
+      <p class="text-sm mt-1">
+        <% if (incident.notifiable_incident) { %>
+          <span class="text-red-400 font-medium">Yes</span>
+        <% } else { %>
+          <span class="text-slate-400">No</span>
+        <% } %>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Description -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6">
+  <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide mb-3">Description</h3>
+  <p class="text-sm text-slate-300 whitespace-pre-wrap"><%= incident.description || 'No description provided.' %></p>
+</div>
+
+<!-- Persons Involved & Witnesses -->
+<% if (incident.persons_involved || incident.witnesses) { %>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+  <% if (incident.persons_involved) { %>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+    <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide mb-3">Persons Involved</h3>
+    <p class="text-sm text-slate-300 whitespace-pre-wrap"><%= incident.persons_involved %></p>
+  </div>
+  <% } %>
+  <% if (incident.witnesses) { %>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+    <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide mb-3">Witnesses</h3>
+    <p class="text-sm text-slate-300 whitespace-pre-wrap"><%= incident.witnesses %></p>
+  </div>
+  <% } %>
+</div>
+<% } %>
+
+<!-- Immediate Actions Taken -->
+<% if (incident.immediate_actions) { %>
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6">
+  <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide mb-3">Immediate Actions Taken</h3>
+  <p class="text-sm text-slate-300 whitespace-pre-wrap"><%= incident.immediate_actions %></p>
+</div>
+<% } %>
+
+<!-- Root Cause -->
+<% if (incident.root_cause) { %>
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6">
+  <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide mb-3">Root Cause</h3>
+  <p class="text-sm text-slate-300 whitespace-pre-wrap"><%= incident.root_cause %></p>
+</div>
+<% } %>
+
+<!-- Corrective Actions Section -->
+<div class="mb-6">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold text-white">Corrective Actions</h2>
+    <span class="text-xs text-slate-500"><%= correctiveActions.length %> action<%= correctiveActions.length !== 1 ? 's' : '' %></span>
+  </div>
+
+  <% if (correctiveActions.length === 0) { %>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center mb-6">
+      <p class="text-slate-500 text-sm">No corrective actions have been added yet.</p>
+    </div>
+  <% } else { %>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto mb-6">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-700">
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Description</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Assigned To</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Due Date</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Priority</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Action</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-700">
+        <% correctiveActions.forEach(ca => { %>
+        <tr class="hover:bg-slate-700/50">
+          <td class="px-4 py-3 text-slate-300 max-w-[300px]"><%= ca.description %></td>
+          <td class="px-4 py-3 text-slate-300"><%= ca.assigned_to_name || 'Unassigned' %></td>
+          <td class="px-4 py-3 text-slate-400 text-xs"><%= ca.due_date || '-' %></td>
+          <td class="px-4 py-3">
+            <span class="text-xs font-medium
+              <% if (ca.priority === 'high') { %>text-red-400
+              <% } else if (ca.priority === 'medium') { %>text-amber-400
+              <% } else { %>text-slate-400<% } %>">
+              <%= ca.priority || 'medium' %>
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+              <% if (ca.status === 'completed') { %>bg-emerald-900/60 text-emerald-300
+              <% } else if (ca.status === 'in_progress') { %>bg-blue-900/60 text-blue-300
+              <% } else { %>bg-slate-700 text-slate-300<% } %>">
+              <%= ca.status ? ca.status.replace(/_/g, ' ') : 'open' %>
+            </span>
+            <% if (ca.status === 'completed' && ca.completed_date) { %>
+              <span class="text-xs text-slate-500 ml-1">(<%= ca.completed_date %>)</span>
+            <% } %>
+          </td>
+          <td class="px-4 py-3">
+            <% if (ca.status !== 'completed') { %>
+              <form method="POST" action="/incidents/<%= incident.id %>/corrective-actions/<%= ca.id %>/complete" class="inline">
+                <input type="hidden" name="completion_notes" value="">
+                <button type="submit" class="px-3 py-1 bg-emerald-900/50 hover:bg-emerald-900/70 text-emerald-300 text-xs font-medium rounded-md transition-colors border border-emerald-800" onclick="const notes = prompt('Completion notes (optional):'); if(notes !== null) this.form.completion_notes.value = notes; else return false;">
+                  Complete
+                </button>
+              </form>
+            <% } else { %>
+              <span class="text-xs text-slate-500">Done</span>
+              <% if (ca.completion_notes) { %>
+                <span class="text-xs text-slate-600 block mt-1" title="<%= ca.completion_notes %>"><%= ca.completion_notes.substring(0, 40) %><%= ca.completion_notes.length > 40 ? '...' : '' %></span>
+              <% } %>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+
+  <!-- Add Corrective Action Form -->
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Add Corrective Action</h3>
+    <form method="POST" action="/incidents/<%= incident.id %>/corrective-actions">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Description -->
+        <div class="md:col-span-2">
+          <label for="ca_description" class="block text-sm font-medium text-slate-300 mb-1">Description <span class="text-red-400">*</span></label>
+          <textarea id="ca_description" name="description" rows="3" required
+            placeholder="Describe the corrective action to be taken..."
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-y"></textarea>
+        </div>
+        <!-- Assigned To -->
+        <div>
+          <label for="ca_assigned_to" class="block text-sm font-medium text-slate-300 mb-1">Assigned To</label>
+          <select id="ca_assigned_to" name="assigned_to_id"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            <option value="">-- Unassigned --</option>
+            <% users.forEach(u => { %>
+              <option value="<%= u.id %>"><%= u.full_name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <!-- Due Date -->
+        <div>
+          <label for="ca_due_date" class="block text-sm font-medium text-slate-300 mb-1">Due Date <span class="text-red-400">*</span></label>
+          <input type="date" id="ca_due_date" name="due_date" required
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+        <!-- Priority -->
+        <div>
+          <label for="ca_priority" class="block text-sm font-medium text-slate-300 mb-1">Priority</label>
+          <select id="ca_priority" name="priority"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4">
+        <button type="submit" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold rounded-lg transition-colors">Add Corrective Action</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Back Link -->
+<div class="mt-6">
+  <a href="/incidents" class="text-slate-400 hover:text-slate-300 text-sm">&larr; Back to all incidents</a>
+</div>

@@ -1,0 +1,744 @@
+<% locals.currentPage = 'jobs' %>
+
+<style>
+  /* CSS-only tab navigation */
+  .tab-content { display: none; }
+  .tab-content:target { display: block; }
+  .tab-content:first-of-type:not(:target) { display: block; }
+  .tab-content:first-of-type:not(:target) ~ .tab-content:target ~ .tab-content:first-of-type { display: none; }
+  /* When any tab is targeted, hide the default first tab */
+  .tab-group:has(.tab-content:target) > .tab-content:first-of-type:not(:target) { display: none; }
+</style>
+
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div class="flex items-center gap-3 flex-wrap">
+    <h1 class="text-2xl font-bold text-white"><%= job.job_number %></h1>
+    <span class="text-lg text-slate-400">&mdash;</span>
+    <span class="text-lg text-slate-300"><%= job.client %></span>
+    <!-- Status Badge -->
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+      <% if (job.status === 'active') { %>bg-blue-900/60 text-blue-300
+      <% } else if (job.status === 'on_hold') { %>bg-amber-900/60 text-amber-300
+      <% } else if (job.status === 'completed') { %>bg-emerald-900/60 text-emerald-300
+      <% } else if (job.status === 'won') { %>bg-teal-900/60 text-teal-300
+      <% } else if (job.status === 'lead') { %>bg-purple-900/60 text-purple-300
+      <% } else if (job.status === 'lost') { %>bg-red-900/60 text-red-300
+      <% } else { %>bg-slate-700 text-slate-300<% } %>">
+      <%= job.status ? job.status.replace('_', ' ') : '-' %>
+    </span>
+    <!-- Health Dot -->
+    <% if (job.health) { %>
+      <span class="inline-block w-3 h-3 rounded-full
+        <% if (job.health === 'green') { %>bg-emerald-500
+        <% } else if (job.health === 'amber') { %>bg-amber-500
+        <% } else if (job.health === 'red') { %>bg-red-500
+        <% } else { %>bg-slate-600<% } %>" title="Health: <%= job.health %>"></span>
+    <% } %>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/jobs/<%= job.id %>/edit" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Edit</a>
+    <a href="/documents/job/<%= job.id %>" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Documents</a>
+  </div>
+</div>
+
+<!-- Info Grid -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6">
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Client</p>
+      <p class="text-sm text-white mt-1"><%= job.client %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Site Address</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.site_address || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Suburb</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.suburb || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Stage</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.stage ? job.stage.replace(/_/g, ' ') : '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">% Complete</p>
+      <div class="flex items-center gap-2 mt-1">
+        <div class="flex-1 max-w-[120px] bg-slate-700 rounded-full h-2">
+          <div class="h-2 rounded-full <%= (job.percent_complete || 0) >= 100 ? 'bg-emerald-500' : 'bg-blue-500' %>" style="width: <%= Math.min(job.percent_complete || 0, 100) %>%"></div>
+        </div>
+        <span class="text-sm text-white"><%= job.percent_complete || 0 %>%</span>
+      </div>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Start Date</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.start_date || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">End Date</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.end_date || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Project Manager</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.pm_name || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Ops Supervisor</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.ops_name || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Planning Owner</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.planning_name || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Marketing Owner</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.marketing_name || '-' %></p>
+    </div>
+    <% if (canViewAccounts) { %>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Accounts Owner</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.accounts_name || '-' %></p>
+    </div>
+    <% } %>
+  </div>
+</div>
+
+<!-- Tab Navigation -->
+<div class="border-b border-slate-700 mb-6">
+  <nav class="flex gap-0 -mb-px overflow-x-auto">
+    <a href="#overview" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-amber-500" onclick="activateTab(this)">Overview</a>
+    <a href="#tasks" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-amber-500" onclick="activateTab(this)">Tasks</a>
+    <a href="#updates" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-amber-500" onclick="activateTab(this)">Updates</a>
+    <a href="#compliance" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-amber-500" onclick="activateTab(this)">Compliance</a>
+    <a href="#incidents" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-amber-500" onclick="activateTab(this)">Incidents</a>
+    <a href="#contacts" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-amber-500" onclick="activateTab(this)">Contacts</a>
+    <a href="#timesheets" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-amber-500" onclick="activateTab(this)">Timesheets</a>
+    <a href="#equipment" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-amber-500" onclick="activateTab(this)">Equipment</a>
+    <a href="#defects" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-amber-500" onclick="activateTab(this)">Defects</a>
+    <% if (canViewAccounts) { %>
+    <a href="#budget" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-amber-500" onclick="activateTab(this)">Budget</a>
+    <a href="#accounts" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-amber-500" onclick="activateTab(this)">Accounts</a>
+    <% } %>
+  </nav>
+</div>
+
+<!-- Tab Content -->
+<div class="tab-group">
+
+  <!-- Overview Tab -->
+  <div id="overview" class="tab-content">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+      <h2 class="text-lg font-semibold text-white mb-4">Job Summary</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide mb-2">Details</h3>
+          <dl class="space-y-3">
+            <div>
+              <dt class="text-xs text-slate-500">Job Number</dt>
+              <dd class="text-sm text-white"><%= job.job_number %></dd>
+            </div>
+            <div>
+              <dt class="text-xs text-slate-500">Client</dt>
+              <dd class="text-sm text-white"><%= job.client %></dd>
+            </div>
+            <div>
+              <dt class="text-xs text-slate-500">Site Address</dt>
+              <dd class="text-sm text-slate-300"><%= job.site_address || 'Not specified' %></dd>
+            </div>
+            <div>
+              <dt class="text-xs text-slate-500">Suburb</dt>
+              <dd class="text-sm text-slate-300"><%= job.suburb || 'Not specified' %></dd>
+            </div>
+          </dl>
+        </div>
+        <div>
+          <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide mb-2">Progress</h3>
+          <dl class="space-y-3">
+            <div>
+              <dt class="text-xs text-slate-500">Status</dt>
+              <dd class="text-sm">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                  <% if (job.status === 'active') { %>bg-blue-900/60 text-blue-300
+                  <% } else if (job.status === 'on_hold') { %>bg-amber-900/60 text-amber-300
+                  <% } else if (job.status === 'completed') { %>bg-emerald-900/60 text-emerald-300
+                  <% } else if (job.status === 'won') { %>bg-teal-900/60 text-teal-300
+                  <% } else if (job.status === 'lead') { %>bg-purple-900/60 text-purple-300
+                  <% } else if (job.status === 'lost') { %>bg-red-900/60 text-red-300
+                  <% } else { %>bg-slate-700 text-slate-300<% } %>">
+                  <%= job.status ? job.status.replace('_', ' ') : '-' %>
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-slate-500">Stage</dt>
+              <dd class="text-sm text-slate-300"><%= job.stage ? job.stage.replace(/_/g, ' ') : '-' %></dd>
+            </div>
+            <div>
+              <dt class="text-xs text-slate-500">Health</dt>
+              <dd class="text-sm flex items-center gap-2">
+                <span class="inline-block w-3 h-3 rounded-full
+                  <% if (job.health === 'green') { %>bg-emerald-500
+                  <% } else if (job.health === 'amber') { %>bg-amber-500
+                  <% } else if (job.health === 'red') { %>bg-red-500
+                  <% } else { %>bg-slate-600<% } %>"></span>
+                <span class="text-slate-300 capitalize"><%= job.health || '-' %></span>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-slate-500">Duration</dt>
+              <dd class="text-sm text-slate-300"><%= job.start_date || '?' %> &rarr; <%= job.end_date || '?' %></dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+      <% if (job.notes) { %>
+      <div class="mt-6 pt-6 border-t border-slate-700">
+        <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide mb-2">Notes</h3>
+        <p class="text-sm text-slate-300 whitespace-pre-wrap"><%= job.notes %></p>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Tasks Tab -->
+  <div id="tasks" class="tab-content">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-white">Tasks</h2>
+      <a href="/tasks/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">+ New Task</a>
+    </div>
+    <% if (tasks.length === 0) { %>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center">
+        <p class="text-slate-500 text-sm">No tasks for this job yet.</p>
+        <a href="/tasks/new?job_id=<%= job.id %>" class="text-amber-400 text-sm hover:underline mt-2 inline-block">Create the first task</a>
+      </div>
+    <% } else { %>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Title</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Division</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Owner</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Due Date</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Priority</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+          <% tasks.forEach(task => { %>
+          <tr class="hover:bg-slate-700/50">
+            <td class="px-4 py-3 text-slate-300 font-medium"><%= task.title %></td>
+            <td class="px-4 py-3 text-slate-400"><%= task.division || '-' %></td>
+            <td class="px-4 py-3 text-slate-300"><%= task.owner_name || '-' %></td>
+            <td class="px-4 py-3 text-slate-400 text-xs"><%= task.due_date || '-' %></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                <% if (task.status === 'completed') { %>bg-emerald-900/60 text-emerald-300
+                <% } else if (task.status === 'in_progress') { %>bg-blue-900/60 text-blue-300
+                <% } else if (task.status === 'overdue') { %>bg-red-900/60 text-red-300
+                <% } else if (task.status === 'blocked') { %>bg-amber-900/60 text-amber-300
+                <% } else { %>bg-slate-700 text-slate-300<% } %>">
+                <%= task.status ? task.status.replace('_', ' ') : 'pending' %>
+              </span>
+            </td>
+            <td class="px-4 py-3">
+              <span class="text-xs font-medium
+                <% if (task.priority === 'high') { %>text-red-400
+                <% } else if (task.priority === 'medium') { %>text-amber-400
+                <% } else { %>text-slate-400<% } %>">
+                <%= task.priority || 'low' %>
+              </span>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Updates Tab -->
+  <div id="updates" class="tab-content">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-white">Project Updates</h2>
+      <a href="/updates/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">+ Submit Update</a>
+    </div>
+    <% if (updates.length === 0) { %>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center">
+        <p class="text-slate-500 text-sm">No updates submitted for this job yet.</p>
+        <a href="/updates/new?job_id=<%= job.id %>" class="text-amber-400 text-sm hover:underline mt-2 inline-block">Submit the first update</a>
+      </div>
+    <% } else { %>
+    <div class="space-y-3">
+      <% updates.forEach(update => { %>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Week ending <%= update.week_ending %></span>
+          <span class="text-xs text-slate-500">by <%= update.submitted_by_name || 'Unknown' %></span>
+        </div>
+        <p class="text-sm text-slate-300"><%= update.summary %></p>
+      </div>
+      <% }) %>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Compliance Tab -->
+  <div id="compliance" class="tab-content">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-white">Compliance Items</h2>
+      <a href="/compliance/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">+ New Compliance Item</a>
+    </div>
+    <% if (complianceItems.length === 0) { %>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center">
+        <p class="text-slate-500 text-sm">No compliance items for this job yet.</p>
+        <a href="/compliance/new?job_id=<%= job.id %>" class="text-amber-400 text-sm hover:underline mt-2 inline-block">Create the first compliance item</a>
+      </div>
+    <% } else { %>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Title</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Due Date</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Approver</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+          <% complianceItems.forEach(item => { %>
+          <tr class="hover:bg-slate-700/50">
+            <td class="px-4 py-3 text-slate-300 font-medium"><%= item.title %></td>
+            <td class="px-4 py-3 text-slate-400"><%= item.item_type || '-' %></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                <% if (item.status === 'approved') { %>bg-emerald-900/60 text-emerald-300
+                <% } else if (item.status === 'submitted') { %>bg-blue-900/60 text-blue-300
+                <% } else if (item.status === 'overdue') { %>bg-red-900/60 text-red-300
+                <% } else if (item.status === 'expiring') { %>bg-amber-900/60 text-amber-300
+                <% } else { %>bg-slate-700 text-slate-300<% } %>">
+                <%= item.status ? item.status.replace('_', ' ') : 'pending' %>
+              </span>
+            </td>
+            <td class="px-4 py-3 text-slate-400 text-xs"><%= item.due_date || '-' %></td>
+            <td class="px-4 py-3 text-slate-300"><%= item.approver_name || '-' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Incidents Tab -->
+  <div id="incidents" class="tab-content">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-white">Safety & Incidents</h2>
+      <a href="/incidents/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">+ Report Incident</a>
+    </div>
+    <% if (incidents.length === 0) { %>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center">
+        <p class="text-slate-500 text-sm">No incidents recorded for this job.</p>
+      </div>
+    <% } else { %>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Severity</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Description</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Reported By</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+          <% incidents.forEach(inc => { %>
+          <tr class="hover:bg-slate-700/50 cursor-pointer" onclick="window.location='/incidents/<%= inc.id %>'">
+            <td class="px-4 py-3 text-slate-300 text-xs"><%= inc.incident_date %></td>
+            <td class="px-4 py-3 text-slate-300"><%= inc.incident_type ? inc.incident_type.replace(/_/g, ' ') : '-' %></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                <% if (inc.severity === 'critical') { %>bg-red-900/60 text-red-300
+                <% } else if (inc.severity === 'high') { %>bg-orange-900/60 text-orange-300
+                <% } else if (inc.severity === 'medium') { %>bg-amber-900/60 text-amber-300
+                <% } else { %>bg-slate-700 text-slate-300<% } %>"><%= inc.severity %></span>
+            </td>
+            <td class="px-4 py-3 text-slate-300 max-w-xs truncate"><%= inc.description ? inc.description.substring(0, 80) : '-' %></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                <% if (inc.investigation_status === 'closed' || inc.investigation_status === 'resolved') { %>bg-emerald-900/60 text-emerald-300
+                <% } else if (inc.investigation_status === 'investigating') { %>bg-blue-900/60 text-blue-300
+                <% } else { %>bg-amber-900/60 text-amber-300<% } %>"><%= inc.investigation_status ? inc.investigation_status.replace(/_/g, ' ') : 'reported' %></span>
+            </td>
+            <td class="px-4 py-3 text-slate-400 text-xs"><%= inc.reported_by_name || '-' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Contacts Tab -->
+  <div id="contacts" class="tab-content">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-white">Client Contacts</h2>
+      <a href="/contacts/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">+ Add Contact</a>
+    </div>
+    <% if (contacts.length === 0) { %>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center">
+        <p class="text-slate-500 text-sm">No contacts for this job yet.</p>
+      </div>
+    <% } else { %>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Organisation</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Phone</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Email</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Primary</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+          <% contacts.forEach(c => { %>
+          <tr class="hover:bg-slate-700/50">
+            <td class="px-4 py-3 text-slate-300 font-medium"><%= c.full_name %></td>
+            <td class="px-4 py-3 text-slate-400"><%= c.contact_type ? c.contact_type.replace(/_/g, ' ') : '-' %></td>
+            <td class="px-4 py-3 text-slate-400"><%= c.company || '-' %></td>
+            <td class="px-4 py-3 text-slate-400"><%= c.phone || '-' %></td>
+            <td class="px-4 py-3 text-slate-400"><%= c.email || '-' %></td>
+            <td class="px-4 py-3"><%= c.is_primary ? '✓' : '' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Timesheets Tab -->
+  <div id="timesheets" class="tab-content">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-white">Timesheets</h2>
+      <a href="/timesheets/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">+ Add Timesheet</a>
+    </div>
+    <% if (timesheets.length === 0) { %>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center">
+        <p class="text-slate-500 text-sm">No timesheets recorded for this job yet.</p>
+      </div>
+    <% } else { %>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Crew Member</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Start</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">End</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Hours</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Shift</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+          <% timesheets.forEach(ts => { %>
+          <tr class="hover:bg-slate-700/50">
+            <td class="px-4 py-3 text-slate-300 text-xs"><%= ts.work_date %></td>
+            <td class="px-4 py-3 text-slate-300"><%= ts.crew_name || '-' %></td>
+            <td class="px-4 py-3 text-slate-400"><%= ts.start_time || '-' %></td>
+            <td class="px-4 py-3 text-slate-400"><%= ts.end_time || '-' %></td>
+            <td class="px-4 py-3 text-white font-medium"><%= ts.total_hours || '-' %></td>
+            <td class="px-4 py-3 text-slate-400"><%= ts.shift_type || 'day' %></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                <% if (ts.approved) { %>bg-emerald-900/60 text-emerald-300
+                <% } else { %>bg-slate-700 text-slate-300<% } %>"><%= ts.approved ? 'Approved' : 'Pending' %></span>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Equipment Tab -->
+  <div id="equipment" class="tab-content">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-white">Equipment Deployed</h2>
+      <a href="/equipment" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">View All Equipment</a>
+    </div>
+    <% if (equipmentAssignments.length === 0) { %>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center">
+        <p class="text-slate-500 text-sm">No equipment assigned to this job.</p>
+      </div>
+    <% } else { %>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Asset #</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Equipment</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Category</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Condition</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Assigned</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Returned</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+          <% equipmentAssignments.forEach(ea => { %>
+          <tr class="hover:bg-slate-700/50">
+            <td class="px-4 py-3 text-blue-400 font-medium"><%= ea.asset_number || '-' %></td>
+            <td class="px-4 py-3 text-slate-300"><%= ea.equipment_name || '-' %></td>
+            <td class="px-4 py-3 text-slate-400"><%= ea.category ? ea.category.replace(/_/g, ' ') : '-' %></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                <% if (ea.equipment_condition === 'new' || ea.equipment_condition === 'good') { %>bg-emerald-900/60 text-emerald-300
+                <% } else if (ea.equipment_condition === 'fair') { %>bg-amber-900/60 text-amber-300
+                <% } else { %>bg-red-900/60 text-red-300<% } %>"><%= ea.equipment_condition || '-' %></span>
+            </td>
+            <td class="px-4 py-3 text-slate-400 text-xs"><%= ea.assigned_date || '-' %></td>
+            <td class="px-4 py-3 text-xs"><%= ea.actual_return_date ? '<span class="text-emerald-400">' + ea.actual_return_date + '</span>' : '<span class="text-amber-400">On site</span>' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Defects Tab -->
+  <div id="defects" class="tab-content">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-white">Defects & Snags</h2>
+      <a href="/defects/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">+ Report Defect</a>
+    </div>
+    <% if (defects.length === 0) { %>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center">
+        <p class="text-slate-500 text-sm">No defects recorded for this job.</p>
+      </div>
+    <% } else { %>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Ref</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Title</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Severity</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Assigned To</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Target Close</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+          <% defects.forEach(d => { %>
+          <tr class="hover:bg-slate-700/50">
+            <td class="px-4 py-3 text-blue-400 font-medium text-xs"><%= d.defect_number || '-' %></td>
+            <td class="px-4 py-3 text-slate-300"><%= d.title %></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                <% if (d.severity === 'critical') { %>bg-red-900/60 text-red-300
+                <% } else if (d.severity === 'major') { %>bg-orange-900/60 text-orange-300
+                <% } else if (d.severity === 'moderate') { %>bg-amber-900/60 text-amber-300
+                <% } else { %>bg-slate-700 text-slate-300<% } %>"><%= d.severity %></span>
+            </td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                <% if (d.status === 'closed') { %>bg-emerald-900/60 text-emerald-300
+                <% } else if (d.status === 'rectification') { %>bg-blue-900/60 text-blue-300
+                <% } else if (d.status === 'investigating') { %>bg-amber-900/60 text-amber-300
+                <% } else { %>bg-red-900/60 text-red-300<% } %>"><%= d.status ? d.status.replace(/_/g, ' ') : 'open' %></span>
+            </td>
+            <td class="px-4 py-3 text-slate-400"><%= d.assigned_to_name || '-' %></td>
+            <td class="px-4 py-3 text-slate-400 text-xs"><%= d.target_close_date || '-' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Budget Tab (conditional) -->
+  <% if (canViewAccounts) { %>
+  <div id="budget" class="tab-content">
+    <div class="mb-4">
+      <h2 class="text-lg font-semibold text-white">Budget & Costs</h2>
+    </div>
+    <% if (budget) { %>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+        <p class="text-xs text-slate-400 uppercase">Contract Value</p>
+        <p class="text-2xl font-bold text-white mt-1">$<%= (budget.contract_value || 0).toLocaleString() %></p>
+      </div>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+        <p class="text-xs text-slate-400 uppercase">Total Budget</p>
+        <p class="text-2xl font-bold text-blue-400 mt-1">$<%= ((budget.labour || 0) + (budget.materials || 0) + (budget.subcontractors || 0) + (budget.equipment || 0) + (budget.other || 0)).toLocaleString() %></p>
+      </div>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+        <p class="text-xs text-slate-400 uppercase">Total Spend</p>
+        <p class="text-2xl font-bold text-amber-400 mt-1">$<%= totalSpend.toLocaleString() %></p>
+      </div>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+        <p class="text-xs text-slate-400 uppercase">Margin</p>
+        <% const margin = (budget.contract_value || 0) - totalSpend; %>
+        <p class="text-2xl font-bold <%= margin >= 0 ? 'text-emerald-400' : 'text-red-400' %> mt-1">$<%= margin.toLocaleString() %></p>
+      </div>
+    </div>
+    <% } else { %>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center mb-6">
+      <p class="text-slate-500 text-sm">No budget set for this job yet.</p>
+      <a href="/budgets/job/<%= job.id %>" class="text-amber-400 text-sm hover:underline mt-2 inline-block">Set up budget</a>
+    </div>
+    <% } %>
+    <% if (costEntries.length > 0) { %>
+    <h3 class="text-sm font-semibold text-white mb-3">Recent Cost Entries</h3>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Category</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Description</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Supplier</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Amount</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+          <% costEntries.forEach(ce => { %>
+          <tr class="hover:bg-slate-700/50">
+            <td class="px-4 py-3 text-slate-400 text-xs"><%= ce.entry_date %></td>
+            <td class="px-4 py-3 text-slate-300"><%= ce.category ? ce.category.replace(/_/g, ' ') : '-' %></td>
+            <td class="px-4 py-3 text-slate-300"><%= ce.description || '-' %></td>
+            <td class="px-4 py-3 text-slate-400"><%= ce.supplier || '-' %></td>
+            <td class="px-4 py-3 text-white text-right font-medium">$<%= (ce.amount || 0).toLocaleString() %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+  <% } %>
+
+  <!-- Accounts Tab (conditional) -->
+  <% if (canViewAccounts) { %>
+  <div id="accounts" class="tab-content">
+    <div class="mb-4">
+      <h2 class="text-lg font-semibold text-white">Accounts</h2>
+    </div>
+
+    <!-- Accounts Status -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6">
+      <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide mb-3">Accounts Status</h3>
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+        <% if (job.accounts_status === 'on_track') { %>bg-emerald-900/60 text-emerald-300
+        <% } else if (job.accounts_status === 'overdue') { %>bg-red-900/60 text-red-300
+        <% } else if (job.accounts_status === 'disputed') { %>bg-amber-900/60 text-amber-300
+        <% } else { %>bg-slate-700 text-slate-400<% } %>">
+        <%= job.accounts_status ? job.accounts_status.replace('_', ' ') : 'N/A' %>
+      </span>
+    </div>
+
+    <!-- Accounts Documents -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+      <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide mb-4">Accounts Documents</h3>
+      <% if (accountsDocs.length === 0) { %>
+        <p class="text-slate-500 text-sm">No accounts documents uploaded yet.</p>
+      <% } else { %>
+        <%
+          // Group documents by category
+          const accountsGrouped = {};
+          accountsDocs.forEach(doc => {
+            const cat = doc.category || 'Uncategorised';
+            if (!accountsGrouped[cat]) accountsGrouped[cat] = [];
+            accountsGrouped[cat].push(doc);
+          });
+        %>
+        <div class="space-y-4">
+          <% Object.keys(accountsGrouped).forEach(category => { %>
+          <div>
+            <h4 class="text-sm font-medium text-slate-300 mb-2 capitalize"><%= category %></h4>
+            <ul class="space-y-1">
+              <% accountsGrouped[category].forEach(doc => { %>
+              <li class="flex items-center justify-between py-2 px-3 bg-slate-700/50 rounded-lg">
+                <div class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  <span class="text-sm text-slate-300"><%= doc.title || doc.filename %></span>
+                </div>
+                <% if (doc.file_path) { %>
+                  <a href="<%= doc.file_path %>" target="_blank" class="text-xs text-blue-400 hover:text-blue-300 hover:underline">View</a>
+                <% } %>
+              </li>
+              <% }) %>
+            </ul>
+          </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+</div>
+
+<!-- Tab switching script -->
+<script>
+  function activateTab(clicked) {
+    // Update tab styling
+    const tabs = clicked.parentElement.querySelectorAll('a');
+    tabs.forEach(tab => {
+      tab.classList.remove('text-white', 'border-amber-500');
+      tab.classList.add('text-slate-400', 'border-transparent');
+    });
+    clicked.classList.remove('text-slate-400', 'border-transparent');
+    clicked.classList.add('text-white', 'border-amber-500');
+
+    // Show/hide content
+    const targetId = clicked.getAttribute('href').substring(1);
+    document.querySelectorAll('.tab-content').forEach(content => {
+      content.style.display = 'none';
+    });
+    const target = document.getElementById(targetId);
+    if (target) target.style.display = 'block';
+  }
+
+  // Initialise: activate first tab or hash-targeted tab
+  document.addEventListener('DOMContentLoaded', function() {
+    const hash = window.location.hash;
+    const tabs = document.querySelectorAll('nav a[href^="#"]');
+    if (hash && document.querySelector('a[href="' + hash + '"]')) {
+      activateTab(document.querySelector('a[href="' + hash + '"]'));
+    } else if (tabs.length > 0) {
+      activateTab(tabs[0]);
+    }
+  });
+</script>

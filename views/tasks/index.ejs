@@ -1,0 +1,176 @@
+<% locals.currentPage = 'tasks' %>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-white">Tasks & Actions</h1>
+    <a href="/tasks/new" class="inline-flex items-center px-4 py-2 bg-amber-500 text-slate-900 font-semibold rounded-lg hover:bg-amber-400 transition">
+      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      New Task
+    </a>
+  </div>
+
+  <!-- Filters -->
+  <form method="GET" action="/tasks" class="bg-slate-800 border border-slate-700 rounded-lg p-4 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+      <!-- Status -->
+      <div>
+        <label class="block text-sm font-medium text-slate-400 mb-1">Status</label>
+        <select name="status" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+          <option value="">All Statuses</option>
+          <option value="not_started" <%= filters.status === 'not_started' ? 'selected' : '' %>>Not Started</option>
+          <option value="in_progress" <%= filters.status === 'in_progress' ? 'selected' : '' %>>In Progress</option>
+          <option value="blocked" <%= filters.status === 'blocked' ? 'selected' : '' %>>Blocked</option>
+          <option value="complete" <%= filters.status === 'complete' ? 'selected' : '' %>>Complete</option>
+        </select>
+      </div>
+
+      <!-- Division -->
+      <div>
+        <label class="block text-sm font-medium text-slate-400 mb-1">Division</label>
+        <select name="division" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+          <option value="">All Divisions</option>
+          <option value="ops" <%= filters.division === 'ops' ? 'selected' : '' %>>Ops</option>
+          <option value="planning" <%= filters.division === 'planning' ? 'selected' : '' %>>Planning</option>
+          <option value="marketing" <%= filters.division === 'marketing' ? 'selected' : '' %>>Marketing</option>
+          <option value="accounts" <%= filters.division === 'accounts' ? 'selected' : '' %>>Accounts</option>
+          <option value="management" <%= filters.division === 'management' ? 'selected' : '' %>>Management</option>
+        </select>
+      </div>
+
+      <!-- Job -->
+      <div>
+        <label class="block text-sm font-medium text-slate-400 mb-1">Job</label>
+        <select name="job_id" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+          <option value="">All Jobs</option>
+          <% jobs.forEach(function(job) { %>
+            <option value="<%= job.id %>" <%= filters.job_id == job.id ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <!-- My Tasks Toggle -->
+      <div>
+        <label class="block text-sm font-medium text-slate-400 mb-1">&nbsp;</label>
+        <a href="<%= filters.owner === 'me' ? '/tasks' : '/tasks?owner=me' + (filters.status ? '&status=' + filters.status : '') + (filters.division ? '&division=' + filters.division : '') + (filters.job_id ? '&job_id=' + filters.job_id : '') %>"
+           class="block w-full text-center px-4 py-2 rounded-lg font-medium transition <%= filters.owner === 'me' ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-300 hover:bg-slate-600' %>">
+          My Tasks
+        </a>
+      </div>
+
+      <!-- Apply -->
+      <div>
+        <label class="block text-sm font-medium text-slate-400 mb-1">&nbsp;</label>
+        <button type="submit" class="w-full px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500 transition font-medium">Apply Filters</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- Tasks Table -->
+  <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+    <% if (tasks.length === 0) { %>
+      <div class="p-8 text-center text-slate-400">
+        <svg class="w-12 h-12 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        <p>No tasks found.</p>
+      </div>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="border-b border-slate-700">
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Task</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Job</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Division</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Owner</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Due Date</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Priority</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-700">
+            <% tasks.forEach(function(task) { %>
+              <%
+                const statusColors = {
+                  not_started: 'bg-slate-600 text-slate-200',
+                  in_progress: 'bg-blue-600 text-blue-100',
+                  blocked: 'bg-red-600 text-red-100',
+                  complete: 'bg-emerald-600 text-emerald-100'
+                };
+                const statusLabels = {
+                  not_started: 'Not Started',
+                  in_progress: 'In Progress',
+                  blocked: 'Blocked',
+                  complete: 'Complete'
+                };
+                const priorityColors = {
+                  high: 'bg-red-600 text-red-100',
+                  medium: 'bg-amber-600 text-amber-100',
+                  low: 'bg-slate-600 text-slate-200'
+                };
+                const divisionColors = {
+                  ops: 'bg-blue-700 text-blue-200',
+                  planning: 'bg-teal-700 text-teal-200',
+                  marketing: 'bg-pink-700 text-pink-200',
+                  accounts: 'bg-amber-700 text-amber-200',
+                  management: 'bg-purple-700 text-purple-200'
+                };
+                const isOverdue = task.due_date && task.status !== 'complete' && new Date(task.due_date) < new Date();
+              %>
+              <tr class="hover:bg-slate-750 hover:bg-opacity-50">
+                <td class="px-4 py-3 text-white font-medium"><%= task.title %></td>
+                <td class="px-4 py-3">
+                  <% if (task.job_id) { %>
+                    <a href="/jobs/<%= task.job_id %>" class="text-amber-400 hover:text-amber-300"><%= task.job_number %></a>
+                  <% } else { %>
+                    <span class="text-slate-500">-</span>
+                  <% } %>
+                </td>
+                <td class="px-4 py-3">
+                  <% if (task.division) { %>
+                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= divisionColors[task.division] || 'bg-slate-600 text-slate-200' %>"><%= task.division.charAt(0).toUpperCase() + task.division.slice(1) %></span>
+                  <% } else { %>
+                    <span class="text-slate-500">-</span>
+                  <% } %>
+                </td>
+                <td class="px-4 py-3 text-slate-300"><%= task.owner_name || '-' %></td>
+                <td class="px-4 py-3 <%= isOverdue ? 'text-red-400 font-semibold' : 'text-slate-300' %>">
+                  <% if (task.due_date) { %>
+                    <%= new Date(task.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
+                    <% if (isOverdue) { %><span class="text-xs ml-1">OVERDUE</span><% } %>
+                  <% } else { %>
+                    -
+                  <% } %>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= statusColors[task.status] || 'bg-slate-600 text-slate-200' %>"><%= statusLabels[task.status] || task.status %></span>
+                </td>
+                <td class="px-4 py-3">
+                  <% if (task.priority) { %>
+                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= priorityColors[task.priority] || 'bg-slate-600 text-slate-200' %>"><%= task.priority.charAt(0).toUpperCase() + task.priority.slice(1) %></span>
+                  <% } else { %>
+                    <span class="text-slate-500">-</span>
+                  <% } %>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center space-x-2">
+                    <a href="/tasks/<%= task.id %>/edit" class="text-slate-400 hover:text-amber-400 transition" title="Edit">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </a>
+                    <% if (task.status !== 'complete') { %>
+                      <form method="POST" action="/tasks/<%= task.id %>/complete" class="inline">
+                        <button type="submit" class="text-slate-400 hover:text-emerald-400 transition" title="Mark Complete" onclick="return confirm('Mark this task as complete?')">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        </button>
+                      </form>
+                    <% } %>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>

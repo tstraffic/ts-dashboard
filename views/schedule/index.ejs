@@ -1,0 +1,158 @@
+<% locals.currentPage = 'schedule' %>
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-white">Job Schedule</h1>
+  <p class="text-slate-400 text-sm mt-1">Visual timeline of active jobs</p>
+</div>
+
+<!-- Date Range Controls -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-6">
+  <form method="GET" class="flex items-end gap-4 flex-wrap">
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">From</label>
+      <input type="date" name="from" value="<%= rangeStart %>" class="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg px-3 py-2">
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">To</label>
+      <input type="date" name="to" value="<%= rangeEnd %>" class="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg px-3 py-2">
+    </div>
+    <button type="submit" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-medium rounded-lg transition-colors">Update Range</button>
+  </form>
+</div>
+
+<!-- Legend -->
+<div class="flex items-center gap-4 mb-4 flex-wrap">
+  <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-blue-500"></span><span class="text-xs text-slate-400">Active</span></div>
+  <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-500"></span><span class="text-xs text-slate-400">On Hold</span></div>
+  <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-teal-500"></span><span class="text-xs text-slate-400">Won</span></div>
+  <div class="flex items-center gap-2"><span class="w-2 h-4 bg-red-500/50 border-l-2 border-red-500"></span><span class="text-xs text-slate-400">Today</span></div>
+</div>
+
+<!-- Timeline Chart -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+  <%
+    const startDate = new Date(rangeStart);
+    const endDate = new Date(rangeEnd);
+    const totalDays = Math.max(1, Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)));
+    const todayDate = new Date(today);
+    const todayOffset = Math.ceil((todayDate - startDate) / (1000 * 60 * 60 * 24));
+    const todayPct = Math.max(0, Math.min(100, (todayOffset / totalDays) * 100));
+    const labelWidthPx = 200;
+
+    // Generate month markers
+    const months = [];
+    const current = new Date(startDate);
+    current.setDate(1);
+    if (current < startDate) current.setMonth(current.getMonth() + 1);
+    while (current <= endDate) {
+      const offset = Math.ceil((current - startDate) / (1000 * 60 * 60 * 24));
+      const pct = Math.max(0, (offset / totalDays) * 100);
+      months.push({ label: current.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }), pct });
+      current.setMonth(current.getMonth() + 1);
+    }
+  %>
+
+  <div style="min-width: 900px;">
+    <!-- Month headers -->
+    <div class="relative h-8 border-b border-slate-700" style="margin-left: <%= labelWidthPx %>px;">
+      <% months.forEach(function(m) { %>
+        <div class="absolute top-0 h-full border-l border-slate-600" style="left: <%= m.pct %>%;">
+          <span class="text-[10px] text-slate-400 pl-1 whitespace-nowrap"><%= m.label %></span>
+        </div>
+      <% }); %>
+      <!-- Today marker in header -->
+      <div class="absolute top-0 h-full border-l-2 border-red-500 z-10" style="left: <%= todayPct %>%;"></div>
+    </div>
+
+    <!-- Job rows -->
+    <% if (jobs.length === 0) { %>
+      <div class="p-8 text-center text-slate-500">No active jobs with scheduled dates.</div>
+    <% } else { %>
+      <% jobs.forEach(function(job) {
+        var jobStart = new Date(job.start_date);
+        var jobEnd = job.end_date ? new Date(job.end_date) : new Date(jobStart.getTime() + 90 * 86400000);
+        var startOff = (jobStart - startDate) / (1000 * 60 * 60 * 24);
+        var duration = Math.max(1, (jobEnd - jobStart) / (1000 * 60 * 60 * 24));
+        var leftPct = (startOff / totalDays) * 100;
+        var widthPct = (duration / totalDays) * 100;
+
+        // Clamp values so bars stay within the visible area
+        if (leftPct < 0) { widthPct = widthPct + leftPct; leftPct = 0; }
+        if (leftPct + widthPct > 100) { widthPct = 100 - leftPct; }
+        if (widthPct < 0.5) widthPct = 0.5;
+
+        var barColor = 'bg-blue-500';
+        if (job.status === 'on_hold') barColor = 'bg-amber-500';
+        else if (job.status === 'won') barColor = 'bg-teal-500';
+
+        var healthBorder = '';
+        if (job.health === 'red') healthBorder = 'border-l-4 border-l-red-500';
+        else if (job.health === 'amber') healthBorder = 'border-l-4 border-l-amber-400';
+      %>
+      <div class="flex items-center h-10 border-b border-slate-700/50 hover:bg-slate-700/30 group">
+        <!-- Job label (fixed width) -->
+        <a href="/jobs/<%= job.id %>" class="block flex-shrink-0 px-3 text-xs truncate text-blue-400 hover:text-blue-300 font-medium" style="width: <%= labelWidthPx %>px;">
+          <%= job.job_number %> - <%= job.client %>
+        </a>
+        <!-- Bar area (fills remaining space) -->
+        <div class="flex-1 relative h-full">
+          <!-- Today line -->
+          <div class="absolute top-0 h-full border-l border-red-500/20 z-0" style="left: <%= todayPct %>%;"></div>
+          <!-- Job bar -->
+          <div class="absolute top-2 h-6 rounded <%= barColor %> opacity-80 hover:opacity-100 cursor-pointer transition-opacity <%= healthBorder %>"
+               style="left: <%= Math.max(0, leftPct) %>%; width: <%= widthPct %>%;"
+               title="<%= job.job_number %> | <%= job.client %> | <%= job.start_date %> to <%= job.end_date || 'TBD' %> | <%= job.percent_complete %>%"
+               onclick="window.location='/jobs/<%= job.id %>'">
+            <span class="text-[10px] text-white font-medium px-1 truncate block leading-6"><%= job.percent_complete %>%</span>
+          </div>
+        </div>
+      </div>
+      <% }); %>
+    <% } %>
+  </div>
+</div>
+
+<!-- Job List Table (compact) -->
+<div class="mt-6">
+  <h2 class="text-lg font-semibold text-white mb-3">Schedule Details</h2>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-700">
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Job</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Client</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Start</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">End</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">PM</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Progress</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-700">
+        <% jobs.forEach(function(job) { %>
+        <tr class="hover:bg-slate-700/50 cursor-pointer" onclick="window.location='/jobs/<%= job.id %>'">
+          <td class="px-4 py-3 text-blue-400 font-medium"><%= job.job_number %></td>
+          <td class="px-4 py-3 text-slate-300"><%= job.client %></td>
+          <td class="px-4 py-3">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+              <% if (job.status === 'active') { %>bg-blue-900/60 text-blue-300
+              <% } else if (job.status === 'on_hold') { %>bg-amber-900/60 text-amber-300
+              <% } else { %>bg-teal-900/60 text-teal-300<% } %>"><%= job.status.replace('_', ' ') %></span>
+          </td>
+          <td class="px-4 py-3 text-slate-400 text-xs"><%= job.start_date %></td>
+          <td class="px-4 py-3 text-slate-400 text-xs"><%= job.end_date || 'TBD' %></td>
+          <td class="px-4 py-3 text-slate-300 text-xs"><%= job.pm_name || '-' %></td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-2">
+              <div class="w-16 bg-slate-700 rounded-full h-1.5">
+                <div class="h-1.5 rounded-full bg-blue-500" style="width: <%= job.percent_complete %>%"></div>
+              </div>
+              <span class="text-xs text-slate-400"><%= job.percent_complete %>%</span>
+            </div>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>

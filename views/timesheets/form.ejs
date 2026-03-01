@@ -1,0 +1,202 @@
+<% locals.currentPage = 'timesheets' %>
+
+<!-- Page Header -->
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-white">Log Timesheet</h1>
+  <p class="text-slate-400 text-sm mt-1">Record daily hours for one or more crew members on a job</p>
+</div>
+
+<!-- Form -->
+<form method="POST" action="/timesheets" class="space-y-6" id="timesheetForm">
+
+  <!-- Job & Date Details -->
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Job & Date</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Job -->
+      <div>
+        <label for="job_id" class="block text-sm font-medium text-slate-300 mb-1">Job <span class="text-red-400">*</span></label>
+        <select id="job_id" name="job_id" required
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          <option value="">-- Select Job --</option>
+          <% jobs.forEach(j => { %>
+            <option value="<%= j.id %>" <%= preselectedJobId == j.id ? 'selected' : '' %>><%= j.job_number %> - <%= j.client %></option>
+          <% }) %>
+        </select>
+      </div>
+      <!-- Work Date -->
+      <div>
+        <label for="work_date" class="block text-sm font-medium text-slate-300 mb-1">Work Date <span class="text-red-400">*</span></label>
+        <input type="date" id="work_date" name="work_date" required
+          value="<%= new Date().toISOString().split('T')[0] %>"
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+      </div>
+      <!-- Shift Type -->
+      <div>
+        <label for="shift_type" class="block text-sm font-medium text-slate-300 mb-1">Shift Type</label>
+        <select id="shift_type" name="shift_type"
+          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          <option value="day">Day</option>
+          <option value="night">Night</option>
+          <option value="split">Split</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Crew Entries -->
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide">Crew Entries</h2>
+      <button type="button" id="addEntryBtn" class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-medium rounded-lg transition-colors border border-amber-500/30">
+        + Add Another Crew Member
+      </button>
+    </div>
+
+    <div id="entriesContainer">
+      <!-- Entry Row 0 -->
+      <div class="entry-row border border-slate-600 rounded-lg p-4 mb-4" data-index="0">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Crew Member #1</span>
+          <button type="button" class="remove-entry-btn text-red-400 hover:text-red-300 text-xs font-medium hidden" title="Remove this entry">Remove</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Crew Member -->
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Crew Member <span class="text-red-400">*</span></label>
+            <select name="entries[0][crew_member_id]" required
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+              <option value="">-- Select --</option>
+              <% crew.forEach(c => { %>
+                <option value="<%= c.id %>"><%= c.full_name %> (<%= c.role.replace('_', ' ') %>)</option>
+              <% }) %>
+            </select>
+          </div>
+          <!-- Start Time -->
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Start Time <span class="text-red-400">*</span></label>
+            <input type="time" name="entries[0][start_time]" required value="06:00"
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          </div>
+          <!-- End Time -->
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">End Time <span class="text-red-400">*</span></label>
+            <input type="time" name="entries[0][end_time]" required value="14:30"
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          </div>
+          <!-- Break -->
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Break (minutes)</label>
+            <input type="number" name="entries[0][break_minutes]" value="30" min="0" max="120"
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          </div>
+          <!-- Role on Site -->
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Role on Site</label>
+            <input type="text" name="entries[0][role_on_site]" placeholder="e.g. TC, Leading Hand"
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          </div>
+          <!-- Notes -->
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Notes</label>
+            <input type="text" name="entries[0][notes]" placeholder="Optional notes"
+              class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex items-center gap-3">
+    <button type="submit" class="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold rounded-lg transition-colors">
+      Submit Timesheet
+    </button>
+    <a href="/timesheets" class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Cancel</a>
+  </div>
+</form>
+
+<script>
+(function() {
+  let entryIndex = 0;
+  const container = document.getElementById('entriesContainer');
+  const addBtn = document.getElementById('addEntryBtn');
+  const crewOptions = document.querySelector('.entry-row select[name="entries[0][crew_member_id]"]').innerHTML;
+
+  addBtn.addEventListener('click', function() {
+    entryIndex++;
+    const div = document.createElement('div');
+    div.className = 'entry-row border border-slate-600 rounded-lg p-4 mb-4';
+    div.setAttribute('data-index', entryIndex);
+    div.innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Crew Member #${entryIndex + 1}</span>
+        <button type="button" class="remove-entry-btn text-red-400 hover:text-red-300 text-xs font-medium" title="Remove this entry">Remove</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1">Crew Member <span class="text-red-400">*</span></label>
+          <select name="entries[${entryIndex}][crew_member_id]" required
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            ${crewOptions}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1">Start Time <span class="text-red-400">*</span></label>
+          <input type="time" name="entries[${entryIndex}][start_time]" required value="06:00"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1">End Time <span class="text-red-400">*</span></label>
+          <input type="time" name="entries[${entryIndex}][end_time]" required value="14:30"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1">Break (minutes)</label>
+          <input type="number" name="entries[${entryIndex}][break_minutes]" value="30" min="0" max="120"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1">Role on Site</label>
+          <input type="text" name="entries[${entryIndex}][role_on_site]" placeholder="e.g. TC, Leading Hand"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1">Notes</label>
+          <input type="text" name="entries[${entryIndex}][notes]" placeholder="Optional notes"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+    updateRemoveButtons();
+  });
+
+  container.addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-entry-btn')) {
+      e.target.closest('.entry-row').remove();
+      updateRemoveButtons();
+      renumberEntries();
+    }
+  });
+
+  function updateRemoveButtons() {
+    const rows = container.querySelectorAll('.entry-row');
+    rows.forEach((row, i) => {
+      const btn = row.querySelector('.remove-entry-btn');
+      if (rows.length > 1) {
+        btn.classList.remove('hidden');
+      } else {
+        btn.classList.add('hidden');
+      }
+    });
+  }
+
+  function renumberEntries() {
+    const rows = container.querySelectorAll('.entry-row');
+    rows.forEach((row, i) => {
+      row.querySelector('.text-slate-500').textContent = `Crew Member #${i + 1}`;
+    });
+  }
+})();
+</script>

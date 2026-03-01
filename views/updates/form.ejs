@@ -1,0 +1,77 @@
+<%
+  const isEdit = !!update;
+  const formAction = '/updates';
+  const selectedJobId = (isEdit && update.job_id) ? update.job_id : (prefillJobId || '');
+  const returnTo = '/updates';
+  // Calculate next Friday for default week ending
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const daysUntilFriday = (5 - dayOfWeek + 7) % 7 || 7;
+  const nextFriday = new Date(today);
+  nextFriday.setDate(today.getDate() + daysUntilFriday);
+  const defaultWeekEnding = nextFriday.toISOString().split('T')[0];
+%>
+
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Header -->
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-white">Submit Weekly Update</h1>
+  </div>
+
+  <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+    <form method="POST" action="<%= formAction %>">
+      <input type="hidden" name="return_to" value="<%= returnTo %>">
+
+      <div class="space-y-6">
+        <!-- Job -->
+        <div>
+          <label for="job_id" class="block text-sm font-medium text-slate-300 mb-1">Job <span class="text-red-400">*</span></label>
+          <select id="job_id" name="job_id" required class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="">Select a job...</option>
+            <% jobs.forEach(function(job) { %>
+              <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Week Ending -->
+        <div>
+          <label for="week_ending" class="block text-sm font-medium text-slate-300 mb-1">Week Ending <span class="text-red-400">*</span></label>
+          <input type="date" id="week_ending" name="week_ending" required value="<%= isEdit && update.week_ending ? new Date(update.week_ending).toISOString().split('T')[0] : defaultWeekEnding %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+        </div>
+
+        <!-- Summary -->
+        <div>
+          <label for="summary" class="block text-sm font-medium text-slate-300 mb-1">Summary <span class="text-red-400">*</span></label>
+          <textarea id="summary" name="summary" rows="4" required class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Summary of progress this week..."><%= isEdit && update.summary ? update.summary : '' %></textarea>
+        </div>
+
+        <!-- Milestones Achieved -->
+        <div>
+          <label for="milestones" class="block text-sm font-medium text-slate-300 mb-1">Milestones Achieved</label>
+          <textarea id="milestones" name="milestones" rows="3" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Key milestones completed this week..."><%= isEdit && update.milestones ? update.milestones : '' %></textarea>
+        </div>
+
+        <!-- Issues / Risks -->
+        <div>
+          <label for="issues_risks" class="block text-sm font-medium text-slate-300 mb-1">Issues / Risks</label>
+          <textarea id="issues_risks" name="issues_risks" rows="3" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Any issues or risks identified..."><%= isEdit && update.issues_risks ? update.issues_risks : '' %></textarea>
+        </div>
+
+        <!-- Blockers / Support Needed -->
+        <div>
+          <label for="blockers" class="block text-sm font-medium text-slate-300 mb-1">Blockers / Support Needed</label>
+          <textarea id="blockers" name="blockers" rows="3" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Any blockers or support needed..."><%= isEdit && update.blockers ? update.blockers : '' %></textarea>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-slate-700">
+        <a href="/updates" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition font-medium">Cancel</a>
+        <button type="submit" class="px-6 py-2 bg-amber-500 text-slate-900 rounded-lg hover:bg-amber-400 transition font-semibold">
+          Submit Update
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
