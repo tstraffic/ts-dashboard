@@ -1,0 +1,178 @@
+<% locals.currentPage = 'reports' %>
+
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-white">Reports & Exports</h1>
+    <p class="text-slate-400 text-sm mt-1">Export data and generate reports</p>
+  </div>
+</div>
+
+<!-- Quick Exports -->
+<div class="mb-8">
+  <h2 class="text-lg font-semibold text-white mb-4">Quick Exports</h2>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+
+    <!-- Jobs -->
+    <a href="/exports/jobs.csv" class="bg-slate-800 border border-slate-700 rounded-xl p-5 hover:border-brand-500/50 hover:bg-slate-750 transition-colors group">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 bg-blue-900/50 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        </div>
+        <div>
+          <p class="text-white font-medium group-hover:text-brand-400 transition-colors">Jobs Register</p>
+          <p class="text-xs text-slate-500">All jobs with status & budget</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500">CSV download</p>
+    </a>
+
+    <!-- Timesheets -->
+    <a href="/exports/timesheets.csv" class="bg-slate-800 border border-slate-700 rounded-xl p-5 hover:border-brand-500/50 hover:bg-slate-750 transition-colors group">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 bg-emerald-900/50 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div>
+          <p class="text-white font-medium group-hover:text-brand-400 transition-colors">Timesheets</p>
+          <p class="text-xs text-slate-500">All timesheet entries</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500">CSV download</p>
+    </a>
+
+    <!-- Incidents -->
+    <a href="/exports/incidents.csv" class="bg-slate-800 border border-slate-700 rounded-xl p-5 hover:border-brand-500/50 hover:bg-slate-750 transition-colors group">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 bg-red-900/50 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        </div>
+        <div>
+          <p class="text-white font-medium group-hover:text-brand-400 transition-colors">Incidents</p>
+          <p class="text-xs text-slate-500">Safety incidents & reports</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500">CSV download</p>
+    </a>
+
+    <!-- Compliance -->
+    <a href="/exports/compliance.csv" class="bg-slate-800 border border-slate-700 rounded-xl p-5 hover:border-brand-500/50 hover:bg-slate-750 transition-colors group">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 bg-purple-900/50 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </div>
+        <div>
+          <p class="text-white font-medium group-hover:text-brand-400 transition-colors">Compliance</p>
+          <p class="text-xs text-slate-500">Permits, approvals & certs</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500">CSV download</p>
+    </a>
+
+    <!-- Equipment -->
+    <a href="/exports/equipment.csv" class="bg-slate-800 border border-slate-700 rounded-xl p-5 hover:border-brand-500/50 hover:bg-slate-750 transition-colors group">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 bg-orange-900/50 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+        </div>
+        <div>
+          <p class="text-white font-medium group-hover:text-brand-400 transition-colors">Equipment</p>
+          <p class="text-xs text-slate-500">Assets & assignments</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500">CSV download</p>
+    </a>
+
+    <!-- Allocations -->
+    <a href="/exports/allocations.csv?from_date=<%= new Date().toISOString().split('T')[0] %>&to_date=<%= (() => { const d = new Date(); d.setDate(d.getDate() + 6); return d.toISOString().split('T')[0]; })() %>" class="bg-slate-800 border border-slate-700 rounded-xl p-5 hover:border-brand-500/50 hover:bg-slate-750 transition-colors group">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 bg-teal-900/50 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </div>
+        <div>
+          <p class="text-white font-medium group-hover:text-brand-400 transition-colors">Allocations</p>
+          <p class="text-xs text-slate-500">This week's crew bookings</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500">CSV download</p>
+    </a>
+
+    <% if (user && (user.role === 'management' || user.role === 'accounts')) { %>
+    <!-- Budgets -->
+    <a href="/exports/budgets.csv" class="bg-slate-800 border border-slate-700 rounded-xl p-5 hover:border-brand-500/50 hover:bg-slate-750 transition-colors group">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 bg-yellow-900/50 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div>
+          <p class="text-white font-medium group-hover:text-brand-400 transition-colors">Budgets</p>
+          <p class="text-xs text-slate-500">Budget & cost summary</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500">CSV download</p>
+    </a>
+    <% } %>
+
+  </div>
+</div>
+
+<!-- Date Range Exports -->
+<div class="mb-8">
+  <h2 class="text-lg font-semibold text-white mb-4">Date Range Exports</h2>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- Timesheet Summary -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+      <h3 class="text-white font-medium mb-3">Timesheet Weekly Summary</h3>
+      <p class="text-xs text-slate-500 mb-4">Hours per crew member for a selected week</p>
+      <form method="GET" action="/exports/timesheet-summary.csv" class="flex items-end gap-3">
+        <div class="flex-1">
+          <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Week of</label>
+          <input type="date" name="week_of" value="<%= new Date().toISOString().split('T')[0] %>"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        </div>
+        <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Export CSV</button>
+      </form>
+    </div>
+
+    <!-- Allocations Date Range -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+      <h3 class="text-white font-medium mb-3">Allocations by Date Range</h3>
+      <p class="text-xs text-slate-500 mb-4">Crew allocations for a specific period</p>
+      <form method="GET" action="/exports/allocations.csv" class="flex items-end gap-3">
+        <div class="flex-1">
+          <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">From</label>
+          <input type="date" name="from_date" value="<%= new Date().toISOString().split('T')[0] %>"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        </div>
+        <div class="flex-1">
+          <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">To</label>
+          <input type="date" name="to_date" value="<%= (() => { const d = new Date(); d.setDate(d.getDate() + 6); return d.toISOString().split('T')[0]; })() %>"
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        </div>
+        <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Export CSV</button>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<!-- Job PDF Report -->
+<div class="mb-8">
+  <h2 class="text-lg font-semibold text-white mb-4">Job Report (PDF)</h2>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 max-w-xl">
+    <p class="text-xs text-slate-500 mb-4">Generate a PDF summary for a specific job including details, budget, timesheets, equipment, and compliance items.</p>
+    <form method="GET" action="/exports/job-report.pdf" class="flex items-end gap-3">
+      <div class="flex-1">
+        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Select Job</label>
+        <select name="job_id" required class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">Choose a job...</option>
+          <% jobs.forEach(j => { %>
+            <option value="<%= j.id %>"><%= j.job_number %> - <%= j.client %></option>
+          <% }) %>
+        </select>
+      </div>
+      <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Generate PDF</button>
+    </form>
+  </div>
+</div>

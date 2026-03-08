@@ -27,8 +27,12 @@
       <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Type</label>
       <select name="incident_type" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Types</option>
-        <option value="injury" <%= filters.incident_type === 'injury' ? 'selected' : '' %>>Injury</option>
         <option value="near_miss" <%= filters.incident_type === 'near_miss' ? 'selected' : '' %>>Near Miss</option>
+        <option value="traffic_incident" <%= filters.incident_type === 'traffic_incident' ? 'selected' : '' %>>Traffic Incident</option>
+        <option value="worker_injury" <%= filters.incident_type === 'worker_injury' ? 'selected' : '' %>>Worker Injury</option>
+        <option value="vehicle_damage" <%= filters.incident_type === 'vehicle_damage' ? 'selected' : '' %>>Vehicle Damage</option>
+        <option value="public_complaint" <%= filters.incident_type === 'public_complaint' ? 'selected' : '' %>>Public Complaint</option>
+        <option value="injury" <%= filters.incident_type === 'injury' ? 'selected' : '' %>>Injury</option>
         <option value="hazard" <%= filters.incident_type === 'hazard' ? 'selected' : '' %>>Hazard</option>
         <option value="property_damage" <%= filters.incident_type === 'property_damage' ? 'selected' : '' %>>Property Damage</option>
         <option value="environmental" <%= filters.incident_type === 'environmental' ? 'selected' : '' %>>Environmental</option>
@@ -62,6 +66,11 @@
     <div class="flex gap-2">
       <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Filter</button>
       <a href="/incidents" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Clear</a>
+      <a href="/exports/incidents.csv?job_id=<%= filters.job_id || '' %>&incident_type=<%= filters.incident_type || '' %>&severity=<%= filters.severity || '' %>&status=<%= filters.status || '' %>"
+        class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Export CSV
+      </a>
     </div>
   </form>
 </div>
@@ -99,6 +108,10 @@
           <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
             <% if (incident.incident_type === 'injury') { %>bg-red-900/60 text-red-300
             <% } else if (incident.incident_type === 'near_miss') { %>bg-orange-900/60 text-brand-300
+            <% } else if (incident.incident_type === 'traffic_incident') { %>bg-red-900/60 text-red-300
+            <% } else if (incident.incident_type === 'worker_injury') { %>bg-red-900/60 text-red-300
+            <% } else if (incident.incident_type === 'vehicle_damage') { %>bg-blue-900/60 text-blue-300
+            <% } else if (incident.incident_type === 'public_complaint') { %>bg-purple-900/60 text-purple-300
             <% } else if (incident.incident_type === 'hazard') { %>bg-yellow-900/60 text-yellow-300
             <% } else if (incident.incident_type === 'property_damage') { %>bg-orange-900/60 text-orange-300
             <% } else if (incident.incident_type === 'environmental') { %>bg-emerald-900/60 text-emerald-300

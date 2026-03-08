@@ -46,6 +46,11 @@
         <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Phone</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Licence</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Licence Expiry</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">TCP Level</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">White Card Expiry</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">TC Ticket Expiry</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">TI Ticket Expiry</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Company</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Actions</th>
       </tr>
@@ -55,6 +60,12 @@
       <%
         const isExpiringSoon = m.licence_expiry && (new Date(m.licence_expiry) - new Date()) < 30 * 24 * 60 * 60 * 1000 && new Date(m.licence_expiry) > new Date();
         const isExpired = m.licence_expiry && new Date(m.licence_expiry) < new Date();
+        const wcExpired = m.white_card_expiry && new Date(m.white_card_expiry) < new Date();
+        const wcExpiring = m.white_card_expiry && !wcExpired && (new Date(m.white_card_expiry) - new Date()) < 30 * 24 * 60 * 60 * 1000;
+        const tcExpired = m.tc_ticket_expiry && new Date(m.tc_ticket_expiry) < new Date();
+        const tcExpiring = m.tc_ticket_expiry && !tcExpired && (new Date(m.tc_ticket_expiry) - new Date()) < 30 * 24 * 60 * 60 * 1000;
+        const tiExpired = m.ti_ticket_expiry && new Date(m.ti_ticket_expiry) < new Date();
+        const tiExpiring = m.ti_ticket_expiry && !tiExpired && (new Date(m.ti_ticket_expiry) - new Date()) < 30 * 24 * 60 * 60 * 1000;
       %>
       <tr class="hover:bg-slate-700/50 cursor-pointer" onclick="window.location='/timesheets/crew/<%= m.id %>/edit'">
         <td class="px-4 py-3 text-white font-medium"><%= m.full_name %></td>
@@ -71,6 +82,35 @@
             -
           <% } %>
         </td>
+        <td class="px-4 py-3 text-slate-300"><%= m.tcp_level || '-' %></td>
+        <td class="px-4 py-3 <%= wcExpired ? 'text-red-400 font-semibold' : (wcExpiring ? 'text-orange-400' : 'text-slate-300') %>">
+          <% if (m.white_card_expiry) { %>
+            <%= new Date(m.white_card_expiry).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
+            <% if (wcExpired) { %><span class="text-xs ml-1">EXPIRED</span><% } %>
+            <% if (wcExpiring) { %><span class="text-xs ml-1">SOON</span><% } %>
+          <% } else { %>
+            -
+          <% } %>
+        </td>
+        <td class="px-4 py-3 <%= tcExpired ? 'text-red-400 font-semibold' : (tcExpiring ? 'text-orange-400' : 'text-slate-300') %>">
+          <% if (m.tc_ticket_expiry) { %>
+            <%= new Date(m.tc_ticket_expiry).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
+            <% if (tcExpired) { %><span class="text-xs ml-1">EXPIRED</span><% } %>
+            <% if (tcExpiring) { %><span class="text-xs ml-1">SOON</span><% } %>
+          <% } else { %>
+            -
+          <% } %>
+        </td>
+        <td class="px-4 py-3 <%= tiExpired ? 'text-red-400 font-semibold' : (tiExpiring ? 'text-orange-400' : 'text-slate-300') %>">
+          <% if (m.ti_ticket_expiry) { %>
+            <%= new Date(m.ti_ticket_expiry).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
+            <% if (tiExpired) { %><span class="text-xs ml-1">EXPIRED</span><% } %>
+            <% if (tiExpiring) { %><span class="text-xs ml-1">SOON</span><% } %>
+          <% } else { %>
+            -
+          <% } %>
+        </td>
+        <td class="px-4 py-3 text-slate-300"><%= m.company || '-' %></td>
         <td class="px-4 py-3">
           <% if (m.active) { %>
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-900/60 text-emerald-300">Active</span>

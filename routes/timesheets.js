@@ -165,11 +165,11 @@ router.get('/crew/new', (req, res) => {
 
 router.post('/crew', (req, res) => {
   const db = getDb();
-  const { full_name, employee_id, role, phone, email, licence_type, licence_expiry, induction_date, hourly_rate } = req.body;
+  const { full_name, employee_id, role, phone, email, licence_type, licence_expiry, induction_date, hourly_rate, tcp_level, white_card, white_card_expiry, first_aid, first_aid_expiry, tc_ticket, tc_ticket_expiry, ti_ticket, ti_ticket_expiry, induction_status, company, medical_expiry, employment_type } = req.body;
   db.prepare(`
-    INSERT INTO crew_members (full_name, employee_id, role, phone, email, licence_type, licence_expiry, induction_date, hourly_rate)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(full_name, employee_id || null, role || 'traffic_controller', phone || '', email || '', licence_type || '', licence_expiry || null, induction_date || null, parseFloat(hourly_rate) || 0);
+    INSERT INTO crew_members (full_name, employee_id, role, phone, email, licence_type, licence_expiry, induction_date, hourly_rate, tcp_level, white_card, white_card_expiry, first_aid, first_aid_expiry, tc_ticket, tc_ticket_expiry, ti_ticket, ti_ticket_expiry, induction_status, company, medical_expiry, employment_type)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(full_name, employee_id || null, role || 'traffic_controller', phone || '', email || '', licence_type || '', licence_expiry || null, induction_date || null, parseFloat(hourly_rate) || 0, tcp_level || '', white_card || '', white_card_expiry || null, first_aid || '', first_aid_expiry || null, tc_ticket || '', tc_ticket_expiry || null, ti_ticket || '', ti_ticket_expiry || null, induction_status || 'pending', company || '', medical_expiry || null, employment_type || 'employee');
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'crew_member', entityLabel: full_name, ip: req.ip });
   req.flash('success', `Crew member ${full_name} added.`);
@@ -189,10 +189,10 @@ router.get('/crew/:id/edit', (req, res) => {
 
 router.post('/crew/:id', (req, res) => {
   const db = getDb();
-  const { full_name, employee_id, role, phone, email, licence_type, licence_expiry, induction_date, hourly_rate, active } = req.body;
+  const { full_name, employee_id, role, phone, email, licence_type, licence_expiry, induction_date, hourly_rate, active, tcp_level, white_card, white_card_expiry, first_aid, first_aid_expiry, tc_ticket, tc_ticket_expiry, ti_ticket, ti_ticket_expiry, induction_status, company, medical_expiry, employment_type } = req.body;
   db.prepare(`
-    UPDATE crew_members SET full_name=?, employee_id=?, role=?, phone=?, email=?, licence_type=?, licence_expiry=?, induction_date=?, hourly_rate=?, active=? WHERE id=?
-  `).run(full_name, employee_id || null, role, phone || '', email || '', licence_type || '', licence_expiry || null, induction_date || null, parseFloat(hourly_rate) || 0, active ? 1 : 0, req.params.id);
+    UPDATE crew_members SET full_name=?, employee_id=?, role=?, phone=?, email=?, licence_type=?, licence_expiry=?, induction_date=?, hourly_rate=?, active=?, tcp_level=?, white_card=?, white_card_expiry=?, first_aid=?, first_aid_expiry=?, tc_ticket=?, tc_ticket_expiry=?, ti_ticket=?, ti_ticket_expiry=?, induction_status=?, company=?, medical_expiry=?, employment_type=? WHERE id=?
+  `).run(full_name, employee_id || null, role, phone || '', email || '', licence_type || '', licence_expiry || null, induction_date || null, parseFloat(hourly_rate) || 0, active ? 1 : 0, tcp_level || '', white_card || '', white_card_expiry || null, first_aid || '', first_aid_expiry || null, tc_ticket || '', tc_ticket_expiry || null, ti_ticket || '', ti_ticket_expiry || null, induction_status || 'pending', company || '', medical_expiry || null, employment_type || 'employee', req.params.id);
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'crew_member', entityId: parseInt(req.params.id), entityLabel: full_name, ip: req.ip });
   req.flash('success', `Crew member updated.`);

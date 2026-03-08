@@ -5,7 +5,13 @@
     tmp_approval: 'TMP Approval',
     council_permit: 'Council Permit',
     traffic_guidance: 'Traffic Guidance',
+    rol: 'ROL',
     insurance: 'Insurance',
+    insurance_certificate: 'Insurance Certificate',
+    public_liability: 'Public Liability',
+    vehicle_registration: 'Vehicle Registration',
+    plant_inspection: 'Plant Inspection',
+    staff_certification: 'Staff Certification',
     swms_review: 'SWMS Review',
     induction: 'Induction',
     road_occupancy: 'Road Occupancy',
@@ -78,8 +84,13 @@
       </div>
 
       <!-- Apply -->
-      <div>
-        <button type="submit" class="w-full px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500 transition font-medium">Apply Filters</button>
+      <div class="flex gap-2 items-end">
+        <button type="submit" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500 transition font-medium">Apply Filters</button>
+        <a href="/exports/compliance.csv?status=<%= filters.status || '' %>&item_type=<%= filters.item_type || '' %>&job_id=<%= filters.job_id || '' %>"
+          class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Export CSV
+        </a>
       </div>
     </div>
   </form>
@@ -109,11 +120,18 @@
             <% items.forEach(function(item) { %>
               <%
                 const isOverdue = item.due_date && item.status !== 'approved' && new Date(item.due_date) < new Date();
+                const isDueSoon = item.due_date && item.status !== 'approved' && !isOverdue && (new Date(item.due_date) - new Date()) < 14 * 24 * 60 * 60 * 1000;
+                const isExpired = item.expiry_date && new Date(item.expiry_date) < new Date();
                 // Format type: replace underscores, title case
                 const formattedType = item.item_type ? item.item_type.replace(/_/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); }) : '-';
               %>
               <tr class="hover:bg-slate-750 hover:bg-opacity-50">
-                <td class="px-4 py-3 text-white font-medium"><%= item.title %></td>
+                <td class="px-4 py-3 text-white font-medium">
+                  <%= item.title %>
+                  <% if (isExpired) { %>
+                    <span class="ml-2 inline-flex px-1.5 py-0.5 text-xs font-semibold rounded bg-red-900 text-red-300">EXPIRED</span>
+                  <% } %>
+                </td>
                 <td class="px-4 py-3 text-slate-300"><%= formattedType %></td>
                 <td class="px-4 py-3">
                   <% if (item.job_id) { %>
@@ -125,10 +143,11 @@
                 <td class="px-4 py-3">
                   <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= statusColors[item.status] || 'bg-slate-600 text-slate-200' %>"><%= statusLabels[item.status] || item.status %></span>
                 </td>
-                <td class="px-4 py-3 <%= isOverdue ? 'text-red-400 font-semibold' : 'text-slate-300' %>">
+                <td class="px-4 py-3 <%= isOverdue ? 'text-red-400 font-semibold' : isDueSoon ? 'text-orange-400 font-medium' : 'text-slate-300' %>">
                   <% if (item.due_date) { %>
                     <%= new Date(item.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
                     <% if (isOverdue) { %><span class="text-xs ml-1">OVERDUE</span><% } %>
+                    <% if (isDueSoon) { %><span class="text-xs ml-1">DUE SOON</span><% } %>
                   <% } else { %>
                     -
                   <% } %>

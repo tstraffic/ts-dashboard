@@ -5,6 +5,706 @@ const fs = require('fs');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'tstraffic.db');
 
+function runMigrations(db) {
+  // Create migration tracking table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  const isMigrationApplied = db.prepare('SELECT 1 FROM schema_migrations WHERE version = ?');
+  const recordMigration = db.prepare('INSERT INTO schema_migrations (version, name) VALUES (?, ?)');
+
+  // =============================================
+  // Migration 1: Job Register Improvements
+  // =============================================
+  if (!isMigrationApplied.get(1)) {
+    console.log('Running migration 1: Job Register Improvements');
+
+    // Add new columns to jobs (use try/catch for each since column may already exist)
+    const newJobCols = [
+      "ALTER TABLE jobs ADD COLUMN client_project_number TEXT DEFAULT ''",
+      "ALTER TABLE jobs ADD COLUMN project_name TEXT DEFAULT ''",
+      "ALTER TABLE jobs ADD COLUMN principal_contractor TEXT DEFAULT ''",
+      "ALTER TABLE jobs ADD COLUMN traffic_supervisor_id INTEGER REFERENCES users(id)",
+      "ALTER TABLE jobs ADD COLUMN contract_value REAL DEFAULT 0",
+      "ALTER TABLE jobs ADD COLUMN estimated_hours REAL DEFAULT 0",
+      "ALTER TABLE jobs ADD COLUMN crew_size INTEGER DEFAULT 0",
+      "ALTER TABLE jobs ADD COLUMN rol_required INTEGER DEFAULT 0",
+      "ALTER TABLE jobs ADD COLUMN tmp_required INTEGER DEFAULT 0",
+      "ALTER TABLE jobs ADD COLUMN sharepoint_url TEXT DEFAULT ''",
+      "ALTER TABLE jobs ADD COLUMN state TEXT DEFAULT 'NSW'",
+    ];
+    for (const sql of newJobCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    // Recreate jobs table to update status CHECK constraint
+    // Check if migration is already done by looking for 'tender' in the CHECK constraint
+    let needsRecreate = true;
+    try {
+      // If we can insert 'tender' status, the new CHECK is already in place
+      db.exec("CREATE TABLE _migration_test_jobs AS SELECT * FROM jobs WHERE 0");
+      db.exec("DROP TABLE _migration_test_jobs");
+      // Try a more reliable check: see if the old constraint rejects 'tender'
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='jobs'").get();
+      if (tableInfo && tableInfo.sql && tableInfo.sql.includes("'tender'")) {
+        needsRecreate = false;
+      }
+    } catch (e) { /* proceed with recreation */ }
+
+    if (needsRecreate) {
+      db.exec('BEGIN TRANSACTION');
+      try {
+        db.exec(`
+          CREATE TABLE jobs_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_number TEXT UNIQUE NOT NULL,
+            job_name TEXT NOT NULL,
+            client TEXT NOT NULL,
+            site_address TEXT NOT NULL,
+            suburb TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'tender' CHECK(status IN ('tender','won','prestart','active','on_hold','completed','closed')),
+            stage TEXT NOT NULL DEFAULT 'tender' CHECK(stage IN ('tender','prestart','delivery','closeout')),
+            percent_complete INTEGER NOT NULL DEFAULT 0 CHECK(percent_complete >= 0 AND percent_complete <= 100),
+            start_date DATE NOT NULL,
+            end_date DATE,
+            project_manager_id INTEGER REFERENCES users(id),
+            ops_supervisor_id INTEGER REFERENCES users(id),
+            planning_owner_id INTEGER REFERENCES users(id),
+            marketing_owner_id INTEGER REFERENCES users(id),
+            accounts_owner_id INTEGER REFERENCES users(id),
+            health TEXT NOT NULL DEFAULT 'green' CHECK(health IN ('green','amber','red')),
+            accounts_status TEXT NOT NULL DEFAULT 'na' CHECK(accounts_status IN ('na','on_track','overdue','disputed')),
+            division_tags TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            last_update_date DATE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            client_project_number TEXT DEFAULT '',
+            project_name TEXT DEFAULT '',
+            principal_contractor TEXT DEFAULT '',
+            traffic_supervisor_id INTEGER REFERENCES users(id),
+            contract_value REAL DEFAULT 0,
+            estimated_hours REAL DEFAULT 0,
+            crew_size INTEGER DEFAULT 0,
+            rol_required INTEGER DEFAULT 0,
+            tmp_required INTEGER DEFAULT 0,
+            sharepoint_url TEXT DEFAULT '',
+            state TEXT DEFAULT 'NSW'
+          );
+        `);
+
+        db.exec(`
+          INSERT INTO jobs_new (
+            id, job_number, job_name, client, site_address, suburb,
+            status, stage, percent_complete, start_date, end_date,
+            project_manager_id, ops_supervisor_id, planning_owner_id,
+            marketing_owner_id, accounts_owner_id, health, accounts_status,
+            division_tags, notes, last_update_date, created_at, updated_at,
+            client_project_number, project_name, principal_contractor,
+            traffic_supervisor_id, contract_value, estimated_hours,
+            crew_size, rol_required, tmp_required, sharepoint_url, state
+          )
+          SELECT
+            id, job_number, job_name, client, site_address, suburb,
+            CASE status WHEN 'lead' THEN 'tender' WHEN 'lost' THEN 'closed' ELSE status END,
+            stage, percent_complete, start_date, end_date,
+            project_manager_id, ops_supervisor_id, planning_owner_id,
+            marketing_owner_id, accounts_owner_id, health, accounts_status,
+            division_tags, notes, last_update_date, created_at, updated_at,
+            client_project_number, project_name, principal_contractor,
+            traffic_supervisor_id, contract_value, estimated_hours,
+            crew_size, rol_required, tmp_required, sharepoint_url, state
+          FROM jobs;
+        `);
+
+        db.exec('DROP TABLE jobs');
+        db.exec('ALTER TABLE jobs_new RENAME TO jobs');
+
+        // Recreate all indexes on jobs
+        db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+          CREATE INDEX IF NOT EXISTS idx_jobs_job_number ON jobs(job_number);
+          CREATE INDEX IF NOT EXISTS idx_jobs_client ON jobs(client);
+          CREATE INDEX IF NOT EXISTS idx_jobs_suburb ON jobs(suburb);
+          CREATE INDEX IF NOT EXISTS idx_jobs_health ON jobs(health);
+          CREATE INDEX IF NOT EXISTS idx_jobs_pm ON jobs(project_manager_id);
+          CREATE INDEX IF NOT EXISTS idx_jobs_start_date ON jobs(start_date);
+        `);
+
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+    }
+
+    recordMigration.run(1, 'Job Register Improvements');
+    console.log('Migration 1 complete.');
+  }
+
+  // =============================================
+  // Migration 2: Audit Log Enhancement
+  // =============================================
+  if (!isMigrationApplied.get(2)) {
+    console.log('Running migration 2: Audit Log Enhancement');
+
+    const auditCols = [
+      "ALTER TABLE activity_log ADD COLUMN before_value TEXT DEFAULT ''",
+      "ALTER TABLE activity_log ADD COLUMN after_value TEXT DEFAULT ''",
+    ];
+    for (const sql of auditCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    recordMigration.run(2, 'Audit Log Enhancement');
+    console.log('Migration 2 complete.');
+  }
+
+  // =============================================
+  // Migration 3: Crew Competency
+  // =============================================
+  if (!isMigrationApplied.get(3)) {
+    console.log('Running migration 3: Crew Competency');
+
+    const crewCols = [
+      "ALTER TABLE crew_members ADD COLUMN tcp_level TEXT DEFAULT ''",
+      "ALTER TABLE crew_members ADD COLUMN white_card TEXT DEFAULT ''",
+      "ALTER TABLE crew_members ADD COLUMN white_card_expiry DATE",
+      "ALTER TABLE crew_members ADD COLUMN first_aid TEXT DEFAULT ''",
+      "ALTER TABLE crew_members ADD COLUMN first_aid_expiry DATE",
+      "ALTER TABLE crew_members ADD COLUMN tc_ticket TEXT DEFAULT ''",
+      "ALTER TABLE crew_members ADD COLUMN tc_ticket_expiry DATE",
+      "ALTER TABLE crew_members ADD COLUMN ti_ticket TEXT DEFAULT ''",
+      "ALTER TABLE crew_members ADD COLUMN ti_ticket_expiry DATE",
+      "ALTER TABLE crew_members ADD COLUMN induction_status TEXT DEFAULT 'pending'",
+      "ALTER TABLE crew_members ADD COLUMN company TEXT DEFAULT ''",
+      "ALTER TABLE crew_members ADD COLUMN medical_expiry DATE",
+      "ALTER TABLE crew_members ADD COLUMN employment_type TEXT DEFAULT 'employee'",
+      "ALTER TABLE crew_members ADD COLUMN status TEXT DEFAULT 'active'",
+    ];
+    for (const sql of crewCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    recordMigration.run(3, 'Crew Competency');
+    console.log('Migration 3 complete.');
+  }
+
+  // =============================================
+  // Migration 4: Equipment Register
+  // =============================================
+  if (!isMigrationApplied.get(4)) {
+    console.log('Running migration 4: Equipment Register');
+
+    const equipCols = [
+      "ALTER TABLE equipment ADD COLUMN registration TEXT DEFAULT ''",
+      "ALTER TABLE equipment ADD COLUMN location TEXT DEFAULT ''",
+    ];
+    for (const sql of equipCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    // Recreate equipment table to expand category CHECK
+    let needsRecreate = true;
+    try {
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='equipment'").get();
+      if (tableInfo && tableInfo.sql && tableInfo.sql.includes("'ute'")) {
+        needsRecreate = false;
+      }
+    } catch (e) { /* proceed */ }
+
+    if (needsRecreate) {
+      db.exec('BEGIN TRANSACTION');
+      try {
+        db.exec(`
+          CREATE TABLE equipment_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            asset_number TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL CHECK(category IN ('ute','truck','arrow_board','vms_board','trailer','barriers','signs','lights','cone','delineator','vehicle','lighting','barrier','sign','vms','other')),
+            description TEXT DEFAULT '',
+            serial_number TEXT DEFAULT '',
+            purchase_date DATE,
+            purchase_cost REAL DEFAULT 0,
+            current_condition TEXT NOT NULL DEFAULT 'good' CHECK(current_condition IN ('new','good','fair','poor','damaged','decommissioned')),
+            storage_location TEXT DEFAULT '',
+            next_inspection_date DATE,
+            inspection_interval_days INTEGER DEFAULT 90,
+            notes TEXT DEFAULT '',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            registration TEXT DEFAULT '',
+            location TEXT DEFAULT ''
+          );
+        `);
+
+        db.exec(`
+          INSERT INTO equipment_new (
+            id, asset_number, name, category, description, serial_number,
+            purchase_date, purchase_cost, current_condition, storage_location,
+            next_inspection_date, inspection_interval_days, notes, active,
+            created_at, updated_at, registration, location
+          )
+          SELECT
+            id, asset_number, name, category, description, serial_number,
+            purchase_date, purchase_cost, current_condition, storage_location,
+            next_inspection_date, inspection_interval_days, notes, active,
+            created_at, updated_at, registration, location
+          FROM equipment;
+        `);
+
+        db.exec('DROP TABLE equipment');
+        db.exec('ALTER TABLE equipment_new RENAME TO equipment');
+
+        // Recreate all indexes on equipment
+        db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_equipment_category ON equipment(category);
+          CREATE INDEX IF NOT EXISTS idx_equipment_active ON equipment(active);
+        `);
+
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+    }
+
+    recordMigration.run(4, 'Equipment Register');
+    console.log('Migration 4 complete.');
+  }
+
+  // =============================================
+  // Migration 5: Incident Upgrade
+  // =============================================
+  if (!isMigrationApplied.get(5)) {
+    console.log('Running migration 5: Incident Upgrade');
+
+    const incidentCols = [
+      "ALTER TABLE incidents ADD COLUMN traffic_disruption TEXT DEFAULT ''",
+      "ALTER TABLE incidents ADD COLUMN police_notified INTEGER DEFAULT 0",
+      "ALTER TABLE incidents ADD COLUMN client_notified INTEGER DEFAULT 0",
+      "ALTER TABLE incidents ADD COLUMN close_out_date DATE",
+    ];
+    for (const sql of incidentCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    // Recreate incidents table to expand incident_type CHECK
+    let needsRecreate = true;
+    try {
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='incidents'").get();
+      if (tableInfo && tableInfo.sql && tableInfo.sql.includes("'traffic_incident'")) {
+        needsRecreate = false;
+      }
+    } catch (e) { /* proceed */ }
+
+    if (needsRecreate) {
+      db.exec('BEGIN TRANSACTION');
+      try {
+        db.exec(`
+          CREATE TABLE incidents_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+            incident_number TEXT UNIQUE NOT NULL,
+            incident_type TEXT NOT NULL CHECK(incident_type IN ('near_miss','traffic_incident','worker_injury','vehicle_damage','public_complaint','environmental','injury','hazard','property_damage','vehicle','other')),
+            severity TEXT NOT NULL DEFAULT 'low' CHECK(severity IN ('low','medium','high','critical')),
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            location TEXT DEFAULT '',
+            incident_date DATE NOT NULL,
+            incident_time TEXT DEFAULT '',
+            reported_by_id INTEGER NOT NULL REFERENCES users(id),
+            persons_involved TEXT DEFAULT '',
+            witnesses TEXT DEFAULT '',
+            immediate_actions TEXT DEFAULT '',
+            root_cause TEXT DEFAULT '',
+            investigation_status TEXT NOT NULL DEFAULT 'reported' CHECK(investigation_status IN ('reported','investigating','resolved','closed')),
+            notifiable_incident INTEGER NOT NULL DEFAULT 0,
+            photo_path TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            traffic_disruption TEXT DEFAULT '',
+            police_notified INTEGER DEFAULT 0,
+            client_notified INTEGER DEFAULT 0,
+            close_out_date DATE
+          );
+        `);
+
+        db.exec(`
+          INSERT INTO incidents_new (
+            id, job_id, incident_number, incident_type, severity, title,
+            description, location, incident_date, incident_time, reported_by_id,
+            persons_involved, witnesses, immediate_actions, root_cause,
+            investigation_status, notifiable_incident, photo_path,
+            created_at, updated_at, traffic_disruption, police_notified,
+            client_notified, close_out_date
+          )
+          SELECT
+            id, job_id, incident_number, incident_type, severity, title,
+            description, location, incident_date, incident_time, reported_by_id,
+            persons_involved, witnesses, immediate_actions, root_cause,
+            investigation_status, notifiable_incident, photo_path,
+            created_at, updated_at, traffic_disruption, police_notified,
+            client_notified, close_out_date
+          FROM incidents;
+        `);
+
+        db.exec('DROP TABLE incidents');
+        db.exec('ALTER TABLE incidents_new RENAME TO incidents');
+
+        // Recreate all indexes on incidents
+        db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_incidents_job ON incidents(job_id);
+          CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(investigation_status);
+          CREATE INDEX IF NOT EXISTS idx_incidents_severity ON incidents(severity);
+          CREATE INDEX IF NOT EXISTS idx_incidents_date ON incidents(incident_date);
+        `);
+
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+    }
+
+    recordMigration.run(5, 'Incident Upgrade');
+    console.log('Migration 5 complete.');
+  }
+
+  // =============================================
+  // Migration 6: Compliance Register
+  // =============================================
+  if (!isMigrationApplied.get(6)) {
+    console.log('Running migration 6: Compliance Register');
+
+    // Recreate compliance table to expand item_type CHECK
+    let needsRecreate = true;
+    try {
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='compliance'").get();
+      if (tableInfo && tableInfo.sql && tableInfo.sql.includes("'rol'")) {
+        needsRecreate = false;
+      }
+    } catch (e) { /* proceed */ }
+
+    if (needsRecreate) {
+      db.exec('BEGIN TRANSACTION');
+      try {
+        db.exec(`
+          CREATE TABLE compliance_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+            item_type TEXT NOT NULL CHECK(item_type IN ('tmp_approval','council_permit','traffic_guidance','insurance','swms_review','induction','road_occupancy','utility_clearance','environmental','rol','insurance_certificate','public_liability','vehicle_registration','plant_inspection','staff_certification','other')),
+            title TEXT NOT NULL,
+            authority_approver TEXT DEFAULT '',
+            internal_approver_id INTEGER REFERENCES users(id),
+            due_date DATE NOT NULL,
+            submitted_date DATE,
+            approved_date DATE,
+            expiry_date DATE,
+            status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','submitted','approved','rejected','expired')),
+            document_path TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+
+        db.exec(`
+          INSERT INTO compliance_new (
+            id, job_id, item_type, title, authority_approver, internal_approver_id,
+            due_date, submitted_date, approved_date, expiry_date, status,
+            document_path, notes, created_at, updated_at
+          )
+          SELECT
+            id, job_id, item_type, title, authority_approver, internal_approver_id,
+            due_date, submitted_date, approved_date, expiry_date, status,
+            document_path, notes, created_at, updated_at
+          FROM compliance;
+        `);
+
+        db.exec('DROP TABLE compliance');
+        db.exec('ALTER TABLE compliance_new RENAME TO compliance');
+
+        // Recreate all indexes on compliance
+        db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_compliance_job_id ON compliance(job_id);
+          CREATE INDEX IF NOT EXISTS idx_compliance_status ON compliance(status);
+          CREATE INDEX IF NOT EXISTS idx_compliance_due_date ON compliance(due_date);
+        `);
+
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+    }
+
+    recordMigration.run(6, 'Compliance Register');
+    console.log('Migration 6 complete.');
+  }
+
+  // =============================================
+  // Migration 7: Notification Expansion
+  // =============================================
+  if (!isMigrationApplied.get(7)) {
+    console.log('Running migration 7: Notification Expansion');
+
+    // Recreate notifications table to expand type CHECK
+    let needsRecreate = true;
+    try {
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='notifications'").get();
+      if (tableInfo && tableInfo.sql && tableInfo.sql.includes("'rol_pending'")) {
+        needsRecreate = false;
+      }
+    } catch (e) { /* proceed */ }
+
+    if (needsRecreate) {
+      db.exec('BEGIN TRANSACTION');
+      try {
+        db.exec(`
+          CREATE TABLE notifications_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type TEXT NOT NULL CHECK(type IN ('overdue_task','expiring_compliance','missing_update','new_incident','corrective_action_due','follow_up_due','equipment_overdue','critical_defect','timesheet_approval','budget_alert','general','rol_pending','ticket_expiry','equipment_inspection_due','induction_overdue')),
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            link TEXT DEFAULT '',
+            job_id INTEGER REFERENCES jobs(id),
+            is_read INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+
+        db.exec(`
+          INSERT INTO notifications_new (
+            id, user_id, type, title, message, link, job_id, is_read, created_at
+          )
+          SELECT
+            id, user_id, type, title, message, link, job_id, is_read, created_at
+          FROM notifications;
+        `);
+
+        db.exec('DROP TABLE notifications');
+        db.exec('ALTER TABLE notifications_new RENAME TO notifications');
+
+        // Recreate all indexes on notifications
+        db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+          CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(user_id, is_read);
+          CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+        `);
+
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+    }
+
+    recordMigration.run(7, 'Notification Expansion');
+    console.log('Migration 7 complete.');
+  }
+
+  // =============================================
+  // Migration 8: Traffic Plans table (NEW)
+  // =============================================
+  if (!isMigrationApplied.get(8)) {
+    console.log('Running migration 8: Traffic Plans table');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS traffic_plans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        plan_number TEXT UNIQUE NOT NULL,
+        plan_type TEXT NOT NULL CHECK(plan_type IN ('TGS','TCP','TMP')),
+        designer TEXT DEFAULT '',
+        rol_required INTEGER DEFAULT 0,
+        rol_submitted INTEGER DEFAULT 0,
+        rol_approved INTEGER DEFAULT 0,
+        council TEXT DEFAULT '',
+        tfnsw TEXT DEFAULT '',
+        submitted_date DATE,
+        approval_date DATE,
+        approved_date DATE,
+        expiry_date DATE,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','submitted','under_review','approved','rejected','expired')),
+        file_link TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        created_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_traffic_plans_job ON traffic_plans(job_id);
+      CREATE INDEX IF NOT EXISTS idx_traffic_plans_status ON traffic_plans(status);
+      CREATE INDEX IF NOT EXISTS idx_traffic_plans_type ON traffic_plans(plan_type);
+      CREATE INDEX IF NOT EXISTS idx_traffic_plans_expiry ON traffic_plans(expiry_date);
+    `);
+
+    recordMigration.run(8, 'Traffic Plans table');
+    console.log('Migration 8 complete.');
+  }
+
+  // =============================================
+  // Migration 9: Budget Enhancements
+  // =============================================
+  if (!isMigrationApplied.get(9)) {
+    console.log('Running migration 9: Budget Enhancements');
+
+    const budgetCols = [
+      "ALTER TABLE cost_entries ADD COLUMN receipt_url TEXT DEFAULT ''",
+      "ALTER TABLE job_budgets ADD COLUMN budget_contingency REAL NOT NULL DEFAULT 0",
+    ];
+    for (const sql of budgetCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    // Expand notifications type CHECK to include over_budget
+    let needsNotifRecreate = true;
+    try {
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='notifications'").get();
+      if (tableInfo && tableInfo.sql && tableInfo.sql.includes("'over_budget'")) {
+        needsNotifRecreate = false;
+      }
+    } catch (e) { }
+
+    if (needsNotifRecreate) {
+      db.exec('BEGIN TRANSACTION');
+      try {
+        db.exec(`
+          CREATE TABLE notifications_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type TEXT NOT NULL CHECK(type IN ('overdue_task','expiring_compliance','missing_update','corrective_action_due','follow_up_due','equipment_overdue','critical_defect','rol_pending','ticket_expiry','equipment_inspection_due','induction_overdue','over_budget','general')),
+            title TEXT NOT NULL,
+            message TEXT NOT NULL DEFAULT '',
+            link TEXT DEFAULT '',
+            job_id INTEGER REFERENCES jobs(id),
+            is_read INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          );
+          INSERT INTO notifications_new SELECT * FROM notifications;
+          DROP TABLE notifications;
+          ALTER TABLE notifications_new RENAME TO notifications;
+          CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+          CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(user_id, is_read);
+          CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+        `);
+        db.exec('COMMIT');
+      } catch (e) {
+        try { db.exec('ROLLBACK'); } catch (r) { }
+        console.log('Notification table recreation skipped:', e.message);
+      }
+    }
+
+    recordMigration.run(9, 'Budget Enhancements');
+    console.log('Migration 9 complete.');
+  }
+
+  // =============================================
+  // Migration 10: Crew Allocations (Booking Board)
+  // =============================================
+  if (!isMigrationApplied.get(10)) {
+    console.log('Running migration 10: Crew Allocations');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS crew_allocations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        allocation_date DATE NOT NULL,
+        start_time TEXT DEFAULT '06:00',
+        end_time TEXT DEFAULT '14:30',
+        shift_type TEXT NOT NULL DEFAULT 'day' CHECK(shift_type IN ('day','night','split')),
+        role_on_site TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'allocated' CHECK(status IN ('allocated','confirmed','declined','completed','cancelled')),
+        notes TEXT DEFAULT '',
+        allocated_by_id INTEGER NOT NULL REFERENCES users(id),
+        confirmed_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_crew_alloc_date ON crew_allocations(allocation_date);
+      CREATE INDEX IF NOT EXISTS idx_crew_alloc_job ON crew_allocations(job_id);
+      CREATE INDEX IF NOT EXISTS idx_crew_alloc_crew ON crew_allocations(crew_member_id);
+      CREATE INDEX IF NOT EXISTS idx_crew_alloc_status ON crew_allocations(status);
+    `);
+
+    recordMigration.run(10, 'Crew Allocations');
+    console.log('Migration 10 complete.');
+  }
+
+  // =============================================
+  // Migration 11: Integration Hooks
+  // =============================================
+  if (!isMigrationApplied.get(11)) {
+    console.log('Running migration 11: Integration Hooks');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS integration_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider TEXT NOT NULL UNIQUE CHECK(provider IN ('traffio','quickbooks','employment_hero','teams','sharepoint')),
+        enabled INTEGER NOT NULL DEFAULT 0,
+        config_json TEXT DEFAULT '{}',
+        last_sync_at DATETIME,
+        sync_status TEXT DEFAULT 'never' CHECK(sync_status IN ('never','syncing','success','error')),
+        error_message TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS sync_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider TEXT NOT NULL,
+        direction TEXT NOT NULL CHECK(direction IN ('import','export','webhook')),
+        entity_type TEXT NOT NULL,
+        records_processed INTEGER DEFAULT 0,
+        records_created INTEGER DEFAULT 0,
+        records_updated INTEGER DEFAULT 0,
+        records_failed INTEGER DEFAULT 0,
+        error_details TEXT DEFAULT '',
+        triggered_by TEXT DEFAULT 'manual',
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME
+      );
+
+      CREATE TABLE IF NOT EXISTS external_refs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        internal_id INTEGER NOT NULL,
+        external_id TEXT NOT NULL,
+        external_data TEXT DEFAULT '{}',
+        last_synced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(provider, entity_type, internal_id),
+        UNIQUE(provider, entity_type, external_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ext_refs_lookup ON external_refs(provider, entity_type, external_id);
+      CREATE INDEX IF NOT EXISTS idx_sync_log_provider ON sync_log(provider, started_at);
+    `);
+
+    // Seed default provider rows (all disabled)
+    const seedProvider = db.prepare(`INSERT OR IGNORE INTO integration_config (provider) VALUES (?)`);
+    seedProvider.run('traffio');
+    seedProvider.run('quickbooks');
+    seedProvider.run('employment_hero');
+    seedProvider.run('teams');
+    seedProvider.run('sharepoint');
+
+    recordMigration.run(11, 'Integration Hooks');
+    console.log('Migration 11 complete.');
+  }
+
+  console.log('All migrations checked/applied.');
+}
+
 function initializeDatabase() {
   // Ensure data directory exists
   const dataDir = path.dirname(DB_PATH);
@@ -408,6 +1108,9 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
   `);
 
+  // Run migrations to add new columns, expand CHECK constraints, and create new tables
+  runMigrations(db);
+
   // Seed default admin user if no users exist
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
   if (userCount.count === 0) {
@@ -422,7 +1125,7 @@ function initializeDatabase() {
     insertUser.run('marketing_user', bcrypt.hashSync('password', 12), 'Jordan Marketing', 'jordan@tstraffic.com.au', 'marketing');
     insertUser.run('accounts_user', bcrypt.hashSync('password', 12), 'Pat Accounts', 'pat@tstraffic.com.au', 'accounts');
 
-    // Seed sample jobs
+    // Seed sample jobs (use statuses valid under the new CHECK after migration 1 runs)
     const insertJob = db.prepare(`
       INSERT INTO jobs (job_number, job_name, client, site_address, suburb, status, stage, percent_complete, start_date, end_date, project_manager_id, ops_supervisor_id, planning_owner_id, marketing_owner_id, accounts_owner_id, health, accounts_status, last_update_date)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

@@ -60,14 +60,14 @@ router.get('/new', (req, res) => {
 // CREATE
 router.post('/', (req, res) => {
   const db = getDb();
-  const { job_id, incident_type, severity, title, description, location, incident_date, incident_time, persons_involved, witnesses, immediate_actions, notifiable_incident } = req.body;
+  const { job_id, incident_type, severity, title, description, location, incident_date, incident_time, persons_involved, witnesses, immediate_actions, notifiable_incident, traffic_disruption, police_notified, client_notified, close_out_date } = req.body;
   const incident_number = nextIncidentNumber(db);
   const job = db.prepare('SELECT job_number FROM jobs WHERE id = ?').get(job_id);
 
   const result = db.prepare(`
-    INSERT INTO incidents (job_id, incident_number, incident_type, severity, title, description, location, incident_date, incident_time, reported_by_id, persons_involved, witnesses, immediate_actions, notifiable_incident)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(job_id, incident_number, incident_type, severity || 'low', title, description, location || '', incident_date, incident_time || '', req.session.user.id, persons_involved || '', witnesses || '', immediate_actions || '', notifiable_incident ? 1 : 0);
+    INSERT INTO incidents (job_id, incident_number, incident_type, severity, title, description, location, incident_date, incident_time, reported_by_id, persons_involved, witnesses, immediate_actions, notifiable_incident, traffic_disruption, police_notified, client_notified, close_out_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(job_id, incident_number, incident_type, severity || 'low', title, description, location || '', incident_date, incident_time || '', req.session.user.id, persons_involved || '', witnesses || '', immediate_actions || '', notifiable_incident ? 1 : 0, traffic_disruption ? 1 : 0, police_notified ? 1 : 0, client_notified ? 1 : 0, close_out_date || null);
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'incident', entityId: result.lastInsertRowid, entityLabel: `${incident_number} - ${title}`, jobId: parseInt(job_id), jobNumber: job ? job.job_number : '', details: `Severity: ${severity}, Type: ${incident_type}`, ip: req.ip });
 
@@ -131,14 +131,14 @@ router.get('/:id/edit', (req, res) => {
 // UPDATE
 router.post('/:id', (req, res) => {
   const db = getDb();
-  const { job_id, incident_type, severity, title, description, location, incident_date, incident_time, persons_involved, witnesses, immediate_actions, root_cause, investigation_status, notifiable_incident } = req.body;
+  const { job_id, incident_type, severity, title, description, location, incident_date, incident_time, persons_involved, witnesses, immediate_actions, root_cause, investigation_status, notifiable_incident, traffic_disruption, police_notified, client_notified, close_out_date } = req.body;
   const job = db.prepare('SELECT job_number FROM jobs WHERE id = ?').get(job_id);
   const existing = db.prepare('SELECT incident_number FROM incidents WHERE id = ?').get(req.params.id);
 
   db.prepare(`
-    UPDATE incidents SET job_id=?, incident_type=?, severity=?, title=?, description=?, location=?, incident_date=?, incident_time=?, persons_involved=?, witnesses=?, immediate_actions=?, root_cause=?, investigation_status=?, notifiable_incident=?, updated_at=CURRENT_TIMESTAMP
+    UPDATE incidents SET job_id=?, incident_type=?, severity=?, title=?, description=?, location=?, incident_date=?, incident_time=?, persons_involved=?, witnesses=?, immediate_actions=?, root_cause=?, investigation_status=?, notifiable_incident=?, traffic_disruption=?, police_notified=?, client_notified=?, close_out_date=?, updated_at=CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(job_id, incident_type, severity, title, description, location || '', incident_date, incident_time || '', persons_involved || '', witnesses || '', immediate_actions || '', root_cause || '', investigation_status, notifiable_incident ? 1 : 0, req.params.id);
+  `).run(job_id, incident_type, severity, title, description, location || '', incident_date, incident_time || '', persons_involved || '', witnesses || '', immediate_actions || '', root_cause || '', investigation_status, notifiable_incident ? 1 : 0, traffic_disruption ? 1 : 0, police_notified ? 1 : 0, client_notified ? 1 : 0, close_out_date || null, req.params.id);
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'incident', entityId: parseInt(req.params.id), entityLabel: existing ? existing.incident_number : title, jobId: parseInt(job_id), jobNumber: job ? job.job_number : '', ip: req.ip });
 

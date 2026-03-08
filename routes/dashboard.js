@@ -8,6 +8,7 @@ router.get('/', (req, res) => {
   const user = req.session.user;
   const today = new Date().toISOString().split('T')[0];
   const next14 = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+  const next30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
   const last7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
 
   // KPI counts
@@ -20,25 +21,43 @@ router.get('/', (req, res) => {
   // Safety KPIs
   const openIncidents = db.prepare("SELECT COUNT(*) as count FROM incidents WHERE investigation_status NOT IN ('closed', 'resolved')").get().count;
   const overdueCorrectiveActions = db.prepare("SELECT COUNT(*) as count FROM corrective_actions WHERE due_date < ? AND status != 'completed'").get(today).count;
+  const notifiableIncidents = db.prepare("SELECT COUNT(*) as count FROM incidents WHERE notifiable_incident = 1 AND investigation_status NOT IN ('closed', 'resolved')").get().count;
 
   // Ops KPIs
   const crewHoursThisWeek = db.prepare(`
     SELECT COALESCE(SUM(total_hours), 0) as total FROM timesheets
     WHERE work_date >= date('now', '-7 days')
   `).get().total;
+  const crewDeployedToday = db.prepare("SELECT COUNT(DISTINCT crew_member_id) as count FROM timesheets WHERE work_date = ?").get(today).count;
   const equipmentDeployed = db.prepare("SELECT COUNT(*) as count FROM equipment_assignments WHERE actual_return_date IS NULL").get().count;
+  const unconfirmedAllocations = db.prepare("SELECT COUNT(*) as count FROM crew_allocations WHERE allocation_date = ? AND status = 'allocated'").get(today).count;
   const openDefects = db.prepare("SELECT COUNT(*) as count FROM defects WHERE status NOT IN ('closed', 'deferred')").get().count;
+
+  // Approvals KPIs
+  const rolPending = db.prepare("SELECT COUNT(*) as count FROM traffic_plans WHERE rol_required = 1 AND (rol_approved IS NULL OR rol_approved = 0) AND status NOT IN ('rejected','expired')").get().count;
+  const tmpPending = db.prepare("SELECT COUNT(*) as count FROM traffic_plans WHERE plan_type = 'TMP' AND status NOT IN ('approved','rejected','expired')").get().count;
+  const ticketsExpiring = db.prepare(`
+    SELECT COUNT(*) as count FROM crew_members WHERE active = 1 AND (
+      (tc_ticket_expiry IS NOT NULL AND tc_ticket_expiry BETWEEN ? AND ?)
+      OR (ti_ticket_expiry IS NOT NULL AND ti_ticket_expiry BETWEEN ? AND ?)
+      OR (white_card_expiry IS NOT NULL AND white_card_expiry BETWEEN ? AND ?)
+      OR (first_aid_expiry IS NOT NULL AND first_aid_expiry BETWEEN ? AND ?)
+      OR (medical_expiry IS NOT NULL AND medical_expiry BETWEEN ? AND ?)
+    )
+  `).get(today, next30, today, next30, today, next30, today, next30, today, next30).count;
 
   // Financial KPIs (accounts/management only)
   let totalContractValue = 0;
   let totalSpend = 0;
   let accountsOverdue = 0;
   let accountsDisputed = 0;
+  let revenueThisMonth = 0;
   if (canViewAccounts(user)) {
     accountsOverdue = db.prepare("SELECT COUNT(*) as count FROM jobs WHERE accounts_status = 'overdue'").get().count;
     accountsDisputed = db.prepare("SELECT COUNT(*) as count FROM jobs WHERE accounts_status = 'disputed'").get().count;
     totalContractValue = db.prepare("SELECT COALESCE(SUM(contract_value), 0) as total FROM job_budgets").get().total;
     totalSpend = db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM cost_entries").get().total;
+    revenueThisMonth = db.prepare("SELECT COALESCE(SUM(jb.contract_value), 0) as total FROM job_budgets jb JOIN jobs j ON jb.job_id = j.id WHERE j.status IN ('active','completed')").get().total;
   }
 
   // My Jobs
@@ -88,9 +107,10 @@ router.get('/', (req, res) => {
     user,
     kpi: {
       activeJobs, startingSoon, overdueTasks, overdueCompliance, missingUpdates,
-      openIncidents, overdueCorrectiveActions,
-      crewHoursThisWeek, equipmentDeployed, openDefects,
-      totalContractValue, totalSpend, accountsOverdue, accountsDisputed
+      openIncidents, overdueCorrectiveActions, notifiableIncidents,
+      crewHoursThisWeek, crewDeployedToday, equipmentDeployed, openDefects, unconfirmedAllocations,
+      rolPending, tmpPending, ticketsExpiring,
+      totalContractValue, totalSpend, revenueThisMonth, accountsOverdue, accountsDisputed
     },
     myJobs,
     needsAttention,

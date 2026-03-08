@@ -49,12 +49,12 @@ router.get('/new', (req, res) => {
 // CREATE EQUIPMENT
 router.post('/', (req, res) => {
   const db = getDb();
-  const { asset_number, name, category, description, serial_number, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes } = req.body;
+  const { asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes } = req.body;
 
   const result = db.prepare(`
-    INSERT INTO equipment (asset_number, name, category, description, serial_number, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(asset_number, name, category, description || '', serial_number || '', purchase_date || null, parseFloat(purchase_cost) || 0, current_condition || 'good', storage_location || '', next_inspection_date || null, parseInt(inspection_interval_days) || 90, notes || '');
+    INSERT INTO equipment (asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(asset_number, name, category, description || '', serial_number || '', registration || '', location || '', purchase_date || null, parseFloat(purchase_cost) || 0, current_condition || 'good', storage_location || '', next_inspection_date || null, parseInt(inspection_interval_days) || 90, notes || '');
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'equipment', entityId: result.lastInsertRowid, entityLabel: `${asset_number} - ${name}`, ip: req.ip });
   req.flash('success', `Equipment ${asset_number} added.`);
@@ -103,11 +103,11 @@ router.get('/:id/edit', (req, res) => {
 // UPDATE EQUIPMENT
 router.post('/:id', (req, res) => {
   const db = getDb();
-  const { asset_number, name, category, description, serial_number, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, active } = req.body;
+  const { asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, active } = req.body;
 
   db.prepare(`
-    UPDATE equipment SET asset_number=?, name=?, category=?, description=?, serial_number=?, purchase_date=?, purchase_cost=?, current_condition=?, storage_location=?, next_inspection_date=?, inspection_interval_days=?, notes=?, active=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
-  `).run(asset_number, name, category, description || '', serial_number || '', purchase_date || null, parseFloat(purchase_cost) || 0, current_condition, storage_location || '', next_inspection_date || null, parseInt(inspection_interval_days) || 90, notes || '', active !== undefined ? (active ? 1 : 0) : 1, req.params.id);
+    UPDATE equipment SET asset_number=?, name=?, category=?, description=?, serial_number=?, registration=?, location=?, purchase_date=?, purchase_cost=?, current_condition=?, storage_location=?, next_inspection_date=?, inspection_interval_days=?, notes=?, active=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
+  `).run(asset_number, name, category, description || '', serial_number || '', registration || '', location || '', purchase_date || null, parseFloat(purchase_cost) || 0, current_condition, storage_location || '', next_inspection_date || null, parseInt(inspection_interval_days) || 90, notes || '', active !== undefined ? (active ? 1 : 0) : 1, req.params.id);
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'equipment', entityId: parseInt(req.params.id), entityLabel: `${asset_number} - ${name}`, ip: req.ip });
   req.flash('success', 'Equipment updated.');

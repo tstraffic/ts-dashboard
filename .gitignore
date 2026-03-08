@@ -11,3 +11,4 @@ uploads/defects/*
 !uploads/defects/.gitkeep
 .env
 *.log
+.claude/

@@ -11,7 +11,8 @@
     { key: 'materials', label: 'Materials' },
     { key: 'subcontractors', label: 'Subcontractors' },
     { key: 'equipment', label: 'Equipment' },
-    { key: 'other', label: 'Other' }
+    { key: 'other', label: 'Other' },
+    { key: 'contingency', label: 'Contingency' }
   ];
 %>
 
@@ -111,7 +112,12 @@
             const pctUsed = budgetAmt > 0 ? (spentAmt / budgetAmt * 100) : 0;
           %>
           <tr class="hover:bg-slate-700/30">
-            <td class="px-4 py-3 text-slate-300 font-medium capitalize"><%= cat.label %></td>
+            <td class="px-4 py-3 text-slate-300 font-medium capitalize">
+              <%= cat.label %>
+              <% if (budgetAmt > 0 && spentAmt > budgetAmt) { %>
+                <span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-900/60 text-red-300">OVER</span>
+              <% } %>
+            </td>
             <td class="px-4 py-3 text-right">
               <input type="number" step="0.01" name="budget_<%= cat.key %>" value="<%= budgetAmt %>"
                 class="w-32 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
@@ -161,6 +167,39 @@
   </form>
 </div>
 
+<!-- P&L Summary -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6">
+  <h2 class="text-lg font-semibold text-white mb-4">Profit & Loss</h2>
+  <%
+    const contractIncVars = (budget.contract_value || 0) + (budget.variations_approved || 0);
+    const grossProfit = contractIncVars - totalSpent;
+    const grossMarginPct = contractIncVars > 0 ? (grossProfit / contractIncVars * 100) : 0;
+  %>
+  <div class="space-y-3">
+    <div class="flex justify-between items-center py-2 border-b border-slate-700">
+      <span class="text-slate-400 text-sm">Contract Value (incl. variations)</span>
+      <span class="text-white font-mono text-sm font-medium"><%= fmtCurrency(contractIncVars) %></span>
+    </div>
+    <div class="flex justify-between items-center py-2 border-b border-slate-700">
+      <span class="text-slate-400 text-sm">Less: Total Costs</span>
+      <span class="text-red-400 font-mono text-sm font-medium">-<%= fmtCurrency(totalSpent) %></span>
+    </div>
+    <div class="flex justify-between items-center py-3 border-t-2 border-slate-600">
+      <span class="text-white font-semibold">Gross Profit</span>
+      <span class="font-mono text-lg font-bold <%= grossProfit >= 0 ? 'text-emerald-400' : 'text-red-400' %>"><%= fmtCurrency(grossProfit) %></span>
+    </div>
+    <div class="flex justify-between items-center py-2">
+      <span class="text-slate-400 text-sm">Gross Margin</span>
+      <span class="font-mono text-sm font-semibold <% if (grossMarginPct > 20) { %>text-emerald-400<% } else if (grossMarginPct >= 0) { %>text-orange-400<% } else { %>text-red-400<% } %>"><%= grossMarginPct.toFixed(1) %>%</span>
+    </div>
+  </div>
+  <% if (totalSpent > (budget.contract_value || 0) && (budget.contract_value || 0) > 0) { %>
+    <div class="mt-4 p-3 bg-red-900/30 border border-red-800 rounded-lg">
+      <p class="text-red-300 text-sm font-medium">⚠ This job has exceeded its contract value by <%= fmtCurrency(totalSpent - budget.contract_value) %></p>
+    </div>
+  <% } %>
+</div>
+
 <!-- Cost Entries Section -->
 <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
   <h2 class="text-lg font-semibold text-white mb-4">Cost Entries</h2>
@@ -207,6 +246,11 @@
           <input type="text" name="supplier" placeholder="Supplier name"
             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Receipt URL</label>
+          <input type="url" name="receipt_url" placeholder="https://..."
+            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        </div>
       </div>
       <div class="flex justify-end mt-3">
         <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Add Entry</button>
@@ -232,6 +276,7 @@
           <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wide">Amount</th>
           <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Invoice Ref</th>
           <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Supplier</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Receipt</th>
           <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Entered By</th>
           <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wide">Actions</th>
         </tr>
@@ -255,6 +300,13 @@
           <td class="px-4 py-3 text-right font-mono text-xs text-white font-medium"><%= fmtCurrency(entry.amount) %></td>
           <td class="px-4 py-3 text-slate-400 text-xs"><%= entry.invoice_ref || '-' %></td>
           <td class="px-4 py-3 text-slate-400 text-xs"><%= entry.supplier || '-' %></td>
+          <td class="px-4 py-3 text-xs">
+            <% if (entry.receipt_url) { %>
+              <a href="<%= entry.receipt_url %>" target="_blank" class="text-brand-400 hover:text-brand-300 hover:underline">View</a>
+            <% } else { %>
+              <span class="text-slate-600">-</span>
+            <% } %>
+          </td>
           <td class="px-4 py-3 text-slate-400 text-xs"><%= entry.entered_by_name %></td>
           <td class="px-4 py-3 text-center">
             <form method="POST" action="/budgets/job/<%= job.id %>/costs/<%= entry.id %>/delete" class="inline" onsubmit="return confirm('Delete this cost entry?');">
@@ -269,7 +321,7 @@
         <tr class="border-t-2 border-slate-600 bg-slate-700/30">
           <td class="px-4 py-3 text-white font-semibold" colspan="3">Total (<%= costEntries.length %> entr<%= costEntries.length !== 1 ? 'ies' : 'y' %>)</td>
           <td class="px-4 py-3 text-right font-mono text-sm text-white font-semibold"><%= fmtCurrency(totalSpent) %></td>
-          <td colspan="4"></td>
+          <td colspan="5"></td>
         </tr>
       </tfoot>
     </table>

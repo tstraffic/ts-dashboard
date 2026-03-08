@@ -2,15 +2,58 @@
 
 <div class="mb-6">
   <h1 class="text-2xl font-bold text-white">Dashboard</h1>
-  <p class="text-slate-400 text-sm mt-1">Overview of all T&S Traffic Control projects</p>
+  <p class="text-slate-400 text-sm mt-1">Overview of T&S operations</p>
 </div>
 
-<!-- KPI Cards -->
-<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <p class="text-xs text-slate-400 uppercase tracking-wide">Active Jobs</p>
+<!-- Today's Operations -->
+<h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Today's Operations</h2>
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+  <div class="bg-slate-800 border border-slate-700 border-l-4 border-l-brand-500 rounded-xl p-4">
+    <p class="text-xs text-slate-400 uppercase tracking-wide">Jobs Active</p>
     <p class="text-3xl font-bold text-white mt-1"><%= kpi.activeJobs %></p>
   </div>
+  <div class="bg-slate-800 border border-slate-700 border-l-4 border-l-brand-500 rounded-xl p-4">
+    <p class="text-xs text-slate-400 uppercase tracking-wide">Crew Deployed Today</p>
+    <p class="text-3xl font-bold text-brand-400 mt-1"><%= kpi.crewDeployedToday %></p>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 border-l-4 border-l-brand-500 rounded-xl p-4">
+    <p class="text-xs text-slate-400 uppercase tracking-wide">Equipment Out</p>
+    <p class="text-3xl font-bold text-brand-400 mt-1"><%= kpi.equipmentDeployed %></p>
+  </div>
+  <a href="/allocations" class="bg-slate-800 border border-slate-700 rounded-xl p-4 hover:bg-slate-700/50 transition-colors <%= kpi.unconfirmedAllocations > 0 ? 'border-orange-700' : '' %>">
+    <p class="text-xs text-slate-400 uppercase tracking-wide">Unconfirmed Allocs</p>
+    <p class="text-3xl font-bold <%= kpi.unconfirmedAllocations > 0 ? 'text-orange-400' : 'text-emerald-400' %> mt-1"><%= kpi.unconfirmedAllocations %></p>
+  </a>
+  <div class="bg-slate-800 border border-slate-700 border-l-4 border-l-brand-500 rounded-xl p-4">
+    <p class="text-xs text-slate-400 uppercase tracking-wide">Crew Hours (7d)</p>
+    <p class="text-3xl font-bold text-brand-400 mt-1"><%= Math.round(kpi.crewHoursThisWeek) %></p>
+  </div>
+</div>
+
+<!-- Approvals & Compliance -->
+<h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Approvals & Compliance</h2>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= kpi.rolPending > 0 ? 'border-orange-700' : '' %>">
+    <p class="text-xs text-slate-400 uppercase tracking-wide">ROL Pending</p>
+    <p class="text-3xl font-bold <%= kpi.rolPending > 0 ? 'text-orange-400' : 'text-emerald-400' %> mt-1"><%= kpi.rolPending %></p>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= kpi.tmpPending > 0 ? 'border-orange-700' : '' %>">
+    <p class="text-xs text-slate-400 uppercase tracking-wide">TMP Pending</p>
+    <p class="text-3xl font-bold <%= kpi.tmpPending > 0 ? 'text-orange-400' : 'text-emerald-400' %> mt-1"><%= kpi.tmpPending %></p>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= kpi.ticketsExpiring > 0 ? 'border-orange-700' : '' %>">
+    <p class="text-xs text-slate-400 uppercase tracking-wide">Tickets Expiring</p>
+    <p class="text-3xl font-bold <%= kpi.ticketsExpiring > 0 ? 'text-orange-400' : 'text-emerald-400' %> mt-1"><%= kpi.ticketsExpiring %></p>
+  </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= kpi.overdueCompliance > 0 ? 'border-red-700' : '' %>">
+    <p class="text-xs text-slate-400 uppercase tracking-wide">Overdue Compliance</p>
+    <p class="text-3xl font-bold <%= kpi.overdueCompliance > 0 ? 'text-red-400' : 'text-emerald-400' %> mt-1"><%= kpi.overdueCompliance %></p>
+  </div>
+</div>
+
+<!-- Jobs & Delivery -->
+<h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Jobs & Delivery</h2>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
   <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
     <p class="text-xs text-slate-400 uppercase tracking-wide">Starting Next 14d</p>
     <p class="text-3xl font-bold text-brand-400 mt-1"><%= kpi.startingSoon %></p>
@@ -19,18 +62,19 @@
     <p class="text-xs text-slate-400 uppercase tracking-wide">Overdue Tasks</p>
     <p class="text-3xl font-bold <%= kpi.overdueTasks > 0 ? 'text-red-400' : 'text-emerald-400' %> mt-1"><%= kpi.overdueTasks %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= kpi.overdueCompliance > 0 ? 'border-red-700' : '' %>">
-    <p class="text-xs text-slate-400 uppercase tracking-wide">Overdue Compliance</p>
-    <p class="text-3xl font-bold <%= kpi.overdueCompliance > 0 ? 'text-red-400' : 'text-emerald-400' %> mt-1"><%= kpi.overdueCompliance %></p>
-  </div>
   <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= kpi.missingUpdates > 0 ? 'border-orange-700' : '' %>">
     <p class="text-xs text-slate-400 uppercase tracking-wide">Missing Updates</p>
     <p class="text-3xl font-bold <%= kpi.missingUpdates > 0 ? 'text-orange-400' : 'text-emerald-400' %> mt-1"><%= kpi.missingUpdates %></p>
   </div>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= kpi.openDefects > 0 ? 'border-orange-700' : '' %>">
+    <p class="text-xs text-slate-400 uppercase tracking-wide">Open Defects</p>
+    <p class="text-3xl font-bold <%= kpi.openDefects > 0 ? 'text-orange-400' : 'text-emerald-400' %> mt-1"><%= kpi.openDefects %></p>
+  </div>
 </div>
 
-<!-- Safety & Ops KPIs -->
-<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+<!-- Safety -->
+<h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Safety</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
   <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= kpi.openIncidents > 0 ? 'border-red-800' : '' %>">
     <p class="text-xs text-slate-400 uppercase tracking-wide">Open Incidents</p>
     <p class="text-3xl font-bold <%= kpi.openIncidents > 0 ? 'text-red-400' : 'text-emerald-400' %> mt-1"><%= kpi.openIncidents %></p>
@@ -39,23 +83,16 @@
     <p class="text-xs text-slate-400 uppercase tracking-wide">Overdue Actions</p>
     <p class="text-3xl font-bold <%= kpi.overdueCorrectiveActions > 0 ? 'text-red-400' : 'text-emerald-400' %> mt-1"><%= kpi.overdueCorrectiveActions %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <p class="text-xs text-slate-400 uppercase tracking-wide">Crew Hours (7d)</p>
-    <p class="text-3xl font-bold text-brand-400 mt-1"><%= Math.round(kpi.crewHoursThisWeek) %></p>
-  </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <p class="text-xs text-slate-400 uppercase tracking-wide">Equipment Deployed</p>
-    <p class="text-3xl font-bold text-brand-400 mt-1"><%= kpi.equipmentDeployed %></p>
-  </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= kpi.openDefects > 0 ? 'border-orange-800' : '' %>">
-    <p class="text-xs text-slate-400 uppercase tracking-wide">Open Defects</p>
-    <p class="text-3xl font-bold <%= kpi.openDefects > 0 ? 'text-orange-400' : 'text-emerald-400' %> mt-1"><%= kpi.openDefects %></p>
+  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= kpi.notifiableIncidents > 0 ? 'border-red-800' : '' %>">
+    <p class="text-xs text-slate-400 uppercase tracking-wide">Notifiable Incidents</p>
+    <p class="text-3xl font-bold <%= kpi.notifiableIncidents > 0 ? 'text-red-400' : 'text-emerald-400' %> mt-1"><%= kpi.notifiableIncidents %></p>
   </div>
 </div>
 
 <% if (canViewAccounts) { %>
-<!-- Financial KPIs -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+<!-- Financial -->
+<h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Financial</h2>
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
   <div class="bg-slate-800 border border-brand-700/40 rounded-xl p-4">
     <p class="text-xs text-brand-400 uppercase tracking-wide">Total Contract Value</p>
     <p class="text-2xl font-bold text-white mt-1">$<%= kpi.totalContractValue.toLocaleString() %></p>
@@ -63,6 +100,10 @@
   <div class="bg-slate-800 border border-brand-700/40 rounded-xl p-4">
     <p class="text-xs text-brand-400 uppercase tracking-wide">Total Spend</p>
     <p class="text-2xl font-bold text-brand-400 mt-1">$<%= kpi.totalSpend.toLocaleString() %></p>
+  </div>
+  <div class="bg-slate-800 border border-brand-700/40 rounded-xl p-4">
+    <p class="text-xs text-brand-400 uppercase tracking-wide">Revenue (Active Jobs)</p>
+    <p class="text-2xl font-bold text-emerald-400 mt-1">$<%= kpi.revenueThisMonth.toLocaleString() %></p>
   </div>
   <div class="bg-slate-800 border border-brand-700/40 rounded-xl p-4">
     <p class="text-xs text-brand-400 uppercase tracking-wide">Invoices Overdue</p>

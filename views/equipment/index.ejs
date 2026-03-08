@@ -63,12 +63,15 @@
       <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Category</label>
       <select name="category" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Categories</option>
-        <option value="barrier" <%= filters.category === 'barrier' ? 'selected' : '' %>>Barrier</option>
-        <option value="sign" <%= filters.category === 'sign' ? 'selected' : '' %>>Sign</option>
+        <option value="ute" <%= filters.category === 'ute' ? 'selected' : '' %>>Ute</option>
+        <option value="truck" <%= filters.category === 'truck' ? 'selected' : '' %>>Truck</option>
         <option value="arrow_board" <%= filters.category === 'arrow_board' ? 'selected' : '' %>>Arrow Board</option>
-        <option value="vms" <%= filters.category === 'vms' ? 'selected' : '' %>>VMS</option>
+        <option value="vms_board" <%= filters.category === 'vms_board' ? 'selected' : '' %>>VMS Board</option>
+        <option value="trailer" <%= filters.category === 'trailer' ? 'selected' : '' %>>Trailer</option>
+        <option value="barriers" <%= filters.category === 'barriers' ? 'selected' : '' %>>Barriers</option>
+        <option value="signs" <%= filters.category === 'signs' ? 'selected' : '' %>>Signs</option>
+        <option value="lights" <%= filters.category === 'lights' ? 'selected' : '' %>>Lights</option>
         <option value="vehicle" <%= filters.category === 'vehicle' ? 'selected' : '' %>>Vehicle</option>
-        <option value="lighting" <%= filters.category === 'lighting' ? 'selected' : '' %>>Lighting</option>
         <option value="cone" <%= filters.category === 'cone' ? 'selected' : '' %>>Cone</option>
         <option value="delineator" <%= filters.category === 'delineator' ? 'selected' : '' %>>Delineator</option>
         <option value="other" <%= filters.category === 'other' ? 'selected' : '' %>>Other</option>
@@ -97,6 +100,11 @@
     <div class="flex gap-2">
       <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Filter</button>
       <a href="/equipment" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Clear</a>
+      <a href="/exports/equipment.csv?category=<%= filters.category || '' %>&condition=<%= filters.condition || '' %>&search=<%= encodeURIComponent(filters.search || '') %>&active=<%= filters.active || '' %>"
+        class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Export CSV
+      </a>
     </div>
   </form>
 </div>
@@ -115,6 +123,7 @@
       <tr class="border-b border-slate-700">
         <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Asset #</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Name</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Registration</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Category</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Condition</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Storage Location</th>
@@ -133,6 +142,7 @@
           <a href="/equipment/<%= eq.id %>" class="text-blue-400 hover:text-blue-300 hover:underline"><%= eq.asset_number %></a>
         </td>
         <td class="px-4 py-3 text-slate-300"><%= eq.name %></td>
+        <td class="px-4 py-3 text-slate-300"><%= eq.registration || '-' %></td>
         <td class="px-4 py-3">
           <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-300">
             <%= eq.category.replace('_', ' ') %>

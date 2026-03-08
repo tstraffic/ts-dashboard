@@ -5,7 +5,7 @@ const flash = require('connect-flash');
 const ejsLayouts = require('express-ejs-layouts');
 const path = require('path');
 const { initializeDatabase } = require('./db/schema');
-const { requireLogin } = require('./middleware/auth');
+const { requireLogin, requirePermission, canAccess } = require('./middleware/auth');
 const { notificationCountMiddleware, generateNotifications } = require('./middleware/notifications');
 
 // Initialize database and seed data
@@ -37,35 +37,41 @@ app.use(session({
 
 app.use(flash());
 
-// Flash messages available in all templates
+// Flash messages + permission helper available in all templates
 app.use((req, res, next) => {
   res.locals.flash_success = req.flash('success');
   res.locals.flash_error = req.flash('error');
   res.locals.user = req.session.user || null;
+  res.locals.canAccess = canAccess;
   next();
 });
 
 // Notification count available in all templates (header bell badge)
 app.use(notificationCountMiddleware);
 
-// Routes
+// Routes (auth is public, everything else requires login + permission)
 app.use('/', require('./routes/auth'));
-app.use('/dashboard', requireLogin, require('./routes/dashboard'));
-app.use('/jobs', requireLogin, require('./routes/jobs'));
-app.use('/tasks', requireLogin, require('./routes/tasks'));
-app.use('/updates', requireLogin, require('./routes/updates'));
-app.use('/compliance', requireLogin, require('./routes/compliance'));
-app.use('/incidents', requireLogin, require('./routes/incidents'));
-app.use('/contacts', requireLogin, require('./routes/contacts'));
-app.use('/documents', requireLogin, require('./routes/documents'));
-app.use('/activity', requireLogin, require('./routes/activity'));
-app.use('/budgets', requireLogin, require('./routes/budgets'));
-app.use('/timesheets', requireLogin, require('./routes/timesheets'));
-app.use('/schedule', requireLogin, require('./routes/schedule'));
-app.use('/equipment', requireLogin, require('./routes/equipment'));
-app.use('/defects', requireLogin, require('./routes/defects'));
-app.use('/notifications', requireLogin, require('./routes/notifications'));
-app.use('/admin', requireLogin, require('./routes/admin'));
+app.use('/dashboard', requireLogin, requirePermission('dashboard'), require('./routes/dashboard'));
+app.use('/jobs', requireLogin, requirePermission('jobs'), require('./routes/jobs'));
+app.use('/tasks', requireLogin, requirePermission('tasks'), require('./routes/tasks'));
+app.use('/updates', requireLogin, requirePermission('updates'), require('./routes/updates'));
+app.use('/compliance', requireLogin, requirePermission('compliance'), require('./routes/compliance'));
+app.use('/plans', requireLogin, requirePermission('plans'), require('./routes/plans'));
+app.use('/incidents', requireLogin, requirePermission('incidents'), require('./routes/incidents'));
+app.use('/contacts', requireLogin, requirePermission('contacts'), require('./routes/contacts'));
+app.use('/documents', requireLogin, requirePermission('documents'), require('./routes/documents'));
+app.use('/activity', requireLogin, requirePermission('activity'), require('./routes/activity'));
+app.use('/budgets', requireLogin, requirePermission('budgets'), require('./routes/budgets'));
+app.use('/timesheets', requireLogin, requirePermission('timesheets'), require('./routes/timesheets'));
+app.use('/allocations', requireLogin, requirePermission('allocations'), require('./routes/allocations'));
+app.use('/schedule', requireLogin, requirePermission('schedule'), require('./routes/schedule'));
+app.use('/equipment', requireLogin, requirePermission('equipment'), require('./routes/equipment'));
+app.use('/exports', requireLogin, requirePermission('exports'), require('./routes/exports'));
+app.use('/reports', requireLogin, requirePermission('reports'), require('./routes/reports'));
+app.use('/defects', requireLogin, requirePermission('defects'), require('./routes/defects'));
+app.use('/notifications', requireLogin, requirePermission('notifications'), require('./routes/notifications'));
+app.use('/admin/integrations', requireLogin, requirePermission('admin'), require('./routes/integrations'));
+app.use('/admin', requireLogin, requirePermission('admin'), require('./routes/admin'));
 
 // Home redirects to dashboard
 app.get('/', (req, res) => {
@@ -93,7 +99,7 @@ app.use((err, req, res, _next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`T&S Dashboard running at http://localhost:${PORT}`);
+  console.log(`T&S Operations Dashboard running at http://localhost:${PORT}`);
   console.log(`Default login: admin / admin123`);
 
   // Generate notifications on startup and every 15 minutes

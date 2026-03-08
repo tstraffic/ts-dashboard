@@ -1,4 +1,5 @@
 const { getDb } = require('../db/database');
+const { sendTeamsNotification } = require('./integrations');
 
 /**
  * Middleware that attaches unread notification count to res.locals for the header bell icon.
@@ -29,6 +30,8 @@ function generateNotifications() {
     const today = new Date().toISOString().split('T')[0];
     const last7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
     const next3 = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
+    const next14 = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+    const next30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
 
     // Helper: create notification if one with the same user+type+title does not already exist within 24hrs
     const insertIfNew = db.prepare(`
@@ -58,7 +61,7 @@ function generateNotifications() {
       SELECT c.id, c.title, c.job_id, c.internal_approver_id, j.job_number, j.project_manager_id
       FROM compliance c JOIN jobs j ON c.job_id = j.id
       WHERE c.due_date BETWEEN ? AND ? AND c.status NOT IN ('approved', 'expired')
-    `).all(today, next3);
+    `).all(today, next14);
 
     for (const c of expiringCompliance) {
       const userId = c.internal_approver_id || c.project_manager_id;
@@ -92,7 +95,10 @@ function generateNotifications() {
 
     for (const ca of overdueCA) {
       const title = 'Corrective Action Overdue: ' + ca.incident_number;
-      insertIfNew.run(ca.assigned_to_id, 'corrective_action_due', title, 'Action for ' + ca.incident_number + ' is overdue.', '/incidents/' + ca.id, ca.job_id, ca.assigned_to_id, 'corrective_action_due', title);
+      const msg = 'Action for ' + ca.incident_number + ' is overdue.';
+      const link = '/incidents/' + ca.id;
+      const result = insertIfNew.run(ca.assigned_to_id, 'corrective_action_due', title, msg, link, ca.job_id, ca.assigned_to_id, 'corrective_action_due', title);
+      if (result.changes > 0) sendTeamsNotification(title, msg, link).catch(() => {});
     }
 
     // 5. Follow-ups due
@@ -122,7 +128,10 @@ function generateNotifications() {
 
     for (const eq of overdueEquip) {
       const title = 'Equipment Overdue: ' + eq.asset_number;
-      insertIfNew.run(eq.assigned_by_id, 'equipment_overdue', title, eq.asset_number + ' (' + eq.name + ') overdue for return from ' + eq.job_number + '.', '/equipment/' + eq.equipment_id, eq.job_id, eq.assigned_by_id, 'equipment_overdue', title);
+      const msg = eq.asset_number + ' (' + eq.name + ') overdue for return from ' + eq.job_number + '.';
+      const link = '/equipment/' + eq.equipment_id;
+      const result = insertIfNew.run(eq.assigned_by_id, 'equipment_overdue', title, msg, link, eq.job_id, eq.assigned_by_id, 'equipment_overdue', title);
+      if (result.changes > 0) sendTeamsNotification(title, msg, link).catch(() => {});
     }
 
     // 7. Critical defects --> notify management users
@@ -135,9 +144,112 @@ function generateNotifications() {
 
     const mgmtUsers = db.prepare("SELECT id FROM users WHERE role = 'management' AND active = 1").all();
     for (const d of criticalDefects) {
+      let teamsNotified = false;
       for (const u of mgmtUsers) {
         const title = 'Critical Defect: ' + d.defect_number;
-        insertIfNew.run(u.id, 'critical_defect', title, d.defect_number + ': ' + d.title + ' on ' + d.job_number, '/defects/' + d.id, d.job_id, u.id, 'critical_defect', title);
+        const msg = d.defect_number + ': ' + d.title + ' on ' + d.job_number;
+        const link = '/defects/' + d.id;
+        const result = insertIfNew.run(u.id, 'critical_defect', title, msg, link, d.job_id, u.id, 'critical_defect', title);
+        if (result.changes > 0 && !teamsNotified) {
+          sendTeamsNotification(title, msg, link).catch(() => {});
+          teamsNotified = true; // Only send once per defect, not per user
+        }
+      }
+    }
+
+    // 8. Ticket Expiry --> notify management (30-day warning for crew member tickets)
+    const expiringTickets = db.prepare(`
+      SELECT cm.id, cm.full_name, cm.tc_ticket_expiry, cm.ti_ticket_expiry, cm.white_card_expiry, cm.first_aid_expiry, cm.medical_expiry
+      FROM crew_members cm
+      WHERE cm.active = 1
+      AND (
+        (cm.tc_ticket_expiry IS NOT NULL AND cm.tc_ticket_expiry BETWEEN ? AND ?)
+        OR (cm.ti_ticket_expiry IS NOT NULL AND cm.ti_ticket_expiry BETWEEN ? AND ?)
+        OR (cm.white_card_expiry IS NOT NULL AND cm.white_card_expiry BETWEEN ? AND ?)
+        OR (cm.first_aid_expiry IS NOT NULL AND cm.first_aid_expiry BETWEEN ? AND ?)
+        OR (cm.medical_expiry IS NOT NULL AND cm.medical_expiry BETWEEN ? AND ?)
+      )
+    `).all(today, next30, today, next30, today, next30, today, next30, today, next30);
+
+    for (const cm of expiringTickets) {
+      const expiring = [];
+      if (cm.tc_ticket_expiry && cm.tc_ticket_expiry >= today && cm.tc_ticket_expiry <= next30) expiring.push('TC Ticket');
+      if (cm.ti_ticket_expiry && cm.ti_ticket_expiry >= today && cm.ti_ticket_expiry <= next30) expiring.push('TI Ticket');
+      if (cm.white_card_expiry && cm.white_card_expiry >= today && cm.white_card_expiry <= next30) expiring.push('White Card');
+      if (cm.first_aid_expiry && cm.first_aid_expiry >= today && cm.first_aid_expiry <= next30) expiring.push('First Aid');
+      if (cm.medical_expiry && cm.medical_expiry >= today && cm.medical_expiry <= next30) expiring.push('Medical');
+      const ticketList = expiring.join(', ');
+      for (const u of mgmtUsers) {
+        const title = 'Ticket Expiry: ' + cm.full_name;
+        insertIfNew.run(u.id, 'ticket_expiry', title, cm.full_name + ' has expiring tickets: ' + ticketList + '.', '/crew/' + cm.id, null, u.id, 'ticket_expiry', title);
+      }
+    }
+
+    // 9. ROL Pending --> notify PM
+    const rolPending = db.prepare(`
+      SELECT tp.id, tp.plan_number, tp.job_id, j.job_number, j.project_manager_id
+      FROM traffic_plans tp
+      JOIN jobs j ON tp.job_id = j.id
+      WHERE tp.rol_required = 1 AND (tp.rol_submitted IS NULL OR tp.rol_submitted = 0)
+      AND tp.status NOT IN ('approved','rejected','expired')
+      AND j.project_manager_id IS NOT NULL
+    `).all();
+
+    for (const rp of rolPending) {
+      const title = 'ROL Pending: ' + rp.plan_number;
+      insertIfNew.run(rp.project_manager_id, 'rol_pending', title, 'ROL not yet submitted for plan ' + rp.plan_number + ' on ' + rp.job_number + '.', '/jobs/' + rp.job_id + '#traffic-plans', rp.job_id, rp.project_manager_id, 'rol_pending', title);
+    }
+
+    // 10. Equipment Inspection Due --> notify management (14-day warning)
+    const equipInspectionDue = db.prepare(`
+      SELECT e.id, e.asset_number, e.name, e.next_inspection_date
+      FROM equipment e
+      WHERE e.active = 1 AND e.next_inspection_date BETWEEN ? AND ?
+    `).all(today, next14);
+
+    for (const e of equipInspectionDue) {
+      for (const u of mgmtUsers) {
+        const title = 'Inspection Due: ' + e.asset_number;
+        insertIfNew.run(u.id, 'equipment_inspection_due', title, e.asset_number + ' (' + e.name + ') inspection due by ' + e.next_inspection_date + '.', '/equipment/' + e.id, null, u.id, 'equipment_inspection_due', title);
+      }
+    }
+
+    // 11. Induction Overdue --> notify management
+    const inductionOverdue = db.prepare(`
+      SELECT cm.id, cm.full_name
+      FROM crew_members cm
+      WHERE cm.active = 1 AND cm.induction_status = 'pending'
+    `).all();
+
+    for (const cm of inductionOverdue) {
+      for (const u of mgmtUsers) {
+        const title = 'Induction Overdue: ' + cm.full_name;
+        insertIfNew.run(u.id, 'induction_overdue', title, cm.full_name + ' has a pending induction.', '/crew/' + cm.id, null, u.id, 'induction_overdue', title);
+      }
+    }
+
+    // 12. Over-budget jobs --> notify management
+    const overBudgetJobs = db.prepare(`
+      SELECT j.id, j.job_number, j.project_manager_id, b.contract_value,
+        COALESCE((SELECT SUM(amount) FROM cost_entries WHERE job_id = j.id), 0) as total_spent
+      FROM jobs j
+      JOIN job_budgets b ON j.id = b.job_id
+      WHERE j.status = 'active'
+      AND COALESCE((SELECT SUM(amount) FROM cost_entries WHERE job_id = j.id), 0) > b.contract_value
+      AND b.contract_value > 0
+    `).all();
+
+    for (const ob of overBudgetJobs) {
+      let teamsNotified = false;
+      for (const u of mgmtUsers) {
+        const title = 'Over Budget: ' + ob.job_number;
+        const msg = ob.job_number + ' has exceeded its contract value. Spent: $' + Math.round(ob.total_spent) + ' / Contract: $' + Math.round(ob.contract_value) + '.';
+        const link = '/budgets/job/' + ob.id;
+        const result = insertIfNew.run(u.id, 'over_budget', title, msg, link, ob.id, u.id, 'over_budget', title);
+        if (result.changes > 0 && !teamsNotified) {
+          sendTeamsNotification(title, msg, link).catch(() => {});
+          teamsNotified = true;
+        }
       }
     }
 

@@ -12,14 +12,16 @@ const { getDb } = require('../db/database');
  * @param {number} [options.jobId] - Related job ID (for filtering by job)
  * @param {string} [options.jobNumber] - Related job number
  * @param {string} [options.details] - Extra details about the action
+ * @param {string} [options.beforeValue] - Value before the change (for update auditing)
+ * @param {string} [options.afterValue] - Value after the change (for update auditing)
  * @param {string} [options.ip] - IP address
  */
-function logActivity({ user, action, entityType, entityId, entityLabel, jobId, jobNumber, details, ip }) {
+function logActivity({ user, action, entityType, entityId, entityLabel, jobId, jobNumber, details, beforeValue, afterValue, ip }) {
   try {
     const db = getDb();
     db.prepare(`
-      INSERT INTO activity_log (user_id, user_name, action, entity_type, entity_id, entity_label, job_id, job_number, details, ip_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO activity_log (user_id, user_name, action, entity_type, entity_id, entity_label, job_id, job_number, details, before_value, after_value, ip_address)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       user ? user.id : null,
       user ? user.full_name : 'System',
@@ -30,6 +32,8 @@ function logActivity({ user, action, entityType, entityId, entityLabel, jobId, j
       jobId || null,
       jobNumber || '',
       details || '',
+      beforeValue || '',
+      afterValue || '',
       ip || ''
     );
   } catch (err) {
@@ -46,7 +50,9 @@ function auditMiddleware(req, res, next) {
     logActivity({
       ...opts,
       user: opts.user || req.session.user,
-      ip: req.ip || req.connection.remoteAddress
+      ip: req.ip || req.connection.remoteAddress,
+      beforeValue: opts.beforeValue || '',
+      afterValue: opts.afterValue || ''
     });
   };
   next();

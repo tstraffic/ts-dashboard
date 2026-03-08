@@ -7,7 +7,7 @@ const { canViewAccounts } = require('../middleware/auth');
 router.get('/', (req, res) => {
   const db = getDb();
   const { status, search, suburb } = req.query;
-  let query = `SELECT j.*, u.full_name as pm_name FROM jobs j LEFT JOIN users u ON j.project_manager_id = u.id WHERE 1=1`;
+  let query = `SELECT j.*, u.full_name as pm_name, bm.budget_contract, bm.total_spent as budget_spent FROM jobs j LEFT JOIN users u ON j.project_manager_id = u.id LEFT JOIN (SELECT b.job_id, b.contract_value as budget_contract, COALESCE((SELECT SUM(amount) FROM cost_entries ce WHERE ce.job_id = b.job_id), 0) as total_spent FROM job_budgets b) bm ON j.id = bm.job_id WHERE 1=1`;
   const params = [];
 
   if (status && status !== 'all') {
@@ -23,12 +23,12 @@ router.get('/', (req, res) => {
     query += ` AND j.suburb = ?`;
     params.push(suburb);
   }
-  query += ` ORDER BY CASE j.status WHEN 'active' THEN 1 WHEN 'on_hold' THEN 2 WHEN 'won' THEN 3 WHEN 'lead' THEN 4 WHEN 'completed' THEN 5 ELSE 6 END, j.start_date DESC`;
+  query += ` ORDER BY CASE j.status WHEN 'active' THEN 1 WHEN 'on_hold' THEN 2 WHEN 'won' THEN 3 WHEN 'tender' THEN 4 WHEN 'prestart' THEN 5 WHEN 'completed' THEN 6 ELSE 7 END, j.start_date DESC`;
 
   const jobs = db.prepare(query).all(...params);
   const suburbs = db.prepare('SELECT DISTINCT suburb FROM jobs ORDER BY suburb').all().map(r => r.suburb);
 
-  res.render('jobs/index', { title: 'Jobs Register', jobs, suburbs, filters: { status, search, suburb }, user: req.session.user });
+  res.render('jobs/index', { title: 'Jobs Register', jobs, suburbs, filters: { status, search, suburb }, user: req.session.user, canViewAccounts: canViewAccounts(req.session.user) });
 });
 
 // New job form
@@ -46,16 +46,21 @@ router.post('/', (req, res) => {
 
   try {
     db.prepare(`
-      INSERT INTO jobs (job_number, job_name, client, site_address, suburb, status, stage, percent_complete, start_date, end_date, project_manager_id, ops_supervisor_id, planning_owner_id, marketing_owner_id, accounts_owner_id, health, accounts_status, division_tags, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO jobs (job_number, job_name, client, site_address, suburb, status, stage, percent_complete, start_date, end_date, project_manager_id, ops_supervisor_id, planning_owner_id, marketing_owner_id, accounts_owner_id, health, accounts_status, division_tags, notes,
+        client_project_number, project_name, principal_contractor, traffic_supervisor_id,
+        contract_value, estimated_hours, crew_size, rol_required, tmp_required, sharepoint_url, state)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       b.job_number, jobName, b.client, b.site_address, b.suburb,
-      b.status || 'lead', b.stage || 'tender', parseInt(b.percent_complete) || 0,
+      b.status || 'tender', b.stage || 'tender', parseInt(b.percent_complete) || 0,
       b.start_date, b.end_date || null,
       b.project_manager_id || null, b.ops_supervisor_id || null,
       b.planning_owner_id || null, b.marketing_owner_id || null, b.accounts_owner_id || null,
       b.health || 'green', b.accounts_status || 'na',
-      b.division_tags || '', b.notes || ''
+      b.division_tags || '', b.notes || '',
+      b.client_project_number || '', b.project_name || '', b.principal_contractor || '', b.traffic_supervisor_id || null,
+      parseFloat(b.contract_value) || 0, parseFloat(b.estimated_hours) || 0, parseInt(b.crew_size) || 0,
+      b.rol_required ? 1 : 0, b.tmp_required ? 1 : 0, b.sharepoint_url || '', b.state || ''
     );
     req.flash('success', `Job ${b.job_number} created successfully.`);
     res.redirect('/jobs');
@@ -76,13 +81,14 @@ router.get('/:id', (req, res) => {
     SELECT j.*,
       pm.full_name as pm_name, ops.full_name as ops_name,
       pl.full_name as planning_name, mk.full_name as marketing_name,
-      ac.full_name as accounts_name
+      ac.full_name as accounts_name, ts.full_name as traffic_supervisor_name
     FROM jobs j
     LEFT JOIN users pm ON j.project_manager_id = pm.id
     LEFT JOIN users ops ON j.ops_supervisor_id = ops.id
     LEFT JOIN users pl ON j.planning_owner_id = pl.id
     LEFT JOIN users mk ON j.marketing_owner_id = mk.id
     LEFT JOIN users ac ON j.accounts_owner_id = ac.id
+    LEFT JOIN users ts ON j.traffic_supervisor_id = ts.id
     WHERE j.id = ?
   `).get(req.params.id);
 
@@ -163,11 +169,18 @@ router.get('/:id', (req, res) => {
     WHERE d.job_id = ? ORDER BY CASE d.severity WHEN 'critical' THEN 1 WHEN 'major' THEN 2 WHEN 'moderate' THEN 3 ELSE 4 END, d.created_at DESC
   `).all(job.id);
 
+  // Traffic plans for this job
+  const trafficPlans = db.prepare(`
+    SELECT tp.*, u.full_name as created_by_name FROM traffic_plans tp
+    LEFT JOIN users u ON tp.created_by_id = u.id
+    WHERE tp.job_id = ? ORDER BY tp.created_at DESC
+  `).all(job.id);
+
   res.render('jobs/show', {
     title: job.job_number,
     job, tasks, updates, complianceItems, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
-    equipmentAssignments, defects,
+    equipmentAssignments, defects, trafficPlans,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });
@@ -192,7 +205,10 @@ router.post('/:id', (req, res) => {
     db.prepare(`
       UPDATE jobs SET job_number=?, job_name=?, client=?, site_address=?, suburb=?, status=?, stage=?, percent_complete=?, start_date=?, end_date=?,
         project_manager_id=?, ops_supervisor_id=?, planning_owner_id=?, marketing_owner_id=?, accounts_owner_id=?,
-        health=?, accounts_status=?, division_tags=?, notes=?, updated_at=CURRENT_TIMESTAMP
+        health=?, accounts_status=?, division_tags=?, notes=?,
+        client_project_number=?, project_name=?, principal_contractor=?, traffic_supervisor_id=?,
+        contract_value=?, estimated_hours=?, crew_size=?, rol_required=?, tmp_required=?, sharepoint_url=?, state=?,
+        updated_at=CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
       b.job_number, jobName, b.client, b.site_address, b.suburb,
@@ -202,6 +218,9 @@ router.post('/:id', (req, res) => {
       b.planning_owner_id || null, b.marketing_owner_id || null, b.accounts_owner_id || null,
       b.health, b.accounts_status || 'na',
       b.division_tags || '', b.notes || '',
+      b.client_project_number || '', b.project_name || '', b.principal_contractor || '', b.traffic_supervisor_id || null,
+      parseFloat(b.contract_value) || 0, parseFloat(b.estimated_hours) || 0, parseInt(b.crew_size) || 0,
+      b.rol_required ? 1 : 0, b.tmp_required ? 1 : 0, b.sharepoint_url || '', b.state || '',
       req.params.id
     );
     req.flash('success', 'Job updated successfully.');

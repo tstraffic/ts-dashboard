@@ -22,8 +22,9 @@
       <% } else if (job.status === 'on_hold') { %>bg-orange-900/60 text-brand-300
       <% } else if (job.status === 'completed') { %>bg-emerald-900/60 text-emerald-300
       <% } else if (job.status === 'won') { %>bg-teal-900/60 text-teal-300
-      <% } else if (job.status === 'lead') { %>bg-purple-900/60 text-purple-300
-      <% } else if (job.status === 'lost') { %>bg-red-900/60 text-red-300
+      <% } else if (job.status === 'tender') { %>bg-purple-900/60 text-purple-300
+      <% } else if (job.status === 'prestart') { %>bg-sky-900/60 text-sky-300
+      <% } else if (job.status === 'closed') { %>bg-slate-600/60 text-slate-300
       <% } else { %>bg-slate-700 text-slate-300<% } %>">
       <%= job.status ? job.status.replace('_', ' ') : '-' %>
     </span>
@@ -50,6 +51,22 @@
       <p class="text-sm text-white mt-1"><%= job.client %></p>
     </div>
     <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Project Name</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.project_name || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Client Project Number</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.client_project_number || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Principal Contractor</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.principal_contractor || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">State</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.state || '-' %></p>
+    </div>
+    <div>
       <p class="text-xs text-slate-500 uppercase tracking-wide">Site Address</p>
       <p class="text-sm text-slate-300 mt-1"><%= job.site_address || '-' %></p>
     </div>
@@ -71,6 +88,26 @@
       </div>
     </div>
     <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Contract Value</p>
+      <p class="text-sm text-white mt-1"><%= job.contract_value ? '$' + Number(job.contract_value).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Estimated Hours</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.estimated_hours || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Crew Size</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.crew_size || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">ROL Required</p>
+      <p class="text-sm mt-1 <%= job.rol_required ? 'text-emerald-400' : 'text-slate-500' %>"><%= job.rol_required ? 'Yes' : 'No' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">TMP Required</p>
+      <p class="text-sm mt-1 <%= job.tmp_required ? 'text-emerald-400' : 'text-slate-500' %>"><%= job.tmp_required ? 'Yes' : 'No' %></p>
+    </div>
+    <div>
       <p class="text-xs text-slate-500 uppercase tracking-wide">Start Date</p>
       <p class="text-sm text-slate-300 mt-1"><%= job.start_date || '-' %></p>
     </div>
@@ -87,6 +124,10 @@
       <p class="text-sm text-slate-300 mt-1"><%= job.ops_name || '-' %></p>
     </div>
     <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Traffic Supervisor</p>
+      <p class="text-sm text-slate-300 mt-1"><%= job.traffic_supervisor_name || '-' %></p>
+    </div>
+    <div>
       <p class="text-xs text-slate-500 uppercase tracking-wide">Planning Owner</p>
       <p class="text-sm text-slate-300 mt-1"><%= job.planning_name || '-' %></p>
     </div>
@@ -98,6 +139,15 @@
     <div>
       <p class="text-xs text-slate-500 uppercase tracking-wide">Accounts Owner</p>
       <p class="text-sm text-slate-300 mt-1"><%= job.accounts_name || '-' %></p>
+    </div>
+    <% } %>
+    <% if (job.sharepoint_url) { %>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">SharePoint</p>
+      <a href="<%= job.sharepoint_url %>" target="_blank" class="inline-flex items-center gap-1 mt-1 px-3 py-1 bg-blue-900/40 text-blue-300 text-sm font-medium rounded-lg hover:bg-blue-900/60 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        Open SharePoint
+      </a>
     </div>
     <% } %>
   </div>
@@ -118,6 +168,9 @@
     <a href="#compliance" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-slate-400 hover:text-white border-transparent hover:border-slate-500
       focus:text-white focus:border-brand-500" onclick="activateTab(this)">Compliance</a>
+    <a href="#plans" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-slate-400 hover:text-white border-transparent hover:border-slate-500
+      focus:text-white focus:border-brand-500" onclick="activateTab(this)">Traffic Plans</a>
     <a href="#incidents" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-slate-400 hover:text-white border-transparent hover:border-slate-500
       focus:text-white focus:border-brand-500" onclick="activateTab(this)">Incidents</a>
@@ -184,8 +237,9 @@
                   <% } else if (job.status === 'on_hold') { %>bg-orange-900/60 text-brand-300
                   <% } else if (job.status === 'completed') { %>bg-emerald-900/60 text-emerald-300
                   <% } else if (job.status === 'won') { %>bg-teal-900/60 text-teal-300
-                  <% } else if (job.status === 'lead') { %>bg-purple-900/60 text-purple-300
-                  <% } else if (job.status === 'lost') { %>bg-red-900/60 text-red-300
+                  <% } else if (job.status === 'tender') { %>bg-purple-900/60 text-purple-300
+                  <% } else if (job.status === 'prestart') { %>bg-sky-900/60 text-sky-300
+                  <% } else if (job.status === 'closed') { %>bg-slate-600/60 text-slate-300
                   <% } else { %>bg-slate-700 text-slate-300<% } %>">
                   <%= job.status ? job.status.replace('_', ' ') : '-' %>
                 </span>
@@ -217,6 +271,28 @@
       <div class="mt-6 pt-6 border-t border-slate-700">
         <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide mb-2">Notes</h3>
         <p class="text-sm text-slate-300 whitespace-pre-wrap"><%= job.notes %></p>
+      </div>
+      <% } %>
+
+      <!-- SharePoint Documents Link -->
+      <% if (canAccess(user, 'documents')) { %>
+      <div class="mt-6 pt-6 border-t border-slate-700">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-medium text-slate-400 uppercase tracking-wide flex items-center gap-2">
+            <svg class="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+            SharePoint Documents
+          </h3>
+        </div>
+        <% if (job.sharepoint_url) { %>
+          <a href="<%= job.sharepoint_url %>" target="_blank" rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-teal-900/30 border border-teal-700/50 rounded-lg text-teal-300 text-sm hover:bg-teal-900/50 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            Open in SharePoint
+          </a>
+          <p class="mt-1 text-xs text-slate-500 break-all"><%= job.sharepoint_url %></p>
+        <% } else { %>
+          <p class="text-sm text-slate-500">No SharePoint folder linked. Set the SharePoint URL when editing this job.</p>
+        <% } %>
       </div>
       <% } %>
     </div>
@@ -345,6 +421,75 @@
             </td>
             <td class="px-4 py-3 text-slate-400 text-xs"><%= item.due_date || '-' %></td>
             <td class="px-4 py-3 text-slate-300"><%= item.approver_name || '-' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Traffic Plans Tab -->
+  <div id="plans" class="tab-content">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-white">Traffic Plans</h2>
+      <a href="/plans/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ New Plan</a>
+    </div>
+    <% if (typeof trafficPlans === 'undefined' || trafficPlans.length === 0) { %>
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center">
+        <p class="text-slate-500 text-sm">No traffic plans for this job yet.</p>
+        <a href="/plans/new?job_id=<%= job.id %>" class="text-brand-400 text-sm hover:underline mt-2 inline-block">Create the first plan</a>
+      </div>
+    <% } else { %>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Plan #</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Designer</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">ROL</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Submitted</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Approved</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Expiry</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+          <% trafficPlans.forEach(tp => { %>
+          <tr class="hover:bg-slate-700/50">
+            <td class="px-4 py-3 text-blue-400 font-medium"><%= tp.plan_number %></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                <% if (tp.plan_type === 'TGS') { %>bg-blue-900/60 text-blue-300
+                <% } else if (tp.plan_type === 'TCP') { %>bg-teal-900/60 text-teal-300
+                <% } else { %>bg-purple-900/60 text-purple-300<% } %>"><%= tp.plan_type %></span>
+            </td>
+            <td class="px-4 py-3 text-slate-300"><%= tp.designer || '-' %></td>
+            <td class="px-4 py-3">
+              <% if (tp.rol_required) { %>
+                <span class="text-xs <%= tp.rol_approved ? 'text-emerald-400' : tp.rol_submitted ? 'text-blue-400' : 'text-orange-400' %>">
+                  <%= tp.rol_approved ? 'Approved' : tp.rol_submitted ? 'Submitted' : 'Required' %>
+                </span>
+              <% } else { %>
+                <span class="text-xs text-slate-500">N/A</span>
+              <% } %>
+            </td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                <% if (tp.status === 'approved') { %>bg-emerald-900/60 text-emerald-300
+                <% } else if (tp.status === 'submitted' || tp.status === 'under_review') { %>bg-blue-900/60 text-blue-300
+                <% } else if (tp.status === 'rejected') { %>bg-red-900/60 text-red-300
+                <% } else if (tp.status === 'expired') { %>bg-orange-900/60 text-orange-300
+                <% } else { %>bg-slate-700 text-slate-300<% } %>"><%= tp.status ? tp.status.replace(/_/g, ' ') : 'draft' %></span>
+            </td>
+            <td class="px-4 py-3 text-slate-400 text-xs"><%= tp.submitted_date || '-' %></td>
+            <td class="px-4 py-3 text-slate-400 text-xs"><%= tp.approved_date || '-' %></td>
+            <td class="px-4 py-3 text-slate-400 text-xs"><%= tp.expiry_date || '-' %></td>
+            <td class="px-4 py-3">
+              <a href="/plans/<%= tp.id %>/edit" class="text-blue-400 hover:text-blue-300 text-xs">Edit</a>
+            </td>
           </tr>
           <% }) %>
         </tbody>

@@ -1,0 +1,174 @@
+<% locals.currentPage = 'plans' %>
+
+<%
+  const isEdit = !!plan;
+  const formAction = isEdit ? '/plans/' + plan.id : '/plans';
+  const pageTitle = isEdit ? 'Edit Traffic Plan' : 'New Traffic Plan';
+  const selectedJobId = (isEdit && plan.job_id) ? plan.job_id : (preselectedJobId || '');
+  const returnTo = '/plans';
+
+  const planTypeOptions = [
+    { value: 'TGS', label: 'TGS' },
+    { value: 'TCP', label: 'TCP' },
+    { value: 'TMP', label: 'TMP' }
+  ];
+
+  const statusOptions = [
+    { value: 'draft', label: 'Draft' },
+    { value: 'submitted', label: 'Submitted' },
+    { value: 'under_review', label: 'Under Review' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'rejected', label: 'Rejected' },
+    { value: 'expired', label: 'Expired' }
+  ];
+%>
+
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Header -->
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-white"><%= pageTitle %></h1>
+  </div>
+
+  <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+    <form method="POST" action="<%= formAction %>">
+      <input type="hidden" name="return_to" value="<%= returnTo %>">
+
+      <!-- Plan Details -->
+      <div class="mb-6">
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Plan Details</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Job -->
+          <div>
+            <label for="job_id" class="block text-sm font-medium text-slate-300 mb-1">Job</label>
+            <select id="job_id" name="job_id" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">Select a job...</option>
+              <% jobs.forEach(function(job) { %>
+                <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
+              <% }) %>
+            </select>
+          </div>
+
+          <!-- Plan Type -->
+          <div>
+            <label for="plan_type" class="block text-sm font-medium text-slate-300 mb-1">Plan Type</label>
+            <select id="plan_type" name="plan_type" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">Select type...</option>
+              <% planTypeOptions.forEach(function(opt) { %>
+                <option value="<%= opt.value %>" <%= isEdit && plan.plan_type === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+              <% }) %>
+            </select>
+          </div>
+
+          <!-- Designer -->
+          <div>
+            <label for="designer" class="block text-sm font-medium text-slate-300 mb-1">Designer</label>
+            <input type="text" id="designer" name="designer" value="<%= isEdit && plan.designer ? plan.designer : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Designer name...">
+          </div>
+
+          <!-- Status -->
+          <div>
+            <label for="status" class="block text-sm font-medium text-slate-300 mb-1">Status</label>
+            <select id="status" name="status" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <% statusOptions.forEach(function(opt) { %>
+                <option value="<%= opt.value %>" <%= isEdit && plan.status === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROL Section -->
+      <div class="mb-6 pt-6 border-t border-slate-700">
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">ROL</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- ROL Checkboxes -->
+          <div class="md:col-span-2 flex flex-wrap items-center gap-6">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="rol_required" value="1" <%= isEdit && plan.rol_required ? 'checked' : '' %>
+                class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+              <span class="text-sm font-medium text-slate-300">ROL Required</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="rol_submitted" value="1" <%= isEdit && plan.rol_submitted ? 'checked' : '' %>
+                class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+              <span class="text-sm font-medium text-slate-300">ROL Submitted</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="rol_approved" value="1" <%= isEdit && plan.rol_approved ? 'checked' : '' %>
+                class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+              <span class="text-sm font-medium text-slate-300">ROL Approved</span>
+            </label>
+          </div>
+
+          <!-- Council -->
+          <div>
+            <label for="council" class="block text-sm font-medium text-slate-300 mb-1">Council</label>
+            <input type="text" id="council" name="council" value="<%= isEdit && plan.council ? plan.council : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Council name...">
+          </div>
+
+          <!-- TfNSW -->
+          <div>
+            <label for="tfnsw" class="block text-sm font-medium text-slate-300 mb-1">TfNSW</label>
+            <input type="text" id="tfnsw" name="tfnsw" value="<%= isEdit && plan.tfnsw ? plan.tfnsw : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="TfNSW reference...">
+          </div>
+        </div>
+      </div>
+
+      <!-- Dates Section -->
+      <div class="mb-6 pt-6 border-t border-slate-700">
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Dates</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Submitted Date -->
+          <div>
+            <label for="submitted_date" class="block text-sm font-medium text-slate-300 mb-1">Submitted Date</label>
+            <input type="date" id="submitted_date" name="submitted_date" value="<%= isEdit && plan.submitted_date ? new Date(plan.submitted_date).toISOString().split('T')[0] : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+
+          <!-- Approval Date -->
+          <div>
+            <label for="approval_date" class="block text-sm font-medium text-slate-300 mb-1">Approval Date</label>
+            <input type="date" id="approval_date" name="approval_date" value="<%= isEdit && plan.approval_date ? new Date(plan.approval_date).toISOString().split('T')[0] : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+
+          <!-- Approved Date -->
+          <div>
+            <label for="approved_date" class="block text-sm font-medium text-slate-300 mb-1">Approved Date</label>
+            <input type="date" id="approved_date" name="approved_date" value="<%= isEdit && plan.approved_date ? new Date(plan.approved_date).toISOString().split('T')[0] : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+
+          <!-- Expiry Date -->
+          <div>
+            <label for="expiry_date" class="block text-sm font-medium text-slate-300 mb-1">Expiry Date</label>
+            <input type="date" id="expiry_date" name="expiry_date" value="<%= isEdit && plan.expiry_date ? new Date(plan.expiry_date).toISOString().split('T')[0] : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+        </div>
+      </div>
+
+      <!-- File Link Section -->
+      <div class="mb-6 pt-6 border-t border-slate-700">
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">File Link</h2>
+        <div>
+          <label for="file_link" class="block text-sm font-medium text-slate-300 mb-1">URL</label>
+          <input type="url" id="file_link" name="file_link" value="<%= isEdit && plan.file_link ? plan.file_link : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="https://...">
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="mb-6 pt-6 border-t border-slate-700">
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Notes</h2>
+        <div>
+          <label for="notes" class="block text-sm font-medium text-slate-300 mb-1">Notes</label>
+          <textarea id="notes" name="notes" rows="3" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Additional notes..."><%= isEdit && plan.notes ? plan.notes : '' %></textarea>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="flex items-center justify-end space-x-3 pt-6 border-t border-slate-700">
+        <a href="/plans" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition font-medium">Cancel</a>
+        <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold">
+          <%= isEdit ? 'Update Plan' : 'Create Plan' %>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

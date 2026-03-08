@@ -1,7 +1,7 @@
 {
   "name": "ts-traffic-dashboard",
   "version": "1.0.0",
-  "description": "T&S Traffic Control - Project Management Dashboard",
+  "description": "T&S Traffic Control - Operations Dashboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -19,6 +19,8 @@
     "express": "^4.21.1",
     "express-ejs-layouts": "^2.5.1",
     "express-session": "^1.18.1",
-    "multer": "^1.4.5-lts.1"
+    "axios": "^1.7.9",
+    "multer": "^1.4.5-lts.1",
+    "pdfkit": "^0.17.2"
   }
 }
