@@ -3,22 +3,22 @@
 
 <!-- Page Header -->
 <div class="mb-6">
-  <h1 class="text-2xl font-bold text-white"><%= isEdit ? 'Edit ' + incident.incident_number : 'Report Incident' %></h1>
-  <p class="text-slate-400 text-sm mt-1"><%= isEdit ? 'Update incident details below' : 'Complete the form to report a new safety incident' %></p>
+  <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit ' + incident.incident_number : 'Report Incident' %></h1>
+  <p class="text-gray-500 text-sm mt-1"><%= isEdit ? 'Update incident details below' : 'Complete the form to report a new safety incident' %></p>
 </div>
 
 <!-- Form -->
 <form method="POST" action="<%= isEdit ? '/incidents/' + incident.id : '/incidents' %>" class="space-y-6">
 
   <!-- Incident Identification -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Incident Details</h2>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Incident Details</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- Job -->
       <div>
-        <label for="job_id" class="block text-sm font-medium text-slate-300 mb-1">Job <span class="text-red-400">*</span></label>
+        <label for="job_id" class="block text-sm font-medium text-gray-600 mb-1">Job <span class="text-red-600">*</span></label>
         <select id="job_id" name="job_id" required
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select Job --</option>
           <% jobs.forEach(j => { %>
             <option value="<%= j.id %>"
@@ -30,135 +30,159 @@
       </div>
       <!-- Incident Type -->
       <div>
-        <label for="incident_type" class="block text-sm font-medium text-slate-300 mb-1">Incident Type <span class="text-red-400">*</span></label>
+        <label for="incident_type" class="block text-sm font-medium text-gray-600 mb-1">Incident Type <span class="text-red-600">*</span></label>
         <select id="incident_type" name="incident_type" required
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select Type --</option>
-          <option value="near_miss" <%= isEdit && incident.incident_type === 'near_miss' ? 'selected' : '' %>>Near Miss</option>
-          <option value="traffic_incident" <%= isEdit && incident.incident_type === 'traffic_incident' ? 'selected' : '' %>>Traffic Incident</option>
-          <option value="worker_injury" <%= isEdit && incident.incident_type === 'worker_injury' ? 'selected' : '' %>>Worker Injury</option>
-          <option value="vehicle_damage" <%= isEdit && incident.incident_type === 'vehicle_damage' ? 'selected' : '' %>>Vehicle Damage</option>
-          <option value="public_complaint" <%= isEdit && incident.incident_type === 'public_complaint' ? 'selected' : '' %>>Public Complaint</option>
-          <option value="injury" <%= isEdit && incident.incident_type === 'injury' ? 'selected' : '' %>>Injury</option>
-          <option value="hazard" <%= isEdit && incident.incident_type === 'hazard' ? 'selected' : '' %>>Hazard</option>
-          <option value="property_damage" <%= isEdit && incident.incident_type === 'property_damage' ? 'selected' : '' %>>Property Damage</option>
-          <option value="environmental" <%= isEdit && incident.incident_type === 'environmental' ? 'selected' : '' %>>Environmental</option>
-          <option value="vehicle" <%= isEdit && incident.incident_type === 'vehicle' ? 'selected' : '' %>>Vehicle</option>
-          <option value="other" <%= isEdit && incident.incident_type === 'other' ? 'selected' : '' %>>Other</option>
+          <% (settingsOptions.incident_type || []).forEach(opt => { %>
+            <option value="<%= opt.key %>" <%= (incident ? incident.incident_type : '') === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+          <% }) %>
         </select>
       </div>
       <!-- Severity -->
       <div>
-        <label for="severity" class="block text-sm font-medium text-slate-300 mb-1">Severity</label>
+        <label for="severity" class="block text-sm font-medium text-gray-600 mb-1">Severity</label>
         <select id="severity" name="severity"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-          <option value="low" <%= isEdit && incident.severity === 'low' ? 'selected' : '' %>>Low</option>
-          <option value="medium" <%= isEdit && incident.severity === 'medium' ? 'selected' : '' %>>Medium</option>
-          <option value="high" <%= isEdit && incident.severity === 'high' ? 'selected' : '' %>>High</option>
-          <option value="critical" <%= isEdit && incident.severity === 'critical' ? 'selected' : '' %>>Critical</option>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <% (settingsOptions.incident_severity || []).forEach(opt => { %>
+            <option value="<%= opt.key %>" <%= (incident ? incident.severity : 'low') === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+          <% }) %>
         </select>
       </div>
       <!-- Title -->
       <div>
-        <label for="title" class="block text-sm font-medium text-slate-300 mb-1">Title <span class="text-red-400">*</span></label>
+        <label for="title" class="block text-sm font-medium text-gray-600 mb-1">Title <span class="text-red-600">*</span></label>
         <input type="text" id="title" name="title" required
           value="<%= isEdit ? incident.title : '' %>"
           placeholder="Brief incident title"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
     <!-- Description -->
     <div class="mt-4">
-      <label for="description" class="block text-sm font-medium text-slate-300 mb-1">Description <span class="text-red-400">*</span></label>
+      <label for="description" class="block text-sm font-medium text-gray-600 mb-1">Description <span class="text-red-600">*</span></label>
       <textarea id="description" name="description" rows="4" required
         placeholder="Describe what happened in detail..."
-        class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.description ? incident.description : '' %></textarea>
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.description ? incident.description : '' %></textarea>
     </div>
   </div>
 
   <!-- Location & Time -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Location & Time</h2>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Location & Time</h2>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <!-- Location -->
       <div>
-        <label for="location" class="block text-sm font-medium text-slate-300 mb-1">Location</label>
+        <label for="location" class="block text-sm font-medium text-gray-600 mb-1">Location</label>
         <input type="text" id="location" name="location"
           value="<%= isEdit && incident.location ? incident.location : '' %>"
           placeholder="Specific location on site"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Incident Date -->
       <div>
-        <label for="incident_date" class="block text-sm font-medium text-slate-300 mb-1">Incident Date <span class="text-red-400">*</span></label>
+        <label for="incident_date" class="block text-sm font-medium text-gray-600 mb-1">Incident Date <span class="text-red-600">*</span></label>
         <input type="date" id="incident_date" name="incident_date" required
           value="<%= isEdit && incident.incident_date ? incident.incident_date : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Incident Time -->
       <div>
-        <label for="incident_time" class="block text-sm font-medium text-slate-300 mb-1">Incident Time</label>
+        <label for="incident_time" class="block text-sm font-medium text-gray-600 mb-1">Incident Time</label>
         <input type="time" id="incident_time" name="incident_time"
           value="<%= isEdit && incident.incident_time ? incident.incident_time : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
   </div>
 
   <!-- People Involved -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">People Involved</h2>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">People Involved</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- Persons Involved -->
       <div>
-        <label for="persons_involved" class="block text-sm font-medium text-slate-300 mb-1">Persons Involved</label>
+        <label for="persons_involved" class="block text-sm font-medium text-gray-600 mb-1">Persons Involved</label>
         <textarea id="persons_involved" name="persons_involved" rows="3"
           placeholder="Names and roles of people involved..."
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.persons_involved ? incident.persons_involved : '' %></textarea>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.persons_involved ? incident.persons_involved : '' %></textarea>
       </div>
       <!-- Witnesses -->
       <div>
-        <label for="witnesses" class="block text-sm font-medium text-slate-300 mb-1">Witnesses</label>
+        <label for="witnesses" class="block text-sm font-medium text-gray-600 mb-1">Witnesses</label>
         <textarea id="witnesses" name="witnesses" rows="3"
           placeholder="Names and contact details of witnesses..."
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.witnesses ? incident.witnesses : '' %></textarea>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.witnesses ? incident.witnesses : '' %></textarea>
       </div>
     </div>
   </div>
 
+  <!-- Linked Crew Members -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Linked Crew Members</h2>
+    <p class="text-xs text-gray-400 mb-4">Link crew members from the roster to this incident for structured tracking. This supplements the free-text fields above.</p>
+    <div id="crew-links-container" class="space-y-3">
+      <% if (linkedCrew && linkedCrew.length > 0) { %>
+        <% linkedCrew.forEach((lc, idx) => { %>
+          <div class="crew-link-row flex items-center gap-3">
+            <select name="crew_member_ids" class="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+              <option value="">-- Select Crew Member --</option>
+              <% crewMembers.forEach(cm => { %>
+                <option value="<%= cm.id %>" <%= lc.crew_member_id == cm.id ? 'selected' : '' %>><%= cm.full_name %> (<%= cm.role || 'crew' %>)</option>
+              <% }) %>
+            </select>
+            <select name="crew_involvement_types" class="w-36 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+              <option value="involved" <%= lc.involvement_type === 'involved' ? 'selected' : '' %>>Involved</option>
+              <option value="witness" <%= lc.involvement_type === 'witness' ? 'selected' : '' %>>Witness</option>
+              <option value="injured" <%= lc.involvement_type === 'injured' ? 'selected' : '' %>>Injured</option>
+              <option value="reporting" <%= lc.involvement_type === 'reporting' ? 'selected' : '' %>>Reporting</option>
+            </select>
+            <button type="button" onclick="this.closest('.crew-link-row').remove()" class="p-2 text-red-600 hover:text-red-700 transition-colors" title="Remove">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+    <button type="button" id="add-crew-link" class="mt-3 flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm text-gray-600 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Add Crew Member
+    </button>
+  </div>
+
   <!-- Actions & Response -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Actions & Response</h2>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Actions & Response</h2>
     <!-- Immediate Actions Taken -->
     <div>
-      <label for="immediate_actions" class="block text-sm font-medium text-slate-300 mb-1">Immediate Actions Taken</label>
+      <label for="immediate_actions" class="block text-sm font-medium text-gray-600 mb-1">Immediate Actions Taken</label>
       <textarea id="immediate_actions" name="immediate_actions" rows="3"
         placeholder="What actions were taken immediately after the incident..."
-        class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.immediate_actions ? incident.immediate_actions : '' %></textarea>
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.immediate_actions ? incident.immediate_actions : '' %></textarea>
     </div>
     <!-- Notifiable Incident -->
     <div class="mt-4">
       <label class="inline-flex items-center gap-3 cursor-pointer">
         <input type="checkbox" name="notifiable_incident" value="1"
           <%= isEdit && incident.notifiable_incident ? 'checked' : '' %>
-          class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
-        <span class="text-sm font-medium text-slate-300">Notifiable Incident</span>
+          class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+        <span class="text-sm font-medium text-gray-600">Notifiable Incident</span>
       </label>
-      <p class="text-xs text-slate-500 mt-1 ml-7">Check if this incident must be reported to a regulatory authority</p>
+      <p class="text-xs text-gray-400 mt-1 ml-7">Check if this incident must be reported to a regulatory authority</p>
     </div>
   </div>
 
   <!-- Notifications & Impact -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Notifications & Impact</h2>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Notifications & Impact</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- Traffic Disruption -->
       <div>
         <label class="inline-flex items-center gap-3 cursor-pointer">
           <input type="checkbox" name="traffic_disruption" value="1"
             <%= isEdit && incident.traffic_disruption ? 'checked' : '' %>
-            class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
-          <span class="text-sm font-medium text-slate-300">Traffic Disruption</span>
+            class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+          <span class="text-sm font-medium text-gray-600">Traffic Disruption</span>
         </label>
       </div>
       <!-- Police Notified -->
@@ -166,8 +190,8 @@
         <label class="inline-flex items-center gap-3 cursor-pointer">
           <input type="checkbox" name="police_notified" value="1"
             <%= isEdit && incident.police_notified ? 'checked' : '' %>
-            class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
-          <span class="text-sm font-medium text-slate-300">Police Notified</span>
+            class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+          <span class="text-sm font-medium text-gray-600">Police Notified</span>
         </label>
       </div>
       <!-- Client Notified -->
@@ -175,37 +199,37 @@
         <label class="inline-flex items-center gap-3 cursor-pointer">
           <input type="checkbox" name="client_notified" value="1"
             <%= isEdit && incident.client_notified ? 'checked' : '' %>
-            class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
-          <span class="text-sm font-medium text-slate-300">Client Notified</span>
+            class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+          <span class="text-sm font-medium text-gray-600">Client Notified</span>
         </label>
       </div>
       <!-- Close Out Date -->
       <div>
-        <label for="close_out_date" class="block text-sm font-medium text-slate-300 mb-1">Close Out Date</label>
+        <label for="close_out_date" class="block text-sm font-medium text-gray-600 mb-1">Close Out Date</label>
         <input type="date" id="close_out_date" name="close_out_date"
           value="<%= isEdit && incident.close_out_date ? incident.close_out_date : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
   </div>
 
   <% if (isEdit) { %>
   <!-- Investigation (edit only) -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Investigation</h2>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Investigation</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- Root Cause -->
       <div class="md:col-span-2">
-        <label for="root_cause" class="block text-sm font-medium text-slate-300 mb-1">Root Cause</label>
+        <label for="root_cause" class="block text-sm font-medium text-gray-600 mb-1">Root Cause</label>
         <textarea id="root_cause" name="root_cause" rows="3"
           placeholder="Identified root cause of the incident..."
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= incident.root_cause || '' %></textarea>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= incident.root_cause || '' %></textarea>
       </div>
       <!-- Investigation Status -->
       <div>
-        <label for="investigation_status" class="block text-sm font-medium text-slate-300 mb-1">Investigation Status</label>
+        <label for="investigation_status" class="block text-sm font-medium text-gray-600 mb-1">Investigation Status</label>
         <select id="investigation_status" name="investigation_status"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="reported" <%= incident.investigation_status === 'reported' ? 'selected' : '' %>>Reported</option>
           <option value="investigating" <%= incident.investigation_status === 'investigating' ? 'selected' : '' %>>Investigating</option>
           <option value="resolved" <%= incident.investigation_status === 'resolved' ? 'selected' : '' %>>Resolved</option>
@@ -221,6 +245,31 @@
     <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
       <%= isEdit ? 'Update Incident' : 'Report Incident' %>
     </button>
-    <a href="<%= isEdit ? '/incidents/' + incident.id : '/incidents' %>" class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Cancel</a>
+    <a href="<%= isEdit ? '/incidents/' + incident.id : '/incidents' %>" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
   </div>
 </form>
+
+<script>
+document.getElementById('add-crew-link').addEventListener('click', function() {
+  const container = document.getElementById('crew-links-container');
+  const crewOptions = `<option value="">-- Select Crew Member --</option>` +
+    <%- JSON.stringify(crewMembers.map(cm => `<option value="${cm.id}">${cm.full_name} (${cm.role || 'crew'})</option>`).join('')) %>;
+  const row = document.createElement('div');
+  row.className = 'crew-link-row flex items-center gap-3';
+  row.innerHTML = `
+    <select name="crew_member_ids" class="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      ${crewOptions}
+    </select>
+    <select name="crew_involvement_types" class="w-36 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      <option value="involved">Involved</option>
+      <option value="witness">Witness</option>
+      <option value="injured">Injured</option>
+      <option value="reporting">Reporting</option>
+    </select>
+    <button type="button" onclick="this.closest('.crew-link-row').remove()" class="p-2 text-red-600 hover:text-red-700 transition-colors" title="Remove">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  `;
+  container.appendChild(row);
+});
+</script>

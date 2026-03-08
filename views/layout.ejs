@@ -11,17 +11,17 @@
         extend: {
           colors: {
             brand: {
-              50: '#eeeeff',
-              100: '#d4d4ff',
-              200: '#a8a8ff',
-              300: '#7b7bff',
-              400: '#5555ee',
-              500: '#3333cc',
-              600: '#2020a0',
-              700: '#1a0a78',
-              800: '#120854',
-              900: '#0a0538',
-              950: '#050220',
+              50: '#EFF6FF',
+              100: '#DBEAFE',
+              200: '#BFDBFE',
+              300: '#93C5FD',
+              400: '#60A5FA',
+              500: '#2B7FFF',
+              600: '#1D6AE5',
+              700: '#1555C0',
+              800: '#0F3F8E',
+              900: '#0A2D66',
+              950: '#051B3F',
             }
           }
         }
@@ -30,7 +30,7 @@
   </script>
   <link rel="stylesheet" href="/css/custom.css">
 </head>
-<body class="h-full bg-slate-900 text-slate-100">
+<body class="h-full bg-gray-50 text-gray-900">
   <%- include('partials/header') %>
 
   <div class="flex flex-1" style="min-height: calc(100vh - 64px);">
@@ -40,17 +40,17 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <% if (typeof flash_success !== 'undefined' && flash_success.length > 0) { %>
           <% flash_success.forEach(msg => { %>
-            <div class="mb-4 p-3 bg-emerald-900/50 border border-emerald-700 rounded-lg text-emerald-300 text-sm flex items-center justify-between">
+            <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-sm flex items-center justify-between">
               <span><%= msg %></span>
-              <button onclick="this.parentElement.remove()" class="text-emerald-400 hover:text-emerald-200">&times;</button>
+              <button onclick="this.parentElement.remove()" class="text-emerald-600 hover:text-emerald-800">&times;</button>
             </div>
           <% }) %>
         <% } %>
         <% if (typeof flash_error !== 'undefined' && flash_error.length > 0) { %>
           <% flash_error.forEach(msg => { %>
-            <div class="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm flex items-center justify-between">
+            <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm flex items-center justify-between">
               <span><%= msg %></span>
-              <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-200">&times;</button>
+              <button onclick="this.parentElement.remove()" class="text-red-600 hover:text-red-800">&times;</button>
             </div>
           <% }) %>
         <% } %>

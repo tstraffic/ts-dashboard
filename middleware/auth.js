@@ -13,6 +13,7 @@ const PERMISSIONS = {
   incidents:     ['management', 'operations'],
   contacts:      ['management', 'operations', 'marketing'],
   timesheets:    ['management', 'operations', 'accounts'],
+  crew:          ['management', 'operations', 'planning'],
   allocations:   ['management', 'operations'],
   schedule:      ['management', 'operations', 'planning'],
   equipment:     ['management', 'operations'],
@@ -24,6 +25,7 @@ const PERMISSIONS = {
   notifications: ['management', 'operations', 'planning', 'marketing', 'accounts'],
   admin:         ['management'],
   activity:      ['management'],
+  settings:      ['management'],
 };
 
 // ---- Helpers ----

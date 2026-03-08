@@ -15,47 +15,47 @@
 <!-- Page Header -->
 <div class="flex items-center justify-between mb-6">
   <div>
-    <h1 class="text-2xl font-bold text-white">Crew Members</h1>
-    <p class="text-slate-400 text-sm mt-1">Manage your crew roster and details</p>
+    <h1 class="text-2xl font-bold text-gray-900">Crew Members</h1>
+    <p class="text-gray-500 text-sm mt-1">Manage your crew roster and details</p>
   </div>
   <a href="/timesheets/crew/new" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Add Crew Member</a>
 </div>
 
 <!-- Sub-navigation -->
-<div class="flex items-center gap-1 mb-6 border-b border-slate-700 pb-3">
-  <a href="/timesheets" class="px-4 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors">Timesheets</a>
-  <a href="/timesheets/crew" class="px-4 py-2 text-sm font-medium rounded-lg bg-slate-700 text-white">Crew Members</a>
-  <a href="/timesheets/summary" class="px-4 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors">Weekly Summary</a>
+<div class="flex items-center gap-1 mb-6 border-b border-gray-200 pb-3">
+  <a href="/timesheets" class="px-4 py-2 text-sm font-medium rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors">Timesheets</a>
+  <a href="/timesheets/crew" class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-50 text-brand-700">Crew Members</a>
+  <a href="/timesheets/summary" class="px-4 py-2 text-sm font-medium rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors">Weekly Summary</a>
 </div>
 
 <!-- Crew Table -->
 <% if (crewMembers.length === 0) { %>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 text-center">
-    <svg class="w-12 h-12 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-    <p class="text-slate-500 text-sm">No crew members found.</p>
-    <a href="/timesheets/crew/new" class="inline-block mt-3 text-brand-400 hover:text-brand-300 text-sm font-medium">Add a crew member</a>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center">
+    <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+    <p class="text-gray-400 text-sm">No crew members found.</p>
+    <a href="/timesheets/crew/new" class="inline-block mt-3 text-brand-600 hover:text-brand-600 text-sm font-medium">Add a crew member</a>
   </div>
 <% } else { %>
-<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
   <table class="w-full text-sm">
     <thead>
-      <tr class="border-b border-slate-700">
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Name</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Employee ID</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Role</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Phone</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Licence</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Licence Expiry</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">TCP Level</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">White Card Expiry</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">TC Ticket Expiry</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">TI Ticket Expiry</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Company</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Actions</th>
+      <tr class="border-b border-gray-200">
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Name</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Employee ID</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Role</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Licence</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Licence Expiry</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">TCP Level</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">White Card Expiry</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">TC Ticket Expiry</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">TI Ticket Expiry</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Company</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-slate-700">
+    <tbody class="divide-y divide-gray-200">
       <% crewMembers.forEach(m => { %>
       <%
         const isExpiringSoon = m.licence_expiry && (new Date(m.licence_expiry) - new Date()) < 30 * 24 * 60 * 60 * 1000 && new Date(m.licence_expiry) > new Date();
@@ -67,13 +67,13 @@
         const tiExpired = m.ti_ticket_expiry && new Date(m.ti_ticket_expiry) < new Date();
         const tiExpiring = m.ti_ticket_expiry && !tiExpired && (new Date(m.ti_ticket_expiry) - new Date()) < 30 * 24 * 60 * 60 * 1000;
       %>
-      <tr class="hover:bg-slate-700/50 cursor-pointer" onclick="window.location='/timesheets/crew/<%= m.id %>/edit'">
-        <td class="px-4 py-3 text-white font-medium"><%= m.full_name %></td>
-        <td class="px-4 py-3 text-slate-300"><%= m.employee_id || '-' %></td>
-        <td class="px-4 py-3 text-slate-300"><%= roleLabels[m.role] || m.role %></td>
-        <td class="px-4 py-3 text-slate-300"><%= m.phone || '-' %></td>
-        <td class="px-4 py-3 text-slate-300"><%= m.licence_type || '-' %></td>
-        <td class="px-4 py-3 <%= isExpired ? 'text-red-400 font-semibold' : (isExpiringSoon ? 'text-brand-400' : 'text-slate-300') %>">
+      <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/timesheets/crew/<%= m.id %>/edit'">
+        <td class="px-4 py-3 text-gray-900 font-medium"><%= m.full_name %></td>
+        <td class="px-4 py-3 text-gray-600"><%= m.employee_id || '-' %></td>
+        <td class="px-4 py-3 text-gray-600"><%= roleLabels[m.role] || m.role %></td>
+        <td class="px-4 py-3 text-gray-600"><%= m.phone || '-' %></td>
+        <td class="px-4 py-3 text-gray-600"><%= m.licence_type || '-' %></td>
+        <td class="px-4 py-3 <%= isExpired ? 'text-red-600 font-semibold' : (isExpiringSoon ? 'text-orange-600' : 'text-gray-600') %>">
           <% if (m.licence_expiry) { %>
             <%= new Date(m.licence_expiry).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
             <% if (isExpired) { %><span class="text-xs ml-1">EXPIRED</span><% } %>
@@ -82,8 +82,8 @@
             -
           <% } %>
         </td>
-        <td class="px-4 py-3 text-slate-300"><%= m.tcp_level || '-' %></td>
-        <td class="px-4 py-3 <%= wcExpired ? 'text-red-400 font-semibold' : (wcExpiring ? 'text-orange-400' : 'text-slate-300') %>">
+        <td class="px-4 py-3 text-gray-600"><%= m.tcp_level || '-' %></td>
+        <td class="px-4 py-3 <%= wcExpired ? 'text-red-600 font-semibold' : (wcExpiring ? 'text-orange-600' : 'text-gray-600') %>">
           <% if (m.white_card_expiry) { %>
             <%= new Date(m.white_card_expiry).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
             <% if (wcExpired) { %><span class="text-xs ml-1">EXPIRED</span><% } %>
@@ -92,7 +92,7 @@
             -
           <% } %>
         </td>
-        <td class="px-4 py-3 <%= tcExpired ? 'text-red-400 font-semibold' : (tcExpiring ? 'text-orange-400' : 'text-slate-300') %>">
+        <td class="px-4 py-3 <%= tcExpired ? 'text-red-600 font-semibold' : (tcExpiring ? 'text-orange-600' : 'text-gray-600') %>">
           <% if (m.tc_ticket_expiry) { %>
             <%= new Date(m.tc_ticket_expiry).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
             <% if (tcExpired) { %><span class="text-xs ml-1">EXPIRED</span><% } %>
@@ -101,7 +101,7 @@
             -
           <% } %>
         </td>
-        <td class="px-4 py-3 <%= tiExpired ? 'text-red-400 font-semibold' : (tiExpiring ? 'text-orange-400' : 'text-slate-300') %>">
+        <td class="px-4 py-3 <%= tiExpired ? 'text-red-600 font-semibold' : (tiExpiring ? 'text-orange-600' : 'text-gray-600') %>">
           <% if (m.ti_ticket_expiry) { %>
             <%= new Date(m.ti_ticket_expiry).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
             <% if (tiExpired) { %><span class="text-xs ml-1">EXPIRED</span><% } %>
@@ -110,16 +110,16 @@
             -
           <% } %>
         </td>
-        <td class="px-4 py-3 text-slate-300"><%= m.company || '-' %></td>
+        <td class="px-4 py-3 text-gray-600"><%= m.company || '-' %></td>
         <td class="px-4 py-3">
           <% if (m.active) { %>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-900/60 text-emerald-300">Active</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Active</span>
           <% } else { %>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-600 text-slate-300">Inactive</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Inactive</span>
           <% } %>
         </td>
         <td class="px-4 py-3">
-          <a href="/timesheets/crew/<%= m.id %>/edit" class="text-slate-400 hover:text-brand-400 transition" title="Edit" onclick="event.stopPropagation()">
+          <a href="/timesheets/crew/<%= m.id %>/edit" class="text-gray-500 hover:text-brand-600 transition" title="Edit" onclick="event.stopPropagation()">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
           </a>
         </td>
@@ -128,5 +128,5 @@
     </tbody>
   </table>
 </div>
-<div class="mt-3 text-xs text-slate-500"><%= crewMembers.length %> crew member<%= crewMembers.length !== 1 ? 's' : '' %></div>
+<div class="mt-3 text-xs text-gray-400"><%= crewMembers.length %> crew member<%= crewMembers.length !== 1 ? 's' : '' %></div>
 <% } %>

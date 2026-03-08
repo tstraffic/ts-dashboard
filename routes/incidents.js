@@ -48,11 +48,14 @@ router.get('/', (req, res) => {
 router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const crewMembers = db.prepare("SELECT id, full_name, role FROM crew_members WHERE active = 1 ORDER BY full_name").all();
   res.render('incidents/form', {
     title: 'Report Incident',
     currentPage: 'incidents',
     incident: null,
     jobs,
+    crewMembers,
+    linkedCrew: [],
     preselectedJobId: req.query.job_id || ''
   });
 });
@@ -69,10 +72,22 @@ router.post('/', (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(job_id, incident_number, incident_type, severity || 'low', title, description, location || '', incident_date, incident_time || '', req.session.user.id, persons_involved || '', witnesses || '', immediate_actions || '', notifiable_incident ? 1 : 0, traffic_disruption ? 1 : 0, police_notified ? 1 : 0, client_notified ? 1 : 0, close_out_date || null);
 
-  logActivity({ user: req.session.user, action: 'create', entityType: 'incident', entityId: result.lastInsertRowid, entityLabel: `${incident_number} - ${title}`, jobId: parseInt(job_id), jobNumber: job ? job.job_number : '', details: `Severity: ${severity}, Type: ${incident_type}`, ip: req.ip });
+  const incidentId = result.lastInsertRowid;
+
+  // Save linked crew members
+  const crewIds = Array.isArray(req.body.crew_member_ids) ? req.body.crew_member_ids : (req.body.crew_member_ids ? [req.body.crew_member_ids] : []);
+  const crewTypes = Array.isArray(req.body.crew_involvement_types) ? req.body.crew_involvement_types : (req.body.crew_involvement_types ? [req.body.crew_involvement_types] : []);
+  const insertCrew = db.prepare('INSERT OR IGNORE INTO incident_crew_members (incident_id, crew_member_id, involvement_type) VALUES (?, ?, ?)');
+  for (let i = 0; i < crewIds.length; i++) {
+    if (crewIds[i]) {
+      insertCrew.run(incidentId, parseInt(crewIds[i]), crewTypes[i] || 'involved');
+    }
+  }
+
+  logActivity({ user: req.session.user, action: 'create', entityType: 'incident', entityId: incidentId, entityLabel: `${incident_number} - ${title}`, jobId: parseInt(job_id), jobNumber: job ? job.job_number : '', details: `Severity: ${severity}, Type: ${incident_type}`, ip: req.ip });
 
   req.flash('success', `Incident ${incident_number} reported successfully.`);
-  res.redirect(`/incidents/${result.lastInsertRowid}`);
+  res.redirect(`/incidents/${incidentId}`);
 });
 
 // SHOW
@@ -99,6 +114,14 @@ router.get('/:id', (req, res) => {
     ORDER BY ca.due_date ASC
   `).all(req.params.id);
 
+  const linkedCrew = db.prepare(`
+    SELECT icm.*, cm.full_name, cm.role, cm.employee_id
+    FROM incident_crew_members icm
+    JOIN crew_members cm ON icm.crew_member_id = cm.id
+    WHERE icm.incident_id = ?
+    ORDER BY cm.full_name
+  `).all(req.params.id);
+
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
 
   res.render('incidents/show', {
@@ -106,6 +129,7 @@ router.get('/:id', (req, res) => {
     currentPage: 'incidents',
     incident,
     correctiveActions,
+    linkedCrew,
     users
   });
 });
@@ -119,11 +143,19 @@ router.get('/:id/edit', (req, res) => {
     return res.redirect('/incidents');
   }
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const crewMembers = db.prepare("SELECT id, full_name, role FROM crew_members WHERE active = 1 ORDER BY full_name").all();
+  const linkedCrew = db.prepare(`
+    SELECT icm.crew_member_id, icm.involvement_type
+    FROM incident_crew_members icm
+    WHERE icm.incident_id = ?
+  `).all(req.params.id);
   res.render('incidents/form', {
     title: `Edit ${incident.incident_number}`,
     currentPage: 'incidents',
     incident,
     jobs,
+    crewMembers,
+    linkedCrew,
     preselectedJobId: ''
   });
 });
@@ -139,6 +171,17 @@ router.post('/:id', (req, res) => {
     UPDATE incidents SET job_id=?, incident_type=?, severity=?, title=?, description=?, location=?, incident_date=?, incident_time=?, persons_involved=?, witnesses=?, immediate_actions=?, root_cause=?, investigation_status=?, notifiable_incident=?, traffic_disruption=?, police_notified=?, client_notified=?, close_out_date=?, updated_at=CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(job_id, incident_type, severity, title, description, location || '', incident_date, incident_time || '', persons_involved || '', witnesses || '', immediate_actions || '', root_cause || '', investigation_status, notifiable_incident ? 1 : 0, traffic_disruption ? 1 : 0, police_notified ? 1 : 0, client_notified ? 1 : 0, close_out_date || null, req.params.id);
+
+  // Sync linked crew members: delete existing, re-insert
+  db.prepare('DELETE FROM incident_crew_members WHERE incident_id = ?').run(req.params.id);
+  const crewIds = Array.isArray(req.body.crew_member_ids) ? req.body.crew_member_ids : (req.body.crew_member_ids ? [req.body.crew_member_ids] : []);
+  const crewTypes = Array.isArray(req.body.crew_involvement_types) ? req.body.crew_involvement_types : (req.body.crew_involvement_types ? [req.body.crew_involvement_types] : []);
+  const insertCrew = db.prepare('INSERT OR IGNORE INTO incident_crew_members (incident_id, crew_member_id, involvement_type) VALUES (?, ?, ?)');
+  for (let i = 0; i < crewIds.length; i++) {
+    if (crewIds[i]) {
+      insertCrew.run(parseInt(req.params.id), parseInt(crewIds[i]), crewTypes[i] || 'involved');
+    }
+  }
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'incident', entityId: parseInt(req.params.id), entityLabel: existing ? existing.incident_number : title, jobId: parseInt(job_id), jobNumber: job ? job.job_number : '', ip: req.ip });
 

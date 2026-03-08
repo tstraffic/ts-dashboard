@@ -3,100 +3,100 @@
 <!-- Page Header -->
 <div class="flex items-center justify-between mb-6">
   <div>
-    <h1 class="text-2xl font-bold text-white">Integrations</h1>
-    <p class="text-slate-400 text-sm mt-1">Connect external systems — Traffio, QuickBooks Online, Employment Hero, Teams & SharePoint</p>
+    <h1 class="text-2xl font-bold text-gray-900">Integrations</h1>
+    <p class="text-gray-500 text-sm mt-1">Connect external systems — Traffio, QuickBooks Online, Employment Hero, Teams & SharePoint</p>
   </div>
-  <a href="/admin/users" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">← Back to Admin</a>
+  <a href="/admin/users" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">← Back to Admin</a>
 </div>
 
 <!-- Provider Cards -->
 <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
 
   <!-- ======= TRAFFIO ======= -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-orange-900/40 rounded-lg flex items-center justify-center">
-          <svg class="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <div class="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
+          <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         </div>
         <div>
-          <h3 class="text-white font-semibold">Traffio</h3>
-          <p class="text-slate-500 text-xs">Traffic management bookings & crew</p>
+          <h3 class="text-gray-900 font-semibold">Traffio</h3>
+          <p class="text-gray-400 text-xs">Traffic management bookings & crew</p>
         </div>
       </div>
       <% if (configs.traffio.enabled) { %>
         <span class="px-2.5 py-0.5 rounded-full text-xs font-medium
-          <%= configs.traffio.sync_status === 'success' ? 'bg-emerald-900/60 text-emerald-300' :
-             configs.traffio.sync_status === 'error' ? 'bg-red-900/60 text-red-300' :
-             configs.traffio.sync_status === 'syncing' ? 'bg-blue-900/60 text-blue-300' :
-             'bg-slate-600 text-slate-300' %>">
+          <%= configs.traffio.sync_status === 'success' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' :
+             configs.traffio.sync_status === 'error' ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20' :
+             configs.traffio.sync_status === 'syncing' ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' :
+             'bg-gray-100 text-gray-600' %>">
           <%= configs.traffio.sync_status === 'success' ? 'Connected' :
              configs.traffio.sync_status === 'error' ? 'Error' :
              configs.traffio.sync_status === 'syncing' ? 'Syncing...' : 'Enabled' %>
         </span>
       <% } else { %>
-        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-600 text-slate-400">Disabled</span>
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Disabled</span>
       <% } %>
     </div>
     <form method="POST" action="/admin/integrations/traffio" class="p-5 space-y-4">
       <div>
-        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">API URL</label>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">API URL</label>
         <input type="url" name="api_url" value="<%= configs.traffio.config.api_url || '' %>" placeholder="https://api.traffio.com.au"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">API Key</label>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">API Key</label>
         <input type="password" name="api_key" value="<%= configs.traffio.config.api_key || '' %>" placeholder="Enter Traffio API key"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
       </div>
       <div class="flex items-center gap-2">
         <input type="hidden" name="enabled" value="0">
         <input type="checkbox" name="enabled" value="1" id="traffio_enabled" <%= configs.traffio.enabled ? 'checked' : '' %>
-          class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500">
-        <label for="traffio_enabled" class="text-sm text-slate-300">Enable Traffio sync</label>
+          class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500">
+        <label for="traffio_enabled" class="text-sm text-gray-600">Enable Traffio sync</label>
       </div>
       <% if (configs.traffio.last_sync_at) { %>
-        <p class="text-xs text-slate-500">Last sync: <%= configs.traffio.last_sync_at %></p>
+        <p class="text-xs text-gray-400">Last sync: <%= configs.traffio.last_sync_at %></p>
       <% } %>
       <% if (configs.traffio.error_message) { %>
-        <p class="text-xs text-red-400"><%= configs.traffio.error_message %></p>
+        <p class="text-xs text-red-600"><%= configs.traffio.error_message %></p>
       <% } %>
       <div class="flex gap-2 pt-2">
         <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Save</button>
-        <button type="submit" formaction="/admin/integrations/traffio/test" formmethod="POST" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Test Connection</button>
+        <button type="submit" formaction="/admin/integrations/traffio/test" formmethod="POST" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Test Connection</button>
       </div>
     </form>
     <% if (configs.traffio.enabled) { %>
-    <div class="px-5 pb-5 border-t border-slate-700 pt-4">
-      <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-3">Sync Now</p>
+    <div class="px-5 pb-5 border-t border-gray-200 pt-4">
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Sync Now</p>
       <form method="POST" action="/admin/integrations/traffio/sync" class="flex flex-wrap gap-2">
-        <button type="submit" name="sync_type" value="all" class="px-3 py-1.5 bg-orange-900/40 hover:bg-orange-900/60 text-orange-300 text-xs font-medium rounded-lg transition-colors">Sync All</button>
-        <button type="submit" name="sync_type" value="jobs" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition-colors">Jobs Only</button>
-        <button type="submit" name="sync_type" value="crew" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition-colors">Crew Only</button>
-        <button type="submit" name="sync_type" value="bookings" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition-colors">Bookings Only</button>
+        <button type="submit" name="sync_type" value="all" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-50 text-amber-700 ring-1 ring-amber-600/20 text-xs font-medium rounded-lg transition-colors">Sync All</button>
+        <button type="submit" name="sync_type" value="jobs" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors">Jobs Only</button>
+        <button type="submit" name="sync_type" value="crew" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors">Crew Only</button>
+        <button type="submit" name="sync_type" value="bookings" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors">Bookings Only</button>
       </form>
     </div>
     <% } %>
   </div>
 
   <!-- ======= QUICKBOOKS ONLINE ======= -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-emerald-900/40 rounded-lg flex items-center justify-center">
-          <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
+          <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
         <div>
-          <h3 class="text-white font-semibold">QuickBooks Online</h3>
-          <p class="text-slate-500 text-xs">Accounting & invoicing</p>
+          <h3 class="text-gray-900 font-semibold">QuickBooks Online</h3>
+          <p class="text-gray-400 text-xs">Accounting & invoicing</p>
         </div>
       </div>
-      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-900/60 text-purple-300">Coming Soon</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 ring-1 ring-purple-600/20">Coming Soon</span>
     </div>
     <form method="POST" action="/admin/integrations/quickbooks" class="p-5 space-y-4">
-      <div class="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
-        <p class="text-sm text-slate-400">QuickBooks Online integration is being prepared. Once connected, the dashboard will be able to:</p>
-        <ul class="mt-2 space-y-1 text-xs text-slate-500">
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <p class="text-sm text-gray-500">QuickBooks Online integration is being prepared. Once connected, the dashboard will be able to:</p>
+        <ul class="mt-2 space-y-1 text-xs text-gray-400">
           <li>• Push invoices from cost entries</li>
           <li>• Sync customer/client records</li>
           <li>• Import payment status</li>
@@ -104,47 +104,47 @@
         </ul>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Client ID</label>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Client ID</label>
         <input type="text" name="client_id" value="<%= configs.quickbooks.config.client_id || '' %>" placeholder="QBO OAuth Client ID"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Client Secret</label>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Client Secret</label>
         <input type="password" name="client_secret" value="<%= configs.quickbooks.config.client_secret || '' %>" placeholder="QBO OAuth Client Secret"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Realm ID (Company)</label>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Realm ID (Company)</label>
         <input type="text" name="realm_id" value="<%= configs.quickbooks.config.realm_id || '' %>" placeholder="QBO Realm / Company ID"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
       </div>
       <div class="flex items-center gap-2">
         <input type="hidden" name="enabled" value="0">
         <input type="checkbox" name="enabled" value="1" id="qb_enabled" disabled
-          class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500 opacity-60">
-        <label for="qb_enabled" class="text-sm text-slate-500">Enable QuickBooks Online sync (coming soon)</label>
+          class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 opacity-60">
+        <label for="qb_enabled" class="text-sm text-gray-400">Enable QuickBooks Online sync (coming soon)</label>
       </div>
     </form>
   </div>
 
   <!-- ======= EMPLOYMENT HERO ======= -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-blue-900/40 rounded-lg flex items-center justify-center">
-          <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+          <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
         </div>
         <div>
-          <h3 class="text-white font-semibold">Employment Hero</h3>
-          <p class="text-slate-500 text-xs">HR, payroll & employee records</p>
+          <h3 class="text-gray-900 font-semibold">Employment Hero</h3>
+          <p class="text-gray-400 text-xs">HR, payroll & employee records</p>
         </div>
       </div>
-      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-900/60 text-purple-300">Coming Soon</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 ring-1 ring-purple-600/20">Coming Soon</span>
     </div>
     <form method="POST" action="/admin/integrations/employment_hero" class="p-5 space-y-4">
-      <div class="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
-        <p class="text-sm text-slate-400">Employment Hero integration is being prepared. Once connected, the dashboard will be able to:</p>
-        <ul class="mt-2 space-y-1 text-xs text-slate-500">
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <p class="text-sm text-gray-500">Employment Hero integration is being prepared. Once connected, the dashboard will be able to:</p>
+        <ul class="mt-2 space-y-1 text-xs text-gray-400">
           <li>• Sync employee records to crew members</li>
           <li>• Push approved timesheets for payroll</li>
           <li>• Import leave/absence data</li>
@@ -152,51 +152,51 @@
         </ul>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">API URL</label>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">API URL</label>
         <input type="url" name="api_url" value="<%= configs.employment_hero.config.api_url || '' %>" placeholder="https://api.employmenthero.com"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">API Key</label>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">API Key</label>
         <input type="password" name="api_key" value="<%= configs.employment_hero.config.api_key || '' %>" placeholder="Employment Hero API key"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Organisation ID</label>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Organisation ID</label>
         <input type="text" name="org_id" value="<%= configs.employment_hero.config.org_id || '' %>" placeholder="EH Organisation ID"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 opacity-60" disabled>
       </div>
       <div class="flex items-center gap-2">
         <input type="hidden" name="enabled" value="0">
         <input type="checkbox" name="enabled" value="1" id="eh_enabled" disabled
-          class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500 opacity-60">
-        <label for="eh_enabled" class="text-sm text-slate-500">Enable Employment Hero sync (coming soon)</label>
+          class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 opacity-60">
+        <label for="eh_enabled" class="text-sm text-gray-400">Enable Employment Hero sync (coming soon)</label>
       </div>
     </form>
   </div>
 
   <!-- ======= MICROSOFT TEAMS ======= -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-indigo-900/40 rounded-lg flex items-center justify-center">
+        <div class="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
           <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         </div>
         <div>
-          <h3 class="text-white font-semibold">Microsoft Teams</h3>
-          <p class="text-slate-500 text-xs">Channel notifications for critical alerts</p>
+          <h3 class="text-gray-900 font-semibold">Microsoft Teams</h3>
+          <p class="text-gray-400 text-xs">Channel notifications for critical alerts</p>
         </div>
       </div>
       <% if (configs.teams.enabled) { %>
-        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-900/60 text-emerald-300">Active</span>
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Active</span>
       <% } else { %>
-        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-600 text-slate-400">Disabled</span>
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Disabled</span>
       <% } %>
     </div>
     <form method="POST" action="/admin/integrations/teams" class="p-5 space-y-4">
-      <div class="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
-        <p class="text-sm text-slate-400">Send critical dashboard notifications to a Teams channel. The following alert types are forwarded:</p>
-        <ul class="mt-2 space-y-1 text-xs text-slate-500">
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <p class="text-sm text-gray-500">Send critical dashboard notifications to a Teams channel. The following alert types are forwarded:</p>
+        <ul class="mt-2 space-y-1 text-xs text-gray-400">
           <li>• Critical defects reported</li>
           <li>• Jobs over budget</li>
           <li>• Overdue equipment returns</li>
@@ -204,56 +204,56 @@
         </ul>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Incoming Webhook URL</label>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Incoming Webhook URL</label>
         <input type="url" name="webhook_url" value="<%= configs.teams.config.webhook_url || '' %>" placeholder="https://outlook.office.com/webhook/..."
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <p class="mt-1 text-xs text-slate-500">Create an incoming webhook in your Teams channel settings and paste the URL here.</p>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <p class="mt-1 text-xs text-gray-400">Create an incoming webhook in your Teams channel settings and paste the URL here.</p>
       </div>
       <div class="flex items-center gap-2">
         <input type="hidden" name="enabled" value="0">
         <input type="checkbox" name="enabled" value="1" id="teams_enabled" <%= configs.teams.enabled ? 'checked' : '' %>
-          class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500">
-        <label for="teams_enabled" class="text-sm text-slate-300">Enable Teams notifications</label>
+          class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500">
+        <label for="teams_enabled" class="text-sm text-gray-600">Enable Teams notifications</label>
       </div>
       <div class="flex gap-2 pt-2">
         <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Save</button>
-        <button type="submit" formaction="/admin/integrations/teams/test" formmethod="POST" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Send Test Message</button>
+        <button type="submit" formaction="/admin/integrations/teams/test" formmethod="POST" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Send Test Message</button>
       </div>
     </form>
   </div>
 
   <!-- ======= SHAREPOINT ======= -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-teal-900/40 rounded-lg flex items-center justify-center">
+        <div class="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center">
           <svg class="w-6 h-6 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
         </div>
         <div>
-          <h3 class="text-white font-semibold">SharePoint</h3>
-          <p class="text-slate-500 text-xs">Document folder linking per job</p>
+          <h3 class="text-gray-900 font-semibold">SharePoint</h3>
+          <p class="text-gray-400 text-xs">Document folder linking per job</p>
         </div>
       </div>
       <% if (configs.sharepoint.enabled) { %>
-        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-900/60 text-emerald-300">Active</span>
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Active</span>
       <% } else { %>
-        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-600 text-slate-400">Disabled</span>
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Disabled</span>
       <% } %>
     </div>
     <form method="POST" action="/admin/integrations/sharepoint" class="p-5 space-y-4">
-      <div class="bg-slate-900/50 border border-slate-700 rounded-lg p-4">
-        <p class="text-sm text-slate-400">Link SharePoint document folders to jobs. Each job can have a SharePoint URL set on its detail page. The base site URL below is used for display purposes.</p>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <p class="text-sm text-gray-500">Link SharePoint document folders to jobs. Each job can have a SharePoint URL set on its detail page. The base site URL below is used for display purposes.</p>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">SharePoint Site URL</label>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">SharePoint Site URL</label>
         <input type="url" name="site_url" value="<%= configs.sharepoint.config.site_url || '' %>" placeholder="https://yourcompany.sharepoint.com/sites/projects"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
       </div>
       <div class="flex items-center gap-2">
         <input type="hidden" name="enabled" value="0">
         <input type="checkbox" name="enabled" value="1" id="sp_enabled" <%= configs.sharepoint.enabled ? 'checked' : '' %>
-          class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-brand-500 focus:ring-brand-500">
-        <label for="sp_enabled" class="text-sm text-slate-300">Enable SharePoint links on jobs</label>
+          class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500">
+        <label for="sp_enabled" class="text-sm text-gray-600">Enable SharePoint links on jobs</label>
       </div>
       <div class="flex gap-2 pt-2">
         <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Save</button>
@@ -264,58 +264,58 @@
 </div>
 
 <!-- Sync Log -->
-<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-  <div class="px-5 py-4 border-b border-slate-700">
-    <h2 class="text-lg font-semibold text-white">Sync Log</h2>
-    <p class="text-slate-500 text-xs mt-0.5">Recent synchronisation activity across all providers</p>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+  <div class="px-5 py-4 border-b border-gray-200">
+    <h2 class="text-lg font-semibold text-gray-900">Sync Log</h2>
+    <p class="text-gray-400 text-xs mt-0.5">Recent synchronisation activity across all providers</p>
   </div>
   <% if (syncLogs.length === 0) { %>
     <div class="p-8 text-center">
-      <p class="text-slate-500 text-sm">No sync activity yet. Configure a provider above and run a sync to see results here.</p>
+      <p class="text-gray-400 text-sm">No sync activity yet. Configure a provider above and run a sync to see results here.</p>
     </div>
   <% } else { %>
   <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b border-slate-700">
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Provider</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Direction</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Entity</th>
-          <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wide">Processed</th>
-          <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wide">Created</th>
-          <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wide">Updated</th>
-          <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase tracking-wide">Failed</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Trigger</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Started</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
+        <tr class="border-b border-gray-200">
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Provider</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Direction</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Entity</th>
+          <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wide">Processed</th>
+          <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wide">Created</th>
+          <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wide">Updated</th>
+          <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wide">Failed</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Trigger</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Started</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-700">
+      <tbody class="divide-y divide-gray-200">
         <% syncLogs.forEach(log => { %>
-        <tr class="hover:bg-slate-700/50">
-          <td class="px-4 py-3 text-slate-300 capitalize"><%= log.provider.replace('_', ' ') %></td>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-gray-600 capitalize"><%= log.provider.replace('_', ' ') %></td>
           <td class="px-4 py-3">
             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-              <%= log.direction === 'import' ? 'bg-blue-900/60 text-blue-300' :
-                 log.direction === 'export' ? 'bg-emerald-900/60 text-emerald-300' :
-                 'bg-purple-900/60 text-purple-300' %>"><%= log.direction %></span>
+              <%= log.direction === 'import' ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' :
+                 log.direction === 'export' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' :
+                 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20' %>"><%= log.direction %></span>
           </td>
-          <td class="px-4 py-3 text-slate-300"><%= log.entity_type %></td>
-          <td class="px-4 py-3 text-center text-slate-300"><%= log.records_processed %></td>
-          <td class="px-4 py-3 text-center text-emerald-400"><%= log.records_created %></td>
-          <td class="px-4 py-3 text-center text-blue-400"><%= log.records_updated %></td>
-          <td class="px-4 py-3 text-center <%= log.records_failed > 0 ? 'text-red-400' : 'text-slate-500' %>"><%= log.records_failed %></td>
-          <td class="px-4 py-3 text-slate-400 text-xs"><%= log.triggered_by %></td>
-          <td class="px-4 py-3 text-slate-400 text-xs"><%= log.started_at %></td>
+          <td class="px-4 py-3 text-gray-600"><%= log.entity_type %></td>
+          <td class="px-4 py-3 text-center text-gray-600"><%= log.records_processed %></td>
+          <td class="px-4 py-3 text-center text-emerald-600"><%= log.records_created %></td>
+          <td class="px-4 py-3 text-center text-brand-600"><%= log.records_updated %></td>
+          <td class="px-4 py-3 text-center <%= log.records_failed > 0 ? 'text-red-600' : 'text-gray-400' %>"><%= log.records_failed %></td>
+          <td class="px-4 py-3 text-gray-500 text-xs"><%= log.triggered_by %></td>
+          <td class="px-4 py-3 text-gray-500 text-xs"><%= log.started_at %></td>
           <td class="px-4 py-3">
             <% if (log.completed_at) { %>
               <% if (log.records_failed > 0 && log.error_details) { %>
-                <span class="text-xs text-orange-400" title="<%= log.error_details %>">Partial</span>
+                <span class="text-xs text-orange-600" title="<%= log.error_details %>">Partial</span>
               <% } else { %>
-                <span class="text-xs text-emerald-400">Complete</span>
+                <span class="text-xs text-emerald-600">Complete</span>
               <% } %>
             <% } else { %>
-              <span class="text-xs text-blue-400">Running...</span>
+              <span class="text-xs text-brand-600">Running...</span>
             <% } %>
           </td>
         </tr>

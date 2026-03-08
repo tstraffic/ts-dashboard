@@ -3,19 +3,19 @@
 <!-- Page Header -->
 <div class="flex items-center justify-between mb-6">
   <div>
-    <h1 class="text-2xl font-bold text-white">Safety & Incidents</h1>
-    <p class="text-slate-400 text-sm mt-1">Track and manage all safety incidents and reports</p>
+    <h1 class="text-2xl font-bold text-gray-900">Safety & Incidents</h1>
+    <p class="text-gray-500 text-sm mt-1">Track and manage all safety incidents and reports</p>
   </div>
   <a href="/incidents/new" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Report Incident</a>
 </div>
 
 <!-- Filter Bar -->
-<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-6">
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-6">
   <form method="GET" action="/incidents" class="flex flex-wrap items-end gap-4">
     <!-- Job -->
     <div class="min-w-[200px] flex-1">
-      <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Job</label>
-      <select name="job_id" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Job</label>
+      <select name="job_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Jobs</option>
         <% jobs.forEach(j => { %>
           <option value="<%= j.id %>" <%= filters.job_id == j.id ? 'selected' : '' %>><%= j.job_number %> - <%= j.client %></option>
@@ -24,37 +24,28 @@
     </div>
     <!-- Incident Type -->
     <div class="min-w-[160px]">
-      <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Type</label>
-      <select name="incident_type" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Type</label>
+      <select name="incident_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Types</option>
-        <option value="near_miss" <%= filters.incident_type === 'near_miss' ? 'selected' : '' %>>Near Miss</option>
-        <option value="traffic_incident" <%= filters.incident_type === 'traffic_incident' ? 'selected' : '' %>>Traffic Incident</option>
-        <option value="worker_injury" <%= filters.incident_type === 'worker_injury' ? 'selected' : '' %>>Worker Injury</option>
-        <option value="vehicle_damage" <%= filters.incident_type === 'vehicle_damage' ? 'selected' : '' %>>Vehicle Damage</option>
-        <option value="public_complaint" <%= filters.incident_type === 'public_complaint' ? 'selected' : '' %>>Public Complaint</option>
-        <option value="injury" <%= filters.incident_type === 'injury' ? 'selected' : '' %>>Injury</option>
-        <option value="hazard" <%= filters.incident_type === 'hazard' ? 'selected' : '' %>>Hazard</option>
-        <option value="property_damage" <%= filters.incident_type === 'property_damage' ? 'selected' : '' %>>Property Damage</option>
-        <option value="environmental" <%= filters.incident_type === 'environmental' ? 'selected' : '' %>>Environmental</option>
-        <option value="vehicle" <%= filters.incident_type === 'vehicle' ? 'selected' : '' %>>Vehicle</option>
-        <option value="other" <%= filters.incident_type === 'other' ? 'selected' : '' %>>Other</option>
+        <% (settingsOptions.incident_type || []).forEach(opt => { %>
+          <option value="<%= opt.key %>" <%= filters.incident_type === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+        <% }) %>
       </select>
     </div>
     <!-- Severity -->
     <div class="min-w-[140px]">
-      <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Severity</label>
-      <select name="severity" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Severity</label>
+      <select name="severity" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Severities</option>
-        <option value="low" <%= filters.severity === 'low' ? 'selected' : '' %>>Low</option>
-        <option value="medium" <%= filters.severity === 'medium' ? 'selected' : '' %>>Medium</option>
-        <option value="high" <%= filters.severity === 'high' ? 'selected' : '' %>>High</option>
-        <option value="critical" <%= filters.severity === 'critical' ? 'selected' : '' %>>Critical</option>
+        <% (settingsOptions.incident_severity || []).forEach(opt => { %>
+          <option value="<%= opt.key %>" <%= filters.severity === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+        <% }) %>
       </select>
     </div>
     <!-- Status -->
     <div class="min-w-[160px]">
-      <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Status</label>
-      <select name="status" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</label>
+      <select name="status" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Statuses</option>
         <option value="reported" <%= filters.status === 'reported' ? 'selected' : '' %>>Reported</option>
         <option value="investigating" <%= filters.status === 'investigating' ? 'selected' : '' %>>Investigating</option>
@@ -65,9 +56,9 @@
     <!-- Buttons -->
     <div class="flex gap-2">
       <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Filter</button>
-      <a href="/incidents" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Clear</a>
+      <a href="/incidents" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Clear</a>
       <a href="/exports/incidents.csv?job_id=<%= filters.job_id || '' %>&incident_type=<%= filters.incident_type || '' %>&severity=<%= filters.severity || '' %>&status=<%= filters.status || '' %>"
-        class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
+        class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         Export CSV
       </a>
@@ -77,68 +68,68 @@
 
 <!-- Incidents Table -->
 <% if (incidents.length === 0) { %>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 text-center">
-    <svg class="w-12 h-12 text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-    <p class="text-slate-500 text-sm">No incidents found matching your filters.</p>
-    <a href="/incidents/new" class="text-brand-400 text-sm hover:underline mt-2 inline-block">Report the first incident</a>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center">
+    <svg class="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+    <p class="text-gray-400 text-sm">No incidents found matching your filters.</p>
+    <a href="/incidents/new" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Report the first incident</a>
   </div>
 <% } else { %>
-<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
   <table class="w-full text-sm">
     <thead>
-      <tr class="border-b border-slate-700">
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Incident #</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Date</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Type</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Severity</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Title</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Job</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Reported By</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
+      <tr class="border-b border-gray-200">
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Incident #</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Severity</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Title</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Job</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Reported By</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-slate-700">
+    <tbody class="divide-y divide-gray-200">
       <% incidents.forEach(incident => { %>
-      <tr class="hover:bg-slate-700/50 cursor-pointer" onclick="window.location='/incidents/<%= incident.id %>'">
+      <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/incidents/<%= incident.id %>'">
         <td class="px-4 py-3 font-medium">
-          <a href="/incidents/<%= incident.id %>" class="text-blue-400 hover:text-blue-300 hover:underline"><%= incident.incident_number %></a>
+          <a href="/incidents/<%= incident.id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= incident.incident_number %></a>
         </td>
-        <td class="px-4 py-3 text-slate-400 text-xs"><%= incident.incident_date || '-' %></td>
+        <td class="px-4 py-3 text-gray-500 text-xs"><%= incident.incident_date || '-' %></td>
         <td class="px-4 py-3">
           <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-            <% if (incident.incident_type === 'injury') { %>bg-red-900/60 text-red-300
-            <% } else if (incident.incident_type === 'near_miss') { %>bg-orange-900/60 text-brand-300
-            <% } else if (incident.incident_type === 'traffic_incident') { %>bg-red-900/60 text-red-300
-            <% } else if (incident.incident_type === 'worker_injury') { %>bg-red-900/60 text-red-300
-            <% } else if (incident.incident_type === 'vehicle_damage') { %>bg-blue-900/60 text-blue-300
-            <% } else if (incident.incident_type === 'public_complaint') { %>bg-purple-900/60 text-purple-300
-            <% } else if (incident.incident_type === 'hazard') { %>bg-yellow-900/60 text-yellow-300
-            <% } else if (incident.incident_type === 'property_damage') { %>bg-orange-900/60 text-orange-300
-            <% } else if (incident.incident_type === 'environmental') { %>bg-emerald-900/60 text-emerald-300
-            <% } else if (incident.incident_type === 'vehicle') { %>bg-blue-900/60 text-blue-300
-            <% } else { %>bg-slate-700 text-slate-300<% } %>">
+            <% if (incident.incident_type === 'injury') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
+            <% } else if (incident.incident_type === 'near_miss') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
+            <% } else if (incident.incident_type === 'traffic_incident') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
+            <% } else if (incident.incident_type === 'worker_injury') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
+            <% } else if (incident.incident_type === 'vehicle_damage') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
+            <% } else if (incident.incident_type === 'public_complaint') { %>bg-purple-50 text-purple-700 ring-1 ring-purple-600/20
+            <% } else if (incident.incident_type === 'hazard') { %>bg-yellow-50 text-yellow-700 ring-1 ring-yellow-600/20
+            <% } else if (incident.incident_type === 'property_damage') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
+            <% } else if (incident.incident_type === 'environmental') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
+            <% } else if (incident.incident_type === 'vehicle') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
+            <% } else { %>bg-white text-gray-600<% } %>">
             <%= incident.incident_type ? incident.incident_type.replace(/_/g, ' ') : '-' %>
           </span>
         </td>
         <td class="px-4 py-3">
           <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-            <% if (incident.severity === 'critical') { %>bg-red-900/60 text-red-300
-            <% } else if (incident.severity === 'high') { %>bg-orange-900/60 text-brand-300
-            <% } else if (incident.severity === 'medium') { %>bg-blue-900/60 text-blue-300
-            <% } else { %>bg-slate-700 text-slate-300<% } %>">
+            <% if (incident.severity === 'critical') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
+            <% } else if (incident.severity === 'high') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
+            <% } else if (incident.severity === 'medium') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
+            <% } else { %>bg-white text-gray-600<% } %>">
             <%= incident.severity || 'low' %>
           </span>
         </td>
-        <td class="px-4 py-3 text-slate-300 font-medium max-w-[200px] truncate"><%= incident.title %></td>
-        <td class="px-4 py-3 text-slate-400 text-xs"><%= incident.job_number %></td>
-        <td class="px-4 py-3 text-slate-300"><%= incident.reported_by_name %></td>
+        <td class="px-4 py-3 text-gray-600 font-medium max-w-[200px] truncate"><%= incident.title %></td>
+        <td class="px-4 py-3 text-gray-500 text-xs"><%= incident.job_number %></td>
+        <td class="px-4 py-3 text-gray-600"><%= incident.reported_by_name %></td>
         <td class="px-4 py-3">
           <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-            <% if (incident.investigation_status === 'reported') { %>bg-slate-700 text-slate-300
-            <% } else if (incident.investigation_status === 'investigating') { %>bg-blue-900/60 text-blue-300
-            <% } else if (incident.investigation_status === 'resolved') { %>bg-emerald-900/60 text-emerald-300
-            <% } else if (incident.investigation_status === 'closed') { %>bg-purple-900/60 text-purple-300
-            <% } else { %>bg-slate-700 text-slate-300<% } %>">
+            <% if (incident.investigation_status === 'reported') { %>bg-white text-gray-600
+            <% } else if (incident.investigation_status === 'investigating') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
+            <% } else if (incident.investigation_status === 'resolved') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
+            <% } else if (incident.investigation_status === 'closed') { %>bg-purple-50 text-purple-700 ring-1 ring-purple-600/20
+            <% } else { %>bg-white text-gray-600<% } %>">
             <%= incident.investigation_status ? incident.investigation_status.replace(/_/g, ' ') : 'reported' %>
           </span>
         </td>
@@ -147,5 +138,5 @@
     </tbody>
   </table>
 </div>
-<div class="mt-3 text-xs text-slate-500"><%= incidents.length %> incident<%= incidents.length !== 1 ? 's' : '' %> found</div>
+<div class="mt-3 text-xs text-gray-400"><%= incidents.length %> incident<%= incidents.length !== 1 ? 's' : '' %> found</div>
 <% } %>

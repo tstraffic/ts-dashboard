@@ -3,119 +3,115 @@
 
 <!-- Page Header -->
 <div class="mb-6">
-  <h1 class="text-2xl font-bold text-white"><%= isEdit ? 'Edit ' + member.full_name : 'Add Crew Member' %></h1>
-  <p class="text-slate-400 text-sm mt-1"><%= isEdit ? 'Update crew member details below' : 'Fill in the details to add a new crew member' %></p>
+  <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit ' + member.full_name : 'Add Crew Member' %></h1>
+  <p class="text-gray-500 text-sm mt-1"><%= isEdit ? 'Update crew member details below' : 'Fill in the details to add a new crew member' %></p>
 </div>
 
 <!-- Form -->
 <form method="POST" action="<%= isEdit ? '/timesheets/crew/' + member.id : '/timesheets/crew' %>" class="space-y-6">
 
   <!-- Personal Details -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Personal Details</h2>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Personal Details</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- Full Name -->
       <div>
-        <label for="full_name" class="block text-sm font-medium text-slate-300 mb-1">Full Name <span class="text-red-400">*</span></label>
+        <label for="full_name" class="block text-sm font-medium text-gray-600 mb-1">Full Name <span class="text-red-600">*</span></label>
         <input type="text" id="full_name" name="full_name" required
           value="<%= isEdit ? member.full_name : '' %>"
           placeholder="Full name"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Employee ID -->
       <div>
-        <label for="employee_id" class="block text-sm font-medium text-slate-300 mb-1">Employee ID</label>
+        <label for="employee_id" class="block text-sm font-medium text-gray-600 mb-1">Employee ID</label>
         <input type="text" id="employee_id" name="employee_id"
           value="<%= isEdit && member.employee_id ? member.employee_id : '' %>"
           placeholder="e.g. EMP-001"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Role -->
       <div>
-        <label for="role" class="block text-sm font-medium text-slate-300 mb-1">Role <span class="text-red-400">*</span></label>
+        <label for="role" class="block text-sm font-medium text-gray-600 mb-1">Role <span class="text-red-600">*</span></label>
         <select id="role" name="role" required
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-          <option value="traffic_controller" <%= isEdit && member.role === 'traffic_controller' ? 'selected' : '' %>>Traffic Controller</option>
-          <option value="leading_hand" <%= isEdit && member.role === 'leading_hand' ? 'selected' : '' %>>Leading Hand</option>
-          <option value="supervisor" <%= isEdit && member.role === 'supervisor' ? 'selected' : '' %>>Supervisor</option>
-          <option value="pilot_vehicle" <%= isEdit && member.role === 'pilot_vehicle' ? 'selected' : '' %>>Pilot Vehicle</option>
-          <option value="spotter" <%= isEdit && member.role === 'spotter' ? 'selected' : '' %>>Spotter</option>
-          <option value="labourer" <%= isEdit && member.role === 'labourer' ? 'selected' : '' %>>Labourer</option>
-          <option value="other" <%= isEdit && member.role === 'other' ? 'selected' : '' %>>Other</option>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <% (settingsOptions.crew_role || []).forEach(opt => { %>
+            <option value="<%= opt.key %>" <%= isEdit && member.role === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+          <% }) %>
         </select>
       </div>
       <!-- Hourly Rate -->
       <div>
-        <label for="hourly_rate" class="block text-sm font-medium text-slate-300 mb-1">Hourly Rate ($)</label>
+        <label for="hourly_rate" class="block text-sm font-medium text-gray-600 mb-1">Hourly Rate ($)</label>
         <input type="number" id="hourly_rate" name="hourly_rate" min="0" step="0.01"
           value="<%= isEdit ? (member.hourly_rate || 0) : '' %>"
           placeholder="0.00"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
   </div>
 
   <!-- Contact Details -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Contact Details</h2>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Contact Details</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- Phone -->
       <div>
-        <label for="phone" class="block text-sm font-medium text-slate-300 mb-1">Phone</label>
+        <label for="phone" class="block text-sm font-medium text-gray-600 mb-1">Phone</label>
         <input type="tel" id="phone" name="phone"
           value="<%= isEdit && member.phone ? member.phone : '' %>"
           placeholder="04XX XXX XXX"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Email -->
       <div>
-        <label for="email" class="block text-sm font-medium text-slate-300 mb-1">Email</label>
+        <label for="email" class="block text-sm font-medium text-gray-600 mb-1">Email</label>
         <input type="email" id="email" name="email"
           value="<%= isEdit && member.email ? member.email : '' %>"
           placeholder="email@example.com"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
   </div>
 
   <!-- Licence & Induction -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Licence & Induction</h2>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Licence & Induction</h2>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <!-- Licence Type -->
       <div>
-        <label for="licence_type" class="block text-sm font-medium text-slate-300 mb-1">Licence Type</label>
+        <label for="licence_type" class="block text-sm font-medium text-gray-600 mb-1">Licence Type</label>
         <input type="text" id="licence_type" name="licence_type"
           value="<%= isEdit && member.licence_type ? member.licence_type : '' %>"
           placeholder="e.g. White Card, TC Licence"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Licence Expiry -->
       <div>
-        <label for="licence_expiry" class="block text-sm font-medium text-slate-300 mb-1">Licence Expiry</label>
+        <label for="licence_expiry" class="block text-sm font-medium text-gray-600 mb-1">Licence Expiry</label>
         <input type="date" id="licence_expiry" name="licence_expiry"
           value="<%= isEdit && member.licence_expiry ? member.licence_expiry : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Induction Date -->
       <div>
-        <label for="induction_date" class="block text-sm font-medium text-slate-300 mb-1">Induction Date</label>
+        <label for="induction_date" class="block text-sm font-medium text-gray-600 mb-1">Induction Date</label>
         <input type="date" id="induction_date" name="induction_date"
           value="<%= isEdit && member.induction_date ? member.induction_date : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
   </div>
 
   <!-- Competency & Tickets -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Competency & Tickets</h2>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Competency & Tickets</h2>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <!-- TCP Level -->
       <div>
-        <label for="tcp_level" class="block text-sm font-medium text-slate-300 mb-1">TCP Level</label>
+        <label for="tcp_level" class="block text-sm font-medium text-gray-600 mb-1">TCP Level</label>
         <select id="tcp_level" name="tcp_level"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="" <%= isEdit && member.tcp_level === '' ? 'selected' : (!isEdit ? 'selected' : '') %>>—</option>
           <option value="TCP1" <%= isEdit && member.tcp_level === 'TCP1' ? 'selected' : '' %>>TCP1</option>
           <option value="TCP2" <%= isEdit && member.tcp_level === 'TCP2' ? 'selected' : '' %>>TCP2</option>
@@ -124,76 +120,76 @@
       </div>
       <!-- White Card -->
       <div>
-        <label for="white_card" class="block text-sm font-medium text-slate-300 mb-1">White Card</label>
+        <label for="white_card" class="block text-sm font-medium text-gray-600 mb-1">White Card</label>
         <input type="text" id="white_card" name="white_card"
           value="<%= isEdit && member.white_card ? member.white_card : '' %>"
           placeholder="Card number"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- White Card Expiry -->
       <div>
-        <label for="white_card_expiry" class="block text-sm font-medium text-slate-300 mb-1">White Card Expiry</label>
+        <label for="white_card_expiry" class="block text-sm font-medium text-gray-600 mb-1">White Card Expiry</label>
         <input type="date" id="white_card_expiry" name="white_card_expiry"
           value="<%= isEdit && member.white_card_expiry ? member.white_card_expiry : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- First Aid -->
       <div>
-        <label for="first_aid" class="block text-sm font-medium text-slate-300 mb-1">First Aid</label>
+        <label for="first_aid" class="block text-sm font-medium text-gray-600 mb-1">First Aid</label>
         <input type="text" id="first_aid" name="first_aid"
           value="<%= isEdit && member.first_aid ? member.first_aid : '' %>"
           placeholder="Cert type"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- First Aid Expiry -->
       <div>
-        <label for="first_aid_expiry" class="block text-sm font-medium text-slate-300 mb-1">First Aid Expiry</label>
+        <label for="first_aid_expiry" class="block text-sm font-medium text-gray-600 mb-1">First Aid Expiry</label>
         <input type="date" id="first_aid_expiry" name="first_aid_expiry"
           value="<%= isEdit && member.first_aid_expiry ? member.first_aid_expiry : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- TC Ticket -->
       <div>
-        <label for="tc_ticket" class="block text-sm font-medium text-slate-300 mb-1">TC Ticket</label>
+        <label for="tc_ticket" class="block text-sm font-medium text-gray-600 mb-1">TC Ticket</label>
         <input type="text" id="tc_ticket" name="tc_ticket"
           value="<%= isEdit && member.tc_ticket ? member.tc_ticket : '' %>"
           placeholder="Ticket number"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- TC Ticket Expiry -->
       <div>
-        <label for="tc_ticket_expiry" class="block text-sm font-medium text-slate-300 mb-1">TC Ticket Expiry</label>
+        <label for="tc_ticket_expiry" class="block text-sm font-medium text-gray-600 mb-1">TC Ticket Expiry</label>
         <input type="date" id="tc_ticket_expiry" name="tc_ticket_expiry"
           value="<%= isEdit && member.tc_ticket_expiry ? member.tc_ticket_expiry : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- TI Ticket -->
       <div>
-        <label for="ti_ticket" class="block text-sm font-medium text-slate-300 mb-1">TI Ticket</label>
+        <label for="ti_ticket" class="block text-sm font-medium text-gray-600 mb-1">TI Ticket</label>
         <input type="text" id="ti_ticket" name="ti_ticket"
           value="<%= isEdit && member.ti_ticket ? member.ti_ticket : '' %>"
           placeholder="Ticket number"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- TI Ticket Expiry -->
       <div>
-        <label for="ti_ticket_expiry" class="block text-sm font-medium text-slate-300 mb-1">TI Ticket Expiry</label>
+        <label for="ti_ticket_expiry" class="block text-sm font-medium text-gray-600 mb-1">TI Ticket Expiry</label>
         <input type="date" id="ti_ticket_expiry" name="ti_ticket_expiry"
           value="<%= isEdit && member.ti_ticket_expiry ? member.ti_ticket_expiry : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Medical Expiry -->
       <div>
-        <label for="medical_expiry" class="block text-sm font-medium text-slate-300 mb-1">Medical Expiry</label>
+        <label for="medical_expiry" class="block text-sm font-medium text-gray-600 mb-1">Medical Expiry</label>
         <input type="date" id="medical_expiry" name="medical_expiry"
           value="<%= isEdit && member.medical_expiry ? member.medical_expiry : '' %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Induction Status -->
       <div>
-        <label for="induction_status" class="block text-sm font-medium text-slate-300 mb-1">Induction Status</label>
+        <label for="induction_status" class="block text-sm font-medium text-gray-600 mb-1">Induction Status</label>
         <select id="induction_status" name="induction_status"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="pending" <%= isEdit && member.induction_status === 'pending' ? 'selected' : '' %>>Pending</option>
           <option value="completed" <%= isEdit && member.induction_status === 'completed' ? 'selected' : '' %>>Completed</option>
           <option value="expired" <%= isEdit && member.induction_status === 'expired' ? 'selected' : '' %>>Expired</option>
@@ -201,21 +197,20 @@
       </div>
       <!-- Company -->
       <div>
-        <label for="company" class="block text-sm font-medium text-slate-300 mb-1">Company</label>
+        <label for="company" class="block text-sm font-medium text-gray-600 mb-1">Company</label>
         <input type="text" id="company" name="company"
           value="<%= isEdit && member.company ? member.company : '' %>"
           placeholder="Company name"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Employment Type -->
       <div>
-        <label for="employment_type" class="block text-sm font-medium text-slate-300 mb-1">Employment Type</label>
+        <label for="employment_type" class="block text-sm font-medium text-gray-600 mb-1">Employment Type</label>
         <select id="employment_type" name="employment_type"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-          <option value="employee" <%= isEdit && member.employment_type === 'employee' ? 'selected' : '' %>>Employee</option>
-          <option value="subcontractor" <%= isEdit && member.employment_type === 'subcontractor' ? 'selected' : '' %>>Subcontractor</option>
-          <option value="casual" <%= isEdit && member.employment_type === 'casual' ? 'selected' : '' %>>Casual</option>
-          <option value="agency" <%= isEdit && member.employment_type === 'agency' ? 'selected' : '' %>>Agency</option>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <% (settingsOptions.employment_type || []).forEach(opt => { %>
+            <option value="<%= opt.key %>" <%= isEdit && member.employment_type === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+          <% }) %>
         </select>
       </div>
     </div>
@@ -223,16 +218,16 @@
 
   <% if (isEdit) { %>
   <!-- Status -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Status</h2>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Status</h2>
     <div class="flex items-center gap-3">
       <label class="relative inline-flex items-center cursor-pointer">
         <input type="checkbox" name="active" value="1" <%= member.active ? 'checked' : '' %> class="sr-only peer">
-        <div class="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
+        <div class="w-11 h-6 bg-gray-100 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
       </label>
-      <span class="text-sm font-medium text-slate-300">Active</span>
+      <span class="text-sm font-medium text-gray-600">Active</span>
     </div>
-    <p class="text-xs text-slate-500 mt-2">Inactive crew members will not appear in timesheet dropdowns.</p>
+    <p class="text-xs text-gray-400 mt-2">Inactive crew members will not appear in timesheet dropdowns.</p>
   </div>
   <% } %>
 
@@ -241,6 +236,6 @@
     <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
       <%= isEdit ? 'Update Crew Member' : 'Add Crew Member' %>
     </button>
-    <a href="/timesheets/crew" class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Cancel</a>
+    <a href="/timesheets/crew" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
   </div>
 </form>
