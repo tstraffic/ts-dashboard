@@ -1,0 +1,186 @@
+<div class="space-y-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <a href="/clients" class="text-gray-400 hover:text-gray-600 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <h1 class="text-2xl font-bold text-gray-900"><%= client.company_name %></h1>
+        <% if (client.active) { %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">Active</span>
+        <% } else { %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Inactive</span>
+        <% } %>
+      </div>
+      <p class="text-sm text-gray-500"><%= client.abn ? 'ABN: ' + client.abn : '' %></p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/clients/<%= client.id %>/edit" class="inline-flex items-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        Edit
+      </a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Client Info -->
+    <div class="lg:col-span-1 space-y-6">
+      <!-- Contact Details -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+        <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">Contact Details</h3>
+        <dl class="space-y-3 text-sm">
+          <% if (client.primary_contact_name) { %>
+          <div>
+            <dt class="text-gray-500">Primary Contact</dt>
+            <dd class="font-medium text-gray-900"><%= client.primary_contact_name %></dd>
+          </div>
+          <% } %>
+          <% if (client.primary_contact_phone) { %>
+          <div>
+            <dt class="text-gray-500">Phone</dt>
+            <dd class="text-gray-900"><a href="tel:<%= client.primary_contact_phone %>" class="text-brand-600 hover:underline"><%= client.primary_contact_phone %></a></dd>
+          </div>
+          <% } %>
+          <% if (client.primary_contact_email) { %>
+          <div>
+            <dt class="text-gray-500">Email</dt>
+            <dd class="text-gray-900"><a href="mailto:<%= client.primary_contact_email %>" class="text-brand-600 hover:underline"><%= client.primary_contact_email %></a></dd>
+          </div>
+          <% } %>
+          <% if (client.address) { %>
+          <div>
+            <dt class="text-gray-500">Address</dt>
+            <dd class="text-gray-900"><%= client.address %></dd>
+          </div>
+          <% } %>
+          <% if (client.billing_address) { %>
+          <div>
+            <dt class="text-gray-500">Billing Address</dt>
+            <dd class="text-gray-900"><%= client.billing_address %></dd>
+          </div>
+          <% } %>
+          <% if (client.payment_terms) { %>
+          <div>
+            <dt class="text-gray-500">Payment Terms</dt>
+            <dd class="text-gray-900"><%= client.payment_terms %></dd>
+          </div>
+          <% } %>
+        </dl>
+      </div>
+
+      <% if (client.notes) { %>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+        <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">Notes</h3>
+        <p class="text-sm text-gray-600 whitespace-pre-line"><%= client.notes %></p>
+      </div>
+      <% } %>
+
+      <!-- Job-Level Contacts -->
+      <% if (contacts.length > 0) { %>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+        <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">Project Contacts</h3>
+        <div class="space-y-3">
+          <% contacts.forEach(contact => { %>
+          <div class="flex items-start gap-3 pb-3 border-b border-gray-100 last:border-0 last:pb-0">
+            <div class="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0">
+              <span class="text-xs font-medium text-brand-700"><%= contact.full_name.split(' ').map(n => n[0]).join('') %></span>
+            </div>
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900"><%= contact.full_name %></p>
+              <% if (contact.position) { %><p class="text-xs text-gray-500"><%= contact.position %></p><% } %>
+              <% if (contact.phone) { %><p class="text-xs text-gray-500"><%= contact.phone %></p><% } %>
+              <% if (contact.email) { %><p class="text-xs text-gray-500"><%= contact.email %></p><% } %>
+            </div>
+          </div>
+          <% }); %>
+        </div>
+      </div>
+      <% } %>
+    </div>
+
+    <!-- Projects & Shifts -->
+    <div class="lg:col-span-2 space-y-6">
+      <!-- Projects -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Projects (<%= projects.length %>)</h3>
+          <a href="/projects/new?client_id=<%= client.id %>" class="text-xs text-brand-600 hover:underline font-medium">+ New Project</a>
+        </div>
+        <% if (projects.length === 0) { %>
+          <div class="p-6 text-center text-gray-500 text-sm">No projects linked to this client yet.</div>
+        <% } else { %>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Job #</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Suburb</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">PM</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Start</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <% projects.forEach(p => { %>
+              <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/projects/<%= p.id %>'">
+                <td class="px-4 py-2.5 font-medium text-brand-600"><%= p.job_number %></td>
+                <td class="px-4 py-2.5 text-gray-600"><%= p.suburb %></td>
+                <td class="px-4 py-2.5">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                    <%= p.status === 'active' ? 'bg-emerald-50 text-emerald-700' : p.status === 'on_hold' ? 'bg-amber-50 text-amber-700' : p.status === 'completed' ? 'bg-gray-100 text-gray-600' : 'bg-blue-50 text-blue-700' %>">
+                    <%= p.status %>
+                  </span>
+                </td>
+                <td class="px-4 py-2.5 text-gray-600"><%= p.pm_name || '-' %></td>
+                <td class="px-4 py-2.5 text-gray-600"><%= p.start_date || '-' %></td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+      </div>
+
+      <!-- Recent Shifts -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Recent Shifts (<%= recentShifts.length %>)</h3>
+        </div>
+        <% if (recentShifts.length === 0) { %>
+          <div class="p-6 text-center text-gray-500 text-sm">No shifts created for this client yet.</div>
+        <% } else { %>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Job #</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Suburb</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                <th class="px-4 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Crew</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <% recentShifts.forEach(s => { %>
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2.5 font-medium text-gray-900"><%= s.job_number %></td>
+                <td class="px-4 py-2.5 text-gray-600"><%= s.suburb %></td>
+                <td class="px-4 py-2.5 text-gray-600"><%= s.start_date %></td>
+                <td class="px-4 py-2.5 text-center"><%= s.crew_count || 0 %></td>
+                <td class="px-4 py-2.5">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                    <%= s.status === 'active' ? 'bg-emerald-50 text-emerald-700' : s.status === 'completed' ? 'bg-gray-100 text-gray-600' : 'bg-blue-50 text-blue-700' %>">
+                    <%= s.status %>
+                  </span>
+                </td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>

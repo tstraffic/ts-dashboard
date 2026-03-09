@@ -8,23 +8,23 @@
 
 <!-- Breadcrumb & Header -->
 <div class="mb-6">
-  <div class="flex items-center gap-2 text-sm text-slate-400 mb-2">
-    <a href="/equipment" class="hover:text-slate-200">Equipment Register</a>
+  <div class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+    <a href="/equipment" class="hover:text-gray-700">Equipment Register</a>
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-    <span class="text-slate-300"><%= item.asset_number %></span>
+    <span class="text-gray-600"><%= item.asset_number %></span>
   </div>
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <h1 class="text-2xl font-bold text-white"><%= item.asset_number %> - <%= item.name %></h1>
+      <h1 class="text-2xl font-bold text-gray-900"><%= item.asset_number %> - <%= item.name %></h1>
       <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-        <% if (item.current_condition === 'new' || item.current_condition === 'good') { %>bg-emerald-900/60 text-emerald-300
-        <% } else if (item.current_condition === 'fair') { %>bg-orange-900/60 text-brand-300
-        <% } else if (item.current_condition === 'poor' || item.current_condition === 'damaged') { %>bg-red-900/60 text-red-300
-        <% } else { %>bg-slate-700 text-slate-400<% } %>">
+        <% if (item.current_condition === 'new' || item.current_condition === 'good') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
+        <% } else if (item.current_condition === 'fair') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
+        <% } else if (item.current_condition === 'poor' || item.current_condition === 'damaged') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
+        <% } else { %>bg-white text-gray-500<% } %>">
         <%= item.current_condition %>
       </span>
       <% if (!item.active) { %>
-        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">Inactive</span>
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white text-gray-500">Inactive</span>
       <% } %>
     </div>
     <a href="/equipment/<%= item.id %>/edit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Edit</a>
@@ -33,37 +33,37 @@
 
 <!-- Info Grid -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Category</p>
-    <p class="text-sm text-white font-medium"><%= item.category.replace('_', ' ') %></p>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Category</p>
+    <p class="text-sm text-gray-900 font-medium"><%= item.category.replace('_', ' ') %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Serial Number</p>
-    <p class="text-sm text-white font-medium"><%= item.serial_number || '-' %></p>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Serial Number</p>
+    <p class="text-sm text-gray-900 font-medium"><%= item.serial_number || '-' %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Registration</p>
-    <p class="text-sm text-white font-medium"><%= item.registration || '-' %></p>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Registration</p>
+    <p class="text-sm text-gray-900 font-medium"><%= item.registration || '-' %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Location</p>
-    <p class="text-sm text-white font-medium"><%= item.location || '-' %></p>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Location</p>
+    <p class="text-sm text-gray-900 font-medium"><%= item.location || '-' %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Storage Location</p>
-    <p class="text-sm text-white font-medium"><%= item.storage_location || '-' %></p>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Storage Location</p>
+    <p class="text-sm text-gray-900 font-medium"><%= item.storage_location || '-' %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Purchase Date</p>
-    <p class="text-sm text-white font-medium"><%= item.purchase_date || '-' %></p>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Purchase Date</p>
+    <p class="text-sm text-gray-900 font-medium"><%= item.purchase_date || '-' %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Purchase Cost</p>
-    <p class="text-sm text-white font-medium"><%= item.purchase_cost ? '$' + parseFloat(item.purchase_cost).toFixed(2) : '-' %></p>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Purchase Cost</p>
+    <p class="text-sm text-gray-900 font-medium"><%= item.purchase_cost ? '$' + parseFloat(item.purchase_cost).toFixed(2) : '-' %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Next Inspection</p>
-    <p class="text-sm font-medium <%= inspOverdue ? 'text-red-400' : 'text-white' %>">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Next Inspection</p>
+    <p class="text-sm font-medium <%= inspOverdue ? 'text-red-600' : text-gray-900' %>">
       <% if (item.next_inspection_date) { %>
         <% if (inspOverdue) { %>
           <span class="flex items-center gap-1">
@@ -78,22 +78,22 @@
       <% } %>
     </p>
     <% if (item.inspection_interval_days) { %>
-      <p class="text-xs text-slate-500 mt-1">Every <%= item.inspection_interval_days %> days</p>
+      <p class="text-xs text-gray-400 mt-1">Every <%= item.inspection_interval_days %> days</p>
     <% } %>
   </div>
 </div>
 
 <% if (item.description) { %>
-<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-8">
-  <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Description</p>
-  <p class="text-sm text-slate-300 whitespace-pre-line"><%= item.description %></p>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-8">
+  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Description</p>
+  <p class="text-sm text-gray-600 whitespace-pre-line"><%= item.description %></p>
 </div>
 <% } %>
 
 <% if (item.notes) { %>
-<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-8">
-  <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Notes</p>
-  <p class="text-sm text-slate-300 whitespace-pre-line"><%= item.notes %></p>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-8">
+  <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Notes</p>
+  <p class="text-sm text-gray-600 whitespace-pre-line"><%= item.notes %></p>
 </div>
 <% } %>
 
@@ -101,40 +101,40 @@
 <!-- CURRENT ASSIGNMENTS -->
 <!-- ============================================ -->
 <div class="mb-8">
-  <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-    <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+  <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+    <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
     Current Assignments
     <% if (activeAssignments.length > 0) { %>
-      <span class="text-xs font-medium bg-orange-900/60 text-brand-300 px-2 py-0.5 rounded-full"><%= activeAssignments.length %> active</span>
+      <span class="text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-600/20 px-2 py-0.5 rounded-full"><%= activeAssignments.length %> active</span>
     <% } %>
   </h2>
 
   <% if (activeAssignments.length > 0) { %>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto mb-4">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto mb-4">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b border-slate-700">
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Job #</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Client</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Assigned Date</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Expected Return</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Qty</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Assigned By</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Action</th>
+        <tr class="border-b border-gray-200">
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Job #</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Client</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Assigned Date</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Expected Return</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Qty</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Assigned By</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Action</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-700">
+      <tbody class="divide-y divide-gray-200">
         <% activeAssignments.forEach(a => { %>
         <%
           const returnOverdue = a.expected_return_date && a.expected_return_date < today;
         %>
-        <tr class="hover:bg-slate-700/50">
-          <td class="px-4 py-3 font-medium"><a href="/jobs/<%= a.job_id %>" class="text-blue-400 hover:text-blue-300 hover:underline"><%= a.job_number %></a></td>
-          <td class="px-4 py-3 text-slate-300"><%= a.client %></td>
-          <td class="px-4 py-3 text-slate-400 text-xs"><%= a.assigned_date %></td>
-          <td class="px-4 py-3 text-xs <%= returnOverdue ? 'text-red-400 font-semibold' : 'text-slate-400' %>"><%= a.expected_return_date || '-' %></td>
-          <td class="px-4 py-3 text-slate-300"><%= a.quantity %></td>
-          <td class="px-4 py-3 text-slate-400 text-xs"><%= a.assigned_by_name %></td>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 font-medium"><a href="/projects/<%= a.job_id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= a.job_number %></a></td>
+          <td class="px-4 py-3 text-gray-600"><%= a.client %></td>
+          <td class="px-4 py-3 text-gray-500 text-xs"><%= a.assigned_date %></td>
+          <td class="px-4 py-3 text-xs <%= returnOverdue ? 'text-red-600 font-semibold' : 'text-gray-500' %>"><%= a.expected_return_date || '-' %></td>
+          <td class="px-4 py-3 text-gray-600"><%= a.quantity %></td>
+          <td class="px-4 py-3 text-gray-500 text-xs"><%= a.assigned_by_name %></td>
           <td class="px-4 py-3">
             <form method="POST" action="/equipment/<%= item.id %>/assignments/<%= a.id %>/return" class="inline">
               <button type="submit" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-md transition-colors"
@@ -147,19 +147,19 @@
     </table>
   </div>
   <% } else { %>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-4">
-    <p class="text-slate-500 text-sm text-center">No active assignments. This equipment is available.</p>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
+    <p class="text-gray-400 text-sm text-center">No active assignments. This equipment is available.</p>
   </div>
   <% } %>
 
   <!-- Assign to Job Form -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Assign to Job</h3>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Assign to Job</h3>
     <form method="POST" action="/equipment/<%= item.id %>/assign" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <!-- Job -->
       <div>
-        <label class="block text-xs font-medium text-slate-400 mb-1">Job <span class="text-red-400">*</span></label>
-        <select name="job_id" required class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <label class="block text-xs font-medium text-gray-500 mb-1">Job <span class="text-red-600">*</span></label>
+        <select name="job_id" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">Select job...</option>
           <% jobs.forEach(j => { %>
             <option value="<%= j.id %>"><%= j.job_number %> - <%= j.client %></option>
@@ -168,27 +168,27 @@
       </div>
       <!-- Assigned Date -->
       <div>
-        <label class="block text-xs font-medium text-slate-400 mb-1">Assigned Date <span class="text-red-400">*</span></label>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Assigned Date <span class="text-red-600">*</span></label>
         <input type="date" name="assigned_date" required value="<%= today %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Expected Return -->
       <div>
-        <label class="block text-xs font-medium text-slate-400 mb-1">Expected Return</label>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Expected Return</label>
         <input type="date" name="expected_return_date"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Quantity -->
       <div>
-        <label class="block text-xs font-medium text-slate-400 mb-1">Quantity</label>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Quantity</label>
         <input type="number" name="quantity" min="1" value="1"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Notes -->
       <div class="md:col-span-2">
-        <label class="block text-xs font-medium text-slate-400 mb-1">Notes</label>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Notes</label>
         <input type="text" name="notes" placeholder="Assignment notes..."
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <div class="flex items-end">
         <button type="submit" class="w-full px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Assign</button>
@@ -202,33 +202,33 @@
 <!-- ============================================ -->
 <% if (pastAssignments.length > 0) { %>
 <div class="mb-8">
-  <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     Assignment History
   </h2>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b border-slate-700">
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Job #</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Client</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Assigned</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Returned</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Qty</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Assigned By</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Notes</th>
+        <tr class="border-b border-gray-200">
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Job #</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Client</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Assigned</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Returned</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Qty</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Assigned By</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Notes</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-700">
+      <tbody class="divide-y divide-gray-200">
         <% pastAssignments.forEach(a => { %>
-        <tr class="hover:bg-slate-700/50">
-          <td class="px-4 py-3 font-medium"><a href="/jobs/<%= a.job_id %>" class="text-blue-400 hover:text-blue-300 hover:underline"><%= a.job_number %></a></td>
-          <td class="px-4 py-3 text-slate-300"><%= a.client %></td>
-          <td class="px-4 py-3 text-slate-400 text-xs"><%= a.assigned_date %></td>
-          <td class="px-4 py-3 text-emerald-400 text-xs"><%= a.actual_return_date %></td>
-          <td class="px-4 py-3 text-slate-300"><%= a.quantity %></td>
-          <td class="px-4 py-3 text-slate-400 text-xs"><%= a.assigned_by_name %></td>
-          <td class="px-4 py-3 text-slate-400 text-xs"><%= a.notes || '-' %></td>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 font-medium"><a href="/projects/<%= a.job_id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= a.job_number %></a></td>
+          <td class="px-4 py-3 text-gray-600"><%= a.client %></td>
+          <td class="px-4 py-3 text-gray-500 text-xs"><%= a.assigned_date %></td>
+          <td class="px-4 py-3 text-emerald-600 text-xs"><%= a.actual_return_date %></td>
+          <td class="px-4 py-3 text-gray-600"><%= a.quantity %></td>
+          <td class="px-4 py-3 text-gray-500 text-xs"><%= a.assigned_by_name %></td>
+          <td class="px-4 py-3 text-gray-500 text-xs"><%= a.notes || '-' %></td>
         </tr>
         <% }) %>
       </tbody>
@@ -241,19 +241,19 @@
 <!-- MAINTENANCE LOG -->
 <!-- ============================================ -->
 <div class="mb-8">
-  <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-    <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+  <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+    <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
     Maintenance Log
   </h2>
 
   <!-- Add Maintenance Form -->
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-4">
-    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Add Maintenance Record</h3>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
+    <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Add Maintenance Record</h3>
     <form method="POST" action="/equipment/<%= item.id %>/maintenance" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <!-- Type -->
       <div>
-        <label class="block text-xs font-medium text-slate-400 mb-1">Type <span class="text-red-400">*</span></label>
-        <select name="maintenance_type" required class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <label class="block text-xs font-medium text-gray-500 mb-1">Type <span class="text-red-600">*</span></label>
+        <select name="maintenance_type" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">Select type...</option>
           <option value="inspection">Inspection</option>
           <option value="repair">Repair</option>
@@ -264,39 +264,39 @@
       </div>
       <!-- Description -->
       <div class="md:col-span-2">
-        <label class="block text-xs font-medium text-slate-400 mb-1">Description <span class="text-red-400">*</span></label>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Description <span class="text-red-600">*</span></label>
         <input type="text" name="description" required placeholder="What was done..."
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Date Performed -->
       <div>
-        <label class="block text-xs font-medium text-slate-400 mb-1">Date Performed <span class="text-red-400">*</span></label>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Date Performed <span class="text-red-600">*</span></label>
         <input type="date" name="performed_date" required value="<%= today %>"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Performed By -->
       <div>
-        <label class="block text-xs font-medium text-slate-400 mb-1">Performed By</label>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Performed By</label>
         <input type="text" name="performed_by" placeholder="Name or company"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Cost -->
       <div>
-        <label class="block text-xs font-medium text-slate-400 mb-1">Cost ($)</label>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Cost ($)</label>
         <input type="number" name="cost" step="0.01" min="0" placeholder="0.00"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <!-- Next Due Date -->
       <div>
-        <label class="block text-xs font-medium text-slate-400 mb-1">Next Due Date</label>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Next Due Date</label>
         <input type="date" name="next_due_date"
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-        <p class="text-xs text-slate-500 mt-1">Will update the equipment's next inspection date</p>
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <p class="text-xs text-gray-400 mt-1">Will update the equipment's next inspection date</p>
       </div>
       <!-- Result -->
       <div>
-        <label class="block text-xs font-medium text-slate-400 mb-1">Result</label>
-        <select name="result" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <label class="block text-xs font-medium text-gray-500 mb-1">Result</label>
+        <select name="result" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="pass">Pass</option>
           <option value="fail">Fail</option>
           <option value="conditional">Conditional</option>
@@ -304,9 +304,9 @@
       </div>
       <!-- Notes -->
       <div>
-        <label class="block text-xs font-medium text-slate-400 mb-1">Notes</label>
+        <label class="block text-xs font-medium text-gray-500 mb-1">Notes</label>
         <input type="text" name="notes" placeholder="Additional notes..."
-          class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <div class="flex items-end">
         <button type="submit" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">Add Record</button>
@@ -316,53 +316,53 @@
 
   <!-- Maintenance History -->
   <% if (maintenance.length > 0) { %>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b border-slate-700">
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Date</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Type</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Description</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Performed By</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Result</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Cost</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Next Due</th>
+        <tr class="border-b border-gray-200">
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Description</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Performed By</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Result</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Cost</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Next Due</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-700">
+      <tbody class="divide-y divide-gray-200">
         <% maintenance.forEach(m => { %>
-        <tr class="hover:bg-slate-700/50">
-          <td class="px-4 py-3 text-slate-400 text-xs"><%= m.performed_date %></td>
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-gray-500 text-xs"><%= m.performed_date %></td>
           <td class="px-4 py-3">
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-              <% if (m.maintenance_type === 'inspection') { %>bg-blue-900/60 text-blue-300
-              <% } else if (m.maintenance_type === 'repair') { %>bg-red-900/60 text-red-300
-              <% } else if (m.maintenance_type === 'service') { %>bg-purple-900/60 text-purple-300
-              <% } else if (m.maintenance_type === 'calibration') { %>bg-teal-900/60 text-teal-300
-              <% } else { %>bg-orange-900/60 text-brand-300<% } %>">
+              <% if (m.maintenance_type === 'inspection') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
+              <% } else if (m.maintenance_type === 'repair') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
+              <% } else if (m.maintenance_type === 'service') { %>bg-purple-50 text-purple-700 ring-1 ring-purple-600/20
+              <% } else if (m.maintenance_type === 'calibration') { %>bg-teal-50 text-teal-700 ring-1 ring-teal-600/20
+              <% } else { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20<% } %>">
               <%= m.maintenance_type %>
             </span>
           </td>
-          <td class="px-4 py-3 text-slate-300"><%= m.description %></td>
-          <td class="px-4 py-3 text-slate-400 text-xs"><%= m.performed_by || '-' %></td>
+          <td class="px-4 py-3 text-gray-600"><%= m.description %></td>
+          <td class="px-4 py-3 text-gray-500 text-xs"><%= m.performed_by || '-' %></td>
           <td class="px-4 py-3">
             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-              <% if (m.result === 'pass') { %>bg-emerald-900/60 text-emerald-300
-              <% } else if (m.result === 'fail') { %>bg-red-900/60 text-red-300
-              <% } else { %>bg-orange-900/60 text-brand-300<% } %>">
+              <% if (m.result === 'pass') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
+              <% } else if (m.result === 'fail') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
+              <% } else { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20<% } %>">
               <%= m.result %>
             </span>
           </td>
-          <td class="px-4 py-3 text-slate-400 text-xs"><%= m.cost ? '$' + parseFloat(m.cost).toFixed(2) : '-' %></td>
-          <td class="px-4 py-3 text-slate-400 text-xs"><%= m.next_due_date || '-' %></td>
+          <td class="px-4 py-3 text-gray-500 text-xs"><%= m.cost ? '$' + parseFloat(m.cost).toFixed(2) : '-' %></td>
+          <td class="px-4 py-3 text-gray-500 text-xs"><%= m.next_due_date || '-' %></td>
         </tr>
         <% }) %>
       </tbody>
     </table>
   </div>
   <% } else { %>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
-    <p class="text-slate-500 text-sm">No maintenance records yet.</p>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center">
+    <p class="text-gray-400 text-sm">No maintenance records yet.</p>
   </div>
   <% } %>
 </div>

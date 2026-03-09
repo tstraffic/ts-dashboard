@@ -2,79 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { logActivity } = require('../middleware/audit');
-
-// Helper: check time overlap
-function timesOverlap(s1, e1, s2, e2) {
-  return s1 < e2 && s2 < e1;
-}
-
-// Helper: run conflict checks before allocation
-function checkConflicts(db, crewMemberId, allocationDate, startTime, endTime, excludeId) {
-  const warnings = [];
-
-  // 1. Double-booking check
-  const existing = db.prepare(`
-    SELECT ca.id, ca.start_time, ca.end_time, j.job_number
-    FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
-    WHERE ca.crew_member_id = ? AND ca.allocation_date = ?
-    AND ca.status IN ('allocated','confirmed')
-    ${excludeId ? 'AND ca.id != ?' : ''}
-  `).all(...(excludeId ? [crewMemberId, allocationDate, excludeId] : [crewMemberId, allocationDate]));
-
-  for (const ea of existing) {
-    if (timesOverlap(startTime, endTime, ea.start_time, ea.end_time)) {
-      warnings.push(`Double-booking: already allocated to ${ea.job_number} on this date (${ea.start_time}-${ea.end_time})`);
-    }
-  }
-
-  // 2. Fatigue check — count days worked in last 7 days
-  const fatigue = db.prepare(`
-    SELECT COUNT(DISTINCT d.work_day) as consecutive_days FROM (
-      SELECT allocation_date as work_day FROM crew_allocations
-      WHERE crew_member_id = ? AND status IN ('allocated','confirmed')
-      AND allocation_date BETWEEN date(?, '-6 days') AND date(?, '-1 day')
-      UNION
-      SELECT work_date as work_day FROM timesheets
-      WHERE crew_member_id = ?
-      AND work_date BETWEEN date(?, '-6 days') AND date(?, '-1 day')
-    ) d
-  `).get(crewMemberId, allocationDate, allocationDate, crewMemberId, allocationDate, allocationDate);
-
-  if (fatigue.consecutive_days >= 5) {
-    warnings.push(`Fatigue risk: ${fatigue.consecutive_days} days worked in last 7 days`);
-  }
-
-  // 3. Ticket expiry check
-  const crew = db.prepare(`
-    SELECT full_name, tc_ticket_expiry, ti_ticket_expiry, white_card_expiry, first_aid_expiry, medical_expiry
-    FROM crew_members WHERE id = ?
-  `).get(crewMemberId);
-
-  if (crew) {
-    const soon = new Date(allocationDate);
-    soon.setDate(soon.getDate() + 7);
-    const soonStr = soon.toISOString().split('T')[0];
-
-    const checks = [
-      { field: 'tc_ticket_expiry', label: 'TC Ticket' },
-      { field: 'ti_ticket_expiry', label: 'TI Ticket' },
-      { field: 'white_card_expiry', label: 'White Card' },
-      { field: 'first_aid_expiry', label: 'First Aid' },
-      { field: 'medical_expiry', label: 'Medical' },
-    ];
-    for (const c of checks) {
-      const val = crew[c.field];
-      if (val && val < allocationDate) {
-        warnings.push(`${crew.full_name}: ${c.label} expired ${val}`);
-      } else if (val && val <= soonStr) {
-        warnings.push(`${crew.full_name}: ${c.label} expiring ${val}`);
-      }
-    }
-  }
-
-  return warnings;
-}
+const {
+  checkAllocationBlocks,
+  getComplianceStatusBatch,
+  getBatchFatigue,
+  tcpLevelMeetsRequirement,
+} = require('../middleware/compliance');
 
 // GET / — Main booking board
 router.get('/', (req, res) => {
@@ -82,6 +15,55 @@ router.get('/', (req, res) => {
   const view = req.query.view || 'day';
   const today = new Date().toISOString().split('T')[0];
   const selectedDate = req.query.date || today;
+
+  // Clients for quick-create shift modal
+  const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
+  // Projects for linking shifts
+  const projects = db.prepare('SELECT id, job_number, client FROM jobs WHERE parent_project_id IS NULL AND status IN (\'active\',\'on_hold\',\'won\') ORDER BY job_number').all();
+
+  if (view === 'month') {
+    // Calculate month boundaries
+    const d = new Date(selectedDate);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const monthStart = firstDay.toISOString().split('T')[0];
+    const monthEnd = lastDay.toISOString().split('T')[0];
+
+    // Get allocation counts per date for the month
+    const dayCounts = db.prepare(`
+      SELECT allocation_date, COUNT(DISTINCT crew_member_id) as crew_count, COUNT(DISTINCT job_id) as job_count
+      FROM crew_allocations
+      WHERE allocation_date BETWEEN ? AND ? AND status IN ('allocated','confirmed')
+      GROUP BY allocation_date
+    `).all(monthStart, monthEnd);
+
+    const dayCountMap = {};
+    for (const row of dayCounts) {
+      dayCountMap[row.allocation_date] = { crew: row.crew_count, jobs: row.job_count };
+    }
+
+    return res.render('allocations/index', {
+      title: 'Allocations',
+      currentPage: 'allocations',
+      view: 'month',
+      selectedDate,
+      today,
+      year, month, firstDay, lastDay, dayCountMap,
+      weekDays: [],
+      jobs: [],
+      allocMap: {},
+      allocations: [],
+      equipmentAssignments: [],
+      equipmentList: [],
+      crewMembers: [],
+      clients,
+      projects,
+      stats: { jobsToday: 0, crewAllocated: 0, unconfirmed: 0, gaps: 0 },
+      userRole: req.session.user.role,
+    });
+  }
 
   if (view === 'week') {
     // Calculate Monday of the selected week
@@ -101,15 +83,13 @@ router.get('/', (req, res) => {
     const weekStart = weekDays[0];
     const weekEnd = weekDays[6];
 
-    // Jobs active during this week
     const jobs = db.prepare(`
-      SELECT j.id, j.job_number, j.client, j.suburb, j.crew_size, j.start_date, j.end_date, j.status
+      SELECT j.id, j.job_number, j.client, j.suburb, j.crew_size, j.start_date, j.end_date, j.status, j.required_tcp_level
       FROM jobs j
       WHERE j.status IN ('active','on_hold','won')
       ORDER BY j.job_number ASC
     `).all();
 
-    // Allocation counts per job per day
     const allocCounts = db.prepare(`
       SELECT job_id, allocation_date, COUNT(*) as cnt
       FROM crew_allocations
@@ -118,7 +98,6 @@ router.get('/', (req, res) => {
       GROUP BY job_id, allocation_date
     `).all(weekStart, weekEnd);
 
-    // Build lookup: { jobId: { date: count } }
     const allocMap = {};
     for (const row of allocCounts) {
       if (!allocMap[row.job_id]) allocMap[row.job_id] = {};
@@ -126,7 +105,7 @@ router.get('/', (req, res) => {
     }
 
     return res.render('allocations/index', {
-      title: 'Crew Allocations',
+      title: 'Allocations',
       currentPage: 'allocations',
       view: 'week',
       selectedDate,
@@ -134,18 +113,21 @@ router.get('/', (req, res) => {
       weekDays,
       jobs,
       allocMap,
-      // not needed in week view but keep template happy
       allocations: [],
       equipmentAssignments: [],
+      equipmentList: [],
       crewMembers: [],
-      stats: { jobsToday: jobs.length, crewAllocated: 0, unconfirmed: 0, gaps: 0 }
+      clients,
+      projects,
+      stats: { jobsToday: jobs.length, crewAllocated: 0, unconfirmed: 0, gaps: 0 },
+      userRole: req.session.user.role,
     });
   }
 
   // Day view
   const jobs = db.prepare(`
     SELECT j.id, j.job_number, j.client, j.suburb, j.crew_size, j.start_date, j.end_date, j.status,
-      u.full_name as pm_name
+      j.required_tcp_level, u.full_name as pm_name
     FROM jobs j
     LEFT JOIN users u ON j.project_manager_id = u.id
     WHERE j.status IN ('active','on_hold','won')
@@ -171,10 +153,21 @@ router.get('/', (req, res) => {
     ORDER BY ea.job_id
   `).all(selectedDate, selectedDate);
 
-  // Active crew for dropdown
-  const crewMembers = db.prepare(`
-    SELECT id, full_name, role, tcp_level FROM crew_members WHERE active = 1 ORDER BY full_name
-  `).all();
+  // Active crew with compliance status for crew panel
+  const crewMembersRaw = db.prepare('SELECT * FROM crew_members WHERE active = 1 ORDER BY full_name').all();
+  const fatigueMap = getBatchFatigue(selectedDate);
+
+  // Count how many times each crew member is already allocated today
+  const allocCountMap = {};
+  for (const a of allocations) {
+    allocCountMap[a.crew_member_id] = (allocCountMap[a.crew_member_id] || 0) + 1;
+  }
+
+  const crewMembers = crewMembersRaw.map(m => ({
+    ...m,
+    compliance: getComplianceStatusBatch(m, fatigueMap, selectedDate),
+    allocatedToday: allocCountMap[m.id] || 0,
+  }));
 
   // Stats
   const crewAllocated = new Set(allocations.map(a => a.crew_member_id)).size;
@@ -185,8 +178,16 @@ router.get('/', (req, res) => {
   }
   const gaps = jobs.filter(j => j.crew_size > 0 && (jobAllocCounts[j.id] || 0) < j.crew_size).length;
 
+  // Equipment list for the equipment panel
+  const equipmentList = db.prepare(`
+    SELECT e.*,
+      (SELECT COUNT(*) FROM equipment_assignments ea WHERE ea.equipment_id = e.id AND ea.assigned_date <= ? AND (ea.actual_return_date IS NULL OR ea.actual_return_date >= ?)) as assigned_count
+    FROM equipment e WHERE e.active = 1
+    ORDER BY e.category, e.name
+  `).all(selectedDate, selectedDate);
+
   res.render('allocations/index', {
-    title: 'Crew Allocations',
+    title: 'Allocations',
     currentPage: 'allocations',
     view: 'day',
     selectedDate,
@@ -194,30 +195,50 @@ router.get('/', (req, res) => {
     jobs,
     allocations,
     equipmentAssignments,
+    equipmentList,
     crewMembers,
-    stats: {
-      jobsToday: jobs.length,
-      crewAllocated,
-      unconfirmed,
-      gaps
-    },
-    // not needed in day view
+    clients,
+    projects,
+    stats: { jobsToday: jobs.length, crewAllocated, unconfirmed, gaps },
     weekDays: [],
-    allocMap: {}
+    allocMap: {},
+    userRole: req.session.user.role,
   });
 });
 
-// POST / — Create allocation
+// POST / — Create allocation (with blocking)
 router.post('/', (req, res) => {
   const db = getDb();
-  const { job_id, crew_member_id, allocation_date, start_time, end_time, shift_type, role_on_site, notes } = req.body;
+  const { job_id, crew_member_id, allocation_date, start_time, end_time, shift_type, role_on_site, notes, force_override } = req.body;
 
-  // Conflict checks (non-blocking — add as warnings)
-  const warnings = checkConflicts(db, parseInt(crew_member_id), allocation_date, start_time || '06:00', end_time || '14:30', null);
+  const check = checkAllocationBlocks(
+    parseInt(crew_member_id), parseInt(job_id),
+    allocation_date, start_time || '06:00', end_time || '14:30', null
+  );
 
-  for (const w of warnings) {
-    req.flash('error', w);
+  // If blocks exist and no override, reject
+  if (!check.allowed && !force_override) {
+    for (const b of check.blocks) req.flash('error', 'BLOCKED: ' + b);
+    for (const w of check.warnings) req.flash('error', w);
+    return res.redirect('/allocations?date=' + allocation_date);
   }
+
+  // If override requested, check authorisation
+  if (!check.allowed && force_override) {
+    const userRole = req.session.user.role;
+    if (userRole !== 'management' && userRole !== 'operations') {
+      req.flash('error', 'Only Management or Operations can override allocation blocks');
+      return res.redirect('/allocations?date=' + allocation_date);
+    }
+    logActivity({
+      user: req.session.user, action: 'update', entityType: 'allocation_override',
+      jobId: parseInt(job_id),
+      details: 'Override: ' + check.blocks.join('; '), ip: req.ip,
+    });
+  }
+
+  // Show warnings (non-blocking)
+  for (const w of check.warnings) req.flash('error', w);
 
   db.prepare(`
     INSERT INTO crew_allocations (job_id, crew_member_id, allocation_date, start_time, end_time, shift_type, role_on_site, notes, allocated_by_id)
@@ -229,14 +250,146 @@ router.post('/', (req, res) => {
   );
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'crew_allocation',
-    jobId: parseInt(job_id), details: `Allocated crew to job on ${allocation_date}`, ip: req.ip });
+    jobId: parseInt(job_id), details: 'Allocated crew to job on ' + allocation_date, ip: req.ip });
 
-  if (warnings.length === 0) {
+  if (check.blocks.length === 0 && check.warnings.length === 0) {
     req.flash('success', 'Crew member allocated successfully');
   }
 
-  res.redirect(`/allocations?date=${allocation_date}`);
+  res.redirect('/allocations?date=' + allocation_date);
 });
+
+// ============================================================
+// JSON API endpoints for drag-and-drop booking board
+// ============================================================
+
+// GET /api/crew-panel.json — Crew list with compliance status
+router.get('/api/crew-panel.json', (req, res) => {
+  const db = getDb();
+  const date = req.query.date || new Date().toISOString().split('T')[0];
+
+  const crewRaw = db.prepare('SELECT * FROM crew_members WHERE active = 1 ORDER BY full_name').all();
+  const fatigueMap = getBatchFatigue(date);
+
+  // Count allocations per crew for the date
+  const allocs = db.prepare(`
+    SELECT crew_member_id, COUNT(*) as cnt FROM crew_allocations
+    WHERE allocation_date = ? AND status IN ('allocated','confirmed')
+    GROUP BY crew_member_id
+  `).all(date);
+  const allocCounts = {};
+  for (const a of allocs) allocCounts[a.crew_member_id] = a.cnt;
+
+  const crew = crewRaw.map(m => {
+    const c = getComplianceStatusBatch(m, fatigueMap, date);
+    return {
+      id: m.id,
+      full_name: m.full_name,
+      role: m.role,
+      tcp_level: m.tcp_level,
+      canAllocate: c.canAllocate,
+      fatigueBlocked: c.fatigueBlocked,
+      inductionComplete: c.inductionComplete,
+      allTicketsValid: c.allTicketsValid,
+      supervisorApproved: c.supervisorApproved,
+      missingDocs: c.missingDocs,
+      daysWorked: c.daysWorked,
+      allocatedToday: allocCounts[m.id] || 0,
+    };
+  });
+
+  res.json(crew);
+});
+
+// POST /api/allocate.json — Create allocation via drag-drop
+router.post('/api/allocate.json', (req, res) => {
+  const db = getDb();
+  const { job_id, crew_member_id, allocation_date, start_time, end_time, shift_type, role_on_site, notes, force_override } = req.body;
+
+  const check = checkAllocationBlocks(
+    parseInt(crew_member_id), parseInt(job_id),
+    allocation_date, start_time || '06:00', end_time || '14:30', null
+  );
+
+  if (!check.allowed && !force_override) {
+    return res.json({ success: false, blocks: check.blocks, warnings: check.warnings, overridable: check.overridable });
+  }
+
+  if (!check.allowed && force_override) {
+    const userRole = req.session.user.role;
+    if (userRole !== 'management' && userRole !== 'operations') {
+      return res.json({ success: false, blocks: ['Unauthorised to override'], warnings: [] });
+    }
+    logActivity({
+      user: req.session.user, action: 'update', entityType: 'allocation_override',
+      jobId: parseInt(job_id),
+      details: 'Override (drag-drop): ' + check.blocks.join('; '), ip: req.ip,
+    });
+  }
+
+  const result = db.prepare(`
+    INSERT INTO crew_allocations (job_id, crew_member_id, allocation_date, start_time, end_time, shift_type, role_on_site, notes, allocated_by_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    parseInt(job_id), parseInt(crew_member_id), allocation_date,
+    start_time || '06:00', end_time || '14:30', shift_type || 'day',
+    role_on_site || '', notes || '', req.session.user.id
+  );
+
+  logActivity({ user: req.session.user, action: 'create', entityType: 'crew_allocation',
+    jobId: parseInt(job_id), details: 'Allocated crew via board on ' + allocation_date, ip: req.ip });
+
+  // Fetch the new allocation with crew info for the UI
+  const alloc = db.prepare(`
+    SELECT ca.*, cm.full_name, cm.role, cm.tcp_level
+    FROM crew_allocations ca JOIN crew_members cm ON ca.crew_member_id = cm.id
+    WHERE ca.id = ?
+  `).get(result.lastInsertRowid);
+
+  res.json({ success: true, allocationId: result.lastInsertRowid, allocation: alloc, warnings: check.warnings });
+});
+
+// POST /api/move.json — Move allocation between jobs
+router.post('/api/move.json', (req, res) => {
+  const db = getDb();
+  const { allocation_id, new_job_id } = req.body;
+
+  const alloc = db.prepare('SELECT * FROM crew_allocations WHERE id = ?').get(allocation_id);
+  if (!alloc) return res.json({ success: false, blocks: ['Allocation not found'] });
+
+  const check = checkAllocationBlocks(
+    alloc.crew_member_id, parseInt(new_job_id),
+    alloc.allocation_date, alloc.start_time, alloc.end_time, alloc.id
+  );
+
+  if (!check.allowed) {
+    return res.json({ success: false, blocks: check.blocks, warnings: check.warnings });
+  }
+
+  db.prepare('UPDATE crew_allocations SET job_id = ?, status = ? WHERE id = ?')
+    .run(parseInt(new_job_id), 'allocated', allocation_id);
+
+  logActivity({ user: req.session.user, action: 'update', entityType: 'crew_allocation',
+    entityId: parseInt(allocation_id), jobId: parseInt(new_job_id),
+    details: 'Moved allocation to new job', ip: req.ip });
+
+  res.json({ success: true, warnings: check.warnings });
+});
+
+// DELETE /api/:id.json — Remove allocation
+router.delete('/api/:id.json', (req, res) => {
+  const db = getDb();
+  const result = db.prepare("DELETE FROM crew_allocations WHERE id = ? AND status = 'allocated'").run(req.params.id);
+  if (result.changes > 0) {
+    logActivity({ user: req.session.user, action: 'delete', entityType: 'crew_allocation',
+      entityId: parseInt(req.params.id), details: 'Removed allocation via board', ip: req.ip });
+  }
+  res.json({ success: result.changes > 0 });
+});
+
+// ============================================================
+// Standard form-based endpoints (kept for fallback)
+// ============================================================
 
 // POST /:id/confirm — Confirm allocation
 router.post('/:id/confirm', (req, res) => {
@@ -250,7 +403,7 @@ router.post('/:id/confirm', (req, res) => {
   logActivity({ user: req.session.user, action: 'update', entityType: 'crew_allocation',
     entityId: parseInt(req.params.id), details: 'Confirmed allocation', ip: req.ip });
   req.flash('success', 'Allocation confirmed');
-  res.redirect(`/allocations?date=${date}`);
+  res.redirect('/allocations?date=' + date);
 });
 
 // POST /:id/cancel — Cancel allocation
@@ -265,7 +418,7 @@ router.post('/:id/cancel', (req, res) => {
   logActivity({ user: req.session.user, action: 'update', entityType: 'crew_allocation',
     entityId: parseInt(req.params.id), details: 'Cancelled allocation', ip: req.ip });
   req.flash('success', 'Allocation cancelled');
-  res.redirect(`/allocations?date=${date}`);
+  res.redirect('/allocations?date=' + date);
 });
 
 // POST /:id/delete — Delete allocation (only if still allocated)
@@ -278,7 +431,7 @@ router.post('/:id/delete', (req, res) => {
   `).run(req.params.id);
 
   req.flash('success', 'Allocation removed');
-  res.redirect(`/allocations?date=${date}`);
+  res.redirect('/allocations?date=' + date);
 });
 
 // POST /confirm-all — Bulk confirm all for a date
@@ -292,9 +445,9 @@ router.post('/confirm-all', (req, res) => {
   `).run(allocation_date);
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'crew_allocation',
-    details: `Bulk confirmed ${result.changes} allocations for ${allocation_date}`, ip: req.ip });
-  req.flash('success', `${result.changes} allocations confirmed`);
-  res.redirect(`/allocations?date=${allocation_date}`);
+    details: 'Bulk confirmed ' + result.changes + ' allocations for ' + allocation_date, ip: req.ip });
+  req.flash('success', result.changes + ' allocations confirmed');
+  res.redirect('/allocations?date=' + allocation_date);
 });
 
 // POST /copy-day — Copy allocations from one day to another
@@ -302,15 +455,14 @@ router.post('/copy-day', (req, res) => {
   const db = getDb();
   const { from_date, to_date } = req.body;
 
-  // Check for existing allocations on target date to avoid duplicates
   const existingCount = db.prepare(`
     SELECT COUNT(*) as count FROM crew_allocations
     WHERE allocation_date = ? AND status IN ('allocated','confirmed')
   `).get(to_date).count;
 
   if (existingCount > 0) {
-    req.flash('error', `${to_date} already has ${existingCount} allocations. Clear them first or allocate manually.`);
-    return res.redirect(`/allocations?date=${to_date}`);
+    req.flash('error', to_date + ' already has ' + existingCount + ' allocations. Clear them first or allocate manually.');
+    return res.redirect('/allocations?date=' + to_date);
   }
 
   const result = db.prepare(`
@@ -321,9 +473,86 @@ router.post('/copy-day', (req, res) => {
   `).run(to_date, req.session.user.id, from_date);
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'crew_allocation',
-    details: `Copied ${result.changes} allocations from ${from_date} to ${to_date}`, ip: req.ip });
-  req.flash('success', `${result.changes} allocations copied from ${from_date} to ${to_date}`);
-  res.redirect(`/allocations?date=${to_date}`);
+    details: 'Copied ' + result.changes + ' allocations from ' + from_date + ' to ' + to_date, ip: req.ip });
+  req.flash('success', result.changes + ' allocations copied from ' + from_date + ' to ' + to_date);
+  res.redirect('/allocations?date=' + to_date);
+});
+
+// POST /create-shift — Quick create a shift (lightweight job entry for daily allocation)
+router.post('/create-shift', (req, res) => {
+  const db = getDb();
+  const b = req.body;
+  const date = b.shift_date || new Date().toISOString().split('T')[0];
+
+  // Resolve client name
+  let clientName = '';
+  if (b.client_id) {
+    const client = db.prepare('SELECT company_name FROM clients WHERE id = ?').get(b.client_id);
+    if (client) clientName = client.company_name;
+  }
+
+  // Generate shift job number
+  const lastShift = db.prepare("SELECT job_number FROM jobs WHERE job_number LIKE 'S-%' ORDER BY id DESC LIMIT 1").get();
+  let nextNum = 1;
+  if (lastShift) {
+    const match = lastShift.job_number.match(/S-(\d+)/);
+    if (match) nextNum = parseInt(match[1]) + 1;
+  }
+  const shiftNumber = 'S-' + String(nextNum).padStart(5, '0');
+  const jobName = `${shiftNumber} | ${clientName} | ${b.suburb || ''} | ${date}`;
+
+  try {
+    const result = db.prepare(`
+      INSERT INTO jobs (job_number, job_name, client, client_id, parent_project_id, site_address, suburb, status, stage, start_date, end_date,
+        crew_size, required_tcp_level, notes, state)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 'delivery', ?, ?, ?, ?, ?, 'NSW')
+    `).run(
+      shiftNumber, jobName, clientName, b.client_id || null, b.parent_project_id || null,
+      b.site_address || '', b.suburb || '', date, date,
+      parseInt(b.crew_size) || 0, b.required_tcp_level || '', b.notes || ''
+    );
+
+    logActivity({ user: req.session.user, action: 'create', entityType: 'shift',
+      jobId: result.lastInsertRowid, details: 'Quick-created shift ' + shiftNumber + ' for ' + date, ip: req.ip });
+
+    req.flash('success', 'Shift ' + shiftNumber + ' created for ' + date);
+    res.redirect('/allocations?date=' + date);
+  } catch (err) {
+    req.flash('error', 'Failed to create shift: ' + err.message);
+    res.redirect('/allocations?date=' + date);
+  }
+});
+
+// GET /api/equipment-panel.json — Equipment list with availability
+router.get('/api/equipment-panel.json', (req, res) => {
+  const db = getDb();
+  const date = req.query.date || new Date().toISOString().split('T')[0];
+
+  const equipment = db.prepare(`
+    SELECT e.*,
+      (SELECT GROUP_CONCAT(j.job_number) FROM equipment_assignments ea JOIN jobs j ON ea.job_id = j.id
+       WHERE ea.equipment_id = e.id AND ea.assigned_date <= ? AND (ea.actual_return_date IS NULL OR ea.actual_return_date >= ?)) as assigned_to
+    FROM equipment e WHERE e.active = 1
+    ORDER BY e.category, e.name
+  `).all(date, date);
+
+  res.json(equipment);
+});
+
+// POST /api/assign-equipment.json — Assign equipment to a job
+router.post('/api/assign-equipment.json', (req, res) => {
+  const db = getDb();
+  const { equipment_id, job_id, date } = req.body;
+
+  const result = db.prepare(`
+    INSERT INTO equipment_assignments (equipment_id, job_id, assigned_date, quantity, assigned_by_id)
+    VALUES (?, ?, ?, 1, ?)
+  `).run(parseInt(equipment_id), parseInt(job_id), date, req.session.user.id);
+
+  logActivity({ user: req.session.user, action: 'create', entityType: 'equipment_assignment',
+    jobId: parseInt(job_id), details: 'Assigned equipment to job via allocations board', ip: req.ip });
+
+  res.json({ success: true, assignmentId: result.lastInsertRowid });
 });
 
 module.exports = router;

@@ -6,6 +6,8 @@
 const PERMISSIONS = {
   dashboard:     ['management', 'operations', 'planning', 'marketing', 'accounts'],
   jobs:          ['management', 'operations', 'planning', 'marketing', 'accounts'],
+  projects:      ['management', 'operations', 'planning', 'marketing', 'accounts'],
+  clients:       ['management', 'operations', 'planning', 'marketing', 'accounts'],
   tasks:         ['management', 'operations', 'planning'],
   updates:       ['management', 'operations', 'planning', 'marketing'],
   compliance:    ['management', 'operations', 'planning'],
@@ -13,7 +15,8 @@ const PERMISSIONS = {
   incidents:     ['management', 'operations'],
   contacts:      ['management', 'operations', 'marketing'],
   timesheets:    ['management', 'operations', 'accounts'],
-  allocations:   ['management', 'operations'],
+  crew:          ['management', 'operations', 'planning'],
+  allocations:   ['management', 'operations', 'planning'],
   schedule:      ['management', 'operations', 'planning'],
   equipment:     ['management', 'operations'],
   defects:       ['management', 'operations'],
@@ -24,6 +27,7 @@ const PERMISSIONS = {
   notifications: ['management', 'operations', 'planning', 'marketing', 'accounts'],
   admin:         ['management'],
   activity:      ['management'],
+  settings:      ['management'],
 };
 
 // ---- Helpers ----

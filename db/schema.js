@@ -702,6 +702,526 @@ function runMigrations(db) {
     console.log('Migration 11 complete.');
   }
 
+  // =============================================
+  // Migration 12: Sprint 1 — Worker Profile & Allocation Blocking
+  // =============================================
+  if (!isMigrationApplied.get(12)) {
+    console.log('Running migration 12: Worker Profile & Allocation Blocking');
+
+    // 1. Supervisor approval fields on crew_members
+    const crewCols = [
+      "ALTER TABLE crew_members ADD COLUMN supervisor_approved INTEGER DEFAULT 0",
+      "ALTER TABLE crew_members ADD COLUMN supervisor_approved_by_id INTEGER REFERENCES users(id)",
+      "ALTER TABLE crew_members ADD COLUMN supervisor_approved_at DATETIME",
+    ];
+    for (const sql of crewCols) {
+      try { db.exec(sql); } catch (e) { /* column may already exist */ }
+    }
+
+    // 2. Required TCP level on jobs
+    try {
+      db.exec("ALTER TABLE jobs ADD COLUMN required_tcp_level TEXT DEFAULT ''");
+    } catch (e) { /* column may already exist */ }
+
+    // 3. Incident ↔ crew member link table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS incident_crew_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        incident_id INTEGER NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        involvement_type TEXT NOT NULL DEFAULT 'involved'
+          CHECK(involvement_type IN ('involved','witness','injured','reporting')),
+        notes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(incident_id, crew_member_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_incident_crew_incident ON incident_crew_members(incident_id);
+      CREATE INDEX IF NOT EXISTS idx_incident_crew_member ON incident_crew_members(crew_member_id);
+    `);
+
+    recordMigration.run(12, 'Worker Profile & Allocation Blocking');
+    console.log('Migration 12 complete.');
+  }
+
+  // =============================================
+  // Migration 13: Settings & Configuration Module
+  // =============================================
+  if (!isMigrationApplied.get(13)) {
+    console.log('Running migration 13: Settings & Configuration Module');
+
+    // 1. App Settings table — stores all configurable enumerations
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL,
+        key TEXT NOT NULL,
+        label TEXT NOT NULL,
+        display_order INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
+        color TEXT DEFAULT '',
+        icon TEXT DEFAULT '',
+        metadata TEXT DEFAULT '{}',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(category, key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_app_settings_category ON app_settings(category);
+      CREATE INDEX IF NOT EXISTS idx_app_settings_active ON app_settings(category, is_active);
+    `);
+
+    // 2. System Config table — key-value store for operational parameters
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS system_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        config_key TEXT NOT NULL UNIQUE,
+        config_value TEXT NOT NULL DEFAULT '',
+        config_type TEXT DEFAULT 'string',
+        description TEXT DEFAULT '',
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_by_id INTEGER REFERENCES users(id)
+      );
+    `);
+
+    // 3. Seed all enumeration settings
+    const insertSetting = db.prepare(`
+      INSERT OR IGNORE INTO app_settings (category, key, label, display_order, is_active, color)
+      VALUES (?, ?, ?, ?, 1, ?)
+    `);
+
+    const seedCategory = (category, items) => {
+      items.forEach((item, idx) => {
+        const key = typeof item === 'string' ? item : item.key;
+        const label = typeof item === 'string'
+          ? item.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+          : item.label;
+        const color = (typeof item === 'object' && item.color) ? item.color : '';
+        insertSetting.run(category, key, label, idx + 1, color);
+      });
+    };
+
+    // Job statuses
+    seedCategory('job_status', [
+      { key: 'tender', label: 'Tender', color: 'slate' },
+      { key: 'won', label: 'Won', color: 'emerald' },
+      { key: 'prestart', label: 'Prestart', color: 'sky' },
+      { key: 'active', label: 'Active', color: 'green' },
+      { key: 'on_hold', label: 'On Hold', color: 'amber' },
+      { key: 'completed', label: 'Completed', color: 'blue' },
+      { key: 'closed', label: 'Closed', color: 'gray' },
+    ]);
+
+    // Job stages
+    seedCategory('job_stage', [
+      { key: 'tender', label: 'Tender' },
+      { key: 'pre_construction', label: 'Pre-Construction' },
+      { key: 'mobilisation', label: 'Mobilisation' },
+      { key: 'in_progress', label: 'In Progress' },
+      { key: 'delivery', label: 'Delivery' },
+      { key: 'demobilisation', label: 'Demobilisation' },
+      { key: 'defects', label: 'Defects' },
+      { key: 'closed', label: 'Closed' },
+    ]);
+
+    // Job health
+    seedCategory('job_health', [
+      { key: 'green', label: 'Green', color: 'green' },
+      { key: 'amber', label: 'Amber', color: 'amber' },
+      { key: 'red', label: 'Red', color: 'red' },
+    ]);
+
+    // Accounts status
+    seedCategory('accounts_status', [
+      { key: 'na', label: 'N/A', color: 'slate' },
+      { key: 'on_track', label: 'On Track', color: 'green' },
+      { key: 'overdue', label: 'Overdue', color: 'red' },
+      { key: 'disputed', label: 'Disputed', color: 'amber' },
+    ]);
+
+    // TCP levels
+    seedCategory('tcp_level', [
+      { key: 'TCP1', label: 'TCP1' },
+      { key: 'TCP2', label: 'TCP2' },
+      { key: 'TCP3', label: 'TCP3' },
+    ]);
+
+    // Incident types
+    seedCategory('incident_type', [
+      { key: 'near_miss', label: 'Near Miss', color: 'amber' },
+      { key: 'traffic_incident', label: 'Traffic Incident', color: 'red' },
+      { key: 'worker_injury', label: 'Worker Injury', color: 'red' },
+      { key: 'vehicle_damage', label: 'Vehicle Damage', color: 'orange' },
+      { key: 'public_complaint', label: 'Public Complaint', color: 'purple' },
+      { key: 'injury', label: 'Injury', color: 'red' },
+      { key: 'hazard', label: 'Hazard', color: 'amber' },
+      { key: 'property_damage', label: 'Property Damage', color: 'orange' },
+      { key: 'environmental', label: 'Environmental', color: 'teal' },
+      { key: 'vehicle', label: 'Vehicle', color: 'blue' },
+      { key: 'other', label: 'Other', color: 'slate' },
+    ]);
+
+    // Incident severity
+    seedCategory('incident_severity', [
+      { key: 'low', label: 'Low', color: 'green' },
+      { key: 'medium', label: 'Medium', color: 'amber' },
+      { key: 'high', label: 'High', color: 'orange' },
+      { key: 'critical', label: 'Critical', color: 'red' },
+    ]);
+
+    // Equipment categories
+    seedCategory('equipment_category', [
+      { key: 'ute', label: 'Ute' },
+      { key: 'truck', label: 'Truck' },
+      { key: 'arrow_board', label: 'Arrow Board' },
+      { key: 'vms_board', label: 'VMS Board' },
+      { key: 'trailer', label: 'Trailer' },
+      { key: 'barriers', label: 'Barriers' },
+      { key: 'signs', label: 'Signs' },
+      { key: 'lights', label: 'Lights' },
+      { key: 'vehicle', label: 'Vehicle' },
+      { key: 'cone', label: 'Cone' },
+      { key: 'delineator', label: 'Delineator' },
+      { key: 'other', label: 'Other' },
+    ]);
+
+    // Crew roles
+    seedCategory('crew_role', [
+      { key: 'traffic_controller', label: 'Traffic Controller' },
+      { key: 'leading_hand', label: 'Leading Hand' },
+      { key: 'supervisor', label: 'Supervisor' },
+      { key: 'pilot_vehicle', label: 'Pilot Vehicle' },
+      { key: 'spotter', label: 'Spotter' },
+      { key: 'labourer', label: 'Labourer' },
+      { key: 'other', label: 'Other' },
+    ]);
+
+    // Employment types
+    seedCategory('employment_type', [
+      { key: 'employee', label: 'Employee' },
+      { key: 'subcontractor', label: 'Subcontractor' },
+      { key: 'casual', label: 'Casual' },
+      { key: 'agency', label: 'Agency' },
+    ]);
+
+    // Defect severity
+    seedCategory('defect_severity', [
+      { key: 'minor', label: 'Minor', color: 'green' },
+      { key: 'moderate', label: 'Moderate', color: 'amber' },
+      { key: 'major', label: 'Major', color: 'orange' },
+      { key: 'critical', label: 'Critical', color: 'red' },
+    ]);
+
+    // Defect status
+    seedCategory('defect_status', [
+      { key: 'open', label: 'Open', color: 'red' },
+      { key: 'investigating', label: 'Investigating', color: 'amber' },
+      { key: 'rectification', label: 'Rectification', color: 'blue' },
+      { key: 'closed', label: 'Closed', color: 'green' },
+      { key: 'deferred', label: 'Deferred', color: 'slate' },
+    ]);
+
+    // Task status
+    seedCategory('task_status', [
+      { key: 'not_started', label: 'Not Started', color: 'slate' },
+      { key: 'in_progress', label: 'In Progress', color: 'blue' },
+      { key: 'blocked', label: 'Blocked', color: 'red' },
+      { key: 'complete', label: 'Complete', color: 'green' },
+    ]);
+
+    // Task priority
+    seedCategory('task_priority', [
+      { key: 'low', label: 'Low', color: 'green' },
+      { key: 'medium', label: 'Medium', color: 'amber' },
+      { key: 'high', label: 'High', color: 'red' },
+    ]);
+
+    seedCategory('task_type', [
+      { key: 'daily', label: 'Daily', color: 'amber' },
+      { key: 'weekly', label: 'Weekly', color: 'blue' },
+      { key: 'one_off', label: 'One-off', color: 'slate' },
+    ]);
+
+    // Traffic plan types
+    seedCategory('plan_type', [
+      { key: 'TGS', label: 'Traffic Guidance Scheme' },
+      { key: 'TCP', label: 'Traffic Control Plan' },
+      { key: 'TMP', label: 'Traffic Management Plan' },
+    ]);
+
+    // Traffic plan status
+    seedCategory('plan_status', [
+      { key: 'draft', label: 'Draft', color: 'slate' },
+      { key: 'submitted', label: 'Submitted', color: 'blue' },
+      { key: 'under_review', label: 'Under Review', color: 'amber' },
+      { key: 'approved', label: 'Approved', color: 'green' },
+      { key: 'rejected', label: 'Rejected', color: 'red' },
+      { key: 'expired', label: 'Expired', color: 'gray' },
+    ]);
+
+    // Shift types
+    seedCategory('shift_type', [
+      { key: 'day', label: 'Day', color: 'amber' },
+      { key: 'night', label: 'Night', color: 'indigo' },
+      { key: 'split', label: 'Split', color: 'purple' },
+    ]);
+
+    // Allocation status
+    seedCategory('allocation_status', [
+      { key: 'allocated', label: 'Allocated', color: 'blue' },
+      { key: 'confirmed', label: 'Confirmed', color: 'green' },
+      { key: 'declined', label: 'Declined', color: 'red' },
+      { key: 'completed', label: 'Completed', color: 'emerald' },
+      { key: 'cancelled', label: 'Cancelled', color: 'slate' },
+    ]);
+
+    // Compliance status
+    seedCategory('compliance_status', [
+      { key: 'not_started', label: 'Not Started', color: 'slate' },
+      { key: 'submitted', label: 'Submitted', color: 'blue' },
+      { key: 'approved', label: 'Approved', color: 'green' },
+      { key: 'rejected', label: 'Rejected', color: 'red' },
+      { key: 'expired', label: 'Expired', color: 'gray' },
+    ]);
+
+    // Australian states
+    seedCategory('state', [
+      { key: 'NSW', label: 'New South Wales' },
+      { key: 'VIC', label: 'Victoria' },
+      { key: 'QLD', label: 'Queensland' },
+      { key: 'SA', label: 'South Australia' },
+      { key: 'WA', label: 'Western Australia' },
+      { key: 'TAS', label: 'Tasmania' },
+      { key: 'NT', label: 'Northern Territory' },
+      { key: 'ACT', label: 'Australian Capital Territory' },
+    ]);
+
+    // 4. Seed system configuration
+    const insertConfig = db.prepare(`
+      INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, description)
+      VALUES (?, ?, ?, ?)
+    `);
+
+    insertConfig.run('company_name', 'T&S Traffic Control', 'string', 'Company display name');
+    insertConfig.run('company_tagline', 'Operations Dashboard', 'string', 'Dashboard subtitle');
+    insertConfig.run('default_timezone', 'Australia/Sydney', 'string', 'Default timezone for dates');
+    insertConfig.run('currency', 'AUD', 'string', 'Default currency');
+    insertConfig.run('default_shift_hours', '12', 'number', 'Default shift length in hours');
+    insertConfig.run('fatigue_max_days', '5', 'number', 'Max work days in fatigue window before blocked');
+    insertConfig.run('fatigue_window_days', '7', 'number', 'Rolling window for fatigue calculation (days)');
+    insertConfig.run('ticket_expiry_warning_days', '30', 'number', 'Days before ticket expiry to show warning');
+    insertConfig.run('max_shift_length_hours', '14', 'number', 'Maximum allowed shift length in hours');
+    insertConfig.run('min_rest_between_shifts_hours', '10', 'number', 'Minimum rest period between shifts in hours');
+
+    recordMigration.run(13, 'Settings & Configuration Module');
+    console.log('Migration 13 complete.');
+  }
+
+  // =============================================
+  // Migration 14: Worker Portal Auth
+  // =============================================
+  if (!isMigrationApplied.get(14)) {
+    console.log('Running migration 14: Worker Portal Auth');
+
+    const workerCols = [
+      "ALTER TABLE crew_members ADD COLUMN pin_hash TEXT",
+      "ALTER TABLE crew_members ADD COLUMN pin_set_at TEXT",
+      "ALTER TABLE crew_members ADD COLUMN pin_set_by_id INTEGER",
+      "ALTER TABLE crew_members ADD COLUMN last_worker_login TEXT",
+      "ALTER TABLE crew_members ADD COLUMN worker_login_count INTEGER DEFAULT 0",
+    ];
+    for (const sql of workerCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    recordMigration.run(14, 'Worker Portal Auth');
+    console.log('Migration 14 complete.');
+  }
+
+  // =============================================
+  // Migration 15: Client Register & Project Structure
+  // =============================================
+  if (!isMigrationApplied.get(15)) {
+    console.log('Running migration 15: Client Register & Project Structure');
+
+    // Create clients table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS clients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_name TEXT NOT NULL,
+        abn TEXT DEFAULT '',
+        primary_contact_name TEXT DEFAULT '',
+        primary_contact_phone TEXT DEFAULT '',
+        primary_contact_email TEXT DEFAULT '',
+        address TEXT DEFAULT '',
+        billing_address TEXT DEFAULT '',
+        payment_terms TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Add client_id and parent_project_id to jobs
+    const newCols15 = [
+      "ALTER TABLE jobs ADD COLUMN client_id INTEGER REFERENCES clients(id)",
+      "ALTER TABLE jobs ADD COLUMN parent_project_id INTEGER REFERENCES jobs(id)",
+    ];
+    for (const sql of newCols15) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    // Seed clients from existing unique client text values in jobs table
+    const uniqueClients = db.prepare('SELECT DISTINCT client FROM jobs WHERE client IS NOT NULL AND client != ?').all('');
+    const insertClient = db.prepare('INSERT INTO clients (company_name) VALUES (?)');
+    for (const row of uniqueClients) {
+      try { insertClient.run(row.client); } catch (e) { /* ignore dups */ }
+    }
+
+    // Backfill client_id on jobs from the newly created clients
+    db.exec(`
+      UPDATE jobs SET client_id = (
+        SELECT c.id FROM clients c WHERE c.company_name = jobs.client
+      ) WHERE client IS NOT NULL AND client != '' AND client_id IS NULL
+    `);
+
+    recordMigration.run(15, 'Client Register & Project Structure');
+    console.log('Migration 15 complete.');
+  }
+
+  // =============================================
+  // Migration 16: Task Types (daily/weekly/one-off)
+  // =============================================
+  if (!isMigrationApplied.get(16)) {
+    console.log('Running migration 16: Task Types');
+
+    const taskCols = [
+      "ALTER TABLE tasks ADD COLUMN task_type TEXT DEFAULT 'one_off'",
+    ];
+    for (const sql of taskCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    recordMigration.run(16, 'Task Types');
+    console.log('Migration 16 complete.');
+  }
+
+  // =============================================
+  // Migration 17: SMTP Email Configuration
+  // =============================================
+  if (!isMigrationApplied.get(17)) {
+    console.log('Running migration 17: SMTP Email Configuration');
+
+    const insertConfig = db.prepare(`
+      INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, description)
+      VALUES (?, ?, ?, ?)
+    `);
+
+    insertConfig.run('smtp_host', '', 'string', 'SMTP server hostname (e.g. smtp.gmail.com)');
+    insertConfig.run('smtp_port', '587', 'string', 'SMTP server port (587 for TLS, 465 for SSL)');
+    insertConfig.run('smtp_user', '', 'string', 'SMTP username / email address');
+    insertConfig.run('smtp_pass', '', 'string', 'SMTP password or app password');
+    insertConfig.run('smtp_from', 'noreply@tstraffic.com.au', 'string', 'Default sender email address');
+
+    recordMigration.run(17, 'SMTP Email Configuration');
+    console.log('Migration 17 complete.');
+  }
+
+  // =============================================
+  // Migration 18: Make tasks.job_id optional
+  // =============================================
+  if (!isMigrationApplied.get(18)) {
+    console.log('Running migration 18: Make tasks.job_id optional');
+
+    db.exec('BEGIN TRANSACTION');
+    try {
+      db.exec(`
+        CREATE TABLE tasks_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+          division TEXT NOT NULL CHECK(division IN ('ops','planning','marketing','accounts','management')),
+          title TEXT NOT NULL,
+          description TEXT DEFAULT '',
+          owner_id INTEGER REFERENCES users(id),
+          due_date DATE NOT NULL,
+          status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','in_progress','blocked','complete')),
+          priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('high','medium','low')),
+          task_type TEXT DEFAULT 'one_off',
+          notes TEXT DEFAULT '',
+          completed_date DATE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO tasks_new SELECT * FROM tasks;
+        DROP TABLE tasks;
+        ALTER TABLE tasks_new RENAME TO tasks;
+        CREATE INDEX IF NOT EXISTS idx_tasks_job ON tasks(job_id);
+        CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_id);
+        CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+        CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
+      `);
+      db.exec('COMMIT');
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch (r) {}
+      console.log('Migration 18 skipped:', e.message);
+    }
+
+    recordMigration.run(18, 'Make tasks.job_id optional');
+    console.log('Migration 18 complete.');
+  }
+
+  // =============================================
+  // Migration 19: Fix tasks.job_id to allow NULL (explicit columns)
+  // =============================================
+  if (!isMigrationApplied.get(19)) {
+    console.log('Running migration 19: Fix tasks.job_id nullable');
+
+    // Check if job_id is already nullable
+    const tableInfo = db.prepare("PRAGMA table_info(tasks)").all();
+    const jobIdCol = tableInfo.find(c => c.name === 'job_id');
+    if (jobIdCol && jobIdCol.notnull === 1) {
+      db.exec('BEGIN TRANSACTION');
+      try {
+        db.exec(`
+          CREATE TABLE tasks_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+            division TEXT NOT NULL CHECK(division IN ('ops','planning','marketing','accounts','management')),
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            owner_id INTEGER NOT NULL REFERENCES users(id),
+            due_date DATE NOT NULL,
+            status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','in_progress','blocked','complete')),
+            priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('high','medium','low')),
+            escalation_level INTEGER NOT NULL DEFAULT 0,
+            completed_date DATE,
+            notes TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            task_type TEXT DEFAULT 'one_off'
+          );
+          INSERT INTO tasks_new (id, job_id, division, title, description, owner_id, due_date, status, priority, escalation_level, completed_date, notes, created_at, updated_at, task_type)
+          SELECT id, job_id, division, title, description, owner_id, due_date, status, priority, escalation_level, completed_date, notes, created_at, updated_at, task_type FROM tasks;
+          DROP TABLE tasks;
+          ALTER TABLE tasks_new RENAME TO tasks;
+          CREATE INDEX IF NOT EXISTS idx_tasks_job ON tasks(job_id);
+          CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_id);
+          CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+          CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
+        `);
+        db.exec('COMMIT');
+        console.log('Migration 19: tasks.job_id is now nullable.');
+      } catch (e) {
+        try { db.exec('ROLLBACK'); } catch (r) {}
+        console.log('Migration 19 error:', e.message);
+      }
+    } else {
+      console.log('Migration 19: tasks.job_id already nullable, skipping DDL.');
+    }
+
+    recordMigration.run(19, 'Fix tasks.job_id nullable');
+    console.log('Migration 19 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

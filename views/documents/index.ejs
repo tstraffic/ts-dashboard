@@ -26,33 +26,33 @@
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
     <div>
-      <a href="/jobs/<%= job.id %>" class="inline-flex items-center text-slate-400 hover:text-brand-400 transition mb-2">
+      <a href="/projects/<%= job.id %>" class="inline-flex items-center text-gray-500 hover:text-brand-600 transition mb-2">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
         Back to Job
       </a>
-      <h1 class="text-2xl font-bold text-white">Documents: <%= job.job_number %></h1>
+      <h1 class="text-2xl font-bold text-gray-900">Documents: <%= job.job_number %></h1>
     </div>
   </div>
 
   <!-- Delivery Documents Section -->
   <div class="mb-8">
-    <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
-      <svg class="w-5 h-5 mr-2 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+    <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+      <svg class="w-5 h-5 mr-2 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
       Job Site Documents (Delivery)
     </h2>
 
     <!-- Upload Form -->
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 mb-4">
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-4 mb-4">
       <form method="POST" action="/documents/upload" enctype="multipart/form-data" class="flex flex-wrap items-end gap-4">
         <input type="hidden" name="library" value="delivery">
         <input type="hidden" name="job_id" value="<%= job.id %>">
         <div class="flex-1 min-w-[200px]">
-          <label class="block text-sm font-medium text-slate-400 mb-1">File</label>
-          <input type="file" name="file" required class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 file:mr-3 file:bg-slate-600 file:text-slate-200 file:border-0 file:rounded file:px-3 file:py-1 file:text-sm">
+          <label class="block text-sm font-medium text-gray-500 mb-1">File</label>
+          <input type="file" name="file" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 file:mr-3 file:bg-gray-100 file:text-gray-700 file:border-0 file:rounded file:px-3 file:py-1 file:text-sm">
         </div>
         <div class="min-w-[180px]">
-          <label class="block text-sm font-medium text-slate-400 mb-1">Category</label>
-          <select name="category" required class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label class="block text-sm font-medium text-gray-500 mb-1">Category</label>
+          <select name="category" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="">Select category...</option>
             <% deliveryCategories.forEach(function(cat) { %>
               <option value="<%= cat %>"><%= cat %></option>
@@ -67,32 +67,32 @@
 
     <!-- Delivery Documents Grouped by Category -->
     <% if (deliveryDocs.length === 0) { %>
-      <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 text-center text-slate-400">
+      <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6 text-center text-gray-500">
         <p>No delivery documents uploaded yet.</p>
       </div>
     <% } else { %>
       <% Object.keys(deliveryGrouped).forEach(function(category) { %>
-        <details class="bg-slate-800 border border-slate-700 rounded-lg mb-3 group" open>
-          <summary class="px-4 py-3 cursor-pointer flex items-center justify-between text-white font-medium hover:bg-slate-750 rounded-lg transition">
+        <details class="bg-white border border-gray-200 rounded-lg shadow-sm mb-3 group" open>
+          <summary class="px-4 py-3 cursor-pointer flex items-center justify-between text-gray-900 font-medium hover:bg-gray-50 rounded-lg transition">
             <span class="flex items-center">
-              <svg class="w-4 h-4 mr-2 text-slate-400 group-open:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              <svg class="w-4 h-4 mr-2 text-gray-500 group-open:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
               <%= category %>
-              <span class="ml-2 text-xs text-slate-400">(<%= deliveryGrouped[category].length %>)</span>
+              <span class="ml-2 text-xs text-gray-500">(<%= deliveryGrouped[category].length %>)</span>
             </span>
           </summary>
-          <div class="border-t border-slate-700 divide-y divide-slate-700">
+          <div class="border-t border-gray-200 divide-y divide-gray-200">
             <% deliveryGrouped[category].forEach(function(doc) { %>
               <div class="px-4 py-3 flex items-center justify-between">
                 <div class="flex-1 min-w-0">
-                  <a href="/documents/download/<%= doc.id %>" class="text-brand-400 hover:text-brand-300 font-medium truncate block"><%= doc.original_name %></a>
-                  <div class="flex items-center space-x-3 text-xs text-slate-400 mt-1">
+                  <a href="/documents/download/<%= doc.id %>" class="text-brand-600 hover:text-brand-700 font-medium truncate block"><%= doc.original_name %></a>
+                  <div class="flex items-center space-x-3 text-xs text-gray-500 mt-1">
                     <span><%= formatFileSize(doc.file_size) %></span>
                     <span>by <%= doc.uploaded_by_name || 'Unknown' %></span>
                     <span><%= doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '' %></span>
                   </div>
                 </div>
                 <form method="POST" action="/documents/delete/<%= doc.id %>" class="ml-4">
-                  <button type="submit" class="text-slate-500 hover:text-red-400 transition" title="Delete" onclick="return confirm('Delete this document?')">
+                  <button type="submit" class="text-gray-400 hover:text-red-600 transition" title="Delete" onclick="return confirm('Delete this document?')">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                   </button>
                 </form>
@@ -107,27 +107,27 @@
   <!-- Accounts Documents Section (Private) -->
   <% if (canViewAccounts) { %>
     <div class="mb-8">
-      <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
-        <svg class="w-5 h-5 mr-2 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+        <svg class="w-5 h-5 mr-2 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
         Accounts Documents (Private)
       </h2>
 
       <!-- Upload Form -->
-      <div class="bg-slate-800 border-2 border-brand-600/50 rounded-lg p-4 mb-4">
+      <div class="bg-white border-2 border-brand-600/50 rounded-lg p-4 mb-4">
         <div class="flex items-center mb-3">
-          <svg class="w-4 h-4 text-brand-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-          <span class="text-brand-400 text-sm font-medium">Accounts documents are restricted and only visible to authorised users.</span>
+          <svg class="w-4 h-4 text-brand-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+          <span class="text-brand-600 text-sm font-medium">Accounts documents are restricted and only visible to authorised users.</span>
         </div>
         <form method="POST" action="/documents/upload" enctype="multipart/form-data" class="flex flex-wrap items-end gap-4">
           <input type="hidden" name="library" value="accounts">
           <input type="hidden" name="job_id" value="<%= job.id %>">
           <div class="flex-1 min-w-[200px]">
-            <label class="block text-sm font-medium text-slate-400 mb-1">File</label>
-            <input type="file" name="file" required class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 file:mr-3 file:bg-slate-600 file:text-slate-200 file:border-0 file:rounded file:px-3 file:py-1 file:text-sm">
+            <label class="block text-sm font-medium text-gray-500 mb-1">File</label>
+            <input type="file" name="file" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 file:mr-3 file:bg-gray-100 file:text-gray-700 file:border-0 file:rounded file:px-3 file:py-1 file:text-sm">
           </div>
           <div class="min-w-[180px]">
-            <label class="block text-sm font-medium text-slate-400 mb-1">Category</label>
-            <select name="category" required class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <label class="block text-sm font-medium text-gray-500 mb-1">Category</label>
+            <select name="category" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
               <option value="">Select category...</option>
               <% accountsCategories.forEach(function(cat) { %>
                 <option value="<%= cat %>"><%= cat %></option>
@@ -142,32 +142,32 @@
 
       <!-- Accounts Documents Grouped by Category -->
       <% if (accountsDocs.length === 0) { %>
-        <div class="bg-slate-800 border-2 border-brand-600/50 rounded-lg p-6 text-center text-slate-400">
+        <div class="bg-white border-2 border-brand-600/50 rounded-lg p-6 text-center text-gray-500">
           <p>No accounts documents uploaded yet.</p>
         </div>
       <% } else { %>
         <% Object.keys(accountsGrouped).forEach(function(category) { %>
-          <details class="bg-slate-800 border-2 border-brand-600/50 rounded-lg mb-3 group" open>
-            <summary class="px-4 py-3 cursor-pointer flex items-center justify-between text-white font-medium hover:bg-slate-750 rounded-lg transition">
+          <details class="bg-white border-2 border-brand-600/50 rounded-lg mb-3 group" open>
+            <summary class="px-4 py-3 cursor-pointer flex items-center justify-between text-gray-900 font-medium hover:bg-gray-50 rounded-lg transition">
               <span class="flex items-center">
-                <svg class="w-4 h-4 mr-2 text-slate-400 group-open:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <svg class="w-4 h-4 mr-2 text-gray-500 group-open:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                 <%= category %>
-                <span class="ml-2 text-xs text-slate-400">(<%= accountsGrouped[category].length %>)</span>
+                <span class="ml-2 text-xs text-gray-500">(<%= accountsGrouped[category].length %>)</span>
               </span>
             </summary>
-            <div class="border-t border-brand-600/30 divide-y divide-slate-700">
+            <div class="border-t border-brand-600/30 divide-y divide-gray-200">
               <% accountsGrouped[category].forEach(function(doc) { %>
                 <div class="px-4 py-3 flex items-center justify-between">
                   <div class="flex-1 min-w-0">
-                    <a href="/documents/download/<%= doc.id %>" class="text-brand-400 hover:text-brand-300 font-medium truncate block"><%= doc.original_name %></a>
-                    <div class="flex items-center space-x-3 text-xs text-slate-400 mt-1">
+                    <a href="/documents/download/<%= doc.id %>" class="text-brand-600 hover:text-brand-700 font-medium truncate block"><%= doc.original_name %></a>
+                    <div class="flex items-center space-x-3 text-xs text-gray-500 mt-1">
                       <span><%= formatFileSize(doc.file_size) %></span>
                       <span>by <%= doc.uploaded_by_name || 'Unknown' %></span>
                       <span><%= doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '' %></span>
                     </div>
                   </div>
                   <form method="POST" action="/documents/delete/<%= doc.id %>" class="ml-4">
-                    <button type="submit" class="text-slate-500 hover:text-red-400 transition" title="Delete" onclick="return confirm('Delete this document?')">
+                    <button type="submit" class="text-gray-400 hover:text-red-600 transition" title="Delete" onclick="return confirm('Delete this document?')">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     </button>
                   </form>

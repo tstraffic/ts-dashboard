@@ -1,0 +1,337 @@
+<% locals.currentPage = 'projects' %>
+<% const isEdit = job !== null && typeof job !== 'undefined' %>
+
+<!-- Page Header -->
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit Project: ' + job.job_number : 'Create New Project' %></h1>
+  <p class="text-gray-500 text-sm mt-1"><%= isEdit ? 'Update project details below' : 'Fill in the details to create a new project' %></p>
+</div>
+
+<!-- Form -->
+<form method="POST" action="<%= isEdit ? '/projects/' + job.id : '/projects' %>" class="space-y-6">
+
+  <!-- Project Identification -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Project Identification</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Job Number -->
+      <div>
+        <label for="job_number" class="block text-sm font-medium text-gray-600 mb-1">Job Number <span class="text-red-600">*</span></label>
+        <input type="text" id="job_number" name="job_number" required
+          pattern="J-\d{5}" title="Format: J-NNNNN (e.g. J-00123)"
+          placeholder="J-00123"
+          value="<%= isEdit ? job.job_number : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <p class="text-xs text-gray-400 mt-1">Format: J-NNNNN</p>
+      </div>
+      <!-- Client (Dropdown) -->
+      <div>
+        <label for="client_id" class="block text-sm font-medium text-gray-600 mb-1">Client <span class="text-red-600">*</span></label>
+        <select id="client_id" name="client_id" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select Client --</option>
+          <% (typeof clients !== 'undefined' ? clients : []).forEach(c => { %>
+            <option value="<%= c.id %>" <%= isEdit && job.client_id == c.id ? 'selected' : (!isEdit && typeof preselectedClientId !== 'undefined' && preselectedClientId == c.id) ? 'selected' : '' %>><%= c.company_name %></option>
+          <% }) %>
+        </select>
+        <p class="text-xs text-gray-400 mt-1"><a href="/clients/new" class="text-brand-600 hover:underline">+ Add new client</a></p>
+        <input type="hidden" name="client" value="<%= isEdit ? job.client : '' %>">
+      </div>
+      <!-- Client Project Number -->
+      <div>
+        <label for="client_project_number" class="block text-sm font-medium text-gray-600 mb-1">Client Project Number</label>
+        <input type="text" id="client_project_number" name="client_project_number"
+          value="<%= isEdit && job.client_project_number ? job.client_project_number : '' %>"
+          placeholder="Client project number"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <!-- Project Name -->
+      <div>
+        <label for="project_name" class="block text-sm font-medium text-gray-600 mb-1">Project Name</label>
+        <input type="text" id="project_name" name="project_name"
+          value="<%= isEdit && job.project_name ? job.project_name : '' %>"
+          placeholder="Project name"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <!-- Principal Contractor -->
+      <div>
+        <label for="principal_contractor" class="block text-sm font-medium text-gray-600 mb-1">Principal Contractor</label>
+        <input type="text" id="principal_contractor" name="principal_contractor"
+          value="<%= isEdit && job.principal_contractor ? job.principal_contractor : '' %>"
+          placeholder="Principal contractor"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <!-- State -->
+      <div>
+        <label for="state" class="block text-sm font-medium text-gray-600 mb-1">State</label>
+        <select id="state" name="state"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <% (settingsOptions.state || []).forEach((opt, idx) => { %>
+            <option value="<%= opt.key %>" <%= isEdit && job.state === opt.key ? 'selected' : (!isEdit && idx === 0) ? 'selected' : '' %>><%= opt.key %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Location -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Location</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Site Address -->
+      <div>
+        <label for="site_address" class="block text-sm font-medium text-gray-600 mb-1">Site Address</label>
+        <input type="text" id="site_address" name="site_address"
+          value="<%= isEdit && job.site_address ? job.site_address : '' %>"
+          placeholder="Full site address"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <!-- Suburb -->
+      <div>
+        <label for="suburb" class="block text-sm font-medium text-gray-600 mb-1">Suburb</label>
+        <input type="text" id="suburb" name="suburb"
+          value="<%= isEdit && job.suburb ? job.suburb : '' %>"
+          placeholder="Suburb"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+    </div>
+  </div>
+
+  <!-- Status & Progress -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Status & Progress</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- Status -->
+      <div>
+        <label for="status" class="block text-sm font-medium text-gray-600 mb-1">Status</label>
+        <select id="status" name="status"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <% (settingsOptions.job_status || []).forEach(opt => { %>
+            <option value="<%= opt.key %>" <%= isEdit && job.status === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+          <% }) %>
+        </select>
+      </div>
+      <!-- Stage -->
+      <div>
+        <label for="stage" class="block text-sm font-medium text-gray-600 mb-1">Stage</label>
+        <select id="stage" name="stage"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <% (settingsOptions.job_stage || []).forEach(opt => { %>
+            <option value="<%= opt.key %>" <%= isEdit && job.stage === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+          <% }) %>
+        </select>
+      </div>
+      <!-- Health -->
+      <div>
+        <label for="health" class="block text-sm font-medium text-gray-600 mb-1">Health</label>
+        <select id="health" name="health"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <% (settingsOptions.job_health || []).forEach(opt => { %>
+            <option value="<%= opt.key %>" <%= isEdit && job.health === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dates & Completion -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Dates & Completion</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Start Date -->
+      <div>
+        <label for="start_date" class="block text-sm font-medium text-gray-600 mb-1">Start Date <span class="text-red-600">*</span></label>
+        <input type="date" id="start_date" name="start_date" required
+          value="<%= isEdit && job.start_date ? job.start_date : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <!-- End Date -->
+      <div>
+        <label for="end_date" class="block text-sm font-medium text-gray-600 mb-1">End Date</label>
+        <input type="date" id="end_date" name="end_date"
+          value="<%= isEdit && job.end_date ? job.end_date : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <!-- % Complete -->
+      <div>
+        <label for="percent_complete" class="block text-sm font-medium text-gray-600 mb-1">% Complete</label>
+        <input type="number" id="percent_complete" name="percent_complete" min="0" max="100"
+          value="<%= isEdit ? (job.percent_complete || 0) : 0 %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+    </div>
+  </div>
+
+  <!-- Operations Details -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Operations Details</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Contract Value -->
+      <div>
+        <label for="contract_value" class="block text-sm font-medium text-gray-600 mb-1">Contract Value</label>
+        <input type="number" id="contract_value" name="contract_value" step="0.01" min="0"
+          value="<%= isEdit && job.contract_value ? job.contract_value : '' %>"
+          placeholder="0.00"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <!-- Estimated Hours -->
+      <div>
+        <label for="estimated_hours" class="block text-sm font-medium text-gray-600 mb-1">Estimated Hours</label>
+        <input type="number" id="estimated_hours" name="estimated_hours" min="0"
+          value="<%= isEdit && job.estimated_hours ? job.estimated_hours : '' %>"
+          placeholder="0"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <!-- Crew Size -->
+      <div>
+        <label for="crew_size" class="block text-sm font-medium text-gray-600 mb-1">Crew Size</label>
+        <input type="number" id="crew_size" name="crew_size" min="0"
+          value="<%= isEdit && job.crew_size ? job.crew_size : '' %>"
+          placeholder="0"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+      <!-- Required TCP Level -->
+      <div>
+        <label for="required_tcp_level" class="block text-sm font-medium text-gray-600 mb-1">Required TCP Level</label>
+        <select id="required_tcp_level" name="required_tcp_level"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="" <%= isEdit && !job.required_tcp_level ? 'selected' : '' %>>Any</option>
+          <% (settingsOptions.tcp_level || []).forEach(opt => { %>
+            <option value="<%= opt.key %>" <%= isEdit && job.required_tcp_level === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+          <% }) %>
+        </select>
+        <p class="text-xs text-gray-400 mt-1">Minimum TCP competency required for crew on this job</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-6 mt-4">
+      <!-- ROL Required -->
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="rol_required" value="1" <%= isEdit && job.rol_required ? 'checked' : '' %>
+          class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+        <span class="text-sm font-medium text-gray-600">ROL Required</span>
+      </label>
+      <!-- TMP Required -->
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="tmp_required" value="1" <%= isEdit && job.tmp_required ? 'checked' : '' %>
+          class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+        <span class="text-sm font-medium text-gray-600">TMP Required</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Team Assignment -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Team Assignment</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Project Manager -->
+      <div>
+        <label for="project_manager_id" class="block text-sm font-medium text-gray-600 mb-1">Project Manager</label>
+        <select id="project_manager_id" name="project_manager_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select --</option>
+          <% users.forEach(u => { %>
+            <option value="<%= u.id %>" <%= isEdit && job.project_manager_id == u.id ? 'selected' : '' %>><%= u.full_name %> (<%= u.role %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <!-- Ops Supervisor -->
+      <div>
+        <label for="ops_supervisor_id" class="block text-sm font-medium text-gray-600 mb-1">Ops Supervisor</label>
+        <select id="ops_supervisor_id" name="ops_supervisor_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select --</option>
+          <% users.forEach(u => { %>
+            <option value="<%= u.id %>" <%= isEdit && job.ops_supervisor_id == u.id ? 'selected' : '' %>><%= u.full_name %> (<%= u.role %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <!-- Traffic Supervisor -->
+      <div>
+        <label for="traffic_supervisor_id" class="block text-sm font-medium text-gray-600 mb-1">Traffic Supervisor</label>
+        <select id="traffic_supervisor_id" name="traffic_supervisor_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select --</option>
+          <% users.forEach(u => { %>
+            <option value="<%= u.id %>" <%= isEdit && job.traffic_supervisor_id == u.id ? 'selected' : '' %>><%= u.full_name %> (<%= u.role %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <!-- Planning Owner -->
+      <div>
+        <label for="planning_owner_id" class="block text-sm font-medium text-gray-600 mb-1">Planning Owner</label>
+        <select id="planning_owner_id" name="planning_owner_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select --</option>
+          <% users.forEach(u => { %>
+            <option value="<%= u.id %>" <%= isEdit && job.planning_owner_id == u.id ? 'selected' : '' %>><%= u.full_name %> (<%= u.role %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <!-- Marketing Owner -->
+      <div>
+        <label for="marketing_owner_id" class="block text-sm font-medium text-gray-600 mb-1">Marketing Owner</label>
+        <select id="marketing_owner_id" name="marketing_owner_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select --</option>
+          <% users.forEach(u => { %>
+            <option value="<%= u.id %>" <%= isEdit && job.marketing_owner_id == u.id ? 'selected' : '' %>><%= u.full_name %> (<%= u.role %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <!-- Accounts Owner -->
+      <div>
+        <label for="accounts_owner_id" class="block text-sm font-medium text-gray-600 mb-1">Accounts Owner</label>
+        <select id="accounts_owner_id" name="accounts_owner_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select --</option>
+          <% users.forEach(u => { %>
+            <option value="<%= u.id %>" <%= isEdit && job.accounts_owner_id == u.id ? 'selected' : '' %>><%= u.full_name %> (<%= u.role %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <!-- Accounts Status -->
+      <div>
+        <label for="accounts_status" class="block text-sm font-medium text-gray-600 mb-1">Accounts Status</label>
+        <select id="accounts_status" name="accounts_status"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <% (settingsOptions.accounts_status || []).forEach(opt => { %>
+            <option value="<%= opt.key %>" <%= isEdit && job.accounts_status === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- SharePoint -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">SharePoint</h2>
+    <div>
+      <label for="sharepoint_url" class="block text-sm font-medium text-gray-600 mb-1">SharePoint URL</label>
+      <input type="url" id="sharepoint_url" name="sharepoint_url"
+        value="<%= isEdit && job.sharepoint_url ? job.sharepoint_url : '' %>"
+        placeholder="https://..."
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Notes</h2>
+    <div>
+      <label for="notes" class="block text-sm font-medium text-gray-600 mb-1">Notes</label>
+      <textarea id="notes" name="notes" rows="4"
+        placeholder="Additional notes about this job..."
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && job.notes ? job.notes : '' %></textarea>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex items-center gap-3">
+    <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
+      <%= isEdit ? 'Update Project' : 'Create Project' %>
+    </button>
+    <a href="/projects" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
+  </div>
+</form>

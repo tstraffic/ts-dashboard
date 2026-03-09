@@ -24,10 +24,10 @@ function initTabs() {
   function activateTab(tabName) {
     tabLinks.forEach(link => {
       const isActive = link.dataset.tab === tabName;
-      link.classList.toggle('border-amber-500', isActive);
-      link.classList.toggle('text-amber-400', isActive);
+      link.classList.toggle('border-brand-600', isActive);
+      link.classList.toggle('text-brand-700', isActive);
       link.classList.toggle('border-transparent', !isActive);
-      link.classList.toggle('text-slate-400', !isActive);
+      link.classList.toggle('text-gray-500', !isActive);
     });
     tabPanels.forEach(panel => {
       panel.classList.toggle('hidden', panel.dataset.tabPanel !== tabName);

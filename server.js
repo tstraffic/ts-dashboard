@@ -6,7 +6,9 @@ const ejsLayouts = require('express-ejs-layouts');
 const path = require('path');
 const { initializeDatabase } = require('./db/schema');
 const { requireLogin, requirePermission, canAccess } = require('./middleware/auth');
+const { requireWorker, blockWorkerFromAdmin, workerLocals } = require('./middleware/workerAuth');
 const { notificationCountMiddleware, generateNotifications } = require('./middleware/notifications');
+const { settingsMiddleware } = require('./middleware/settings');
 
 // Initialize database and seed data
 initializeDatabase();
@@ -49,9 +51,22 @@ app.use((req, res, next) => {
 // Notification count available in all templates (header bell badge)
 app.use(notificationCountMiddleware);
 
+// Settings available in all templates (dropdown options, system config)
+app.use(settingsMiddleware);
+
+// Worker Portal routes (must be BEFORE blockWorkerFromAdmin)
+app.use('/w', require('./routes/worker/auth'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/home'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/jobs'));
+
+// Block worker-only sessions from admin routes
+app.use(blockWorkerFromAdmin);
+
 // Routes (auth is public, everything else requires login + permission)
 app.use('/', require('./routes/auth'));
 app.use('/dashboard', requireLogin, requirePermission('dashboard'), require('./routes/dashboard'));
+app.use('/projects', requireLogin, requirePermission('projects'), require('./routes/projects'));
+app.use('/clients', requireLogin, requirePermission('clients'), require('./routes/clients'));
 app.use('/jobs', requireLogin, requirePermission('jobs'), require('./routes/jobs'));
 app.use('/tasks', requireLogin, requirePermission('tasks'), require('./routes/tasks'));
 app.use('/updates', requireLogin, requirePermission('updates'), require('./routes/updates'));
@@ -63,6 +78,7 @@ app.use('/documents', requireLogin, requirePermission('documents'), require('./r
 app.use('/activity', requireLogin, requirePermission('activity'), require('./routes/activity'));
 app.use('/budgets', requireLogin, requirePermission('budgets'), require('./routes/budgets'));
 app.use('/timesheets', requireLogin, requirePermission('timesheets'), require('./routes/timesheets'));
+app.use('/crew', requireLogin, requirePermission('crew'), require('./routes/crew'));
 app.use('/allocations', requireLogin, requirePermission('allocations'), require('./routes/allocations'));
 app.use('/schedule', requireLogin, requirePermission('schedule'), require('./routes/schedule'));
 app.use('/equipment', requireLogin, requirePermission('equipment'), require('./routes/equipment'));
@@ -72,15 +88,27 @@ app.use('/defects', requireLogin, requirePermission('defects'), require('./route
 app.use('/notifications', requireLogin, requirePermission('notifications'), require('./routes/notifications'));
 app.use('/admin/integrations', requireLogin, requirePermission('admin'), require('./routes/integrations'));
 app.use('/admin', requireLogin, requirePermission('admin'), require('./routes/admin'));
+app.use('/settings', requireLogin, requirePermission('settings'), require('./routes/settings'));
 
-// Home redirects to dashboard
+// Home redirects to dashboard or worker portal
 app.get('/', (req, res) => {
+  if (req.session.worker) return res.redirect('/w/home');
   if (req.session.user) return res.redirect('/dashboard');
   res.redirect('/login');
 });
 
 // 404
 app.use((req, res) => {
+  // If on a worker path, render worker error page
+  if (req.path.startsWith('/w') && req.session && req.session.worker) {
+    return res.status(404).render('worker/error', {
+      layout: 'worker/layout',
+      title: '404 Not Found',
+      message: 'The page you are looking for does not exist.',
+      worker: req.session.worker,
+      currentPage: '',
+    });
+  }
   res.status(404).render('error', {
     title: '404 Not Found',
     message: 'The page you are looking for does not exist.',
@@ -91,6 +119,16 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, _next) => {
   console.error(err.stack);
+  // Worker routes get worker error page
+  if (req.path.startsWith('/w') && req.session && req.session.worker) {
+    return res.status(500).render('worker/error', {
+      layout: 'worker/layout',
+      title: 'Server Error',
+      message: 'Something went wrong. Please try again.',
+      worker: req.session.worker,
+      currentPage: '',
+    });
+  }
   res.status(500).render('error', {
     title: 'Server Error',
     message: 'Something went wrong. Please try again.',

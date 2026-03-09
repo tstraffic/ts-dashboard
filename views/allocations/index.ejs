@@ -2,6 +2,7 @@
 
 <%
   const roleAbbr = { traffic_controller: 'TC', leading_hand: 'LH', supervisor: 'SV', pilot_vehicle: 'PV', spotter: 'SP', labourer: 'LB', other: '' };
+  const tcpLevels = { 'TCP1': 1, 'TCP2': 2, 'TCP3': 3 };
 
   // Build lookup maps for day view
   const allocByJob = {};
@@ -24,40 +25,48 @@
   const prevStr = prevDate.toISOString().split('T')[0];
   const nextStr = nextDate.toISOString().split('T')[0];
   const dayLabel = selD.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const canOverride = typeof userRole !== 'undefined' && (userRole === 'management' || userRole === 'operations');
 %>
 
 <div class="mb-6 flex items-center justify-between flex-wrap gap-4">
   <div>
-    <h1 class="text-2xl font-bold text-white">Crew Allocations</h1>
-    <p class="text-slate-400 text-sm mt-1">Booking board — assign crew to jobs</p>
+    <h1 class="text-2xl font-bold text-gray-900">Allocations</h1>
+    <p class="text-gray-500 text-sm mt-1">Calendar board &mdash; create shifts, allocate crew & equipment</p>
   </div>
   <div class="flex items-center gap-2">
+    <button onclick="document.getElementById('create-shift-modal').classList.remove('hidden')" class="px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors inline-flex items-center gap-1">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/></svg>
+      New Shift
+    </button>
     <a href="/exports/allocations.csv?from_date=<%= selectedDate %>&to_date=<%= selectedDate %>"
-      class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
+      class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-      Export CSV
+      CSV
     </a>
-    <a href="/allocations?view=day&date=<%= selectedDate %>" class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors <%= view === 'day' ? 'bg-brand-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600' %>">Day</a>
-    <a href="/allocations?view=week&date=<%= selectedDate %>" class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors <%= view === 'week' ? 'bg-brand-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600' %>">Week</a>
+    <div class="flex rounded-lg overflow-hidden border border-gray-300">
+      <a href="/allocations?view=day&date=<%= selectedDate %>" class="px-3 py-1.5 text-xs font-medium transition-colors <%= view === 'day' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Day</a>
+      <a href="/allocations?view=week&date=<%= selectedDate %>" class="px-3 py-1.5 text-xs font-medium border-l border-gray-300 transition-colors <%= view === 'week' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Week</a>
+      <a href="/allocations?view=month&date=<%= selectedDate %>" class="px-3 py-1.5 text-xs font-medium border-l border-gray-300 transition-colors <%= view === 'month' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Month</a>
+    </div>
   </div>
 </div>
 
 <!-- Date Navigation -->
-<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-6">
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-6">
   <div class="flex items-center justify-between">
-    <a href="/allocations?view=<%= view %>&date=<%= prevStr %>" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors">&larr; Prev</a>
+    <a href="/allocations?view=<%= view %>&date=<%= prevStr %>" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors">&larr; Prev</a>
     <div class="flex items-center gap-3">
-      <span class="text-white font-semibold"><%= dayLabel %></span>
+      <span class="text-gray-900 font-semibold"><%= dayLabel %></span>
       <form method="GET" class="flex items-center gap-2">
         <input type="hidden" name="view" value="<%= view %>">
-        <input type="date" name="date" value="<%= selectedDate %>" class="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg px-3 py-1.5">
+        <input type="date" name="date" value="<%= selectedDate %>" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-1.5">
         <button type="submit" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm rounded-lg transition-colors">Go</button>
       </form>
       <% if (selectedDate !== today) { %>
-        <a href="/allocations?view=<%= view %>&date=<%= today %>" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg transition-colors">Today</a>
+        <a href="/allocations?view=<%= view %>&date=<%= today %>" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-900 text-xs rounded-lg transition-colors">Today</a>
       <% } %>
     </div>
-    <a href="/allocations?view=<%= view %>&date=<%= nextStr %>" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors">Next &rarr;</a>
+    <a href="/allocations?view=<%= view %>&date=<%= nextStr %>" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors">Next &rarr;</a>
   </div>
 </div>
 
@@ -65,21 +74,21 @@
 
 <!-- Summary Stats -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-  <div class="bg-slate-800 border border-slate-700 border-l-4 border-l-brand-500 rounded-xl p-4">
-    <p class="text-xs text-slate-400 uppercase tracking-wide">Jobs</p>
-    <p class="text-3xl font-bold text-white mt-1"><%= stats.jobsToday %></p>
+  <div class="bg-white border border-gray-200 border-l-4 border-l-brand-500 rounded-xl p-4">
+    <p class="text-xs text-gray-500 uppercase tracking-wide">Jobs</p>
+    <p class="text-3xl font-bold text-gray-900 mt-1"><%= stats.jobsToday %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 border-l-4 border-l-brand-500 rounded-xl p-4">
-    <p class="text-xs text-slate-400 uppercase tracking-wide">Crew Allocated</p>
-    <p class="text-3xl font-bold text-brand-400 mt-1"><%= stats.crewAllocated %></p>
+  <div class="bg-white border border-gray-200 border-l-4 border-l-brand-500 rounded-xl p-4">
+    <p class="text-xs text-gray-500 uppercase tracking-wide">Crew Allocated</p>
+    <p class="text-3xl font-bold text-brand-600 mt-1"><%= stats.crewAllocated %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= stats.unconfirmed > 0 ? 'border-orange-700' : '' %>">
-    <p class="text-xs text-slate-400 uppercase tracking-wide">Unconfirmed</p>
-    <p class="text-3xl font-bold <%= stats.unconfirmed > 0 ? 'text-orange-400' : 'text-emerald-400' %> mt-1"><%= stats.unconfirmed %></p>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 <%= stats.unconfirmed > 0 ? 'border-orange-300' : '' %>">
+    <p class="text-xs text-gray-500 uppercase tracking-wide">Unconfirmed</p>
+    <p class="text-3xl font-bold <%= stats.unconfirmed > 0 ? 'text-orange-600' : 'text-emerald-600' %> mt-1"><%= stats.unconfirmed %></p>
   </div>
-  <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 <%= stats.gaps > 0 ? 'border-red-700' : '' %>">
-    <p class="text-xs text-slate-400 uppercase tracking-wide">Jobs with Gaps</p>
-    <p class="text-3xl font-bold <%= stats.gaps > 0 ? 'text-red-400' : 'text-emerald-400' %> mt-1"><%= stats.gaps %></p>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 <%= stats.gaps > 0 ? 'border-red-700' : '' %>">
+    <p class="text-xs text-gray-500 uppercase tracking-wide">Jobs with Gaps</p>
+    <p class="text-3xl font-bold <%= stats.gaps > 0 ? 'text-red-600' : 'text-emerald-600' %> mt-1"><%= stats.gaps %></p>
   </div>
 </div>
 
@@ -87,8 +96,8 @@
 <div class="flex items-center gap-3 mb-6 flex-wrap">
   <form method="POST" action="/allocations/copy-day" class="flex items-center gap-2">
     <input type="hidden" name="to_date" value="<%= selectedDate %>">
-    <input type="date" name="from_date" value="<%= prevStr %>" class="bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5">
-    <button type="submit" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium rounded-lg transition-colors">Copy From &rarr; <%= selectedDate %></button>
+    <input type="date" name="from_date" value="<%= prevStr %>" class="bg-white border border-gray-300 text-gray-900 text-xs rounded-lg px-2 py-1.5">
+    <button type="submit" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors border border-gray-300">Copy From &rarr; <%= selectedDate %></button>
   </form>
   <form method="POST" action="/allocations/confirm-all">
     <input type="hidden" name="allocation_date" value="<%= selectedDate %>">
@@ -96,169 +105,336 @@
   </form>
 </div>
 
-<!-- Booking Board -->
-<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
-  <table class="w-full text-sm">
-    <thead>
-      <tr class="border-b border-slate-700">
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase w-28">Job</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Client / Suburb</th>
-        <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase w-16">Need</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Allocated Crew</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase w-40">Equipment</th>
-        <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase w-16">Add</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-slate-700">
-      <% jobs.forEach(function(job) {
-        const jobAllocs = allocByJob[job.id] || [];
-        const jobEquip = equipByJob[job.id] || [];
-        const allocated = jobAllocs.length;
-        const needed = job.crew_size || 0;
-        const gap = Math.max(0, needed - allocated);
-        const hasGap = needed > 0 && gap > 0;
+<!-- TWO-PANEL BOOKING BOARD -->
+<div class="flex gap-4" style="min-height: 600px;">
+
+  <!-- CREW PANEL (left sidebar) -->
+  <div class="w-72 flex-shrink-0 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+    <div class="p-3 border-b border-gray-200">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Crew Panel</p>
+      <input type="text" id="crew-search" placeholder="Search crew..."
+        class="w-full px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 mb-2">
+      <div class="flex gap-1">
+        <button onclick="filterCrewPanel('all')" class="crew-filter-btn px-2 py-1 text-[10px] font-medium rounded bg-brand-600 text-white" data-filter="all">All</button>
+        <button onclick="filterCrewPanel('clear')" class="crew-filter-btn px-2 py-1 text-[10px] font-medium rounded bg-white text-gray-600" data-filter="clear">Clear</button>
+        <button onclick="filterCrewPanel('blocked')" class="crew-filter-btn px-2 py-1 text-[10px] font-medium rounded bg-white text-gray-600" data-filter="blocked">Blocked</button>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto p-2 space-y-1" id="crew-panel">
+      <%
+        // Sort: allocatable first, then blocked
+        const sortedCrew = [...crewMembers].sort((a, b) => {
+          if (a.compliance.canAllocate && !b.compliance.canAllocate) return -1;
+          if (!a.compliance.canAllocate && b.compliance.canAllocate) return 1;
+          return a.full_name.localeCompare(b.full_name);
+        });
       %>
-      <tr class="hover:bg-slate-700/30 <%= hasGap ? 'border-l-2 border-l-red-500' : '' %>" id="job-row-<%= job.id %>">
-        <td class="px-4 py-3">
-          <a href="/jobs/<%= job.id %>" class="text-blue-400 hover:text-blue-300 font-medium text-xs"><%= job.job_number %></a>
-          <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium
-            <% if (job.status === 'active') { %>bg-blue-900/60 text-blue-300
-            <% } else if (job.status === 'on_hold') { %>bg-orange-900/60 text-orange-300
-            <% } else { %>bg-teal-900/60 text-teal-300<% } %>"><%= job.status %></span>
-        </td>
-        <td class="px-4 py-3 text-slate-300 text-xs"><%= job.client %> <span class="text-slate-500">/ <%= job.suburb %></span></td>
-        <td class="px-4 py-3 text-center">
-          <% if (needed > 0) { %>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold
-              <%= gap === 0 ? 'bg-emerald-900/60 text-emerald-300' : 'bg-red-900/60 text-red-300' %>"><%= allocated %>/<%= needed %></span>
-          <% } else { %>
-            <span class="text-slate-500 text-xs">&mdash;</span>
-          <% } %>
-        </td>
-        <td class="px-4 py-3">
-          <div class="flex flex-wrap gap-1">
-            <% jobAllocs.forEach(function(a) {
-              const abbr = roleAbbr[a.role] || '';
-              const isExpired = (a.tc_ticket_expiry && a.tc_ticket_expiry < selectedDate) ||
-                                (a.ti_ticket_expiry && a.ti_ticket_expiry < selectedDate) ||
-                                (a.white_card_expiry && a.white_card_expiry < selectedDate);
-            %>
-              <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium
-                <% if (a.status === 'confirmed') { %>bg-emerald-900/60 text-emerald-300 border border-emerald-700/50
-                <% } else if (a.status === 'declined') { %>bg-red-900/60 text-red-300 border border-red-700/50
-                <% } else { %>bg-orange-900/60 text-orange-300 border border-orange-700/50<% } %>"
-                title="<%= a.full_name %> | <%= a.start_time %>-<%= a.end_time %> | <%= a.shift_type %><%= a.role_on_site ? ' | ' + a.role_on_site : '' %>">
-                <%= a.full_name.split(' ')[0] %> <span class="opacity-60"><%= abbr %></span>
-                <% if (a.status === 'confirmed') { %><span class="text-emerald-400">&#10003;</span><% } %>
-                <% if (a.status === 'allocated') { %><span class="text-orange-400">&#9711;</span><% } %>
-                <% if (isExpired) { %><span class="text-yellow-400" title="Ticket expired">&#9888;</span><% } %>
-              </span>
-            <% }); %>
-            <% if (gap > 0) { %>
-              <span class="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-medium bg-red-900/40 text-red-400 border border-red-700/30">+<%= gap %> needed</span>
+      <% for (const cm of sortedCrew) { %>
+        <div class="crew-card px-2 py-1.5 rounded-lg border cursor-grab select-none
+          <%= cm.compliance.canAllocate ? 'bg-gray-50 border-gray-200 hover:border-brand-500 hover:bg-gray-50' : 'bg-gray-50/30 border-gray-200/50 opacity-50' %>"
+          draggable="<%= cm.compliance.canAllocate ? 'true' : 'false' %>"
+          data-crew-id="<%= cm.id %>"
+          data-crew-name="<%= cm.full_name %>"
+          data-crew-role="<%= cm.role %>"
+          data-crew-tcp="<%= cm.tcp_level || '' %>"
+          data-can-allocate="<%= cm.compliance.canAllocate %>"
+          data-search-text="<%= cm.full_name.toLowerCase() %> <%= (cm.role || '').toLowerCase() %> <%= (cm.tcp_level || '').toLowerCase() %>">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-xs font-medium text-gray-900 truncate"><%= cm.full_name %></span>
+            </div>
+            <% if (cm.allocatedToday > 0) { %>
+              <span class="flex-shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-brand-600 text-[9px] text-white font-bold"><%= cm.allocatedToday %></span>
             <% } %>
           </div>
-          <!-- Inline confirm/cancel for each allocation (expandable) -->
-          <div id="alloc-detail-<%= job.id %>" class="hidden mt-2 space-y-1">
-            <% jobAllocs.forEach(function(a) { %>
-              <div class="flex items-center gap-2 text-xs text-slate-400">
-                <span class="text-white font-medium w-32 truncate"><%= a.full_name %></span>
-                <span><%= a.start_time %>-<%= a.end_time %></span>
-                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium
-                  <% if (a.shift_type === 'night') { %>bg-indigo-900/60 text-indigo-300
-                  <% } else if (a.shift_type === 'split') { %>bg-purple-900/60 text-purple-300
-                  <% } else { %>bg-slate-700 text-slate-300<% } %>"><%= a.shift_type %></span>
-                <% if (a.status === 'allocated') { %>
-                  <form method="POST" action="/allocations/<%= a.id %>/confirm?date=<%= selectedDate %>" class="inline">
-                    <button class="px-1.5 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] rounded transition-colors">Confirm</button>
-                  </form>
-                <% } %>
-                <form method="POST" action="/allocations/<%= a.id %>/cancel?date=<%= selectedDate %>" class="inline">
-                  <button class="px-1.5 py-0.5 bg-red-700 hover:bg-red-600 text-white text-[10px] rounded transition-colors">Cancel</button>
-                </form>
-                <form method="POST" action="/allocations/<%= a.id %>/delete?date=<%= selectedDate %>" class="inline">
-                  <button class="px-1.5 py-0.5 bg-slate-600 hover:bg-slate-500 text-white text-[10px] rounded transition-colors">Delete</button>
-                </form>
-              </div>
-            <% }); %>
-          </div>
-        </td>
-        <td class="px-4 py-3">
-          <div class="flex flex-wrap gap-1">
-            <% jobEquip.forEach(function(eq) { %>
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-700 text-slate-300" title="<%= eq.asset_number %> - <%= eq.equipment_name %>">
-                <%= eq.equipment_name %>
-              </span>
-            <% }); %>
-            <% if (jobEquip.length === 0) { %>
-              <span class="text-slate-500 text-xs">&mdash;</span>
+          <div class="flex items-center gap-1 mt-0.5">
+            <span class="text-[10px] text-gray-500"><%= roleAbbr[cm.role] || cm.role %></span>
+            <% if (cm.tcp_level) { %>
+              <span class="text-[10px] text-gray-400"><%= cm.tcp_level %></span>
             <% } %>
+            <span class="ml-auto flex gap-0.5">
+              <% if (cm.compliance.canAllocate) { %>
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Allocatable"></span>
+              <% } else { %>
+                <span class="w-1.5 h-1.5 rounded-full bg-red-400" title="Blocked"></span>
+              <% } %>
+              <% if (cm.compliance.fatigueBlocked) { %>
+                <span class="w-1.5 h-1.5 rounded-full bg-orange-400" title="Fatigue (<%= cm.compliance.daysWorked %>/7)"></span>
+              <% } %>
+              <% if (!cm.compliance.allTicketsValid) { %>
+                <span class="w-1.5 h-1.5 rounded-full bg-red-400" title="Expired tickets"></span>
+              <% } %>
+            </span>
           </div>
-        </td>
-        <td class="px-4 py-3 text-center">
-          <button onclick="toggleForm(<%= job.id %>)" class="p-1 bg-brand-700 hover:bg-brand-600 text-white rounded-lg transition-colors" title="Add crew">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/></svg>
-          </button>
-          <% if (jobAllocs.length > 0) { %>
-          <button onclick="toggleDetail(<%= job.id %>)" class="p-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors mt-1" title="Manage allocations">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-          </button>
-          <% } %>
-        </td>
-      </tr>
-      <!-- Inline Allocation Form (hidden by default) -->
-      <tr id="form-row-<%= job.id %>" class="hidden bg-slate-900/50">
-        <td colspan="6" class="px-4 py-3">
-          <form method="POST" action="/allocations" class="flex items-end gap-3 flex-wrap">
-            <input type="hidden" name="job_id" value="<%= job.id %>">
-            <input type="hidden" name="allocation_date" value="<%= selectedDate %>">
-            <div>
-              <label class="block text-[10px] text-slate-400 mb-1">Crew Member</label>
-              <select name="crew_member_id" required class="bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5 w-48">
-                <option value="">Select...</option>
-                <% crewMembers.forEach(function(cm) { %>
-                  <option value="<%= cm.id %>"><%= cm.full_name %> (<%= (roleAbbr[cm.role] || cm.role) %><%= cm.tcp_level ? ' ' + cm.tcp_level : '' %>)</option>
+        </div>
+      <% } %>
+      <% if (crewMembers.length === 0) { %>
+        <p class="text-xs text-gray-400 text-center py-4">No active crew</p>
+      <% } %>
+    </div>
+    <div class="p-2 border-t border-gray-200 text-[10px] text-gray-400 text-center">
+      <%= crewMembers.filter(c => c.compliance.canAllocate).length %>/<%= crewMembers.length %> allocatable
+    </div>
+  </div>
+
+  <!-- JOB BOARD (main area) -->
+  <div class="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="overflow-x-auto overflow-y-auto" style="max-height: 700px;">
+      <table class="w-full text-sm">
+        <thead class="sticky top-0 bg-white z-10">
+          <tr class="border-b border-gray-200">
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-28">Job</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client / Suburb</th>
+            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-16">Need</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Allocated Crew</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-36">Equipment</th>
+            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-16">Add</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <% jobs.forEach(function(job) {
+            const jobAllocs = allocByJob[job.id] || [];
+            const jobEquip = equipByJob[job.id] || [];
+            const allocated = jobAllocs.length;
+            const needed = job.crew_size || 0;
+            const gap = Math.max(0, needed - allocated);
+            const hasGap = needed > 0 && gap > 0;
+          %>
+          <tr class="hover:bg-white/30 <%= hasGap ? 'border-l-2 border-l-red-500' : '' %> drop-zone"
+              id="job-row-<%= job.id %>"
+              data-job-id="<%= job.id %>"
+              data-required-tcp="<%= job.required_tcp_level || '' %>">
+            <td class="px-4 py-3">
+              <a href="/projects/<%= job.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-xs"><%= job.job_number %></a>
+              <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium
+                <% if (job.status === 'active') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
+                <% } else if (job.status === 'on_hold') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
+                <% } else { %>bg-teal-50 text-teal-700 ring-1 ring-teal-600/20<% } %>"><%= job.status %></span>
+              <% if (job.required_tcp_level) { %>
+                <span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20 ml-1"><%= job.required_tcp_level %></span>
+              <% } %>
+            </td>
+            <td class="px-4 py-3 text-gray-600 text-xs"><%= job.client %> <span class="text-gray-400">/ <%= job.suburb %></span></td>
+            <td class="px-4 py-3 text-center">
+              <% if (needed > 0) { %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold
+                  <%= gap === 0 ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : 'bg-red-50 text-red-700 ring-1 ring-red-600/20' %>" id="count-<%= job.id %>"><%= allocated %>/<%= needed %></span>
+              <% } else { %>
+                <span class="text-gray-400 text-xs">&mdash;</span>
+              <% } %>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1 min-h-[28px] drop-target rounded-lg p-0.5 transition-colors" data-job-id="<%= job.id %>">
+                <% jobAllocs.forEach(function(a) {
+                  const abbr = roleAbbr[a.role] || '';
+                  const isExpired = (a.tc_ticket_expiry && a.tc_ticket_expiry < selectedDate) ||
+                                    (a.ti_ticket_expiry && a.ti_ticket_expiry < selectedDate) ||
+                                    (a.white_card_expiry && a.white_card_expiry < selectedDate);
+                  const tcpMismatch = job.required_tcp_level && a.tcp_level &&
+                                      (tcpLevels[a.tcp_level] || 0) < (tcpLevels[job.required_tcp_level] || 0);
+                %>
+                  <span class="alloc-chip inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium cursor-grab
+                    <% if (a.status === 'confirmed') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20 border border-emerald-300
+                    <% } else if (a.status === 'declined') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20 border border-red-300
+                    <% } else { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20 border border-orange-300/50<% } %>"
+                    draggable="true"
+                    data-alloc-id="<%= a.id %>"
+                    data-crew-id="<%= a.crew_member_id %>"
+                    title="<%= a.full_name %> | <%= a.start_time %>-<%= a.end_time %> | <%= a.shift_type %><%= a.role_on_site ? ' | ' + a.role_on_site : '' %>">
+                    <%= a.full_name.split(' ')[0] %> <span class="opacity-60"><%= abbr %></span>
+                    <span class="px-0.5 py-0 rounded text-[9px]
+                      <%= a.shift_type === 'night' ? 'bg-indigo-800 text-indigo-200' : a.shift_type === 'split' ? 'bg-purple-800 text-purple-200' : '' %>">
+                      <% if (a.shift_type !== 'day') { %><%= a.shift_type[0].toUpperCase() %><% } %>
+                    </span>
+                    <% if (a.status === 'confirmed') { %><span class="text-emerald-600">&#10003;</span><% } %>
+                    <% if (isExpired) { %><span class="text-yellow-400" title="Ticket expired">&#9888;</span><% } %>
+                    <% if (tcpMismatch) { %><span class="text-orange-600" title="TCP level below requirement">&#9650;</span><% } %>
+                  </span>
                 <% }); %>
-              </select>
-            </div>
-            <div>
-              <label class="block text-[10px] text-slate-400 mb-1">Start</label>
-              <input type="time" name="start_time" value="06:00" class="bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5 w-24">
-            </div>
-            <div>
-              <label class="block text-[10px] text-slate-400 mb-1">End</label>
-              <input type="time" name="end_time" value="14:30" class="bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5 w-24">
-            </div>
-            <div>
-              <label class="block text-[10px] text-slate-400 mb-1">Shift</label>
-              <select name="shift_type" class="bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5">
-                <option value="day">Day</option>
-                <option value="night">Night</option>
-                <option value="split">Split</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-[10px] text-slate-400 mb-1">Role on Site</label>
-              <input type="text" name="role_on_site" placeholder="e.g. TC, Spotter" class="bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5 w-28">
-            </div>
-            <div>
-              <label class="block text-[10px] text-slate-400 mb-1">Notes</label>
-              <input type="text" name="notes" placeholder="Optional" class="bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5 w-28">
-            </div>
-            <button type="submit" class="px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition-colors">Add</button>
-            <button type="button" onclick="toggleForm(<%= job.id %>)" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg transition-colors">Cancel</button>
-          </form>
-        </td>
-      </tr>
-      <% }); %>
-    </tbody>
-  </table>
-  <% if (jobs.length === 0) { %>
-    <div class="p-8 text-center text-slate-500">No active jobs found.</div>
-  <% } %>
+                <% if (gap > 0) { %>
+                  <span class="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-medium bg-red-50 text-red-600 border border-red-200">+<%= gap %> needed</span>
+                <% } %>
+                <% if (jobAllocs.length === 0 && needed > 0) { %>
+                  <span class="text-xs text-gray-400 italic">Drop crew here</span>
+                <% } %>
+              </div>
+              <!-- Expandable detail/actions -->
+              <div id="alloc-detail-<%= job.id %>" class="hidden mt-2 space-y-1">
+                <% jobAllocs.forEach(function(a) { %>
+                  <div class="flex items-center gap-2 text-xs text-gray-500">
+                    <span class="text-gray-900 font-medium w-32 truncate"><%= a.full_name %></span>
+                    <span><%= a.start_time %>-<%= a.end_time %></span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-medium
+                      <% if (a.shift_type === 'night') { %>bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20
+                      <% } else if (a.shift_type === 'split') { %>bg-purple-50 text-purple-700 ring-1 ring-purple-600/20
+                      <% } else { %>bg-white text-gray-600<% } %>"><%= a.shift_type %></span>
+                    <% if (a.status === 'allocated') { %>
+                      <form method="POST" action="/allocations/<%= a.id %>/confirm?date=<%= selectedDate %>" class="inline">
+                        <button class="px-1.5 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] rounded transition-colors">Confirm</button>
+                      </form>
+                    <% } %>
+                    <form method="POST" action="/allocations/<%= a.id %>/cancel?date=<%= selectedDate %>" class="inline">
+                      <button class="px-1.5 py-0.5 bg-red-700 hover:bg-red-600 text-white text-[10px] rounded transition-colors">Cancel</button>
+                    </form>
+                    <form method="POST" action="/allocations/<%= a.id %>/delete?date=<%= selectedDate %>" class="inline">
+                      <button class="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-300 text-gray-700 text-[10px] rounded transition-colors">Del</button>
+                    </form>
+                  </div>
+                <% }); %>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <% jobEquip.forEach(function(eq) { %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-white text-gray-600" title="<%= eq.asset_number %> - <%= eq.equipment_name %>">
+                    <%= eq.equipment_name %>
+                  </span>
+                <% }); %>
+                <% if (jobEquip.length === 0) { %>
+                  <span class="text-gray-400 text-xs">&mdash;</span>
+                <% } %>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-center">
+              <button onclick="toggleForm(<%= job.id %>)" class="p-1 bg-brand-700 hover:bg-brand-600 text-white rounded-lg transition-colors" title="Add crew (form)">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/></svg>
+              </button>
+              <% if (jobAllocs.length > 0) { %>
+              <button onclick="toggleDetail(<%= job.id %>)" class="p-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors mt-1" title="Manage allocations">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+              <% } %>
+            </td>
+          </tr>
+          <!-- Inline Allocation Form -->
+          <tr id="form-row-<%= job.id %>" class="hidden bg-gray-50">
+            <td colspan="6" class="px-4 py-3">
+              <form method="POST" action="/allocations" class="flex items-end gap-3 flex-wrap">
+                <input type="hidden" name="job_id" value="<%= job.id %>">
+                <input type="hidden" name="allocation_date" value="<%= selectedDate %>">
+                <div>
+                  <label class="block text-[10px] text-gray-500 mb-1">Crew Member</label>
+                  <select name="crew_member_id" required class="bg-white border border-gray-300 text-gray-900 text-xs rounded-lg px-2 py-1.5 w-48">
+                    <option value="">Select...</option>
+                    <% crewMembers.forEach(function(cm) { %>
+                      <option value="<%= cm.id %>" <%= !cm.compliance.canAllocate ? 'class="text-red-600"' : '' %>>
+                        <%= cm.full_name %> (<%= (roleAbbr[cm.role] || cm.role) %><%= cm.tcp_level ? ' ' + cm.tcp_level : '' %>)<%= !cm.compliance.canAllocate ? ' [BLOCKED]' : '' %>
+                      </option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] text-gray-500 mb-1">Start</label>
+                  <input type="time" name="start_time" value="06:00" class="bg-white border border-gray-300 text-gray-900 text-xs rounded-lg px-2 py-1.5 w-24">
+                </div>
+                <div>
+                  <label class="block text-[10px] text-gray-500 mb-1">End</label>
+                  <input type="time" name="end_time" value="14:30" class="bg-white border border-gray-300 text-gray-900 text-xs rounded-lg px-2 py-1.5 w-24">
+                </div>
+                <div>
+                  <label class="block text-[10px] text-gray-500 mb-1">Shift</label>
+                  <select name="shift_type" class="bg-white border border-gray-300 text-gray-900 text-xs rounded-lg px-2 py-1.5">
+                    <% (settingsOptions.shift_type || []).forEach(opt => { %>
+                      <option value="<%= opt.key %>"><%= opt.label %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] text-gray-500 mb-1">Role</label>
+                  <input type="text" name="role_on_site" placeholder="TC, Spotter" class="bg-white border border-gray-300 text-gray-900 text-xs rounded-lg px-2 py-1.5 w-24">
+                </div>
+                <button type="submit" class="px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition-colors">Add</button>
+                <button type="button" onclick="toggleForm(<%= job.id %>)" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-900 text-xs rounded-lg transition-colors">Cancel</button>
+              </form>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+      <% if (jobs.length === 0) { %>
+        <div class="p-8 text-center text-gray-400">No active jobs found.</div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- EQUIPMENT PANEL (right sidebar) -->
+  <div class="w-64 flex-shrink-0 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+    <div class="p-3 border-b border-gray-200">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Equipment</p>
+      <input type="text" id="equip-search" placeholder="Search equipment..."
+        class="w-full px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 mb-2">
+      <div class="flex gap-1 flex-wrap">
+        <button onclick="filterEquipPanel('all')" class="equip-filter-btn px-2 py-1 text-[10px] font-medium rounded bg-brand-600 text-white" data-filter="all">All</button>
+        <button onclick="filterEquipPanel('available')" class="equip-filter-btn px-2 py-1 text-[10px] font-medium rounded bg-white text-gray-600" data-filter="available">Free</button>
+        <button onclick="filterEquipPanel('assigned')" class="equip-filter-btn px-2 py-1 text-[10px] font-medium rounded bg-white text-gray-600" data-filter="assigned">Assigned</button>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto p-2 space-y-1" id="equip-panel">
+      <% (typeof equipmentList !== 'undefined' ? equipmentList : []).forEach(eq => {
+        const isAvailable = (eq.assigned_count || 0) === 0;
+      %>
+        <div class="equip-card px-2 py-1.5 rounded-lg border cursor-grab select-none
+          <%= isAvailable ? 'bg-gray-50 border-gray-200 hover:border-brand-500' : 'bg-amber-50/50 border-amber-200/50' %>"
+          draggable="true"
+          data-equip-id="<%= eq.id %>"
+          data-equip-name="<%= eq.name %>"
+          data-equip-available="<%= isAvailable %>"
+          data-search-text="<%= eq.name.toLowerCase() %> <%= (eq.asset_number || '').toLowerCase() %> <%= (eq.category || '').toLowerCase() %>">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-gray-900 truncate"><%= eq.name %></span>
+            <% if (!isAvailable) { %>
+              <span class="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Assigned"></span>
+            <% } else { %>
+              <span class="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-400" title="Available"></span>
+            <% } %>
+          </div>
+          <div class="flex items-center gap-1 mt-0.5">
+            <span class="text-[10px] text-gray-500"><%= eq.asset_number || '' %></span>
+            <span class="text-[10px] text-gray-400 ml-auto"><%= eq.category || '' %></span>
+          </div>
+        </div>
+      <% }) %>
+      <% if (typeof equipmentList === 'undefined' || equipmentList.length === 0) { %>
+        <p class="text-xs text-gray-400 text-center py-4">No equipment</p>
+      <% } %>
+    </div>
+    <div class="p-2 border-t border-gray-200 text-[10px] text-gray-400 text-center">
+      <% const freeCount = (typeof equipmentList !== 'undefined' ? equipmentList : []).filter(e => (e.assigned_count || 0) === 0).length; %>
+      <%= freeCount %>/<%= (typeof equipmentList !== 'undefined' ? equipmentList : []).length %> available
+    </div>
+  </div>
+
+</div><!-- end three-panel -->
+
+<!-- Override Modal -->
+<div id="block-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 max-w-md w-full mx-4">
+    <h3 class="text-lg font-bold text-gray-900 mb-3">Allocation Blocked</h3>
+    <div id="block-reasons" class="space-y-1 mb-3"></div>
+    <div id="block-warnings" class="space-y-1 mb-4"></div>
+    <div class="flex gap-3">
+      <% if (canOverride) { %>
+        <button id="override-btn" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg transition-colors">
+          Override & Allocate
+        </button>
+      <% } else { %>
+        <p class="text-xs text-gray-500">Only Management or Operations can override blocks.</p>
+      <% } %>
+      <button id="cancel-block-btn" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+        Cancel
+      </button>
+    </div>
+  </div>
 </div>
 
-<% } else { %>
+<!-- Toast notification -->
+<div id="toast" class="hidden fixed bottom-6 right-6 z-50 max-w-sm">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-3 shadow-xl">
+    <p id="toast-msg" class="text-sm text-white"></p>
+  </div>
+</div>
+
+<% } else if (view === 'week') { %>
 
 <!-- WEEK VIEW -->
 <%
@@ -266,48 +442,48 @@
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 %>
 
-<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
   <table class="w-full text-sm">
     <thead>
-      <tr class="border-b border-slate-700">
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase w-40">Job</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Client</th>
-        <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase w-12">Need</th>
+      <tr class="border-b border-gray-200">
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-40">Job</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
+        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-12">Need</th>
         <% weekDays.forEach(function(d, i) {
           const isToday = d === today;
         %>
-          <th class="px-2 py-3 text-center text-xs font-medium uppercase w-16 <%= isToday ? 'text-brand-400 bg-brand-900/20' : 'text-slate-400' %>">
+          <th class="px-2 py-3 text-center text-xs font-medium uppercase w-16 <%= isToday ? 'text-brand-600 bg-brand-50' : 'text-gray-500' %>">
             <div><%= dayNames[i] %></div>
             <div class="text-[10px] font-normal"><%= d.substring(5) %></div>
           </th>
         <% }); %>
       </tr>
     </thead>
-    <tbody class="divide-y divide-slate-700">
+    <tbody class="divide-y divide-gray-200">
       <% jobs.forEach(function(job) {
         const jobMap = allocMap[job.id] || {};
         const needed = job.crew_size || 0;
       %>
-      <tr class="hover:bg-slate-700/30">
+      <tr class="hover:bg-white/30">
         <td class="px-4 py-2">
-          <a href="/jobs/<%= job.id %>" class="text-blue-400 hover:text-blue-300 font-medium text-xs"><%= job.job_number %></a>
+          <a href="/projects/<%= job.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-xs"><%= job.job_number %></a>
         </td>
-        <td class="px-4 py-2 text-slate-300 text-xs"><%= job.client %></td>
-        <td class="px-4 py-2 text-center text-xs text-slate-400"><% if (needed > 0) { %><%= needed %><% } else { %>&mdash;<% } %></td>
+        <td class="px-4 py-2 text-gray-600 text-xs"><%= job.client %></td>
+        <td class="px-4 py-2 text-center text-xs text-gray-500"><% if (needed > 0) { %><%= needed %><% } else { %>&mdash;<% } %></td>
         <% weekDays.forEach(function(d) {
           const cnt = jobMap[d] || 0;
           const isToday = d === today;
           const inRange = (!job.start_date || d >= job.start_date) && (!job.end_date || d <= job.end_date);
-          let cellClass = 'text-slate-500';
+          let cellClass = 'text-gray-400';
           if (inRange && needed > 0) {
-            if (cnt >= needed) cellClass = 'text-emerald-400 font-bold';
-            else if (cnt > 0) cellClass = 'text-orange-400 font-bold';
-            else cellClass = 'text-red-400';
+            if (cnt >= needed) cellClass = 'text-emerald-600 font-bold';
+            else if (cnt > 0) cellClass = 'text-orange-600 font-bold';
+            else cellClass = 'text-red-600';
           }
         %>
-          <td class="px-2 py-2 text-center text-xs <%= isToday ? 'bg-brand-900/20' : '' %>">
+          <td class="px-2 py-2 text-center text-xs <%= isToday ? 'bg-brand-50' : '' %>">
             <% if (!inRange) { %>
-              <span class="text-slate-600">&mdash;</span>
+              <span class="text-gray-400">&mdash;</span>
             <% } else { %>
               <a href="/allocations?view=day&date=<%= d %>" class="<%= cellClass %> hover:underline">
                 <% if (needed > 0) { %><%= cnt %>/<%= needed %><% } else if (cnt > 0) { %><%= cnt %><% } else { %>&mdash;<% } %>
@@ -320,20 +496,468 @@
     </tbody>
   </table>
   <% if (jobs.length === 0) { %>
-    <div class="p-8 text-center text-slate-500">No active jobs found.</div>
+    <div class="p-8 text-center text-gray-400">No active jobs found.</div>
   <% } %>
+</div>
+
+<% } else if (view === 'month') { %>
+
+<!-- MONTH VIEW — Calendar Grid -->
+<%
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const mLabel = monthNames[month] + ' ' + year;
+
+  // Navigate to prev/next month
+  const prevMonth = new Date(year, month - 1, 1);
+  const nextMonth = new Date(year, month + 1, 1);
+  const prevMonthStr = prevMonth.toISOString().split('T')[0];
+  const nextMonthStr = nextMonth.toISOString().split('T')[0];
+
+  // Build calendar grid: find first Monday on or before the 1st
+  const firstDow = firstDay.getDay(); // 0=Sun
+  const gridStart = new Date(firstDay);
+  const offset = firstDow === 0 ? -6 : 1 - firstDow;
+  gridStart.setDate(gridStart.getDate() + offset);
+
+  // Build 6 weeks of dates
+  const calWeeks = [];
+  const cursor = new Date(gridStart);
+  for (let w = 0; w < 6; w++) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      week.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    calWeeks.push(week);
+  }
+%>
+
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+  <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+    <a href="/allocations?view=month&date=<%= prevMonthStr %>" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors">&larr; <%= monthNames[prevMonth.getMonth()] %></a>
+    <h2 class="text-lg font-bold text-gray-900"><%= mLabel %></h2>
+    <a href="/allocations?view=month&date=<%= nextMonthStr %>" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors"><%= monthNames[nextMonth.getMonth()] %> &rarr;</a>
+  </div>
+  <table class="w-full">
+    <thead>
+      <tr class="border-b border-gray-200">
+        <% ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(dn => { %>
+          <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase w-[14.28%]"><%= dn %></th>
+        <% }) %>
+      </tr>
+    </thead>
+    <tbody>
+      <% calWeeks.forEach(week => { %>
+        <tr class="border-b border-gray-100">
+          <% week.forEach(cellDate => {
+            const cellStr = cellDate.toISOString().split('T')[0];
+            const isCurrentMonth = cellDate.getMonth() === month;
+            const isToday = cellStr === today;
+            const dc = typeof dayCountMap !== 'undefined' ? (dayCountMap[cellStr] || null) : null;
+          %>
+            <td class="p-1 align-top h-24 <%= !isCurrentMonth ? 'bg-gray-50' : '' %> <%= isToday ? 'ring-2 ring-inset ring-brand-500' : '' %>">
+              <a href="/allocations?view=day&date=<%= cellStr %>" class="block h-full rounded-lg p-2 hover:bg-brand-50 transition-colors">
+                <div class="text-xs font-semibold <%= isCurrentMonth ? (isToday ? 'text-brand-600' : 'text-gray-900') : 'text-gray-400' %>"><%= cellDate.getDate() %></div>
+                <% if (dc) { %>
+                  <div class="mt-1 space-y-0.5">
+                    <div class="text-[10px] text-brand-600 font-medium"><%= dc.jobs %> shift<%= dc.jobs !== 1 ? 's' : '' %></div>
+                    <div class="text-[10px] text-gray-500"><%= dc.crew %> crew</div>
+                  </div>
+                <% } %>
+              </a>
+            </td>
+          <% }) %>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
 </div>
 
 <% } %>
 
+<!-- Quick-Create Shift Modal -->
+<div id="create-shift-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-900">New Shift</h3>
+      <button onclick="document.getElementById('create-shift-modal').classList.add('hidden')" class="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form method="POST" action="/allocations/create-shift" class="space-y-4">
+      <!-- Client -->
+      <div>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Client <span class="text-red-500">*</span></label>
+        <select name="client_id" required id="shift-client-select"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          onchange="filterProjectsByClient(this.value)">
+          <option value="">-- Select Client --</option>
+          <% (typeof clients !== 'undefined' ? clients : []).forEach(c => { %>
+            <option value="<%= c.id %>"><%= c.company_name %></option>
+          <% }) %>
+        </select>
+        <a href="/clients/new" target="_blank" class="text-[10px] text-brand-600 hover:underline mt-1 inline-block">+ Add new client</a>
+      </div>
+      <!-- Project (optional) -->
+      <div>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Link to Project <span class="text-gray-400">(optional)</span></label>
+        <select name="parent_project_id" id="shift-project-select"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- None (standalone shift) --</option>
+          <% (typeof projects !== 'undefined' ? projects : []).forEach(p => { %>
+            <option value="<%= p.id %>" data-client="<%= p.client %>"><%= p.job_number %> — <%= p.client %></option>
+          <% }) %>
+        </select>
+      </div>
+      <!-- Date -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date <span class="text-red-500">*</span></label>
+          <input type="date" name="shift_date" value="<%= selectedDate %>" required
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Suburb</label>
+          <input type="text" name="suburb" placeholder="e.g. Parramatta"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        </div>
+      </div>
+      <!-- Site Address -->
+      <div>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Site Address</label>
+        <input type="text" name="site_address" placeholder="Full street address"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <!-- Crew requirements -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Crew Size Needed</label>
+          <input type="number" name="crew_size" min="0" max="50" value="2"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Required TCP Level</label>
+          <select name="required_tcp_level"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+            <option value="">Any</option>
+            <option value="TCP1">TCP1</option>
+            <option value="TCP2">TCP2</option>
+            <option value="TCP3">TCP3</option>
+          </select>
+        </div>
+      </div>
+      <!-- Notes -->
+      <div>
+        <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Notes</label>
+        <textarea name="notes" rows="2" placeholder="Special instructions, PPE requirements..."
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"></textarea>
+      </div>
+      <!-- Actions -->
+      <div class="flex justify-end gap-3 pt-2 border-t border-gray-200">
+        <button type="button" onclick="document.getElementById('create-shift-modal').classList.add('hidden')"
+          class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+        <button type="submit"
+          class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Create Shift</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
+// ============================================================
+// Drag-and-Drop + UI helpers
+// ============================================================
+const ALLOC_DATE = '<%= selectedDate %>';
+let pendingDrop = null; // stores context for override modal
+
 function toggleForm(jobId) {
-  const row = document.getElementById('form-row-' + jobId);
-  row.classList.toggle('hidden');
+  document.getElementById('form-row-' + jobId).classList.toggle('hidden');
+}
+function toggleDetail(jobId) {
+  document.getElementById('alloc-detail-' + jobId).classList.toggle('hidden');
 }
 
-function toggleDetail(jobId) {
-  const detail = document.getElementById('alloc-detail-' + jobId);
-  detail.classList.toggle('hidden');
+// Crew panel search
+document.getElementById('crew-search')?.addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.crew-card').forEach(card => {
+    card.style.display = card.dataset.searchText.includes(q) ? '' : 'none';
+  });
+});
+
+// Crew panel filter buttons
+function filterCrewPanel(filter) {
+  document.querySelectorAll('.crew-filter-btn').forEach(btn => {
+    btn.className = btn.dataset.filter === filter
+      ? 'crew-filter-btn px-2 py-1 text-[10px] font-medium rounded bg-brand-600 text-white'
+      : 'crew-filter-btn px-2 py-1 text-[10px] font-medium rounded bg-white text-gray-600';
+  });
+  document.querySelectorAll('.crew-card').forEach(card => {
+    if (filter === 'all') card.style.display = '';
+    else if (filter === 'clear') card.style.display = card.dataset.canAllocate === 'true' ? '' : 'none';
+    else if (filter === 'blocked') card.style.display = card.dataset.canAllocate === 'false' ? '' : 'none';
+  });
+}
+
+function showToast(msg, duration) {
+  const toast = document.getElementById('toast');
+  const msgEl = document.getElementById('toast-msg');
+  msgEl.textContent = msg;
+  toast.classList.remove('hidden');
+  setTimeout(() => toast.classList.add('hidden'), duration || 3000);
+}
+
+// Drag from crew panel
+document.querySelectorAll('.crew-card[draggable="true"]').forEach(card => {
+  card.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', JSON.stringify({
+      type: 'crew',
+      crew_id: card.dataset.crewId,
+      crew_name: card.dataset.crewName,
+    }));
+    e.dataTransfer.effectAllowed = 'copy';
+    card.classList.add('opacity-50');
+  });
+  card.addEventListener('dragend', e => {
+    card.classList.remove('opacity-50');
+    // Remove all highlights
+    document.querySelectorAll('.drop-target').forEach(dt => dt.classList.remove('ring-2', 'ring-brand-500', 'bg-brand-50'));
+  });
+});
+
+// Drag allocated chips between jobs
+document.querySelectorAll('.alloc-chip[draggable="true"]').forEach(chip => {
+  chip.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', JSON.stringify({
+      type: 'move',
+      alloc_id: chip.dataset.allocId,
+      crew_id: chip.dataset.crewId,
+    }));
+    e.dataTransfer.effectAllowed = 'move';
+    chip.classList.add('opacity-50');
+    e.stopPropagation();
+  });
+  chip.addEventListener('dragend', e => {
+    chip.classList.remove('opacity-50');
+    document.querySelectorAll('.drop-target').forEach(dt => dt.classList.remove('ring-2', 'ring-brand-500', 'bg-brand-50'));
+  });
+});
+
+// Drop targets (the flex container in each job's allocated crew cell)
+document.querySelectorAll('.drop-target').forEach(target => {
+  target.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    target.classList.add('ring-2', 'ring-brand-500', 'bg-brand-50');
+  });
+  target.addEventListener('dragleave', e => {
+    target.classList.remove('ring-2', 'ring-brand-500', 'bg-brand-50');
+  });
+  target.addEventListener('drop', async e => {
+    e.preventDefault();
+    target.classList.remove('ring-2', 'ring-brand-500', 'bg-brand-50');
+
+    let data;
+    try { data = JSON.parse(e.dataTransfer.getData('text/plain')); } catch(err) { return; }
+
+    const jobId = target.dataset.jobId;
+
+    if (data.type === 'crew') {
+      // New allocation from crew panel
+      await allocateCrew(jobId, data.crew_id, data.crew_name);
+    } else if (data.type === 'move') {
+      // Move between jobs
+      await moveAllocation(data.alloc_id, jobId);
+    }
+  });
+});
+
+async function allocateCrew(jobId, crewId, crewName) {
+  try {
+    const resp = await fetch('/allocations/api/allocate.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        job_id: jobId,
+        crew_member_id: crewId,
+        allocation_date: ALLOC_DATE,
+        start_time: '06:00',
+        end_time: '14:30',
+        shift_type: 'day',
+      })
+    });
+    const result = await resp.json();
+
+    if (result.success) {
+      showToast((crewName || 'Crew') + ' allocated');
+      if (result.warnings && result.warnings.length > 0) {
+        showToast('Warning: ' + result.warnings[0], 5000);
+      }
+      // Reload to refresh the board
+      setTimeout(() => location.reload(), 500);
+    } else if (result.blocks && result.blocks.length > 0) {
+      // Show block modal
+      showBlockModal(result.blocks, result.warnings || [], result.overridable, {
+        job_id: jobId, crew_member_id: crewId, allocation_date: ALLOC_DATE,
+        start_time: '06:00', end_time: '14:30', shift_type: 'day',
+      });
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, 5000);
+  }
+}
+
+async function moveAllocation(allocId, newJobId) {
+  try {
+    const resp = await fetch('/allocations/api/move.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ allocation_id: allocId, new_job_id: newJobId })
+    });
+    const result = await resp.json();
+
+    if (result.success) {
+      showToast('Allocation moved');
+      setTimeout(() => location.reload(), 500);
+    } else {
+      showToast('Move blocked: ' + (result.blocks || []).join('; '), 5000);
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, 5000);
+  }
+}
+
+function showBlockModal(blocks, warnings, overridable, dropData) {
+  const modal = document.getElementById('block-modal');
+  const reasonsEl = document.getElementById('block-reasons');
+  const warningsEl = document.getElementById('block-warnings');
+
+  reasonsEl.innerHTML = blocks.map(b =>
+    '<p class="text-sm text-red-600 flex items-center gap-2"><span class="text-red-500">&#10005;</span> ' + b + '</p>'
+  ).join('');
+
+  warningsEl.innerHTML = warnings.map(w =>
+    '<p class="text-xs text-orange-600 flex items-center gap-2"><span>&#9888;</span> ' + w + '</p>'
+  ).join('');
+
+  pendingDrop = dropData;
+  modal.classList.remove('hidden');
+}
+
+document.getElementById('cancel-block-btn')?.addEventListener('click', () => {
+  document.getElementById('block-modal').classList.add('hidden');
+  pendingDrop = null;
+});
+
+document.getElementById('override-btn')?.addEventListener('click', async () => {
+  if (!pendingDrop) return;
+  document.getElementById('block-modal').classList.add('hidden');
+
+  try {
+    const resp = await fetch('/allocations/api/allocate.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...pendingDrop, force_override: true })
+    });
+    const result = await resp.json();
+    if (result.success) {
+      showToast('Override successful');
+      setTimeout(() => location.reload(), 500);
+    } else {
+      showToast('Override failed: ' + (result.blocks || []).join('; '), 5000);
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, 5000);
+  }
+  pendingDrop = null;
+});
+
+// ============================================================
+// Equipment Panel
+// ============================================================
+document.getElementById('equip-search')?.addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.equip-card').forEach(card => {
+    card.style.display = card.dataset.searchText.includes(q) ? '' : 'none';
+  });
+});
+
+function filterEquipPanel(filter) {
+  document.querySelectorAll('.equip-filter-btn').forEach(btn => {
+    btn.className = btn.dataset.filter === filter
+      ? 'equip-filter-btn px-2 py-1 text-[10px] font-medium rounded bg-brand-600 text-white'
+      : 'equip-filter-btn px-2 py-1 text-[10px] font-medium rounded bg-white text-gray-600';
+  });
+  document.querySelectorAll('.equip-card').forEach(card => {
+    if (filter === 'all') card.style.display = '';
+    else if (filter === 'available') card.style.display = card.dataset.equipAvailable === 'true' ? '' : 'none';
+    else if (filter === 'assigned') card.style.display = card.dataset.equipAvailable === 'false' ? '' : 'none';
+  });
+}
+
+// Drag from equipment panel
+document.querySelectorAll('.equip-card[draggable="true"]').forEach(card => {
+  card.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', JSON.stringify({
+      type: 'equipment',
+      equip_id: card.dataset.equipId,
+      equip_name: card.dataset.equipName,
+    }));
+    e.dataTransfer.effectAllowed = 'copy';
+    card.classList.add('opacity-50');
+  });
+  card.addEventListener('dragend', e => {
+    card.classList.remove('opacity-50');
+    document.querySelectorAll('.drop-target').forEach(dt => dt.classList.remove('ring-2', 'ring-brand-500', 'bg-brand-50'));
+  });
+});
+
+// Extend drop targets to handle equipment drops
+document.querySelectorAll('.drop-target').forEach(target => {
+  const origDrop = target._dropHandler;
+  target.addEventListener('drop', async e => {
+    let data;
+    try { data = JSON.parse(e.dataTransfer.getData('text/plain')); } catch(err) { return; }
+    if (data.type !== 'equipment') return;
+    e.preventDefault();
+    e.stopPropagation();
+    target.classList.remove('ring-2', 'ring-brand-500', 'bg-brand-50');
+
+    const jobId = target.dataset.jobId;
+    try {
+      const resp = await fetch('/allocations/api/assign-equipment.json', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ equipment_id: data.equip_id, job_id: jobId, date: ALLOC_DATE })
+      });
+      const result = await resp.json();
+      if (result.success) {
+        showToast((data.equip_name || 'Equipment') + ' assigned');
+        setTimeout(() => location.reload(), 500);
+      }
+    } catch (err) {
+      showToast('Error: ' + err.message, 5000);
+    }
+  }, true);
+});
+
+// ============================================================
+// Quick-Create Shift — Filter projects by client
+// ============================================================
+function filterProjectsByClient(clientId) {
+  const select = document.getElementById('shift-project-select');
+  if (!select) return;
+  const options = select.querySelectorAll('option');
+  options.forEach(opt => {
+    if (!opt.value) { opt.style.display = ''; return; }
+    if (!clientId) { opt.style.display = ''; return; }
+    // Show all if no client filter, otherwise show matching
+    opt.style.display = ''; // show all for now — projects don't have client_id in the option data
+  });
+}
+
+// Auto-open modal if URL has ?action=new-shift
+if (window.location.search.includes('action=new-shift')) {
+  document.getElementById('create-shift-modal')?.classList.remove('hidden');
 }
 </script>

@@ -20,11 +20,11 @@
     other: 'Other'
   };
   const statusColors = {
-    not_started: 'bg-slate-600 text-slate-200',
-    submitted: 'bg-blue-600 text-blue-100',
-    approved: 'bg-emerald-600 text-emerald-100',
-    rejected: 'bg-red-600 text-red-100',
-    expired: 'bg-brand-700 text-brand-100'
+    not_started: 'bg-gray-100 text-gray-600',
+    submitted: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    approved: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+    rejected: 'bg-red-50 text-red-700 ring-1 ring-red-600/20',
+    expired: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
   };
   const statusLabels = {
     not_started: 'Not Started',
@@ -38,7 +38,7 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold text-white">Compliance & Approvals</h1>
+    <h1 class="text-2xl font-bold text-gray-900">Compliance & Approvals</h1>
     <a href="/compliance/new" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition">
       <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
       New Item
@@ -46,12 +46,12 @@
   </div>
 
   <!-- Filters -->
-  <form method="GET" action="/compliance" class="bg-slate-800 border border-slate-700 rounded-lg p-4 mb-6">
+  <form method="GET" action="/compliance" class="bg-white border border-gray-200 rounded-lg shadow-sm p-4 mb-6">
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
       <!-- Status -->
       <div>
-        <label class="block text-sm font-medium text-slate-400 mb-1">Status</label>
-        <select name="status" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="block text-sm font-medium text-gray-500 mb-1">Status</label>
+        <select name="status" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Statuses</option>
           <option value="not_started" <%= filters.status === 'not_started' ? 'selected' : '' %>>Not Started</option>
           <option value="submitted" <%= filters.status === 'submitted' ? 'selected' : '' %>>Submitted</option>
@@ -63,8 +63,8 @@
 
       <!-- Item Type -->
       <div>
-        <label class="block text-sm font-medium text-slate-400 mb-1">Type</label>
-        <select name="item_type" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="block text-sm font-medium text-gray-500 mb-1">Type</label>
+        <select name="item_type" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Types</option>
           <% Object.keys(typeLabels).forEach(function(key) { %>
             <option value="<%= key %>" <%= filters.item_type === key ? 'selected' : '' %>><%= typeLabels[key] %></option>
@@ -74,8 +74,8 @@
 
       <!-- Job -->
       <div>
-        <label class="block text-sm font-medium text-slate-400 mb-1">Job</label>
-        <select name="job_id" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="block text-sm font-medium text-gray-500 mb-1">Job</label>
+        <select name="job_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Jobs</option>
           <% jobs.forEach(function(job) { %>
             <option value="<%= job.id %>" <%= filters.job_id == job.id ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
@@ -85,9 +85,9 @@
 
       <!-- Apply -->
       <div class="flex gap-2 items-end">
-        <button type="submit" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500 transition font-medium">Apply Filters</button>
+        <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium">Apply Filters</button>
         <a href="/exports/compliance.csv?status=<%= filters.status || '' %>&item_type=<%= filters.item_type || '' %>&job_id=<%= filters.job_id || '' %>"
-          class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
+          class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
           Export CSV
         </a>
@@ -96,27 +96,27 @@
   </form>
 
   <!-- Compliance Table -->
-  <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+  <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
     <% if (items.length === 0) { %>
-      <div class="p-8 text-center text-slate-400">
-        <svg class="w-12 h-12 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      <div class="p-8 text-center text-gray-500">
+        <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
         <p>No compliance items found.</p>
       </div>
     <% } else { %>
       <div class="overflow-x-auto">
         <table class="w-full">
           <thead>
-            <tr class="border-b border-slate-700">
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Title</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Job</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Due Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Approver</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+            <tr class="border-b border-gray-200">
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Title</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Job</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Due Date</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Approver</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-700">
+          <tbody class="divide-y divide-gray-200">
             <% items.forEach(function(item) { %>
               <%
                 const isOverdue = item.due_date && item.status !== 'approved' && new Date(item.due_date) < new Date();
@@ -125,25 +125,25 @@
                 // Format type: replace underscores, title case
                 const formattedType = item.item_type ? item.item_type.replace(/_/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); }) : '-';
               %>
-              <tr class="hover:bg-slate-750 hover:bg-opacity-50">
-                <td class="px-4 py-3 text-white font-medium">
+              <tr class="hover:bg-gray-50 hover:bg-opacity-50">
+                <td class="px-4 py-3 text-gray-900 font-medium">
                   <%= item.title %>
                   <% if (isExpired) { %>
-                    <span class="ml-2 inline-flex px-1.5 py-0.5 text-xs font-semibold rounded bg-red-900 text-red-300">EXPIRED</span>
+                    <span class="ml-2 inline-flex px-1.5 py-0.5 text-xs font-semibold rounded bg-red-900 text-red-600">EXPIRED</span>
                   <% } %>
                 </td>
-                <td class="px-4 py-3 text-slate-300"><%= formattedType %></td>
+                <td class="px-4 py-3 text-gray-600"><%= formattedType %></td>
                 <td class="px-4 py-3">
                   <% if (item.job_id) { %>
-                    <a href="/jobs/<%= item.job_id %>" class="text-brand-400 hover:text-brand-300"><%= item.job_number %></a>
+                    <a href="/projects/<%= item.job_id %>" class="text-brand-600 hover:text-brand-700"><%= item.job_number %></a>
                   <% } else { %>
-                    <span class="text-slate-500">-</span>
+                    <span class="text-gray-400">-</span>
                   <% } %>
                 </td>
                 <td class="px-4 py-3">
-                  <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= statusColors[item.status] || 'bg-slate-600 text-slate-200' %>"><%= statusLabels[item.status] || item.status %></span>
+                  <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= statusColors[item.status] || 'bg-gray-100 text-gray-700' %>"><%= statusLabels[item.status] || item.status %></span>
                 </td>
-                <td class="px-4 py-3 <%= isOverdue ? 'text-red-400 font-semibold' : isDueSoon ? 'text-orange-400 font-medium' : 'text-slate-300' %>">
+                <td class="px-4 py-3 <%= isOverdue ? 'text-red-600 font-semibold' : isDueSoon ? 'text-orange-600 font-medium' : 'text-gray-600' %>">
                   <% if (item.due_date) { %>
                     <%= new Date(item.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
                     <% if (isOverdue) { %><span class="text-xs ml-1">OVERDUE</span><% } %>
@@ -152,9 +152,9 @@
                     -
                   <% } %>
                 </td>
-                <td class="px-4 py-3 text-slate-300"><%= item.approver_name || '-' %></td>
+                <td class="px-4 py-3 text-gray-600"><%= item.approver_name || '-' %></td>
                 <td class="px-4 py-3">
-                  <a href="/compliance/<%= item.id %>/edit" class="text-slate-400 hover:text-brand-400 transition" title="Edit">
+                  <a href="/compliance/<%= item.id %>/edit" class="text-gray-500 hover:text-brand-600 transition" title="Edit">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </a>
                 </td>

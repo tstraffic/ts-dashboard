@@ -29,6 +29,24 @@ router.get('/', (req, res) => {
 });
 
 // ============================================
+// RECENT NOTIFICATIONS (JSON API for popup)
+// ============================================
+router.get('/recent', (req, res) => {
+  const db = getDb();
+  const userId = req.session.user.id;
+  const notifications = db.prepare(`
+    SELECT n.id, n.type, n.title, n.message, n.link, n.is_read, n.created_at, j.job_number
+    FROM notifications n
+    LEFT JOIN jobs j ON n.job_id = j.id
+    WHERE n.user_id = ? AND n.is_read = 0
+    ORDER BY n.created_at DESC
+    LIMIT 8
+  `).all(userId);
+  const unreadCount = db.prepare('SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0').get(userId).count;
+  res.json({ notifications, unreadCount });
+});
+
+// ============================================
 // MARK SINGLE NOTIFICATION AS READ
 // ============================================
 router.post('/:id/read', (req, res) => {
