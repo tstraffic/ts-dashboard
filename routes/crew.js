@@ -4,6 +4,9 @@ const bcrypt = require('bcryptjs');
 const { getDb } = require('../db/database');
 const { logActivity } = require('../middleware/audit');
 const { requireRole } = require('../middleware/auth');
+const { createInvitation, TOKEN_EXPIRY_HOURS } = require('../services/invitations');
+const { sendEmail } = require('../services/email');
+const { workerInviteEmail } = require('../services/emailTemplates');
 const {
   getComplianceStatus,
   getComplianceStatusBatch,
@@ -202,6 +205,38 @@ router.post('/:id/set-pin', requireRole('management', 'operations'), (req, res) 
   });
 
   req.flash('success', 'Portal PIN set for ' + member.full_name);
+  res.redirect('/crew/' + member.id);
+});
+
+// POST /:id/send-invite — Send email invitation for worker portal
+router.post('/:id/send-invite', requireRole('management', 'operations'), async (req, res) => {
+  const db = getDb();
+  const member = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(req.params.id);
+  if (!member) {
+    req.flash('error', 'Crew member not found');
+    return res.redirect('/crew');
+  }
+
+  if (!member.email || !member.employee_id) {
+    req.flash('error', 'Crew member needs both an email and Employee ID to receive an invite.');
+    return res.redirect('/crew/' + member.id);
+  }
+
+  const { token } = createInvitation({ type: 'crew_member', targetId: member.id, email: member.email, createdById: req.session.user.id });
+  const setupUrl = (process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`) + '/w/setup/' + token;
+  await sendEmail(member.email, 'Set up your T&S Worker Portal PIN', workerInviteEmail(member.full_name, setupUrl, TOKEN_EXPIRY_HOURS));
+
+  logActivity({
+    user: req.session.user,
+    action: 'update',
+    entityType: 'crew_member',
+    entityId: member.id,
+    entityLabel: member.full_name,
+    details: 'Sent worker portal email invitation',
+    ip: req.ip,
+  });
+
+  req.flash('success', `Invitation email sent to ${member.email}`);
   res.redirect('/crew/' + member.id);
 });
 

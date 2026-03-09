@@ -7,7 +7,7 @@ const path = require('path');
 const { initializeDatabase } = require('./db/schema');
 const { requireLogin, requirePermission, canAccess } = require('./middleware/auth');
 const { requireWorker, blockWorkerFromAdmin, workerLocals } = require('./middleware/workerAuth');
-const { notificationCountMiddleware, generateNotifications } = require('./middleware/notifications');
+const { notificationCountMiddleware, generateNotifications, sendDailyDigests } = require('./middleware/notifications');
 const { settingsMiddleware } = require('./middleware/settings');
 
 // Initialize database and seed data
@@ -53,6 +53,10 @@ app.use(notificationCountMiddleware);
 
 // Settings available in all templates (dropdown options, system config)
 app.use(settingsMiddleware);
+
+// Public invite/setup routes (no auth required, must be BEFORE blockWorkerFromAdmin)
+app.use('/invite', require('./routes/invite'));
+app.use('/w/setup', require('./routes/worker/setup'));
 
 // Worker Portal routes (must be BEFORE blockWorkerFromAdmin)
 app.use('/w', require('./routes/worker/auth'));
@@ -143,4 +147,13 @@ app.listen(PORT, () => {
   // Generate notifications on startup and every 15 minutes
   generateNotifications();
   setInterval(generateNotifications, 15 * 60 * 1000);
+
+  // Daily digest emails — check every 15 min, send at 7:00 AM
+  setInterval(() => {
+    const now = new Date();
+    if (now.getHours() === 7 && now.getMinutes() < 15) {
+      console.log('Sending daily digest emails...');
+      sendDailyDigests();
+    }
+  }, 15 * 60 * 1000);
 });
