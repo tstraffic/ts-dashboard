@@ -1,176 +1,399 @@
 <% locals.currentPage = 'tasks' %>
+<%
+  // --- Helper: build tab/filter URLs preserving other query params ---
+  function tabUrl(newTab) {
+    const p = [];
+    if (newTab) p.push('tab=' + newTab);
+    if (filters.view) p.push('view=' + encodeURIComponent(filters.view));
+    if (filters.owner) p.push('owner=' + encodeURIComponent(filters.owner));
+    if (filters.priority && filters.priority !== 'all') p.push('priority=' + encodeURIComponent(filters.priority));
+    if (filters.division && filters.division !== 'all') p.push('division=' + encodeURIComponent(filters.division));
+    if (filters.job_id) p.push('job_id=' + encodeURIComponent(filters.job_id));
+    if (filters.task_type && filters.task_type !== 'all') p.push('task_type=' + encodeURIComponent(filters.task_type));
+    return '/tasks' + (p.length ? '?' + p.join('&') : '');
+  }
+  function viewUrl(newView) {
+    const p = [];
+    if (newView && newView !== 'all') p.push('view=' + newView);
+    if (filters.tab) p.push('tab=' + encodeURIComponent(filters.tab));
+    if (filters.owner) p.push('owner=' + encodeURIComponent(filters.owner));
+    if (filters.priority && filters.priority !== 'all') p.push('priority=' + encodeURIComponent(filters.priority));
+    if (filters.division && filters.division !== 'all') p.push('division=' + encodeURIComponent(filters.division));
+    if (filters.job_id) p.push('job_id=' + encodeURIComponent(filters.job_id));
+    if (filters.task_type && filters.task_type !== 'all') p.push('task_type=' + encodeURIComponent(filters.task_type));
+    return '/tasks' + (p.length ? '?' + p.join('&') : '');
+  }
+  function filterUrl(key, value) {
+    const base = { ...filters };
+    if (value) base[key] = value; else delete base[key];
+    const p = [];
+    for (const [k, v] of Object.entries(base)) { if (v) p.push(k + '=' + encodeURIComponent(v)); }
+    return '/tasks' + (p.length ? '?' + p.join('&') : '');
+  }
+
+  const currentView = activeView || 'all';
+
+  // --- Time-bucket grouping (for "all" view) ---
+  const todayStr = today;
+  const todayDate = new Date(todayStr + 'T00:00:00');
+  const dayOfWeek = todayDate.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const thisMonday = new Date(todayDate); thisMonday.setDate(todayDate.getDate() + mondayOffset);
+  const thisSunday = new Date(thisMonday); thisSunday.setDate(thisMonday.getDate() + 6);
+  const nextMonday = new Date(thisMonday); nextMonday.setDate(thisMonday.getDate() + 7);
+  const nextSunday = new Date(nextMonday); nextSunday.setDate(nextMonday.getDate() + 6);
+
+  function toDateStr(d) { return d.toISOString().split('T')[0]; }
+
+  const buckets = { overdue: [], today: [], this_week: [], next_week: [], later: [] };
+  tasks.forEach(function(t) {
+    const due = t.due_date ? t.due_date.split('T')[0] : null;
+    if (!due) { buckets.later.push(t); return; }
+    if (t.status !== 'complete' && due < todayStr) { buckets.overdue.push(t); }
+    else if (due === todayStr) { buckets.today.push(t); }
+    else if (due >= toDateStr(thisMonday) && due <= toDateStr(thisSunday)) { buckets.this_week.push(t); }
+    else if (due >= toDateStr(nextMonday) && due <= toDateStr(nextSunday)) { buckets.next_week.push(t); }
+    else { buckets.later.push(t); }
+  });
+
+  const bucketMeta = [
+    { key: 'overdue', label: 'Overdue', accent: 'red', icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+    { key: 'today', label: 'Today', accent: 'brand', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+    { key: 'this_week', label: 'This Week', accent: 'blue', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+    { key: 'next_week', label: 'Next Week', accent: 'indigo', icon: 'M13 7l5 5m0 0l-5 5m5-5H6' },
+    { key: 'later', label: 'Later', accent: 'gray', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+  ];
+
+  // --- Status-bucket grouping (for today/week views) ---
+  const statusBuckets = { in_progress: [], not_started: [], blocked: [], complete: [] };
+  tasks.forEach(function(t) {
+    if (statusBuckets[t.status]) { statusBuckets[t.status].push(t); }
+    else { statusBuckets.not_started.push(t); }
+  });
+
+  const statusBucketMeta = [
+    { key: 'in_progress', label: 'In Progress', accentBg: 'bg-blue-100', accentText: 'text-blue-600', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+    { key: 'not_started', label: 'Not Started', accentBg: 'bg-gray-100', accentText: 'text-gray-500', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+    { key: 'blocked', label: 'Blocked', accentBg: 'bg-red-100', accentText: 'text-red-600', icon: 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' },
+    { key: 'complete', label: 'Completed', accentBg: 'bg-emerald-100', accentText: 'text-emerald-600', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+  ];
+
+  // --- Color maps ---
+  const statusColors = { not_started: 'bg-gray-100 text-gray-700', in_progress: 'bg-blue-100 text-blue-700', blocked: 'bg-red-100 text-red-700', complete: 'bg-emerald-100 text-emerald-700' };
+  const statusLabels = { not_started: 'Not Started', in_progress: 'In Progress', blocked: 'Blocked', complete: 'Complete' };
+  const priorityDots = { high: 'bg-red-500', medium: 'bg-amber-400', low: 'bg-gray-300' };
+  const typeBadges = { daily: 'bg-amber-50 text-amber-700 ring-amber-200', weekly: 'bg-blue-50 text-blue-700 ring-blue-200', one_off: 'bg-gray-50 text-gray-600 ring-gray-200' };
+  const typeLabels = { daily: 'Daily', weekly: 'Weekly', one_off: 'One-off' };
+
+  // Initials helper
+  function getInitials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    return parts.length >= 2 ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
+  }
+  const initialsColors = ['bg-brand-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-violet-500', 'bg-cyan-500', 'bg-orange-500', 'bg-teal-500'];
+  function initialsColor(name) {
+    if (!name) return initialsColors[0];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return initialsColors[Math.abs(hash) % initialsColors.length];
+  }
+
+  const activeTab = filters.tab || '';
+%>
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
   <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Tasks & Actions</h1>
-    <a href="/tasks/new" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition">
-      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-      New Task
+    <div class="flex items-center gap-2">
+      <a href="<%= filterUrl('owner', filters.owner === 'me' ? '' : 'me') %>"
+         class="inline-flex items-center px-4 py-2 rounded-lg font-medium text-sm transition <%= filters.owner === 'me' ? 'bg-brand-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50' %>">
+        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        My Tasks
+      </a>
+      <a href="/tasks/new" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition text-sm shadow-sm">
+        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        New Task
+      </a>
+    </div>
+  </div>
+
+  <!-- View Toggle -->
+  <div class="flex items-center gap-2 mb-5">
+    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider mr-1">View:</span>
+    <div class="inline-flex rounded-lg overflow-hidden border border-gray-300 shadow-sm">
+      <a href="<%= viewUrl('today') %>"
+         class="px-4 py-2 text-sm font-medium transition-colors border-r border-gray-300 <%= currentView === 'today' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' %>">
+        <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Today
+      </a>
+      <a href="<%= viewUrl('week') %>"
+         class="px-4 py-2 text-sm font-medium transition-colors border-r border-gray-300 <%= currentView === 'week' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' %>">
+        <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        This Week
+      </a>
+      <a href="<%= viewUrl('all') %>"
+         class="px-4 py-2 text-sm font-medium transition-colors <%= currentView === 'all' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' %>">
+        <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        All
+      </a>
+    </div>
+  </div>
+
+  <!-- Summary Stat Cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+    <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+      <div class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total</div>
+      <div class="text-2xl font-bold text-gray-900 mt-1"><%= counts.total || 0 %></div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+      <div class="text-xs font-medium text-gray-500 uppercase tracking-wider">Not Started</div>
+      <div class="text-2xl font-bold text-gray-600 mt-1"><%= counts.not_started || 0 %></div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+      <div class="text-xs font-medium text-gray-500 uppercase tracking-wider">In Progress</div>
+      <div class="text-2xl font-bold text-blue-600 mt-1"><%= counts.in_progress || 0 %></div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+      <div class="text-xs font-medium text-gray-500 uppercase tracking-wider">Blocked</div>
+      <div class="text-2xl font-bold text-red-600 mt-1"><%= counts.blocked || 0 %></div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+      <div class="text-xs font-medium text-amber-500 uppercase tracking-wider">Overdue</div>
+      <div class="text-2xl font-bold text-amber-600 mt-1"><%= counts.overdue || 0 %></div>
+    </div>
+  </div>
+
+  <!-- Status Tabs -->
+  <div class="flex flex-wrap items-center gap-2 mb-4">
+    <a href="<%= tabUrl('') %>" class="inline-flex items-center px-3.5 py-1.5 rounded-full text-sm font-medium transition <%= !activeTab ? 'bg-brand-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50' %>">
+      All <span class="ml-1.5 text-xs opacity-80"><%= counts.total || 0 %></span>
+    </a>
+    <a href="<%= tabUrl('not_started') %>" class="inline-flex items-center px-3.5 py-1.5 rounded-full text-sm font-medium transition <%= activeTab === 'not_started' ? 'bg-gray-700 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50' %>">
+      Not Started <span class="ml-1.5 text-xs opacity-80"><%= counts.not_started || 0 %></span>
+    </a>
+    <a href="<%= tabUrl('in_progress') %>" class="inline-flex items-center px-3.5 py-1.5 rounded-full text-sm font-medium transition <%= activeTab === 'in_progress' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50' %>">
+      In Progress <span class="ml-1.5 text-xs opacity-80"><%= counts.in_progress || 0 %></span>
+    </a>
+    <a href="<%= tabUrl('blocked') %>" class="inline-flex items-center px-3.5 py-1.5 rounded-full text-sm font-medium transition <%= activeTab === 'blocked' ? 'bg-red-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50' %>">
+      Blocked <span class="ml-1.5 text-xs opacity-80"><%= counts.blocked || 0 %></span>
+    </a>
+    <a href="<%= tabUrl('completed') %>" class="inline-flex items-center px-3.5 py-1.5 rounded-full text-sm font-medium transition <%= activeTab === 'completed' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50' %>">
+      Completed <span class="ml-1.5 text-xs opacity-80"><%= counts.complete || 0 %></span>
     </a>
   </div>
 
-  <!-- Filters -->
-  <form method="GET" action="/tasks" class="bg-white border border-gray-200 rounded-lg shadow-sm p-4 mb-6">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-      <!-- Status -->
-      <div>
-        <label class="block text-sm font-medium text-gray-500 mb-1">Status</label>
-        <select name="status" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-          <option value="">All Statuses</option>
-          <option value="not_started" <%= filters.status === 'not_started' ? 'selected' : '' %>>Not Started</option>
-          <option value="in_progress" <%= filters.status === 'in_progress' ? 'selected' : '' %>>In Progress</option>
-          <option value="blocked" <%= filters.status === 'blocked' ? 'selected' : '' %>>Blocked</option>
-          <option value="complete" <%= filters.status === 'complete' ? 'selected' : '' %>>Complete</option>
-        </select>
-      </div>
-
-      <!-- Division -->
-      <div>
-        <label class="block text-sm font-medium text-gray-500 mb-1">Division</label>
-        <select name="division" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-          <option value="">All Divisions</option>
-          <option value="ops" <%= filters.division === 'ops' ? 'selected' : '' %>>Ops</option>
-          <option value="planning" <%= filters.division === 'planning' ? 'selected' : '' %>>Planning</option>
-          <option value="marketing" <%= filters.division === 'marketing' ? 'selected' : '' %>>Marketing</option>
-          <option value="accounts" <%= filters.division === 'accounts' ? 'selected' : '' %>>Accounts</option>
-          <option value="management" <%= filters.division === 'management' ? 'selected' : '' %>>Management</option>
-        </select>
-      </div>
-
-      <!-- Job -->
-      <div>
-        <label class="block text-sm font-medium text-gray-500 mb-1">Job</label>
-        <select name="job_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-          <option value="">All Jobs</option>
-          <% jobs.forEach(function(job) { %>
-            <option value="<%= job.id %>" <%= filters.job_id == job.id ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
-          <% }) %>
-        </select>
-      </div>
-
-      <!-- My Tasks Toggle -->
-      <div>
-        <label class="block text-sm font-medium text-gray-500 mb-1">&nbsp;</label>
-        <a href="<%= filters.owner === 'me' ? '/tasks' : '/tasks?owner=me' + (filters.status ? '&status=' + filters.status : '') + (filters.division ? '&division=' + filters.division : '') + (filters.job_id ? '&job_id=' + filters.job_id : '') %>"
-           class="block w-full text-center px-4 py-2 rounded-lg font-medium transition <%= filters.owner === 'me' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">
-          My Tasks
-        </a>
-      </div>
-
-      <!-- Apply -->
-      <div>
-        <label class="block text-sm font-medium text-gray-500 mb-1">&nbsp;</label>
-        <button type="submit" class="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium">Apply Filters</button>
-      </div>
+  <!-- Compact Filter Bar -->
+  <form method="GET" action="/tasks" class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-6">
+    <% if (filters.tab) { %><input type="hidden" name="tab" value="<%= filters.tab %>"><% } %>
+    <% if (filters.view) { %><input type="hidden" name="view" value="<%= filters.view %>"><% } %>
+    <% if (filters.owner === 'me') { %><input type="hidden" name="owner" value="me"><% } %>
+    <div class="flex flex-wrap items-center gap-3">
+      <select name="owner" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="all">All Owners</option>
+        <% users.forEach(function(u) { %>
+          <option value="<%= u.id %>" <%= filters.owner == u.id ? 'selected' : '' %>><%= u.full_name %></option>
+        <% }) %>
+      </select>
+      <select name="priority" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="all">All Priorities</option>
+        <option value="high" <%= filters.priority === 'high' ? 'selected' : '' %>>High</option>
+        <option value="medium" <%= filters.priority === 'medium' ? 'selected' : '' %>>Medium</option>
+        <option value="low" <%= filters.priority === 'low' ? 'selected' : '' %>>Low</option>
+      </select>
+      <select name="division" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="all">All Divisions</option>
+        <option value="ops" <%= filters.division === 'ops' ? 'selected' : '' %>>Ops</option>
+        <option value="planning" <%= filters.division === 'planning' ? 'selected' : '' %>>Planning</option>
+        <option value="marketing" <%= filters.division === 'marketing' ? 'selected' : '' %>>Marketing</option>
+        <option value="accounts" <%= filters.division === 'accounts' ? 'selected' : '' %>>Accounts</option>
+        <option value="management" <%= filters.division === 'management' ? 'selected' : '' %>>Management</option>
+      </select>
+      <select name="task_type" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="all">All Types</option>
+        <option value="daily" <%= filters.task_type === 'daily' ? 'selected' : '' %>>Daily</option>
+        <option value="weekly" <%= filters.task_type === 'weekly' ? 'selected' : '' %>>Weekly</option>
+        <option value="one_off" <%= filters.task_type === 'one_off' ? 'selected' : '' %>>One-off</option>
+      </select>
+      <select name="job_id" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Projects</option>
+        <% jobs.forEach(function(job) { %>
+          <option value="<%= job.id %>" <%= filters.job_id == job.id ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
+        <% }) %>
+      </select>
+      <button type="submit" class="text-sm px-4 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium">
+        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+        Filter
+      </button>
+      <% if (filters.priority || filters.division || filters.task_type || filters.job_id || (filters.owner && filters.owner !== 'me')) { %>
+        <a href="<%= tabUrl(activeTab) %>" class="text-sm text-gray-500 hover:text-red-500 transition">✕ Clear</a>
+      <% } %>
     </div>
   </form>
 
-  <!-- Tasks Table -->
-  <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-    <% if (tasks.length === 0) { %>
-      <div class="p-8 text-center text-gray-500">
-        <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-        <p>No tasks found.</p>
-      </div>
-    <% } else { %>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead>
-            <tr class="border-b border-gray-200">
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Task</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Job</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Division</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Owner</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Due Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Priority</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200">
-            <% tasks.forEach(function(task) { %>
+  <!-- Task Cards -->
+  <% if (tasks.length === 0) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-12 text-center">
+      <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+      <p class="text-gray-500 text-lg mb-2">No tasks found</p>
+      <p class="text-gray-400 text-sm mb-4">
+        <% if (currentView === 'today') { %>No tasks due today.<% } else if (currentView === 'week') { %>No tasks due this week.<% } else { %>Try adjusting your filters or create a new task.<% } %>
+      </p>
+      <a href="/tasks/new" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition text-sm">
+        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Create Task
+      </a>
+    </div>
+
+  <% } else if (currentView === 'today' || currentView === 'week') { %>
+    <!-- Status-grouped rendering for Today / This Week views -->
+    <div class="space-y-6">
+      <% statusBucketMeta.forEach(function(sbm) { %>
+        <% const items = statusBuckets[sbm.key]; if (!items || items.length === 0) return; %>
+        <div>
+          <!-- Status Group Header -->
+          <div class="flex items-center gap-2 mb-3">
+            <div class="flex items-center justify-center w-7 h-7 rounded-lg <%= sbm.accentBg %> <%= sbm.accentText %>">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<%= sbm.icon %>"/></svg>
+            </div>
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">
+              <%= sbm.label %> <span class="font-normal text-xs">(<%= items.length %>)</span>
+            </h2>
+          </div>
+
+          <!-- Card Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <% items.forEach(function(task) { %>
               <%
-                const statusColors = {
-                  not_started: 'bg-gray-100 text-gray-700',
-                  in_progress: 'bg-blue-600 text-blue-100',
-                  blocked: 'bg-red-600 text-red-100',
-                  complete: 'bg-emerald-600 text-emerald-100'
-                };
-                const statusLabels = {
-                  not_started: 'Not Started',
-                  in_progress: 'In Progress',
-                  blocked: 'Blocked',
-                  complete: 'Complete'
-                };
-                const priorityColors = {
-                  high: 'bg-red-600 text-red-100',
-                  medium: 'bg-brand-700 text-brand-100',
-                  low: 'bg-gray-100 text-gray-700'
-                };
-                const divisionColors = {
-                  ops: 'bg-blue-700 text-blue-200',
-                  planning: 'bg-teal-700 text-teal-200',
-                  marketing: 'bg-pink-700 text-pink-200',
-                  accounts: 'bg-brand-800 text-brand-200',
-                  management: 'bg-purple-700 text-purple-200'
-                };
-                const isOverdue = task.due_date && task.status !== 'complete' && new Date(task.due_date) < new Date();
+                const isOverdue = task.due_date && task.status !== 'complete' && task.due_date.split('T')[0] < todayStr;
+                const dueDisplay = task.due_date ? new Date(task.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }) : 'No date';
               %>
-              <tr class="hover:bg-gray-50 hover:bg-opacity-50">
-                <td class="px-4 py-3 text-gray-900 font-medium"><%= task.title %></td>
-                <td class="px-4 py-3">
-                  <% if (task.job_id) { %>
-                    <a href="/jobs/<%= task.job_id %>" class="text-brand-600 hover:text-brand-700"><%= task.job_number %></a>
-                  <% } else { %>
-                    <span class="text-gray-400">-</span>
-                  <% } %>
-                </td>
-                <td class="px-4 py-3">
-                  <% if (task.division) { %>
-                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= divisionColors[task.division] || 'bg-gray-100 text-gray-700' %>"><%= task.division.charAt(0).toUpperCase() + task.division.slice(1) %></span>
-                  <% } else { %>
-                    <span class="text-gray-400">-</span>
-                  <% } %>
-                </td>
-                <td class="px-4 py-3 text-gray-600"><%= task.owner_name || '-' %></td>
-                <td class="px-4 py-3 <%= isOverdue ? 'text-red-600 font-semibold' : 'text-gray-600' %>">
-                  <% if (task.due_date) { %>
-                    <%= new Date(task.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
-                    <% if (isOverdue) { %><span class="text-xs ml-1">OVERDUE</span><% } %>
-                  <% } else { %>
-                    -
-                  <% } %>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= statusColors[task.status] || 'bg-gray-100 text-gray-700' %>"><%= statusLabels[task.status] || task.status %></span>
-                </td>
-                <td class="px-4 py-3">
-                  <% if (task.priority) { %>
-                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= priorityColors[task.priority] || 'bg-gray-100 text-gray-700' %>"><%= task.priority.charAt(0).toUpperCase() + task.priority.slice(1) %></span>
-                  <% } else { %>
-                    <span class="text-gray-400">-</span>
-                  <% } %>
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center space-x-2">
-                    <a href="/tasks/<%= task.id %>/edit" class="text-gray-500 hover:text-brand-600 transition" title="Edit">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                    </a>
-                    <% if (task.status !== 'complete') { %>
-                      <form method="POST" action="/tasks/<%= task.id %>/complete" class="inline">
-                        <button type="submit" class="text-gray-500 hover:text-emerald-600 transition" title="Mark Complete" onclick="return confirm('Mark this task as complete?')">
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        </button>
-                      </form>
-                    <% } %>
+              <div class="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow <%= isOverdue ? 'border-l-4 border-l-red-400' : '' %>">
+                <div class="p-4">
+                  <div class="flex items-start gap-2 mb-2">
+                    <span class="mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 <%= priorityDots[task.priority] || 'bg-gray-300' %>"></span>
+                    <div class="flex-1 min-w-0">
+                      <a href="/tasks/<%= task.id %>/edit" class="text-sm font-semibold text-gray-900 hover:text-brand-600 transition line-clamp-2 block"><%= task.title %></a>
+                      <% if (task.description) { %>
+                        <p class="text-xs text-gray-400 mt-0.5 line-clamp-1"><%= task.description %></p>
+                      <% } %>
+                    </div>
+                    <span class="flex-shrink-0 inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ring-1 ring-inset <%= typeBadges[task.task_type] || typeBadges.one_off %>"><%= typeLabels[task.task_type] || 'One-off' %></span>
                   </div>
-                </td>
-              </tr>
+                  <% if (task.job_number) { %>
+                    <div class="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+                      <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                      <a href="/projects/<%= task.job_id %>" class="text-brand-600 hover:text-brand-700 font-medium"><%= task.job_number %></a>
+                      <span class="text-gray-400"><%= task.client %></span>
+                    </div>
+                  <% } %>
+                  <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+                    <div class="flex items-center gap-2">
+                      <% if (task.owner_name) { %>
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white <%= initialsColor(task.owner_name) %>" title="<%= task.owner_name %>"><%= getInitials(task.owner_name) %></div>
+                      <% } else { %>
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-400 bg-gray-100">?</div>
+                      <% } %>
+                      <span class="text-xs <%= isOverdue ? 'text-red-600 font-semibold' : 'text-gray-500' %>"><%= dueDisplay %></span>
+                      <!-- Inline Status Select -->
+                      <form method="POST" action="/tasks/<%= task.id %>/status" class="inline">
+                        <select name="status" onchange="this.form.submit()"
+                          class="text-[11px] font-medium rounded-full pl-2 pr-6 py-0.5 border-0 cursor-pointer <%= statusColors[task.status] || 'bg-gray-100 text-gray-700' %> focus:ring-2 focus:ring-brand-500 focus:ring-offset-1">
+                          <option value="not_started" <%= task.status === 'not_started' ? 'selected' : '' %>>Not Started</option>
+                          <option value="in_progress" <%= task.status === 'in_progress' ? 'selected' : '' %>>In Progress</option>
+                          <option value="blocked" <%= task.status === 'blocked' ? 'selected' : '' %>>Blocked</option>
+                          <option value="complete" <%= task.status === 'complete' ? 'selected' : '' %>>Complete</option>
+                        </select>
+                      </form>
+                    </div>
+                    <a href="/tasks/<%= task.id %>/edit" class="p-1 text-gray-400 hover:text-brand-600 rounded transition" title="Edit">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </a>
+                  </div>
+                </div>
+              </div>
             <% }) %>
-          </tbody>
-        </table>
-      </div>
-    <% } %>
-  </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+
+  <% } else { %>
+    <!-- Time-bucket rendering for All view -->
+    <div class="space-y-6">
+      <% bucketMeta.forEach(function(bm) { %>
+        <% const items = buckets[bm.key]; if (!items || items.length === 0) return; %>
+        <div>
+          <div class="flex items-center gap-2 mb-3">
+            <div class="flex items-center justify-center w-7 h-7 rounded-lg <%= bm.key === 'overdue' ? 'bg-red-100 text-red-600' : bm.key === 'today' ? 'bg-brand-100 text-brand-600' : bm.key === 'this_week' ? 'bg-blue-100 text-blue-600' : bm.key === 'next_week' ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500' %>">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<%= bm.icon %>"/></svg>
+            </div>
+            <h2 class="text-sm font-semibold uppercase tracking-wider <%= bm.key === 'overdue' ? 'text-red-600' : 'text-gray-500' %>">
+              <%= bm.label %> <span class="font-normal text-xs">(<%= items.length %>)</span>
+            </h2>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <% items.forEach(function(task) { %>
+              <%
+                const isOverdue = task.due_date && task.status !== 'complete' && task.due_date.split('T')[0] < todayStr;
+                const dueDisplay = task.due_date ? new Date(task.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }) : 'No date';
+              %>
+              <div class="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow <%= isOverdue ? 'border-l-4 border-l-red-400' : '' %>">
+                <div class="p-4">
+                  <div class="flex items-start gap-2 mb-2">
+                    <span class="mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 <%= priorityDots[task.priority] || 'bg-gray-300' %>"></span>
+                    <div class="flex-1 min-w-0">
+                      <a href="/tasks/<%= task.id %>/edit" class="text-sm font-semibold text-gray-900 hover:text-brand-600 transition line-clamp-2 block"><%= task.title %></a>
+                      <% if (task.description) { %>
+                        <p class="text-xs text-gray-400 mt-0.5 line-clamp-1"><%= task.description %></p>
+                      <% } %>
+                    </div>
+                    <span class="flex-shrink-0 inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ring-1 ring-inset <%= typeBadges[task.task_type] || typeBadges.one_off %>"><%= typeLabels[task.task_type] || 'One-off' %></span>
+                  </div>
+                  <% if (task.job_number) { %>
+                    <div class="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+                      <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                      <a href="/projects/<%= task.job_id %>" class="text-brand-600 hover:text-brand-700 font-medium"><%= task.job_number %></a>
+                      <span class="text-gray-400"><%= task.client %></span>
+                    </div>
+                  <% } %>
+                  <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+                    <div class="flex items-center gap-2">
+                      <% if (task.owner_name) { %>
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white <%= initialsColor(task.owner_name) %>" title="<%= task.owner_name %>"><%= getInitials(task.owner_name) %></div>
+                      <% } else { %>
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-400 bg-gray-100">?</div>
+                      <% } %>
+                      <span class="text-xs <%= isOverdue ? 'text-red-600 font-semibold' : 'text-gray-500' %>"><%= dueDisplay %></span>
+                      <!-- Inline Status Select -->
+                      <form method="POST" action="/tasks/<%= task.id %>/status" class="inline">
+                        <select name="status" onchange="this.form.submit()"
+                          class="text-[11px] font-medium rounded-full pl-2 pr-6 py-0.5 border-0 cursor-pointer <%= statusColors[task.status] || 'bg-gray-100 text-gray-700' %> focus:ring-2 focus:ring-brand-500 focus:ring-offset-1">
+                          <option value="not_started" <%= task.status === 'not_started' ? 'selected' : '' %>>Not Started</option>
+                          <option value="in_progress" <%= task.status === 'in_progress' ? 'selected' : '' %>>In Progress</option>
+                          <option value="blocked" <%= task.status === 'blocked' ? 'selected' : '' %>>Blocked</option>
+                          <option value="complete" <%= task.status === 'complete' ? 'selected' : '' %>>Complete</option>
+                        </select>
+                      </form>
+                    </div>
+                    <a href="/tasks/<%= task.id %>/edit" class="p-1 text-gray-400 hover:text-brand-600 rounded transition" title="Edit">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <% if (tasks.length > 0) { %>
+    <div class="mt-6 text-center text-sm text-gray-400">
+      Showing <%= tasks.length %> task<%= tasks.length !== 1 ? 's' : '' %>
+    </div>
+  <% } %>
 </div>

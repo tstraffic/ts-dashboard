@@ -16,12 +16,12 @@
     <form method="POST" action="<%= formAction %>">
       <input type="hidden" name="return_to" value="<%= returnTo %>">
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <!-- Job -->
         <div>
-          <label for="job_id" class="block text-sm font-medium text-gray-600 mb-1">Job <span class="text-red-600">*</span></label>
-          <select id="job_id" name="job_id" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="">Select a job...</option>
+          <label for="job_id" class="block text-sm font-medium text-gray-600 mb-1">Project <span class="text-gray-400 font-normal text-xs">(optional)</span></label>
+          <select id="job_id" name="job_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="">No project</option>
             <% jobs.forEach(function(job) { %>
               <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
             <% }) %>
@@ -40,6 +40,19 @@
             <option value="management" <%= isEdit && task.division === 'management' ? 'selected' : '' %>>Management</option>
           </select>
         </div>
+
+        <!-- Task Type -->
+        <div>
+          <label for="task_type" class="block text-sm font-medium text-gray-600 mb-1">Task Type</label>
+          <select id="task_type" name="task_type" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="one_off" <%= isEdit && task.task_type === 'one_off' ? 'selected' : (!isEdit ? 'selected' : '') %>>One-off</option>
+            <option value="daily" <%= isEdit && task.task_type === 'daily' ? 'selected' : '' %>>Daily</option>
+            <option value="weekly" <%= isEdit && task.task_type === 'weekly' ? 'selected' : '' %>>Weekly</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
 
         <!-- Title -->
         <div class="md:col-span-2">

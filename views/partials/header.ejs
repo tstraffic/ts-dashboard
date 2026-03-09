@@ -9,12 +9,33 @@
       </div>
       <div class="flex items-center space-x-4">
         <% if (user) { %>
-          <a href="/notifications" class="relative text-gray-400 hover:text-gray-700 transition-colors" title="Notifications">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-            <% if (typeof unreadNotifications !== 'undefined' && unreadNotifications > 0) { %>
-              <span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"><%= unreadNotifications > 9 ? '9+' : unreadNotifications %></span>
-            <% } %>
-          </a>
+          <!-- Notification Bell + Popup -->
+          <div class="relative" id="notif-container">
+            <button onclick="toggleNotifDropdown()" class="relative text-gray-400 hover:text-gray-700 transition-colors focus:outline-none" title="Notifications" id="notif-bell">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+              <% if (typeof unreadNotifications !== 'undefined' && unreadNotifications > 0) { %>
+                <span id="notif-badge" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"><%= unreadNotifications > 9 ? '9+' : unreadNotifications %></span>
+              <% } else { %>
+                <span id="notif-badge" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center hidden">0</span>
+              <% } %>
+            </button>
+
+            <!-- Dropdown Popup -->
+            <div id="notif-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50" style="min-height:120px">
+              <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <span class="font-semibold text-sm text-gray-900">Notifications</span>
+                <span id="notif-unread-label" class="text-xs text-gray-400"></span>
+              </div>
+              <div id="notif-list" class="max-h-80 overflow-y-auto">
+                <div class="p-6 text-center text-gray-400 text-sm" id="notif-loading">Loading...</div>
+              </div>
+              <div class="flex items-center justify-between px-4 py-2.5 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+                <button onclick="markAllReadFromPopup()" class="text-xs font-medium text-gray-500 hover:text-brand-600 transition">Mark All Read</button>
+                <a href="/notifications" class="text-xs font-semibold text-brand-600 hover:text-brand-700 transition">View All &rarr;</a>
+              </div>
+            </div>
+          </div>
+
           <span class="text-gray-500 text-sm hidden md:inline"><%= user.full_name %></span>
           <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1
             <% if (user.role === 'management') { %>bg-purple-50 text-purple-700 ring-purple-600/20
@@ -31,3 +52,108 @@
     </div>
   </div>
 </nav>
+
+<% if (user) { %>
+<script>
+(function() {
+  let notifOpen = false;
+  const dropdown = document.getElementById('notif-dropdown');
+  const container = document.getElementById('notif-container');
+
+  window.toggleNotifDropdown = function() {
+    if (notifOpen) {
+      dropdown.classList.add('hidden');
+      notifOpen = false;
+    } else {
+      dropdown.classList.remove('hidden');
+      notifOpen = true;
+      loadNotifications();
+    }
+  };
+
+  // Close on click outside
+  document.addEventListener('click', function(e) {
+    if (notifOpen && !container.contains(e.target)) {
+      dropdown.classList.add('hidden');
+      notifOpen = false;
+    }
+  });
+
+  function timeAgo(dateStr) {
+    const now = new Date();
+    const d = new Date(dateStr);
+    const diffMs = now - d;
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return days + 'd ago';
+    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  }
+
+  function typeColor(type) {
+    if (['overdue_task','new_incident','critical_defect'].includes(type)) return 'bg-red-500';
+    if (['expiring_compliance','equipment_overdue','ticket_expiry'].includes(type)) return 'bg-amber-500';
+    if (type === 'missing_update') return 'bg-yellow-400';
+    if (['corrective_action_due'].includes(type)) return 'bg-rose-500';
+    if (type === 'follow_up_due') return 'bg-purple-500';
+    if (type === 'over_budget') return 'bg-orange-500';
+    return 'bg-brand-500';
+  }
+
+  function loadNotifications() {
+    const list = document.getElementById('notif-list');
+    list.innerHTML = '<div class="p-6 text-center text-gray-400 text-sm">Loading...</div>';
+
+    fetch('/notifications/recent')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        const badge = document.getElementById('notif-badge');
+        const label = document.getElementById('notif-unread-label');
+        if (data.unreadCount > 0) {
+          badge.textContent = data.unreadCount > 9 ? '9+' : data.unreadCount;
+          badge.classList.remove('hidden');
+          label.textContent = data.unreadCount + ' unread';
+        } else {
+          badge.classList.add('hidden');
+          label.textContent = 'All caught up';
+        }
+
+        if (data.notifications.length === 0) {
+          list.innerHTML = '<div class="p-6 text-center"><svg class="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><p class="text-gray-400 text-sm">No new notifications</p></div>';
+          return;
+        }
+
+        var html = '';
+        data.notifications.forEach(function(n) {
+          var dotClass = typeColor(n.type);
+          html += '<form method="POST" action="/notifications/' + n.id + '/read" class="block">';
+          html += '<button type="submit" class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 flex items-start gap-3">';
+          html += '<span class="mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ' + dotClass + '"></span>';
+          html += '<div class="flex-1 min-w-0">';
+          html += '<p class="text-sm font-medium text-gray-900 truncate">' + n.title.replace(/</g, '&lt;') + '</p>';
+          html += '<p class="text-xs text-gray-400 mt-0.5 truncate">' + n.message.replace(/</g, '&lt;') + '</p>';
+          html += '<span class="text-[10px] text-gray-400 mt-0.5 block">' + timeAgo(n.created_at) + '</span>';
+          html += '</div></button></form>';
+        });
+        list.innerHTML = html;
+      })
+      .catch(function() {
+        list.innerHTML = '<div class="p-6 text-center text-red-400 text-sm">Failed to load</div>';
+      });
+  }
+
+  window.markAllReadFromPopup = function() {
+    fetch('/notifications/mark-all-read', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+      .then(function() {
+        loadNotifications();
+        var badge = document.getElementById('notif-badge');
+        badge.classList.add('hidden');
+      })
+      .catch(function() {});
+  };
+})();
+</script>
+<% } %>

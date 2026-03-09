@@ -129,7 +129,7 @@
           const returnOverdue = a.expected_return_date && a.expected_return_date < today;
         %>
         <tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 font-medium"><a href="/jobs/<%= a.job_id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= a.job_number %></a></td>
+          <td class="px-4 py-3 font-medium"><a href="/projects/<%= a.job_id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= a.job_number %></a></td>
           <td class="px-4 py-3 text-gray-600"><%= a.client %></td>
           <td class="px-4 py-3 text-gray-500 text-xs"><%= a.assigned_date %></td>
           <td class="px-4 py-3 text-xs <%= returnOverdue ? 'text-red-600 font-semibold' : 'text-gray-500' %>"><%= a.expected_return_date || '-' %></td>
@@ -222,7 +222,7 @@
       <tbody class="divide-y divide-gray-200">
         <% pastAssignments.forEach(a => { %>
         <tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 font-medium"><a href="/jobs/<%= a.job_id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= a.job_number %></a></td>
+          <td class="px-4 py-3 font-medium"><a href="/projects/<%= a.job_id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= a.job_number %></a></td>
           <td class="px-4 py-3 text-gray-600"><%= a.client %></td>
           <td class="px-4 py-3 text-gray-500 text-xs"><%= a.assigned_date %></td>
           <td class="px-4 py-3 text-emerald-600 text-xs"><%= a.actual_return_date %></td>

@@ -32,6 +32,7 @@ const CATEGORY_META = {
   compliance_status:  { label: 'Compliance Status',    group: 'Safety',    icon: 'shield' },
   task_status:        { label: 'Task Status',          group: 'Planning',  icon: 'check-square' },
   task_priority:      { label: 'Task Priority',        group: 'Planning',  icon: 'flag' },
+  task_type:          { label: 'Task Types',           group: 'Planning',  icon: 'repeat' },
   plan_type:          { label: 'Traffic Plan Types',   group: 'Planning',  icon: 'map' },
   plan_status:        { label: 'Traffic Plan Status',  group: 'Planning',  icon: 'clipboard' },
   equipment_category: { label: 'Equipment Categories', group: 'Assets',    icon: 'truck' },

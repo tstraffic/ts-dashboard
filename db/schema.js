@@ -934,6 +934,12 @@ function runMigrations(db) {
       { key: 'high', label: 'High', color: 'red' },
     ]);
 
+    seedCategory('task_type', [
+      { key: 'daily', label: 'Daily', color: 'amber' },
+      { key: 'weekly', label: 'Weekly', color: 'blue' },
+      { key: 'one_off', label: 'One-off', color: 'slate' },
+    ]);
+
     // Traffic plan types
     seedCategory('plan_type', [
       { key: 'TGS', label: 'Traffic Guidance Scheme' },
@@ -1028,6 +1034,192 @@ function runMigrations(db) {
 
     recordMigration.run(14, 'Worker Portal Auth');
     console.log('Migration 14 complete.');
+  }
+
+  // =============================================
+  // Migration 15: Client Register & Project Structure
+  // =============================================
+  if (!isMigrationApplied.get(15)) {
+    console.log('Running migration 15: Client Register & Project Structure');
+
+    // Create clients table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS clients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_name TEXT NOT NULL,
+        abn TEXT DEFAULT '',
+        primary_contact_name TEXT DEFAULT '',
+        primary_contact_phone TEXT DEFAULT '',
+        primary_contact_email TEXT DEFAULT '',
+        address TEXT DEFAULT '',
+        billing_address TEXT DEFAULT '',
+        payment_terms TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Add client_id and parent_project_id to jobs
+    const newCols15 = [
+      "ALTER TABLE jobs ADD COLUMN client_id INTEGER REFERENCES clients(id)",
+      "ALTER TABLE jobs ADD COLUMN parent_project_id INTEGER REFERENCES jobs(id)",
+    ];
+    for (const sql of newCols15) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    // Seed clients from existing unique client text values in jobs table
+    const uniqueClients = db.prepare('SELECT DISTINCT client FROM jobs WHERE client IS NOT NULL AND client != ?').all('');
+    const insertClient = db.prepare('INSERT INTO clients (company_name) VALUES (?)');
+    for (const row of uniqueClients) {
+      try { insertClient.run(row.client); } catch (e) { /* ignore dups */ }
+    }
+
+    // Backfill client_id on jobs from the newly created clients
+    db.exec(`
+      UPDATE jobs SET client_id = (
+        SELECT c.id FROM clients c WHERE c.company_name = jobs.client
+      ) WHERE client IS NOT NULL AND client != '' AND client_id IS NULL
+    `);
+
+    recordMigration.run(15, 'Client Register & Project Structure');
+    console.log('Migration 15 complete.');
+  }
+
+  // =============================================
+  // Migration 16: Task Types (daily/weekly/one-off)
+  // =============================================
+  if (!isMigrationApplied.get(16)) {
+    console.log('Running migration 16: Task Types');
+
+    const taskCols = [
+      "ALTER TABLE tasks ADD COLUMN task_type TEXT DEFAULT 'one_off'",
+    ];
+    for (const sql of taskCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    recordMigration.run(16, 'Task Types');
+    console.log('Migration 16 complete.');
+  }
+
+  // =============================================
+  // Migration 17: SMTP Email Configuration
+  // =============================================
+  if (!isMigrationApplied.get(17)) {
+    console.log('Running migration 17: SMTP Email Configuration');
+
+    const insertConfig = db.prepare(`
+      INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, description)
+      VALUES (?, ?, ?, ?)
+    `);
+
+    insertConfig.run('smtp_host', '', 'string', 'SMTP server hostname (e.g. smtp.gmail.com)');
+    insertConfig.run('smtp_port', '587', 'string', 'SMTP server port (587 for TLS, 465 for SSL)');
+    insertConfig.run('smtp_user', '', 'string', 'SMTP username / email address');
+    insertConfig.run('smtp_pass', '', 'string', 'SMTP password or app password');
+    insertConfig.run('smtp_from', 'noreply@tstraffic.com.au', 'string', 'Default sender email address');
+
+    recordMigration.run(17, 'SMTP Email Configuration');
+    console.log('Migration 17 complete.');
+  }
+
+  // =============================================
+  // Migration 18: Make tasks.job_id optional
+  // =============================================
+  if (!isMigrationApplied.get(18)) {
+    console.log('Running migration 18: Make tasks.job_id optional');
+
+    db.exec('BEGIN TRANSACTION');
+    try {
+      db.exec(`
+        CREATE TABLE tasks_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+          division TEXT NOT NULL CHECK(division IN ('ops','planning','marketing','accounts','management')),
+          title TEXT NOT NULL,
+          description TEXT DEFAULT '',
+          owner_id INTEGER REFERENCES users(id),
+          due_date DATE NOT NULL,
+          status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','in_progress','blocked','complete')),
+          priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('high','medium','low')),
+          task_type TEXT DEFAULT 'one_off',
+          notes TEXT DEFAULT '',
+          completed_date DATE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO tasks_new SELECT * FROM tasks;
+        DROP TABLE tasks;
+        ALTER TABLE tasks_new RENAME TO tasks;
+        CREATE INDEX IF NOT EXISTS idx_tasks_job ON tasks(job_id);
+        CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_id);
+        CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+        CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
+      `);
+      db.exec('COMMIT');
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch (r) {}
+      console.log('Migration 18 skipped:', e.message);
+    }
+
+    recordMigration.run(18, 'Make tasks.job_id optional');
+    console.log('Migration 18 complete.');
+  }
+
+  // =============================================
+  // Migration 19: Fix tasks.job_id to allow NULL (explicit columns)
+  // =============================================
+  if (!isMigrationApplied.get(19)) {
+    console.log('Running migration 19: Fix tasks.job_id nullable');
+
+    // Check if job_id is already nullable
+    const tableInfo = db.prepare("PRAGMA table_info(tasks)").all();
+    const jobIdCol = tableInfo.find(c => c.name === 'job_id');
+    if (jobIdCol && jobIdCol.notnull === 1) {
+      db.exec('BEGIN TRANSACTION');
+      try {
+        db.exec(`
+          CREATE TABLE tasks_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+            division TEXT NOT NULL CHECK(division IN ('ops','planning','marketing','accounts','management')),
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            owner_id INTEGER NOT NULL REFERENCES users(id),
+            due_date DATE NOT NULL,
+            status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','in_progress','blocked','complete')),
+            priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('high','medium','low')),
+            escalation_level INTEGER NOT NULL DEFAULT 0,
+            completed_date DATE,
+            notes TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            task_type TEXT DEFAULT 'one_off'
+          );
+          INSERT INTO tasks_new (id, job_id, division, title, description, owner_id, due_date, status, priority, escalation_level, completed_date, notes, created_at, updated_at, task_type)
+          SELECT id, job_id, division, title, description, owner_id, due_date, status, priority, escalation_level, completed_date, notes, created_at, updated_at, task_type FROM tasks;
+          DROP TABLE tasks;
+          ALTER TABLE tasks_new RENAME TO tasks;
+          CREATE INDEX IF NOT EXISTS idx_tasks_job ON tasks(job_id);
+          CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_id);
+          CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+          CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
+        `);
+        db.exec('COMMIT');
+        console.log('Migration 19: tasks.job_id is now nullable.');
+      } catch (e) {
+        try { db.exec('ROLLBACK'); } catch (r) {}
+        console.log('Migration 19 error:', e.message);
+      }
+    } else {
+      console.log('Migration 19: tasks.job_id already nullable, skipping DDL.');
+    }
+
+    recordMigration.run(19, 'Fix tasks.job_id nullable');
+    console.log('Migration 19 complete.');
   }
 
   console.log('All migrations checked/applied.');

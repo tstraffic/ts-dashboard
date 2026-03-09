@@ -91,7 +91,7 @@
       %>
       <div class="flex items-center h-10 border-b border-gray-200/50 hover:bg-white/30 group">
         <!-- Job label (fixed width) -->
-        <a href="/jobs/<%= job.id %>" class="block flex-shrink-0 px-3 text-xs truncate text-brand-600 hover:text-brand-700 font-medium" style="width: <%= labelWidthPx %>px;">
+        <a href="/projects/<%= job.id %>" class="block flex-shrink-0 px-3 text-xs truncate text-brand-600 hover:text-brand-700 font-medium" style="width: <%= labelWidthPx %>px;">
           <%= job.job_number %> - <%= job.client %>
         </a>
         <!-- Bar area (fills remaining space) -->
@@ -102,7 +102,7 @@
           <div class="absolute top-2 h-6 rounded <%= barColor %> opacity-80 hover:opacity-100 cursor-pointer transition-opacity <%= healthBorder %>"
                style="left: <%= Math.max(0, leftPct) %>%; width: <%= widthPct %>%;"
                title="<%= job.job_number %> | <%= job.client %> | <%= job.start_date %> to <%= job.end_date || 'TBD' %> | <%= job.percent_complete %>%"
-               onclick="window.location='/jobs/<%= job.id %>'">
+               onclick="window.location='/projects/<%= job.id %>'">
             <span class="text-[10px] text-white font-medium px-1 truncate block leading-6"><%= job.percent_complete %>%</span>
           </div>
         </div>
@@ -130,7 +130,7 @@
       </thead>
       <tbody class="divide-y divide-gray-200">
         <% jobs.forEach(function(job) { %>
-        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/jobs/<%= job.id %>'">
+        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/projects/<%= job.id %>'">
           <td class="px-4 py-3 text-brand-600 font-medium"><%= job.job_number %></td>
           <td class="px-4 py-3 text-gray-600"><%= job.client %></td>
           <td class="px-4 py-3">

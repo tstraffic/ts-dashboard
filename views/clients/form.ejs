@@ -1,0 +1,122 @@
+<div class="space-y-6 max-w-3xl">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900"><%= client ? 'Edit Client' : 'Add New Client' %></h1>
+      <p class="text-sm text-gray-500 mt-1"><%= client ? 'Update client details' : 'Register a new client company' %></p>
+    </div>
+    <a href="<%= client ? '/clients/' + client.id : '/clients' %>" class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition border border-gray-300">
+      Cancel
+    </a>
+  </div>
+
+  <form method="POST" action="<%= client ? '/clients/' + client.id : '/clients' %>" class="space-y-6">
+    <!-- Company Information -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+      <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">Company Information</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Company Name <span class="text-red-500">*</span></label>
+          <input type="text" name="company_name" value="<%= client ? client.company_name : '' %>" required
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. ABC Civil Contractors">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">ABN</label>
+          <input type="text" name="abn" value="<%= client ? client.abn : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. 12 345 678 901">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
+          <select name="payment_terms"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="" <%= !client || !client.payment_terms ? 'selected' : '' %>>Select...</option>
+            <option value="7 days" <%= client && client.payment_terms === '7 days' ? 'selected' : '' %>>7 Days</option>
+            <option value="14 days" <%= client && client.payment_terms === '14 days' ? 'selected' : '' %>>14 Days</option>
+            <option value="30 days" <%= client && client.payment_terms === '30 days' ? 'selected' : '' %>>30 Days</option>
+            <option value="45 days" <%= client && client.payment_terms === '45 days' ? 'selected' : '' %>>45 Days</option>
+            <option value="60 days" <%= client && client.payment_terms === '60 days' ? 'selected' : '' %>>60 Days</option>
+            <option value="EOM" <%= client && client.payment_terms === 'EOM' ? 'selected' : '' %>>End of Month</option>
+            <option value="EOM+30" <%= client && client.payment_terms === 'EOM+30' ? 'selected' : '' %>>EOM + 30</option>
+            <option value="COD" <%= client && client.payment_terms === 'COD' ? 'selected' : '' %>>Cash on Delivery</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Primary Contact -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+      <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">Primary Contact</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+          <input type="text" name="primary_contact_name" value="<%= client ? client.primary_contact_name : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. John Smith">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+          <input type="text" name="primary_contact_phone" value="<%= client ? client.primary_contact_phone : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. 0412 345 678">
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input type="email" name="primary_contact_email" value="<%= client ? client.primary_contact_email : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. john@abccivil.com.au">
+        </div>
+      </div>
+    </div>
+
+    <!-- Addresses -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+      <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">Addresses</h3>
+      <div class="grid grid-cols-1 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Office / Site Address</label>
+          <input type="text" name="address" value="<%= client ? client.address : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. 123 George St, Sydney NSW 2000">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Billing Address</label>
+          <input type="text" name="billing_address" value="<%= client ? client.billing_address : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. PO Box 456, Sydney NSW 2001">
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+      <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">Notes</h3>
+      <textarea name="notes" rows="3"
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        placeholder="Any additional notes about this client..."><%= client ? client.notes : '' %></textarea>
+    </div>
+
+    <% if (client) { %>
+    <!-- Status -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+      <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">Status</h3>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="active" value="1" <%= client.active ? 'checked' : '' %>
+          class="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500">
+        <span class="text-sm text-gray-700">Active client</span>
+      </label>
+    </div>
+    <% } %>
+
+    <!-- Submit -->
+    <div class="flex items-center gap-3">
+      <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+        <%= client ? 'Update Client' : 'Create Client' %>
+      </button>
+      <a href="<%= client ? '/clients/' + client.id : '/clients' %>" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition border border-gray-300">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>

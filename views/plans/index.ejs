@@ -110,7 +110,7 @@
                 <td class="px-4 py-3 text-brand-600 font-medium"><%= plan.plan_number %></td>
                 <td class="px-4 py-3">
                   <% if (plan.job_id) { %>
-                    <a href="/jobs/<%= plan.job_id %>" class="text-brand-600 hover:text-brand-700"><%= plan.job_number %></a>
+                    <a href="/projects/<%= plan.job_id %>" class="text-brand-600 hover:text-brand-700"><%= plan.job_number %></a>
                   <% } else { %>
                     <span class="text-gray-400">-</span>
                   <% } %>

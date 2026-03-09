@@ -16,6 +16,55 @@ router.get('/', (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   const selectedDate = req.query.date || today;
 
+  // Clients for quick-create shift modal
+  const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
+  // Projects for linking shifts
+  const projects = db.prepare('SELECT id, job_number, client FROM jobs WHERE parent_project_id IS NULL AND status IN (\'active\',\'on_hold\',\'won\') ORDER BY job_number').all();
+
+  if (view === 'month') {
+    // Calculate month boundaries
+    const d = new Date(selectedDate);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const monthStart = firstDay.toISOString().split('T')[0];
+    const monthEnd = lastDay.toISOString().split('T')[0];
+
+    // Get allocation counts per date for the month
+    const dayCounts = db.prepare(`
+      SELECT allocation_date, COUNT(DISTINCT crew_member_id) as crew_count, COUNT(DISTINCT job_id) as job_count
+      FROM crew_allocations
+      WHERE allocation_date BETWEEN ? AND ? AND status IN ('allocated','confirmed')
+      GROUP BY allocation_date
+    `).all(monthStart, monthEnd);
+
+    const dayCountMap = {};
+    for (const row of dayCounts) {
+      dayCountMap[row.allocation_date] = { crew: row.crew_count, jobs: row.job_count };
+    }
+
+    return res.render('allocations/index', {
+      title: 'Allocations',
+      currentPage: 'allocations',
+      view: 'month',
+      selectedDate,
+      today,
+      year, month, firstDay, lastDay, dayCountMap,
+      weekDays: [],
+      jobs: [],
+      allocMap: {},
+      allocations: [],
+      equipmentAssignments: [],
+      equipmentList: [],
+      crewMembers: [],
+      clients,
+      projects,
+      stats: { jobsToday: 0, crewAllocated: 0, unconfirmed: 0, gaps: 0 },
+      userRole: req.session.user.role,
+    });
+  }
+
   if (view === 'week') {
     // Calculate Monday of the selected week
     const d = new Date(selectedDate);
@@ -56,7 +105,7 @@ router.get('/', (req, res) => {
     }
 
     return res.render('allocations/index', {
-      title: 'Crew Allocations',
+      title: 'Allocations',
       currentPage: 'allocations',
       view: 'week',
       selectedDate,
@@ -66,7 +115,10 @@ router.get('/', (req, res) => {
       allocMap,
       allocations: [],
       equipmentAssignments: [],
+      equipmentList: [],
       crewMembers: [],
+      clients,
+      projects,
       stats: { jobsToday: jobs.length, crewAllocated: 0, unconfirmed: 0, gaps: 0 },
       userRole: req.session.user.role,
     });
@@ -126,8 +178,16 @@ router.get('/', (req, res) => {
   }
   const gaps = jobs.filter(j => j.crew_size > 0 && (jobAllocCounts[j.id] || 0) < j.crew_size).length;
 
+  // Equipment list for the equipment panel
+  const equipmentList = db.prepare(`
+    SELECT e.*,
+      (SELECT COUNT(*) FROM equipment_assignments ea WHERE ea.equipment_id = e.id AND ea.assigned_date <= ? AND (ea.actual_return_date IS NULL OR ea.actual_return_date >= ?)) as assigned_count
+    FROM equipment e WHERE e.active = 1
+    ORDER BY e.category, e.name
+  `).all(selectedDate, selectedDate);
+
   res.render('allocations/index', {
-    title: 'Crew Allocations',
+    title: 'Allocations',
     currentPage: 'allocations',
     view: 'day',
     selectedDate,
@@ -135,7 +195,10 @@ router.get('/', (req, res) => {
     jobs,
     allocations,
     equipmentAssignments,
+    equipmentList,
     crewMembers,
+    clients,
+    projects,
     stats: { jobsToday: jobs.length, crewAllocated, unconfirmed, gaps },
     weekDays: [],
     allocMap: {},
@@ -413,6 +476,83 @@ router.post('/copy-day', (req, res) => {
     details: 'Copied ' + result.changes + ' allocations from ' + from_date + ' to ' + to_date, ip: req.ip });
   req.flash('success', result.changes + ' allocations copied from ' + from_date + ' to ' + to_date);
   res.redirect('/allocations?date=' + to_date);
+});
+
+// POST /create-shift — Quick create a shift (lightweight job entry for daily allocation)
+router.post('/create-shift', (req, res) => {
+  const db = getDb();
+  const b = req.body;
+  const date = b.shift_date || new Date().toISOString().split('T')[0];
+
+  // Resolve client name
+  let clientName = '';
+  if (b.client_id) {
+    const client = db.prepare('SELECT company_name FROM clients WHERE id = ?').get(b.client_id);
+    if (client) clientName = client.company_name;
+  }
+
+  // Generate shift job number
+  const lastShift = db.prepare("SELECT job_number FROM jobs WHERE job_number LIKE 'S-%' ORDER BY id DESC LIMIT 1").get();
+  let nextNum = 1;
+  if (lastShift) {
+    const match = lastShift.job_number.match(/S-(\d+)/);
+    if (match) nextNum = parseInt(match[1]) + 1;
+  }
+  const shiftNumber = 'S-' + String(nextNum).padStart(5, '0');
+  const jobName = `${shiftNumber} | ${clientName} | ${b.suburb || ''} | ${date}`;
+
+  try {
+    const result = db.prepare(`
+      INSERT INTO jobs (job_number, job_name, client, client_id, parent_project_id, site_address, suburb, status, stage, start_date, end_date,
+        crew_size, required_tcp_level, notes, state)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 'delivery', ?, ?, ?, ?, ?, 'NSW')
+    `).run(
+      shiftNumber, jobName, clientName, b.client_id || null, b.parent_project_id || null,
+      b.site_address || '', b.suburb || '', date, date,
+      parseInt(b.crew_size) || 0, b.required_tcp_level || '', b.notes || ''
+    );
+
+    logActivity({ user: req.session.user, action: 'create', entityType: 'shift',
+      jobId: result.lastInsertRowid, details: 'Quick-created shift ' + shiftNumber + ' for ' + date, ip: req.ip });
+
+    req.flash('success', 'Shift ' + shiftNumber + ' created for ' + date);
+    res.redirect('/allocations?date=' + date);
+  } catch (err) {
+    req.flash('error', 'Failed to create shift: ' + err.message);
+    res.redirect('/allocations?date=' + date);
+  }
+});
+
+// GET /api/equipment-panel.json — Equipment list with availability
+router.get('/api/equipment-panel.json', (req, res) => {
+  const db = getDb();
+  const date = req.query.date || new Date().toISOString().split('T')[0];
+
+  const equipment = db.prepare(`
+    SELECT e.*,
+      (SELECT GROUP_CONCAT(j.job_number) FROM equipment_assignments ea JOIN jobs j ON ea.job_id = j.id
+       WHERE ea.equipment_id = e.id AND ea.assigned_date <= ? AND (ea.actual_return_date IS NULL OR ea.actual_return_date >= ?)) as assigned_to
+    FROM equipment e WHERE e.active = 1
+    ORDER BY e.category, e.name
+  `).all(date, date);
+
+  res.json(equipment);
+});
+
+// POST /api/assign-equipment.json — Assign equipment to a job
+router.post('/api/assign-equipment.json', (req, res) => {
+  const db = getDb();
+  const { equipment_id, job_id, date } = req.body;
+
+  const result = db.prepare(`
+    INSERT INTO equipment_assignments (equipment_id, job_id, assigned_date, quantity, assigned_by_id)
+    VALUES (?, ?, ?, 1, ?)
+  `).run(parseInt(equipment_id), parseInt(job_id), date, req.session.user.id);
+
+  logActivity({ user: req.session.user, action: 'create', entityType: 'equipment_assignment',
+    jobId: parseInt(job_id), details: 'Assigned equipment to job via allocations board', ip: req.ip });
+
+  res.json({ success: true, assignmentId: result.lastInsertRowid });
 });
 
 module.exports = router;

@@ -14,6 +14,7 @@
       'Regional': configs.filter(c => ['default_timezone', 'currency'].includes(c.config_key)),
       'Shift Rules': configs.filter(c => ['default_shift_hours', 'max_shift_length_hours', 'min_rest_between_shifts_hours'].includes(c.config_key)),
       'Compliance & Fatigue': configs.filter(c => ['fatigue_max_days', 'fatigue_window_days', 'ticket_expiry_warning_days'].includes(c.config_key)),
+      'Email (SMTP)': configs.filter(c => ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from'].includes(c.config_key)),
     };
 
     const fieldLabels = {
@@ -27,6 +28,11 @@
       fatigue_max_days: 'Fatigue: Max Work Days in Window',
       fatigue_window_days: 'Fatigue: Rolling Window (days)',
       ticket_expiry_warning_days: 'Ticket Expiry Warning (days before)',
+      smtp_host: 'SMTP Host',
+      smtp_port: 'SMTP Port',
+      smtp_user: 'SMTP Username',
+      smtp_pass: 'SMTP Password',
+      smtp_from: 'From Address',
     };
   %>
 
@@ -43,8 +49,14 @@
               <% if (config.config_type === 'number') { %>
                 <input type="number" id="<%= config.config_key %>" name="<%= config.config_key %>" value="<%= config.config_value %>" step="any"
                   class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+              <% } else if (config.config_key === 'smtp_pass') { %>
+                <input type="password" id="<%= config.config_key %>" name="<%= config.config_key %>" value="<%= config.config_value %>" placeholder="App password or SMTP password" autocomplete="new-password"
+                  class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
               <% } else { %>
                 <input type="text" id="<%= config.config_key %>" name="<%= config.config_key %>" value="<%= config.config_value %>"
+                  <% if (config.config_key === 'smtp_host') { %>placeholder="e.g. smtp.gmail.com"<% } %>
+                  <% if (config.config_key === 'smtp_user') { %>placeholder="e.g. ops@tstraffic.com.au"<% } %>
+                  <% if (config.config_key === 'smtp_from') { %>placeholder="e.g. noreply@tstraffic.com.au"<% } %>
                   class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
               <% } %>
               <% if (config.description) { %>
