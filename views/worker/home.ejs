@@ -1,0 +1,152 @@
+<div class="space-y-5">
+  <!-- Greeting -->
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900"><%= greeting %>, <%= firstName %></h1>
+    <p class="text-gray-500 text-sm mt-0.5"><%= new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) %></p>
+  </div>
+
+  <!-- Compliance Alerts -->
+  <% if (compliance && (!compliance.canAllocate || compliance.fatigueBlocked || compliance.expiringItems.length > 0)) { %>
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+      <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+        </svg>
+        <div>
+          <p class="text-sm font-semibold text-amber-800">Compliance Alert</p>
+          <ul class="text-sm text-amber-700 mt-1 space-y-0.5">
+            <% if (compliance.fatigueBlocked) { %>
+              <li>⚠ Fatigue limit reached (<%= compliance.daysWorked %>/7 days worked)</li>
+            <% } %>
+            <% if (compliance.expiredItems && compliance.expiredItems.length > 0) { %>
+              <li>⚠ Expired: <%= compliance.expiredItems.join(', ') %></li>
+            <% } %>
+            <% if (compliance.expiringItems && compliance.expiringItems.length > 0) { %>
+              <li>⏳ Expiring soon: <%= compliance.expiringItems.join(', ') %></li>
+            <% } %>
+            <% if (!compliance.inductionComplete) { %>
+              <li>⚠ Induction not completed</li>
+            <% } %>
+          </ul>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Today's Shift -->
+  <div>
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Today's Shift</h2>
+    <% if (todaysShifts.length === 0) { %>
+      <!-- No Shift Empty State -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
+        <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+          <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <p class="text-gray-500 text-sm">No shift scheduled for today</p>
+        <a href="/w/jobs" class="inline-block mt-3 text-brand-600 text-sm font-medium">View upcoming jobs &rarr;</a>
+      </div>
+    <% } else { %>
+      <% todaysShifts.forEach(shift => { %>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-3">
+          <!-- Status Banner -->
+          <div class="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+              <%= shift.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
+                : shift.status === 'completed' ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20'
+                : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' %>">
+              <%= shift.status.charAt(0).toUpperCase() + shift.status.slice(1) %>
+            </span>
+            <span class="text-xs text-gray-400"><%= shift.shift_type %> shift</span>
+          </div>
+
+          <!-- Job Info -->
+          <div class="p-4 space-y-3">
+            <div>
+              <p class="text-xs text-gray-500"><%= shift.job_number %></p>
+              <p class="font-semibold text-gray-900"><%= shift.client %></p>
+            </div>
+
+            <!-- Address -->
+            <div class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-gray-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+              <p class="text-sm text-gray-600"><%= shift.site_address %>, <%= shift.suburb %></p>
+            </div>
+
+            <!-- Time -->
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <p class="text-sm text-gray-900 font-medium"><%= shift.start_time %> — <%= shift.end_time %></p>
+            </div>
+
+            <!-- Supervisor -->
+            <% if (shift.supervisor_name) { %>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                <p class="text-sm text-gray-600">Supervisor: <span class="font-medium text-gray-900"><%= shift.supervisor_name %></span></p>
+              </div>
+            <% } %>
+
+            <!-- Role on site -->
+            <% if (shift.role_on_site) { %>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/>
+                </svg>
+                <p class="text-sm text-gray-600">Role: <span class="font-medium text-gray-900"><%= shift.role_on_site.replace(/_/g, ' ') %></span></p>
+              </div>
+            <% } %>
+          </div>
+
+          <!-- Actions -->
+          <div class="px-4 py-3 bg-gray-50 border-t border-gray-100">
+            <a href="/w/jobs/<%= shift.id %>" class="block text-center text-sm font-medium text-brand-600">
+              View Job Details &rarr;
+            </a>
+          </div>
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+
+  <!-- Quick Actions -->
+  <div>
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Quick Actions</h2>
+    <div class="grid grid-cols-3 gap-3">
+      <a href="/w/clock" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center hover:bg-gray-50 transition">
+        <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mx-auto mb-2">
+          <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <p class="text-xs font-medium text-gray-700">Clock In</p>
+      </a>
+      <a href="#" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center hover:bg-gray-50 transition opacity-50 pointer-events-none">
+        <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-2">
+          <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <p class="text-xs font-medium text-gray-700">Prestart</p>
+        <p class="text-[10px] text-gray-400">Coming soon</p>
+      </a>
+      <a href="#" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center hover:bg-gray-50 transition opacity-50 pointer-events-none">
+        <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-2">
+          <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+          </svg>
+        </div>
+        <p class="text-xs font-medium text-gray-700">Incident</p>
+        <p class="text-[10px] text-gray-400">Coming soon</p>
+      </a>
+    </div>
+  </div>
+</div>

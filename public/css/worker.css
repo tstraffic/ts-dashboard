@@ -1,0 +1,84 @@
+/* Worker Portal — Mobile-First Styles */
+
+/* Safe area padding for notch phones (iPhone X+) */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Bottom tab nav — fixed with safe area */
+nav.fixed {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Main content — bottom padding to clear tab bar */
+main {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px) + 1rem);
+}
+
+/* Large touch targets — minimum 44px */
+a, button {
+  min-height: 44px;
+}
+
+/* Prevent text selection on nav */
+nav a {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Remove default input zoom on iOS */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="tel"],
+input[type="number"],
+select,
+textarea {
+  font-size: 16px;
+}
+
+/* Active press effect for cards */
+a.active\:bg-gray-50:active {
+  background-color: rgb(249 250 251);
+}
+
+/* Custom scrollbar (minimal for mobile) */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+/* Standalone PWA — hide browser chrome padding */
+@media all and (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* Shift card transition */
+.shift-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.shift-card:active {
+  transform: scale(0.98);
+}

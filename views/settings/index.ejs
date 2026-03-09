@@ -1,0 +1,51 @@
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Settings</h1>
+    <p class="text-gray-500 mt-1">Configure operational parameters and system options</p>
+  </div>
+</div>
+
+<!-- System Configuration Card -->
+<div class="mb-8">
+  <a href="/settings/system" class="block bg-gradient-to-r from-brand-50 to-white border border-brand-200 rounded-xl p-6 hover:border-brand-400 transition-colors group shadow-sm">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center space-x-4">
+        <div class="w-12 h-12 rounded-lg bg-brand-50 flex items-center justify-center">
+          <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 group-hover:text-brand-600 transition-colors">System Configuration</h3>
+          <p class="text-sm text-gray-500">Company details, shift rules, compliance thresholds</p>
+        </div>
+      </div>
+      <svg class="w-5 h-5 text-gray-400 group-hover:text-brand-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </div>
+  </a>
+</div>
+
+<!-- Enumeration Settings by Group -->
+<% const groupOrder = ['Jobs', 'Workforce', 'Safety', 'Planning', 'Assets', 'General']; %>
+<% for (const groupName of groupOrder) { %>
+  <% if (groups[groupName] && groups[groupName].length > 0) { %>
+    <div class="mb-6">
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3"><%= groupName %></h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <% for (const cat of groups[groupName]) { %>
+          <a href="/settings/category/<%= cat.category %>" class="bg-white border border-gray-200 rounded-lg shadow-sm p-4 hover:border-brand-500/40 hover:bg-white/80 transition-colors group">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-semibold text-gray-900 group-hover:text-brand-600 transition-colors"><%= cat.meta.label %></h3>
+              <svg class="w-4 h-4 text-gray-400 group-hover:text-brand-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </div>
+            <div class="flex items-center space-x-3 text-xs text-gray-500">
+              <span><%= cat.active %> active</span>
+              <% if (cat.total - cat.active > 0) { %>
+                <span class="text-gray-400">|</span>
+                <span class="text-gray-400"><%= cat.total - cat.active %> inactive</span>
+              <% } %>
+            </div>
+          </a>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
+<% } %>

@@ -6,7 +6,7 @@
     update: 'bg-blue-600 text-blue-100',
     delete: 'bg-red-600 text-red-100',
     login: 'bg-purple-600 text-purple-100',
-    logout: 'bg-slate-600 text-slate-200',
+    logout: 'bg-gray-100 text-gray-700',
     upload: 'bg-teal-600 text-teal-100',
     download: 'bg-cyan-600 text-cyan-100',
     complete: 'bg-emerald-600 text-emerald-100',
@@ -48,18 +48,18 @@
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
     <div>
-      <h1 class="text-2xl font-bold text-white">Activity Log</h1>
-      <p class="text-sm text-slate-400 mt-1">Audit trail of all system actions</p>
+      <h1 class="text-2xl font-bold text-gray-900">Activity Log</h1>
+      <p class="text-sm text-gray-500 mt-1">Audit trail of all system actions</p>
     </div>
   </div>
 
   <!-- Filters -->
-  <form method="GET" action="/activity" class="bg-slate-800 border border-slate-700 rounded-lg p-4 mb-6">
+  <form method="GET" action="/activity" class="bg-white border border-gray-200 rounded-lg shadow-sm p-4 mb-6">
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-end">
       <!-- User -->
       <div>
-        <label class="block text-sm font-medium text-slate-400 mb-1">User</label>
-        <select name="user_id" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="block text-sm font-medium text-gray-500 mb-1">User</label>
+        <select name="user_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Users</option>
           <% users.forEach(function(u) { %>
             <option value="<%= u.id %>" <%= filters.user_id == u.id ? 'selected' : '' %>><%= u.full_name %></option>
@@ -69,8 +69,8 @@
 
       <!-- Action -->
       <div>
-        <label class="block text-sm font-medium text-slate-400 mb-1">Action</label>
-        <select name="action" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="block text-sm font-medium text-gray-500 mb-1">Action</label>
+        <select name="action" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Actions</option>
           <% Object.keys(actionLabels).forEach(function(key) { %>
             <option value="<%= key %>" <%= filters.action === key ? 'selected' : '' %>><%= actionLabels[key] %></option>
@@ -80,8 +80,8 @@
 
       <!-- Entity Type -->
       <div>
-        <label class="block text-sm font-medium text-slate-400 mb-1">Entity Type</label>
-        <select name="entity_type" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="block text-sm font-medium text-gray-500 mb-1">Entity Type</label>
+        <select name="entity_type" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Types</option>
           <% Object.keys(entityTypeLabels).forEach(function(key) { %>
             <option value="<%= key %>" <%= filters.entity_type === key ? 'selected' : '' %>><%= entityTypeLabels[key] %></option>
@@ -91,8 +91,8 @@
 
       <!-- Job -->
       <div>
-        <label class="block text-sm font-medium text-slate-400 mb-1">Job</label>
-        <select name="job_id" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="block text-sm font-medium text-gray-500 mb-1">Job</label>
+        <select name="job_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Jobs</option>
           <% jobs.forEach(function(job) { %>
             <option value="<%= job.id %>" <%= filters.job_id == job.id ? 'selected' : '' %>><%= job.job_number %></option>
@@ -102,14 +102,14 @@
 
       <!-- Date From -->
       <div>
-        <label class="block text-sm font-medium text-slate-400 mb-1">From Date</label>
-        <input type="date" name="from_date" value="<%= filters.from_date || '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="block text-sm font-medium text-gray-500 mb-1">From Date</label>
+        <input type="date" name="from_date" value="<%= filters.from_date || '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
       </div>
 
       <!-- Date To -->
       <div>
-        <label class="block text-sm font-medium text-slate-400 mb-1">To Date</label>
-        <input type="date" name="to_date" value="<%= filters.to_date || '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="block text-sm font-medium text-gray-500 mb-1">To Date</label>
+        <input type="date" name="to_date" value="<%= filters.to_date || '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
       </div>
     </div>
 
@@ -117,7 +117,7 @@
       <button type="submit" class="px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition">
         Apply Filters
       </button>
-      <a href="/activity" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500 transition font-medium">
+      <a href="/activity" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium">
         Clear
       </a>
     </div>
@@ -125,7 +125,7 @@
 
   <!-- Results Count -->
   <div class="flex items-center justify-between mb-4">
-    <p class="text-sm text-slate-400">
+    <p class="text-sm text-gray-500">
       <% if (pagination.total > 0) { %>
         Showing <%= ((pagination.page - 1) * 50) + 1 %> - <%= Math.min(pagination.page * 50, pagination.total) %> of <%= pagination.total %> entries
       <% } else { %>
@@ -135,10 +135,10 @@
   </div>
 
   <!-- Activity Table -->
-  <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+  <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
     <% if (logs.length === 0) { %>
-      <div class="p-8 text-center text-slate-400">
-        <svg class="w-12 h-12 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <div class="p-8 text-center text-gray-500">
+        <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <p>No activity log entries found.</p>
         <p class="text-sm mt-1">Activity will appear here as users interact with the system.</p>
       </div>
@@ -146,21 +146,21 @@
       <div class="overflow-x-auto">
         <table class="w-full">
           <thead>
-            <tr class="border-b border-slate-700">
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Timestamp</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">User</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Action</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Entity Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Entity</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Job</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Details</th>
+            <tr class="border-b border-gray-200">
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Timestamp</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Entity Type</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Entity</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Job</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Details</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-700">
+          <tbody class="divide-y divide-gray-200">
             <% logs.forEach(function(log) { %>
               <%
                 const displayName = log.user_display_name || log.user_name || 'System';
-                const actionColor = actionColors[log.action] || 'bg-slate-600 text-slate-200';
+                const actionColor = actionColors[log.action] || 'bg-gray-100 text-gray-700';
                 const actionLabel = actionLabels[log.action] || log.action;
                 const entityLabel = entityTypeLabels[log.entity_type] || log.entity_type;
                 let formattedTime = '';
@@ -169,28 +169,28 @@
                   formattedTime = d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false });
                 }
               %>
-              <tr class="hover:bg-slate-750 hover:bg-opacity-50">
-                <td class="px-4 py-3 text-sm text-slate-300 whitespace-nowrap"><%= formattedTime %></td>
-                <td class="px-4 py-3 text-sm text-white font-medium whitespace-nowrap"><%= displayName %></td>
+              <tr class="hover:bg-gray-50 hover:bg-opacity-50">
+                <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap"><%= formattedTime %></td>
+                <td class="px-4 py-3 text-sm text-gray-900 font-medium whitespace-nowrap"><%= displayName %></td>
                 <td class="px-4 py-3">
                   <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= actionColor %>"><%= actionLabel %></span>
                 </td>
-                <td class="px-4 py-3 text-sm text-slate-300"><%= entityLabel %></td>
-                <td class="px-4 py-3 text-sm text-slate-300">
+                <td class="px-4 py-3 text-sm text-gray-600"><%= entityLabel %></td>
+                <td class="px-4 py-3 text-sm text-gray-600">
                   <% if (log.entity_label) { %>
                     <%= log.entity_label %>
                   <% } else { %>
-                    <span class="text-slate-500">-</span>
+                    <span class="text-gray-400">-</span>
                   <% } %>
                 </td>
                 <td class="px-4 py-3 text-sm">
                   <% if (log.job_number) { %>
-                    <a href="/jobs/<%= log.job_id %>" class="text-brand-400 hover:text-brand-300"><%= log.job_number %></a>
+                    <a href="/jobs/<%= log.job_id %>" class="text-brand-600 hover:text-brand-700"><%= log.job_number %></a>
                   <% } else { %>
-                    <span class="text-slate-500">-</span>
+                    <span class="text-gray-400">-</span>
                   <% } %>
                 </td>
-                <td class="px-4 py-3 text-sm text-slate-400 max-w-xs truncate" title="<%= log.details || '' %>">
+                <td class="px-4 py-3 text-sm text-gray-500 max-w-xs truncate" title="<%= log.details || '' %>">
                   <%= log.details || '-' %>
                 </td>
               </tr>
@@ -204,7 +204,7 @@
   <!-- Pagination -->
   <% if (pagination.totalPages > 1) { %>
     <div class="flex items-center justify-between mt-6">
-      <p class="text-sm text-slate-400">
+      <p class="text-sm text-gray-500">
         Page <%= pagination.page %> of <%= pagination.totalPages %>
       </p>
       <div class="flex items-center gap-2">
@@ -213,11 +213,11 @@
             const prevParams = new URLSearchParams(filters);
             prevParams.set('page', pagination.page - 1);
           %>
-          <a href="/activity?<%= prevParams.toString() %>" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 hover:text-white transition text-sm font-medium">
+          <a href="/activity?<%= prevParams.toString() %>" class="px-3 py-1.5 bg-white text-gray-600 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition text-sm font-medium">
             Previous
           </a>
         <% } else { %>
-          <span class="px-3 py-1.5 bg-slate-800 text-slate-600 rounded-lg text-sm font-medium cursor-not-allowed">
+          <span class="px-3 py-1.5 bg-white text-gray-400 rounded-lg text-sm font-medium cursor-not-allowed">
             Previous
           </span>
         <% } %>
@@ -236,9 +236,9 @@
             const firstParams = new URLSearchParams(filters);
             firstParams.set('page', 1);
           %>
-          <a href="/activity?<%= firstParams.toString() %>" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 hover:text-white transition text-sm font-medium">1</a>
+          <a href="/activity?<%= firstParams.toString() %>" class="px-3 py-1.5 bg-white text-gray-600 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition text-sm font-medium">1</a>
           <% if (startPage > 2) { %>
-            <span class="px-2 text-slate-500">...</span>
+            <span class="px-2 text-gray-400">...</span>
           <% } %>
         <% } %>
 
@@ -250,19 +250,19 @@
           <% if (i === pagination.page) { %>
             <span class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-bold"><%= i %></span>
           <% } else { %>
-            <a href="/activity?<%= pageParams.toString() %>" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 hover:text-white transition text-sm font-medium"><%= i %></a>
+            <a href="/activity?<%= pageParams.toString() %>" class="px-3 py-1.5 bg-white text-gray-600 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition text-sm font-medium"><%= i %></a>
           <% } %>
         <% } %>
 
         <% if (endPage < pagination.totalPages) { %>
           <% if (endPage < pagination.totalPages - 1) { %>
-            <span class="px-2 text-slate-500">...</span>
+            <span class="px-2 text-gray-400">...</span>
           <% } %>
           <%
             const lastParams = new URLSearchParams(filters);
             lastParams.set('page', pagination.totalPages);
           %>
-          <a href="/activity?<%= lastParams.toString() %>" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 hover:text-white transition text-sm font-medium"><%= pagination.totalPages %></a>
+          <a href="/activity?<%= lastParams.toString() %>" class="px-3 py-1.5 bg-white text-gray-600 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition text-sm font-medium"><%= pagination.totalPages %></a>
         <% } %>
 
         <% if (pagination.page < pagination.totalPages) { %>
@@ -270,11 +270,11 @@
             const nextParams = new URLSearchParams(filters);
             nextParams.set('page', pagination.page + 1);
           %>
-          <a href="/activity?<%= nextParams.toString() %>" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 hover:text-white transition text-sm font-medium">
+          <a href="/activity?<%= nextParams.toString() %>" class="px-3 py-1.5 bg-white text-gray-600 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition text-sm font-medium">
             Next
           </a>
         <% } else { %>
-          <span class="px-3 py-1.5 bg-slate-800 text-slate-600 rounded-lg text-sm font-medium cursor-not-allowed">
+          <span class="px-3 py-1.5 bg-white text-gray-400 rounded-lg text-sm font-medium cursor-not-allowed">
             Next
           </span>
         <% } %>

@@ -3,7 +3,7 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold text-white">Project Updates</h1>
+    <h1 class="text-2xl font-bold text-gray-900">Project Updates</h1>
     <a href="/updates/new" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition">
       <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
       Submit Update
@@ -11,11 +11,11 @@
   </div>
 
   <!-- Filter -->
-  <form method="GET" action="/updates" class="bg-slate-800 border border-slate-700 rounded-lg p-4 mb-6">
+  <form method="GET" action="/updates" class="bg-white border border-gray-200 rounded-lg shadow-sm p-4 mb-6">
     <div class="flex items-end gap-4">
       <div class="flex-1">
-        <label class="block text-sm font-medium text-slate-400 mb-1">Job</label>
-        <select name="job_id" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="block text-sm font-medium text-gray-500 mb-1">Job</label>
+        <select name="job_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Jobs</option>
           <% jobs.forEach(function(job) { %>
             <option value="<%= job.id %>" <%= filters.job_id == job.id ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
@@ -23,39 +23,39 @@
         </select>
       </div>
       <div>
-        <button type="submit" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500 transition font-medium">Apply</button>
+        <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-300 transition font-medium">Apply</button>
       </div>
     </div>
   </form>
 
   <!-- Updates List -->
   <% if (updates.length === 0) { %>
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-8 text-center text-slate-400">
-      <svg class="w-12 h-12 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-8 text-center text-gray-500">
+      <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       <p>No updates found.</p>
     </div>
   <% } else { %>
     <div class="space-y-4">
       <% updates.forEach(function(update) { %>
-        <a href="/updates/<%= update.id %>" class="block bg-slate-800 border border-slate-700 rounded-lg p-5 hover:border-slate-600 transition">
+        <a href="/updates/<%= update.id %>" class="block bg-white border border-gray-200 rounded-lg shadow-sm p-5 hover:border-gray-300 transition">
           <div class="flex items-start justify-between mb-2">
             <div>
               <div class="flex items-center space-x-2 mb-1">
-                <span class="text-brand-400 font-semibold"><%= update.job_number %></span>
-                <span class="text-slate-500">-</span>
-                <span class="text-white font-medium"><%= update.client %></span>
+                <span class="text-brand-600 font-semibold"><%= update.job_number %></span>
+                <span class="text-gray-400">-</span>
+                <span class="text-gray-900 font-medium"><%= update.client %></span>
               </div>
-              <div class="flex items-center space-x-4 text-sm text-slate-400">
+              <div class="flex items-center space-x-4 text-sm text-gray-500">
                 <span>Week ending: <%= update.week_ending ? new Date(update.week_ending).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></span>
                 <span>by <%= update.submitted_by_name || 'Unknown' %></span>
               </div>
             </div>
-            <div class="text-xs text-slate-500">
+            <div class="text-xs text-gray-400">
               <%= update.created_at ? new Date(update.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '' %>
             </div>
           </div>
           <% if (update.summary) { %>
-            <p class="text-slate-300 text-sm mt-2 line-clamp-2"><%= update.summary.length > 200 ? update.summary.substring(0, 200) + '...' : update.summary %></p>
+            <p class="text-gray-600 text-sm mt-2 line-clamp-2"><%= update.summary.length > 200 ? update.summary.substring(0, 200) + '...' : update.summary %></p>
           <% } %>
         </a>
       <% }) %>

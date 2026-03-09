@@ -9,18 +9,18 @@
 <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <!-- Header -->
   <div class="mb-6">
-    <h1 class="text-2xl font-bold text-white"><%= pageTitle %></h1>
+    <h1 class="text-2xl font-bold text-gray-900"><%= pageTitle %></h1>
   </div>
 
-  <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+  <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
     <form method="POST" action="<%= formAction %>">
       <input type="hidden" name="return_to" value="<%= returnTo %>">
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Job -->
         <div>
-          <label for="job_id" class="block text-sm font-medium text-slate-300 mb-1">Job <span class="text-red-400">*</span></label>
-          <select id="job_id" name="job_id" required class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label for="job_id" class="block text-sm font-medium text-gray-600 mb-1">Job <span class="text-red-600">*</span></label>
+          <select id="job_id" name="job_id" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="">Select a job...</option>
             <% jobs.forEach(function(job) { %>
               <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
@@ -30,8 +30,8 @@
 
         <!-- Division -->
         <div>
-          <label for="division" class="block text-sm font-medium text-slate-300 mb-1">Division</label>
-          <select id="division" name="division" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label for="division" class="block text-sm font-medium text-gray-600 mb-1">Division</label>
+          <select id="division" name="division" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="">Select division...</option>
             <option value="ops" <%= isEdit && task.division === 'ops' ? 'selected' : '' %>>Ops</option>
             <option value="planning" <%= isEdit && task.division === 'planning' ? 'selected' : '' %>>Planning</option>
@@ -43,20 +43,20 @@
 
         <!-- Title -->
         <div class="md:col-span-2">
-          <label for="title" class="block text-sm font-medium text-slate-300 mb-1">Title <span class="text-red-400">*</span></label>
-          <input type="text" id="title" name="title" required value="<%= isEdit ? task.title : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Task title...">
+          <label for="title" class="block text-sm font-medium text-gray-600 mb-1">Title <span class="text-red-600">*</span></label>
+          <input type="text" id="title" name="title" required value="<%= isEdit ? task.title : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Task title...">
         </div>
 
         <!-- Description -->
         <div class="md:col-span-2">
-          <label for="description" class="block text-sm font-medium text-slate-300 mb-1">Description</label>
-          <textarea id="description" name="description" rows="3" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Task description..."><%= isEdit && task.description ? task.description : '' %></textarea>
+          <label for="description" class="block text-sm font-medium text-gray-600 mb-1">Description</label>
+          <textarea id="description" name="description" rows="3" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Task description..."><%= isEdit && task.description ? task.description : '' %></textarea>
         </div>
 
         <!-- Owner -->
         <div>
-          <label for="owner_id" class="block text-sm font-medium text-slate-300 mb-1">Owner <span class="text-red-400">*</span></label>
-          <select id="owner_id" name="owner_id" required class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label for="owner_id" class="block text-sm font-medium text-gray-600 mb-1">Owner <span class="text-red-600">*</span></label>
+          <select id="owner_id" name="owner_id" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="">Select owner...</option>
             <% users.forEach(function(user) { %>
               <option value="<%= user.id %>" <%= isEdit && task.owner_id == user.id ? 'selected' : '' %>><%= user.full_name || user.username %></option>
@@ -66,41 +66,40 @@
 
         <!-- Due Date -->
         <div>
-          <label for="due_date" class="block text-sm font-medium text-slate-300 mb-1">Due Date <span class="text-red-400">*</span></label>
-          <input type="date" id="due_date" name="due_date" required value="<%= isEdit && task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label for="due_date" class="block text-sm font-medium text-gray-600 mb-1">Due Date <span class="text-red-600">*</span></label>
+          <input type="date" id="due_date" name="due_date" required value="<%= isEdit && task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
         </div>
 
         <!-- Status -->
         <div>
-          <label for="status" class="block text-sm font-medium text-slate-300 mb-1">Status</label>
-          <select id="status" name="status" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="not_started" <%= isEdit && task.status === 'not_started' ? 'selected' : '' %>>Not Started</option>
-            <option value="in_progress" <%= isEdit && task.status === 'in_progress' ? 'selected' : '' %>>In Progress</option>
-            <option value="blocked" <%= isEdit && task.status === 'blocked' ? 'selected' : '' %>>Blocked</option>
-            <option value="complete" <%= isEdit && task.status === 'complete' ? 'selected' : '' %>>Complete</option>
+          <label for="status" class="block text-sm font-medium text-gray-600 mb-1">Status</label>
+          <select id="status" name="status" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <% (settingsOptions.task_status || []).forEach(opt => { %>
+              <option value="<%= opt.key %>" <%= isEdit && task.status === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+            <% }) %>
           </select>
         </div>
 
         <!-- Priority -->
         <div>
-          <label for="priority" class="block text-sm font-medium text-slate-300 mb-1">Priority</label>
-          <select id="priority" name="priority" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="medium" <%= isEdit && task.priority === 'medium' ? 'selected' : '' %>>Medium</option>
-            <option value="high" <%= isEdit && task.priority === 'high' ? 'selected' : '' %>>High</option>
-            <option value="low" <%= isEdit && task.priority === 'low' ? 'selected' : '' %>>Low</option>
+          <label for="priority" class="block text-sm font-medium text-gray-600 mb-1">Priority</label>
+          <select id="priority" name="priority" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <% (settingsOptions.task_priority || []).forEach(opt => { %>
+              <option value="<%= opt.key %>" <%= isEdit && task.priority === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+            <% }) %>
           </select>
         </div>
 
         <!-- Notes -->
         <div class="md:col-span-2">
-          <label for="notes" class="block text-sm font-medium text-slate-300 mb-1">Notes</label>
-          <textarea id="notes" name="notes" rows="3" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Additional notes..."><%= isEdit && task.notes ? task.notes : '' %></textarea>
+          <label for="notes" class="block text-sm font-medium text-gray-600 mb-1">Notes</label>
+          <textarea id="notes" name="notes" rows="3" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Additional notes..."><%= isEdit && task.notes ? task.notes : '' %></textarea>
         </div>
       </div>
 
       <!-- Buttons -->
-      <div class="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-slate-700">
-        <a href="/tasks" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition font-medium">Cancel</a>
+      <div class="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+        <a href="/tasks" class="px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition font-medium">Cancel</a>
         <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold">
           <%= isEdit ? 'Update Task' : 'Create Task' %>
         </button>

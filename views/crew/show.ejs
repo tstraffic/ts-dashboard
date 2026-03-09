@@ -1,0 +1,420 @@
+<div class="space-y-6">
+  <!-- Breadcrumb -->
+  <div class="flex items-center gap-2 text-sm text-gray-500">
+    <a href="/crew" class="hover:text-gray-900 transition">Workforce</a>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    <span class="text-gray-900"><%= member.full_name %></span>
+  </div>
+
+  <!-- Header -->
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold text-lg">
+        <%= member.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() %>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900"><%= member.full_name %></h1>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white text-gray-600">
+            <%= member.role ? member.role.replace(/_/g, ' ') : 'No role' %>
+          </span>
+          <% if (member.active) { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Active</span>
+          <% } else { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20">Inactive</span>
+          <% } %>
+          <% if (compliance.canAllocate) { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Can Allocate</span>
+          <% } else { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-50 text-red-700 ring-1 ring-red-600/20">Cannot Allocate</span>
+          <% } %>
+        </div>
+      </div>
+    </div>
+    <a href="/timesheets/crew/<%= member.id %>/edit" class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition">
+      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+      Edit
+    </a>
+  </div>
+
+  <!-- Identity Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Worker ID</p>
+      <p class="text-gray-900 font-medium mt-1"><%= member.employee_id || '—' %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</p>
+      <p class="text-gray-900 font-medium mt-1"><%= member.phone || '—' %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</p>
+      <p class="text-gray-900 font-medium mt-1"><%= member.email || '—' %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Company</p>
+      <p class="text-gray-900 font-medium mt-1"><%= member.company || '—' %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Employment Type</p>
+      <p class="text-gray-900 font-medium mt-1"><%= member.employment_type ? member.employment_type.replace(/_/g, ' ') : '—' %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">TCP Level</p>
+      <p class="text-gray-900 font-medium mt-1"><%= member.tcp_level || 'Not set' %></p>
+    </div>
+  </div>
+
+  <!-- Compliance Status Panel -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Compliance Status</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Induction -->
+      <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+        <% if (compliance.inductionComplete) { %>
+          <div class="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">
+            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </div>
+        <% } else { %>
+          <div class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
+            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </div>
+        <% } %>
+        <div>
+          <p class="text-xs text-gray-500">Induction</p>
+          <p class="text-sm font-medium <%= compliance.inductionComplete ? 'text-emerald-600' : 'text-red-600' %>">
+            <%= member.induction_status ? member.induction_status.charAt(0).toUpperCase() + member.induction_status.slice(1) : 'Pending' %>
+          </p>
+        </div>
+      </div>
+
+      <!-- Tickets -->
+      <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+        <% if (compliance.allTicketsValid) { %>
+          <div class="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">
+            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </div>
+        <% } else { %>
+          <div class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
+            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </div>
+        <% } %>
+        <div>
+          <p class="text-xs text-gray-500">Tickets</p>
+          <p class="text-sm font-medium <%= compliance.allTicketsValid ? 'text-emerald-600' : 'text-red-600' %>">
+            <%= compliance.allTicketsValid ? 'All Valid' : compliance.expiredItems.length + ' Expired' %>
+          </p>
+        </div>
+      </div>
+
+      <!-- Licence -->
+      <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+        <% if (compliance.licenceValid) { %>
+          <div class="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">
+            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </div>
+        <% } else { %>
+          <div class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
+            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </div>
+        <% } %>
+        <div>
+          <p class="text-xs text-gray-500">Licence</p>
+          <p class="text-sm font-medium <%= compliance.licenceValid ? 'text-emerald-600' : 'text-red-600' %>">
+            <%= member.licence_type || 'Not set' %><% if (member.licence_expiry) { %> — exp. <%= member.licence_expiry %><% } %>
+          </p>
+        </div>
+      </div>
+
+      <!-- Fatigue -->
+      <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+        <% if (compliance.fatigueBlocked) { %>
+          <div class="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center">
+            <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+          </div>
+        <% } else { %>
+          <div class="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">
+            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </div>
+        <% } %>
+        <div>
+          <p class="text-xs text-gray-500">Fatigue</p>
+          <p class="text-sm font-medium <%= compliance.fatigueBlocked ? 'text-orange-600' : 'text-emerald-600' %>">
+            <%= compliance.daysWorked %>/7 days worked<%= compliance.fatigueBlocked ? ' — BLOCKED' : '' %>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ticket Detail Grid -->
+    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <% const ticketFields = [
+        { label: 'TC Ticket', num: member.tc_ticket, exp: member.tc_ticket_expiry },
+        { label: 'TI Ticket', num: member.ti_ticket, exp: member.ti_ticket_expiry },
+        { label: 'White Card', num: member.white_card, exp: member.white_card_expiry },
+        { label: 'First Aid', num: member.first_aid, exp: member.first_aid_expiry },
+        { label: 'Medical', num: '', exp: member.medical_expiry },
+      ]; %>
+      <% for (const tf of ticketFields) { %>
+        <% const isExpired = tf.exp && tf.exp < today;
+           const isExpiring = tf.exp && !isExpired && tf.exp <= new Date(new Date(today).getTime() + 30*86400000).toISOString().split('T')[0]; %>
+        <div class="flex items-center justify-between p-2 rounded bg-gray-50 border border-gray-200/50">
+          <div>
+            <p class="text-xs text-gray-500"><%= tf.label %></p>
+            <p class="text-xs text-gray-400"><%= tf.num || '—' %></p>
+          </div>
+          <% if (!tf.exp) { %>
+            <span class="text-xs text-gray-400">No date</span>
+          <% } else if (isExpired) { %>
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 ring-1 ring-red-600/20">EXP <%= tf.exp %></span>
+          <% } else if (isExpiring) { %>
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 ring-1 ring-amber-600/20"><%= tf.exp %></span>
+          <% } else { %>
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20"><%= tf.exp %></span>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+
+    <!-- Supervisor Approval + Missing Docs -->
+    <div class="mt-4 flex flex-wrap items-center gap-4">
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-gray-500">Supervisor Approved:</span>
+        <% if (compliance.supervisorApproved) { %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 ring-1 ring-purple-600/20">
+            Yes<% if (approvedBy) { %> — by <%= approvedBy %><% } %>
+          </span>
+        <% } else { %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white text-gray-500">No</span>
+        <% } %>
+        <% if (canAccess(user, 'incidents')) { %>
+          <form method="POST" action="/crew/<%= member.id %>/supervisor-approve" class="inline">
+            <button type="submit" class="px-2 py-1 text-xs font-medium rounded <%= compliance.supervisorApproved ? 'bg-gray-100 hover:bg-gray-200 text-gray-600' : 'bg-purple-600 hover:bg-purple-500 text-white' %> transition">
+              <%= compliance.supervisorApproved ? 'Revoke' : 'Approve' %>
+            </button>
+          </form>
+        <% } %>
+      </div>
+      <% if (compliance.missingDocs) { %>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-500">Missing:</span>
+          <span class="text-xs text-yellow-400"><%= compliance.missingItems.join(', ') %></span>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Worker Portal Access -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">Worker Portal Access</h2>
+        <p class="text-sm text-gray-500 mt-0.5">Allow this worker to access the mobile Worker Portal</p>
+      </div>
+      <% if (member.pin_hash) { %>
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">
+          <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          PIN Set
+        </span>
+      <% } else { %>
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+          No Access
+        </span>
+      <% } %>
+    </div>
+
+    <% if (!member.employee_id) { %>
+      <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
+        ⚠ This worker needs an Employee ID before a portal PIN can be set. <a href="/timesheets/crew/<%= member.id %>/edit" class="font-medium underline">Edit profile</a>
+      </div>
+    <% } else { %>
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <% if (member.pin_hash) { %>
+          <!-- PIN is set — show last login info and actions -->
+          <div class="text-sm text-gray-500">
+            <% if (member.last_worker_login) { %>
+              Last login: <span class="text-gray-700"><%= new Date(member.last_worker_login).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></span>
+              <% if (member.worker_login_count) { %> (<%= member.worker_login_count %> total)<% } %>
+            <% } else { %>
+              Never logged in
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="mt-3 flex flex-wrap items-end gap-3">
+        <!-- Set / Reset PIN form -->
+        <form method="POST" action="/crew/<%= member.id %>/set-pin" class="flex items-end gap-2">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1"><%= member.pin_hash ? 'Reset PIN' : 'Set PIN' %></label>
+            <input type="text" name="pin" inputmode="numeric" pattern="[0-9]{4,6}" maxlength="6" required
+              placeholder="4-6 digits"
+              class="w-28 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          </div>
+          <button type="submit" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+            <%= member.pin_hash ? 'Reset' : 'Set PIN' %>
+          </button>
+        </form>
+
+        <% if (member.pin_hash) { %>
+          <!-- Clear PIN -->
+          <form method="POST" action="/crew/<%= member.id %>/clear-pin" onsubmit="return confirm('Remove portal access for this worker?')">
+            <button type="submit" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg border border-gray-300 transition">
+              Clear PIN
+            </button>
+          </form>
+        <% } %>
+
+        <% if (member.email && member.employee_id) { %>
+          <!-- Send Invite Email -->
+          <form method="POST" action="/crew/<%= member.id %>/send-invite">
+            <button type="submit" class="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium rounded-lg border border-blue-200 transition">
+              <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              Email Invite
+            </button>
+          </form>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Upcoming Shifts -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Upcoming Shifts</h2>
+    </div>
+    <% if (upcomingShifts.length === 0) { %>
+      <div class="p-6 text-center text-gray-500">No upcoming allocations</div>
+    <% } else { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shift</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <% for (const s of upcomingShifts) { %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-2.5 text-gray-600"><%= s.allocation_date %></td>
+            <td class="px-4 py-2.5"><a href="/jobs/<%= s.job_id %>" class="text-brand-600 hover:text-brand-700"><%= s.job_number %></a></td>
+            <td class="px-4 py-2.5 text-gray-600"><%= s.client %></td>
+            <td class="px-4 py-2.5 text-gray-600"><%= s.start_time %> — <%= s.end_time %></td>
+            <td class="px-4 py-2.5">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium
+                <%= s.shift_type === 'night' ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20' : s.shift_type === 'split' ? 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20' : 'bg-white text-gray-600' %>">
+                <%= s.shift_type %>
+              </span>
+            </td>
+            <td class="px-4 py-2.5">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium
+                <%= s.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : s.status === 'declined' ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' %>">
+                <%= s.status %>
+              </span>
+            </td>
+          </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Recent Timesheets -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Recent Timesheets</h2>
+    </div>
+    <% if (recentTimesheets.length === 0) { %>
+      <div class="p-6 text-center text-gray-500">No timesheet entries</div>
+    <% } else { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hours</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shift</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Approved</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <% for (const t of recentTimesheets) { %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-2.5 text-gray-600"><%= t.work_date %></td>
+            <td class="px-4 py-2.5"><a href="/jobs/<%= t.job_id %>" class="text-brand-600 hover:text-brand-700"><%= t.job_number %></a></td>
+            <td class="px-4 py-2.5 text-gray-900 font-medium"><%= t.total_hours %>h</td>
+            <td class="px-4 py-2.5">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium
+                <%= t.shift_type === 'night' ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20' : 'bg-white text-gray-600' %>">
+                <%= t.shift_type %>
+              </span>
+            </td>
+            <td class="px-4 py-2.5">
+              <% if (t.approved) { %>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Approved</span>
+              <% } else { %>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-600/20">Pending</span>
+              <% } %>
+            </td>
+          </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Linked Incidents -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Linked Incidents</h2>
+    </div>
+    <% if (linkedIncidents.length === 0) { %>
+      <div class="p-6 text-center text-gray-500">No linked incidents</div>
+    <% } else { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Incident #</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Severity</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <% for (const i of linkedIncidents) { %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-2.5"><a href="/incidents/<%= i.id %>" class="text-brand-600 hover:text-brand-700"><%= i.incident_number %></a></td>
+            <td class="px-4 py-2.5 text-gray-600"><%= i.incident_date %></td>
+            <td class="px-4 py-2.5 text-gray-600"><%= i.incident_type.replace(/_/g, ' ') %></td>
+            <td class="px-4 py-2.5">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium
+                <%= i.severity === 'critical' ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20' : i.severity === 'high' ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' : i.severity === 'medium' ? 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-600/20' : 'bg-white text-gray-600' %>">
+                <%= i.severity %>
+              </span>
+            </td>
+            <td class="px-4 py-2.5 text-gray-600"><%= i.title %></td>
+            <td class="px-4 py-2.5">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium
+                <%= i.investigation_status === 'closed' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : i.investigation_status === 'resolved' ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' %>">
+                <%= i.investigation_status %>
+              </span>
+            </td>
+          </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+</div>

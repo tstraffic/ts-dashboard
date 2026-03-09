@@ -9,46 +9,55 @@
 <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <!-- Header -->
   <div class="mb-6">
-    <h1 class="text-2xl font-bold text-white"><%= pageTitle %></h1>
+    <h1 class="text-2xl font-bold text-gray-900"><%= pageTitle %></h1>
   </div>
 
-  <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+  <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
     <form method="POST" action="<%= formAction %>">
       <div class="space-y-6">
         <!-- Username -->
         <div>
-          <label for="username" class="block text-sm font-medium text-slate-300 mb-1">Username <span class="text-red-400">*</span></label>
-          <input type="text" id="username" name="username" required value="<%= isEdit ? editUser.username : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Username...">
+          <label for="username" class="block text-sm font-medium text-gray-600 mb-1">Username <span class="text-red-600">*</span></label>
+          <input type="text" id="username" name="username" required value="<%= isEdit ? editUser.username : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Username...">
         </div>
 
+        <!-- Send Invite (new user only) -->
+        <% if (!isEdit) { %>
+        <div class="flex items-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <input type="hidden" name="send_invite" value="0">
+          <input type="checkbox" id="send_invite" name="send_invite" value="1" class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500 focus:ring-offset-0 focus:ring-2">
+          <label for="send_invite" class="ml-2 text-sm font-medium text-blue-700">Send email invitation (user sets their own password)</label>
+        </div>
+        <% } %>
+
         <!-- Password -->
-        <div>
-          <label for="password" class="block text-sm font-medium text-slate-300 mb-1">
+        <div id="password-field">
+          <label for="password" class="block text-sm font-medium text-gray-600 mb-1">
             Password
-            <% if (!isEdit) { %><span class="text-red-400">*</span><% } %>
+            <% if (!isEdit) { %><span class="text-red-600" id="pw-required">*</span><% } %>
           </label>
-          <input type="password" id="password" name="password" <%= !isEdit ? 'required' : '' %> class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="<%= isEdit ? 'Leave blank to keep current password' : 'Password...' %>">
+          <input type="password" id="password" name="password" <%= !isEdit ? 'required' : '' %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="<%= isEdit ? 'Leave blank to keep current password' : 'Password...' %>">
           <% if (isEdit) { %>
-            <p class="text-xs text-slate-400 mt-1">Leave blank to keep current password.</p>
+            <p class="text-xs text-gray-500 mt-1">Leave blank to keep current password.</p>
           <% } %>
         </div>
 
         <!-- Full Name -->
         <div>
-          <label for="full_name" class="block text-sm font-medium text-slate-300 mb-1">Full Name <span class="text-red-400">*</span></label>
-          <input type="text" id="full_name" name="full_name" required value="<%= isEdit ? editUser.full_name : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Full name...">
+          <label for="full_name" class="block text-sm font-medium text-gray-600 mb-1">Full Name <span class="text-red-600">*</span></label>
+          <input type="text" id="full_name" name="full_name" required value="<%= isEdit ? editUser.full_name : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Full name...">
         </div>
 
         <!-- Email -->
         <div>
-          <label for="email" class="block text-sm font-medium text-slate-300 mb-1">Email</label>
-          <input type="email" id="email" name="email" value="<%= isEdit && editUser.email ? editUser.email : '' %>" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Email address...">
+          <label for="email" class="block text-sm font-medium text-gray-600 mb-1">Email</label>
+          <input type="email" id="email" name="email" value="<%= isEdit && editUser.email ? editUser.email : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Email address...">
         </div>
 
         <!-- Role -->
         <div>
-          <label for="role" class="block text-sm font-medium text-slate-300 mb-1">Role</label>
-          <select id="role" name="role" class="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label for="role" class="block text-sm font-medium text-gray-600 mb-1">Role</label>
+          <select id="role" name="role" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="management" <%= isEdit && editUser.role === 'management' ? 'selected' : '' %>>Management</option>
             <option value="operations" <%= isEdit && editUser.role === 'operations' ? 'selected' : '' %>>Operations</option>
             <option value="planning" <%= isEdit && editUser.role === 'planning' ? 'selected' : '' %>>Planning</option>
@@ -60,14 +69,14 @@
         <!-- Active -->
         <div class="flex items-center">
           <input type="hidden" name="active" value="0">
-          <input type="checkbox" id="active" name="active" value="1" <%= (!isEdit || editUser.active) ? 'checked' : '' %> class="w-4 h-4 bg-slate-700 border-slate-600 rounded text-brand-500 focus:ring-brand-500 focus:ring-offset-0 focus:ring-2">
-          <label for="active" class="ml-2 text-sm font-medium text-slate-300">Active</label>
+          <input type="checkbox" id="active" name="active" value="1" <%= (!isEdit || editUser.active) ? 'checked' : '' %> class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500 focus:ring-offset-0 focus:ring-2">
+          <label for="active" class="ml-2 text-sm font-medium text-gray-600">Active</label>
         </div>
       </div>
 
       <!-- Buttons -->
-      <div class="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-slate-700">
-        <a href="/admin/users" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition font-medium">Cancel</a>
+      <div class="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+        <a href="/admin/users" class="px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition font-medium">Cancel</a>
         <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold">
           <%= isEdit ? 'Update User' : 'Create User' %>
         </button>
@@ -75,3 +84,28 @@
     </form>
   </div>
 </div>
+
+<% if (!isEdit) { %>
+<script>
+  const inviteCheckbox = document.getElementById('send_invite');
+  const pwField = document.getElementById('password-field');
+  const pwInput = document.getElementById('password');
+  const pwRequired = document.getElementById('pw-required');
+  const emailInput = document.getElementById('email');
+
+  if (inviteCheckbox) {
+    inviteCheckbox.addEventListener('change', function() {
+      if (this.checked) {
+        pwField.style.display = 'none';
+        pwInput.removeAttribute('required');
+        pwInput.value = '';
+        if (emailInput) emailInput.setAttribute('required', '');
+      } else {
+        pwField.style.display = '';
+        pwInput.setAttribute('required', '');
+        if (emailInput) emailInput.removeAttribute('required');
+      }
+    });
+  }
+</script>
+<% } %>
