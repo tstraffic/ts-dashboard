@@ -21,11 +21,20 @@
           <input type="text" id="username" name="username" required value="<%= isEdit ? editUser.username : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Username...">
         </div>
 
+        <!-- Send Invite (new user only) -->
+        <% if (!isEdit) { %>
+        <div class="flex items-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <input type="hidden" name="send_invite" value="0">
+          <input type="checkbox" id="send_invite" name="send_invite" value="1" class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500 focus:ring-offset-0 focus:ring-2">
+          <label for="send_invite" class="ml-2 text-sm font-medium text-blue-700">Send email invitation (user sets their own password)</label>
+        </div>
+        <% } %>
+
         <!-- Password -->
-        <div>
+        <div id="password-field">
           <label for="password" class="block text-sm font-medium text-gray-600 mb-1">
             Password
-            <% if (!isEdit) { %><span class="text-red-600">*</span><% } %>
+            <% if (!isEdit) { %><span class="text-red-600" id="pw-required">*</span><% } %>
           </label>
           <input type="password" id="password" name="password" <%= !isEdit ? 'required' : '' %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="<%= isEdit ? 'Leave blank to keep current password' : 'Password...' %>">
           <% if (isEdit) { %>
@@ -75,3 +84,28 @@
     </form>
   </div>
 </div>
+
+<% if (!isEdit) { %>
+<script>
+  const inviteCheckbox = document.getElementById('send_invite');
+  const pwField = document.getElementById('password-field');
+  const pwInput = document.getElementById('password');
+  const pwRequired = document.getElementById('pw-required');
+  const emailInput = document.getElementById('email');
+
+  if (inviteCheckbox) {
+    inviteCheckbox.addEventListener('change', function() {
+      if (this.checked) {
+        pwField.style.display = 'none';
+        pwInput.removeAttribute('required');
+        pwInput.value = '';
+        if (emailInput) emailInput.setAttribute('required', '');
+      } else {
+        pwField.style.display = '';
+        pwInput.setAttribute('required', '');
+        if (emailInput) emailInput.removeAttribute('required');
+      }
+    });
+  }
+</script>
+<% } %>

@@ -1030,6 +1030,43 @@ function runMigrations(db) {
     console.log('Migration 14 complete.');
   }
 
+  // =============================================
+  // Migration 15: Email Invitations & Preferences
+  // =============================================
+  if (!isMigrationApplied.get(15)) {
+    console.log('Running migration 15: Email Invitations & Preferences');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS invitations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL CHECK(type IN ('admin_user', 'crew_member', 'password_reset', 'pin_reset')),
+        target_id INTEGER NOT NULL,
+        token TEXT NOT NULL UNIQUE,
+        email TEXT NOT NULL,
+        expires_at DATETIME NOT NULL,
+        used_at DATETIME,
+        created_by_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_invitations_token ON invitations(token);
+      CREATE INDEX IF NOT EXISTS idx_invitations_target ON invitations(type, target_id);
+    `);
+
+    const emailCols = [
+      "ALTER TABLE users ADD COLUMN email_notifications_enabled INTEGER DEFAULT 1",
+      "ALTER TABLE users ADD COLUMN notification_frequency TEXT DEFAULT 'immediate'",
+      "ALTER TABLE crew_members ADD COLUMN email_notifications_enabled INTEGER DEFAULT 1",
+      "ALTER TABLE crew_members ADD COLUMN notification_frequency TEXT DEFAULT 'immediate'",
+      "ALTER TABLE notifications ADD COLUMN email_sent_at DATETIME",
+    ];
+    for (const sql of emailCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    recordMigration.run(15, 'Email Invitations & Preferences');
+    console.log('Migration 15 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
