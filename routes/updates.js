@@ -18,7 +18,7 @@ router.get('/', (req, res) => {
 router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold') ORDER BY job_number").all();
-  res.render('updates/form', { title: 'Submit Weekly Update', update: null, jobs, user: req.session.user, prefillJobId: req.query.job_id || '' });
+  res.render('updates/form', { title: 'Submit Weekly Update', update: null, jobs, user: req.session.user, prefillJobId: req.query.job_id || '', returnTo: req.query.return_to || '/projects#updates' });
 });
 
 router.post('/', (req, res) => {
@@ -32,7 +32,7 @@ router.post('/', (req, res) => {
   db.prepare('UPDATE jobs SET last_update_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(b.week_ending, b.job_id);
 
   req.flash('success', 'Weekly update submitted.');
-  res.redirect(b.return_to || '/updates');
+  res.redirect(b.return_to || '/projects#updates');
 });
 
 router.get('/:id', (req, res) => {
