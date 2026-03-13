@@ -32,7 +32,25 @@ router.get('/', (req, res) => {
   const jobs = db.prepare(query).all(...params);
   const suburbs = db.prepare('SELECT DISTINCT suburb FROM jobs WHERE parent_project_id IS NULL ORDER BY suburb').all().map(r => r.suburb);
 
-  res.render('projects/index', { title: 'Project Register', jobs, suburbs, filters: { status, search, suburb }, user: req.session.user, canViewAccounts: canViewAccounts(req.session.user) });
+  // Recent updates for the Updates tab
+  const updateJobFilter = req.query.update_job_id;
+  let updatesQuery = `SELECT pu.*, j.job_number, j.client, u.full_name as submitted_by_name
+    FROM project_updates pu
+    JOIN jobs j ON pu.job_id = j.id
+    LEFT JOIN users u ON pu.submitted_by_id = u.id
+    WHERE 1=1`;
+  const updateParams = [];
+  if (updateJobFilter) { updatesQuery += ` AND pu.job_id = ?`; updateParams.push(updateJobFilter); }
+  updatesQuery += ` ORDER BY pu.week_ending DESC, pu.created_at DESC LIMIT 100`;
+  const recentUpdates = db.prepare(updatesQuery).all(...updateParams);
+
+  res.render('projects/index', {
+    title: 'Project Register',
+    jobs, suburbs, filters: { status, search, suburb },
+    recentUpdates, updateJobFilter: updateJobFilter || '',
+    user: req.session.user,
+    canViewAccounts: canViewAccounts(req.session.user)
+  });
 });
 
 // New project form

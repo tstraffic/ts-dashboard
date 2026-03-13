@@ -1,56 +1,59 @@
 <%
   const isEdit = !!item;
   const formAction = isEdit ? '/compliance/' + item.id : '/compliance';
-  const pageTitle = isEdit ? 'Edit Compliance Item' : 'New Compliance Item';
+  const pageTitle = isEdit ? 'Edit Plan / Approval' : 'New Plan / Approval';
   const selectedJobId = (isEdit && item.job_id) ? item.job_id : (prefillJobId || '');
-  const returnTo = '/compliance';
+  const selectedClientId = (isEdit && item.client_id) ? item.client_id : (prefillClientId || '');
+  const cancelHref = (typeof returnTo !== 'undefined' && returnTo) ? returnTo : '/compliance';
 
   const typeOptions = [
-    { value: 'tmp_approval', label: 'TMP Approval' },
-    { value: 'council_permit', label: 'Council Permit' },
-    { value: 'traffic_guidance', label: 'Traffic Guidance' },
-    { value: 'rol', label: 'ROL (Road Occupancy Licence)' },
-    { value: 'insurance', label: 'Insurance' },
-    { value: 'insurance_certificate', label: 'Insurance Certificate' },
-    { value: 'public_liability', label: 'Public Liability' },
+    { value: 'traffic_guidance',     label: 'TCP / TGS (Traffic Guidance Scheme)' },
+    { value: 'tmp_approval',         label: 'CTMP (Construction Traffic Mgmt Plan)' },
+    { value: 'spa',                  label: 'SPA (Special Permit Application)' },
+    { value: 'rol',                  label: 'ROL (Road Occupancy Licence)' },
+    { value: 'council_permit',       label: 'Council Permit' },
+    { value: 'insurance',            label: 'Insurance' },
+    { value: 'insurance_certificate',label: 'Insurance Certificate' },
+    { value: 'public_liability',     label: 'Public Liability' },
     { value: 'vehicle_registration', label: 'Vehicle Registration' },
-    { value: 'plant_inspection', label: 'Plant Inspection' },
-    { value: 'staff_certification', label: 'Staff Certification' },
-    { value: 'swms_review', label: 'SWMS Review' },
-    { value: 'induction', label: 'Induction' },
-    { value: 'road_occupancy', label: 'Road Occupancy' },
-    { value: 'utility_clearance', label: 'Utility Clearance' },
-    { value: 'environmental', label: 'Environmental' },
-    { value: 'other', label: 'Other' }
+    { value: 'plant_inspection',     label: 'Plant Inspection' },
+    { value: 'staff_certification',  label: 'Staff Certification' },
+    { value: 'swms_review',          label: 'SWMS Review' },
+    { value: 'induction',            label: 'Induction' },
+    { value: 'road_occupancy',       label: 'Road Occupancy' },
+    { value: 'utility_clearance',    label: 'Utility Clearance' },
+    { value: 'environmental',        label: 'Environmental' },
+    { value: 'other',                label: 'Other' },
+  ];
+  const statusOptions = [
+    { value: 'not_started', label: 'Not Started' },
+    { value: 'submitted',   label: 'Submitted' },
+    { value: 'approved',    label: 'Approved' },
+    { value: 'rejected',    label: 'Rejected' },
+    { value: 'expired',     label: 'Expired' },
   ];
 %>
 
 <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <!-- Header -->
   <div class="mb-6">
+    <a href="<%= cancelHref %>" class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-3">
+      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      Back
+    </a>
     <h1 class="text-2xl font-bold text-gray-900"><%= pageTitle %></h1>
   </div>
 
-  <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
-    <form method="POST" action="<%= formAction %>">
-      <input type="hidden" name="return_to" value="<%= returnTo %>">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <form method="POST" action="<%= formAction %>" id="complianceForm" onsubmit="return validateAssignment()">
+      <input type="hidden" name="return_to" value="<%= cancelHref %>">
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Job -->
-        <div>
-          <label for="job_id" class="block text-sm font-medium text-gray-600 mb-1">Job</label>
-          <select id="job_id" name="job_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="">Select a job...</option>
-            <% jobs.forEach(function(job) { %>
-              <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
-            <% }) %>
-          </select>
-        </div>
 
         <!-- Item Type -->
         <div>
-          <label for="item_type" class="block text-sm font-medium text-gray-600 mb-1">Item Type</label>
-          <select id="item_type" name="item_type" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label for="item_type" class="block text-sm font-medium text-gray-600 mb-1">Type <span class="text-red-600">*</span></label>
+          <select id="item_type" name="item_type" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="">Select type...</option>
             <% typeOptions.forEach(function(opt) { %>
               <option value="<%= opt.value %>" <%= isEdit && item.item_type === opt.value ? 'selected' : '' %>><%= opt.label %></option>
@@ -59,76 +62,172 @@
         </div>
 
         <!-- Title -->
-        <div class="md:col-span-2">
+        <div>
           <label for="title" class="block text-sm font-medium text-gray-600 mb-1">Title <span class="text-red-600">*</span></label>
-          <input type="text" id="title" name="title" required value="<%= isEdit ? item.title : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Item title...">
+          <input type="text" id="title" name="title" required value="<%= isEdit ? item.title : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. CTMP for Main St works, ROL #12345...">
         </div>
 
-        <!-- Authority / Approver -->
+        <!-- Project / Client assignment (full width) -->
+        <div class="md:col-span-2">
+          <div class="flex items-center gap-2 mb-2">
+            <label class="block text-sm font-medium text-gray-600">Assign To <span class="text-red-600">*</span></label>
+            <span class="text-xs text-gray-400">— select a project, a client, or both</span>
+          </div>
+          <div id="assignment-error" class="hidden mb-2 text-sm text-red-600 flex items-center gap-1">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Please select at least a project or a client.
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <!-- Project -->
+            <div>
+              <label for="job_id" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Project</label>
+              <select id="job_id" name="job_id" onchange="clearAssignmentError()"
+                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="">No project</option>
+                <% jobs.forEach(function(job) { %>
+                  <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> – <%= job.client %></option>
+                <% }) %>
+              </select>
+            </div>
+            <!-- Client -->
+            <div>
+              <label for="client_id" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Client</label>
+              <select id="client_id" name="client_id" onchange="clearAssignmentError()"
+                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="">No client</option>
+                <% clients.forEach(function(c) { %>
+                  <option value="<%= c.id %>" <%= String(selectedClientId) === String(c.id) ? 'selected' : '' %>><%= c.company_name %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Authority / External Approver -->
         <div>
-          <label for="authority" class="block text-sm font-medium text-gray-600 mb-1">Authority / Approver</label>
-          <input type="text" id="authority" name="authority" value="<%= isEdit && item.authority ? item.authority : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. Council name, RMS...">
+          <label for="authority_approver" class="block text-sm font-medium text-gray-600 mb-1">Authority / External Approver</label>
+          <input type="text" id="authority_approver" name="authority_approver"
+            value="<%= isEdit && item.authority_approver ? item.authority_approver : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. TfNSW, Council name, RMS...">
         </div>
 
         <!-- Internal Approver -->
         <div>
-          <label for="approver_id" class="block text-sm font-medium text-gray-600 mb-1">Internal Approver</label>
-          <select id="approver_id" name="approver_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label for="internal_approver_id" class="block text-sm font-medium text-gray-600 mb-1">Internal Approver</label>
+          <select id="internal_approver_id" name="internal_approver_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="">Select approver...</option>
-            <% users.forEach(function(user) { %>
-              <option value="<%= user.id %>" <%= isEdit && item.approver_id == user.id ? 'selected' : '' %>><%= user.full_name || user.username %></option>
+            <% users.forEach(function(u) { %>
+              <option value="<%= u.id %>" <%= isEdit && item.internal_approver_id == u.id ? 'selected' : '' %>><%= u.full_name %></option>
             <% }) %>
           </select>
         </div>
 
-        <!-- Due Date -->
+        <!-- Assigned To -->
         <div>
-          <label for="due_date" class="block text-sm font-medium text-gray-600 mb-1">Due Date <span class="text-red-600">*</span></label>
-          <input type="date" id="due_date" name="due_date" required value="<%= isEdit && item.due_date ? new Date(item.due_date).toISOString().split('T')[0] : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
-
-        <!-- Submitted Date -->
-        <div>
-          <label for="submitted_date" class="block text-sm font-medium text-gray-600 mb-1">Submitted Date</label>
-          <input type="date" id="submitted_date" name="submitted_date" value="<%= isEdit && item.submitted_date ? new Date(item.submitted_date).toISOString().split('T')[0] : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
-
-        <!-- Approved Date -->
-        <div>
-          <label for="approved_date" class="block text-sm font-medium text-gray-600 mb-1">Approved Date</label>
-          <input type="date" id="approved_date" name="approved_date" value="<%= isEdit && item.approved_date ? new Date(item.approved_date).toISOString().split('T')[0] : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
-
-        <!-- Expiry Date -->
-        <div>
-          <label for="expiry_date" class="block text-sm font-medium text-gray-600 mb-1">Expiry Date</label>
-          <input type="date" id="expiry_date" name="expiry_date" value="<%= isEdit && item.expiry_date ? new Date(item.expiry_date).toISOString().split('T')[0] : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label for="assigned_to_id" class="block text-sm font-medium text-gray-600 mb-1">Assigned To</label>
+          <select id="assigned_to_id" name="assigned_to_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="">Unassigned</option>
+            <% users.forEach(function(u) { %>
+              <option value="<%= u.id %>" <%= isEdit && item.assigned_to_id == u.id ? 'selected' : '' %>><%= u.full_name %></option>
+            <% }) %>
+          </select>
         </div>
 
         <!-- Status -->
         <div>
           <label for="status" class="block text-sm font-medium text-gray-600 mb-1">Status</label>
           <select id="status" name="status" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <% settingsOptions.compliance_status.forEach(opt => { %>
-              <option value="<%= opt.key %>" <%= isEdit && item.status === opt.key ? 'selected' : '' %>><%= opt.label %></option>
+            <% statusOptions.forEach(function(opt) { %>
+              <option value="<%= opt.value %>" <%= (isEdit ? item.status : 'not_started') === opt.value ? 'selected' : '' %>><%= opt.label %></option>
             <% }) %>
           </select>
+        </div>
+
+        <!-- Due Date -->
+        <div>
+          <label for="due_date" class="block text-sm font-medium text-gray-600 mb-1">Due Date</label>
+          <input type="date" id="due_date" name="due_date"
+            value="<%= isEdit && item.due_date ? item.due_date.split('T')[0] : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <!-- Submitted Date -->
+        <div>
+          <label for="submitted_date" class="block text-sm font-medium text-gray-600 mb-1">Submitted Date</label>
+          <input type="date" id="submitted_date" name="submitted_date"
+            value="<%= isEdit && item.submitted_date ? item.submitted_date.split('T')[0] : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <!-- Approved Date -->
+        <div>
+          <label for="approved_date" class="block text-sm font-medium text-gray-600 mb-1">Approved Date</label>
+          <input type="date" id="approved_date" name="approved_date"
+            value="<%= isEdit && item.approved_date ? item.approved_date.split('T')[0] : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <!-- Expiry Date -->
+        <div>
+          <label for="expiry_date" class="block text-sm font-medium text-gray-600 mb-1">Expiry Date</label>
+          <input type="date" id="expiry_date" name="expiry_date"
+            value="<%= isEdit && item.expiry_date ? item.expiry_date.split('T')[0] : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
         </div>
 
         <!-- Notes -->
         <div class="md:col-span-2">
           <label for="notes" class="block text-sm font-medium text-gray-600 mb-1">Notes</label>
-          <textarea id="notes" name="notes" rows="3" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Additional notes..."><%= isEdit && item.notes ? item.notes : '' %></textarea>
+          <textarea id="notes" name="notes" rows="3"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="Additional notes..."><%= isEdit && item.notes ? item.notes : '' %></textarea>
         </div>
       </div>
 
       <!-- Buttons -->
-      <div class="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
-        <a href="/compliance" class="px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition font-medium">Cancel</a>
-        <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold">
-          <%= isEdit ? 'Update Item' : 'Create Item' %>
-        </button>
+      <div class="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
+        <% if (isEdit) { %>
+          <form method="POST" action="/compliance/<%= item.id %>/delete" onsubmit="return confirm('Delete this item?')" style="display:inline;">
+            <input type="hidden" name="return_to" value="<%= cancelHref %>">
+            <button type="submit" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition text-sm font-medium">Delete</button>
+          </form>
+        <% } else { %>
+          <div></div>
+        <% } %>
+        <div class="flex gap-3">
+          <a href="<%= cancelHref %>" class="px-4 py-2 bg-white text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition font-medium text-sm">Cancel</a>
+          <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold text-sm">
+            <%= isEdit ? 'Update Item' : 'Create Item' %>
+          </button>
+        </div>
       </div>
     </form>
   </div>
 </div>
+
+<script>
+function validateAssignment() {
+  const jobId = document.getElementById('job_id').value;
+  const clientId = document.getElementById('client_id').value;
+  if (!jobId && !clientId) {
+    const err = document.getElementById('assignment-error');
+    err.classList.remove('hidden');
+    err.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Highlight both selects
+    ['job_id','client_id'].forEach(id => {
+      document.getElementById(id).classList.add('border-red-400', 'ring-1', 'ring-red-400');
+    });
+    return false;
+  }
+  return true;
+}
+function clearAssignmentError() {
+  document.getElementById('assignment-error').classList.add('hidden');
+  ['job_id','client_id'].forEach(id => {
+    document.getElementById(id).classList.remove('border-red-400', 'ring-1', 'ring-red-400');
+  });
+}
+</script>

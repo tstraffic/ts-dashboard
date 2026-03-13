@@ -1222,6 +1222,126 @@ function runMigrations(db) {
     console.log('Migration 19 complete.');
   }
 
+  // Migration 20: Email Invitations & Preferences
+  // =============================================
+  if (!isMigrationApplied.get(20)) {
+    console.log('Running migration 20: Email Invitations & Preferences');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS invitations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL CHECK(type IN ('admin_user', 'crew_member', 'password_reset', 'pin_reset')),
+        target_id INTEGER NOT NULL,
+        token TEXT NOT NULL UNIQUE,
+        email TEXT NOT NULL,
+        expires_at DATETIME NOT NULL,
+        used_at DATETIME,
+        created_by_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_invitations_token ON invitations(token);
+      CREATE INDEX IF NOT EXISTS idx_invitations_target ON invitations(type, target_id);
+    `);
+
+    const emailCols = [
+      "ALTER TABLE users ADD COLUMN email_notifications_enabled INTEGER DEFAULT 1",
+      "ALTER TABLE users ADD COLUMN notification_frequency TEXT DEFAULT 'immediate'",
+      "ALTER TABLE crew_members ADD COLUMN email_notifications_enabled INTEGER DEFAULT 1",
+      "ALTER TABLE crew_members ADD COLUMN notification_frequency TEXT DEFAULT 'immediate'",
+      "ALTER TABLE notifications ADD COLUMN email_sent_at DATETIME",
+    ];
+    for (const sql of emailCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+
+    recordMigration.run(20, 'Email Invitations & Preferences');
+    console.log('Migration 20 complete.');
+  }
+
+  // Migration 21: Add SPA to compliance item_type + assigned_to_id column
+  // =============================================
+  if (!isMigrationApplied.get(21)) {
+    console.log('Running migration 21: Add SPA type + assigned_to_id to compliance');
+
+    // Recreate compliance table to add 'spa' to item_type CHECK and assigned_to_id column
+    try {
+      db.exec(`
+        CREATE TABLE compliance_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+          item_type TEXT NOT NULL CHECK(item_type IN ('tmp_approval','council_permit','traffic_guidance','insurance','swms_review','induction','road_occupancy','utility_clearance','environmental','rol','insurance_certificate','public_liability','vehicle_registration','plant_inspection','staff_certification','spa','other')),
+          title TEXT NOT NULL,
+          authority_approver TEXT DEFAULT '',
+          internal_approver_id INTEGER REFERENCES users(id),
+          assigned_to_id INTEGER REFERENCES users(id),
+          due_date DATE,
+          submitted_date DATE,
+          approved_date DATE,
+          expiry_date DATE,
+          status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','submitted','approved','rejected','expired')),
+          notes TEXT DEFAULT '',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO compliance_new (id, job_id, item_type, title, authority_approver, internal_approver_id, due_date, submitted_date, approved_date, expiry_date, status, notes, created_at, updated_at)
+          SELECT id, job_id, item_type, title, authority_approver, internal_approver_id, due_date, submitted_date, approved_date, expiry_date, status, notes, created_at, updated_at FROM compliance;
+        DROP TABLE compliance;
+        ALTER TABLE compliance_new RENAME TO compliance;
+        CREATE INDEX IF NOT EXISTS idx_compliance_job_id ON compliance(job_id);
+        CREATE INDEX IF NOT EXISTS idx_compliance_status ON compliance(status);
+        CREATE INDEX IF NOT EXISTS idx_compliance_due_date ON compliance(due_date);
+        CREATE INDEX IF NOT EXISTS idx_compliance_type ON compliance(item_type);
+      `);
+    } catch (e) {
+      console.log('Migration 21 note:', e.message);
+    }
+
+    recordMigration.run(21, 'Add SPA type and assigned_to_id to compliance');
+    console.log('Migration 21 complete.');
+  }
+
+  // =============================================
+  // Migration 22: Allow compliance to link to client instead of requiring a project
+  // =============================================
+  if (!isMigrationApplied.get(22)) {
+    console.log('Running migration 22: Make job_id nullable + add client_id to compliance');
+    try {
+      db.exec(`
+        CREATE TABLE compliance_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+          client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+          item_type TEXT NOT NULL CHECK(item_type IN ('tmp_approval','council_permit','traffic_guidance','insurance','swms_review','induction','road_occupancy','utility_clearance','environmental','rol','insurance_certificate','public_liability','vehicle_registration','plant_inspection','staff_certification','spa','other')),
+          title TEXT NOT NULL,
+          authority_approver TEXT DEFAULT '',
+          internal_approver_id INTEGER REFERENCES users(id),
+          assigned_to_id INTEGER REFERENCES users(id),
+          due_date DATE,
+          submitted_date DATE,
+          approved_date DATE,
+          expiry_date DATE,
+          status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','submitted','approved','rejected','expired')),
+          notes TEXT DEFAULT '',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO compliance_new (id, job_id, client_id, item_type, title, authority_approver, internal_approver_id, assigned_to_id, due_date, submitted_date, approved_date, expiry_date, status, notes, created_at, updated_at)
+          SELECT id, job_id, NULL, item_type, title, authority_approver, internal_approver_id, assigned_to_id, due_date, submitted_date, approved_date, expiry_date, status, notes, created_at, updated_at FROM compliance;
+        DROP TABLE compliance;
+        ALTER TABLE compliance_new RENAME TO compliance;
+        CREATE INDEX IF NOT EXISTS idx_compliance_job_id ON compliance(job_id);
+        CREATE INDEX IF NOT EXISTS idx_compliance_client_id ON compliance(client_id);
+        CREATE INDEX IF NOT EXISTS idx_compliance_status ON compliance(status);
+        CREATE INDEX IF NOT EXISTS idx_compliance_due_date ON compliance(due_date);
+        CREATE INDEX IF NOT EXISTS idx_compliance_type ON compliance(item_type);
+      `);
+    } catch (e) {
+      console.log('Migration 22 note:', e.message);
+    }
+    recordMigration.run(22, 'Make job_id nullable and add client_id to compliance');
+    console.log('Migration 22 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

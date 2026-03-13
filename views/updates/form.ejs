@@ -2,7 +2,7 @@
   const isEdit = !!update;
   const formAction = '/updates';
   const selectedJobId = (isEdit && update.job_id) ? update.job_id : (prefillJobId || '');
-  const returnTo = '/updates';
+  const returnTo = (typeof locals !== 'undefined' && locals.returnTo) ? locals.returnTo : '/projects#updates';
   // Calculate next Friday for default week ending
   const today = new Date();
   const dayOfWeek = today.getDay();
@@ -67,7 +67,7 @@
 
       <!-- Buttons -->
       <div class="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
-        <a href="/updates" class="px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition font-medium">Cancel</a>
+        <a href="/projects#updates" class="px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition font-medium">Cancel</a>
         <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold">
           Submit Update
         </button>
