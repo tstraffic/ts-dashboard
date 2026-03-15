@@ -28,15 +28,23 @@ router.post('/users', async (req, res) => {
 
   try {
     if (sendInvite) {
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        req.flash('error', 'Email invitations require SMTP to be configured. Create the user with a password instead, or set up SMTP in Railway environment variables.');
+        return res.redirect('/admin/users/new');
+      }
       const result = db.prepare('INSERT INTO users (username, password_hash, full_name, email, role, active) VALUES (?, ?, ?, ?, ?, ?)').run(
         b.username, 'INVITE_PENDING', b.full_name, b.email, b.role, 0
       );
       const userId = result.lastInsertRowid;
       const { token } = createInvitation({ type: 'admin_user', targetId: userId, email: b.email, createdById: req.session.user.id });
       const inviteUrl = (process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`) + '/invite/' + token;
-      await sendEmail(b.email, 'You\'ve been invited to T&S Operations Dashboard', adminInviteEmail(b.full_name, inviteUrl, TOKEN_EXPIRY_HOURS));
+      const emailResult = await sendEmail(b.email, 'You\'ve been invited to T&S Operations Dashboard', adminInviteEmail(b.full_name, inviteUrl, TOKEN_EXPIRY_HOURS));
       logActivity({ user: req.session.user, action: 'create', entityType: 'user', entityId: userId, entityLabel: b.full_name, details: 'Created user via email invitation', ip: req.ip });
-      req.flash('success', `Invitation sent to ${b.email} for ${b.username}.`);
+      if (emailResult) {
+        req.flash('success', `Invitation sent to ${b.email} for ${b.username}.`);
+      } else {
+        req.flash('success', `User ${b.username} created but email failed to send. Use "Resend Invite" from the user list once SMTP is configured.`);
+      }
     } else {
       if (!b.password) {
         req.flash('error', 'Password is required when not sending an invite.');
