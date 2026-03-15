@@ -1,0 +1,146 @@
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900"><%= editMember ? 'Edit' : 'Add' %> Crew Member</h1>
+      <p class="text-sm text-gray-500 mt-1"><%= editMember ? 'Update crew member details' : 'Add a new field worker to the roster' %></p>
+    </div>
+    <a href="/crew" class="text-sm text-gray-500 hover:text-gray-700">&larr; Back to Workforce</a>
+  </div>
+
+  <form method="POST" action="<%= editMember ? '/crew/' + editMember.id : '/crew' %>" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-6">
+
+    <!-- Basic Info -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+        <input type="text" name="full_name" value="<%= editMember ? editMember.full_name : '' %>" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+        <input type="text" name="employee_id" value="<%= editMember ? (editMember.employee_id || '') : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          placeholder="e.g. TS001">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+        <select name="role" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <% const roles = [
+            {val: 'traffic_controller', label: 'Traffic Controller'},
+            {val: 'leading_hand', label: 'Leading Hand'},
+            {val: 'supervisor', label: 'Supervisor'},
+            {val: 'pilot_vehicle', label: 'Pilot Vehicle'},
+            {val: 'spotter', label: 'Spotter'},
+            {val: 'labourer', label: 'Labourer'},
+            {val: 'other', label: 'Other'},
+          ]; %>
+          <% roles.forEach(r => { %>
+            <option value="<%= r.val %>" <%= editMember && editMember.role === r.val ? 'selected' : '' %>><%= r.label %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">TCP Level</label>
+        <select name="tcp_level" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">— None —</option>
+          <option value="TCP1" <%= editMember && editMember.tcp_level === 'TCP1' ? 'selected' : '' %>>TCP1</option>
+          <option value="TCP2" <%= editMember && editMember.tcp_level === 'TCP2' ? 'selected' : '' %>>TCP2</option>
+          <option value="TCP3" <%= editMember && editMember.tcp_level === 'TCP3' ? 'selected' : '' %>>TCP3</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Contact -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+        <input type="tel" name="phone" value="<%= editMember ? (editMember.phone || '') : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+        <input type="email" name="email" value="<%= editMember ? (editMember.email || '') : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          placeholder="For worker portal invitations">
+      </div>
+    </div>
+
+    <!-- Employment -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Company</label>
+        <input type="text" name="company" value="<%= editMember ? (editMember.company || '') : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          placeholder="e.g. T&S Traffic Control">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Employment Type</label>
+        <select name="employment_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="employee" <%= editMember && editMember.employment_type === 'employee' ? 'selected' : '' %>>Employee</option>
+          <option value="contractor" <%= editMember && editMember.employment_type === 'contractor' ? 'selected' : '' %>>Contractor</option>
+          <option value="casual" <%= editMember && editMember.employment_type === 'casual' ? 'selected' : '' %>>Casual</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Hourly Rate ($)</label>
+        <input type="number" step="0.01" name="hourly_rate" value="<%= editMember ? (editMember.hourly_rate || '') : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+
+    <!-- Licences & Tickets -->
+    <div class="border-t border-gray-200 pt-4">
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Licences & Tickets</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Licence Type</label>
+          <input type="text" name="licence_type" value="<%= editMember ? (editMember.licence_type || '') : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. C, LR, MR, HR">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Licence Expiry</label>
+          <input type="date" name="licence_expiry" value="<%= editMember ? (editMember.licence_expiry || '') : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">White Card</label>
+          <input type="text" name="white_card" value="<%= editMember ? (editMember.white_card || '') : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">White Card Expiry</label>
+          <input type="date" name="white_card_expiry" value="<%= editMember ? (editMember.white_card_expiry || '') : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Induction Date</label>
+          <input type="date" name="induction_date" value="<%= editMember ? (editMember.induction_date || '') : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Medical Expiry</label>
+          <input type="date" name="medical_expiry" value="<%= editMember ? (editMember.medical_expiry || '') : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="flex items-center gap-2">
+      <input type="checkbox" name="active" id="active" value="1" <%= !editMember || editMember.active ? 'checked' : '' %>
+        class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+      <label for="active" class="text-sm text-gray-700">Active</label>
+    </div>
+
+    <div class="flex items-center gap-3 pt-2">
+      <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+        <%= editMember ? 'Update' : 'Add' %> Crew Member
+      </button>
+      <a href="/crew" class="px-5 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+    </div>
+  </form>
+</div>
