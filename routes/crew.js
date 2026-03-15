@@ -70,6 +70,70 @@ router.get('/', (req, res) => {
   });
 });
 
+// GET /new — Add Crew Member form
+router.get('/new', (req, res) => {
+  res.render('crew/form', { title: 'Add Crew Member', currentPage: 'crew', editMember: null });
+});
+
+// POST / — Create Crew Member
+router.post('/', (req, res) => {
+  const db = getDb();
+  const b = req.body;
+  try {
+    const result = db.prepare(`
+      INSERT INTO crew_members (full_name, employee_id, role, tcp_level, phone, email, company, employment_type, hourly_rate, licence_type, licence_expiry, white_card, white_card_expiry, induction_date, medical_expiry, active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      b.full_name, b.employee_id || null, b.role, b.tcp_level || '', b.phone || '', b.email || '',
+      b.company || '', b.employment_type || 'employee', parseFloat(b.hourly_rate) || 0,
+      b.licence_type || '', b.licence_expiry || null, b.white_card || '', b.white_card_expiry || null,
+      b.induction_date || null, b.medical_expiry || null, b.active ? 1 : 0
+    );
+    logActivity({ user: req.session.user, action: 'create', entityType: 'crew_member', entityId: result.lastInsertRowid, entityLabel: b.full_name, details: 'Added crew member', ip: req.ip });
+    req.flash('success', b.full_name + ' added to workforce.');
+    res.redirect('/crew/' + result.lastInsertRowid);
+  } catch (err) {
+    if (err.message.includes('UNIQUE')) {
+      req.flash('error', 'Employee ID "' + b.employee_id + '" already exists.');
+    } else {
+      req.flash('error', 'Failed to add crew member: ' + err.message);
+    }
+    res.redirect('/crew/new');
+  }
+});
+
+// GET /:id/edit — Edit Crew Member form
+router.get('/:id/edit', (req, res) => {
+  const db = getDb();
+  const editMember = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(req.params.id);
+  if (!editMember) { req.flash('error', 'Crew member not found'); return res.redirect('/crew'); }
+  res.render('crew/form', { title: 'Edit ' + editMember.full_name, currentPage: 'crew', editMember });
+});
+
+// POST /:id — Update Crew Member
+router.post('/:id', (req, res) => {
+  const db = getDb();
+  const b = req.body;
+  const member = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(req.params.id);
+  if (!member) { req.flash('error', 'Crew member not found'); return res.redirect('/crew'); }
+  try {
+    db.prepare(`
+      UPDATE crew_members SET full_name=?, employee_id=?, role=?, tcp_level=?, phone=?, email=?, company=?, employment_type=?, hourly_rate=?, licence_type=?, licence_expiry=?, white_card=?, white_card_expiry=?, induction_date=?, medical_expiry=?, active=? WHERE id=?
+    `).run(
+      b.full_name, b.employee_id || null, b.role, b.tcp_level || '', b.phone || '', b.email || '',
+      b.company || '', b.employment_type || 'employee', parseFloat(b.hourly_rate) || 0,
+      b.licence_type || '', b.licence_expiry || null, b.white_card || '', b.white_card_expiry || null,
+      b.induction_date || null, b.medical_expiry || null, b.active ? 1 : 0, req.params.id
+    );
+    logActivity({ user: req.session.user, action: 'update', entityType: 'crew_member', entityId: member.id, entityLabel: b.full_name, details: 'Updated crew member details', ip: req.ip });
+    req.flash('success', b.full_name + ' updated.');
+    res.redirect('/crew/' + member.id);
+  } catch (err) {
+    req.flash('error', 'Failed to update: ' + err.message);
+    res.redirect('/crew/' + member.id + '/edit');
+  }
+});
+
 // GET /:id — Worker Profile
 router.get('/:id', (req, res) => {
   const db = getDb();
