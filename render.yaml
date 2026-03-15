@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: ts-dashboard
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: PORT
+        value: 3000
+      - key: APP_BASE_URL
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.office365.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_SECURE
+        value: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: T&S Traffic Control
+      - key: SMTP_FROM_EMAIL
+        sync: false
+    disk:
+      name: ts-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
