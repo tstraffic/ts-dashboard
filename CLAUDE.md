@@ -3,7 +3,7 @@
 ## Overview
 Full-stack operations management platform for **T&S Traffic Control** (Sydney traffic management company). Two interfaces in a single codebase:
 
-1. **Admin Dashboard** — Desktop web app for office staff (management, operations, admin roles)
+1. **Admin Dashboard** — Desktop + mobile responsive web app for office staff (management, operations, admin roles)
 2. **Worker Portal** — Mobile-first PWA for field crew members (under `/w/` prefix)
 
 ## Tech Stack
@@ -11,8 +11,12 @@ Full-stack operations management platform for **T&S Traffic Control** (Sydney tr
 - **Database**: SQLite via better-sqlite3
 - **Frontend**: Tailwind CSS (CDN), vanilla JS
 - **Auth**: Admin = username/password (bcrypt). Worker = Employee ID + numeric PIN (bcrypt)
+- **Hosting**: Railway (auto-deploys from `main` branch)
+- **Email**: Resend HTTP API (env var `RESEND_API_KEY` or `SMTP_PASS` starting with `re_`)
+- **Push Notifications**: Web Push (VAPID) via `web-push` npm package
 - **Node path on this machine**: `PATH="/c/Program Files/nodejs:$PATH"` (required for all node/npm commands)
 - **GitHub repo**: `tstraffic/ts-dashboard` (origin)
+- **Live URL**: `https://ts-dashboard.up.railway.app`
 
 ## Brand Colors
 - Primary: `#2B7FFF` (brand-600: `#1D6AE5`)
@@ -20,25 +24,36 @@ Full-stack operations management platform for **T&S Traffic Control** (Sydney tr
 - Light enterprise theme (white/gray backgrounds, colored accents)
 
 ## Architecture
-- **Admin routes**: `/dashboard`, `/jobs`, `/crew`, `/allocations`, etc. Protected by `req.session.user`
+- **Admin routes**: `/dashboard`, `/jobs`, `/crew`, `/allocations`, `/profile`, etc. Protected by `req.session.user`
 - **Worker routes**: `/w/home`, `/w/jobs`, `/w/jobs/:id`, etc. Protected by `req.session.worker`
 - **Session isolation**: `req.session.worker` is separate from `req.session.user`. Both can coexist
 - **Layout override**: Admin uses `views/layout.ejs` (default). Worker uses `views/worker/layout.ejs` via `res.locals.layout`
 - **`blockWorkerFromAdmin`** middleware prevents worker-only sessions from accessing admin routes
+- **Permissions**: `middleware/auth.js` has `PERMISSIONS` object mapping modules to allowed roles
 
-## Database Migrations
-14 migrations in `db/schema.js`. Migration 14 = Worker Portal auth columns on `crew_members`:
-- `pin_hash`, `pin_set_at`, `pin_set_by_id`, `last_worker_login`, `worker_login_count`
+## Database
+- SQLite via better-sqlite3, file at `./data/database.sqlite`
+- 29+ migrations in `db/schema.js`
+- Key tables: `users`, `jobs`, `crew_members`, `crew_allocations`, `tasks`, `incidents`, `notifications`, `push_subscriptions`, `system_config`, `invitations`
+- Migration 14 = Worker Portal auth columns on `crew_members`
+- Migration 29 = `push_subscriptions` table for Web Push
 
 ## Key Middleware
-- `middleware/auth.js` — Admin auth (`requireAuth`, `requireRole`)
+- `middleware/auth.js` — Admin auth (`requireLogin`, `requireRole`, `requirePermission`, `canAccess`)
 - `middleware/workerAuth.js` — Worker auth (`requireWorker`, `requireOwnData`, `blockWorkerFromAdmin`, `workerLocals`)
-- `middleware/compliance.js` — Ticket/licence/fatigue compliance checks (`getComplianceStatus`, `getComplianceStatusBatch`, `getBatchFatigue`)
+- `middleware/compliance.js` — Ticket/licence/fatigue compliance checks
+- `middleware/notifications.js` — Notification generation engine + push integration
 - `middleware/audit.js` — Activity logging (`logActivity`)
 - `middleware/settings.js` — System settings
 
+## Key Services
+- `services/email.js` — Email sending (Resend HTTP API or SMTP fallback)
+- `services/emailTemplates.js` — Branded HTML email templates
+- `services/pushNotification.js` — Web Push (VAPID key management, subscription CRUD, sending)
+- `services/invitations.js` — Token-based invitations/password resets
+
 ## Test Data
-- Admin: username `admin` / password `admin123`
+- Admin: username `admin` / password `admin123` (**CHANGE THIS ON PRODUCTION**)
 - Worker: Employee ID `EMP-001` / PIN `1234` (John Smith, crew_member id=1)
 
 ---
@@ -56,9 +71,100 @@ Full-stack operations management platform for **T&S Traffic Control** (Sydney tr
 - **My Jobs**: List view (today + 7 days grouped by date), job detail (supervisor, crew, site info)
 - **PWA foundation**: manifest.json, service worker (network-first caching), worker.css, worker.js
 - **Admin PIN management**: Set/reset/clear PIN from crew profile page, login tracking
-- **Files created**: 15 new files (middleware, routes, views, PWA assets)
-- **Files modified**: server.js, db/schema.js, routes/crew.js, views/crew/show.ejs
 - **PR**: Merged via `claude/eloquent-booth` branch
+
+### Admin PWA + Mobile Responsive (completed)
+- **PWA**: `manifest-admin.json`, `admin-sw.js` service worker, offline page, meta tags
+- **Mobile sidebar**: Full-height overlay with scrollable nav, user avatar header, close button, swipe-to-close gesture, sign out pinned at bottom, backdrop blur animation
+- **Mobile header**: Sticky, compact 56px on mobile, profile avatar circle (initials), notification bell
+- **Responsive views**: Dashboard, jobs, crew, tasks views all responsive with hidden columns, stacked filters, touch-friendly buttons
+- **CSS**: `custom.css` with mobile touch targets (44px min), iOS zoom prevention, safe-area insets, tap feedback
+- **Service worker cache**: Versioned (`ts-admin-v3`), network-first for HTML, cache-first for assets
+
+### Push Notifications (completed)
+- **VAPID keys**: Auto-generated on startup, stored in `system_config` DB table
+- **Client flow**: Service worker registers → checks subscription → shows enable prompt after 3s → subscribes via Push API → saves to server
+- **Server**: `services/pushNotification.js` handles init, subscribe, send. Routes at `/notifications/push/*`
+- **Triggers**: Task creation/assignment/status change (`routes/tasks.js`), notification engine (`middleware/notifications.js`)
+- **Test button**: Profile page has "Send Test Notification" button + status indicator (Enabled/Not Enabled/Blocked/Not Supported)
+- **Push subscriptions DB**: `push_subscriptions` table (user_id, endpoint, p256dh, auth)
+
+### User Profile Page (completed)
+- **Route**: `/profile` (requireLogin only, all roles)
+- **Features**: Edit full name, email, notification preferences (toggle + frequency)
+- **Security**: Change password (current + new), send password reset link to own email
+- **Push section**: Shows push notification status, test notification button
+- **Header link**: Username in header is clickable → profile page. Avatar circle with initials on desktop.
+
+### Email System (completed)
+- **Resend HTTP API**: Replaces SMTP (Railway blocks ports 465/587)
+- **Env vars**: `RESEND_API_KEY` (or `SMTP_PASS` starting with `re_`), `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`, `APP_BASE_URL`
+- **Templates**: Branded HTML emails for password reset, notifications
+- **Fallback**: If key doesn't start with `re_`, falls back to nodemailer SMTP
+
+---
+
+## File Structure (Admin — Key Files)
+
+```
+server.js                        — Express app setup, route registration
+db/schema.js                     — All migrations
+db/database.js                   — SQLite connection
+
+middleware/auth.js               — Admin auth + permissions
+middleware/notifications.js      — Notification generation engine
+middleware/compliance.js         — Compliance checks
+middleware/settings.js           — System settings
+
+routes/auth.js                   — Login/logout/forgot-password/reset
+routes/profile.js                — User profile (GET/POST + change password + reset email)
+routes/dashboard.js              — Main dashboard
+routes/notifications.js          — Notifications + push subscription endpoints
+routes/tasks.js                  — Tasks (with push notification triggers)
+routes/[module].js               — Other CRUD routes
+
+services/email.js                — Email sending (Resend/SMTP)
+services/pushNotification.js     — Web Push service
+services/invitations.js          — Token management
+
+views/layout.ejs                 — Admin layout (header + sidebar + main)
+views/partials/header.ejs        — Sticky header (hamburger, logo, bell, avatar, logout)
+views/partials/sidebar.ejs       — Sidebar nav (mobile overlay + desktop static)
+views/partials/footer.ejs        — Footer
+views/profile.ejs                — User profile page
+views/dashboard.ejs              — Dashboard
+views/[module]/*.ejs             — Module views
+
+public/css/custom.css            — Custom styles (mobile sidebar, touch targets, animations)
+public/js/app.js                 — Client JS (sidebar toggle, tabs, push subscription)
+public/js/admin-sw.js            — Admin service worker (caching + push handler)
+public/manifest-admin.json       — Admin PWA manifest
+public/offline.html              — Offline fallback page
+```
+
+## File Structure (Worker Portal)
+```
+middleware/workerAuth.js
+routes/worker/auth.js            — Login/logout
+routes/worker/home.js            — Home screen
+routes/worker/jobs.js            — Jobs list + detail
+views/worker/layout.ejs          — Mobile shell + bottom tab nav
+views/worker/login.ejs           — Standalone login page
+views/worker/home.ejs            — Home screen
+views/worker/jobs.ejs            — Jobs list
+views/worker/job-detail.ejs      — Job detail
+views/worker/error.ejs           — Error page
+public/manifest.json             — Worker PWA manifest
+public/css/worker.css
+public/js/worker.js
+public/js/worker-sw.js           — Worker service worker
+```
+
+## Bottom Tab Nav (Worker Portal)
+4 tabs: Home (house), Jobs (briefcase), Clock (clock), Profile (user)
+- Home + Jobs = Sprint 1 (done)
+- Clock = Sprint 2 (next)
+- Profile = Sprint 5 (future)
 
 ---
 
@@ -86,33 +192,26 @@ Full-stack operations management platform for **T&S Traffic Control** (Sydney tr
 
 ### Sprint 5: Mobile Polish + PWA Install + Notifications
 - **PWA install prompts**: Proper install flow with app icons and splash screens
-- **Push notifications**: Shift reminders, approval notifications (web push or similar)
+- **Push notifications**: Shift reminders, approval notifications
 - **Offline support**: Enhanced service worker for offline prestart/clock forms
 - **UI polish**: Animations, transitions, loading states, error recovery
 - **Performance**: Optimize queries, add indexes if needed
 
 ---
 
-## File Structure (Worker Portal)
+## Environment Variables (Railway)
 ```
-middleware/workerAuth.js
-routes/worker/auth.js        — Login/logout
-routes/worker/home.js        — Home screen
-routes/worker/jobs.js        — Jobs list + detail
-views/worker/layout.ejs      — Mobile shell + bottom tab nav
-views/worker/login.ejs       — Standalone login page
-views/worker/home.ejs        — Home screen
-views/worker/jobs.ejs        — Jobs list
-views/worker/job-detail.ejs  — Job detail
-views/worker/error.ejs       — Error page
-public/manifest.json
-public/css/worker.css
-public/js/worker.js
-public/js/worker-sw.js
+DATABASE_PATH=./data/database.sqlite
+SESSION_SECRET=<random-string>
+APP_BASE_URL=https://ts-dashboard.up.railway.app
+RESEND_API_KEY=re_xxxxxxxxxxxx       # or SMTP_PASS=re_xxxxxxxxxxxx
+SMTP_FROM_EMAIL=onboarding@resend.dev # change after domain verification
+SMTP_FROM_NAME=T&S Traffic Control
+# VAPID keys auto-generated and stored in system_config DB
+# Optional: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL
 ```
 
-## Bottom Tab Nav (Worker Portal)
-4 tabs: Home (house), Jobs (briefcase), Clock (clock), Profile (user)
-- Home + Jobs = Sprint 1 (done)
-- Clock = Sprint 2 (next)
-- Profile = Sprint 5 (future)
+## Known Issues / TODO
+- **Default admin password**: Still `admin/admin123` on production — needs changing
+- **Resend domain**: Using `onboarding@resend.dev` — need to verify `tstc.com.au` domain in Resend for custom from address
+- **iOS push**: Limited support (iOS 16.4+ Safari only, must add to home screen)
