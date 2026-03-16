@@ -1489,6 +1489,71 @@ function runMigrations(db) {
     console.log('Migration 27 complete.');
   }
 
+  // =============================================
+  // Migration 28: Force-fix tasks division CHECK constraint (retry-safe)
+  // =============================================
+  if (!isMigrationApplied.get(28)) {
+    console.log('Running migration 28: Force-fix tasks division CHECK');
+
+    const tableSQL = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get();
+    const currentSQL = tableSQL ? tableSQL.sql : '';
+    console.log('[Migration 28] Current tasks DDL:', currentSQL);
+
+    if (!currentSQL.includes("'finance'") || !currentSQL.includes("'admin'")) {
+      // Get only column names that actually exist in current table
+      const existingCols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
+      console.log('[Migration 28] Existing columns:', existingCols.join(', '));
+
+      // Target columns for new table
+      const targetCols = ['id','job_id','division','title','description','owner_id','due_date','status','priority','task_type','notes','completed_date','created_at','updated_at'];
+      // Only copy columns present in BOTH old and new
+      const commonCols = targetCols.filter(c => existingCols.includes(c));
+      const colList = commonCols.join(', ');
+      console.log('[Migration 28] Copying columns:', colList);
+
+      try {
+        db.exec('BEGIN TRANSACTION');
+        db.exec(`
+          CREATE TABLE tasks_rebuild (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+            division TEXT NOT NULL DEFAULT 'ops' CHECK(division IN ('ops','planning','finance','admin','marketing','accounts','management')),
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            owner_id INTEGER REFERENCES users(id),
+            due_date DATE NOT NULL,
+            status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','in_progress','blocked','complete')),
+            priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('high','medium','low')),
+            task_type TEXT DEFAULT 'one_off',
+            notes TEXT DEFAULT '',
+            completed_date DATE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        db.exec(`INSERT INTO tasks_rebuild (${colList}) SELECT ${colList} FROM tasks`);
+        db.exec('DROP TABLE tasks');
+        db.exec('ALTER TABLE tasks_rebuild RENAME TO tasks');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_job ON tasks(job_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date)');
+        db.exec('COMMIT');
+        console.log('Migration 28: tasks table rebuilt successfully.');
+      } catch (e) {
+        try { db.exec('ROLLBACK'); } catch (r) {}
+        console.error('Migration 28 FAILED:', e.message, e.stack);
+        // Do NOT record migration — allow retry on next restart
+        throw new Error('Migration 28 failed: ' + e.message);
+      }
+    } else {
+      console.log('Migration 28: CHECK constraint already includes finance/admin, skipping.');
+    }
+
+    recordMigration.run(28, 'Force-fix tasks division CHECK constraint');
+    console.log('Migration 28 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
