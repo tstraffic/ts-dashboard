@@ -54,7 +54,7 @@
                   class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
               <% } else { %>
                 <input type="text" id="<%= config.config_key %>" name="<%= config.config_key %>" value="<%= config.config_value %>"
-                  <% if (config.config_key === 'smtp_host') { %>placeholder="e.g. smtp.gmail.com"<% } %>
+                  <% if (config.config_key === 'smtp_host') { %>placeholder="e.g. smtp.resend.com"<% } %>
                   <% if (config.config_key === 'smtp_user') { %>placeholder="e.g. ops@tstraffic.com.au"<% } %>
                   <% if (config.config_key === 'smtp_from') { %>placeholder="e.g. noreply@tstraffic.com.au"<% } %>
                   class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
@@ -74,3 +74,23 @@
     <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Save Configuration</button>
   </div>
 </form>
+
+<!-- Test Email Section -->
+<div class="mt-6 bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+  <h2 class="text-lg font-semibold text-gray-900 mb-2">Test Email</h2>
+  <p class="text-sm text-gray-500 mb-4">Send a test email to verify your SMTP configuration is working. Save your SMTP settings above first.</p>
+  <form method="POST" action="/settings/system/test-email" class="flex items-end gap-3">
+    <div class="flex-1">
+      <label for="test_email" class="block text-sm font-medium text-gray-600 mb-1">Send test to</label>
+      <input type="email" id="test_email" name="test_email" value="<%= user.email || '' %>" placeholder="your@email.com" required
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+    </div>
+    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+      Send Test Email
+    </button>
+  </form>
+  <p class="text-xs text-gray-400 mt-3">
+    <strong>Tip:</strong> Using Resend? Set host to <code class="bg-gray-100 px-1 rounded">smtp.resend.com</code>, port <code class="bg-gray-100 px-1 rounded">465</code>, username <code class="bg-gray-100 px-1 rounded">resend</code>, password = your API key (starts with <code class="bg-gray-100 px-1 rounded">re_</code>).
+    Or set SMTP_* environment variables in Railway instead.
+  </p>
+</div>
