@@ -60,6 +60,30 @@ router.get('/', (req, res) => {
     revenueThisMonth = db.prepare("SELECT COALESCE(SUM(jb.contract_value), 0) as total FROM job_budgets jb JOIN jobs j ON jb.job_id = j.id WHERE j.status IN ('active','completed')").get().total;
   }
 
+  // Today's allocations
+  const todaysAllocations = db.prepare(`
+    SELECT ca.*, cm.full_name as crew_name, cm.role as crew_role, j.job_number, j.client, j.site_address
+    FROM crew_allocations ca
+    JOIN crew_members cm ON ca.crew_member_id = cm.id
+    JOIN jobs j ON ca.job_id = j.id
+    WHERE ca.allocation_date = ?
+    ORDER BY ca.start_time ASC
+  `).all(today);
+
+  // Crew availability summary
+  const totalActiveCrew = db.prepare("SELECT COUNT(*) as count FROM crew_members WHERE active = 1").get().count;
+  const allocatedToday = db.prepare("SELECT COUNT(DISTINCT crew_member_id) as count FROM crew_allocations WHERE allocation_date = ?").get(today).count;
+  const availableCrew = totalActiveCrew - allocatedToday;
+
+  // Recent activity log (last 10)
+  const recentActivity = db.prepare(`
+    SELECT al.*, u.full_name as user_name
+    FROM activity_log al
+    LEFT JOIN users u ON al.user_id = u.id
+    ORDER BY al.created_at DESC
+    LIMIT 10
+  `).all();
+
   // My Jobs
   const myJobs = db.prepare(`
     SELECT j.*, u.full_name as pm_name FROM jobs j
@@ -180,7 +204,13 @@ router.get('/', (req, res) => {
     jobStatusDist,
     jobHealthDist,
     crewHoursByDay,
-    canViewAccounts: canViewAccounts(user)
+    canViewAccounts: canViewAccounts(user),
+    todaysAllocations,
+    totalActiveCrew,
+    allocatedToday,
+    availableCrew,
+    recentActivity,
+    userRole: user.role
   });
 });
 

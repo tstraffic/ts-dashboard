@@ -10,22 +10,37 @@ router.get('/', (req, res) => {
   const db = getDb();
   const userId = req.session.user.id;
 
+  const filter = req.query.filter || 'all';
+  let whereExtra = '';
+  if (filter === 'unread') whereExtra = ' AND n.is_read = 0';
+  if (filter === 'read') whereExtra = ' AND n.is_read = 1';
+
   const notifications = db.prepare(`
     SELECT n.*, j.job_number
     FROM notifications n
     LEFT JOIN jobs j ON n.job_id = j.id
-    WHERE n.user_id = ?
+    WHERE n.user_id = ?${whereExtra}
     ORDER BY n.created_at DESC
     LIMIT 100
   `).all(userId);
 
   const unreadCount = db.prepare('SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0').get(userId).count;
+  const totalCount = db.prepare('SELECT COUNT(*) as count FROM notifications WHERE user_id = ?').get(userId).count;
+
+  // Group by type for stats
+  const typeCounts = {};
+  notifications.forEach(n => {
+    typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
+  });
 
   res.render('notifications/index', {
     title: 'Notifications',
     currentPage: 'notifications',
     notifications,
-    unreadCount
+    unreadCount,
+    totalCount,
+    typeCounts,
+    filter
   });
 });
 

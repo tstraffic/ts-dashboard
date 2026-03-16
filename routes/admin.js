@@ -14,7 +14,22 @@ router.use(requireRole('admin'));
 router.get('/users', (req, res) => {
   const db = getDb();
   const users = db.prepare('SELECT id, username, password_hash, full_name, email, role, active, created_at FROM users ORDER BY full_name').all();
-  res.render('admin/users', { title: 'User Management', users, user: req.session.user });
+
+  // Stats
+  const roleAliases = { management: 'admin', accounts: 'finance', marketing: 'operations' };
+  const stats = {
+    total: users.length,
+    active: users.filter(u => u.active && u.password_hash !== 'INVITE_PENDING').length,
+    pending: users.filter(u => u.password_hash === 'INVITE_PENDING').length,
+    inactive: users.filter(u => !u.active && u.password_hash !== 'INVITE_PENDING').length,
+    byRole: {}
+  };
+  users.forEach(u => {
+    const r = roleAliases[u.role] || u.role || 'unknown';
+    stats.byRole[r] = (stats.byRole[r] || 0) + 1;
+  });
+
+  res.render('admin/users', { title: 'User Management', users, user: req.session.user, stats });
 });
 
 router.get('/users/new', (req, res) => {
