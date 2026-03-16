@@ -5,7 +5,7 @@ const { requireRole } = require('../middleware/auth');
 const { logActivity } = require('../middleware/audit');
 
 // Apply role restriction to all routes
-router.use(requireRole('management', 'accounts'));
+router.use(requireRole('admin', 'finance'));
 
 // LIST - All jobs with budget overview
 router.get('/', (req, res) => {

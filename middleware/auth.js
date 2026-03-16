@@ -2,32 +2,33 @@
 
 // ---- Centralised Permission Map ----
 // Single source of truth: which roles can access which modules.
-// Management always has full access. Crew uses separate portal.
+// Admin always has full access. Crew uses separate portal.
+// Roles: admin (full access), operations (no finance), planning (no finance), finance (finance + reporting)
 const PERMISSIONS = {
-  dashboard:     ['management', 'operations', 'planning', 'marketing', 'accounts'],
-  jobs:          ['management', 'operations', 'planning', 'marketing', 'accounts'],
-  projects:      ['management', 'operations', 'planning', 'marketing', 'accounts'],
-  clients:       ['management', 'operations', 'planning', 'marketing', 'accounts'],
-  tasks:         ['management', 'operations', 'planning'],
-  updates:       ['management', 'operations', 'planning', 'marketing'],
-  compliance:    ['management', 'operations', 'planning'],
-  plans:         ['management', 'planning'],
-  incidents:     ['management', 'operations'],
-  contacts:      ['management', 'operations', 'marketing'],
-  timesheets:    ['management', 'operations', 'accounts'],
-  crew:          ['management', 'operations', 'planning'],
-  allocations:   ['management', 'operations', 'planning'],
-  schedule:      ['management', 'operations', 'planning'],
-  equipment:     ['management', 'operations'],
-  defects:       ['management', 'operations'],
-  documents:     ['management', 'operations', 'planning', 'accounts'],
-  budgets:       ['management', 'accounts'],
-  reports:       ['management', 'operations', 'planning', 'accounts'],
-  exports:       ['management', 'operations', 'planning', 'accounts'],
-  notifications: ['management', 'operations', 'planning', 'marketing', 'accounts'],
-  admin:         ['management'],
-  activity:      ['management'],
-  settings:      ['management'],
+  dashboard:     ['admin', 'operations', 'planning', 'finance'],
+  jobs:          ['admin', 'operations', 'planning', 'finance'],
+  projects:      ['admin', 'operations', 'planning', 'finance'],
+  clients:       ['admin', 'operations', 'planning', 'finance'],
+  tasks:         ['admin', 'operations', 'planning'],
+  updates:       ['admin', 'operations', 'planning'],
+  compliance:    ['admin', 'operations', 'planning'],
+  plans:         ['admin', 'operations', 'planning'],
+  incidents:     ['admin', 'operations', 'planning'],
+  contacts:      ['admin', 'operations', 'planning'],
+  timesheets:    ['admin', 'operations', 'planning', 'finance'],
+  crew:          ['admin', 'operations', 'planning'],
+  allocations:   ['admin', 'operations', 'planning'],
+  schedule:      ['admin', 'operations', 'planning'],
+  equipment:     ['admin', 'operations', 'planning'],
+  defects:       ['admin', 'operations', 'planning'],
+  documents:     ['admin', 'operations', 'planning', 'finance'],
+  budgets:       ['admin', 'finance'],
+  reports:       ['admin', 'operations', 'planning', 'finance'],
+  exports:       ['admin', 'operations', 'planning', 'finance'],
+  notifications: ['admin', 'operations', 'planning', 'finance'],
+  admin:         ['admin'],
+  activity:      ['admin'],
+  settings:      ['admin'],
 };
 
 // ---- Helpers ----
@@ -89,18 +90,18 @@ function requireAccountsAccess(req, res, next) {
     return res.redirect('/login');
   }
   const role = req.session.user.role;
-  if (role === 'accounts' || role === 'management') {
+  if (role === 'finance' || role === 'admin') {
     return next();
   }
   res.status(403).render('error', {
     title: 'Access Denied',
-    message: 'Accounts documents are restricted to Accounts and Management only.',
+    message: 'Accounts documents are restricted to Finance and Admin only.',
     user: req.session.user
   });
 }
 
 function canViewAccounts(user) {
-  return user && (user.role === 'accounts' || user.role === 'management');
+  return user && (user.role === 'finance' || user.role === 'admin');
 }
 
 module.exports = { requireLogin, requireRole, requirePermission, requireAccountsAccess, canViewAccounts, canAccess, PERMISSIONS };

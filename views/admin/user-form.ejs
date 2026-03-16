@@ -58,11 +58,10 @@
         <div>
           <label for="role" class="block text-sm font-medium text-gray-600 mb-1">Role</label>
           <select id="role" name="role" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="management" <%= isEdit && editUser.role === 'management' ? 'selected' : '' %>>Management</option>
+            <option value="admin" <%= isEdit && editUser.role === 'admin' ? 'selected' : '' %>>Admin</option>
             <option value="operations" <%= isEdit && editUser.role === 'operations' ? 'selected' : '' %>>Operations</option>
             <option value="planning" <%= isEdit && editUser.role === 'planning' ? 'selected' : '' %>>Planning</option>
-            <option value="marketing" <%= isEdit && editUser.role === 'marketing' ? 'selected' : '' %>>Marketing</option>
-            <option value="accounts" <%= isEdit && editUser.role === 'accounts' ? 'selected' : '' %>>Accounts</option>
+            <option value="finance" <%= isEdit && editUser.role === 'finance' ? 'selected' : '' %>>Finance</option>
           </select>
         </div>
 

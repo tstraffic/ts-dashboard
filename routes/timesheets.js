@@ -114,7 +114,7 @@ router.post('/', (req, res) => {
 });
 
 // APPROVE (management/operations only)
-router.post('/:id/approve', requireRole('management', 'operations'), (req, res) => {
+router.post('/:id/approve', requireRole('admin', 'operations'), (req, res) => {
   const db = getDb();
   db.prepare('UPDATE timesheets SET approved = 1, approved_by_id = ?, approved_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.session.user.id, req.params.id);
   logActivity({ user: req.session.user, action: 'approve', entityType: 'timesheet', entityId: parseInt(req.params.id), ip: req.ip });
@@ -123,7 +123,7 @@ router.post('/:id/approve', requireRole('management', 'operations'), (req, res) 
 });
 
 // BULK APPROVE
-router.post('/approve-bulk', requireRole('management', 'operations'), (req, res) => {
+router.post('/approve-bulk', requireRole('admin', 'operations'), (req, res) => {
   const db = getDb();
   const ids = req.body.timesheet_ids;
   if (!ids) { req.flash('error', 'No timesheets selected.'); return res.redirect('/timesheets'); }

@@ -33,11 +33,10 @@
           <label for="division" class="block text-sm font-medium text-gray-600 mb-1">Division</label>
           <select id="division" name="division" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="">Select division...</option>
-            <option value="ops" <%= isEdit && task.division === 'ops' ? 'selected' : '' %>>Ops</option>
+            <option value="ops" <%= isEdit && task.division === 'ops' ? 'selected' : '' %>>Operations</option>
             <option value="planning" <%= isEdit && task.division === 'planning' ? 'selected' : '' %>>Planning</option>
-            <option value="marketing" <%= isEdit && task.division === 'marketing' ? 'selected' : '' %>>Marketing</option>
-            <option value="accounts" <%= isEdit && task.division === 'accounts' ? 'selected' : '' %>>Accounts</option>
-            <option value="management" <%= isEdit && task.division === 'management' ? 'selected' : '' %>>Management</option>
+            <option value="finance" <%= isEdit && task.division === 'finance' ? 'selected' : '' %>>Finance</option>
+            <option value="admin" <%= isEdit && task.division === 'admin' ? 'selected' : '' %>>Admin</option>
           </select>
         </div>
 
