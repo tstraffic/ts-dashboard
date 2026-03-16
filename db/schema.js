@@ -1348,15 +1348,25 @@ function runMigrations(db) {
     recordMigration.run(23, 'Rename roles: management->admin, accounts->finance, remove marketing (no-op, see migration 24)');
   }
 
-  // Migration 24: Recreate users table with updated role CHECK constraint
-  // SQLite can't ALTER CHECK constraints, so we recreate the table
+  // Migration 24: was recorded but failed — skip it
   if (!isMigrationApplied.get(24)) {
-    console.log('Running migration 24: Recreate users table with new role CHECK');
+    recordMigration.run(24, 'Recreate users table (no-op, see migration 25)');
+  }
+
+  // Migration 25: Recreate users table with updated role CHECK constraint
+  // Must disable foreign keys to allow DROP TABLE
+  if (!isMigrationApplied.get(25)) {
+    console.log('Running migration 25: Recreate users table with new role CHECK');
 
     try {
-      db.exec('BEGIN TRANSACTION');
+      // Disable foreign keys so we can drop the users table
+      db.pragma('foreign_keys = OFF');
 
-      // Create new users table with updated CHECK
+      // Get column info to handle both old and new schemas
+      const cols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+      const hasEmailNotif = cols.includes('email_notifications_enabled');
+      const hasNotifFreq = cols.includes('notification_frequency');
+
       db.exec(`
         CREATE TABLE users_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1372,7 +1382,6 @@ function runMigrations(db) {
         );
       `);
 
-      // Copy data, converting old role names to new ones
       db.exec(`
         INSERT INTO users_new (id, username, password_hash, full_name, email, role, active, created_at, email_notifications_enabled, notification_frequency)
         SELECT id, username, password_hash, full_name, email,
@@ -1383,27 +1392,30 @@ function runMigrations(db) {
             ELSE role
           END,
           active, created_at,
-          COALESCE(email_notifications_enabled, 1),
-          COALESCE(notification_frequency, 'immediate')
+          ${hasEmailNotif ? 'COALESCE(email_notifications_enabled, 1)' : '1'},
+          ${hasNotifFreq ? "COALESCE(notification_frequency, 'immediate')" : "'immediate'"}
         FROM users;
       `);
 
       db.exec('DROP TABLE users;');
       db.exec('ALTER TABLE users_new RENAME TO users;');
 
+      // Re-enable foreign keys
+      db.pragma('foreign_keys = ON');
+
       // Also update tasks divisions
       try { db.prepare("UPDATE tasks SET division = 'admin' WHERE division = 'management'").run(); } catch (e) { /* ignore */ }
       try { db.prepare("UPDATE tasks SET division = 'finance' WHERE division = 'accounts'").run(); } catch (e) { /* ignore */ }
       try { db.prepare("UPDATE tasks SET division = 'ops' WHERE division = 'marketing'").run(); } catch (e) { /* ignore */ }
 
-      db.exec('COMMIT');
+      recordMigration.run(25, 'Recreate users table with new role CHECK constraint');
+      console.log('Migration 25 complete.');
     } catch (e) {
-      try { db.exec('ROLLBACK'); } catch (re) { /* ignore */ }
-      console.log('Migration 24 error:', e.message);
+      db.pragma('foreign_keys = ON');
+      // Clean up if users_new was created but not renamed
+      try { db.exec('DROP TABLE IF EXISTS users_new'); } catch (re) { /* ignore */ }
+      console.error('Migration 25 FAILED:', e.message);
     }
-
-    recordMigration.run(24, 'Recreate users table with new role CHECK constraint');
-    console.log('Migration 24 complete.');
   }
 
   console.log('All migrations checked/applied.');
