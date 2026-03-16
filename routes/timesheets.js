@@ -47,6 +47,8 @@ router.get('/', (req, res) => {
   // Summary stats
   const totalHours = timesheets.reduce((sum, t) => sum + (t.total_hours || 0), 0);
   const pendingApproval = timesheets.filter(t => !t.approved).length;
+  const approvedCount = timesheets.filter(t => t.approved).length;
+  const uniqueCrew = new Set(timesheets.map(t => t.crew_member_id)).size;
 
   res.render('timesheets/index', {
     title: 'Timesheets',
@@ -55,7 +57,7 @@ router.get('/', (req, res) => {
     jobs,
     crew,
     filters: req.query,
-    stats: { totalHours: totalHours.toFixed(1), pendingApproval }
+    stats: { totalHours: totalHours.toFixed(1), pendingApproval, approvedCount, uniqueCrew }
   });
 });
 

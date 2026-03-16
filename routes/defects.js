@@ -34,13 +34,34 @@ router.get('/', (req, res) => {
 
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
 
+  // Compute stats
+  const allDefects = db.prepare('SELECT severity, status, target_close_date FROM defects').all();
+  const today = new Date().toISOString().split('T')[0];
+  const stats = {
+    total: allDefects.length,
+    open: allDefects.filter(d => !['closed', 'deferred'].includes(d.status)).length,
+    criticalMajor: allDefects.filter(d => ['critical', 'major'].includes(d.severity) && !['closed', 'deferred'].includes(d.status)).length,
+    overdue: allDefects.filter(d => d.target_close_date && d.target_close_date < today && !['closed', 'deferred'].includes(d.status)).length
+  };
+
   res.render('defects/index', {
-    title: 'Defects & Snag List',
+    title: 'Defects',
     currentPage: 'defects',
     defects,
     jobs,
-    filters: req.query
+    filters: req.query,
+    stats
   });
+});
+
+// Inline status change
+router.post('/:id/status', (req, res) => {
+  const db = getDb();
+  const { status } = req.body;
+  const valid = ['open', 'investigating', 'rectification', 'closed', 'deferred'];
+  if (!valid.includes(status)) { req.flash('error', 'Invalid status'); return res.redirect('/defects'); }
+  db.prepare('UPDATE defects SET status = ? WHERE id = ?').run(status, req.params.id);
+  res.redirect('/defects');
 });
 
 // NEW FORM
