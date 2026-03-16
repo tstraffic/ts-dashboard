@@ -1343,23 +1343,67 @@ function runMigrations(db) {
     console.log('Migration 22 complete.');
   }
 
-  // Migration 23: Rename roles (management→admin, accounts→finance, remove marketing)
-  // =============================================
+  // Migration 23: Was a failed attempt to rename roles via UPDATE (CHECK constraint blocked it)
   if (!isMigrationApplied.get(23)) {
-    console.log('Running migration 23: Rename company divisions/roles');
+    recordMigration.run(23, 'Rename roles: management->admin, accounts->finance, remove marketing (no-op, see migration 24)');
+  }
 
-    // Update existing user roles
-    try { db.prepare("UPDATE users SET role = 'admin' WHERE role = 'management'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
-    try { db.prepare("UPDATE users SET role = 'finance' WHERE role = 'accounts'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
-    try { db.prepare("UPDATE users SET role = 'operations' WHERE role = 'marketing'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
+  // Migration 24: Recreate users table with updated role CHECK constraint
+  // SQLite can't ALTER CHECK constraints, so we recreate the table
+  if (!isMigrationApplied.get(24)) {
+    console.log('Running migration 24: Recreate users table with new role CHECK');
 
-    // Update tasks division references
-    try { db.prepare("UPDATE tasks SET division = 'admin' WHERE division = 'management'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
-    try { db.prepare("UPDATE tasks SET division = 'finance' WHERE division = 'accounts'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
-    try { db.prepare("UPDATE tasks SET division = 'ops' WHERE division = 'marketing'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
+    try {
+      db.exec('BEGIN TRANSACTION');
 
-    recordMigration.run(23, 'Rename roles: management->admin, accounts->finance, remove marketing');
-    console.log('Migration 23 complete.');
+      // Create new users table with updated CHECK
+      db.exec(`
+        CREATE TABLE users_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          username TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          full_name TEXT NOT NULL,
+          email TEXT,
+          role TEXT NOT NULL CHECK(role IN ('admin','operations','planning','finance')),
+          active INTEGER NOT NULL DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          email_notifications_enabled INTEGER DEFAULT 1,
+          notification_frequency TEXT DEFAULT 'immediate'
+        );
+      `);
+
+      // Copy data, converting old role names to new ones
+      db.exec(`
+        INSERT INTO users_new (id, username, password_hash, full_name, email, role, active, created_at, email_notifications_enabled, notification_frequency)
+        SELECT id, username, password_hash, full_name, email,
+          CASE role
+            WHEN 'management' THEN 'admin'
+            WHEN 'accounts' THEN 'finance'
+            WHEN 'marketing' THEN 'operations'
+            ELSE role
+          END,
+          active, created_at,
+          COALESCE(email_notifications_enabled, 1),
+          COALESCE(notification_frequency, 'immediate')
+        FROM users;
+      `);
+
+      db.exec('DROP TABLE users;');
+      db.exec('ALTER TABLE users_new RENAME TO users;');
+
+      // Also update tasks divisions
+      try { db.prepare("UPDATE tasks SET division = 'admin' WHERE division = 'management'").run(); } catch (e) { /* ignore */ }
+      try { db.prepare("UPDATE tasks SET division = 'finance' WHERE division = 'accounts'").run(); } catch (e) { /* ignore */ }
+      try { db.prepare("UPDATE tasks SET division = 'ops' WHERE division = 'marketing'").run(); } catch (e) { /* ignore */ }
+
+      db.exec('COMMIT');
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch (re) { /* ignore */ }
+      console.log('Migration 24 error:', e.message);
+    }
+
+    recordMigration.run(24, 'Recreate users table with new role CHECK constraint');
+    console.log('Migration 24 complete.');
   }
 
   console.log('All migrations checked/applied.');
