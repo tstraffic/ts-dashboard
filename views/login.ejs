@@ -81,6 +81,8 @@
     button[type="submit"]:active {
       transform: scale(0.98);
     }
+    /* Hide Tailwind CDN dev indicator */
+    #__tailwind_indicator,div[style*="z-index: 2147483647"]{display:none!important}
   </style>
 </head>
 <body class="h-full login-bg flex items-center justify-center p-4">
@@ -123,7 +125,7 @@
       </div>
     </form>
 
-    <p class="text-center text-brand-300/60 text-xs mt-8">T&S Operations Dashboard v1.0</p>
+    <p class="text-center text-brand-300/60 text-xs mt-8">&copy; <%= new Date().getFullYear() %> T&S Traffic Control</p>
   </div>
 </body>
 </html>
