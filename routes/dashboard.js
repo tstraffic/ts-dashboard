@@ -121,6 +121,36 @@ router.get('/', (req, res) => {
     ORDER BY work_date ASC
   `).all();
 
+  // Plans & Approvals — urgent items for dashboard widget
+  const complianceUrgent = db.prepare(`
+    SELECT c.id, c.title, c.item_type, c.status, c.due_date, c.expiry_date,
+      c.council_fee_paid, c.council_fee_amount,
+      j.job_number, j.client as job_client,
+      cl.company_name as client_name,
+      a.full_name as assigned_name
+    FROM compliance c
+    LEFT JOIN jobs j ON c.job_id = j.id
+    LEFT JOIN clients cl ON c.client_id = cl.id
+    LEFT JOIN users a ON c.assigned_to_id = a.id
+    WHERE (
+      (c.due_date IS NOT NULL AND c.due_date <= ? AND c.status NOT IN ('approved','expired'))
+      OR (c.due_date IS NOT NULL AND c.due_date > ? AND c.due_date <= ? AND c.status NOT IN ('approved','expired'))
+      OR (c.expiry_date IS NOT NULL AND c.expiry_date >= ? AND c.expiry_date <= ? AND c.status = 'approved')
+      OR (c.expiry_date IS NOT NULL AND c.expiry_date < ? AND c.status = 'approved')
+      OR (c.status IN ('not_started','submitted') AND c.due_date IS NOT NULL)
+    )
+    ORDER BY
+      CASE
+        WHEN c.due_date IS NOT NULL AND c.due_date < ? AND c.status NOT IN ('approved','expired') THEN 1
+        WHEN c.expiry_date IS NOT NULL AND c.expiry_date < ? THEN 2
+        WHEN c.due_date IS NOT NULL AND c.due_date <= ? AND c.status NOT IN ('approved','expired') THEN 3
+        WHEN c.expiry_date IS NOT NULL AND c.expiry_date <= ? THEN 4
+        ELSE 5
+      END,
+      COALESCE(c.due_date, c.expiry_date) ASC
+    LIMIT 10
+  `).all(today, today, next14, today, next30, today, today, today, next14, next30);
+
   // Action items: things that need immediate attention
   const actionItems = [];
   if (overdueTasks > 0) actionItems.push({ icon: 'task', color: 'red', text: `${overdueTasks} overdue task${overdueTasks !== 1 ? 's' : ''}`, link: '/tasks' });
@@ -145,6 +175,7 @@ router.get('/', (req, res) => {
     needsAttention,
     recentUpdates,
     overdueTasksList,
+    complianceUrgent,
     actionItems,
     jobStatusDist,
     jobHealthDist,

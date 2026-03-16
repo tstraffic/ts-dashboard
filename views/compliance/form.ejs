@@ -136,6 +136,24 @@
           </select>
         </div>
 
+        <!-- Designer -->
+        <div>
+          <label for="designer" class="block text-sm font-medium text-gray-600 mb-1">Designer</label>
+          <input type="text" id="designer" name="designer"
+            value="<%= isEdit && item.designer ? item.designer : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="Plan designer name...">
+        </div>
+
+        <!-- File / Document Link -->
+        <div>
+          <label for="file_link" class="block text-sm font-medium text-gray-600 mb-1">File / Document Link</label>
+          <input type="url" id="file_link" name="file_link"
+            value="<%= isEdit && item.file_link ? item.file_link : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="https://...">
+        </div>
+
         <!-- Status -->
         <div>
           <label for="status" class="block text-sm font-medium text-gray-600 mb-1">Status</label>
@@ -185,6 +203,29 @@
             class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
             placeholder="Additional notes..."><%= isEdit && item.notes ? item.notes : '' %></textarea>
         </div>
+
+        <!-- Council Fee (shown for council_permit type) -->
+        <div class="md:col-span-2 p-4 bg-amber-50 rounded-lg border border-amber-200" id="council-fee-section" style="display: none;">
+          <h3 class="text-sm font-semibold text-amber-800 mb-3">Council Fee</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="council_fee_amount" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Fee Amount ($)</label>
+              <input type="number" id="council_fee_amount" name="council_fee_amount" step="0.01" min="0"
+                value="<%= isEdit && item.council_fee_amount ? item.council_fee_amount : '' %>"
+                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="0.00">
+            </div>
+            <div class="flex items-end">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="hidden" name="council_fee_paid" value="0">
+                <input type="checkbox" id="council_fee_paid" name="council_fee_paid" value="1"
+                  <%= isEdit && item.council_fee_paid ? 'checked' : '' %>
+                  class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500 focus:ring-offset-0 focus:ring-2">
+                <span class="text-sm font-medium text-gray-700">Fee has been paid</span>
+              </label>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Buttons -->
@@ -230,4 +271,16 @@ function clearAssignmentError() {
     document.getElementById(id).classList.remove('border-red-400', 'ring-1', 'ring-red-400');
   });
 }
+// Show/hide council fee section based on item type
+function toggleCouncilFee() {
+  var type = document.getElementById('item_type').value;
+  var section = document.getElementById('council-fee-section');
+  if (type === 'council_permit') {
+    section.style.display = '';
+  } else {
+    section.style.display = 'none';
+  }
+}
+document.getElementById('item_type').addEventListener('change', toggleCouncilFee);
+toggleCouncilFee(); // Run on page load
 </script>
