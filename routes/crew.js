@@ -201,6 +201,26 @@ router.get('/:id', (req, res) => {
   });
 });
 
+// POST /:id/delete — Delete Crew Member
+router.post('/:id/delete', requireRole('management', 'operations'), (req, res) => {
+  const db = getDb();
+  const member = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(req.params.id);
+  if (!member) { req.flash('error', 'Crew member not found'); return res.redirect('/crew'); }
+
+  // Check for linked records
+  const allocations = db.prepare('SELECT COUNT(*) as count FROM crew_allocations WHERE crew_member_id = ?').get(req.params.id).count;
+  const timesheets = db.prepare('SELECT COUNT(*) as count FROM timesheets WHERE crew_member_id = ?').get(req.params.id).count;
+  if (allocations > 0 || timesheets > 0) {
+    req.flash('error', `Cannot delete ${member.full_name} — they have ${allocations} allocation(s) and ${timesheets} timesheet(s). Deactivate instead.`);
+    return res.redirect('/crew/' + member.id);
+  }
+
+  db.prepare('DELETE FROM crew_members WHERE id = ?').run(req.params.id);
+  logActivity({ user: req.session.user, action: 'delete', entityType: 'crew_member', entityId: member.id, entityLabel: member.full_name, details: 'Deleted crew member', ip: req.ip });
+  req.flash('success', member.full_name + ' deleted.');
+  res.redirect('/crew');
+});
+
 // POST /:id/supervisor-approve — Toggle supervisor approval
 router.post('/:id/supervisor-approve', requireRole('management', 'operations'), (req, res) => {
   const db = getDb();

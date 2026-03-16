@@ -114,6 +114,26 @@ router.post('/:id', (req, res) => {
   res.redirect(`/equipment/${req.params.id}`);
 });
 
+// DELETE EQUIPMENT
+router.post('/:id/delete', (req, res) => {
+  const db = getDb();
+  const item = db.prepare('SELECT * FROM equipment WHERE id = ?').get(req.params.id);
+  if (!item) { req.flash('error', 'Equipment not found.'); return res.redirect('/equipment'); }
+
+  const assignments = db.prepare('SELECT COUNT(*) as count FROM equipment_assignments WHERE equipment_id = ? AND actual_return_date IS NULL').get(req.params.id).count;
+  if (assignments > 0) {
+    req.flash('error', `Cannot delete ${item.asset_number} — it is currently deployed. Return it first or deactivate instead.`);
+    return res.redirect('/equipment/' + item.id);
+  }
+
+  db.prepare('DELETE FROM equipment_maintenance WHERE equipment_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM equipment_assignments WHERE equipment_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM equipment WHERE id = ?').run(req.params.id);
+  logActivity({ user: req.session.user, action: 'delete', entityType: 'equipment', entityId: item.id, entityLabel: `${item.asset_number} - ${item.name}`, ip: req.ip });
+  req.flash('success', `Equipment ${item.asset_number} deleted.`);
+  res.redirect('/equipment');
+});
+
 // ASSIGN TO JOB
 router.post('/:id/assign', (req, res) => {
   const db = getDb();

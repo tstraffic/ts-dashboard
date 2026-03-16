@@ -102,6 +102,35 @@ router.get('/', (req, res) => {
     LIMIT 10
   `).all(today);
 
+  // Chart data: job status distribution
+  const jobStatusDist = db.prepare(`
+    SELECT status, COUNT(*) as count FROM jobs GROUP BY status
+  `).all();
+
+  // Chart data: job health distribution
+  const jobHealthDist = db.prepare(`
+    SELECT health, COUNT(*) as count FROM jobs WHERE status = 'active' GROUP BY health
+  `).all();
+
+  // Chart data: crew hours by day (last 7 days)
+  const crewHoursByDay = db.prepare(`
+    SELECT work_date, COALESCE(SUM(total_hours), 0) as hours
+    FROM timesheets
+    WHERE work_date >= date('now', '-7 days')
+    GROUP BY work_date
+    ORDER BY work_date ASC
+  `).all();
+
+  // Action items: things that need immediate attention
+  const actionItems = [];
+  if (overdueTasks > 0) actionItems.push({ icon: 'task', color: 'red', text: `${overdueTasks} overdue task${overdueTasks !== 1 ? 's' : ''}`, link: '/tasks' });
+  if (overdueCompliance > 0) actionItems.push({ icon: 'shield', color: 'red', text: `${overdueCompliance} overdue compliance item${overdueCompliance !== 1 ? 's' : ''}`, link: '/compliance' });
+  if (openIncidents > 0) actionItems.push({ icon: 'alert', color: 'red', text: `${openIncidents} open incident${openIncidents !== 1 ? 's' : ''}`, link: '/incidents' });
+  if (missingUpdates > 0) actionItems.push({ icon: 'update', color: 'orange', text: `${missingUpdates} job${missingUpdates !== 1 ? 's' : ''} missing weekly update`, link: '/updates' });
+  if (unconfirmedAllocations > 0) actionItems.push({ icon: 'crew', color: 'orange', text: `${unconfirmedAllocations} unconfirmed allocation${unconfirmedAllocations !== 1 ? 's' : ''} today`, link: '/allocations' });
+  if (ticketsExpiring > 0) actionItems.push({ icon: 'ticket', color: 'orange', text: `${ticketsExpiring} crew ticket${ticketsExpiring !== 1 ? 's' : ''} expiring soon`, link: '/crew' });
+  if (openDefects > 0) actionItems.push({ icon: 'defect', color: 'orange', text: `${openDefects} open defect${openDefects !== 1 ? 's' : ''}`, link: '/defects' });
+
   res.render('dashboard', {
     title: 'Dashboard',
     user,
@@ -116,6 +145,10 @@ router.get('/', (req, res) => {
     needsAttention,
     recentUpdates,
     overdueTasksList,
+    actionItems,
+    jobStatusDist,
+    jobHealthDist,
+    crewHoursByDay,
     canViewAccounts: canViewAccounts(user)
   });
 });

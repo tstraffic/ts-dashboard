@@ -90,6 +90,24 @@ router.post('/users/:id', (req, res) => {
   res.redirect('/admin/users');
 });
 
+// DELETE USER
+router.post('/users/:id/delete', (req, res) => {
+  const db = getDb();
+  const targetUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (!targetUser) { req.flash('error', 'User not found.'); return res.redirect('/admin/users'); }
+
+  // Prevent deleting yourself
+  if (targetUser.id === req.session.user.id) {
+    req.flash('error', 'You cannot delete your own account.');
+    return res.redirect('/admin/users');
+  }
+
+  db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
+  logActivity({ user: req.session.user, action: 'delete', entityType: 'user', entityId: targetUser.id, entityLabel: targetUser.full_name, details: 'Deleted user account', ip: req.ip });
+  req.flash('success', `User ${targetUser.username} deleted.`);
+  res.redirect('/admin/users');
+});
+
 // Resend invitation email
 router.post('/users/:id/resend-invite', async (req, res) => {
   const db = getDb();
