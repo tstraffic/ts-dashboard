@@ -1,4 +1,4 @@
-/* T&S Dashboard Custom Styles — Light Theme */
+/* T&S Dashboard Custom Styles — Premium Mobile Experience */
 
 /* Brand Colors */
 :root {
@@ -7,7 +7,7 @@
   --brand-500: #2B7FFF;
 }
 
-/* Smooth transitions */
+/* Smooth transitions on interactive elements */
 a, button, input, select, textarea {
   transition: all 0.15s ease;
 }
@@ -15,15 +15,15 @@ a, button, input, select, textarea {
 /* Custom scrollbar — desktop only */
 @media (min-width: 1024px) {
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #f1f5f9;
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
     background: #cbd5e1;
-    border-radius: 4px;
+    border-radius: 100px;
   }
   ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
@@ -43,10 +43,10 @@ a, button, input, select, textarea {
   transition: width 0.5s ease;
 }
 
-/* ===== Mobile Sidebar ===== */
+/* ===== Mobile Sidebar — Slide-in Panel ===== */
 
 #sidebar {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform;
 }
 
@@ -56,7 +56,7 @@ a, button, input, select, textarea {
 }
 
 @media (max-width: 1023px) {
-  /* Sidebar open state */
+  /* Sidebar open state — full height panel */
   #sidebar.sidebar-open {
     display: flex !important;
     flex-direction: column;
@@ -70,21 +70,28 @@ a, button, input, select, textarea {
   }
 }
 
-/* Sidebar nav scrollbar — thin and subtle */
-#sidebar nav::-webkit-scrollbar {
-  width: 3px;
+/* Sidebar nav scrollbar — ultra-thin, subtle */
+.sidebar-nav::-webkit-scrollbar {
+  width: 2px;
 }
-#sidebar nav::-webkit-scrollbar-track {
+.sidebar-nav::-webkit-scrollbar-track {
   background: transparent;
 }
-#sidebar nav::-webkit-scrollbar-thumb {
+.sidebar-nav::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,0.15);
-  border-radius: 3px;
+  border-radius: 100px;
 }
 
-/* Active link indicator */
-.border-l-2 {
-  border-left-width: 2px;
+/* Sidebar link hover animation */
+.sidebar-link {
+  position: relative;
+  transform: translateX(0);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (max-width: 1023px) {
+  .sidebar-link:active {
+    transform: scale(0.97);
+  }
 }
 
 /* ===== Mobile-friendly touch targets ===== */
@@ -121,6 +128,11 @@ a, button, input, select, textarea {
     padding-right: env(safe-area-inset-right);
   }
 
+  /* Sticky header respects safe area */
+  nav.sticky {
+    top: env(safe-area-inset-top);
+  }
+
   /* Extra bottom padding on sidebar for home indicator */
   #sidebar {
     padding-bottom: env(safe-area-inset-bottom);
@@ -130,12 +142,7 @@ a, button, input, select, textarea {
 /* ===== Mobile tap highlight ===== */
 @media (max-width: 1023px) {
   a, button {
-    -webkit-tap-highlight-color: rgba(43, 127, 255, 0.1);
-  }
-
-  /* Active state feedback */
-  #sidebar a:active {
-    transform: scale(0.98);
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
@@ -149,5 +156,65 @@ a, button, input, select, textarea {
     width: auto !important;
     max-width: none !important;
     margin-top: 0 !important;
+  }
+}
+
+/* ===== Glassmorphism header ===== */
+@supports (backdrop-filter: blur(12px)) {
+  nav.sticky {
+    background: rgba(255, 255, 255, 0.85) !important;
+  }
+}
+
+/* ===== Card hover effects ===== */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ===== Animate badge pulse ===== */
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+.animate-pulse {
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+/* ===== Flash message animations ===== */
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.mb-4[class*="bg-emerald"],
+.mb-4[class*="bg-red"] {
+  animation: slide-down 0.3s ease-out;
+}
+
+/* ===== Responsive table improvements ===== */
+@media (max-width: 768px) {
+  /* Stack table headers nicely */
+  table th {
+    white-space: nowrap;
+  }
+
+  /* Compact table cells on mobile */
+  table td, table th {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
+
+/* ===== Print styles ===== */
+@media print {
+  #sidebar, #sidebar-backdrop, nav.sticky, .no-print {
+    display: none !important;
+  }
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }
