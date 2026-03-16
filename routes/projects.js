@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { canViewAccounts } = require('../middleware/auth');
+const { logActivity } = require('../middleware/audit');
 
 // List all projects (top-level jobs only, parent_project_id IS NULL)
 router.get('/', (req, res) => {
@@ -266,11 +267,31 @@ router.post('/:id', (req, res) => {
   }
 });
 
-// Delete project
+// Delete project (cascades to related records)
 router.post('/:id/delete', (req, res) => {
   const db = getDb();
+  const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(req.params.id);
+  if (!job) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
+
+  // Cascade delete all linked records
+  db.prepare('DELETE FROM tasks WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM project_updates WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM crew_allocations WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM timesheets WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM incidents WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM client_contacts WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM communication_log WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM equipment_assignments WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM budget_items WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM budget_meta WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM documents WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM defects WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM traffic_plans WHERE job_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM compliance_items WHERE job_id = ?').run(req.params.id);
   db.prepare('DELETE FROM jobs WHERE id = ?').run(req.params.id);
-  req.flash('success', 'Project deleted.');
+
+  logActivity({ user: req.session.user, action: 'delete', entityType: 'project', entityId: job.id, entityLabel: `${job.job_number} - ${job.client}`, details: 'Deleted project and all associated data', ip: req.ip });
+  req.flash('success', `Project ${job.job_number} deleted.`);
   res.redirect('/projects');
 });
 
