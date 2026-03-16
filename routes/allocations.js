@@ -8,6 +8,7 @@ const {
   getBatchFatigue,
   tcpLevelMeetsRequirement,
 } = require('../middleware/compliance');
+const { sendAllocationEmail } = require('../middleware/email');
 
 // GET / — Main booking board
 router.get('/', (req, res) => {
@@ -251,6 +252,28 @@ router.post('/', (req, res) => {
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'crew_allocation',
     jobId: parseInt(job_id), details: 'Allocated crew to job on ' + allocation_date, ip: req.ip });
+
+  // Send email notification to job PM/supervisor
+  try {
+    const job = db.prepare('SELECT j.*, u.full_name as pm_name, u.email as pm_email, u.id as pm_id FROM jobs j LEFT JOIN users u ON j.project_manager_id = u.id WHERE j.id = ?').get(parseInt(job_id));
+    const crewMember = db.prepare('SELECT full_name FROM crew_members WHERE id = ?').get(parseInt(crew_member_id));
+    if (job && crewMember) {
+      const allocData = { crew_name: crewMember.full_name, job_number: job.job_number, client: job.client, allocation_date, shift_type: shift_type || 'day' };
+      const allocatedByName = req.session.user.full_name;
+      const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+      // Notify PM (if different from allocator)
+      if (job.pm_id && job.pm_id !== req.session.user.id && job.pm_email) {
+        sendAllocationEmail(allocData, { full_name: job.pm_name, email: job.pm_email }, allocatedByName, baseUrl);
+      }
+      // Notify ops supervisor (if different from PM and allocator)
+      if (job.ops_supervisor_id && job.ops_supervisor_id !== req.session.user.id && job.ops_supervisor_id !== job.pm_id) {
+        const sup = db.prepare('SELECT full_name, email FROM users WHERE id = ?').get(job.ops_supervisor_id);
+        if (sup && sup.email) sendAllocationEmail(allocData, sup, allocatedByName, baseUrl);
+      }
+    }
+  } catch (emailErr) {
+    console.error('[Allocations] Email error:', emailErr.message);
+  }
 
   if (check.blocks.length === 0 && check.warnings.length === 0) {
     req.flash('success', 'Crew member allocated successfully');
