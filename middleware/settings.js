@@ -37,6 +37,16 @@ const CATEGORY_META = {
   plan_status:        { label: 'Traffic Plan Status',  group: 'Planning',  icon: 'clipboard' },
   equipment_category: { label: 'Equipment Categories', group: 'Assets',    icon: 'truck' },
   state:              { label: 'Australian States',    group: 'General',   icon: 'globe' },
+  // CRM categories
+  opportunity_stages: { label: 'Opportunity Stages',   group: 'CRM',       icon: 'layers' },
+  activity_types:     { label: 'Activity Types',       group: 'CRM',       icon: 'calendar' },
+  lead_sources:       { label: 'Lead Sources',         group: 'CRM',       icon: 'target' },
+  loss_reasons:       { label: 'Loss Reasons',         group: 'CRM',       icon: 'x-circle' },
+  service_categories: { label: 'Service Categories',   group: 'CRM',       icon: 'briefcase' },
+  priority_levels:    { label: 'Priority Levels',      group: 'CRM',       icon: 'flag' },
+  industry_segments:  { label: 'Industry Segments',    group: 'CRM',       icon: 'globe' },
+  client_categories:  { label: 'Client Categories',    group: 'CRM',       icon: 'users' },
+  contact_types:      { label: 'Contact Types',        group: 'CRM',       icon: 'user' },
 };
 
 /**

@@ -231,4 +231,215 @@
     <% } %>
   </div>
 
+  <!-- 6-7 2-col grid for Pipeline by Owner and Meetings by Owner -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+    <!-- 6. Pipeline by Owner -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Pipeline by Owner</h2>
+      <% if (pipelineByOwner && pipelineByOwner.length > 0) { %>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Owner</th>
+              <th class="px-3 py-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Open Opps</th>
+              <th class="px-3 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Value</th>
+              <th class="px-3 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Weighted Value</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% pipelineByOwner.forEach(function(row) { %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-3 py-2 text-sm text-gray-700 font-medium"><%= row.owner_name || 'Unassigned' %></td>
+              <td class="px-3 py-2 text-center text-sm text-gray-600 tabular-nums"><%= row.count || 0 %></td>
+              <td class="px-3 py-2 text-right text-sm font-semibold text-gray-900 tabular-nums"><%= formatCurrency(row.value) %></td>
+              <td class="px-3 py-2 text-right text-sm text-gray-600 tabular-nums"><%= formatCurrency(row.weighted) %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 text-center py-6">No open pipeline data available</p>
+      <% } %>
+    </div>
+
+    <!-- 7. Meetings by Owner (This Month) -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Meetings by Owner (This Month)</h2>
+      <% if (meetingsByOwner && meetingsByOwner.length > 0) { %>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Owner</th>
+              <th class="px-3 py-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Meetings This Month</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% meetingsByOwner.forEach(function(row) { %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-3 py-2 text-sm text-gray-700 font-medium"><%= row.owner_name || 'Unassigned' %></td>
+              <td class="px-3 py-2 text-center">
+                <span class="text-sm font-bold text-gray-900 tabular-nums"><%= row.count || 0 %></span>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 text-center py-6">No meetings recorded this month</p>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- 8. Stale Opportunities -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Stale Opportunities</h2>
+    <p class="text-xs text-gray-400 mb-3">Open opportunities with no activity in 14+ days</p>
+    <% if (staleOpportunities && staleOpportunities.length > 0) { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-8">Opp#</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Title</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Owner</th>
+            <th class="px-3 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Value</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Last Activity</th>
+            <th class="px-3 py-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Days Stale</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% staleOpportunities.forEach(function(row) {
+            const lastAct = row.last_activity_date ? new Date(row.last_activity_date) : null;
+            const daysStale = lastAct ? Math.round((Date.now() - lastAct.getTime()) / (1000*60*60*24)) : 999;
+            let staleSeverity = 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20';
+            if (daysStale > 30) staleSeverity = 'bg-red-50 text-red-700 ring-1 ring-red-600/20';
+          %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-3 py-2 text-xs text-gray-400 tabular-nums"><%= row.id %></td>
+            <td class="px-3 py-2">
+              <a href="/crm/opportunities/<%= row.id %>" class="text-sm text-brand-600 hover:text-brand-700 font-medium hover:underline"><%= row.title || 'Untitled' %></a>
+            </td>
+            <td class="px-3 py-2 text-sm text-gray-600"><%= row.client_name || 'N/A' %></td>
+            <td class="px-3 py-2 text-sm text-gray-600"><%= row.owner_name || 'Unassigned' %></td>
+            <td class="px-3 py-2 text-right text-sm font-semibold text-gray-900 tabular-nums"><%= formatCurrency(row.estimated_value) %></td>
+            <td class="px-3 py-2 text-xs text-gray-500 tabular-nums"><%= formatDate(row.last_activity_date) %></td>
+            <td class="px-3 py-2 text-center">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold <%= staleSeverity %>"><%= daysStale === 999 ? 'Never' : daysStale + 'd' %></span>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <div class="text-center py-6">
+      <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+        <svg class="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <p class="text-sm text-gray-500">No stale opportunities. All open opportunities have recent activity.</p>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- 9. Follow-ups Overdue -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Follow-ups Overdue</h2>
+    <% if (overdueFollowUps && overdueFollowUps.length > 0) { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date Due</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subject</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Owner</th>
+            <th class="px-3 py-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Days Overdue</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% overdueFollowUps.forEach(function(row) {
+            const dueDate = row.next_step_due_date ? new Date(row.next_step_due_date) : null;
+            const daysOverdue = dueDate ? Math.round((Date.now() - dueDate.getTime()) / (1000*60*60*24)) : 0;
+            let overdueSeverity = 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20';
+            if (daysOverdue > 7) overdueSeverity = 'bg-red-50 text-red-700 ring-1 ring-red-600/20';
+          %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-3 py-2 text-xs text-gray-500 tabular-nums"><%= formatDate(row.next_step_due_date) %></td>
+            <td class="px-3 py-2">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-50 text-gray-600 ring-1 ring-gray-500/20"><%= (row.activity_type || '').replace(/_/g, ' ') %></span>
+            </td>
+            <td class="px-3 py-2 text-sm text-gray-700 font-medium"><%= row.subject || '-' %></td>
+            <td class="px-3 py-2 text-sm text-gray-600"><%= row.client_name || 'N/A' %></td>
+            <td class="px-3 py-2 text-sm text-gray-600"><%= row.owner_name || 'Unassigned' %></td>
+            <td class="px-3 py-2 text-center">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold <%= overdueSeverity %>"><%= daysOverdue %>d</span>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <div class="text-center py-6">
+      <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+        <svg class="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <p class="text-sm text-gray-500">No overdue follow-ups. All follow-ups are on track.</p>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- 10. Opportunities Without Next Step -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Opportunities Without Next Step</h2>
+    <% if (oppsNoNextStep && oppsNoNextStep.length > 0) { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-8">Opp#</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Title</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Owner</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Stage</th>
+            <th class="px-3 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Value</th>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Close Date</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% oppsNoNextStep.forEach(function(row) { %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-3 py-2 text-xs text-gray-400 tabular-nums"><%= row.id %></td>
+            <td class="px-3 py-2">
+              <a href="/crm/opportunities/<%= row.id %>" class="text-sm text-brand-600 hover:text-brand-700 font-medium hover:underline"><%= row.title || 'Untitled' %></a>
+            </td>
+            <td class="px-3 py-2 text-sm text-gray-600"><%= row.client_name || 'N/A' %></td>
+            <td class="px-3 py-2 text-sm text-gray-600"><%= row.owner_name || 'Unassigned' %></td>
+            <td class="px-3 py-2">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-50 text-gray-600 ring-1 ring-gray-500/20"><%= (row.stage || '').replace(/_/g, ' ') %></span>
+            </td>
+            <td class="px-3 py-2 text-right text-sm font-semibold text-gray-900 tabular-nums"><%= formatCurrency(row.estimated_value) %></td>
+            <td class="px-3 py-2 text-xs text-gray-500 tabular-nums"><%= formatDate(row.expected_close_date) %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <div class="text-center py-6">
+      <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+        <svg class="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <p class="text-sm text-gray-500">All open opportunities have a next step defined.</p>
+    </div>
+    <% } %>
+  </div>
+
 </div>

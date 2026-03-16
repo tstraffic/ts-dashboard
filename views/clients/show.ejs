@@ -46,6 +46,37 @@
     </div>
   </div>
 
+  <!-- Quick Actions Bar -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-3">
+    <div class="flex items-center gap-2 overflow-x-auto pb-1 -mb-1 scrollbar-thin">
+      <a href="/crm/activities/new?client_id=<%= company.id %>&type=call" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-medium rounded-lg transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+        Log Call
+      </a>
+      <a href="/crm/activities/new?client_id=<%= company.id %>&type=email" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium rounded-lg transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        Log Email
+      </a>
+      <a href="/crm/meetings/new?account_id=<%= company.id %>" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-medium rounded-lg transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Log Meeting
+      </a>
+      <span class="w-px h-5 bg-gray-200 flex-shrink-0"></span>
+      <a href="/opportunities/new?client_id=<%= company.id %>" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium rounded-lg transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+        Create Opportunity
+      </a>
+      <a href="/contacts/new?company_id=<%= company.id %>" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-medium rounded-lg transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+        Add Contact
+      </a>
+      <a href="/tasks/new?client_id=<%= company.id %>" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-medium rounded-lg transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Create Task
+      </a>
+    </div>
+  </div>
+
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Sidebar Info -->
     <div class="lg:col-span-1 space-y-5">
@@ -304,227 +335,401 @@
       <% } %>
     </div>
 
-    <!-- Main Content -->
-    <div class="lg:col-span-2 space-y-5">
-      <% if (cType === 'client') { %>
-      <!-- Projects (clients only) -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Projects (<%= projects.length %>)</h3>
-          <a href="/projects/new?client_id=<%= company.id %>" class="text-xs text-brand-600 hover:underline font-medium">+ New Project</a>
+    <!-- Main Content (Tabbed) -->
+    <div class="lg:col-span-2 space-y-0">
+      <!-- Tab Navigation -->
+      <div class="bg-white border border-gray-200 rounded-t-xl shadow-sm">
+        <div class="flex overflow-x-auto border-b border-gray-200" id="accountTabs">
+          <button type="button" data-tab="overview" class="account-tab-btn flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors border-brand-600 text-brand-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+            Overview
+          </button>
+          <button type="button" data-tab="contacts" class="account-tab-btn flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Contacts
+            <% var acContacts = typeof accountContacts !== 'undefined' ? accountContacts : contacts; %>
+            <% if (acContacts.length > 0) { %>
+              <span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full"><%= acContacts.length %></span>
+            <% } %>
+          </button>
+          <button type="button" data-tab="jobs" class="account-tab-btn flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            Jobs
+            <% var acJobs = typeof accountJobs !== 'undefined' ? accountJobs : []; %>
+            <% if (acJobs.length > 0) { %>
+              <span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full"><%= acJobs.length %></span>
+            <% } %>
+          </button>
+          <button type="button" data-tab="timeline" class="account-tab-btn flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Timeline
+          </button>
         </div>
-        <% if (projects.length === 0) { %>
-          <div class="p-6 text-center text-gray-500 text-sm">No projects linked to this client yet.</div>
-        <% } else { %>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Job #</th>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden sm:table-cell">Suburb</th>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Status</th>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden md:table-cell">PM</th>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden lg:table-cell">Start</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-              <% projects.forEach(p => { %>
-              <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/projects/<%= p.id %>'">
-                <td class="px-4 py-2.5 font-medium text-brand-600"><%= p.job_number %></td>
-                <td class="px-4 py-2.5 text-gray-600 hidden sm:table-cell"><%= p.suburb %></td>
-                <td class="px-4 py-2.5">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
-                    <%= p.status === 'active' ? 'bg-emerald-50 text-emerald-700' : p.status === 'on_hold' ? 'bg-amber-50 text-amber-700' : p.status === 'completed' ? 'bg-gray-100 text-gray-600' : 'bg-blue-50 text-blue-700' %>">
-                    <%= p.status %>
-                  </span>
-                </td>
-                <td class="px-4 py-2.5 text-gray-600 text-xs hidden md:table-cell"><%= p.pm_name || '-' %></td>
-                <td class="px-4 py-2.5 text-gray-600 text-xs hidden lg:table-cell"><%= p.start_date || '-' %></td>
-              </tr>
-              <% }); %>
-            </tbody>
-          </table>
+      </div>
+
+      <!-- Tab: Overview -->
+      <div id="tab-overview" class="account-tab-panel space-y-5 pt-5">
+        <% if (cType === 'client') { %>
+        <!-- Projects (clients only) -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Projects (<%= projects.length %>)</h3>
+            <a href="/projects/new?client_id=<%= company.id %>" class="text-xs text-brand-600 hover:underline font-medium">+ New Project</a>
+          </div>
+          <% if (projects.length === 0) { %>
+            <div class="p-6 text-center text-gray-500 text-sm">No projects linked to this client yet.</div>
+          <% } else { %>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Job #</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden sm:table-cell">Suburb</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Status</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden md:table-cell">PM</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden lg:table-cell">Start</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <% projects.forEach(p => { %>
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/projects/<%= p.id %>'">
+                  <td class="px-4 py-2.5 font-medium text-brand-600"><%= p.job_number %></td>
+                  <td class="px-4 py-2.5 text-gray-600 hidden sm:table-cell"><%= p.suburb %></td>
+                  <td class="px-4 py-2.5">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
+                      <%= p.status === 'active' ? 'bg-emerald-50 text-emerald-700' : p.status === 'on_hold' ? 'bg-amber-50 text-amber-700' : p.status === 'completed' ? 'bg-gray-100 text-gray-600' : 'bg-blue-50 text-blue-700' %>">
+                      <%= p.status %>
+                    </span>
+                  </td>
+                  <td class="px-4 py-2.5 text-gray-600 text-xs hidden md:table-cell"><%= p.pm_name || '-' %></td>
+                  <td class="px-4 py-2.5 text-gray-600 text-xs hidden lg:table-cell"><%= p.start_date || '-' %></td>
+                </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <% } %>
+        </div>
+
+        <!-- Recent Shifts -->
+        <% if (recentShifts.length > 0) { %>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div class="px-5 py-3 border-b border-gray-200">
+            <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Recent Shifts (<%= recentShifts.length %>)</h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Job #</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden sm:table-cell">Suburb</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Date</th>
+                  <th class="px-4 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase">Crew</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <% recentShifts.forEach(s => { %>
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-2.5 font-medium text-gray-900"><%= s.job_number %></td>
+                  <td class="px-4 py-2.5 text-gray-600 hidden sm:table-cell"><%= s.suburb %></td>
+                  <td class="px-4 py-2.5 text-gray-600 text-xs"><%= s.start_date %></td>
+                  <td class="px-4 py-2.5 text-center"><%= s.crew_count || 0 %></td>
+                  <td class="px-4 py-2.5">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
+                      <%= s.status === 'active' ? 'bg-emerald-50 text-emerald-700' : s.status === 'completed' ? 'bg-gray-100 text-gray-600' : 'bg-blue-50 text-blue-700' %>">
+                      <%= s.status %>
+                    </span>
+                  </td>
+                </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <% } %>
+        <% } %>
+
+        <!-- Opportunities -->
+        <% if (typeof opportunities !== 'undefined' && opportunities.length > 0) { %>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Opportunities (<%= opportunities.length %>)</h3>
+            <a href="/opportunities/new?client_id=<%= company.id %>" class="text-xs text-brand-600 hover:underline font-medium">+ New</a>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Opportunity</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden sm:table-cell">Stage</th>
+                  <th class="px-4 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase">Value</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden md:table-cell">Close Date</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden lg:table-cell">Owner</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <% opportunities.forEach(opp => { %>
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/opportunities/<%= opp.id %>'">
+                  <td class="px-4 py-2.5">
+                    <p class="font-medium text-brand-600"><%= opp.opportunity_number %></p>
+                    <p class="text-xs text-gray-500 truncate max-w-[200px]"><%= opp.title %></p>
+                  </td>
+                  <td class="px-4 py-2.5 hidden sm:table-cell">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 ring-1 ring-blue-600/20 capitalize"><%= (opp.stage || '').replace(/_/g, ' ') %></span>
+                  </td>
+                  <td class="px-4 py-2.5 text-right font-medium text-gray-900">$<%= (opp.estimated_value || 0).toLocaleString() %></td>
+                  <td class="px-4 py-2.5 text-gray-600 text-xs hidden md:table-cell"><%= formatDate(opp.expected_close_date) %></td>
+                  <td class="px-4 py-2.5 text-gray-600 text-xs hidden lg:table-cell"><%= opp.owner_name || '-' %></td>
+                  <td class="px-4 py-2.5">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
+                      <%= opp.status === 'won' ? 'bg-emerald-50 text-emerald-700' : opp.status === 'lost' ? 'bg-gray-100 text-gray-600' : opp.status === 'on_hold' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700' %>">
+                      <%= opp.status %>
+                    </span>
+                  </td>
+                </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <% } %>
+
+        <!-- Recent Communications (all types) -->
+        <% if (typeof comms !== 'undefined' && comms.length > 0) { %>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Recent Communications</h3>
+            <a href="/contacts/comms" class="text-xs text-brand-600 hover:underline font-medium">View All</a>
+          </div>
+          <div class="divide-y divide-gray-100">
+            <% comms.forEach(comm => { %>
+            <div class="px-5 py-3">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <% if (comm.direction === 'outgoing') { %>
+                      <svg class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                    <% } else { %>
+                      <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                    <% } %>
+                    <span class="text-sm font-medium text-gray-900 truncate"><%= comm.subject %></span>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-gray-100 text-gray-500 uppercase"><%= comm.comm_type %></span>
+                  </div>
+                  <p class="text-xs text-gray-500 line-clamp-2 ml-5"><%= comm.summary %></p>
+                  <p class="text-[10px] text-gray-400 ml-5 mt-1">
+                    <%= formatDate(comm.comm_date) %> by <%= comm.logged_by_name %>
+                    <% if (comm.contact_name) { %> &middot; with <%= comm.contact_name %><% } %>
+                  </p>
+                </div>
+              </div>
+            </div>
+            <% }); %>
+          </div>
+        </div>
+        <% } %>
+
+        <% if (cType !== 'client' && projects.length === 0 && (typeof comms === 'undefined' || comms.length === 0) && (typeof opportunities === 'undefined' || opportunities.length === 0)) { %>
+        <!-- Empty state for non-client companies with no data -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+          <div class="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          </div>
+          <h3 class="text-gray-900 font-semibold text-base mb-1">No activity yet</h3>
+          <p class="text-gray-500 text-sm">Communication logs and linked projects will appear here.</p>
         </div>
         <% } %>
       </div>
 
-      <!-- Recent Shifts -->
-      <% if (recentShifts.length > 0) { %>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-gray-200">
-          <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Recent Shifts (<%= recentShifts.length %>)</h3>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Job #</th>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden sm:table-cell">Suburb</th>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Date</th>
-                <th class="px-4 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase">Crew</th>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Status</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-              <% recentShifts.forEach(s => { %>
-              <tr class="hover:bg-gray-50">
-                <td class="px-4 py-2.5 font-medium text-gray-900"><%= s.job_number %></td>
-                <td class="px-4 py-2.5 text-gray-600 hidden sm:table-cell"><%= s.suburb %></td>
-                <td class="px-4 py-2.5 text-gray-600 text-xs"><%= s.start_date %></td>
-                <td class="px-4 py-2.5 text-center"><%= s.crew_count || 0 %></td>
-                <td class="px-4 py-2.5">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
-                    <%= s.status === 'active' ? 'bg-emerald-50 text-emerald-700' : s.status === 'completed' ? 'bg-gray-100 text-gray-600' : 'bg-blue-50 text-blue-700' %>">
-                    <%= s.status %>
-                  </span>
-                </td>
-              </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <% } %>
-      <% } %>
-
-      <!-- Opportunities -->
-      <% if (typeof opportunities !== 'undefined' && opportunities.length > 0) { %>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Opportunities (<%= opportunities.length %>)</h3>
-          <a href="/opportunities/new?client_id=<%= company.id %>" class="text-xs text-brand-600 hover:underline font-medium">+ New</a>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Opportunity</th>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden sm:table-cell">Stage</th>
-                <th class="px-4 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase">Value</th>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden md:table-cell">Close Date</th>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden lg:table-cell">Owner</th>
-                <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Status</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-              <% opportunities.forEach(opp => { %>
-              <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/opportunities/<%= opp.id %>'">
-                <td class="px-4 py-2.5">
-                  <p class="font-medium text-brand-600"><%= opp.opportunity_number %></p>
-                  <p class="text-xs text-gray-500 truncate max-w-[200px]"><%= opp.title %></p>
-                </td>
-                <td class="px-4 py-2.5 hidden sm:table-cell">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 ring-1 ring-blue-600/20 capitalize"><%= (opp.stage || '').replace(/_/g, ' ') %></span>
-                </td>
-                <td class="px-4 py-2.5 text-right font-medium text-gray-900">$<%= (opp.estimated_value || 0).toLocaleString() %></td>
-                <td class="px-4 py-2.5 text-gray-600 text-xs hidden md:table-cell"><%= formatDate(opp.expected_close_date) %></td>
-                <td class="px-4 py-2.5 text-gray-600 text-xs hidden lg:table-cell"><%= opp.owner_name || '-' %></td>
-                <td class="px-4 py-2.5">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
-                    <%= opp.status === 'won' ? 'bg-emerald-50 text-emerald-700' : opp.status === 'lost' ? 'bg-gray-100 text-gray-600' : opp.status === 'on_hold' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700' %>">
-                    <%= opp.status %>
-                  </span>
-                </td>
-              </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <% } %>
-
-      <!-- CRM Activity Timeline -->
-      <% if (typeof crmActivities !== 'undefined' && crmActivities.length > 0) { %>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">CRM Activity (<%= crmActivities.length %>)</h3>
-          <a href="/crm/activities/new?client_id=<%= company.id %>" class="text-xs text-brand-600 hover:underline font-medium">+ Log Activity</a>
-        </div>
-        <div class="divide-y divide-gray-100">
-          <% crmActivities.forEach(act => { %>
-          <div class="px-5 py-3">
-            <div class="flex items-start gap-3">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
-                <%= act.activity_type === 'call' ? 'bg-blue-50' : act.activity_type === 'email' ? 'bg-sky-50' : act.activity_type === 'meeting' ? 'bg-purple-50' : act.activity_type === 'site_visit' ? 'bg-emerald-50' : 'bg-gray-50' %>">
-                <% if (act.activity_type === 'call') { %>
-                  <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                <% } else if (act.activity_type === 'email') { %>
-                  <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                <% } else if (act.activity_type === 'meeting') { %>
-                  <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <% } else { %>
-                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                <% } %>
-              </div>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2 mb-0.5">
-                  <span class="text-sm font-medium text-gray-900 truncate"><%= act.subject %></span>
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-gray-100 text-gray-500 uppercase"><%= act.activity_type.replace(/_/g, ' ') %></span>
-                  <% if (act.is_completed) { %>
-                    <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                  <% } %>
-                </div>
-                <% if (act.notes) { %><p class="text-xs text-gray-500 line-clamp-2"><%= act.notes %></p><% } %>
-                <p class="text-[10px] text-gray-400 mt-1">
-                  <%= formatDate(act.activity_date) %> by <%= act.owner_name || 'Unknown' %>
-                  <% if (act.contact_name) { %> &middot; with <%= act.contact_name %><% } %>
-                  <% if (act.opportunity_number) { %> &middot; <%= act.opportunity_number %><% } %>
-                </p>
-                <% if (act.next_step) { %>
-                <p class="text-xs text-brand-600 mt-1">Next: <%= act.next_step %><% if (act.next_step_due_date) { %> (due <%= formatDate(act.next_step_due_date) %>)<% } %></p>
-                <% } %>
-              </div>
-            </div>
+      <!-- Tab: Contacts -->
+      <div id="tab-contacts" class="account-tab-panel hidden space-y-5 pt-5">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Contacts (<%= acContacts.length %>)</h3>
+            <a href="/contacts/new?company_id=<%= company.id %>" class="text-xs text-brand-600 hover:underline font-medium">+ Add Contact</a>
           </div>
-          <% }); %>
-        </div>
-      </div>
-      <% } %>
-
-      <!-- Recent Communications (all types) -->
-      <% if (typeof comms !== 'undefined' && comms.length > 0) { %>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Recent Communications</h3>
-          <a href="/contacts/comms" class="text-xs text-brand-600 hover:underline font-medium">View All</a>
-        </div>
-        <div class="divide-y divide-gray-100">
-          <% comms.forEach(comm => { %>
-          <div class="px-5 py-3">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2 mb-0.5">
-                  <% if (comm.direction === 'outgoing') { %>
-                    <svg class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
-                  <% } else { %>
-                    <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
-                  <% } %>
-                  <span class="text-sm font-medium text-gray-900 truncate"><%= comm.subject %></span>
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-gray-100 text-gray-500 uppercase"><%= comm.comm_type %></span>
-                </div>
-                <p class="text-xs text-gray-500 line-clamp-2 ml-5"><%= comm.summary %></p>
-                <p class="text-[10px] text-gray-400 ml-5 mt-1">
-                  <%= formatDate(comm.comm_date) %> by <%= comm.logged_by_name %>
-                  <% if (comm.contact_name) { %> &middot; with <%= comm.contact_name %><% } %>
-                </p>
-              </div>
+          <% if (acContacts.length === 0) { %>
+          <div class="p-10 text-center">
+            <div class="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             </div>
+            <h3 class="text-gray-500 text-sm font-medium mb-1">No contacts linked</h3>
+            <p class="text-gray-400 text-xs mb-3">Add a contact to track your relationships with this account.</p>
+            <a href="/contacts/new?company_id=<%= company.id %>" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+              Add Contact
+            </a>
           </div>
-          <% }); %>
+          <% } else { %>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Name</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden sm:table-cell">Position</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden md:table-cell">Phone</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden md:table-cell">Email</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden lg:table-cell">Influence</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden lg:table-cell">Relationship</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden xl:table-cell">Last Contact</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <% acContacts.forEach(function(c) { %>
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/contacts/<%= c.id %>'">
+                  <td class="px-4 py-2.5">
+                    <div class="flex items-center gap-2">
+                      <div class="w-7 h-7 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0">
+                        <span class="text-[10px] font-bold text-brand-700"><%= c.full_name ? c.full_name.split(' ').map(function(n){ return n[0]; }).join('').substring(0, 2).toUpperCase() : '?' %></span>
+                      </div>
+                      <a href="/contacts/<%= c.id %>" class="font-medium text-brand-600 hover:text-brand-700 text-sm"><%= c.full_name %></a>
+                    </div>
+                  </td>
+                  <td class="px-4 py-2.5 text-gray-600 text-xs hidden sm:table-cell"><%= c.position || '-' %></td>
+                  <td class="px-4 py-2.5 hidden md:table-cell">
+                    <% if (c.phone) { %>
+                      <a href="tel:<%= c.phone %>" class="text-xs text-brand-600 hover:underline"><%= c.phone %></a>
+                    <% } else { %>
+                      <span class="text-xs text-gray-300">-</span>
+                    <% } %>
+                  </td>
+                  <td class="px-4 py-2.5 hidden md:table-cell">
+                    <% if (c.email) { %>
+                      <a href="mailto:<%= c.email %>" class="text-xs text-brand-600 hover:underline break-all"><%= c.email %></a>
+                    <% } else { %>
+                      <span class="text-xs text-gray-300">-</span>
+                    <% } %>
+                  </td>
+                  <td class="px-4 py-2.5 hidden lg:table-cell">
+                    <% if (c.influence_level) { %>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
+                        <%= c.influence_level === 'decision_maker' ? 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20' : c.influence_level === 'influencer' ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' : c.influence_level === 'champion' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : c.influence_level === 'blocker' ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20' : 'bg-gray-100 text-gray-600' %>">
+                        <%= (c.influence_level || '').replace(/_/g, ' ') %>
+                      </span>
+                    <% } else { %>
+                      <span class="text-xs text-gray-300">-</span>
+                    <% } %>
+                  </td>
+                  <td class="px-4 py-2.5 hidden lg:table-cell">
+                    <% if (c.relationship_status) { %>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
+                        <%= c.relationship_status === 'strong' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : c.relationship_status === 'warm' ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' : c.relationship_status === 'cold' ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' : c.relationship_status === 'new' ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-600/20' : 'bg-gray-100 text-gray-600' %>">
+                        <%= (c.relationship_status || '').replace(/_/g, ' ') %>
+                      </span>
+                    <% } else { %>
+                      <span class="text-xs text-gray-300">-</span>
+                    <% } %>
+                  </td>
+                  <td class="px-4 py-2.5 text-gray-600 text-xs hidden xl:table-cell"><%= c.last_contacted ? formatDate(c.last_contacted) : '-' %></td>
+                </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <% } %>
         </div>
       </div>
-      <% } %>
 
-      <% if (cType !== 'client' && projects.length === 0 && (typeof comms === 'undefined' || comms.length === 0)) { %>
-      <!-- Empty state for non-client companies with no data -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
-        <div class="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      <!-- Tab: Jobs -->
+      <div id="tab-jobs" class="account-tab-panel hidden space-y-5 pt-5">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Jobs (<%= acJobs.length %>)</h3>
+          </div>
+          <% if (acJobs.length === 0) { %>
+          <div class="p-10 text-center">
+            <div class="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            </div>
+            <h3 class="text-gray-500 text-sm font-medium mb-1">No jobs linked</h3>
+            <p class="text-gray-400 text-xs">Jobs associated with this account will appear here.</p>
+          </div>
+          <% } else { %>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Job #</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Job Name</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase">Status</th>
+                  <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase hidden sm:table-cell">Start Date</th>
+                  <th class="px-4 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase hidden md:table-cell">Contract Value</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <% acJobs.forEach(function(job) { %>
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/jobs/<%= job.id %>'">
+                  <td class="px-4 py-2.5">
+                    <a href="/jobs/<%= job.id %>" class="font-medium text-brand-600 hover:text-brand-700"><%= job.job_number %></a>
+                  </td>
+                  <td class="px-4 py-2.5 text-gray-900 text-sm"><%= job.job_name || '-' %></td>
+                  <td class="px-4 py-2.5">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
+                      <%= job.status === 'active' ? 'bg-emerald-50 text-emerald-700' : job.status === 'completed' ? 'bg-gray-100 text-gray-600' : job.status === 'on_hold' ? 'bg-amber-50 text-amber-700' : job.status === 'cancelled' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700' %>">
+                      <%= (job.status || 'unknown').replace(/_/g, ' ') %>
+                    </span>
+                  </td>
+                  <td class="px-4 py-2.5 text-gray-600 text-xs hidden sm:table-cell"><%= job.start_date ? formatDate(job.start_date) : '-' %></td>
+                  <td class="px-4 py-2.5 text-right font-medium text-gray-900 hidden md:table-cell"><%= job.contract_value ? '$' + Number(job.contract_value).toLocaleString() : '-' %></td>
+                </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <% } %>
         </div>
-        <h3 class="text-gray-900 font-semibold text-base mb-1">No activity yet</h3>
-        <p class="text-gray-500 text-sm">Communication logs and linked projects will appear here.</p>
       </div>
-      <% } %>
+
+      <!-- Tab: Timeline -->
+      <div id="tab-timeline" class="account-tab-panel hidden space-y-5 pt-5">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">Activity Timeline</h3>
+            <a href="/crm/activities/new?client_id=<%= company.id %>" class="text-xs text-brand-600 hover:underline font-medium">+ Log Activity</a>
+          </div>
+          <div class="p-5">
+            <%- include('../partials/crm-timeline', { timelineEvents: typeof timelineEvents !== 'undefined' ? timelineEvents : [] }) %>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
+
+<script>
+(function() {
+  var tabs = document.querySelectorAll('.account-tab-btn');
+  var panels = document.querySelectorAll('.account-tab-panel');
+
+  function activateTab(tabName) {
+    tabs.forEach(function(btn) {
+      var isActive = btn.getAttribute('data-tab') === tabName;
+      btn.classList.toggle('border-brand-600', isActive);
+      btn.classList.toggle('text-brand-600', isActive);
+      btn.classList.toggle('border-transparent', !isActive);
+      btn.classList.toggle('text-gray-500', !isActive);
+    });
+    panels.forEach(function(panel) {
+      var isActive = panel.id === 'tab-' + tabName;
+      panel.classList.toggle('hidden', !isActive);
+    });
+    // Update URL hash without scrolling
+    if (history.replaceState) {
+      history.replaceState(null, null, '#' + tabName);
+    }
+  }
+
+  tabs.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      activateTab(btn.getAttribute('data-tab'));
+    });
+  });
+
+  // Activate tab from URL hash on load
+  var hash = window.location.hash.replace('#', '');
+  if (hash && document.getElementById('tab-' + hash)) {
+    activateTab(hash);
+  }
+})();
+</script>

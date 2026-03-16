@@ -149,6 +149,17 @@
       <a href="/opportunities" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Clear</a>
     </div>
   </form>
+  <!-- Quick Filters -->
+  <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-gray-100">
+    <a href="/opportunities?stale=1" class="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full transition-colors <%= filters.stale === '1' ? 'bg-red-100 text-red-700 ring-1 ring-red-500' : 'bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600' %>">
+      <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Stale (14+ days)
+    </a>
+    <a href="/opportunities?no_next_step=1" class="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full transition-colors <%= filters.no_next_step === '1' ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-500' : 'bg-gray-100 text-gray-600 hover:bg-amber-50 hover:text-amber-600' %>">
+      <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+      No Next Step
+    </a>
+  </div>
 </div>
 
 <!-- Opportunities Table -->
