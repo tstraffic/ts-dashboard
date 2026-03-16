@@ -119,12 +119,12 @@
       </div>
 
       <!-- Buttons -->
-      <div class="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
-        <a href="/tasks" class="px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition font-medium">
+      <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+        <a href="/tasks" class="px-4 py-2.5 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition font-medium text-center">
           <%= canEdit ? 'Cancel' : 'Back' %>
         </a>
         <% if (canEdit) { %>
-          <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold">
+          <button type="submit" class="px-6 py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold">
             <%= isEdit ? 'Update Task' : 'Create Task' %>
           </button>
         <% } %>

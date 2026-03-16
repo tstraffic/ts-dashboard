@@ -190,45 +190,47 @@
     <% if (filters.tab) { %><input type="hidden" name="tab" value="<%= filters.tab %>"><% } %>
     <% if (filters.view) { %><input type="hidden" name="view" value="<%= filters.view %>"><% } %>
     <% if (filters.owner === 'me') { %><input type="hidden" name="owner" value="me"><% } %>
-    <div class="flex flex-wrap items-center gap-3">
-      <select name="owner" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+    <div class="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-3">
+      <select name="owner" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
         <option value="all">All Owners</option>
         <% users.forEach(function(u) { %>
           <option value="<%= u.id %>" <%= filters.owner == u.id ? 'selected' : '' %>><%= u.full_name %></option>
         <% }) %>
       </select>
-      <select name="priority" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+      <select name="priority" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
         <option value="all">All Priorities</option>
         <option value="high" <%= filters.priority === 'high' ? 'selected' : '' %>>High</option>
         <option value="medium" <%= filters.priority === 'medium' ? 'selected' : '' %>>Medium</option>
         <option value="low" <%= filters.priority === 'low' ? 'selected' : '' %>>Low</option>
       </select>
-      <select name="division" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+      <select name="division" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
         <option value="all">All Divisions</option>
         <option value="ops" <%= filters.division === 'ops' ? 'selected' : '' %>>Operations</option>
         <option value="planning" <%= filters.division === 'planning' ? 'selected' : '' %>>Planning</option>
         <option value="finance" <%= filters.division === 'finance' ? 'selected' : '' %>>Finance</option>
         <option value="admin" <%= filters.division === 'admin' ? 'selected' : '' %>>Admin</option>
       </select>
-      <select name="task_type" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+      <select name="task_type" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
         <option value="all">All Types</option>
         <option value="daily" <%= filters.task_type === 'daily' ? 'selected' : '' %>>Daily</option>
         <option value="weekly" <%= filters.task_type === 'weekly' ? 'selected' : '' %>>Weekly</option>
         <option value="one_off" <%= filters.task_type === 'one_off' ? 'selected' : '' %>>One-off</option>
       </select>
-      <select name="job_id" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500">
+      <select name="job_id" class="col-span-2 sm:col-span-1 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
         <option value="">All Projects</option>
         <% jobs.forEach(function(job) { %>
           <option value="<%= job.id %>" <%= filters.job_id == job.id ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
         <% }) %>
       </select>
-      <button type="submit" class="text-sm px-4 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium">
-        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
-        Filter
-      </button>
-      <% if (filters.priority || filters.division || filters.task_type || filters.job_id || (filters.owner && filters.owner !== 'me')) { %>
-        <a href="<%= tabUrl(activeTab) %>" class="text-sm text-gray-500 hover:text-red-500 transition">✕ Clear</a>
-      <% } %>
+      <div class="col-span-2 sm:col-span-1 flex items-center gap-2">
+        <button type="submit" class="text-sm px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium">
+          <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+          Filter
+        </button>
+        <% if (filters.priority || filters.division || filters.task_type || filters.job_id || (filters.owner && filters.owner !== 'me')) { %>
+          <a href="<%= tabUrl(activeTab) %>" class="text-sm text-gray-500 hover:text-red-500 transition">✕ Clear</a>
+        <% } %>
+      </div>
     </div>
   </form>
 

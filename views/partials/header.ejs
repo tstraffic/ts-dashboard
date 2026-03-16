@@ -41,7 +41,7 @@
             </div>
           </div>
 
-          <span class="text-gray-500 text-sm hidden md:inline"><%= user.full_name %></span>
+          <a href="/profile" class="text-gray-600 hover:text-brand-600 text-sm font-medium hidden md:inline transition-colors"><%= user.full_name %></a>
           <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1
             <% if (user.role === 'admin') { %>bg-purple-50 text-purple-700 ring-purple-600/20
             <% } else if (user.role === 'operations') { %>bg-blue-50 text-blue-700 ring-blue-600/20
