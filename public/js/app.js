@@ -108,18 +108,32 @@ document.addEventListener('DOMContentLoaded', initTabs);
 // ===== Push Notification Subscription =====
 (function() {
   // Only run for logged-in users (notification bell exists) and browsers that support push
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-  if (!document.getElementById('notif-bell')) return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.log('[Push] Browser does not support push notifications');
+    return;
+  }
+  if (!document.getElementById('notif-bell')) {
+    console.log('[Push] No notif-bell found — user not logged in');
+    return;
+  }
+
+  console.log('[Push] Initializing push subscription flow...');
 
   // Wait for service worker to be ready, then check/request push permission
   navigator.serviceWorker.ready.then(function(registration) {
+    console.log('[Push] Service worker ready:', registration.scope);
+
     // Check existing subscription
     registration.pushManager.getSubscription().then(function(subscription) {
       if (subscription) {
-        // Already subscribed — send to server in case it's a new device login
+        console.log('[Push] Already subscribed, syncing with server...');
         sendSubscriptionToServer(subscription);
+        // Update any push status indicator
+        updatePushStatus(true);
         return;
       }
+
+      console.log('[Push] Not subscribed yet. Permission:', Notification.permission);
 
       // Not subscribed yet — show a prompt after a short delay (non-intrusive)
       if (Notification.permission === 'granted') {
@@ -127,11 +141,23 @@ document.addEventListener('DOMContentLoaded', initTabs);
       } else if (Notification.permission !== 'denied') {
         // Ask after 3 seconds so it's not immediate on page load
         setTimeout(function() { showPushPrompt(registration); }, 3000);
+      } else {
+        console.log('[Push] Permission denied by user');
       }
+    }).catch(function(err) {
+      console.error('[Push] Error checking subscription:', err);
     });
+  }).catch(function(err) {
+    console.error('[Push] Service worker not ready:', err);
   });
 
   function showPushPrompt(registration) {
+    // Don't show if already dismissed this session
+    if (sessionStorage.getItem('push-dismissed')) {
+      console.log('[Push] Prompt dismissed this session, skipping');
+      return;
+    }
+
     // Create a subtle in-app banner instead of relying solely on browser prompt
     var banner = document.createElement('div');
     banner.id = 'push-prompt';
@@ -154,22 +180,26 @@ document.addEventListener('DOMContentLoaded', initTabs);
     });
     document.getElementById('push-dismiss').addEventListener('click', function() {
       banner.remove();
-      // Remember dismissal so we don't ask again this session
       sessionStorage.setItem('push-dismissed', '1');
     });
-
-    // Don't show if already dismissed this session
-    if (sessionStorage.getItem('push-dismissed')) {
-      banner.remove();
-    }
   }
 
   function subscribeToPush(registration) {
+    console.log('[Push] Fetching VAPID key...');
     // Fetch VAPID public key from server
     fetch('/notifications/push/vapid-key')
-      .then(function(res) { return res.json(); })
+      .then(function(res) {
+        if (!res.ok) {
+          throw new Error('VAPID key request failed: ' + res.status);
+        }
+        return res.json();
+      })
       .then(function(data) {
-        if (!data.publicKey) return;
+        if (!data.publicKey) {
+          console.error('[Push] No public key returned from server');
+          return;
+        }
+        console.log('[Push] Got VAPID key, subscribing to push manager...');
 
         var key = urlBase64ToUint8Array(data.publicKey);
         return registration.pushManager.subscribe({
@@ -179,11 +209,13 @@ document.addEventListener('DOMContentLoaded', initTabs);
       })
       .then(function(subscription) {
         if (subscription) {
+          console.log('[Push] Subscribed! Sending to server...');
           sendSubscriptionToServer(subscription);
+          updatePushStatus(true);
         }
       })
       .catch(function(err) {
-        console.log('[Push] Subscribe error:', err);
+        console.error('[Push] Subscribe error:', err);
       });
   }
 
@@ -192,10 +224,45 @@ document.addEventListener('DOMContentLoaded', initTabs);
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(subscription)
-    }).catch(function(err) {
-      console.log('[Push] Failed to send subscription to server:', err);
+    })
+    .then(function(res) {
+      if (!res.ok) {
+        console.error('[Push] Server rejected subscription:', res.status);
+      } else {
+        console.log('[Push] Subscription saved to server');
+      }
+    })
+    .catch(function(err) {
+      console.error('[Push] Failed to send subscription to server:', err);
     });
   }
+
+  // Update push status indicator on profile page (if present)
+  function updatePushStatus(subscribed) {
+    var statusEl = document.getElementById('push-status');
+    if (statusEl) {
+      statusEl.textContent = subscribed ? 'Enabled' : 'Disabled';
+      statusEl.className = subscribed
+        ? 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
+        : 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500';
+    }
+  }
+
+  // Expose for test button on profile page
+  window.sendTestPush = function() {
+    fetch('/notifications/push/test', { method: 'POST' })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.success) {
+          alert('Test notification sent! You should receive it in a few seconds.');
+        } else {
+          alert('Failed: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        alert('Error: ' + err.message);
+      });
+  };
 
   // Convert base64 VAPID key to Uint8Array for the Push API
   function urlBase64ToUint8Array(base64String) {
