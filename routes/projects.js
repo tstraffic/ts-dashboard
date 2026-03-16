@@ -273,21 +273,16 @@ router.post('/:id/delete', (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(req.params.id);
   if (!job) { req.flash('error', 'Project not found.'); return res.redirect('/projects'); }
 
-  // Cascade delete all linked records
-  db.prepare('DELETE FROM tasks WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM project_updates WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM crew_allocations WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM timesheets WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM incidents WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM client_contacts WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM communication_log WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM equipment_assignments WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM budget_items WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM budget_meta WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM documents WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM defects WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM traffic_plans WHERE job_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM compliance_items WHERE job_id = ?').run(req.params.id);
+  // Cascade delete all linked records (try/catch each in case table doesn't exist)
+  const linkedTables = [
+    'tasks', 'project_updates', 'crew_allocations', 'timesheets',
+    'incidents', 'corrective_actions', 'client_contacts', 'communication_log',
+    'equipment_assignments', 'job_budgets', 'cost_entries', 'documents',
+    'defects', 'traffic_plans', 'compliance', 'notifications'
+  ];
+  for (const table of linkedTables) {
+    try { db.prepare(`DELETE FROM ${table} WHERE job_id = ?`).run(req.params.id); } catch (e) { /* table may not exist */ }
+  }
   db.prepare('DELETE FROM jobs WHERE id = ?').run(req.params.id);
 
   logActivity({ user: req.session.user, action: 'delete', entityType: 'project', entityId: job.id, entityLabel: `${job.job_number} - ${job.client}`, details: 'Deleted project and all associated data', ip: req.ip });
