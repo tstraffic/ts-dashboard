@@ -4,12 +4,21 @@
   const pageTitle = isEdit ? 'Edit Task' : 'New Task';
   const selectedJobId = (isEdit && task.job_id) ? task.job_id : (prefillJobId || '');
   const returnTo = (typeof locals.req !== 'undefined' && locals.req && locals.req.headers && locals.req.headers.referer) ? locals.req.headers.referer : '/tasks';
+  // editable is passed from route for edit mode; always true for new tasks
+  const canEdit = isEdit ? (typeof editable !== 'undefined' ? editable : true) : true;
+  const disabled = canEdit ? '' : 'disabled';
 %>
 
 <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <!-- Header -->
   <div class="mb-6">
     <h1 class="text-2xl font-bold text-gray-900"><%= pageTitle %></h1>
+    <% if (isEdit && !canEdit) { %>
+      <p class="mt-1 text-sm text-amber-600">
+        <svg class="w-4 h-4 inline -mt-0.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        Read-only — this task is assigned to someone else. Only the task owner or an admin can edit it.
+      </p>
+    <% } %>
   </div>
 
   <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
@@ -20,7 +29,7 @@
         <!-- Job -->
         <div>
           <label for="job_id" class="block text-sm font-medium text-gray-600 mb-1">Project <span class="text-gray-400 font-normal text-xs">(optional)</span></label>
-          <select id="job_id" name="job_id" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <select id="job_id" name="job_id" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
             <option value="">No project</option>
             <% jobs.forEach(function(job) { %>
               <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
@@ -31,7 +40,7 @@
         <!-- Division -->
         <div>
           <label for="division" class="block text-sm font-medium text-gray-600 mb-1">Division <span class="text-red-600">*</span></label>
-          <select id="division" name="division" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <select id="division" name="division" required <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
             <option value="">Select division...</option>
             <option value="ops" <%= isEdit && task.division === 'ops' ? 'selected' : (!isEdit ? 'selected' : '') %>>Operations</option>
             <option value="planning" <%= isEdit && task.division === 'planning' ? 'selected' : '' %>>Planning</option>
@@ -43,7 +52,7 @@
         <!-- Task Type -->
         <div>
           <label for="task_type" class="block text-sm font-medium text-gray-600 mb-1">Task Type</label>
-          <select id="task_type" name="task_type" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <select id="task_type" name="task_type" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
             <option value="one_off" <%= isEdit && task.task_type === 'one_off' ? 'selected' : (!isEdit ? 'selected' : '') %>>One-off</option>
             <option value="daily" <%= isEdit && task.task_type === 'daily' ? 'selected' : '' %>>Daily</option>
             <option value="weekly" <%= isEdit && task.task_type === 'weekly' ? 'selected' : '' %>>Weekly</option>
@@ -56,22 +65,22 @@
         <!-- Title -->
         <div class="md:col-span-2">
           <label for="title" class="block text-sm font-medium text-gray-600 mb-1">Title <span class="text-red-600">*</span></label>
-          <input type="text" id="title" name="title" required value="<%= isEdit ? task.title : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Task title...">
+          <input type="text" id="title" name="title" required <%= disabled %> value="<%= isEdit ? task.title : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>" placeholder="Task title...">
         </div>
 
         <!-- Description -->
         <div class="md:col-span-2">
           <label for="description" class="block text-sm font-medium text-gray-600 mb-1">Description</label>
-          <textarea id="description" name="description" rows="3" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Task description..."><%= isEdit && task.description ? task.description : '' %></textarea>
+          <textarea id="description" name="description" rows="3" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>" placeholder="Task description..."><%= isEdit && task.description ? task.description : '' %></textarea>
         </div>
 
         <!-- Owner -->
         <div>
           <label for="owner_id" class="block text-sm font-medium text-gray-600 mb-1">Owner <span class="text-red-600">*</span></label>
-          <select id="owner_id" name="owner_id" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <select id="owner_id" name="owner_id" required <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
             <option value="">Select owner...</option>
-            <% users.forEach(function(user) { %>
-              <option value="<%= user.id %>" <%= isEdit && task.owner_id == user.id ? 'selected' : '' %>><%= user.full_name || user.username %></option>
+            <% users.forEach(function(u) { %>
+              <option value="<%= u.id %>" <%= isEdit && task.owner_id == u.id ? 'selected' : '' %>><%= u.full_name || u.username %></option>
             <% }) %>
           </select>
         </div>
@@ -79,13 +88,13 @@
         <!-- Due Date -->
         <div>
           <label for="due_date" class="block text-sm font-medium text-gray-600 mb-1">Due Date <span class="text-red-600">*</span></label>
-          <input type="date" id="due_date" name="due_date" required value="<%= isEdit && task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <input type="date" id="due_date" name="due_date" required <%= disabled %> value="<%= isEdit && task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
         </div>
 
         <!-- Status -->
         <div>
           <label for="status" class="block text-sm font-medium text-gray-600 mb-1">Status</label>
-          <select id="status" name="status" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <select id="status" name="status" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
             <% (settingsOptions.task_status || []).forEach(opt => { %>
               <option value="<%= opt.key %>" <%= isEdit && task.status === opt.key ? 'selected' : '' %>><%= opt.label %></option>
             <% }) %>
@@ -95,7 +104,7 @@
         <!-- Priority -->
         <div>
           <label for="priority" class="block text-sm font-medium text-gray-600 mb-1">Priority</label>
-          <select id="priority" name="priority" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <select id="priority" name="priority" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
             <% (settingsOptions.task_priority || []).forEach(opt => { %>
               <option value="<%= opt.key %>" <%= isEdit && task.priority === opt.key ? 'selected' : '' %>><%= opt.label %></option>
             <% }) %>
@@ -105,16 +114,20 @@
         <!-- Notes -->
         <div class="md:col-span-2">
           <label for="notes" class="block text-sm font-medium text-gray-600 mb-1">Notes</label>
-          <textarea id="notes" name="notes" rows="3" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Additional notes..."><%= isEdit && task.notes ? task.notes : '' %></textarea>
+          <textarea id="notes" name="notes" rows="3" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>" placeholder="Additional notes..."><%= isEdit && task.notes ? task.notes : '' %></textarea>
         </div>
       </div>
 
       <!-- Buttons -->
       <div class="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
-        <a href="/tasks" class="px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition font-medium">Cancel</a>
-        <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold">
-          <%= isEdit ? 'Update Task' : 'Create Task' %>
-        </button>
+        <a href="/tasks" class="px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition font-medium">
+          <%= canEdit ? 'Cancel' : 'Back' %>
+        </a>
+        <% if (canEdit) { %>
+          <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold">
+            <%= isEdit ? 'Update Task' : 'Create Task' %>
+          </button>
+        <% } %>
       </div>
     </form>
   </div>
