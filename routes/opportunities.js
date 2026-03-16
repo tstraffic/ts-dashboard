@@ -24,13 +24,14 @@ router.get('/api/search.json', (req, res) => {
 router.get('/', (req, res, next) => {
   try {
     const db = getDb();
-    const { owner, stage, status, client_id, search, sort } = req.query;
+    const { owner, stage, status, client_id, search, sort, stale, no_next_step } = req.query;
 
     let query = `
       SELECT o.*,
         c.company_name as client_name,
         u.full_name as owner_name,
-        cc.full_name as contact_name
+        cc.full_name as contact_name,
+        (SELECT MAX(ca.activity_date) FROM crm_activities ca WHERE ca.opportunity_id = o.id) as last_activity_date
       FROM opportunities o
       LEFT JOIN clients c ON o.client_id = c.id
       LEFT JOIN users u ON o.owner_id = u.id
@@ -59,6 +60,17 @@ router.get('/', (req, res, next) => {
       query += ` AND (o.opportunity_number LIKE ? OR o.title LIKE ? OR c.company_name LIKE ? OR o.notes LIKE ?)`;
       const term = `%${search}%`;
       params.push(term, term, term, term);
+    }
+    // Stale filter: no activity in 14+ days
+    if (stale === '1') {
+      query += ` AND o.status = 'open' AND (
+        (SELECT MAX(ca.activity_date) FROM crm_activities ca WHERE ca.opportunity_id = o.id) < DATE('now', '-14 days')
+        OR NOT EXISTS (SELECT 1 FROM crm_activities ca WHERE ca.opportunity_id = o.id)
+      )`;
+    }
+    // No next step filter
+    if (no_next_step === '1') {
+      query += ` AND o.status = 'open' AND (o.next_step IS NULL OR o.next_step = '')`;
     }
 
     // Sorting
@@ -104,7 +116,7 @@ router.get('/', (req, res, next) => {
       opportunities,
       stats,
       users,
-      filters: { owner, stage, status, client_id, search, sort },
+      filters: { owner, stage, status, client_id, search, sort, stale, no_next_step },
     });
   } catch (err) {
     console.error('Opportunities list error:', err);
@@ -360,13 +372,22 @@ router.post('/:id', (req, res) => {
     const probability = parseInt(b.probability) || 10;
     const weightedValue = estimatedValue * probability / 100;
 
+    // Determine won/lost dates
+    const newStatus = b.status || 'open';
+    const todayStr = new Date().toISOString().slice(0, 10);
+    let wonDate = current.won_date || null;
+    let lostDate = current.lost_date || null;
+    if (newStatus === 'won' && current.status !== 'won') wonDate = todayStr;
+    if (newStatus === 'lost' && current.status !== 'lost') lostDate = todayStr;
+    if (newStatus === 'open') { wonDate = null; lostDate = null; }
+
     db.prepare(`
       UPDATE opportunities SET
         title = ?, client_id = ?, contact_id = ?, owner_id = ?,
         service_type = ?, stage = ?, probability = ?, estimated_value = ?, weighted_value = ?,
         expected_close_date = ?, source = ?, region = ?, notes = ?,
         next_step = ?, next_step_due_date = ?, status = ?, loss_reason = ?,
-        updated_at = CURRENT_TIMESTAMP
+        won_date = ?, lost_date = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
       b.title,
@@ -384,8 +405,9 @@ router.post('/:id', (req, res) => {
       b.notes || '',
       b.next_step || '',
       b.next_step_due_date || null,
-      b.status || 'open',
+      newStatus,
       b.loss_reason || '',
+      wonDate, lostDate,
       req.params.id
     );
 
@@ -480,13 +502,23 @@ router.post('/:id/stage', (req, res) => {
     const { stage, probability } = req.body;
     const newProbability = probability !== undefined ? parseInt(probability) : opportunity.probability;
     const weightedValue = opportunity.estimated_value * newProbability / 100;
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    // Determine status and won/lost dates from stage
+    let newStatus = opportunity.status;
+    let wonDate = opportunity.won_date || null;
+    let lostDate = opportunity.lost_date || null;
+    if (stage === 'won') { newStatus = 'won'; wonDate = wonDate || todayStr; }
+    else if (stage === 'lost') { newStatus = 'lost'; lostDate = lostDate || todayStr; }
+    else if (stage === 'on_hold') { newStatus = 'on_hold'; }
+    else if (['won', 'lost', 'on_hold'].includes(opportunity.status)) { newStatus = 'open'; wonDate = null; lostDate = null; }
 
     db.prepare(`
       UPDATE opportunities SET
-        stage = ?, probability = ?, weighted_value = ?,
-        updated_at = CURRENT_TIMESTAMP
+        stage = ?, probability = ?, weighted_value = ?, status = ?,
+        won_date = ?, lost_date = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(stage, newProbability, weightedValue, req.params.id);
+    `).run(stage, newProbability, weightedValue, newStatus, wonDate, lostDate, req.params.id);
 
     // Log stage change as CRM activity if stage actually changed
     if (stage && stage !== opportunity.stage) {

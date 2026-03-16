@@ -12,12 +12,37 @@ router.get('/', (req, res, next) => {
     const today = new Date().toISOString().slice(0, 10);
     const userId = req.session.user.id;
 
-    // Current month boundaries
+    // Dashboard filters
+    const view = req.query.view || 'my'; // 'my' or 'team'
+    const filterOwnerId = req.query.owner_id || (view === 'my' ? userId : null);
+    const period = req.query.period || 'month'; // week, month, quarter
+
+    // Compute date boundaries based on period
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
 
-    // Current week boundary (Monday)
+    let periodStart, periodEnd;
+    if (period === 'week') {
+      const todayDate2 = new Date(today + 'T00:00:00');
+      const dow = todayDate2.getDay();
+      const monOffset = dow === 0 ? -6 : 1 - dow;
+      const mon = new Date(todayDate2);
+      mon.setDate(todayDate2.getDate() + monOffset);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      periodStart = mon.toISOString().slice(0, 10);
+      periodEnd = sun.toISOString().slice(0, 10);
+    } else if (period === 'quarter') {
+      const qMonth = Math.floor(now.getMonth() / 3) * 3;
+      periodStart = new Date(now.getFullYear(), qMonth, 1).toISOString().slice(0, 10);
+      periodEnd = new Date(now.getFullYear(), qMonth + 3, 0).toISOString().slice(0, 10);
+    } else {
+      periodStart = monthStart;
+      periodEnd = monthEnd;
+    }
+
+    // Current week boundary (Monday) - always needed
     const todayDate = new Date(today + 'T00:00:00');
     const dayOfWeek = todayDate.getDay();
     const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -25,58 +50,68 @@ router.get('/', (req, res, next) => {
     monday.setDate(todayDate.getDate() + mondayOffset);
     const weekStart = monday.toISOString().slice(0, 10);
 
+    // Owner filter clause for pipeline queries
+    const ownerFilter = filterOwnerId ? ' AND owner_id = ?' : '';
+    const ownerParams = filterOwnerId ? [filterOwnerId] : [];
+
     // --- Pipeline Summary ---
     const pipelineSummary = db.prepare(`
       SELECT
         COUNT(*) as total_open,
         COALESCE(SUM(estimated_value), 0) as total_value,
         COALESCE(SUM(weighted_value), 0) as weighted_value
-      FROM opportunities WHERE status = 'open'
-    `).get();
+      FROM opportunities WHERE status = 'open'${ownerFilter}
+    `).get(...ownerParams);
 
     const opportunitiesByStage = db.prepare(`
       SELECT stage, COUNT(*) as count, COALESCE(SUM(estimated_value), 0) as value
-      FROM opportunities WHERE status = 'open'
+      FROM opportunities WHERE status = 'open'${ownerFilter}
       GROUP BY stage ORDER BY count DESC
-    `).all();
+    `).all(...ownerParams);
 
     const closingThisMonth = db.prepare(`
       SELECT COUNT(*) as count, COALESCE(SUM(estimated_value), 0) as value
       FROM opportunities
-      WHERE status = 'open' AND expected_close_date BETWEEN ? AND ?
-    `).get(monthStart, monthEnd);
+      WHERE status = 'open' AND expected_close_date BETWEEN ? AND ?${ownerFilter}
+    `).get(periodStart, periodEnd, ...ownerParams);
 
     const wonThisMonth = db.prepare(`
       SELECT COUNT(*) as count, COALESCE(SUM(estimated_value), 0) as value
       FROM opportunities
-      WHERE status = 'won' AND updated_at >= ?
-    `).get(monthStart);
+      WHERE status = 'won' AND updated_at >= ?${ownerFilter}
+    `).get(periodStart, ...ownerParams);
 
     const lostThisMonth = db.prepare(`
       SELECT COUNT(*) as count
       FROM opportunities
-      WHERE status = 'lost' AND updated_at >= ?
-    `).get(monthStart);
+      WHERE status = 'lost' AND updated_at >= ?${ownerFilter}
+    `).get(periodStart, ...ownerParams);
 
     // --- Activity Summary ---
+    const actOwnerFilter = filterOwnerId ? ' AND owner_id = ?' : '';
+    const actOwnerParams = filterOwnerId ? [filterOwnerId] : [];
+
     const activitiesThisWeek = db.prepare(`
       SELECT activity_type, COUNT(*) as count
       FROM crm_activities
-      WHERE activity_date >= ?
+      WHERE activity_date >= ?${actOwnerFilter}
       GROUP BY activity_type
-    `).all(weekStart);
+    `).all(weekStart, ...actOwnerParams);
 
     const followUpsDueToday = db.prepare(`
       SELECT COUNT(*) as count
       FROM crm_activities
-      WHERE DATE(next_step_due_date) = ? AND is_completed = 0
-    `).get(today);
+      WHERE DATE(next_step_due_date) = ? AND is_completed = 0${actOwnerFilter}
+    `).get(today, ...actOwnerParams);
 
     const overdueFollowUps = db.prepare(`
       SELECT COUNT(*) as count
       FROM crm_activities
-      WHERE DATE(next_step_due_date) < ? AND is_completed = 0
-    `).get(today);
+      WHERE DATE(next_step_due_date) < ? AND is_completed = 0${actOwnerFilter}
+    `).get(today, ...actOwnerParams);
+
+    // Users for filter dropdown
+    const dashboardUsers = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
 
     // --- Account Health ---
     const activeClients = db.prepare(`
@@ -198,6 +233,8 @@ router.get('/', (req, res, next) => {
         won_this_month: wonThisMonth.count,
         won_value: wonThisMonth.value,
       },
+      filters: { view, owner_id: filterOwnerId, period },
+      dashboardUsers,
     });
   } catch (err) {
     console.error('CRM Dashboard error:', err);
@@ -458,6 +495,16 @@ router.post('/activities', (req, res) => {
       }
     }
 
+    // Update opportunity's last_activity_at if opportunity_id provided
+    if (b.opportunity_id) {
+      try {
+        db.prepare(`UPDATE opportunities SET last_activity_at = CURRENT_TIMESTAMP WHERE id = ?`)
+          .run(b.opportunity_id);
+      } catch (e) {
+        console.warn('Could not update opportunity last_activity_at:', e.message);
+      }
+    }
+
     logActivity({
       user: req.session.user,
       action: 'create',
@@ -686,6 +733,64 @@ router.get('/reports', (req, res, next) => {
       ORDER BY c.last_contacted_date IS NULL DESC, c.last_contacted_date ASC
     `).all(thirtyDaysAgoStr);
 
+    // Pipeline by owner
+    const pipelineByOwner = db.prepare(`
+      SELECT u.full_name as owner_name, COUNT(*) as count,
+        COALESCE(SUM(o.estimated_value), 0) as value,
+        COALESCE(SUM(o.weighted_value), 0) as weighted
+      FROM opportunities o
+      LEFT JOIN users u ON o.owner_id = u.id
+      WHERE o.status = 'open'
+      GROUP BY o.owner_id
+      ORDER BY value DESC
+    `).all();
+
+    // Stale opportunities (no activity in 14+ days)
+    const staleOpportunities = db.prepare(`
+      SELECT o.*, c.company_name as client_name, u.full_name as owner_name,
+        (SELECT MAX(ca.activity_date) FROM crm_activities ca WHERE ca.opportunity_id = o.id) as last_activity_date
+      FROM opportunities o
+      LEFT JOIN clients c ON o.client_id = c.id
+      LEFT JOIN users u ON o.owner_id = u.id
+      WHERE o.status = 'open'
+      AND (SELECT MAX(ca.activity_date) FROM crm_activities ca WHERE ca.opportunity_id = o.id) < DATE('now', '-14 days')
+      OR (o.status = 'open' AND NOT EXISTS (SELECT 1 FROM crm_activities ca WHERE ca.opportunity_id = o.id))
+      ORDER BY o.expected_close_date ASC
+    `).all();
+
+    // Follow-ups overdue
+    const overdueFollowUps = db.prepare(`
+      SELECT ca.*, c.company_name as client_name, u.full_name as owner_name,
+        cc.full_name as contact_name
+      FROM crm_activities ca
+      LEFT JOIN clients c ON ca.client_id = c.id
+      LEFT JOIN users u ON ca.owner_id = u.id
+      LEFT JOIN client_contacts cc ON ca.contact_id = cc.id
+      WHERE ca.is_completed = 0 AND DATE(ca.next_step_due_date) < DATE('now')
+      ORDER BY ca.next_step_due_date ASC
+      LIMIT 50
+    `).all();
+
+    // Opportunities without next step
+    const oppsNoNextStep = db.prepare(`
+      SELECT o.*, c.company_name as client_name, u.full_name as owner_name
+      FROM opportunities o
+      LEFT JOIN clients c ON o.client_id = c.id
+      LEFT JOIN users u ON o.owner_id = u.id
+      WHERE o.status = 'open' AND (o.next_step IS NULL OR o.next_step = '')
+      ORDER BY o.expected_close_date ASC
+    `).all();
+
+    // Meetings by owner (this month)
+    const meetingsByOwner = db.prepare(`
+      SELECT u.full_name as owner_name, COUNT(*) as count
+      FROM crm_meetings m
+      LEFT JOIN users u ON m.owner_id = u.id
+      WHERE m.meeting_date >= DATE('now', 'start of month')
+      GROUP BY m.owner_id
+      ORDER BY count DESC
+    `).all();
+
     res.render('crm/reports', {
       title: 'CRM Reports',
       currentPage: 'crm-reports',
@@ -694,9 +799,254 @@ router.get('/reports', (req, res, next) => {
       activityByOwner,
       topAccounts,
       dormantAccounts,
+      pipelineByOwner,
+      staleOpportunities,
+      overdueFollowUps,
+      oppsNoNextStep,
+      meetingsByOwner,
     });
   } catch (err) {
     console.error('CRM Reports error:', err);
+    next(err);
+  }
+});
+
+// ============================================================
+// GET /meetings — Meetings List
+// ============================================================
+router.get('/meetings', (req, res, next) => {
+  try {
+    const db = getDb();
+    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const todayDate = new Date(today + 'T00:00:00');
+    const dayOfWeek = todayDate.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(todayDate);
+    monday.setDate(todayDate.getDate() + mondayOffset);
+    const weekStart = monday.toISOString().slice(0, 10);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const weekEnd = sunday.toISOString().slice(0, 10);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+
+    // Build query filters
+    let where = [];
+    let params = [];
+
+    if (req.query.search) {
+      where.push("(m.title LIKE ? OR c.company_name LIKE ?)");
+      params.push('%' + req.query.search + '%', '%' + req.query.search + '%');
+    }
+    if (req.query.owner_id) {
+      where.push('m.owner_id = ?');
+      params.push(req.query.owner_id);
+    }
+    if (req.query.account_id) {
+      where.push('m.account_id = ?');
+      params.push(req.query.account_id);
+    }
+    if (req.query.from) {
+      where.push('DATE(m.meeting_date) >= ?');
+      params.push(req.query.from);
+    }
+    if (req.query.to) {
+      where.push('DATE(m.meeting_date) <= ?');
+      params.push(req.query.to);
+    }
+
+    // View tab filter
+    const view = req.query.view || 'upcoming';
+    if (view === 'today') {
+      where.push('DATE(m.meeting_date) = ?');
+      params.push(today);
+    } else if (view === 'this_week') {
+      where.push('DATE(m.meeting_date) >= ? AND DATE(m.meeting_date) <= ?');
+      params.push(weekStart, weekEnd);
+    } else if (view === 'upcoming') {
+      where.push('DATE(m.meeting_date) >= ?');
+      params.push(today);
+    } else if (view === 'past') {
+      where.push('DATE(m.meeting_date) < ?');
+      params.push(today);
+    }
+
+    const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
+
+    const meetings = db.prepare(`
+      SELECT m.*,
+        c.company_name as account_name,
+        u.full_name as owner_name,
+        o.title as opportunity_title, o.opportunity_number
+      FROM crm_meetings m
+      LEFT JOIN clients c ON m.account_id = c.id
+      LEFT JOIN users u ON m.owner_id = u.id
+      LEFT JOIN opportunities o ON m.opportunity_id = o.id
+      ${whereClause}
+      ORDER BY ${view === 'past' ? 'm.meeting_date DESC' : 'm.meeting_date ASC'}
+      LIMIT 100
+    `).all(...params);
+
+    // Stats
+    const todayMeetings = db.prepare(`SELECT COUNT(*) as count FROM crm_meetings WHERE DATE(meeting_date) = ?`).get(today);
+    const weekMeetings = db.prepare(`SELECT COUNT(*) as count FROM crm_meetings WHERE DATE(meeting_date) >= ? AND DATE(meeting_date) <= ?`).get(weekStart, weekEnd);
+    const monthMeetings = db.prepare(`SELECT COUNT(*) as count FROM crm_meetings WHERE DATE(meeting_date) >= ? AND DATE(meeting_date) <= ?`).get(monthStart, monthEnd);
+    const overdueFollowups = db.prepare(`SELECT COUNT(*) as count FROM crm_meetings WHERE outcome != '' AND follow_up_actions != '' AND next_meeting_date < ? AND next_meeting_date IS NOT NULL`).get(today);
+
+    const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
+    const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
+
+    res.render('crm/meetings', {
+      title: 'Meetings',
+      currentPage: 'crm-meetings',
+      meetings,
+      stats: {
+        today: todayMeetings.count,
+        this_week: weekMeetings.count,
+        this_month: monthMeetings.count,
+        overdue_followups: overdueFollowups.count,
+      },
+      users,
+      clients,
+      filters: req.query,
+      todayStr: today,
+    });
+  } catch (err) {
+    console.error('Meetings list error:', err);
+    next(err);
+  }
+});
+
+// ============================================================
+// GET /meetings/new — New Meeting Form
+// ============================================================
+router.get('/meetings/new', (req, res, next) => {
+  try {
+    const db = getDb();
+    const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
+    const opportunities = db.prepare("SELECT id, opportunity_number, title, client_id FROM opportunities WHERE status = 'open' ORDER BY title").all();
+    const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
+
+    res.render('crm/meeting-form', {
+      title: 'Schedule Meeting',
+      currentPage: 'crm-meetings',
+      meeting: null,
+      clients,
+      opportunities,
+      users,
+      query: req.query,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================
+// POST /meetings — Create Meeting
+// ============================================================
+router.post('/meetings', (req, res, next) => {
+  try {
+    const db = getDb();
+    const { title, meeting_date, duration_minutes, location_type, location_text,
+            account_id, opportunity_id, owner_id, purpose, attendees, notes } = req.body;
+
+    const result = db.prepare(`
+      INSERT INTO crm_meetings (title, meeting_date, duration_minutes, location_type, location_text,
+        account_id, opportunity_id, owner_id, purpose, attendees, notes, created_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      title, meeting_date, duration_minutes || null, location_type || '', location_text || '',
+      account_id || null, opportunity_id || null, owner_id || null,
+      purpose || '', attendees || '', notes || '', req.session.user.id
+    );
+
+    // Auto-create CRM activity for timeline
+    const actResult = db.prepare(`
+      INSERT INTO crm_activities (activity_type, subject, notes, client_id, contact_id, opportunity_id,
+        owner_id, activity_date, location, created_by_id)
+      VALUES ('meeting', ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+    `).run(
+      title, purpose || notes || '', account_id || null, opportunity_id || null,
+      owner_id || req.session.user.id, meeting_date, location_text || '',
+      req.session.user.id
+    );
+
+    // Link activity to meeting
+    db.prepare('UPDATE crm_meetings SET activity_id = ? WHERE id = ?').run(actResult.lastInsertRowid, result.lastInsertRowid);
+
+    // Update account last_contacted_date
+    if (account_id) {
+      db.prepare('UPDATE clients SET last_contacted_date = ? WHERE id = ?').run(meeting_date ? meeting_date.slice(0, 10) : new Date().toISOString().slice(0, 10), account_id);
+    }
+
+    logActivity(req, { action: 'create', entity: 'crm_meeting', entityId: result.lastInsertRowid, entityLabel: title });
+
+    req.flash('success', 'Meeting scheduled.');
+    res.redirect('/crm/meetings');
+  } catch (err) {
+    console.error('Create meeting error:', err);
+    next(err);
+  }
+});
+
+// ============================================================
+// GET /meetings/:id/edit — Edit Meeting
+// ============================================================
+router.get('/meetings/:id/edit', (req, res, next) => {
+  try {
+    const db = getDb();
+    const meeting = db.prepare('SELECT * FROM crm_meetings WHERE id = ?').get(req.params.id);
+    if (!meeting) { req.flash('error', 'Meeting not found.'); return res.redirect('/crm/meetings'); }
+
+    const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
+    const opportunities = db.prepare("SELECT id, opportunity_number, title, client_id FROM opportunities WHERE status = 'open' ORDER BY title").all();
+    const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
+
+    res.render('crm/meeting-form', {
+      title: 'Edit Meeting',
+      currentPage: 'crm-meetings',
+      meeting,
+      clients,
+      opportunities,
+      users,
+      query: {},
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================
+// POST /meetings/:id — Update Meeting
+// ============================================================
+router.post('/meetings/:id', (req, res, next) => {
+  try {
+    const db = getDb();
+    const { title, meeting_date, duration_minutes, location_type, location_text,
+            account_id, opportunity_id, owner_id, purpose, attendees, notes,
+            outcome, follow_up_actions, next_meeting_date } = req.body;
+
+    db.prepare(`
+      UPDATE crm_meetings SET
+        title = ?, meeting_date = ?, duration_minutes = ?, location_type = ?, location_text = ?,
+        account_id = ?, opportunity_id = ?, owner_id = ?, purpose = ?, attendees = ?, notes = ?,
+        outcome = ?, follow_up_actions = ?, next_meeting_date = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      title, meeting_date, duration_minutes || null, location_type || '', location_text || '',
+      account_id || null, opportunity_id || null, owner_id || null,
+      purpose || '', attendees || '', notes || '',
+      outcome || '', follow_up_actions || '', next_meeting_date || null,
+      req.params.id
+    );
+
+    logActivity(req, { action: 'update', entity: 'crm_meeting', entityId: req.params.id, entityLabel: title });
+
+    req.flash('success', 'Meeting updated.');
+    res.redirect('/crm/meetings');
+  } catch (err) {
+    console.error('Update meeting error:', err);
     next(err);
   }
 });

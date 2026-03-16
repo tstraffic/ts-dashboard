@@ -100,8 +100,9 @@ router.post('/', (req, res) => {
         insurance_policy, product_categories, account_number, website, approved, rating,
         account_owner_id, bdm_owner_id, lead_source, estimated_annual_value, service_interests,
         target_regions, priority, prequal_status, vendor_status, contract_status, industry_segment,
-        next_action_date, next_action_note)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        next_action_date, next_action_note, phone, email_general, suburb, state, postcode,
+        client_category, onboarding_stage, tender_panel_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       b.company_name, b.abn || '', b.primary_contact_name || '', b.primary_contact_phone || '',
       b.primary_contact_email || '', b.address || '', b.billing_address || '',
@@ -113,7 +114,9 @@ router.post('/', (req, res) => {
       parseFloat(b.estimated_annual_value) || 0, b.service_interests || '',
       b.target_regions || '', b.priority || 'normal', b.prequal_status || 'none',
       b.vendor_status || 'none', b.contract_status || '', b.industry_segment || '',
-      b.next_action_date || null, b.next_action_note || ''
+      b.next_action_date || null, b.next_action_note || '',
+      b.phone || '', b.email_general || '', b.suburb || '', b.state || '', b.postcode || '',
+      b.client_category || '', b.onboarding_stage || '', b.tender_panel_status || ''
     );
 
     const typeLabel = companyType.charAt(0).toUpperCase() + companyType.slice(1);
@@ -232,6 +235,48 @@ router.get('/:id', (req, res, next) => {
     FROM opportunities WHERE client_id = ?
   `).get(client.id);
 
+  // CRM: Meetings for this account
+  const meetings = db.prepare(`
+    SELECT m.*, u.full_name as owner_name, o.title as opp_title, o.opportunity_number
+    FROM crm_meetings m
+    LEFT JOIN users u ON m.owner_id = u.id
+    LEFT JOIN opportunities o ON m.opportunity_id = o.id
+    WHERE m.account_id = ?
+    ORDER BY m.meeting_date DESC
+    LIMIT 20
+  `).all(client.id);
+
+  // Jobs linked to this client
+  const accountJobs = db.prepare(`
+    SELECT j.id, j.job_number, j.job_name, j.status, j.start_date, j.end_date,
+      j.contract_value, u.full_name as pm_name
+    FROM jobs j
+    LEFT JOIN users u ON j.project_manager_id = u.id
+    WHERE j.client_id = ?
+    ORDER BY j.start_date DESC
+    LIMIT 30
+  `).all(client.id);
+
+  // Enhanced contacts with CRM fields
+  const accountContacts = db.prepare(`
+    SELECT cc.*, u.full_name as owner_name
+    FROM client_contacts cc
+    LEFT JOIN users u ON cc.contact_owner_id = u.id
+    WHERE cc.company_id = ?
+    ORDER BY cc.is_primary DESC, cc.full_name ASC
+  `).all(client.id);
+
+  // Build timeline events from activities + stage changes
+  const timelineEvents = crmActivities.map(a => ({
+    type: a.activity_type === 'meeting' ? 'meeting' : 'activity',
+    date: a.activity_date || a.created_at,
+    icon_type: a.activity_type,
+    title: a.subject,
+    description: a.notes || a.outcome || '',
+    user_name: a.owner_name || '',
+    meta: { contact_name: a.contact_name, opp_title: a.opp_title },
+  }));
+
   // Users for owner dropdowns
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
 
@@ -246,6 +291,10 @@ router.get('/:id', (req, res, next) => {
     opportunities,
     crmActivities,
     pipelineSummary,
+    meetings,
+    accountJobs,
+    accountContacts,
+    timelineEvents,
     users,
   });
   } catch (err) {
@@ -286,6 +335,8 @@ router.post('/:id', (req, res) => {
         account_owner_id=?, bdm_owner_id=?, lead_source=?, estimated_annual_value=?,
         service_interests=?, target_regions=?, priority=?, prequal_status=?, vendor_status=?,
         contract_status=?, industry_segment=?, next_action_date=?, next_action_note=?,
+        phone=?, email_general=?, suburb=?, state=?, postcode=?,
+        client_category=?, onboarding_stage=?, tender_panel_status=?,
         updated_at=CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
@@ -300,6 +351,8 @@ router.post('/:id', (req, res) => {
       b.target_regions || '', b.priority || 'normal', b.prequal_status || 'none',
       b.vendor_status || 'none', b.contract_status || '', b.industry_segment || '',
       b.next_action_date || null, b.next_action_note || '',
+      b.phone || '', b.email_general || '', b.suburb || '', b.state || '', b.postcode || '',
+      b.client_category || '', b.onboarding_stage || '', b.tender_panel_status || '',
       req.params.id
     );
 

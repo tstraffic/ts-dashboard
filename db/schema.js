@@ -1947,6 +1947,185 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 37: CRM Sprint 2 — meetings, missing fields, settings
+  // =============================================
+  if (!isMigrationApplied.get(37)) {
+    console.log('Running migration 37: CRM Sprint 2 — meetings, missing fields, settings');
+    try {
+      // A. New columns on clients
+      const clientCols37 = [
+        "ALTER TABLE clients ADD COLUMN phone TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN email_general TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN suburb TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN state TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN postcode TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN client_category TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN onboarding_stage TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN tender_panel_status TEXT DEFAULT ''",
+      ];
+      for (const sql of clientCols37) {
+        try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+      }
+
+      // B. Remove CHECK constraint on client_contacts.contact_type by recreating table
+      // SQLite does not support ALTER TABLE DROP CONSTRAINT, so we must recreate
+      try {
+        const hasCheck = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='client_contacts'").get();
+        if (hasCheck && hasCheck.sql && hasCheck.sql.includes("CHECK(contact_type IN")) {
+          db.exec(`
+            CREATE TABLE client_contacts_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+              company_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+              contact_type TEXT NOT NULL DEFAULT 'other',
+              company TEXT NOT NULL DEFAULT '',
+              full_name TEXT NOT NULL DEFAULT '',
+              position TEXT DEFAULT '',
+              phone TEXT DEFAULT '',
+              email TEXT DEFAULT '',
+              notes TEXT DEFAULT '',
+              is_primary INTEGER NOT NULL DEFAULT 0,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              relationship_strength TEXT DEFAULT '',
+              influence_level TEXT DEFAULT '',
+              buying_role TEXT DEFAULT '',
+              preferred_comm_method TEXT DEFAULT '',
+              referred_by TEXT DEFAULT '',
+              contact_owner_id INTEGER REFERENCES users(id),
+              last_contact_date DATE,
+              next_contact_date DATE,
+              first_name TEXT DEFAULT '',
+              last_name TEXT DEFAULT '',
+              mobile TEXT DEFAULT '',
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+          // Copy existing data
+          const existingCols = db.pragma('table_info(client_contacts)').map(c => c.name);
+          const commonCols = existingCols.filter(c =>
+            ['id','job_id','company_id','contact_type','company','full_name','position','phone','email',
+             'notes','is_primary','created_at','relationship_strength','influence_level','buying_role',
+             'preferred_comm_method','referred_by','contact_owner_id','last_contact_date','next_contact_date',
+             'first_name','last_name','mobile','updated_at'].includes(c)
+          );
+          const colList = commonCols.join(', ');
+          db.exec(`INSERT INTO client_contacts_new (${colList}) SELECT ${colList} FROM client_contacts`);
+          db.exec('DROP TABLE client_contacts');
+          db.exec('ALTER TABLE client_contacts_new RENAME TO client_contacts');
+          console.log('  Recreated client_contacts without CHECK constraint');
+        }
+      } catch (e) {
+        console.warn('  Could not recreate client_contacts:', e.message);
+        // Fallback: just add new columns
+        const contactCols37 = [
+          "ALTER TABLE client_contacts ADD COLUMN first_name TEXT DEFAULT ''",
+          "ALTER TABLE client_contacts ADD COLUMN last_name TEXT DEFAULT ''",
+          "ALTER TABLE client_contacts ADD COLUMN mobile TEXT DEFAULT ''",
+          "ALTER TABLE client_contacts ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+        ];
+        for (const sql of contactCols37) {
+          try { db.exec(sql); } catch (e2) { /* column likely already exists */ }
+        }
+      }
+
+      // C. New columns on opportunities
+      const oppCols37 = [
+        "ALTER TABLE opportunities ADD COLUMN won_date DATE",
+        "ALTER TABLE opportunities ADD COLUMN lost_date DATE",
+        "ALTER TABLE opportunities ADD COLUMN last_activity_at DATETIME",
+      ];
+      for (const sql of oppCols37) {
+        try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+      }
+
+      // D. New column on crm_activities
+      try { db.exec("ALTER TABLE crm_activities ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP"); } catch (e) {}
+
+      // E. crm_meetings table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS crm_meetings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          activity_id INTEGER REFERENCES crm_activities(id) ON DELETE SET NULL,
+          account_id INTEGER REFERENCES clients(id),
+          opportunity_id INTEGER REFERENCES opportunities(id),
+          owner_id INTEGER REFERENCES users(id),
+          title TEXT NOT NULL,
+          meeting_date DATETIME NOT NULL,
+          duration_minutes INTEGER,
+          location_type TEXT DEFAULT '',
+          location_text TEXT DEFAULT '',
+          attendees TEXT DEFAULT '',
+          purpose TEXT DEFAULT '',
+          notes TEXT DEFAULT '',
+          outcome TEXT DEFAULT '',
+          follow_up_actions TEXT DEFAULT '',
+          next_meeting_date DATE,
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Indexes on crm_meetings
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_meetings_account ON crm_meetings(account_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_meetings_opportunity ON crm_meetings(opportunity_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_meetings_owner ON crm_meetings(owner_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_meetings_date ON crm_meetings(meeting_date)'); } catch (e) {}
+
+      // F. Seed new settings categories
+      const seedSetting37 = db.prepare(`
+        INSERT OR IGNORE INTO app_settings (category, key, label, color, display_order, is_active)
+        VALUES (?, ?, ?, ?, ?, 1)
+      `);
+
+      const newSeeds = {
+        industry_segments: [
+          { key: 'civil', label: 'Civil', color: 'blue' },
+          { key: 'utilities', label: 'Utilities', color: 'amber' },
+          { key: 'government', label: 'Government', color: 'indigo' },
+          { key: 'council', label: 'Council', color: 'teal' },
+          { key: 'events', label: 'Events', color: 'pink' },
+          { key: 'commercial_builder', label: 'Commercial Builder', color: 'orange' },
+          { key: 'rail', label: 'Rail', color: 'purple' },
+          { key: 'other', label: 'Other', color: 'gray' },
+        ],
+        client_categories: [
+          { key: 'principal_contractor', label: 'Principal Contractor', color: 'blue' },
+          { key: 'subcontractor', label: 'Subcontractor', color: 'amber' },
+          { key: 'builder', label: 'Builder', color: 'orange' },
+          { key: 'utility', label: 'Utility', color: 'teal' },
+          { key: 'council', label: 'Council', color: 'indigo' },
+          { key: 'event_organiser', label: 'Event Organiser', color: 'pink' },
+          { key: 'government', label: 'Government', color: 'purple' },
+          { key: 'private_client', label: 'Private Client', color: 'emerald' },
+        ],
+        contact_types: [
+          { key: 'decision_maker', label: 'Decision Maker', color: 'red' },
+          { key: 'project_manager', label: 'Project Manager', color: 'blue' },
+          { key: 'estimator', label: 'Estimator', color: 'amber' },
+          { key: 'procurement', label: 'Procurement', color: 'purple' },
+          { key: 'safety', label: 'Safety', color: 'emerald' },
+          { key: 'planner', label: 'Planner', color: 'indigo' },
+          { key: 'accounts', label: 'Accounts', color: 'teal' },
+          { key: 'site_contact', label: 'Site Contact', color: 'orange' },
+          { key: 'other', label: 'Other', color: 'gray' },
+        ],
+      };
+
+      for (const [category, items] of Object.entries(newSeeds)) {
+        items.forEach((item, idx) => {
+          seedSetting37.run(category, item.key, item.label, item.color || '', idx);
+        });
+      }
+
+      recordMigration.run(37, 'CRM Sprint 2 — meetings table, missing fields, new settings');
+      console.log('Migration 37 complete.');
+    } catch (e) {
+      console.error('Migration 37 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

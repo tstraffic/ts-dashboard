@@ -98,7 +98,7 @@
       <% contacts.forEach(c => { %>
       <tr class="hover:bg-gray-50">
         <td class="px-3 py-2.5">
-          <span class="font-medium text-gray-900"><%= c.full_name %></span>
+          <a href="/contacts/<%= c.id %>" class="font-medium text-gray-900 hover:text-brand-600 transition"><%= c.full_name %></a>
           <% if (c.position) { %><span class="block text-[10px] text-gray-400"><%= c.position %></span><% } %>
           <span class="sm:hidden text-[10px] text-gray-400"><%= c.company %></span>
           <% if (c.is_primary) { %>
