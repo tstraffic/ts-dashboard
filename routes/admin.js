@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const { getDb } = require('../db/database');
 const { requireRole } = require('../middleware/auth');
 const { createInvitation, TOKEN_EXPIRY_HOURS } = require('../services/invitations');
-const { sendEmail } = require('../services/email');
+const { sendEmail, isConfigured } = require('../services/email');
 const { adminInviteEmail } = require('../services/emailTemplates');
 const { logActivity } = require('../middleware/audit');
 
@@ -28,8 +28,8 @@ router.post('/users', async (req, res) => {
 
   try {
     if (sendInvite) {
-      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        req.flash('error', 'Email invitations require SMTP to be configured. Create the user with a password instead, or set up SMTP in Railway environment variables.');
+      if (!isConfigured()) {
+        req.flash('error', 'Email invitations require SMTP to be configured. Go to Settings → System Configuration to set up SMTP, or add SMTP environment variables in Railway.');
         return res.redirect('/admin/users/new');
       }
       const result = db.prepare('INSERT INTO users (username, password_hash, full_name, email, role, active) VALUES (?, ?, ?, ?, ?, ?)').run(

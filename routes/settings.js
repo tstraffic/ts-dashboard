@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDb } = require('../db/database');
 const { logActivity } = require('../middleware/audit');
 const { reloadSettings, CATEGORY_META, getOptions } = require('../middleware/settings');
+const { sendEmail, testConnection, isConfigured } = require('../services/email');
 
 // ─── Settings Dashboard ────────────────────────────────────────────
 router.get('/', (req, res) => {
@@ -73,6 +74,50 @@ router.post('/system', (req, res) => {
   }
 
   req.flash('success', changes.length > 0 ? `Updated ${changes.length} setting(s).` : 'No changes made.');
+  res.redirect('/settings/system');
+});
+
+// ─── Test Email ───────────────────────────────────────────────────
+router.post('/system/test-email', async (req, res) => {
+  const toEmail = req.body.test_email || req.session.user.email;
+  if (!toEmail) {
+    req.flash('error', 'No email address provided. Enter a test email or set one on your user profile.');
+    return res.redirect('/settings/system');
+  }
+
+  if (!isConfigured()) {
+    req.flash('error', 'SMTP is not configured. Add SMTP settings below or set environment variables in Railway.');
+    return res.redirect('/settings/system');
+  }
+
+  try {
+    // First test the connection
+    await testConnection();
+
+    // Then send a test email
+    const result = await sendEmail(
+      toEmail,
+      'T&S Dashboard — Test Email',
+      `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">
+        <div style="background: #2B7FFF; padding: 20px 24px; border-radius: 12px 12px 0 0;">
+          <h2 style="color: white; margin: 0; font-size: 18px;">T&S Operations Dashboard</h2>
+        </div>
+        <div style="border: 1px solid #E5E7EB; border-top: none; padding: 24px; border-radius: 0 0 12px 12px; background: #FAFAFA;">
+          <h3 style="color: #111827; margin: 0 0 12px;">Email is working!</h3>
+          <p style="color: #6B7280; margin: 0 0 16px;">This is a test email from the T&S Operations Dashboard. If you received this, your SMTP configuration is correct.</p>
+          <p style="color: #9CA3AF; font-size: 12px; margin: 0;">Sent at ${new Date().toLocaleString('en-AU', { timeZone: 'Australia/Sydney' })} AEST</p>
+        </div>
+      </div>`
+    );
+
+    if (result) {
+      req.flash('success', `Test email sent to ${toEmail} — check your inbox!`);
+    } else {
+      req.flash('error', 'Email send failed. Check your SMTP credentials and try again.');
+    }
+  } catch (err) {
+    req.flash('error', `SMTP connection failed: ${err.message}`);
+  }
   res.redirect('/settings/system');
 });
 
