@@ -202,11 +202,21 @@ router.get('/:id', (req, res) => {
     WHERE tp.job_id = ? ORDER BY tp.created_at DESC
   `).all(job.id);
 
+  // Activity log for this job + child entities
+  const activities = db.prepare(`
+    SELECT al.*, u.full_name as user_name
+    FROM activity_log al
+    LEFT JOIN users u ON al.user_id = u.id
+    WHERE (al.entity_type = 'job' AND al.entity_id = ?)
+      OR (al.entity_type IN ('task','incident','compliance','defect','equipment_assignment','timesheet','traffic_plan','project_update') AND al.job_id = ?)
+    ORDER BY al.created_at DESC LIMIT 30
+  `).all(job.id, job.id);
+
   res.render('projects/show', {
     title: job.job_number,
     job, tasks, updates, complianceItems, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
-    equipmentAssignments, defects, trafficPlans,
+    equipmentAssignments, defects, trafficPlans, activities,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });

@@ -2,21 +2,28 @@
 <% const isEdit = incident !== null && typeof incident !== 'undefined' %>
 
 <!-- Page Header -->
-<div class="mb-6">
-  <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit ' + incident.incident_number : 'Report Incident' %></h1>
-  <p class="text-gray-500 text-sm mt-1"><%= isEdit ? 'Update incident details below' : 'Complete the form to report a new safety incident' %></p>
+<div class="flex items-center gap-2 text-sm text-gray-400 mb-4">
+  <a href="/incidents" class="hover:text-gray-900 transition">Incidents</a>
+  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <span class="text-gray-900"><%= isEdit ? incident.incident_number : 'Report Incident' %></span>
+</div>
+
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit ' + incident.incident_number : 'Report Incident' %></h1>
+    <p class="text-gray-500 text-sm mt-0.5"><%= isEdit ? 'Update incident details' : 'Complete the form to report a new safety incident' %></p>
+  </div>
 </div>
 
 <!-- Form -->
-<form method="POST" action="<%= isEdit ? '/incidents/' + incident.id : '/incidents' %>" class="space-y-6">
+<form method="POST" action="<%= isEdit ? '/incidents/' + incident.id : '/incidents' %>" class="space-y-5" data-wizard>
 
-  <!-- Incident Identification -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Incident Details</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <!-- Job -->
+  <!-- Step 1: Incident Details -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="0" data-wizard-title="Details">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Incident Details</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
-        <label for="job_id" class="block text-sm font-medium text-gray-600 mb-1">Job <span class="text-red-600">*</span></label>
+        <label for="job_id" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job <span class="text-red-500">*</span></label>
         <select id="job_id" name="job_id" required
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select Job --</option>
@@ -28,9 +35,8 @@
           <% }) %>
         </select>
       </div>
-      <!-- Incident Type -->
       <div>
-        <label for="incident_type" class="block text-sm font-medium text-gray-600 mb-1">Incident Type <span class="text-red-600">*</span></label>
+        <label for="incident_type" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Incident Type <span class="text-red-500">*</span></label>
         <select id="incident_type" name="incident_type" required
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select Type --</option>
@@ -39,9 +45,8 @@
           <% }) %>
         </select>
       </div>
-      <!-- Severity -->
       <div>
-        <label for="severity" class="block text-sm font-medium text-gray-600 mb-1">Severity</label>
+        <label for="severity" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Severity</label>
         <select id="severity" name="severity"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <% (settingsOptions.incident_severity || []).forEach(opt => { %>
@@ -49,46 +54,41 @@
           <% }) %>
         </select>
       </div>
-      <!-- Title -->
       <div>
-        <label for="title" class="block text-sm font-medium text-gray-600 mb-1">Title <span class="text-red-600">*</span></label>
+        <label for="title" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Title <span class="text-red-500">*</span></label>
         <input type="text" id="title" name="title" required
           value="<%= isEdit ? incident.title : '' %>"
           placeholder="Brief incident title"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
-    <!-- Description -->
     <div class="mt-4">
-      <label for="description" class="block text-sm font-medium text-gray-600 mb-1">Description <span class="text-red-600">*</span></label>
+      <label for="description" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Description <span class="text-red-500">*</span></label>
       <textarea id="description" name="description" rows="4" required
         placeholder="Describe what happened in detail..."
         class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.description ? incident.description : '' %></textarea>
     </div>
   </div>
 
-  <!-- Location & Time -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Location & Time</h2>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <!-- Location -->
+  <!-- Step 2: Location & Time -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="1" data-wizard-title="Location & Time">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Location & Time</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div>
-        <label for="location" class="block text-sm font-medium text-gray-600 mb-1">Location</label>
+        <label for="location" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Location</label>
         <input type="text" id="location" name="location"
           value="<%= isEdit && incident.location ? incident.location : '' %>"
           placeholder="Specific location on site"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Incident Date -->
       <div>
-        <label for="incident_date" class="block text-sm font-medium text-gray-600 mb-1">Incident Date <span class="text-red-600">*</span></label>
+        <label for="incident_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Incident Date <span class="text-red-500">*</span></label>
         <input type="date" id="incident_date" name="incident_date" required
           value="<%= isEdit && incident.incident_date ? incident.incident_date : '' %>"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Incident Time -->
       <div>
-        <label for="incident_time" class="block text-sm font-medium text-gray-600 mb-1">Incident Time</label>
+        <label for="incident_time" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Incident Time</label>
         <input type="time" id="incident_time" name="incident_time"
           value="<%= isEdit && incident.incident_time ? incident.incident_time : '' %>"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
@@ -96,71 +96,67 @@
     </div>
   </div>
 
-  <!-- People Involved -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">People Involved</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <!-- Persons Involved -->
+  <!-- Step 3: People Involved + Linked Crew -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="2" data-wizard-title="People">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">People Involved</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
-        <label for="persons_involved" class="block text-sm font-medium text-gray-600 mb-1">Persons Involved</label>
+        <label for="persons_involved" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Persons Involved</label>
         <textarea id="persons_involved" name="persons_involved" rows="3"
           placeholder="Names and roles of people involved..."
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.persons_involved ? incident.persons_involved : '' %></textarea>
       </div>
-      <!-- Witnesses -->
       <div>
-        <label for="witnesses" class="block text-sm font-medium text-gray-600 mb-1">Witnesses</label>
+        <label for="witnesses" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Witnesses</label>
         <textarea id="witnesses" name="witnesses" rows="3"
           placeholder="Names and contact details of witnesses..."
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.witnesses ? incident.witnesses : '' %></textarea>
       </div>
     </div>
-  </div>
 
-  <!-- Linked Crew Members -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Linked Crew Members</h2>
-    <p class="text-xs text-gray-400 mb-4">Link crew members from the roster to this incident for structured tracking. This supplements the free-text fields above.</p>
-    <div id="crew-links-container" class="space-y-3">
-      <% if (linkedCrew && linkedCrew.length > 0) { %>
-        <% linkedCrew.forEach((lc, idx) => { %>
-          <div class="crew-link-row flex items-center gap-3">
-            <select name="crew_member_ids" class="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-              <option value="">-- Select Crew Member --</option>
-              <% crewMembers.forEach(cm => { %>
-                <option value="<%= cm.id %>" <%= lc.crew_member_id == cm.id ? 'selected' : '' %>><%= cm.full_name %> (<%= cm.role || 'crew' %>)</option>
-              <% }) %>
-            </select>
-            <select name="crew_involvement_types" class="w-36 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-              <option value="involved" <%= lc.involvement_type === 'involved' ? 'selected' : '' %>>Involved</option>
-              <option value="witness" <%= lc.involvement_type === 'witness' ? 'selected' : '' %>>Witness</option>
-              <option value="injured" <%= lc.involvement_type === 'injured' ? 'selected' : '' %>>Injured</option>
-              <option value="reporting" <%= lc.involvement_type === 'reporting' ? 'selected' : '' %>>Reporting</option>
-            </select>
-            <button type="button" onclick="this.closest('.crew-link-row').remove()" class="p-2 text-red-600 hover:text-red-700 transition-colors" title="Remove">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-          </div>
-        <% }) %>
-      <% } %>
+    <!-- Linked Crew Members -->
+    <div class="mt-5 pt-4 border-t border-gray-100">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Linked Crew Members</h3>
+      <p class="text-xs text-gray-400 mb-3">Link crew members from the roster for structured tracking.</p>
+      <div id="crew-links-container" class="space-y-3">
+        <% if (linkedCrew && linkedCrew.length > 0) { %>
+          <% linkedCrew.forEach((lc, idx) => { %>
+            <div class="crew-link-row flex items-center gap-3">
+              <select name="crew_member_ids" class="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                <option value="">-- Select --</option>
+                <% crewMembers.forEach(cm => { %>
+                  <option value="<%= cm.id %>" <%= lc.crew_member_id == cm.id ? 'selected' : '' %>><%= cm.full_name %> (<%= cm.role || 'crew' %>)</option>
+                <% }) %>
+              </select>
+              <select name="crew_involvement_types" class="w-36 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                <option value="involved" <%= lc.involvement_type === 'involved' ? 'selected' : '' %>>Involved</option>
+                <option value="witness" <%= lc.involvement_type === 'witness' ? 'selected' : '' %>>Witness</option>
+                <option value="injured" <%= lc.involvement_type === 'injured' ? 'selected' : '' %>>Injured</option>
+                <option value="reporting" <%= lc.involvement_type === 'reporting' ? 'selected' : '' %>>Reporting</option>
+              </select>
+              <button type="button" onclick="this.closest('.crew-link-row').remove()" class="p-2 text-red-600 hover:text-red-700 transition" title="Remove">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          <% }) %>
+        <% } %>
+      </div>
+      <button type="button" id="add-crew-link" class="mt-3 flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm text-gray-600 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Add Crew Member
+      </button>
     </div>
-    <button type="button" id="add-crew-link" class="mt-3 flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm text-gray-600 transition-colors">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-      Add Crew Member
-    </button>
   </div>
 
-  <!-- Actions & Response -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Actions & Response</h2>
-    <!-- Immediate Actions Taken -->
+  <!-- Step 4: Actions, Response & Notifications -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="3" data-wizard-title="Response">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Actions & Response</h2>
     <div>
-      <label for="immediate_actions" class="block text-sm font-medium text-gray-600 mb-1">Immediate Actions Taken</label>
+      <label for="immediate_actions" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Immediate Actions Taken</label>
       <textarea id="immediate_actions" name="immediate_actions" rows="3"
         placeholder="What actions were taken immediately after the incident..."
         class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && incident.immediate_actions ? incident.immediate_actions : '' %></textarea>
     </div>
-    <!-- Notifiable Incident -->
     <div class="mt-4">
       <label class="inline-flex items-center gap-3 cursor-pointer">
         <input type="checkbox" name="notifiable_incident" value="1"
@@ -170,64 +166,57 @@
       </label>
       <p class="text-xs text-gray-400 mt-1 ml-7">Check if this incident must be reported to a regulatory authority</p>
     </div>
-  </div>
 
-  <!-- Notifications & Impact -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Notifications & Impact</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <!-- Traffic Disruption -->
-      <div>
-        <label class="inline-flex items-center gap-3 cursor-pointer">
-          <input type="checkbox" name="traffic_disruption" value="1"
-            <%= isEdit && incident.traffic_disruption ? 'checked' : '' %>
-            class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
-          <span class="text-sm font-medium text-gray-600">Traffic Disruption</span>
-        </label>
-      </div>
-      <!-- Police Notified -->
-      <div>
-        <label class="inline-flex items-center gap-3 cursor-pointer">
-          <input type="checkbox" name="police_notified" value="1"
-            <%= isEdit && incident.police_notified ? 'checked' : '' %>
-            class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
-          <span class="text-sm font-medium text-gray-600">Police Notified</span>
-        </label>
-      </div>
-      <!-- Client Notified -->
-      <div>
-        <label class="inline-flex items-center gap-3 cursor-pointer">
-          <input type="checkbox" name="client_notified" value="1"
-            <%= isEdit && incident.client_notified ? 'checked' : '' %>
-            class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
-          <span class="text-sm font-medium text-gray-600">Client Notified</span>
-        </label>
-      </div>
-      <!-- Close Out Date -->
-      <div>
-        <label for="close_out_date" class="block text-sm font-medium text-gray-600 mb-1">Close Out Date</label>
-        <input type="date" id="close_out_date" name="close_out_date"
-          value="<%= isEdit && incident.close_out_date ? incident.close_out_date : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+    <div class="mt-5 pt-4 border-t border-gray-100">
+      <h3 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Notifications & Impact</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="inline-flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" name="traffic_disruption" value="1"
+              <%= isEdit && incident.traffic_disruption ? 'checked' : '' %>
+              class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+            <span class="text-sm font-medium text-gray-600">Traffic Disruption</span>
+          </label>
+        </div>
+        <div>
+          <label class="inline-flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" name="police_notified" value="1"
+              <%= isEdit && incident.police_notified ? 'checked' : '' %>
+              class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+            <span class="text-sm font-medium text-gray-600">Police Notified</span>
+          </label>
+        </div>
+        <div>
+          <label class="inline-flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" name="client_notified" value="1"
+              <%= isEdit && incident.client_notified ? 'checked' : '' %>
+              class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+            <span class="text-sm font-medium text-gray-600">Client Notified</span>
+          </label>
+        </div>
+        <div>
+          <label for="close_out_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Close Out Date</label>
+          <input type="date" id="close_out_date" name="close_out_date"
+            value="<%= isEdit && incident.close_out_date ? incident.close_out_date : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        </div>
       </div>
     </div>
   </div>
 
   <% if (isEdit) { %>
-  <!-- Investigation (edit only) -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Investigation</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <!-- Root Cause -->
-      <div class="md:col-span-2">
-        <label for="root_cause" class="block text-sm font-medium text-gray-600 mb-1">Root Cause</label>
+  <!-- Step 5: Investigation (edit only) -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="4" data-wizard-title="Investigation">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Investigation</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="sm:col-span-2">
+        <label for="root_cause" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Root Cause</label>
         <textarea id="root_cause" name="root_cause" rows="3"
           placeholder="Identified root cause of the incident..."
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= incident.root_cause || '' %></textarea>
       </div>
-      <!-- Investigation Status -->
       <div>
-        <label for="investigation_status" class="block text-sm font-medium text-gray-600 mb-1">Investigation Status</label>
+        <label for="investigation_status" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Investigation Status</label>
         <select id="investigation_status" name="investigation_status"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="reported" <%= incident.investigation_status === 'reported' ? 'selected' : '' %>>Reported</option>
@@ -240,19 +229,21 @@
   </div>
   <% } %>
 
-  <!-- Actions -->
-  <div class="flex items-center gap-3">
-    <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
-      <%= isEdit ? 'Update Incident' : 'Report Incident' %>
-    </button>
-    <a href="<%= isEdit ? '/incidents/' + incident.id : '/incidents' %>" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
-  </div>
+  <!-- Fallback actions for no-JS -->
+  <noscript>
+    <div class="flex items-center gap-3">
+      <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
+        <%= isEdit ? 'Update Incident' : 'Report Incident' %>
+      </button>
+      <a href="<%= isEdit ? '/incidents/' + incident.id : '/incidents' %>" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
+    </div>
+  </noscript>
 </form>
 
 <script>
 document.getElementById('add-crew-link').addEventListener('click', function() {
   const container = document.getElementById('crew-links-container');
-  const crewOptions = `<option value="">-- Select Crew Member --</option>` +
+  const crewOptions = `<option value="">-- Select --</option>` +
     <%- JSON.stringify(crewMembers.map(cm => `<option value="${cm.id}">${cm.full_name} (${cm.role || 'crew'})</option>`).join('')) %>;
   const row = document.createElement('div');
   row.className = 'crew-link-row flex items-center gap-3';
@@ -266,7 +257,7 @@ document.getElementById('add-crew-link').addEventListener('click', function() {
       <option value="injured">Injured</option>
       <option value="reporting">Reporting</option>
     </select>
-    <button type="button" onclick="this.closest('.crew-link-row').remove()" class="p-2 text-red-600 hover:text-red-700 transition-colors" title="Remove">
+    <button type="button" onclick="this.closest('.crew-link-row').remove()" class="p-2 text-red-600 hover:text-red-700 transition" title="Remove">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
     </button>
   `;

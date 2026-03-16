@@ -184,7 +184,7 @@
   </div>
 
   <!-- Compact Filter Bar -->
-  <form method="GET" action="/tasks" class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-6">
+  <form method="GET" action="/tasks" data-module="tasks" class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-6">
     <% if (filters.tab) { %><input type="hidden" name="tab" value="<%= filters.tab %>"><% } %>
     <% if (filters.view) { %><input type="hidden" name="view" value="<%= filters.view %>"><% } %>
     <% if (filters.owner === 'me') { %><input type="hidden" name="owner" value="me"><% } %>

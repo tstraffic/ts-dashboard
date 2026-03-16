@@ -197,6 +197,9 @@
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Accounts</a>
     <% } %>
+    <a href="#activity" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
+      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Activity</a>
   </nav>
 </div>
 
@@ -855,6 +858,17 @@
     </div>
   </div>
   <% } %>
+
+  <!-- Activity Tab -->
+  <div id="activity" class="tab-content">
+    <div class="bg-white border border-gray-200 rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Activity History</h3>
+        <a href="/activity?entity_type=job&entity_id=<%= job.id %>" class="text-xs text-brand-600 hover:text-brand-500 font-medium">View all &rarr;</a>
+      </div>
+      <%- include('../partials/activity-timeline', { activities: typeof activities !== 'undefined' ? activities : [], entityLink: '/activity?entity_type=job&entity_id=' + job.id }) %>
+    </div>
+  </div>
 
 </div>
 

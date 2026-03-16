@@ -113,10 +113,18 @@ router.get('/:id', (req, res) => {
 
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
 
+  const activities = db.prepare(`
+    SELECT al.*, u.full_name as user_name
+    FROM activity_log al LEFT JOIN users u ON al.user_id = u.id
+    WHERE al.entity_type = 'defect' AND al.entity_id = ?
+    ORDER BY al.created_at DESC LIMIT 20
+  `).all(req.params.id);
+
   res.render('defects/show', {
     title: `Defect ${defect.defect_number}`,
     currentPage: 'defects',
     defect,
+    activities,
     users
   });
 });

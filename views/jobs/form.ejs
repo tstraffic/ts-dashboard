@@ -16,26 +16,12 @@
   </div>
 </div>
 
-<!-- Step Indicator -->
-<div class="flex items-center gap-2 mb-5 overflow-x-auto pb-1">
-  <% const sections = ['Identification', 'Location', 'Status', 'Dates', 'Operations', 'Team', 'Notes'];
-     sections.forEach((s, i) => { %>
-  <a href="#section-<%= i %>" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-500 hover:border-brand-400 hover:text-brand-600 transition whitespace-nowrap">
-    <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center text-[10px] font-bold"><%= i + 1 %></span>
-    <%= s %>
-  </a>
-  <% }) %>
-</div>
-
 <!-- Form -->
-<form method="POST" action="<%= isEdit ? '/jobs/' + job.id : '/jobs' %>" class="space-y-5">
+<form method="POST" action="<%= isEdit ? '/jobs/' + job.id : '/jobs' %>" class="space-y-5" data-wizard>
 
   <!-- 1. Job Identification -->
-  <div id="section-0" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">
-      <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-50 text-brand-600 text-[10px] font-bold mr-1.5">1</span>
-      Job Identification
-    </h2>
+  <div id="section-0" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="0" data-wizard-title="Identification">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Job Identification</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div>
         <label for="job_number" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job Number <span class="text-red-500">*</span></label>
@@ -76,11 +62,8 @@
   </div>
 
   <!-- 2. Location -->
-  <div id="section-1" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">
-      <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-50 text-brand-600 text-[10px] font-bold mr-1.5">2</span>
-      Location
-    </h2>
+  <div id="section-1" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="1" data-wizard-title="Location">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Location</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <label for="site_address" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Site Address</label>
@@ -96,11 +79,8 @@
   </div>
 
   <!-- 3. Status & Progress -->
-  <div id="section-2" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">
-      <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-50 text-brand-600 text-[10px] font-bold mr-1.5">3</span>
-      Status & Progress
-    </h2>
+  <div id="section-2" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="2" data-wizard-title="Status">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Status & Progress</h2>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div>
         <label for="status" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Status</label>
@@ -130,11 +110,8 @@
   </div>
 
   <!-- 4. Dates & Completion -->
-  <div id="section-3" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">
-      <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-50 text-brand-600 text-[10px] font-bold mr-1.5">4</span>
-      Dates & Completion
-    </h2>
+  <div id="section-3" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="3" data-wizard-title="Dates">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Dates & Completion</h2>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div>
         <label for="start_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Start Date <span class="text-red-500">*</span></label>
@@ -162,11 +139,8 @@
   </div>
 
   <!-- 5. Operations Details -->
-  <div id="section-4" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">
-      <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-50 text-brand-600 text-[10px] font-bold mr-1.5">5</span>
-      Operations Details
-    </h2>
+  <div id="section-4" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="4" data-wizard-title="Operations">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Operations Details</h2>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div>
         <label for="contract_value" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Contract Value ($)</label>
@@ -210,11 +184,8 @@
   </div>
 
   <!-- 6. Team Assignment -->
-  <div id="section-5" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">
-      <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-50 text-brand-600 text-[10px] font-bold mr-1.5">6</span>
-      Team Assignment
-    </h2>
+  <div id="section-5" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="5" data-wizard-title="Team">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Team Assignment</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <% const teamFields = [
         { id: 'project_manager_id', label: 'Project Manager' },
@@ -247,11 +218,8 @@
   </div>
 
   <!-- 7. SharePoint & Notes -->
-  <div id="section-6" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">
-      <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-50 text-brand-600 text-[10px] font-bold mr-1.5">7</span>
-      Notes & Links
-    </h2>
+  <div id="section-6" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="6" data-wizard-title="Notes & Links">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Notes & Links</h2>
     <div class="space-y-4">
       <div>
         <label for="sharepoint_url" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">SharePoint URL</label>
@@ -266,11 +234,13 @@
     </div>
   </div>
 
-  <!-- Actions (sticky on mobile) -->
-  <div class="sticky bottom-0 bg-gray-50/95 backdrop-blur-sm border-t border-gray-200 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 flex items-center gap-3">
-    <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
-      <%= isEdit ? 'Update Job' : 'Create Job' %>
-    </button>
-    <a href="/jobs" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
-  </div>
+  <!-- Actions (fallback for no-JS, hidden when wizard active) -->
+  <noscript>
+    <div class="sticky bottom-0 bg-gray-50/95 backdrop-blur-sm border-t border-gray-200 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 flex items-center gap-3">
+      <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
+        <%= isEdit ? 'Update Job' : 'Create Job' %>
+      </button>
+      <a href="/jobs" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
+    </div>
+  </noscript>
 </form>

@@ -248,6 +248,13 @@ router.get('/:id', (req, res) => {
     approvedBy = db.prepare('SELECT full_name FROM users WHERE id = ?').get(member.supervisor_approved_by_id);
   }
 
+  const activities = db.prepare(`
+    SELECT al.*, u.full_name as user_name
+    FROM activity_log al LEFT JOIN users u ON al.user_id = u.id
+    WHERE al.entity_type = 'crew_member' AND al.entity_id = ?
+    ORDER BY al.created_at DESC LIMIT 20
+  `).all(req.params.id);
+
   res.render('crew/show', {
     title: member.full_name + ' — Worker Profile',
     currentPage: 'crew',
@@ -256,6 +263,7 @@ router.get('/:id', (req, res) => {
     upcomingShifts,
     recentTimesheets,
     linkedIncidents,
+    activities,
     approvedBy: approvedBy ? approvedBy.full_name : null,
     today,
   });

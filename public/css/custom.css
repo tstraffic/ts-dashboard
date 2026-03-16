@@ -208,6 +208,188 @@ a, button, input, select, textarea {
   }
 }
 
+/* ===== Floating Action Button ===== */
+.fab-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 40;
+}
+.fab-trigger {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--brand-600);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(29, 106, 229, 0.35);
+  cursor: pointer;
+  border: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.fab-trigger:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(29, 106, 229, 0.45);
+}
+.fab-trigger.fab-open svg {
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+.fab-trigger svg {
+  transition: transform 0.2s ease;
+}
+.fab-menu {
+  position: absolute;
+  bottom: calc(100% + 0.75rem);
+  right: 0;
+  display: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 200px;
+}
+.fab-menu.fab-menu-open {
+  display: flex;
+  animation: fab-slide-up 0.2s ease-out;
+}
+.fab-menu a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.fab-menu a:hover {
+  background: #eff6ff;
+  color: var(--brand-600);
+}
+@keyframes fab-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (min-width: 1024px) {
+  .fab-container { display: none; }
+}
+
+/* ===== Sidebar Badges ===== */
+.sidebar-badge {
+  min-width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  font-weight: 700;
+  border-radius: 9999px;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+/* ===== Bulk Action Bar ===== */
+.bulk-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid #e5e7eb;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  animation: slide-up 0.2s ease-out;
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Activity Timeline ===== */
+.activity-timeline {
+  position: relative;
+  padding-left: 1.5rem;
+}
+.activity-timeline::before {
+  content: '';
+  position: absolute;
+  left: 0.4375rem;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 1px;
+  background: #e5e7eb;
+}
+.activity-timeline-item {
+  position: relative;
+  padding-bottom: 1rem;
+}
+.activity-timeline-dot {
+  position: absolute;
+  left: -1.5rem;
+  top: 0.25rem;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px #e5e7eb;
+}
+
+/* ===== Onboarding Checklist ===== */
+.onboarding-check {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.onboarding-check.completed {
+  background: #059669;
+  border-color: #059669;
+  color: white;
+}
+
+/* ===== Form Submit Spinner ===== */
+form.form-submitting button[type="submit"],
+form.form-submitting input[type="submit"] {
+  pointer-events: none;
+  opacity: 0.65;
+  position: relative;
+}
+form.form-submitting button[type="submit"]::after,
+form.form-submitting input[type="submit"]::after {
+  content: '';
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-left: 0.5rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== Table row transitions ===== */
+tbody tr {
+  transition: background-color 0.15s ease;
+}
+
 /* ===== Print styles ===== */
 @media print {
   #sidebar, #sidebar-backdrop, nav.sticky, .no-print {

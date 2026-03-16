@@ -7,7 +7,7 @@
   const isFinance = ['admin', 'finance'].includes(normalRole);
 %>
 
-<!-- Hero Banner with role-aware stats -->
+<!-- Hero Banner -->
 <div class="relative bg-gradient-to-r from-brand-900 via-brand-800 to-brand-700 rounded-2xl p-5 sm:p-6 mb-5 overflow-hidden">
   <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3"></div>
   <div class="absolute bottom-0 left-1/4 w-48 h-48 bg-white/5 rounded-full translate-y-1/2"></div>
@@ -70,9 +70,30 @@
   })();
 </script>
 
-<%
-  const totalIssues = kpi.overdueTasks + kpi.openIncidents + kpi.overdueCompliance + kpi.openDefects + kpi.unconfirmedAllocations + kpi.ticketsExpiring;
-%>
+<% if (typeof onboarding !== 'undefined' && onboarding) { %>
+<!-- Onboarding Checklist -->
+<div class="bg-white border border-brand-200 rounded-2xl shadow-sm p-4 sm:p-5 mb-5 relative" id="onboarding-banner">
+  <button onclick="fetch('/profile/dismiss-onboarding',{method:'POST',headers:{'Content-Type':'application/json'}}).then(()=>document.getElementById('onboarding-banner').remove())"
+    class="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-lg leading-none" title="Dismiss">&times;</button>
+  <h3 class="text-sm font-bold text-gray-900 mb-0.5">Getting Started</h3>
+  <p class="text-xs text-gray-500 mb-3">Complete these steps to get the most out of your dashboard.</p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+    <% onboarding.forEach(item => { %>
+    <a href="<%= item.link %>" class="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors group">
+      <span class="onboarding-check <%= item.done ? 'completed' : '' %>">
+        <% if (item.done) { %><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg><% } %>
+      </span>
+      <span class="text-sm <%= item.done ? 'text-gray-400 line-through' : 'text-gray-700 group-hover:text-brand-600' %>"><%= item.label %></span>
+    </a>
+    <% }) %>
+  </div>
+  <div class="mt-3 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+    <% const doneCount = onboarding.filter(i => i.done).length; %>
+    <div class="h-full bg-brand-500 rounded-full transition-all" style="width: <%= Math.round(doneCount / onboarding.length * 100) %>%"></div>
+  </div>
+  <p class="text-[10px] text-gray-400 mt-1"><%= onboarding.filter(i => i.done).length %>/<%= onboarding.length %> complete</p>
+</div>
+<% } %>
 
 <!-- Urgency Tiles -->
 <div class="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-5">
@@ -122,90 +143,26 @@
 </div>
 <% } %>
 
-<!-- Today's Operations (ops/admin only) -->
-<% if (isOps && todaysAllocations.length > 0) { %>
-<div class="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-5">
-  <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-      <h2 class="text-sm font-bold text-gray-900">Today's Allocations</h2>
-      <span class="text-[10px] font-medium text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full"><%= todaysAllocations.length %> crew</span>
-    </div>
-    <div class="flex items-center gap-3">
-      <span class="text-xs text-gray-500"><span class="font-semibold text-emerald-600"><%= availableCrew %></span> available</span>
-      <a href="/allocations" class="text-xs text-brand-600 hover:text-brand-500 font-medium">View all &rarr;</a>
-    </div>
+<!-- Dashboard Tabs -->
+<%
+  const tabs = [];
+  tabs.push({ id: 'my-work', label: 'My Work' });
+  if (isOps) tabs.push({ id: 'operations', label: 'Operations' });
+  tabs.push({ id: 'insights', label: 'Insights' });
+  if (isPlanning || isOps) tabs.push({ id: 'plans-safety', label: 'Plans & Safety' });
+  if (isFinance) tabs.push({ id: 'finance', label: 'Finance' });
+%>
+
+<div class="mb-5">
+  <!-- Tab Nav -->
+  <div class="flex gap-1 border-b border-gray-200 mb-4 overflow-x-auto scrollbar-hide">
+    <% tabs.forEach((tab, i) => { %>
+    <button data-tab="<%= tab.id %>" class="px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px <%= i === 0 ? 'text-brand-600 border-brand-600' : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300' %>"><%= tab.label %></button>
+    <% }) %>
   </div>
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="border-b border-gray-100">
-          <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Crew</th>
-          <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Role</th>
-          <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Job</th>
-          <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Location</th>
-          <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Time</th>
-          <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-50">
-        <% todaysAllocations.slice(0, 12).forEach(a => { %>
-        <tr class="hover:bg-gray-50">
-          <td class="px-3 py-2 text-gray-900 font-medium text-xs"><%= a.crew_name %></td>
-          <td class="px-3 py-2 text-gray-500 text-xs hidden sm:table-cell"><%= a.crew_role ? a.crew_role.replace(/_/g, ' ') : '-' %></td>
-          <td class="px-3 py-2">
-            <a href="/projects/<%= a.job_id %>" class="text-brand-600 hover:text-brand-700 text-xs font-medium"><%= a.job_number %></a>
-            <p class="text-gray-400 text-[10px] truncate max-w-[120px] sm:hidden"><%= a.client %></p>
-          </td>
-          <td class="px-3 py-2 text-gray-500 text-xs truncate max-w-[160px] hidden md:table-cell"><%= a.site_address || '-' %></td>
-          <td class="px-3 py-2 text-gray-500 text-xs tabular-nums hidden md:table-cell"><%= a.start_time || '-' %> - <%= a.end_time || '-' %></td>
-          <td class="px-3 py-2">
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium
-              <%= a.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : a.status === 'declined' ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' %>">
-              <%= a.status %>
-            </span>
-          </td>
-        </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </div>
-  <% if (todaysAllocations.length > 12) { %>
-  <div class="px-4 py-2 border-t border-gray-100 text-center">
-    <a href="/allocations" class="text-xs text-brand-600 hover:text-brand-500 font-medium">View all <%= todaysAllocations.length %> allocations &rarr;</a>
-  </div>
-  <% } %>
-</div>
-<% } %>
 
-<!-- Two Column Layout -->
-<div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-5">
-
-  <!-- Left Column (2/3) -->
-  <div class="xl:col-span-2 space-y-4">
-
-    <!-- Charts Row -->
-    <% if (jobStatusDist.length > 0 || crewHoursByDay.length > 0) { %>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <% if (jobStatusDist.length > 0) { %>
-      <div class="bg-white border border-gray-200 rounded-2xl p-4">
-        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-2">Job Pipeline</h3>
-        <div class="relative" style="height: 160px;">
-          <canvas id="jobStatusChart"></canvas>
-        </div>
-      </div>
-      <% } %>
-      <% if (crewHoursByDay.length > 0) { %>
-      <div class="bg-white border border-gray-200 rounded-2xl p-4">
-        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-2">Crew Hours (7 Days)</h3>
-        <div class="relative" style="height: 160px;">
-          <canvas id="crewHoursChart"></canvas>
-        </div>
-      </div>
-      <% } %>
-    </div>
-    <% } %>
-
+  <!-- Tab: My Work -->
+  <div data-tab-panel="my-work" class="space-y-4">
     <!-- Overdue Tasks -->
     <% if (overdueTasksList.length > 0) { %>
     <div class="bg-white border border-red-200 rounded-2xl overflow-hidden">
@@ -292,11 +249,238 @@
       <% } %>
     </div>
 
-    <!-- Plans & Approvals -->
+    <!-- Recent Updates -->
+    <% if (recentUpdates.length > 0) { %>
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Recent Updates</h2>
+        <a href="/updates" class="text-xs text-brand-600 hover:text-brand-500 font-medium">All &rarr;</a>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-2xl p-4">
+        <div class="space-y-2.5">
+          <% recentUpdates.slice(0, 5).forEach(u => { %>
+          <a href="/projects/<%= u.job_id %>" class="block group">
+            <p class="text-xs font-medium text-brand-600 group-hover:text-brand-500"><%= u.job_number %> &mdash; <%= u.client %></p>
+            <p class="text-[11px] text-gray-500 mt-0.5 line-clamp-2"><%= u.summary.length > 100 ? u.summary.substring(0, 100) + '...' : u.summary %></p>
+            <p class="text-[10px] text-gray-300 mt-0.5"><%= u.submitted_by_name %> &middot; <%= u.week_ending %></p>
+          </a>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Tab: Operations (ops/admin only) -->
+  <% if (isOps) { %>
+  <div data-tab-panel="operations" class="hidden space-y-4">
+    <!-- Today's Allocations -->
+    <% if (todaysAllocations.length > 0) { %>
+    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <h2 class="text-sm font-bold text-gray-900">Today's Allocations</h2>
+          <span class="text-[10px] font-medium text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full"><%= todaysAllocations.length %> crew</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-gray-500"><span class="font-semibold text-emerald-600"><%= availableCrew %></span> available</span>
+          <a href="/allocations" class="text-xs text-brand-600 hover:text-brand-500 font-medium">View all &rarr;</a>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Crew</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Role</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Job</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Location</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Time</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            <% todaysAllocations.slice(0, 15).forEach(a => { %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-3 py-2 text-gray-900 font-medium text-xs"><%= a.crew_name %></td>
+              <td class="px-3 py-2 text-gray-500 text-xs hidden sm:table-cell"><%= a.crew_role ? a.crew_role.replace(/_/g, ' ') : '-' %></td>
+              <td class="px-3 py-2">
+                <a href="/projects/<%= a.job_id %>" class="text-brand-600 hover:text-brand-700 text-xs font-medium"><%= a.job_number %></a>
+                <p class="text-gray-400 text-[10px] truncate max-w-[120px] sm:hidden"><%= a.client %></p>
+              </td>
+              <td class="px-3 py-2 text-gray-500 text-xs truncate max-w-[160px] hidden md:table-cell"><%= a.site_address || '-' %></td>
+              <td class="px-3 py-2 text-gray-500 text-xs tabular-nums hidden md:table-cell"><%= a.start_time || '-' %> - <%= a.end_time || '-' %></td>
+              <td class="px-3 py-2">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium
+                  <%= a.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : a.status === 'declined' ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' %>">
+                  <%= a.status %>
+                </span>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% if (todaysAllocations.length > 15) { %>
+      <div class="px-4 py-2 border-t border-gray-100 text-center">
+        <a href="/allocations" class="text-xs text-brand-600 hover:text-brand-500 font-medium">View all <%= todaysAllocations.length %> allocations &rarr;</a>
+      </div>
+      <% } %>
+    </div>
+    <% } else { %>
+    <div class="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+      <div class="w-12 h-12 bg-brand-50 rounded-xl flex items-center justify-center mx-auto mb-3">
+        <svg class="w-6 h-6 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      </div>
+      <p class="text-sm font-medium text-gray-700">No allocations today</p>
+      <p class="text-xs text-gray-400 mt-1">Schedule crew from the <a href="/allocations" class="text-brand-600 hover:text-brand-500">Allocations</a> page.</p>
+    </div>
+    <% } %>
+
+    <!-- Crew & Equipment Row -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Crew Availability -->
+      <div class="bg-white border border-gray-200 rounded-2xl p-4">
+        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">Crew Availability</h3>
+        <div class="flex items-center justify-center gap-2 mb-3">
+          <div class="relative w-20 h-20">
+            <svg viewBox="0 0 36 36" class="w-20 h-20 -rotate-90">
+              <circle cx="18" cy="18" r="15.91549431" fill="none" stroke="#f3f4f6" stroke-width="3"></circle>
+              <circle cx="18" cy="18" r="15.91549431" fill="none" stroke="#2B7FFF" stroke-width="3"
+                stroke-dasharray="<%= totalActiveCrew > 0 ? (allocatedToday / totalActiveCrew * 100) : 0 %> <%= totalActiveCrew > 0 ? 100 - (allocatedToday / totalActiveCrew * 100) : 100 %>"
+                stroke-linecap="round"></circle>
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-lg font-extrabold text-gray-900"><%= allocatedToday %></span>
+            </div>
+          </div>
+        </div>
+        <div class="space-y-1.5 text-center">
+          <div class="flex items-center justify-between px-2">
+            <span class="text-xs text-gray-500">Allocated today</span>
+            <span class="text-sm font-bold text-brand-600"><%= allocatedToday %></span>
+          </div>
+          <div class="flex items-center justify-between px-2">
+            <span class="text-xs text-gray-500">Available</span>
+            <span class="text-sm font-bold text-emerald-600"><%= availableCrew %></span>
+          </div>
+          <div class="flex items-center justify-between px-2">
+            <span class="text-xs text-gray-500">Total active</span>
+            <span class="text-sm font-bold text-gray-900"><%= totalActiveCrew %></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Operations Summary -->
+      <div class="bg-white border border-gray-200 rounded-2xl p-4">
+        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">Operations Summary</h3>
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">Equipment deployed</span>
+            <span class="text-sm font-bold text-gray-900"><%= kpi.equipmentDeployed %></span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">Jobs starting soon</span>
+            <span class="text-sm font-bold <%= kpi.startingSoon > 0 ? 'text-brand-600' : 'text-gray-900' %>"><%= kpi.startingSoon %></span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">Missing weekly updates</span>
+            <span class="text-sm font-bold <%= kpi.missingUpdates > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><%= kpi.missingUpdates %></span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">Corrective actions due</span>
+            <span class="text-sm font-bold <%= kpi.overdueCorrectiveActions > 0 ? 'text-red-600' : 'text-emerald-600' %>"><%= kpi.overdueCorrectiveActions %></span>
+          </div>
+          <% if (kpi.notifiableIncidents > 0) { %>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-red-600 font-medium">Notifiable incidents</span>
+            <span class="text-sm font-bold text-red-600"><%= kpi.notifiableIncidents %></span>
+          </div>
+          <% } %>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">ROL pending</span>
+            <span class="text-sm font-bold <%= kpi.rolPending > 0 ? 'text-amber-600' : 'text-gray-400' %>"><%= kpi.rolPending %></span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">TMP pending</span>
+            <span class="text-sm font-bold <%= kpi.tmpPending > 0 ? 'text-amber-600' : 'text-gray-400' %>"><%= kpi.tmpPending %></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Tab: Insights -->
+  <div data-tab-panel="insights" class="hidden space-y-4">
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-white border border-gray-200 rounded-2xl p-4">
+        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-2">Job Pipeline</h3>
+        <div class="relative" style="height: 180px;">
+          <canvas id="jobStatusChart"></canvas>
+        </div>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-2xl p-4">
+        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-2">Crew Hours (7 Days)</h3>
+        <div class="relative" style="height: 180px;">
+          <canvas id="crewHoursChart"></canvas>
+        </div>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-2xl p-4">
+        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">Job Health</h3>
+        <% if (jobHealthDist.length > 0) { %>
+        <div class="relative mx-auto" style="height: 120px; width: 120px;">
+          <canvas id="jobHealthChart"></canvas>
+        </div>
+        <div class="flex justify-center gap-3 mt-2">
+          <% jobHealthDist.forEach(h => { %>
+          <div class="flex items-center gap-1 text-xs text-gray-500">
+            <span class="w-2 h-2 rounded-full <%= h.health === 'green' ? 'bg-emerald-500' : h.health === 'amber' ? 'bg-amber-400' : 'bg-red-500' %>"></span>
+            <span class="capitalize"><%= h.health %> (<%= h.count %>)</span>
+          </div>
+          <% }) %>
+        </div>
+        <% } else { %>
+        <p class="text-sm text-gray-400 text-center py-8">No active jobs</p>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <% if (recentActivity.length > 0) { %>
+    <div class="bg-white border border-gray-200 rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Recent Activity</h3>
+        <a href="/activity" class="text-xs text-brand-600 hover:text-brand-500 font-medium">All &rarr;</a>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        <% recentActivity.slice(0, 9).forEach(a => {
+          const actionColors = { create: 'bg-emerald-500', update: 'bg-blue-500', delete: 'bg-red-500', login: 'bg-purple-500', approve: 'bg-teal-500' };
+          const dotColor = actionColors[a.action] || 'bg-gray-400';
+        %>
+        <div class="flex items-start gap-2.5 p-2 rounded-lg hover:bg-gray-50 transition">
+          <div class="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 <%= dotColor %>"></div>
+          <div class="min-w-0">
+            <p class="text-xs text-gray-700 truncate"><span class="font-medium"><%= a.user_name || 'System' %></span> <%= a.action %> <%= a.entity_type ? a.entity_type.replace(/_/g, ' ') : '' %></p>
+            <% if (a.entity_label) { %><p class="text-[10px] text-gray-400 truncate"><%= a.entity_label %></p><% } %>
+            <p class="text-[10px] text-gray-300"><%= new Date(a.created_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></p>
+          </div>
+        </div>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Tab: Plans & Safety -->
+  <% if (isPlanning || isOps) { %>
+  <div data-tab-panel="plans-safety" class="hidden space-y-4">
     <% if (complianceUrgent.length > 0) { %>
     <div>
       <div class="flex items-center justify-between mb-2">
-        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Plans & Approvals</h2>
+        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Compliance & Approvals</h2>
         <a href="/compliance" class="text-xs text-brand-600 hover:text-brand-500 font-medium">View all &rarr;</a>
       </div>
       <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden overflow-x-auto">
@@ -359,212 +543,133 @@
         </table>
       </div>
     </div>
+    <% } else { %>
+    <div class="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+      <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-3">
+        <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      </div>
+      <p class="text-sm font-medium text-gray-700">All clear</p>
+      <p class="text-xs text-gray-400 mt-1">No urgent compliance or approval items right now.</p>
+    </div>
     <% } %>
   </div>
+  <% } %>
 
-  <!-- Right Column (1/3) -->
-  <div class="space-y-4">
-
-    <!-- Job Health -->
-    <% if (jobHealthDist.length > 0) { %>
-    <div class="bg-white border border-gray-200 rounded-2xl p-4">
-      <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">Job Health</h3>
-      <div class="relative mx-auto" style="height: 140px; width: 140px;">
-        <canvas id="jobHealthChart"></canvas>
-      </div>
-      <div class="flex justify-center gap-3 mt-2">
-        <% jobHealthDist.forEach(h => { %>
-        <div class="flex items-center gap-1 text-xs text-gray-500">
-          <span class="w-2 h-2 rounded-full <%= h.health === 'green' ? 'bg-emerald-500' : h.health === 'amber' ? 'bg-amber-400' : 'bg-red-500' %>"></span>
-          <span class="capitalize"><%= h.health %> (<%= h.count %>)</span>
+  <!-- Tab: Finance -->
+  <% if (isFinance) { %>
+  <div data-tab-panel="finance" class="hidden space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Financial Summary -->
+      <div class="bg-white border border-gray-200 rounded-2xl p-5">
+        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-4">Financial Overview</h3>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">Total Contract Value</span>
+            <span class="text-lg font-bold text-gray-900">$<%= kpi.totalContractValue.toLocaleString() %></span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">Total Spend</span>
+            <span class="text-lg font-bold text-brand-600">$<%= kpi.totalSpend.toLocaleString() %></span>
+          </div>
+          <% if (kpi.totalContractValue > 0) { %>
+          <div>
+            <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div class="h-full bg-brand-500 rounded-full" style="width: <%= Math.min(100, Math.round(kpi.totalSpend / kpi.totalContractValue * 100)) %>%"></div>
+            </div>
+            <p class="text-xs text-gray-400 text-center mt-1"><%= Math.round(kpi.totalSpend / kpi.totalContractValue * 100) %>% of budget used</p>
+          </div>
+          <% } %>
         </div>
-        <% }) %>
+      </div>
+
+      <!-- Accounts Status -->
+      <div class="bg-white border border-gray-200 rounded-2xl p-5">
+        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-4">Accounts Status</h3>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="text-center p-4 rounded-xl <%= kpi.accountsOverdue > 0 ? 'bg-red-50' : 'bg-gray-50' %>">
+            <p class="text-3xl font-extrabold <%= kpi.accountsOverdue > 0 ? 'text-red-600' : 'text-emerald-600' %>"><%= kpi.accountsOverdue %></p>
+            <p class="text-[10px] font-medium text-gray-500 uppercase tracking-wider mt-1">Overdue</p>
+          </div>
+          <div class="text-center p-4 rounded-xl <%= kpi.accountsDisputed > 0 ? 'bg-amber-50' : 'bg-gray-50' %>">
+            <p class="text-3xl font-extrabold <%= kpi.accountsDisputed > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><%= kpi.accountsDisputed %></p>
+            <p class="text-[10px] font-medium text-gray-500 uppercase tracking-wider mt-1">Disputed</p>
+          </div>
+        </div>
       </div>
     </div>
-    <% } %>
+  </div>
+  <% } %>
+</div>
 
-    <!-- Crew Availability (ops/admin) -->
+<!-- Mobile FAB (Quick Actions) -->
+<div class="fixed bottom-6 right-6 z-40 lg:hidden" id="fab-container">
+  <div class="fab-menu hidden flex flex-col-reverse gap-2 mb-3" id="fab-menu">
+    <a href="/jobs/new" class="flex items-center gap-2 bg-white shadow-lg rounded-full pl-3 pr-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+      <span class="w-8 h-8 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      </span>
+      New Job
+    </a>
+    <a href="/incidents/new" class="flex items-center gap-2 bg-white shadow-lg rounded-full pl-3 pr-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+      <span class="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+      </span>
+      Incident
+    </a>
+    <a href="/defects/new" class="flex items-center gap-2 bg-white shadow-lg rounded-full pl-3 pr-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+      <span class="w-8 h-8 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </span>
+      Defect
+    </a>
     <% if (isOps) { %>
-    <div class="bg-white border border-gray-200 rounded-2xl p-4">
-      <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">Crew Availability</h3>
-      <div class="flex items-center justify-center gap-2 mb-3">
-        <div class="relative w-20 h-20">
-          <svg viewBox="0 0 36 36" class="w-20 h-20 -rotate-90">
-            <circle cx="18" cy="18" r="15.91549431" fill="none" stroke="#f3f4f6" stroke-width="3"></circle>
-            <circle cx="18" cy="18" r="15.91549431" fill="none" stroke="#2B7FFF" stroke-width="3"
-              stroke-dasharray="<%= totalActiveCrew > 0 ? (allocatedToday / totalActiveCrew * 100) : 0 %> <%= totalActiveCrew > 0 ? 100 - (allocatedToday / totalActiveCrew * 100) : 100 %>"
-              stroke-linecap="round"></circle>
-          </svg>
-          <div class="absolute inset-0 flex items-center justify-center">
-            <span class="text-lg font-extrabold text-gray-900"><%= allocatedToday %></span>
-          </div>
-        </div>
-      </div>
-      <div class="space-y-1.5 text-center">
-        <div class="flex items-center justify-between px-2">
-          <span class="text-xs text-gray-500">Allocated today</span>
-          <span class="text-sm font-bold text-brand-600"><%= allocatedToday %></span>
-        </div>
-        <div class="flex items-center justify-between px-2">
-          <span class="text-xs text-gray-500">Available</span>
-          <span class="text-sm font-bold text-emerald-600"><%= availableCrew %></span>
-        </div>
-        <div class="flex items-center justify-between px-2">
-          <span class="text-xs text-gray-500">Total active</span>
-          <span class="text-sm font-bold text-gray-900"><%= totalActiveCrew %></span>
-        </div>
-      </div>
-    </div>
+    <a href="/allocations" class="flex items-center gap-2 bg-white shadow-lg rounded-full pl-3 pr-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+      <span class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </span>
+      Allocations
+    </a>
     <% } %>
+  </div>
+  <button id="fab-toggle" class="w-14 h-14 bg-brand-600 hover:bg-brand-500 text-white rounded-full shadow-lg flex items-center justify-center transition-transform" onclick="document.getElementById('fab-menu').classList.toggle('hidden'); this.classList.toggle('rotate-45')">
+    <svg class="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+  </button>
+</div>
 
-    <!-- Operational Summary -->
-    <div class="bg-white border border-gray-200 rounded-2xl p-4">
-      <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">Operations Summary</h3>
-      <div class="space-y-2.5">
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-500">Equipment deployed</span>
-          <span class="text-sm font-bold text-gray-900"><%= kpi.equipmentDeployed %></span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-500">Jobs starting soon</span>
-          <span class="text-sm font-bold <%= kpi.startingSoon > 0 ? 'text-brand-600' : 'text-gray-900' %>"><%= kpi.startingSoon %></span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-500">Missing weekly updates</span>
-          <span class="text-sm font-bold <%= kpi.missingUpdates > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><%= kpi.missingUpdates %></span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-500">Corrective actions due</span>
-          <span class="text-sm font-bold <%= kpi.overdueCorrectiveActions > 0 ? 'text-red-600' : 'text-emerald-600' %>"><%= kpi.overdueCorrectiveActions %></span>
-        </div>
-        <% if (kpi.notifiableIncidents > 0) { %>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-red-600 font-medium">Notifiable incidents</span>
-          <span class="text-sm font-bold text-red-600"><%= kpi.notifiableIncidents %></span>
-        </div>
-        <% } %>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-500">ROL pending</span>
-          <span class="text-sm font-bold <%= kpi.rolPending > 0 ? 'text-amber-600' : 'text-gray-400' %>"><%= kpi.rolPending %></span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-500">TMP pending</span>
-          <span class="text-sm font-bold <%= kpi.tmpPending > 0 ? 'text-amber-600' : 'text-gray-400' %>"><%= kpi.tmpPending %></span>
-        </div>
-      </div>
+<!-- Desktop Quick Actions (hidden on mobile where FAB is used) -->
+<div class="hidden lg:block">
+  <div class="bg-white border border-gray-200 rounded-2xl p-4">
+    <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">Quick Actions</h3>
+    <div class="flex flex-wrap gap-2">
+      <a href="/jobs/new" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-medium rounded-lg transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        New Job
+      </a>
+      <a href="/tasks" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium rounded-lg transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Tasks
+      </a>
+      <a href="/incidents/new" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-medium rounded-lg transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        Report Incident
+      </a>
+      <a href="/defects/new" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium rounded-lg transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Report Defect
+      </a>
+      <% if (isOps) { %>
+      <a href="/allocations" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium rounded-lg transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Allocations
+      </a>
+      <% } %>
+      <% if (isPlanning) { %>
+      <a href="/compliance" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium rounded-lg transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Compliance
+      </a>
+      <% } %>
     </div>
-
-    <% if (canViewAccounts) { %>
-    <!-- Financial Summary -->
-    <div class="bg-white border border-gray-200 rounded-2xl p-4">
-      <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">Financial</h3>
-      <div class="space-y-2.5">
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-500">Contract Value</span>
-          <span class="text-sm font-bold text-gray-900">$<%= kpi.totalContractValue.toLocaleString() %></span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-500">Total Spend</span>
-          <span class="text-sm font-bold text-brand-600">$<%= kpi.totalSpend.toLocaleString() %></span>
-        </div>
-        <% if (kpi.totalContractValue > 0) { %>
-        <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-          <div class="h-full bg-brand-500 rounded-full" style="width: <%= Math.min(100, Math.round(kpi.totalSpend / kpi.totalContractValue * 100)) %>%"></div>
-        </div>
-        <p class="text-[10px] text-gray-400 text-center"><%= Math.round(kpi.totalSpend / kpi.totalContractValue * 100) %>% of budget used</p>
-        <% } %>
-        <div class="h-px bg-gray-100"></div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-500">Invoices Overdue</span>
-          <span class="text-sm font-bold <%= kpi.accountsOverdue > 0 ? 'text-red-600' : 'text-emerald-600' %>"><%= kpi.accountsOverdue %></span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-500">Invoices Disputed</span>
-          <span class="text-sm font-bold <%= kpi.accountsDisputed > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><%= kpi.accountsDisputed %></span>
-        </div>
-      </div>
-    </div>
-    <% } %>
-
-    <!-- Recent Activity -->
-    <% if (recentActivity.length > 0) { %>
-    <div class="bg-white border border-gray-200 rounded-2xl p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Recent Activity</h3>
-        <a href="/activity" class="text-xs text-brand-600 hover:text-brand-500 font-medium">All &rarr;</a>
-      </div>
-      <div class="space-y-2">
-        <% recentActivity.slice(0, 6).forEach(a => {
-          const actionColors = { create: 'bg-emerald-500', update: 'bg-blue-500', delete: 'bg-red-500', login: 'bg-purple-500', approve: 'bg-teal-500' };
-          const dotColor = actionColors[a.action] || 'bg-gray-400';
-        %>
-        <div class="flex items-start gap-2.5">
-          <div class="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 <%= dotColor %>"></div>
-          <div class="min-w-0">
-            <p class="text-xs text-gray-700 truncate"><span class="font-medium"><%= a.user_name || 'System' %></span> <%= a.action %> <%= a.entity_type ? a.entity_type.replace(/_/g, ' ') : '' %></p>
-            <% if (a.entity_label) { %><p class="text-[10px] text-gray-400 truncate"><%= a.entity_label %></p><% } %>
-            <p class="text-[10px] text-gray-300"><%= new Date(a.created_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></p>
-          </div>
-        </div>
-        <% }) %>
-      </div>
-    </div>
-    <% } %>
-
-    <!-- Recent Updates (if no activity log) -->
-    <% if (recentUpdates.length > 0 && recentActivity.length === 0) { %>
-    <div class="bg-white border border-gray-200 rounded-2xl p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Recent Updates</h3>
-        <a href="/updates" class="text-xs text-brand-600 hover:text-brand-500 font-medium">All &rarr;</a>
-      </div>
-      <div class="space-y-2.5">
-        <% recentUpdates.slice(0, 4).forEach(u => { %>
-        <a href="/projects/<%= u.job_id %>" class="block group">
-          <p class="text-xs font-medium text-brand-600 group-hover:text-brand-500"><%= u.job_number %> &mdash; <%= u.client %></p>
-          <p class="text-[11px] text-gray-500 mt-0.5 line-clamp-2"><%= u.summary.length > 80 ? u.summary.substring(0, 80) + '...' : u.summary %></p>
-          <p class="text-[10px] text-gray-300 mt-0.5"><%= u.submitted_by_name %> &middot; <%= u.week_ending %></p>
-        </a>
-        <% }) %>
-      </div>
-    </div>
-    <% } %>
-
-    <!-- Quick Actions -->
-    <div class="bg-white border border-gray-200 rounded-2xl p-4">
-      <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">Quick Actions</h3>
-      <div class="space-y-1.5">
-        <a href="/jobs/new" class="flex items-center gap-2 p-2 rounded-lg hover:bg-brand-50 transition text-sm text-gray-600 hover:text-brand-600">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          New Job
-        </a>
-        <a href="/tasks" class="flex items-center gap-2 p-2 rounded-lg hover:bg-brand-50 transition text-sm text-gray-600 hover:text-brand-600">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-          New Task
-        </a>
-        <a href="/incidents/new" class="flex items-center gap-2 p-2 rounded-lg hover:bg-brand-50 transition text-sm text-gray-600 hover:text-brand-600">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-          Report Incident
-        </a>
-        <a href="/defects/new" class="flex items-center gap-2 p-2 rounded-lg hover:bg-brand-50 transition text-sm text-gray-600 hover:text-brand-600">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          Report Defect
-        </a>
-        <% if (isOps) { %>
-        <a href="/allocations" class="flex items-center gap-2 p-2 rounded-lg hover:bg-brand-50 transition text-sm text-gray-600 hover:text-brand-600">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          Manage Allocations
-        </a>
-        <% } %>
-        <% if (isPlanning) { %>
-        <a href="/compliance" class="flex items-center gap-2 p-2 rounded-lg hover:bg-brand-50 transition text-sm text-gray-600 hover:text-brand-600">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-          Plans & Compliance
-        </a>
-        <% } %>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -612,4 +717,19 @@
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: true } } }
   });
   <% } %>
+
+  // Lazy-init charts when Insights tab becomes visible
+  (function() {
+    var chartsInitialized = false;
+    document.querySelectorAll('[data-tab]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        if (this.getAttribute('data-tab') === 'insights' && !chartsInitialized) {
+          chartsInitialized = true;
+          setTimeout(function() {
+            window.dispatchEvent(new Event('resize'));
+          }, 50);
+        }
+      });
+    });
+  })();
 </script>

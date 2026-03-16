@@ -1,6 +1,10 @@
 <!-- Mobile sidebar backdrop -->
 <div id="sidebar-backdrop" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-40 hidden lg:hidden" aria-hidden="true"></div>
 
+<%
+  const b = typeof sidebarBadges !== 'undefined' ? sidebarBadges : {};
+%>
+
 <!-- Sidebar -->
 <aside id="sidebar" class="w-[280px] lg:w-64 bg-brand-900 flex-shrink-0 hidden lg:flex lg:flex-col fixed lg:sticky z-50 inset-y-0 left-0 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-out lg:top-0" style="min-height: calc(100vh - 56px); max-height: 100vh;">
 
@@ -39,7 +43,7 @@
     </div>
   </div>
 
-  <!-- Scrollable nav area — THIS IS THE KEY FIX: flex-1 + overflow-y-auto with NO overflow-hidden on parent -->
+  <!-- Scrollable nav area -->
   <nav class="flex-1 overflow-y-auto overscroll-contain py-3 px-3 space-y-0.5 sidebar-nav">
 
     <% if (canAccess(user, 'dashboard')) { %>
@@ -55,7 +59,8 @@
     <% if (canAccess(user, 'allocations')) { %>
     <a href="/allocations" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'allocations' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-      Allocations
+      <span class="flex-1">Allocations</span>
+      <% if (b.allocations) { %><span class="sidebar-badge bg-amber-500 text-white"><%= b.allocations %></span><% } %>
     </a>
     <% } %>
     <% if (canAccess(user, 'projects')) { %>
@@ -72,12 +77,13 @@
     <% } %>
 
     <div class="pt-3 mt-2 border-t border-white/10">
-      <p class="px-3 text-[10px] font-bold text-brand-400 uppercase tracking-widest mb-1.5">Workforce</p>
+      <p class="px-3 text-[10px] font-bold text-brand-400 uppercase tracking-widest mb-1.5">People</p>
     </div>
     <% if (canAccess(user, 'crew')) { %>
     <a href="/crew" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'crew' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-      Crew Roster
+      <span class="flex-1">Crew Roster</span>
+      <% if (b.crew) { %><span class="sidebar-badge bg-amber-500 text-white"><%= b.crew %></span><% } %>
     </a>
     <% } %>
     <% if (canAccess(user, 'timesheets')) { %>
@@ -94,18 +100,20 @@
     <% } %>
 
     <div class="pt-3 mt-2 border-t border-white/10">
-      <p class="px-3 text-[10px] font-bold text-brand-400 uppercase tracking-widest mb-1.5">Project Management</p>
+      <p class="px-3 text-[10px] font-bold text-brand-400 uppercase tracking-widest mb-1.5">Planning</p>
     </div>
     <% if (canAccess(user, 'tasks')) { %>
     <a href="/tasks" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'tasks' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-      Tasks
+      <span class="flex-1">Tasks</span>
+      <% if (b.tasks) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.tasks %></span><% } %>
     </a>
     <% } %>
     <% if (canAccess(user, 'compliance')) { %>
     <a href="/compliance" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'compliance' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-      Plans & Compliance
+      <span class="flex-1">Plans & Compliance</span>
+      <% if (b.compliance) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.compliance %></span><% } %>
     </a>
     <% } %>
 
@@ -115,18 +123,20 @@
     <% if (canAccess(user, 'incidents')) { %>
     <a href="/incidents" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'incidents' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-      Incidents
+      <span class="flex-1">Incidents</span>
+      <% if (b.incidents) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.incidents %></span><% } %>
     </a>
     <% } %>
     <% if (canAccess(user, 'defects')) { %>
     <a href="/defects" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'defects' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      Defects
+      <span class="flex-1">Defects</span>
+      <% if (b.defects) { %><span class="sidebar-badge bg-amber-500 text-white"><%= b.defects %></span><% } %>
     </a>
     <% } %>
 
     <div class="pt-3 mt-2 border-t border-white/10">
-      <p class="px-3 text-[10px] font-bold text-brand-400 uppercase tracking-widest mb-1.5">Resources</p>
+      <p class="px-3 text-[10px] font-bold text-brand-400 uppercase tracking-widest mb-1.5">Assets & Reports</p>
     </div>
     <% if (canAccess(user, 'equipment')) { %>
     <a href="/equipment" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'equipment' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">

@@ -1,0 +1,79 @@
+<%
+  // Expects: activities (array), entityLink (optional base URL for "View all")
+  const acts = typeof activities !== 'undefined' ? activities : [];
+  const actionColors = {
+    create: 'bg-emerald-500',
+    update: 'bg-blue-500',
+    delete: 'bg-red-500',
+    login: 'bg-purple-500',
+    approve: 'bg-teal-500',
+    assign: 'bg-indigo-500',
+    complete: 'bg-emerald-500',
+    status_change: 'bg-amber-500',
+  };
+  const actionLabels = {
+    create: 'Created',
+    update: 'Updated',
+    delete: 'Deleted',
+    approve: 'Approved',
+    assign: 'Assigned',
+    complete: 'Completed',
+    status_change: 'Changed status of',
+  };
+%>
+
+<% if (acts.length === 0) { %>
+<div class="text-center py-8">
+  <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
+    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  </div>
+  <p class="text-sm text-gray-500">No activity recorded yet</p>
+</div>
+<% } else { %>
+<div class="activity-timeline relative pl-6">
+  <% acts.slice(0, 20).forEach((a, i) => {
+    const dotColor = actionColors[a.action] || 'bg-gray-400';
+    const label = actionLabels[a.action] || (a.action ? a.action.charAt(0).toUpperCase() + a.action.slice(1) : 'Action');
+    const entityName = a.entity_type ? a.entity_type.replace(/_/g, ' ') : '';
+  %>
+  <div class="relative pb-5 <%= i === acts.length - 1 || i === 19 ? '' : 'border-l-2 border-gray-100' %> ml-0.5">
+    <!-- Dot -->
+    <div class="activity-timeline-dot absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white <%= dotColor %> shadow-sm"></div>
+    <!-- Content -->
+    <div class="pl-5">
+      <div class="flex items-start gap-2">
+        <!-- User avatar -->
+        <div class="w-6 h-6 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+          <%= a.user_name ? a.user_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : 'S' %>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-gray-800">
+            <span class="font-medium"><%= a.user_name || 'System' %></span>
+            <span class="text-gray-500"><%= label.toLowerCase() %></span>
+            <% if (entityName) { %><span class="text-gray-500"><%= entityName %></span><% } %>
+          </p>
+          <% if (a.entity_label) { %>
+          <p class="text-xs text-gray-500 mt-0.5 truncate"><%= a.entity_label %></p>
+          <% } %>
+          <% if (a.before_value || a.after_value) { %>
+          <details class="mt-1">
+            <summary class="text-[10px] text-brand-600 cursor-pointer hover:text-brand-500">Show changes</summary>
+            <div class="mt-1 text-[11px] bg-gray-50 rounded-lg p-2 space-y-0.5 max-h-40 overflow-y-auto">
+              <% if (a.before_value) { %><p class="text-red-600"><span class="font-medium">Before:</span> <%= typeof a.before_value === 'string' && a.before_value.length > 200 ? a.before_value.substring(0, 200) + '...' : a.before_value %></p><% } %>
+              <% if (a.after_value) { %><p class="text-emerald-600"><span class="font-medium">After:</span> <%= typeof a.after_value === 'string' && a.after_value.length > 200 ? a.after_value.substring(0, 200) + '...' : a.after_value %></p><% } %>
+            </div>
+          </details>
+          <% } %>
+          <p class="text-[10px] text-gray-300 mt-1"><%= new Date(a.created_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <% }) %>
+</div>
+<% if (acts.length > 20 && typeof entityLink !== 'undefined' && entityLink) { %>
+<div class="text-center mt-2">
+  <a href="<%= entityLink %>" class="text-xs text-brand-600 hover:text-brand-500 font-medium">View all <%= acts.length %> entries &rarr;</a>
+</div>
+<% } %>
+<% } %>

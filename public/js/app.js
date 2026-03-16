@@ -94,6 +94,17 @@ document.querySelectorAll('form[data-confirm]').forEach(form => {
   });
 });
 
+// ===== Form Submit Spinner (prevent double-submit) =====
+document.addEventListener('submit', function(e) {
+  var form = e.target;
+  if (form.tagName !== 'FORM') return;
+  // Skip filter/search forms (GET) and inline status selects
+  if (form.method && form.method.toUpperCase() === 'GET') return;
+  if (form.classList.contains('no-spinner')) return;
+  if (form.classList.contains('form-submitting')) { e.preventDefault(); return; }
+  form.classList.add('form-submitting');
+});
+
 // ===== Tab navigation (for job detail page) =====
 function initTabs() {
   const tabLinks = document.querySelectorAll('[data-tab]');
@@ -130,6 +141,129 @@ function initTabs() {
 }
 
 document.addEventListener('DOMContentLoaded', initTabs);
+
+// ===== Saved Views =====
+(function() {
+  var form = document.querySelector('[data-module]');
+  if (!form) return;
+
+  var module = form.dataset.module;
+  var container = document.createElement('div');
+  container.className = 'inline-flex items-center gap-2 ml-2';
+  container.innerHTML =
+    '<div class="relative" id="saved-views-wrap">' +
+    '<button type="button" id="sv-toggle" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">' +
+    '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>' +
+    'Views</button>' +
+    '<div id="sv-dropdown" class="hidden absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1">' +
+    '<div id="sv-list" class="max-h-40 overflow-y-auto"></div>' +
+    '<div class="border-t border-gray-100 p-2">' +
+    '<button type="button" id="sv-save" class="w-full text-left px-3 py-1.5 text-xs text-brand-600 hover:bg-brand-50 rounded-lg transition">Save current filters...</button>' +
+    '</div></div></div>';
+
+  // Insert after the form or filter bar
+  var filterBar = form.querySelector('.flex') || form;
+  if (filterBar.parentElement) filterBar.parentElement.insertBefore(container, filterBar.nextSibling);
+
+  var dropdown = document.getElementById('sv-dropdown');
+  var listEl = document.getElementById('sv-list');
+
+  document.getElementById('sv-toggle').addEventListener('click', function() {
+    dropdown.classList.toggle('hidden');
+    if (!dropdown.classList.contains('hidden')) loadViews();
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!container.contains(e.target)) dropdown.classList.add('hidden');
+  });
+
+  function loadViews() {
+    fetch('/api/views?module=' + module).then(function(r) { return r.json(); }).then(function(views) {
+      if (views.length === 0) {
+        listEl.innerHTML = '<p class="px-3 py-2 text-xs text-gray-400">No saved views yet</p>';
+        return;
+      }
+      listEl.innerHTML = views.map(function(v) {
+        return '<div class="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50 group">' +
+          '<a href="?' + v.query_params + '" class="text-xs text-gray-700 flex-1 truncate">' + v.name + '</a>' +
+          '<button data-delete-view="' + v.id + '" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 ml-2">' +
+          '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>';
+      }).join('');
+
+      listEl.querySelectorAll('[data-delete-view]').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          fetch('/api/views/' + btn.dataset.deleteView, { method: 'DELETE' }).then(function() { loadViews(); });
+        });
+      });
+    });
+  }
+
+  document.getElementById('sv-save').addEventListener('click', function() {
+    var name = prompt('View name:');
+    if (!name) return;
+    var params = window.location.search.substring(1);
+    fetch('/api/views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ module: module, name: name, query_params: params })
+    }).then(function(r) { return r.json(); }).then(function() { loadViews(); });
+  });
+})();
+
+// ===== Bulk Actions =====
+(function() {
+  var table = document.querySelector('[data-bulk-module]');
+  if (!table) return;
+
+  var module = table.dataset.bulkModule;
+  var checkboxes = table.querySelectorAll('input[data-bulk-id]');
+  var headerCheck = table.querySelector('input[data-bulk-all]');
+  if (checkboxes.length === 0) return;
+
+  // Create action bar
+  var bar = document.createElement('div');
+  bar.className = 'bulk-action-bar hidden';
+  bar.innerHTML =
+    '<div class="flex items-center gap-3">' +
+    '<span class="text-sm font-medium text-gray-700"><span id="bulk-count">0</span> selected</span>' +
+    '<button type="button" data-bulk-action="export" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50">Export Selected</button>' +
+    '<button type="button" data-bulk-action="clear" class="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">Clear</button>' +
+    '</div>';
+  document.body.appendChild(bar);
+
+  var countEl = bar.querySelector('#bulk-count');
+
+  function updateBar() {
+    var checked = table.querySelectorAll('input[data-bulk-id]:checked');
+    var count = checked.length;
+    countEl.textContent = count;
+    bar.classList.toggle('hidden', count === 0);
+    if (headerCheck) headerCheck.checked = count === checkboxes.length && count > 0;
+  }
+
+  checkboxes.forEach(function(cb) { cb.addEventListener('change', updateBar); });
+
+  if (headerCheck) {
+    headerCheck.addEventListener('change', function() {
+      checkboxes.forEach(function(cb) { cb.checked = headerCheck.checked; });
+      updateBar();
+    });
+  }
+
+  bar.querySelector('[data-bulk-action="clear"]').addEventListener('click', function() {
+    checkboxes.forEach(function(cb) { cb.checked = false; });
+    if (headerCheck) headerCheck.checked = false;
+    updateBar();
+  });
+
+  bar.querySelector('[data-bulk-action="export"]').addEventListener('click', function() {
+    var ids = [];
+    table.querySelectorAll('input[data-bulk-id]:checked').forEach(function(cb) { ids.push(cb.dataset.bulkId); });
+    if (ids.length === 0) return;
+    window.location.href = '/exports/' + module + '?ids=' + ids.join(',');
+  });
+})();
 
 // ===== Push Notification Subscription =====
 (function() {

@@ -9,6 +9,7 @@ const { requireLogin, requirePermission, canAccess } = require('./middleware/aut
 const { requireWorker, blockWorkerFromAdmin, workerLocals } = require('./middleware/workerAuth');
 const { notificationCountMiddleware, generateNotifications, sendDailyDigests } = require('./middleware/notifications');
 const { settingsMiddleware } = require('./middleware/settings');
+const { sidebarBadges } = require('./middleware/sidebarBadges');
 const { initVapid } = require('./services/pushNotification');
 
 // Initialize database and seed data
@@ -55,6 +56,9 @@ app.use(notificationCountMiddleware);
 // Settings available in all templates (dropdown options, system config)
 app.use(settingsMiddleware);
 
+// Sidebar badge counts (cached 60s)
+app.use(sidebarBadges);
+
 // Public invite/setup routes (no auth required, must be BEFORE blockWorkerFromAdmin)
 app.use('/invite', require('./routes/invite'));
 app.use('/w/setup', require('./routes/worker/setup'));
@@ -95,6 +99,7 @@ app.use('/notifications', requireLogin, requirePermission('notifications'), requ
 app.use('/admin/integrations', requireLogin, requirePermission('admin'), require('./routes/integrations'));
 app.use('/admin', requireLogin, requirePermission('admin'), require('./routes/admin'));
 app.use('/settings', requireLogin, requirePermission('settings'), require('./routes/settings'));
+app.use('/api/views', requireLogin, require('./routes/saved-views'));
 
 // Home redirects to dashboard or worker portal
 app.get('/', (req, res) => {
