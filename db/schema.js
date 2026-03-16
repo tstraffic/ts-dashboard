@@ -1418,6 +1418,21 @@ function runMigrations(db) {
     }
   }
 
+  if (!isMigrationApplied.get(26)) {
+    console.log('Running migration 26: Add designer, file_link, council fee fields to compliance');
+    const newCols = [
+      "ALTER TABLE compliance ADD COLUMN designer TEXT DEFAULT ''",
+      "ALTER TABLE compliance ADD COLUMN file_link TEXT DEFAULT ''",
+      "ALTER TABLE compliance ADD COLUMN council_fee_paid INTEGER DEFAULT 0",
+      "ALTER TABLE compliance ADD COLUMN council_fee_amount REAL DEFAULT 0",
+    ];
+    for (const sql of newCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+    recordMigration.run(26, 'Add designer, file_link, council fee fields to compliance');
+    console.log('Migration 26 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

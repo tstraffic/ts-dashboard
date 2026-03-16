@@ -103,9 +103,9 @@ router.post('/', (req, res) => {
   const db = getDb();
   const b = req.body;
   db.prepare(`
-    INSERT INTO compliance (job_id, client_id, item_type, title, authority_approver, internal_approver_id, assigned_to_id, due_date, submitted_date, approved_date, expiry_date, status, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(b.job_id || null, b.client_id || null, b.item_type, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status || 'not_started', b.notes || '');
+    INSERT INTO compliance (job_id, client_id, item_type, title, authority_approver, internal_approver_id, assigned_to_id, due_date, submitted_date, approved_date, expiry_date, status, notes, designer, file_link, council_fee_paid, council_fee_amount)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(b.job_id || null, b.client_id || null, b.item_type, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status || 'not_started', b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid ? 1 : 0, parseFloat(b.council_fee_amount) || 0);
   req.flash('success', 'Item created.');
   res.redirect(b.return_to || '/compliance');
 });
@@ -126,9 +126,9 @@ router.post('/:id', (req, res) => {
   const b = req.body;
   db.prepare(`
     UPDATE compliance SET job_id=?, client_id=?, item_type=?, title=?, authority_approver=?, internal_approver_id=?, assigned_to_id=?,
-      due_date=?, submitted_date=?, approved_date=?, expiry_date=?, status=?, notes=?, updated_at=CURRENT_TIMESTAMP
+      due_date=?, submitted_date=?, approved_date=?, expiry_date=?, status=?, notes=?, designer=?, file_link=?, council_fee_paid=?, council_fee_amount=?, updated_at=CURRENT_TIMESTAMP
     WHERE id=?
-  `).run(b.job_id || null, b.client_id || null, b.item_type, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status, b.notes || '', req.params.id);
+  `).run(b.job_id || null, b.client_id || null, b.item_type, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status, b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid ? 1 : 0, parseFloat(b.council_fee_amount) || 0, req.params.id);
   req.flash('success', 'Item updated.');
   res.redirect(b.return_to || '/compliance');
 });
