@@ -117,10 +117,11 @@ router.post('/', (req, res) => {
     const db = getDb();
     const b = req.body;
     const jobId = b.job_id || null;
+    const division = b.division || 'ops';
     const result = db.prepare(`
       INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority, task_type, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(jobId, b.division, b.title, b.description || '', b.owner_id, b.due_date,
+    `).run(jobId, division, b.title, b.description || '', b.owner_id, b.due_date,
       b.status || 'not_started', b.priority || 'medium', b.task_type || 'one_off', b.notes || '');
 
     // Send email notification to assigned owner (fire-and-forget)
@@ -169,11 +170,12 @@ router.post('/:id', (req, res) => {
     const ownerChanged = oldTask && String(oldTask.owner_id) !== String(b.owner_id);
 
     const updateJobId = b.job_id || null;
+    const division = b.division || 'ops';
     const completedDate = b.status === 'complete' ? new Date().toISOString().split('T')[0] : null;
     db.prepare(`
       UPDATE tasks SET job_id=?, division=?, title=?, description=?, owner_id=?, due_date=?,
       status=?, priority=?, task_type=?, notes=?, completed_date=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
-    `).run(updateJobId, b.division, b.title, b.description || '', b.owner_id, b.due_date,
+    `).run(updateJobId, division, b.title, b.description || '', b.owner_id, b.due_date,
       b.status, b.priority, b.task_type || 'one_off', b.notes || '', completedDate, req.params.id);
 
     // Send email to new owner if reassigned (fire-and-forget)
