@@ -102,9 +102,30 @@ router.post('/users/:id/delete', (req, res) => {
     return res.redirect('/admin/users');
   }
 
-  db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
-  logActivity({ user: req.session.user, action: 'delete', entityType: 'user', entityId: targetUser.id, entityLabel: targetUser.full_name, details: 'Deleted user account', ip: req.ip });
-  req.flash('success', `User ${targetUser.username} deleted.`);
+  try {
+    // Nullify foreign key references so delete doesn't fail
+    const refTables = [
+      { table: 'jobs', cols: ['project_manager_id', 'ops_supervisor_id', 'planning_owner_id', 'marketing_owner_id', 'accounts_owner_id', 'traffic_supervisor_id'] },
+      { table: 'tasks', cols: ['owner_id'] },
+      { table: 'timesheets', cols: ['approved_by_id'] },
+      { table: 'activity_log', cols: ['user_id'] },
+      { table: 'compliance', cols: ['internal_approver_id', 'assigned_to_id'] },
+      { table: 'communication_log', cols: ['logged_by_id'] },
+      { table: 'equipment_assignments', cols: ['assigned_by_id'] },
+      { table: 'invitations', cols: ['created_by_id'] },
+    ];
+    for (const ref of refTables) {
+      for (const col of ref.cols) {
+        try { db.prepare(`UPDATE ${ref.table} SET ${col} = NULL WHERE ${col} = ?`).run(req.params.id); } catch (e) { /* table/col may not exist */ }
+      }
+    }
+
+    db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
+    logActivity({ user: req.session.user, action: 'delete', entityType: 'user', entityId: targetUser.id, entityLabel: targetUser.full_name, details: 'Deleted user account', ip: req.ip });
+    req.flash('success', `User ${targetUser.username} deleted.`);
+  } catch (err) {
+    req.flash('error', `Failed to delete user: ${err.message}`);
+  }
   res.redirect('/admin/users');
 });
 
