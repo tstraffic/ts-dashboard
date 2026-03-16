@@ -352,7 +352,12 @@
         </tbody>
       </table>
       <% if (jobs.length === 0) { %>
-        <div class="p-8 text-center text-gray-400">No active jobs found.</div>
+        <div class="p-10 text-center">
+          <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <p class="text-gray-500 text-sm font-medium">No active jobs to allocate</p>
+          <p class="text-gray-400 text-xs mt-1">Create a job first, then allocate crew and equipment to shifts here</p>
+          <a href="/jobs/new" class="inline-flex items-center mt-3 px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition-colors">Create Job</a>
+        </div>
       <% } %>
     </div>
   </div>
@@ -496,7 +501,12 @@
     </tbody>
   </table>
   <% if (jobs.length === 0) { %>
-    <div class="p-8 text-center text-gray-400">No active jobs found.</div>
+    <div class="p-10 text-center">
+      <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      <p class="text-gray-500 text-sm font-medium">No active jobs to allocate</p>
+      <p class="text-gray-400 text-xs mt-1">Create a job first, then allocate crew and equipment to shifts here</p>
+      <a href="/jobs/new" class="inline-flex items-center mt-3 px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition-colors">Create Job</a>
+    </div>
   <% } %>
 </div>
 

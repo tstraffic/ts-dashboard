@@ -58,10 +58,14 @@
 
 <!-- Contacts Table -->
 <% if (contacts.length === 0) { %>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center">
-    <svg class="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-    <p class="text-gray-400 text-sm">No contacts found matching your filters.</p>
-    <a href="/contacts/new" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Add the first contact</a>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+    <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    <p class="text-gray-500 text-sm font-medium">No contacts found</p>
+    <p class="text-gray-400 text-xs mt-1">Track client reps, council officers, subcontractors, and other stakeholders linked to your jobs</p>
+    <a href="/contacts/new" class="inline-flex items-center mt-3 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      Add First Contact
+    </a>
   </div>
 <% } else { %>
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
