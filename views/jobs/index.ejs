@@ -35,7 +35,7 @@
 
 <!-- Filter Bar -->
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-5">
-  <form method="GET" action="/jobs" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 sm:gap-3">
+  <form method="GET" action="/jobs" data-module="jobs" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 sm:gap-3">
     <div class="flex-1 min-w-0 sm:min-w-[200px]">
       <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Search</label>
       <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Job number, client, address..."
@@ -85,10 +85,11 @@
     </a>
   </div>
 <% } else { %>
-<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto" data-bulk-module="jobs">
   <table class="w-full text-sm">
     <thead>
       <tr class="border-b border-gray-200">
+        <th class="px-2 py-2.5 w-8"><input type="checkbox" data-bulk-all class="rounded border-gray-300 text-brand-600 focus:ring-brand-500"></th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Job</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Client</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Suburb</th>
@@ -109,6 +110,7 @@
         const isOnHold = job.status === 'on_hold';
       %>
       <tr class="hover:bg-gray-50 <%= isOverdue ? 'border-l-4 border-l-red-400' : isOnHold ? 'border-l-4 border-l-amber-400' : '' %>">
+        <td class="px-2 py-2.5 w-8" onclick="event.stopPropagation()"><input type="checkbox" data-bulk-id="<%= job.id %>" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500"></td>
         <td class="px-3 py-2.5">
           <a href="/jobs/<%= job.id %>" class="text-brand-600 hover:text-brand-700 font-semibold text-sm hover:underline"><%= job.job_number %></a>
           <p class="text-gray-400 text-xs truncate max-w-[180px] sm:hidden"><%= job.client %></p>
@@ -116,7 +118,7 @@
         <td class="px-3 py-2.5 text-gray-600 text-xs hidden sm:table-cell max-w-[160px] truncate"><%= job.client %></td>
         <td class="px-3 py-2.5 text-gray-500 text-xs hidden lg:table-cell"><%= job.suburb || '-' %></td>
         <td class="px-3 py-2.5">
-          <form method="POST" action="/jobs/<%= job.id %>/status" class="inline">
+          <form method="POST" action="/jobs/<%= job.id %>/status" class="inline no-spinner">
             <select name="status" onchange="this.form.submit()" class="text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer appearance-none
               <% if (job.status === 'active') { %>bg-blue-50 text-blue-700
               <% } else if (job.status === 'on_hold') { %>bg-amber-50 text-amber-700

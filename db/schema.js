@@ -1579,6 +1579,30 @@ function runMigrations(db) {
     }
   }
 
+  // Migration 30: Saved views + user preferences
+  if (!isMigrationApplied.get(30)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS saved_views (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          module TEXT NOT NULL,
+          name TEXT NOT NULL,
+          query_params TEXT NOT NULL DEFAULT '',
+          is_default INTEGER NOT NULL DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_saved_views_user ON saved_views(user_id, module)');
+      // Add preferences column to users if not exists
+      try { db.exec("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'"); } catch (e) { /* already exists */ }
+      recordMigration.run(30, 'Saved views table + user preferences column');
+      console.log('Migration 30 complete.');
+    } catch (e) {
+      console.error('Migration 30 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

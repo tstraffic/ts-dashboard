@@ -121,4 +121,15 @@ router.post('/send-reset-email', async (req, res) => {
   res.redirect('/profile');
 });
 
+// POST /profile/dismiss-onboarding
+router.post('/dismiss-onboarding', (req, res) => {
+  const db = getDb();
+  try {
+    const current = JSON.parse(db.prepare('SELECT preferences FROM users WHERE id = ?').get(req.session.user.id)?.preferences || '{}');
+    current.onboarding_dismissed = true;
+    db.prepare('UPDATE users SET preferences = ? WHERE id = ?').run(JSON.stringify(current), req.session.user.id);
+  } catch (e) { /* ignore */ }
+  res.json({ success: true });
+});
+
 module.exports = router;

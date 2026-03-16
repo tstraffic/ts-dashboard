@@ -1,107 +1,93 @@
 <% locals.currentPage = 'equipment' %>
 <% const isEdit = item !== null && typeof item !== 'undefined' %>
 
-<!-- Page Header -->
-<div class="mb-6">
-  <div class="flex items-center gap-2 text-sm text-gray-500 mb-2">
-    <a href="/equipment" class="hover:text-gray-700">Equipment Register</a>
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-    <span class="text-gray-600"><%= isEdit ? 'Edit ' + item.asset_number : 'Add Equipment' %></span>
-  </div>
-  <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit: ' + item.asset_number + ' - ' + item.name : 'Add New Equipment' %></h1>
-  <p class="text-gray-500 text-sm mt-1"><%= isEdit ? 'Update equipment details below' : 'Register a new piece of equipment or asset' %></p>
+<!-- Breadcrumb -->
+<div class="flex items-center gap-2 text-sm text-gray-400 mb-4">
+  <a href="/equipment" class="hover:text-gray-900 transition">Equipment</a>
+  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <span class="text-gray-900"><%= isEdit ? item.asset_number : 'New Equipment' %></span>
 </div>
 
-<!-- Form -->
-<form method="POST" action="<%= isEdit ? '/equipment/' + item.id : '/equipment' %>" class="space-y-6">
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit: ' + item.asset_number : 'Add New Equipment' %></h1>
+    <p class="text-gray-500 text-sm mt-0.5"><%= isEdit ? 'Update equipment details' : 'Register a new piece of equipment or asset' %></p>
+  </div>
+</div>
 
-  <!-- Asset Identification -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Asset Identification</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <!-- Asset Number -->
+<form method="POST" action="<%= isEdit ? '/equipment/' + item.id : '/equipment' %>" class="space-y-5" data-wizard>
+
+  <!-- Step 1: Identification -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="0" data-wizard-title="Identification">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Asset Identification</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div>
-        <label for="asset_number" class="block text-sm font-medium text-gray-600 mb-1">Asset Number <span class="text-red-600">*</span></label>
+        <label for="asset_number" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Asset Number <span class="text-red-500">*</span></label>
         <input type="text" id="asset_number" name="asset_number" required
-          value="<%= isEdit ? item.asset_number : '' %>"
-          placeholder="e.g. EQ-0001"
+          value="<%= isEdit ? item.asset_number : '' %>" placeholder="e.g. EQ-0001"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Name -->
       <div>
-        <label for="name" class="block text-sm font-medium text-gray-600 mb-1">Name <span class="text-red-600">*</span></label>
+        <label for="name" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Name <span class="text-red-500">*</span></label>
         <input type="text" id="name" name="name" required
-          value="<%= isEdit ? item.name : '' %>"
-          placeholder="Equipment name"
+          value="<%= isEdit ? item.name : '' %>" placeholder="Equipment name"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Category -->
       <div>
-        <label for="category" class="block text-sm font-medium text-gray-600 mb-1">Category <span class="text-red-600">*</span></label>
+        <label for="category" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Category <span class="text-red-500">*</span></label>
         <select id="category" name="category" required
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">Select category...</option>
           <% (settingsOptions.equipment_category || []).forEach(opt => { %>
-            <option value="<%= opt.key %>" <%= (typeof equipment !== 'undefined' && equipment && equipment.category === opt.key) ? 'selected' : '' %>><%= opt.label %></option>
+            <option value="<%= opt.key %>" <%= isEdit && item.category === opt.key ? 'selected' : '' %>><%= opt.label %></option>
           <% }) %>
         </select>
       </div>
-      <!-- Serial Number -->
       <div>
-        <label for="serial_number" class="block text-sm font-medium text-gray-600 mb-1">Serial Number</label>
+        <label for="serial_number" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Serial Number</label>
         <input type="text" id="serial_number" name="serial_number"
-          value="<%= isEdit && item.serial_number ? item.serial_number : '' %>"
-          placeholder="Manufacturer serial number"
+          value="<%= isEdit && item.serial_number ? item.serial_number : '' %>" placeholder="Manufacturer serial"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Registration -->
       <div>
-        <label for="registration" class="block text-sm font-medium text-gray-600 mb-1">Registration</label>
+        <label for="registration" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Registration</label>
         <input type="text" id="registration" name="registration"
-          value="<%= isEdit && item.registration ? item.registration : '' %>"
-          placeholder="e.g. ABC-123"
+          value="<%= isEdit && item.registration ? item.registration : '' %>" placeholder="e.g. ABC-123"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Location -->
       <div>
-        <label for="location" class="block text-sm font-medium text-gray-600 mb-1">Location</label>
+        <label for="location" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Location</label>
         <input type="text" id="location" name="location"
-          value="<%= isEdit && item.location ? item.location : '' %>"
-          placeholder="Current location or site"
+          value="<%= isEdit && item.location ? item.location : '' %>" placeholder="Current location"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
-    <!-- Description -->
     <div class="mt-4">
-      <label for="description" class="block text-sm font-medium text-gray-600 mb-1">Description</label>
-      <textarea id="description" name="description" rows="3"
-        placeholder="Equipment description, specifications, etc."
+      <label for="description" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Description</label>
+      <textarea id="description" name="description" rows="2"
+        placeholder="Equipment description, specifications..."
         class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && item.description ? item.description : '' %></textarea>
     </div>
   </div>
 
-  <!-- Purchase & Condition -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Purchase & Condition</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <!-- Purchase Date -->
+  <!-- Step 2: Specifications & Condition -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="1" data-wizard-title="Specifications">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Purchase & Condition</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div>
-        <label for="purchase_date" class="block text-sm font-medium text-gray-600 mb-1">Purchase Date</label>
+        <label for="purchase_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Purchase Date</label>
         <input type="date" id="purchase_date" name="purchase_date"
           value="<%= isEdit && item.purchase_date ? item.purchase_date : '' %>"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Purchase Cost -->
       <div>
-        <label for="purchase_cost" class="block text-sm font-medium text-gray-600 mb-1">Purchase Cost ($)</label>
+        <label for="purchase_cost" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Purchase Cost ($)</label>
         <input type="number" id="purchase_cost" name="purchase_cost" step="0.01" min="0"
-          value="<%= isEdit && item.purchase_cost ? item.purchase_cost : '' %>"
-          placeholder="0.00"
+          value="<%= isEdit && item.purchase_cost ? item.purchase_cost : '' %>" placeholder="0.00"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Condition -->
       <div>
-        <label for="current_condition" class="block text-sm font-medium text-gray-600 mb-1">Current Condition</label>
+        <label for="current_condition" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Current Condition</label>
         <select id="current_condition" name="current_condition"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="new" <%= isEdit && item.current_condition === 'new' ? 'selected' : '' %>>New</option>
@@ -115,65 +101,53 @@
     </div>
   </div>
 
-  <!-- Location & Inspection -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Location & Inspection</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <!-- Storage Location -->
+  <!-- Step 3: Compliance & Notes -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="2" data-wizard-title="Compliance">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Inspection & Storage</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div>
-        <label for="storage_location" class="block text-sm font-medium text-gray-600 mb-1">Storage Location</label>
+        <label for="storage_location" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Storage Location</label>
         <input type="text" id="storage_location" name="storage_location"
-          value="<%= isEdit && item.storage_location ? item.storage_location : '' %>"
-          placeholder="e.g. Yard A, Bay 3"
+          value="<%= isEdit && item.storage_location ? item.storage_location : '' %>" placeholder="e.g. Yard A, Bay 3"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Next Inspection -->
       <div>
-        <label for="next_inspection_date" class="block text-sm font-medium text-gray-600 mb-1">Next Inspection Date</label>
+        <label for="next_inspection_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Next Inspection Date</label>
         <input type="date" id="next_inspection_date" name="next_inspection_date"
           value="<%= isEdit && item.next_inspection_date ? item.next_inspection_date : '' %>"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Inspection Interval -->
       <div>
-        <label for="inspection_interval_days" class="block text-sm font-medium text-gray-600 mb-1">Inspection Interval (days)</label>
+        <label for="inspection_interval_days" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Inspection Interval (days)</label>
         <input type="number" id="inspection_interval_days" name="inspection_interval_days" min="1"
-          value="<%= isEdit && item.inspection_interval_days ? item.inspection_interval_days : '90' %>"
-          placeholder="90"
+          value="<%= isEdit && item.inspection_interval_days ? item.inspection_interval_days : '90' %>" placeholder="90"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-        <p class="text-xs text-gray-400 mt-1">Default: 90 days</p>
+        <p class="text-xs text-gray-400 mt-0.5">Default: 90 days</p>
       </div>
     </div>
-  </div>
-
-  <!-- Notes & Status -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Notes & Status</h2>
-    <!-- Notes -->
-    <div class="mb-4">
-      <label for="notes" class="block text-sm font-medium text-gray-600 mb-1">Notes</label>
-      <textarea id="notes" name="notes" rows="3"
+    <div class="mt-4">
+      <label for="notes" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Notes</label>
+      <textarea id="notes" name="notes" rows="2"
         placeholder="Additional notes..."
         class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"><%= isEdit && item.notes ? item.notes : '' %></textarea>
     </div>
     <% if (isEdit) { %>
-    <!-- Active checkbox -->
-    <div class="flex items-center gap-3 pt-2 border-t border-gray-200">
+    <div class="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100">
       <input type="hidden" name="active" value="">
       <input type="checkbox" id="active" name="active" value="1" <%= item.active ? 'checked' : '' %>
-        class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500 focus:ring-offset-white">
+        class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500">
       <label for="active" class="text-sm text-gray-600">Active</label>
-      <p class="text-xs text-gray-400">Uncheck to deactivate this equipment (it will be hidden from default views)</p>
+      <p class="text-xs text-gray-400">Uncheck to deactivate (hidden from default views)</p>
     </div>
     <% } %>
   </div>
 
-  <!-- Actions -->
-  <div class="flex items-center gap-3">
-    <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
-      <%= isEdit ? 'Save Changes' : 'Add Equipment' %>
-    </button>
-    <a href="<%= isEdit ? '/equipment/' + item.id : '/equipment' %>" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
-  </div>
-
+  <noscript>
+    <div class="flex items-center gap-3">
+      <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+        <%= isEdit ? 'Save Changes' : 'Add Equipment' %>
+      </button>
+      <a href="<%= isEdit ? '/equipment/' + item.id : '/equipment' %>" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition">Cancel</a>
+    </div>
+  </noscript>
 </form>

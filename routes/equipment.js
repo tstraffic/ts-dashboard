@@ -86,12 +86,20 @@ router.get('/:id', (req, res) => {
 
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
 
+  const activities = db.prepare(`
+    SELECT al.*, u.full_name as user_name
+    FROM activity_log al LEFT JOIN users u ON al.user_id = u.id
+    WHERE al.entity_type = 'equipment' AND al.entity_id = ?
+    ORDER BY al.created_at DESC LIMIT 20
+  `).all(req.params.id);
+
   res.render('equipment/show', {
     title: `Equipment - ${item.asset_number}`,
     currentPage: 'equipment',
     item,
     assignments,
     maintenance,
+    activities,
     jobs
   });
 });
