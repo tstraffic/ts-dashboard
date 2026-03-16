@@ -55,6 +55,24 @@ function generateNotifications() {
       return result;
     }
 
+    // 0. Upcoming task deadlines --> notify task owner (due today, tomorrow, or in 3 days)
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const in3days = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
+
+    const upcomingTasks = db.prepare(`
+      SELECT t.id, t.title, t.due_date, t.owner_id, t.job_id, j.job_number
+      FROM tasks t LEFT JOIN jobs j ON t.job_id = j.id
+      WHERE t.status NOT IN ('complete') AND t.owner_id IS NOT NULL
+      AND t.due_date IN (?, ?, ?)
+    `).all(today, tomorrow, in3days);
+
+    for (const t of upcomingTasks) {
+      const daysUntil = Math.round((new Date(t.due_date) - new Date(today)) / 86400000);
+      const urgency = daysUntil === 0 ? 'due today' : daysUntil === 1 ? 'due tomorrow' : 'due in 3 days';
+      const title = 'Deadline ' + urgency + ': ' + t.title;
+      insertAndTrack(t.owner_id, 'deadline_reminder', title, 'Task "' + t.title + '"' + (t.job_number ? ' on ' + t.job_number : '') + ' is ' + urgency + '.', '/tasks/' + t.id + '/edit', t.job_id);
+    }
+
     // 1. Overdue tasks --> notify task owner
     const overdueTasks = db.prepare(`
       SELECT t.id, t.title, t.owner_id, t.job_id, j.job_number
