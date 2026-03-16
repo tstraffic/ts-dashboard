@@ -1,19 +1,52 @@
+const { Resend } = require('resend');
 const nodemailer = require('nodemailer');
 
+let _resendClient = null;
 let _transporter = null;
 let _lastConfigHash = null;
 
 /**
- * Get SMTP config — env vars take priority, then falls back to Settings page (system_config DB).
- * This means you can configure SMTP either way and everything works.
+ * Get the Resend API key from env vars or system_config DB.
+ * Returns { apiKey, fromName, fromEmail } or null.
+ */
+function getResendConfig() {
+  // Check env vars: RESEND_API_KEY or SMTP_PASS starting with re_
+  const apiKey = process.env.RESEND_API_KEY
+    || (process.env.SMTP_PASS && process.env.SMTP_PASS.startsWith('re_') ? process.env.SMTP_PASS : null);
+
+  if (apiKey) {
+    return {
+      apiKey,
+      fromName: process.env.SMTP_FROM_NAME || 'T&S Traffic Control',
+      fromEmail: process.env.SMTP_FROM_EMAIL || 'onboarding@resend.dev',
+    };
+  }
+
+  // Fall back to system_config DB
+  try {
+    const { getConfig } = require('../middleware/settings');
+    const pass = getConfig('smtp_pass', '');
+    if (pass && pass.startsWith('re_')) {
+      return {
+        apiKey: pass,
+        fromName: 'T&S Traffic Control',
+        fromEmail: getConfig('smtp_from', 'onboarding@resend.dev'),
+      };
+    }
+  } catch (e) { /* settings not ready */ }
+
+  return null;
+}
+
+/**
+ * Get SMTP config for non-Resend providers (M365, Gmail, etc.).
  */
 function getSmtpConfig() {
-  // 1. Check environment variables first
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+  if (process.env.SMTP_USER && process.env.SMTP_PASS && !process.env.SMTP_PASS.startsWith('re_')) {
     return {
-      host: process.env.SMTP_HOST || 'smtp.resend.com',
-      port: parseInt(process.env.SMTP_PORT) || 465,
-      secure: process.env.SMTP_SECURE !== 'false', // default true for Resend
+      host: process.env.SMTP_HOST || 'smtp.office365.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === 'true',
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
       fromName: process.env.SMTP_FROM_NAME || 'T&S Traffic Control',
@@ -21,86 +54,120 @@ function getSmtpConfig() {
     };
   }
 
-  // 2. Fall back to system_config table (Settings page)
   try {
     const { getConfig } = require('../middleware/settings');
     const host = getConfig('smtp_host', '');
     const user = getConfig('smtp_user', '');
     const pass = getConfig('smtp_pass', '');
-    if (host && user && pass) {
-      const port = parseInt(getConfig('smtp_port', '465'), 10);
+    if (host && user && pass && !pass.startsWith('re_')) {
+      const port = parseInt(getConfig('smtp_port', '587'), 10);
       return {
-        host,
-        port,
+        host, port,
         secure: port === 465,
-        user,
-        pass,
+        user, pass,
         fromName: 'T&S Traffic Control',
         fromEmail: getConfig('smtp_from', user),
       };
     }
-  } catch (e) {
-    // settings module not ready yet (startup)
-  }
+  } catch (e) { /* settings not ready */ }
 
-  return null; // not configured
+  return null;
+}
+
+function getResendClient() {
+  const config = getResendConfig();
+  if (!config) return null;
+  if (!_resendClient || _lastConfigHash !== config.apiKey) {
+    _resendClient = new Resend(config.apiKey);
+    _lastConfigHash = config.apiKey;
+  }
+  return _resendClient;
 }
 
 function getTransporter() {
   const config = getSmtpConfig();
   if (!config) return null;
-
-  // Rebuild transporter if config changed
-  const configHash = `${config.host}:${config.port}:${config.user}`;
-  if (_transporter && _lastConfigHash === configHash) return _transporter;
-
+  const hash = `${config.host}:${config.port}:${config.user}`;
+  if (_transporter && _lastConfigHash === hash) return _transporter;
   _transporter = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: {
-      user: config.user,
-      pass: config.pass,
-    },
-    connectionTimeout: 10000,
-    socketTimeout: 10000,
+    host: config.host, port: config.port, secure: config.secure,
+    auth: { user: config.user, pass: config.pass },
+    connectionTimeout: 10000, socketTimeout: 10000,
   });
-  _lastConfigHash = configHash;
+  _lastConfigHash = hash;
   return _transporter;
 }
 
 /**
- * Check if SMTP is configured (either via env vars or Settings page)
+ * Check if email is configured (Resend API or SMTP)
  */
 function isConfigured() {
-  return getSmtpConfig() !== null;
+  return getResendConfig() !== null || getSmtpConfig() !== null;
 }
 
+/**
+ * Send an email. Uses Resend HTTP API if key starts with re_, otherwise SMTP.
+ */
 async function sendEmail(to, subject, html) {
-  const config = getSmtpConfig();
-  if (!config) {
-    console.warn('[Email] SMTP not configured — skipping:', subject);
+  // Try Resend HTTP API first
+  const resendConfig = getResendConfig();
+  if (resendConfig) {
+    try {
+      const client = getResendClient();
+      const { data, error } = await client.emails.send({
+        from: `${resendConfig.fromName} <${resendConfig.fromEmail}>`,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        html,
+      });
+      if (error) {
+        console.error('[Email/Resend] API error:', error.message || JSON.stringify(error));
+        return null;
+      }
+      console.log('[Email/Resend] Sent:', subject, '→', to, '| id:', data?.id);
+      return data;
+    } catch (err) {
+      console.error('[Email/Resend] Send error:', err.message);
+      return null;
+    }
+  }
+
+  // Fall back to SMTP
+  const smtpConfig = getSmtpConfig();
+  if (!smtpConfig) {
+    console.warn('[Email] Not configured — skipping:', subject);
     return null;
   }
   try {
     const transporter = getTransporter();
     const info = await transporter.sendMail({
-      from: `"${config.fromName}" <${config.fromEmail}>`,
-      to,
-      subject,
-      html,
+      from: `"${smtpConfig.fromName}" <${smtpConfig.fromEmail}>`,
+      to, subject, html,
     });
-    console.log('[Email] Sent:', subject, '→', to);
+    console.log('[Email/SMTP] Sent:', subject, '→', to);
     return info;
   } catch (err) {
-    console.error('[Email] Send error:', err.message);
+    console.error('[Email/SMTP] Send error:', err.message);
     return null;
   }
 }
 
+/**
+ * Test email connectivity.
+ */
 async function testConnection() {
+  const resendConfig = getResendConfig();
+  if (resendConfig) {
+    // Resend doesn't have a verify endpoint — send a lightweight API call
+    const client = getResendClient();
+    // List domains as a connectivity check
+    const { error } = await client.domains.list();
+    if (error) throw new Error(error.message || 'Resend API key invalid');
+    return true;
+  }
+
   const transporter = getTransporter();
-  if (!transporter) throw new Error('SMTP not configured');
+  if (!transporter) throw new Error('Email not configured');
   return transporter.verify();
 }
 
