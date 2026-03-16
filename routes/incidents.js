@@ -35,13 +35,33 @@ router.get('/', (req, res) => {
 
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
 
+  // Compute stats
+  const allIncidents = db.prepare('SELECT severity, investigation_status, incident_date FROM incidents').all();
+  const stats = {
+    total: allIncidents.length,
+    open: allIncidents.filter(i => ['reported', 'investigating'].includes(i.investigation_status)).length,
+    critical: allIncidents.filter(i => ['critical', 'high'].includes(i.severity) && ['reported', 'investigating'].includes(i.investigation_status)).length,
+    thisMonth: allIncidents.filter(i => i.incident_date && i.incident_date >= new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]).length
+  };
+
   res.render('incidents/index', {
     title: 'Safety & Incidents',
     currentPage: 'incidents',
     incidents,
     jobs,
-    filters: req.query
+    filters: req.query,
+    stats
   });
+});
+
+// Inline status change
+router.post('/:id/status', (req, res) => {
+  const db = getDb();
+  const { status } = req.body;
+  const valid = ['reported', 'investigating', 'resolved', 'closed'];
+  if (!valid.includes(status)) { req.flash('error', 'Invalid status'); return res.redirect('/incidents'); }
+  db.prepare('UPDATE incidents SET investigation_status = ? WHERE id = ?').run(status, req.params.id);
+  res.redirect('/incidents');
 });
 
 // NEW FORM

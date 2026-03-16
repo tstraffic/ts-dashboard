@@ -1,39 +1,46 @@
 <% locals.currentPage = 'timesheets' %>
 
 <!-- Page Header -->
-<div class="flex items-center justify-between mb-6">
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
   <div>
     <h1 class="text-2xl font-bold text-gray-900">Timesheets</h1>
-    <p class="text-gray-500 text-sm mt-1">Track crew hours and approve timesheets</p>
+    <p class="text-gray-500 text-sm mt-0.5">Track crew hours and approve timesheets</p>
   </div>
-  <a href="/timesheets/new" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Log Timesheet</a>
+  <a href="/timesheets/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Log Timesheet</a>
 </div>
 
 <!-- Sub-navigation -->
-<div class="flex items-center gap-1 mb-6 border-b border-gray-200 pb-3">
-  <a href="/timesheets" class="px-4 py-2 text-sm font-medium rounded-lg bg-brand-50 text-brand-700">Timesheets</a>
-  <a href="/timesheets/crew" class="px-4 py-2 text-sm font-medium rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors">Crew Members</a>
-  <a href="/timesheets/summary" class="px-4 py-2 text-sm font-medium rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors">Weekly Summary</a>
+<div class="flex items-center gap-1 mb-5 border-b border-gray-200 pb-2">
+  <a href="/timesheets" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-brand-50 text-brand-700">Timesheets</a>
+  <a href="/timesheets/crew" class="px-3 py-1.5 text-sm font-medium rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors">Crew Members</a>
+  <a href="/timesheets/summary" class="px-3 py-1.5 text-sm font-medium rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors">Weekly Summary</a>
 </div>
 
 <!-- Stats Bar -->
-<div class="grid grid-cols-2 sm:grid-cols-2 gap-4 mb-6">
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-    <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Total Hours</div>
-    <div class="text-2xl font-bold text-gray-900"><%= stats.totalHours %></div>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Hours</p>
+    <p class="text-xl font-bold text-gray-900 mt-0.5"><%= stats.totalHours %></p>
   </div>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-    <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Pending Approval</div>
-    <div class="text-2xl font-bold <%= stats.pendingApproval > 0 ? 'text-orange-600' : 'text-gray-900' %>"><%= stats.pendingApproval %></div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pending</p>
+    <p class="text-xl font-bold <%= stats.pendingApproval > 0 ? 'text-orange-600' : 'text-gray-900' %> mt-0.5"><%= stats.pendingApproval %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Approved</p>
+    <p class="text-xl font-bold text-emerald-600 mt-0.5"><%= stats.approvedCount %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Crew Logged</p>
+    <p class="text-xl font-bold text-gray-900 mt-0.5"><%= stats.uniqueCrew %></p>
   </div>
 </div>
 
 <!-- Filter Bar -->
-<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-6">
-  <form method="GET" action="/timesheets" class="flex flex-wrap items-end gap-4">
-    <!-- Job -->
-    <div class="min-w-[180px]">
-      <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Job</label>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-5">
+  <form method="GET" action="/timesheets" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 sm:gap-3">
+    <div class="flex-1 min-w-0 sm:min-w-[160px]">
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Job</label>
       <select name="job_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Jobs</option>
         <% jobs.forEach(j => { %>
@@ -41,39 +48,37 @@
         <% }) %>
       </select>
     </div>
-    <!-- Crew Member -->
-    <div class="min-w-[180px]">
-      <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Crew Member</label>
-      <select name="crew_member_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-        <option value="">All Crew</option>
-        <% crew.forEach(c => { %>
-          <option value="<%= c.id %>" <%= filters.crew_member_id == c.id ? 'selected' : '' %>><%= c.full_name %></option>
-        <% }) %>
-      </select>
+    <div class="flex gap-2 w-full sm:w-auto">
+      <div class="flex-1 sm:flex-none sm:min-w-[140px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Crew</label>
+        <select name="crew_member_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">All Crew</option>
+          <% crew.forEach(c => { %>
+            <option value="<%= c.id %>" <%= filters.crew_member_id == c.id ? 'selected' : '' %>><%= c.full_name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="flex-1 sm:flex-none sm:min-w-[130px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Date</label>
+        <input type="date" name="work_date" value="<%= filters.work_date || '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div class="flex-1 sm:flex-none sm:min-w-[100px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Status</label>
+        <select name="approved" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">All</option>
+          <option value="0" <%= filters.approved === '0' ? 'selected' : '' %>>Pending</option>
+          <option value="1" <%= filters.approved === '1' ? 'selected' : '' %>>Approved</option>
+        </select>
+      </div>
     </div>
-    <!-- Date -->
-    <div class="min-w-[160px]">
-      <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date</label>
-      <input type="date" name="work_date" value="<%= filters.work_date || '' %>"
-        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-    </div>
-    <!-- Approved -->
-    <div class="min-w-[140px]">
-      <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Approved</label>
-      <select name="approved" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-        <option value="">All</option>
-        <option value="0" <%= filters.approved === '0' ? 'selected' : '' %>>Pending</option>
-        <option value="1" <%= filters.approved === '1' ? 'selected' : '' %>>Approved</option>
-      </select>
-    </div>
-    <!-- Buttons -->
     <div class="flex gap-2">
       <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Apply</button>
       <a href="/timesheets" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Clear</a>
       <a href="/exports/timesheets.csv?job_id=<%= filters.job_id || '' %>&crew_member_id=<%= filters.crew_member_id || '' %>&work_date=<%= filters.work_date || '' %>&approved=<%= filters.approved || '' %>"
         class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        Export CSV
+        <span class="hidden sm:inline">CSV</span>
       </a>
     </div>
   </form>
@@ -81,10 +86,11 @@
 
 <!-- Timesheets Table -->
 <% if (timesheets.length === 0) { %>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center">
-    <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    <p class="text-gray-400 text-sm">No timesheet entries found.</p>
-    <a href="/timesheets/new" class="inline-block mt-3 text-brand-600 hover:text-brand-600 text-sm font-medium">Log a timesheet</a>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-12 text-center">
+    <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <p class="text-gray-500 text-sm font-medium">No timesheet entries found</p>
+    <p class="text-gray-400 text-xs mt-1">Adjust your filters or log a new timesheet</p>
+    <a href="/timesheets/new" class="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Log Timesheet</a>
   </div>
 <% } else { %>
 <form method="POST" action="/timesheets/approve-bulk" id="bulkApproveForm">
@@ -92,68 +98,64 @@
     <table class="w-full text-sm">
       <thead>
         <tr class="border-b border-gray-200">
-          <th class="px-3 py-3 text-left">
+          <th class="px-2 py-2.5 text-left w-8">
             <input type="checkbox" id="selectAll" class="rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500" title="Select all">
           </th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Crew Member</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Job</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Start</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">End</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Break</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Hours</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Shift</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Approved</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
+          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date</th>
+          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Crew</th>
+          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Job</th>
+          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Time</th>
+          <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hours</th>
+          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Shift</th>
+          <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+          <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest w-16">Actions</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-200">
+      <tbody class="divide-y divide-gray-100">
         <% timesheets.forEach(t => { %>
-        <tr class="hover:bg-gray-50">
-          <td class="px-3 py-3">
+        <tr class="hover:bg-gray-50 <%= !t.approved ? 'bg-orange-50/30' : '' %>">
+          <td class="px-2 py-2">
             <% if (!t.approved) { %>
               <input type="checkbox" name="timesheet_ids" value="<%= t.id %>" class="bulk-checkbox rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500">
             <% } %>
           </td>
-          <td class="px-4 py-3 text-gray-600 text-xs">
-            <%= new Date(t.work_date).toLocaleDateString('en-AU', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) %>
+          <td class="px-3 py-2 text-gray-600 text-xs tabular-nums">
+            <%= new Date(t.work_date).toLocaleDateString('en-AU', { weekday: 'short', day: '2-digit', month: 'short' }) %>
           </td>
-          <td class="px-4 py-3 text-gray-900 font-medium"><%= t.crew_name %></td>
-          <td class="px-4 py-3">
-            <a href="/projects/<%= t.job_id %>" class="text-brand-600 hover:text-brand-600 text-xs"><%= t.job_number %></a>
+          <td class="px-3 py-2 text-gray-900 font-medium text-xs"><%= t.crew_name %></td>
+          <td class="px-3 py-2 hidden sm:table-cell">
+            <a href="/projects/<%= t.job_id %>" class="text-brand-600 hover:text-brand-700 text-xs"><%= t.job_number %></a>
           </td>
-          <td class="px-4 py-3 text-gray-600"><%= t.start_time %></td>
-          <td class="px-4 py-3 text-gray-600"><%= t.end_time %></td>
-          <td class="px-4 py-3 text-gray-500"><%= t.break_minutes %>m</td>
-          <td class="px-4 py-3 text-gray-900 font-medium"><%= parseFloat(t.total_hours).toFixed(1) %></td>
-          <td class="px-4 py-3">
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+          <td class="px-3 py-2 text-gray-500 text-xs hidden md:table-cell tabular-nums"><%= t.start_time %>-<%= t.end_time %> <span class="text-gray-300">(<%= t.break_minutes %>m brk)</span></td>
+          <td class="px-3 py-2 text-right text-gray-900 font-semibold text-xs tabular-nums"><%= parseFloat(t.total_hours).toFixed(1) %></td>
+          <td class="px-3 py-2 hidden lg:table-cell">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium
               <% if (t.shift_type === 'night') { %>bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20
               <% } else if (t.shift_type === 'split') { %>bg-purple-50 text-purple-700 ring-1 ring-purple-600/20
               <% } else { %>bg-sky-50 text-sky-700 ring-1 ring-sky-600/20<% } %>">
               <%= t.shift_type %>
             </span>
           </td>
-          <td class="px-4 py-3">
+          <td class="px-3 py-2 text-center">
             <% if (t.approved) { %>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Approved</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Approved</span>
             <% } else { %>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700 ring-1 ring-orange-600/20">Pending</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 ring-1 ring-orange-600/20">Pending</span>
             <% } %>
           </td>
-          <td class="px-4 py-3">
-            <div class="flex items-center gap-2">
+          <td class="px-3 py-2 text-right">
+            <div class="flex items-center justify-end gap-1">
               <% if (!t.approved) { %>
                 <form method="POST" action="/timesheets/<%= t.id %>/approve" class="inline">
-                  <button type="submit" class="text-emerald-600 hover:text-emerald-600 transition" title="Approve">
+                  <button type="submit" class="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition" title="Approve">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                   </button>
                 </form>
               <% } %>
-              <form method="POST" action="/timesheets/<%= t.id %>/delete" class="inline" onsubmit="return confirm('Delete this timesheet entry?')">
-                <button type="submit" class="text-red-600 hover:text-red-600 transition" title="Delete">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
+              <form method="POST" action="/timesheets/<%= t.id %>/delete" class="inline" onsubmit="return confirm('Delete this entry?')">
+                <button type="submit" class="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition" title="Delete">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
               </form>
             </div>
           </td>
@@ -163,9 +165,9 @@
     </table>
   </div>
 
-  <!-- Bulk Approve Button -->
-  <div class="mt-4 flex items-center justify-between">
-    <div class="text-xs text-gray-400"><%= timesheets.length %> entr<%= timesheets.length !== 1 ? 'ies' : 'y' %> found</div>
+  <!-- Bulk Approve -->
+  <div class="mt-3 flex items-center justify-between">
+    <div class="text-xs text-gray-400"><%= timesheets.length %> entr<%= timesheets.length !== 1 ? 'ies' : 'y' %></div>
     <button type="submit" id="bulkApproveBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
       Approve Selected
     </button>
@@ -174,7 +176,6 @@
 <% } %>
 
 <script>
-  // Select all checkbox
   const selectAll = document.getElementById('selectAll');
   const bulkBtn = document.getElementById('bulkApproveBtn');
   if (selectAll) {

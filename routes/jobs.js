@@ -28,7 +28,31 @@ router.get('/', (req, res) => {
   const jobs = db.prepare(query).all(...params);
   const suburbs = db.prepare('SELECT DISTINCT suburb FROM jobs ORDER BY suburb').all().map(r => r.suburb);
 
-  res.render('jobs/index', { title: 'Jobs Register', jobs, suburbs, filters: { status, search, suburb }, user: req.session.user, canViewAccounts: canViewAccounts(req.session.user) });
+  // Compute stats from the full (unfiltered) job set for the stat cards
+  const allJobs = db.prepare('SELECT status, health, end_date FROM jobs').all();
+  const today = new Date().toISOString().split('T')[0];
+  const stats = {
+    active: allJobs.filter(j => j.status === 'active').length,
+    onHold: allJobs.filter(j => j.status === 'on_hold').length,
+    tender: allJobs.filter(j => ['tender', 'won', 'prestart'].includes(j.status)).length,
+    overdue: allJobs.filter(j => j.end_date && j.end_date < today && !['completed', 'closed'].includes(j.status)).length,
+    healthRed: allJobs.filter(j => j.health === 'red' && !['completed', 'closed'].includes(j.status)).length
+  };
+
+  res.render('jobs/index', { title: 'Jobs Register', jobs, suburbs, filters: { status, search, suburb }, user: req.session.user, canViewAccounts: canViewAccounts(req.session.user), stats });
+});
+
+// Inline status change
+router.post('/:id/status', (req, res) => {
+  const db = getDb();
+  const { status } = req.body;
+  const validStatuses = ['tender', 'won', 'prestart', 'active', 'on_hold', 'completed', 'closed'];
+  if (!validStatuses.includes(status)) {
+    req.flash('error', 'Invalid status');
+    return res.redirect('/jobs');
+  }
+  db.prepare('UPDATE jobs SET status = ? WHERE id = ?').run(status, req.params.id);
+  res.redirect('/jobs');
 });
 
 // New job form
