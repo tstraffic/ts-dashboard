@@ -8,7 +8,7 @@ const { passwordResetEmail } = require('../services/emailTemplates');
 
 router.get('/login', (req, res) => {
   if (req.session.user) return res.redirect('/dashboard');
-  res.render('login', { title: 'Login', user: null });
+  res.render('login', { layout: false, title: 'Login', user: null, flash_error: req.flash('error') });
 });
 
 router.post('/login', (req, res) => {
