@@ -69,6 +69,7 @@ app.use(blockWorkerFromAdmin);
 
 // Routes (auth is public, everything else requires login + permission)
 app.use('/', require('./routes/auth'));
+app.use('/profile', requireLogin, require('./routes/profile'));
 app.use('/dashboard', requireLogin, requirePermission('dashboard'), require('./routes/dashboard'));
 app.use('/projects', requireLogin, requirePermission('projects'), require('./routes/projects'));
 app.use('/clients', requireLogin, requirePermission('clients'), require('./routes/clients'));
