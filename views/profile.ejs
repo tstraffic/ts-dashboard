@@ -169,4 +169,77 @@
     </div>
   </div>
 
+  <!-- Push Notifications Card -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-200 bg-gray-50">
+      <h2 class="text-base font-semibold text-gray-900">Push Notifications</h2>
+    </div>
+    <div class="p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-gray-900">Mobile / Desktop Notifications</p>
+          <p class="text-xs text-gray-500 mt-0.5">Receive instant alerts on your device for tasks, deadlines, and updates</p>
+        </div>
+        <span id="push-status" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Checking...</span>
+      </div>
+
+      <div id="push-not-supported" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-3">
+        <p class="text-sm text-amber-800">
+          <svg class="w-4 h-4 inline -mt-0.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+          Your browser does not support push notifications. Try Chrome, Edge, or Firefox on a desktop or Android device.
+        </p>
+      </div>
+
+      <div id="push-denied" class="hidden bg-red-50 border border-red-200 rounded-lg p-3">
+        <p class="text-sm text-red-800">
+          <svg class="w-4 h-4 inline -mt-0.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+          Notifications are blocked. Open your browser settings and allow notifications for this site, then refresh.
+        </p>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button onclick="sendTestPush()" id="push-test-btn" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          <svg class="w-4 h-4 inline -mt-0.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          Send Test Notification
+        </button>
+      </div>
+
+      <p class="text-xs text-gray-400">Push notifications work on Chrome, Edge, Firefox (desktop & Android). iOS Safari has limited support.</p>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    var statusEl = document.getElementById('push-status');
+    var testBtn = document.getElementById('push-test-btn');
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      statusEl.textContent = 'Not Supported';
+      statusEl.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-600/20';
+      document.getElementById('push-not-supported').classList.remove('hidden');
+      return;
+    }
+
+    if (Notification.permission === 'denied') {
+      statusEl.textContent = 'Blocked';
+      statusEl.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20';
+      document.getElementById('push-denied').classList.remove('hidden');
+      return;
+    }
+
+    navigator.serviceWorker.ready.then(function(reg) {
+      reg.pushManager.getSubscription().then(function(sub) {
+        if (sub) {
+          statusEl.textContent = 'Enabled';
+          statusEl.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20';
+          testBtn.disabled = false;
+        } else {
+          statusEl.textContent = 'Not Enabled';
+          statusEl.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600';
+        }
+      });
+    });
+  })();
+  </script>
+
 </div>

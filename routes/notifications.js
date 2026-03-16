@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
-const { getVapidPublicKey, saveSubscription, removeSubscription } = require('../services/pushNotification');
+const { getVapidPublicKey, saveSubscription, removeSubscription, sendPushToUser } = require('../services/pushNotification');
 
 // ============================================
 // LIST NOTIFICATIONS FOR CURRENT USER
@@ -117,6 +117,33 @@ router.post('/push/unsubscribe', (req, res) => {
   } catch (err) {
     console.error('[Push] Unsubscribe error:', err.message);
     res.status(500).json({ error: 'Failed to unsubscribe' });
+  }
+});
+
+// ============================================
+// PUSH NOTIFICATION: SEND TEST
+// ============================================
+router.post('/push/test', (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const db = getDb();
+    const subCount = db.prepare('SELECT COUNT(*) as cnt FROM push_subscriptions WHERE user_id = ?').get(userId);
+
+    if (!subCount || subCount.cnt === 0) {
+      return res.json({ success: false, error: 'No push subscriptions found for your account. Make sure you clicked "Enable" on the notification prompt.' });
+    }
+
+    sendPushToUser(userId, {
+      title: 'T&S Test Notification',
+      body: 'Push notifications are working! You will receive alerts for tasks, deadlines, and updates.',
+      url: '/profile',
+      type: 'test'
+    });
+
+    res.json({ success: true, devices: subCount.cnt });
+  } catch (err) {
+    console.error('[Push] Test push error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
