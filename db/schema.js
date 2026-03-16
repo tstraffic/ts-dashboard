@@ -1720,6 +1720,38 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 35: Company Directory — add company_type + type-specific fields to clients, company_id to client_contacts
+  // =============================================
+  if (!isMigrationApplied.get(35)) {
+    console.log('Running migration 35: Company Directory — company_type + type-specific fields');
+    try {
+      const newCols = [
+        "ALTER TABLE clients ADD COLUMN company_type TEXT NOT NULL DEFAULT 'client'",
+        "ALTER TABLE clients ADD COLUMN trade_specialty TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN insurance_expiry DATE",
+        "ALTER TABLE clients ADD COLUMN insurance_policy TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN product_categories TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN account_number TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN website TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN approved INTEGER NOT NULL DEFAULT 1",
+        "ALTER TABLE clients ADD COLUMN rating INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE client_contacts ADD COLUMN company_id INTEGER REFERENCES clients(id) ON DELETE SET NULL",
+      ];
+      for (const sql of newCols) {
+        try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+      }
+      // Indexes
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_clients_company_type ON clients(company_type)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_client_contacts_company ON client_contacts(company_id)'); } catch (e) {}
+
+      recordMigration.run(35, 'Company Directory — company_type, type-specific fields, company_id on contacts');
+      console.log('Migration 35 complete.');
+    } catch (e) {
+      console.error('Migration 35 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
@@ -2249,6 +2281,33 @@ function initializeDatabase() {
     insertTask.run(9, 'planning', 'Submit ROL application to TfNSW', 'Road Occupancy Licence for Olympic Blvd night works', 3, '2026-03-18', 'in_progress', 'high');
     insertTask.run(10, 'ops', 'Conduct crew toolbox talk', 'Weekly safety briefing for Victoria Rd crew', 2, '2026-03-17', 'not_started', 'medium');
     insertTask.run(11, 'accounts', 'Process progress claim #3', 'Georgiou Group progress claim for February works', 5, '2026-03-15', 'not_started', 'high');
+
+    // ── Clients / Subcontractors / Suppliers ──
+    const insertClient = db.prepare(`
+      INSERT INTO clients (company_name, abn, primary_contact_name, primary_contact_phone, primary_contact_email, address, billing_address, payment_terms, notes, active, company_type, trade_specialty, insurance_expiry, insurance_policy, product_categories, account_number, website, approved, rating)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    // Clients
+    insertClient.run('ABC Civil', '51 234 567 890', 'Greg Thompson', '0400 111 222', 'greg.t@abccivil.com.au', '100 George St, Sydney NSW 2000', 'PO Box 100, Sydney NSW 2001', '30 days', 'Major civil contractor, long-term client', 1, 'client', '', null, '', '', '', 'www.abccivil.com.au', 1, 4);
+    insertClient.run('RMS NSW', '20 345 678 901', 'Linda Park', '0400 222 333', 'linda.park@transport.nsw.gov.au', '20 Lee St, Chippendale NSW 2008', '', 'EOM+30', 'Government - Transport for NSW', 1, 'client', '', null, '', '', '', 'www.transport.nsw.gov.au', 1, 5);
+    insertClient.run('Lendlease', '40 456 789 012', 'Rebecca Walsh', '0400 888 999', 'r.walsh@lendlease.com', '30 The Bond, Millers Point NSW 2000', 'Level 14, 30 The Bond, Millers Point NSW 2000', '45 days', 'Tier 1 builder', 1, 'client', '', null, '', '', '', 'www.lendlease.com', 1, 4);
+    insertClient.run('Sydney Water', '49 776 225 038', 'Fiona Clarke', '0400 444 555', 'fiona.c@sydneywater.com.au', '1 Smith St, Parramatta NSW 2150', '', '30 days', '', 1, 'client', '', null, '', '', '', 'www.sydneywater.com.au', 1, 3);
+    // Subcontractors
+    insertClient.run('Sydney Line Marking', '33 111 222 333', 'Dave Russo', '0411 222 333', 'dave@sydneylinemarking.com.au', '18 Industrial Ave, Bankstown NSW 2200', '', '14 days', 'Reliable line marking subbie. Available most nights.', 1, 'subcontractor', 'line_marking', '2026-09-30', 'QBE-PL-445566', '', '', 'www.sydneylinemarking.com.au', 1, 4);
+    insertClient.run('PowerGrid Electrical', '44 222 333 444', 'Maria Santos', '0422 333 444', 'maria@powergridelectrical.com.au', '7 Sparks Rd, Penrith NSW 2750', '', '14 days', 'Licensed electrician for street lighting and signal work', 1, 'subcontractor', 'electrical', '2027-01-15', 'AIG-PL-778899', '', '', 'www.powergridelectrical.com.au', 1, 5);
+    insertClient.run('Metro Fencing Solutions', '55 333 444 555', 'Trent O\'Neill', '0433 444 555', 'trent@metrofencing.com.au', '22 Boundary St, Granville NSW 2142', '', '7 days', 'Temp fencing and hoarding. Quick turnaround.', 1, 'subcontractor', 'fencing', '2026-06-15', 'ZURICH-PL-112233', '', '', '', 1, 3);
+    // Suppliers
+    insertClient.run('Barrier Systems Australia', '66 444 555 666', 'Kim Tran', '0444 555 666', 'kim@barriersystems.com.au', '5 Factory Rd, Wetherill Park NSW 2164', 'PO Box 55, Wetherill Park NSW 2164', '30 days', 'Plastic and concrete barriers. Water-fill available.', 1, 'supplier', '', null, '', 'barriers,delineators', 'BSA-2200', 'www.barriersystems.com.au', 1, 4);
+    insertClient.run('Kennards Hire', '22 555 666 777', 'Account Team', '13 15 64', 'hire@kennards.com.au', '126 Silverwater Rd, Silverwater NSW 2128', '', 'EOM', 'General equipment hire. Use national account rate.', 1, 'supplier', '', null, '', 'lighting,vehicles,other', 'KH-NAT-5540', 'www.kennards.com.au', 1, 4);
+    insertClient.run('SignPac', '77 666 777 888', 'Ross Brennan', '0455 666 777', 'ross@signpac.com.au', '40 Industry Rd, Padstow NSW 2211', '', '14 days', 'Custom and standard traffic signs. 48hr turnaround on stock items.', 1, 'supplier', '', null, '', 'signs,cones,delineators', 'SP-1180', 'www.signpac.com.au', 1, 5);
+
+    // Link jobs to clients
+    try {
+      db.exec("UPDATE jobs SET client_id = 1 WHERE client = 'ABC Civil'");
+      db.exec("UPDATE jobs SET client_id = 2 WHERE client = 'RMS NSW'");
+      db.exec("UPDATE jobs SET client_id = 3 WHERE client = 'Lendlease'");
+      db.exec("UPDATE jobs SET client_id = 4 WHERE client = 'Sydney Water'");
+    } catch (e) { /* client_id column may not exist yet */ }
 
     // ── Contacts (5) ──
     const insertContact = db.prepare(`

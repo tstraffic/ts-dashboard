@@ -105,7 +105,13 @@
             <span class="inline-flex items-center ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-brand-50 text-brand-600 ring-1 ring-brand-600/20">PRIMARY</span>
           <% } %>
         </td>
-        <td class="px-3 py-2.5 text-gray-600 text-xs hidden sm:table-cell"><%= c.company || '-' %></td>
+        <td class="px-3 py-2.5 text-xs hidden sm:table-cell">
+          <% if (c.company_id) { %>
+            <a href="/clients/<%= c.company_id %>" class="text-brand-600 hover:text-brand-700 font-medium" onclick="event.stopPropagation()"><%= c.linked_company_name || c.company %></a>
+          <% } else { %>
+            <span class="text-gray-600"><%= c.company || '-' %></span>
+          <% } %>
+        </td>
         <td class="px-3 py-2.5">
           <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
             <% if (c.contact_type === 'client') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20

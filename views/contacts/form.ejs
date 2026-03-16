@@ -22,9 +22,25 @@
           placeholder="John Smith"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Company -->
+      <!-- Linked Company (from directory) -->
       <div>
-        <label for="company" class="block text-sm font-medium text-gray-600 mb-1">Company <span class="text-red-600">*</span></label>
+        <label for="company_id" class="block text-sm font-medium text-gray-600 mb-1">Company <span class="text-gray-400 text-xs">(from directory)</span></label>
+        <select id="company_id" name="company_id" onchange="onCompanySelect(this)"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select from directory or type below --</option>
+          <% if (typeof companies !== 'undefined' && companies) { %>
+            <% companies.forEach(comp => { %>
+              <option value="<%= comp.id %>" data-name="<%= comp.company_name %>"
+                <%= (isEdit && contact.company_id == comp.id) || (!isEdit && preselectedCompanyId == comp.id) ? 'selected' : '' %>>
+                <%= comp.company_name %> <% if (comp.company_type !== 'client') { %>(<%= comp.company_type %>)<% } %>
+              </option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <!-- Company (text fallback) -->
+      <div>
+        <label for="company" class="block text-sm font-medium text-gray-600 mb-1">Company Name <span class="text-red-600">*</span></label>
         <input type="text" id="company" name="company" required
           value="<%= isEdit ? contact.company : '' %>"
           placeholder="Company name"
@@ -124,6 +140,24 @@
     <a href="/contacts" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
   </div>
 </form>
+
+<script>
+function onCompanySelect(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.name) {
+    document.getElementById('company').value = opt.dataset.name;
+  }
+}
+// On load: if a company is preselected, auto-fill
+(function() {
+  const sel = document.getElementById('company_id');
+  const companyInput = document.getElementById('company');
+  if (sel && sel.value && !companyInput.value) {
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.name) companyInput.value = opt.dataset.name;
+  }
+})();
+</script>
 
 <% if (typeof activityLog !== 'undefined' && activityLog.length > 0) { %>
 <!-- Activity Timeline -->

@@ -21,11 +21,12 @@ router.get('/', (req, res) => {
   const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
   const contacts = db.prepare(`
-    SELECT cc.*, j.job_number, j.client,
+    SELECT cc.*, j.job_number, j.client, cl2.company_name as linked_company_name,
       (SELECT COUNT(*) FROM communication_log cl WHERE cl.contact_id = cc.id) as comms_count,
-      (SELECT MAX(cl2.comm_date) FROM communication_log cl2 WHERE cl2.contact_id = cc.id) as last_contact_date
+      (SELECT MAX(cl3.comm_date) FROM communication_log cl3 WHERE cl3.contact_id = cc.id) as last_contact_date
     FROM client_contacts cc
     LEFT JOIN jobs j ON cc.job_id = j.id
+    LEFT JOIN clients cl2 ON cc.company_id = cl2.id
     ${whereClause}
     ORDER BY cc.company, cc.full_name
   `).all(...params);
@@ -47,12 +48,15 @@ router.get('/', (req, res) => {
 router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs ORDER BY job_number DESC").all();
+  const companies = db.prepare("SELECT id, company_name, company_type FROM clients WHERE active = 1 ORDER BY company_name").all();
   res.render('contacts/form', {
     title: 'New Contact',
     currentPage: 'contacts',
     contact: null,
     jobs,
-    preselectedJobId: req.query.job_id || ''
+    companies,
+    preselectedJobId: req.query.job_id || '',
+    preselectedCompanyId: req.query.company_id || ''
   });
 });
 
@@ -61,11 +65,11 @@ router.get('/new', (req, res) => {
 // ============================================
 router.post('/', (req, res) => {
   const db = getDb();
-  const { job_id, contact_type, company, full_name, position, phone, email, notes, is_primary } = req.body;
+  const { job_id, company_id, contact_type, company, full_name, position, phone, email, notes, is_primary } = req.body;
   const result = db.prepare(`
-    INSERT INTO client_contacts (job_id, contact_type, company, full_name, position, phone, email, notes, is_primary)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(job_id || null, contact_type, company, full_name, position || '', phone || '', email || '', notes || '', is_primary ? 1 : 0);
+    INSERT INTO client_contacts (job_id, company_id, contact_type, company, full_name, position, phone, email, notes, is_primary)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(job_id || null, company_id || null, contact_type, company, full_name, position || '', phone || '', email || '', notes || '', is_primary ? 1 : 0);
 
   logActivity({
     user: req.session.user,
@@ -209,6 +213,7 @@ router.get('/:id/edit', (req, res) => {
     return res.redirect('/contacts');
   }
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs ORDER BY job_number DESC").all();
+  const companies = db.prepare("SELECT id, company_name, company_type FROM clients WHERE active = 1 ORDER BY company_name").all();
 
   // Activity log
   const activityLog = db.prepare(`
@@ -223,7 +228,9 @@ router.get('/:id/edit', (req, res) => {
     currentPage: 'contacts',
     contact,
     jobs,
+    companies,
     preselectedJobId: '',
+    preselectedCompanyId: '',
     activityLog
   });
 });
@@ -233,11 +240,11 @@ router.get('/:id/edit', (req, res) => {
 // ============================================
 router.post('/:id', (req, res) => {
   const db = getDb();
-  const { job_id, contact_type, company, full_name, position, phone, email, notes, is_primary } = req.body;
+  const { job_id, company_id, contact_type, company, full_name, position, phone, email, notes, is_primary } = req.body;
   db.prepare(`
-    UPDATE client_contacts SET job_id=?, contact_type=?, company=?, full_name=?, position=?, phone=?, email=?, notes=?, is_primary=?
+    UPDATE client_contacts SET job_id=?, company_id=?, contact_type=?, company=?, full_name=?, position=?, phone=?, email=?, notes=?, is_primary=?
     WHERE id=?
-  `).run(job_id || null, contact_type, company, full_name, position || '', phone || '', email || '', notes || '', is_primary ? 1 : 0, req.params.id);
+  `).run(job_id || null, company_id || null, contact_type, company, full_name, position || '', phone || '', email || '', notes || '', is_primary ? 1 : 0, req.params.id);
 
   logActivity({
     user: req.session.user,
