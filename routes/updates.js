@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
+const { logActivity } = require('../middleware/audit');
 
 router.get('/', (req, res) => {
   const db = getDb();
@@ -44,6 +45,18 @@ router.get('/:id', (req, res) => {
   `).get(req.params.id);
   if (!update) { req.flash('error', 'Update not found.'); return res.redirect('/updates'); }
   res.render('updates/show', { title: `Update: ${update.job_number}`, update, user: req.session.user });
+});
+
+// DELETE UPDATE
+router.post('/:id/delete', (req, res) => {
+  const db = getDb();
+  const update = db.prepare('SELECT pu.*, j.job_number FROM project_updates pu JOIN jobs j ON pu.job_id = j.id WHERE pu.id = ?').get(req.params.id);
+  if (!update) { req.flash('error', 'Update not found.'); return res.redirect('/updates'); }
+
+  db.prepare('DELETE FROM project_updates WHERE id = ?').run(req.params.id);
+  logActivity({ user: req.session.user, action: 'delete', entityType: 'project_update', entityId: parseInt(req.params.id), entityLabel: `${update.job_number} - Week ${update.week_ending}`, ip: req.ip });
+  req.flash('success', 'Project update deleted.');
+  res.redirect('/updates');
 });
 
 module.exports = router;

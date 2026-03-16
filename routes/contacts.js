@@ -183,6 +183,20 @@ router.post('/comms/:id/follow-up-done', (req, res) => {
 });
 
 // ============================================
+// DELETE COMMUNICATION
+// ============================================
+router.post('/comms/:id/delete', (req, res) => {
+  const db = getDb();
+  const comm = db.prepare('SELECT * FROM communication_log WHERE id = ?').get(req.params.id);
+  if (!comm) { req.flash('error', 'Communication not found.'); return res.redirect('/contacts/comms'); }
+
+  db.prepare('DELETE FROM communication_log WHERE id = ?').run(req.params.id);
+  logActivity({ user: req.session.user, action: 'delete', entityType: 'communication', entityId: parseInt(req.params.id), entityLabel: comm.subject ? comm.subject.substring(0, 50) : '', ip: req.ip });
+  req.flash('success', 'Communication entry deleted.');
+  res.redirect('/contacts/comms');
+});
+
+// ============================================
 // EDIT CONTACT
 // ============================================
 router.get('/:id/edit', (req, res) => {

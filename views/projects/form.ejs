@@ -192,17 +192,18 @@
       </div>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-      <!-- Required TCP Level -->
+      <!-- Required TC Level -->
       <div>
-        <label for="required_tcp_level" class="block text-sm font-medium text-gray-600 mb-1">Required TCP Level</label>
+        <label for="required_tcp_level" class="block text-sm font-medium text-gray-600 mb-1">Required TC Level</label>
         <select id="required_tcp_level" name="required_tcp_level"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="" <%= isEdit && !job.required_tcp_level ? 'selected' : '' %>>Any</option>
-          <% (settingsOptions.tcp_level || []).forEach(opt => { %>
-            <option value="<%= opt.key %>" <%= isEdit && job.required_tcp_level === opt.key ? 'selected' : '' %>><%= opt.label %></option>
-          <% }) %>
+          <option value="beginner" <%= isEdit && job.required_tcp_level === 'beginner' ? 'selected' : '' %>>Beginner</option>
+          <option value="intermediate" <%= isEdit && job.required_tcp_level === 'intermediate' ? 'selected' : '' %>>Intermediate</option>
+          <option value="team_leader" <%= isEdit && job.required_tcp_level === 'team_leader' ? 'selected' : '' %>>Team Leader</option>
+          <option value="supervisor" <%= isEdit && job.required_tcp_level === 'supervisor' ? 'selected' : '' %>>Supervisor</option>
         </select>
-        <p class="text-xs text-gray-400 mt-1">Minimum TCP competency required for crew on this job</p>
+        <p class="text-xs text-gray-400 mt-1">Minimum TC competency required for crew on this job</p>
       </div>
     </div>
     <div class="flex items-center gap-6 mt-4">

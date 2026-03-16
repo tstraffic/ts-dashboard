@@ -837,11 +837,12 @@ function runMigrations(db) {
       { key: 'disputed', label: 'Disputed', color: 'amber' },
     ]);
 
-    // TCP levels
+    // TC levels
     seedCategory('tcp_level', [
-      { key: 'TCP1', label: 'TCP1' },
-      { key: 'TCP2', label: 'TCP2' },
-      { key: 'TCP3', label: 'TCP3' },
+      { key: 'beginner', label: 'Beginner' },
+      { key: 'intermediate', label: 'Intermediate' },
+      { key: 'team_leader', label: 'Team Leader' },
+      { key: 'supervisor', label: 'Supervisor' },
     ]);
 
     // Incident types
