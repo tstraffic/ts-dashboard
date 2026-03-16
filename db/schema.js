@@ -1433,6 +1433,62 @@ function runMigrations(db) {
     console.log('Migration 26 complete.');
   }
 
+  // =============================================
+  // Migration 27: Fix tasks division CHECK constraint
+  // =============================================
+  if (!isMigrationApplied.get(27)) {
+    console.log('Running migration 27: Fix tasks division CHECK constraint');
+
+    // Check current CHECK constraint by inspecting table SQL
+    const tableSQL = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get();
+    const needsFix = tableSQL && !tableSQL.sql.includes("'finance'");
+
+    if (needsFix) {
+      // Get current columns to build explicit INSERT
+      const cols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
+      const colList = cols.join(', ');
+
+      db.exec('BEGIN TRANSACTION');
+      try {
+        db.exec(`
+          CREATE TABLE tasks_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+            division TEXT NOT NULL CHECK(division IN ('ops','planning','finance','admin','marketing','accounts','management')),
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            owner_id INTEGER REFERENCES users(id),
+            due_date DATE NOT NULL,
+            status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','in_progress','blocked','complete')),
+            priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('high','medium','low')),
+            task_type TEXT DEFAULT 'one_off',
+            notes TEXT DEFAULT '',
+            completed_date DATE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          );
+          INSERT INTO tasks_new (${colList}) SELECT ${colList} FROM tasks;
+          DROP TABLE tasks;
+          ALTER TABLE tasks_new RENAME TO tasks;
+          CREATE INDEX IF NOT EXISTS idx_tasks_job ON tasks(job_id);
+          CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_id);
+          CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+          CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
+        `);
+        db.exec('COMMIT');
+        console.log('Migration 27: tasks table rebuilt with updated CHECK constraint.');
+      } catch (e) {
+        try { db.exec('ROLLBACK'); } catch (r) {}
+        console.error('Migration 27 error:', e.message);
+      }
+    } else {
+      console.log('Migration 27: CHECK constraint already correct, skipping rebuild.');
+    }
+
+    recordMigration.run(27, 'Fix tasks division CHECK constraint');
+    console.log('Migration 27 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
