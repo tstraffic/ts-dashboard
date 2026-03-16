@@ -12,20 +12,22 @@ a, button, input, select, textarea {
   transition: all 0.15s ease;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+/* Custom scrollbar — desktop only */
+@media (min-width: 1024px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
 }
 
 /* Line clamp for text truncation */
@@ -43,35 +45,54 @@ a, button, input, select, textarea {
 
 /* ===== Mobile Sidebar ===== */
 
-/* Sidebar slide-in animation */
 #sidebar {
-  transition: transform 0.2s ease-in-out;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+#sidebar-backdrop {
+  transition: opacity 0.3s ease;
+  opacity: 0;
 }
 
 @media (max-width: 1023px) {
-  /* When sidebar is open on mobile */
+  /* Sidebar open state */
   #sidebar.sidebar-open {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column;
     transform: translateX(0) !important;
   }
 
   /* Backdrop visible */
   #sidebar-backdrop.backdrop-visible {
     display: block !important;
+    opacity: 1;
   }
 }
 
-/* Active sidebar link left border */
+/* Sidebar nav scrollbar — thin and subtle */
+#sidebar nav::-webkit-scrollbar {
+  width: 3px;
+}
+#sidebar nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+#sidebar nav::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+}
+
+/* Active link indicator */
 .border-l-2 {
   border-left-width: 2px;
 }
 
 /* ===== Mobile-friendly touch targets ===== */
 @media (max-width: 640px) {
-  /* Larger tap targets on mobile */
+  /* Prevent iOS zoom on focus */
   select, input[type="text"], input[type="email"], input[type="password"],
   input[type="date"], input[type="number"], input[type="tel"], textarea {
-    font-size: 16px !important; /* Prevents iOS zoom on focus */
+    font-size: 16px !important;
     min-height: 44px;
   }
 
@@ -81,28 +102,52 @@ a, button, input, select, textarea {
     min-width: 44px;
   }
 
-  /* Wider tables scroll hint */
+  /* Smooth horizontal scroll for tables */
   .overflow-x-auto {
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .overflow-x-auto::-webkit-scrollbar {
+    display: none;
   }
 }
 
-/* ===== PWA standalone mode adjustments ===== */
+/* ===== PWA standalone mode ===== */
 @media (display-mode: standalone) {
-  /* Remove safe-area insets for notched phones */
   body {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
+
+  /* Extra bottom padding on sidebar for home indicator */
+  #sidebar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
-/* ===== Responsive table cards on mobile ===== */
+/* ===== Mobile tap highlight ===== */
+@media (max-width: 1023px) {
+  a, button {
+    -webkit-tap-highlight-color: rgba(43, 127, 255, 0.1);
+  }
+
+  /* Active state feedback */
+  #sidebar a:active {
+    transform: scale(0.98);
+  }
+}
+
+/* ===== Notification dropdown mobile ===== */
 @media (max-width: 640px) {
-  /* Hide scrollbar on mobile for cleaner look */
-  ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+  #notif-dropdown {
+    position: fixed !important;
+    top: 56px !important;
+    left: 0.5rem !important;
+    right: 0.5rem !important;
+    width: auto !important;
+    max-width: none !important;
+    margin-top: 0 !important;
   }
 }
