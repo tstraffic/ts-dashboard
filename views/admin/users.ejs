@@ -3,102 +3,138 @@
 <%
   const roleAliases = { management: 'admin', accounts: 'finance', marketing: 'operations' };
   const roleColors = {
-    admin: 'bg-purple-600 text-purple-100',
-    operations: 'bg-blue-600 text-blue-100',
-    planning: 'bg-teal-600 text-teal-100',
-    finance: 'bg-amber-600 text-amber-100'
+    admin: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
+    operations: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    planning: 'bg-teal-50 text-teal-700 ring-1 ring-teal-600/20',
+    finance: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
   };
   function displayRole(r) { return roleAliases[r] || r; }
 %>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
     <h1 class="text-2xl font-bold text-gray-900">User Management</h1>
-    <a href="/admin/users/new" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition">
-      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-      Add User
-    </a>
+    <p class="text-gray-500 text-sm mt-0.5">Manage platform users, roles, and access</p>
   </div>
+  <a href="/admin/users/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Add User</a>
+</div>
 
-  <!-- Users Table -->
-  <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-    <% if (users.length === 0) { %>
-      <div class="p-8 text-center text-gray-500">
-        <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-        <p>No users found.</p>
-      </div>
-    <% } else { %>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead>
-            <tr class="border-b border-gray-200">
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Full Name</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Username</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Active</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200">
-            <% users.forEach(function(user) { %>
-              <tr class="hover:bg-gray-50 hover:bg-opacity-50">
-                <td class="px-4 py-3 text-gray-900 font-medium"><%= user.full_name || '-' %></td>
-                <td class="px-4 py-3 text-gray-600"><%= user.username %></td>
-                <td class="px-4 py-3 text-gray-600"><%= user.email || '-' %></td>
-                <td class="px-4 py-3">
-                  <% if (user.role) { %>
-                    <% const dr = displayRole(user.role); %>
-                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= roleColors[dr] || 'bg-gray-100 text-gray-700' %>"><%= dr.charAt(0).toUpperCase() + dr.slice(1) %></span>
-                  <% } else { %>
-                    <span class="text-gray-400">-</span>
-                  <% } %>
-                </td>
-                <td class="px-4 py-3">
-                  <% if (user.password_hash === 'INVITE_PENDING') { %>
-                    <span class="inline-flex items-center">
-                      <span class="w-2.5 h-2.5 bg-amber-400 rounded-full mr-2"></span>
-                      <span class="text-amber-600 text-sm">Invite Pending</span>
-                    </span>
-                  <% } else if (user.active) { %>
-                    <span class="inline-flex items-center">
-                      <span class="w-2.5 h-2.5 bg-emerald-400 rounded-full mr-2"></span>
-                      <span class="text-emerald-600 text-sm">Active</span>
-                    </span>
-                  <% } else { %>
-                    <span class="inline-flex items-center">
-                      <span class="w-2.5 h-2.5 bg-red-400 rounded-full mr-2"></span>
-                      <span class="text-red-600 text-sm">Inactive</span>
-                    </span>
-                  <% } %>
-                </td>
-                <td class="px-4 py-3 text-gray-600 text-sm">
-                  <%= user.created_at ? new Date(user.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %>
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-2">
-                    <a href="/admin/users/<%= user.id %>/edit" class="text-gray-500 hover:text-brand-600 transition" title="Edit">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                    </a>
-                    <% if (user.password_hash === 'INVITE_PENDING' && user.email) { %>
-                      <form method="POST" action="/admin/users/<%= user.id %>/resend-invite" class="inline">
-                        <button type="submit" class="text-xs text-amber-600 hover:text-amber-700 font-medium" title="Resend Invite">Resend</button>
-                      </form>
-                    <% } %>
-                    <form method="POST" action="/admin/users/<%= user.id %>/delete" class="inline" onsubmit="return confirm('Delete user <%= user.username %>? This cannot be undone.')">
-                      <button type="submit" class="text-gray-400 hover:text-red-600 transition" title="Delete">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                      </button>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
-    <% } %>
+<!-- Stats Row -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Users</p>
+    <p class="text-xl font-bold text-gray-900 mt-0.5"><%= stats.total %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active</p>
+    <p class="text-xl font-bold text-emerald-600 mt-0.5"><%= stats.active %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Invite Pending</p>
+    <p class="text-xl font-bold <%= stats.pending > 0 ? 'text-amber-600' : 'text-gray-900' %> mt-0.5"><%= stats.pending %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Inactive</p>
+    <p class="text-xl font-bold <%= stats.inactive > 0 ? 'text-red-600' : 'text-gray-900' %> mt-0.5"><%= stats.inactive %></p>
   </div>
 </div>
+
+<!-- Role Distribution -->
+<% if (Object.keys(stats.byRole).length > 0) { %>
+<div class="flex flex-wrap items-center gap-2 mb-5">
+  <span class="text-xs text-gray-400 font-medium">Roles:</span>
+  <% Object.entries(stats.byRole).forEach(([role, count]) => { %>
+    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium <%= roleColors[role] || 'bg-gray-50 text-gray-600' %>">
+      <%= role.charAt(0).toUpperCase() + role.slice(1) %> <span class="ml-1 opacity-60"><%= count %></span>
+    </span>
+  <% }) %>
+</div>
+<% } %>
+
+<!-- Users Table -->
+<% if (users.length === 0) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-12 text-center">
+    <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+    <p class="text-gray-500 text-sm font-medium">No users found</p>
+    <a href="/admin/users/new" class="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Add User</a>
+  </div>
+<% } else { %>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-200">
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">User</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Username</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Email</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Role</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Created</th>
+        <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest w-20">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      <% users.forEach(function(u) {
+        const dr = displayRole(u.role);
+        const isPending = u.password_hash === 'INVITE_PENDING';
+        const isInactive = !u.active && !isPending;
+      %>
+      <tr class="hover:bg-gray-50 <%= isInactive ? 'opacity-50' : '' %>">
+        <td class="px-3 py-2.5">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 text-xs font-bold flex-shrink-0">
+              <%= u.full_name ? u.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : u.username[0].toUpperCase() %>
+            </div>
+            <div>
+              <p class="text-gray-900 font-medium text-sm"><%= u.full_name || u.username %></p>
+              <p class="text-gray-400 text-xs sm:hidden"><%= u.username %></p>
+            </div>
+          </div>
+        </td>
+        <td class="px-3 py-2.5 text-gray-600 text-xs hidden sm:table-cell"><%= u.username %></td>
+        <td class="px-3 py-2.5 text-gray-500 text-xs hidden md:table-cell"><%= u.email || '-' %></td>
+        <td class="px-3 py-2.5">
+          <% if (dr) { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium <%= roleColors[dr] || 'bg-gray-50 text-gray-600' %>"><%= dr.charAt(0).toUpperCase() + dr.slice(1) %></span>
+          <% } else { %>
+            <span class="text-gray-400 text-xs">-</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5">
+          <% if (isPending) { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-600/20">Invite Pending</span>
+          <% } else if (u.active) { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Active</span>
+          <% } else { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20">Inactive</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-gray-500 text-xs hidden lg:table-cell tabular-nums">
+          <%= u.created_at ? new Date(u.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %>
+        </td>
+        <td class="px-3 py-2.5 text-right">
+          <div class="flex items-center justify-end gap-1">
+            <a href="/admin/users/<%= u.id %>/edit" class="p-1 text-gray-400 hover:text-brand-600 rounded transition" title="Edit">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </a>
+            <% if (isPending && u.email) { %>
+              <form method="POST" action="/admin/users/<%= u.id %>/resend-invite" class="inline">
+                <button type="submit" class="p-1 text-amber-500 hover:text-amber-600 rounded transition" title="Resend Invite">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                </button>
+              </form>
+            <% } %>
+            <form method="POST" action="/admin/users/<%= u.id %>/delete" class="inline" onsubmit="return confirm('Delete user <%= u.username %>? This cannot be undone.')">
+              <button type="submit" class="p-1 text-gray-300 hover:text-red-600 rounded transition" title="Delete">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<div class="mt-2 text-xs text-gray-400"><%= users.length %> user<%= users.length !== 1 ? 's' : '' %></div>
+<% } %>
