@@ -41,20 +41,68 @@ a, button, input, select, textarea {
   transition: width 0.5s ease;
 }
 
-/* Mobile sidebar toggle */
+/* ===== Mobile Sidebar ===== */
+
+/* Sidebar slide-in animation */
+#sidebar {
+  transition: transform 0.2s ease-in-out;
+}
+
 @media (max-width: 1023px) {
-  .sidebar-open aside {
-    display: block;
-    position: fixed;
-    z-index: 50;
-    top: 64px;
-    left: 0;
-    bottom: 0;
-    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  /* When sidebar is open on mobile */
+  #sidebar.sidebar-open {
+    display: block !important;
+    transform: translateX(0) !important;
+  }
+
+  /* Backdrop visible */
+  #sidebar-backdrop.backdrop-visible {
+    display: block !important;
   }
 }
 
 /* Active sidebar link left border */
 .border-l-2 {
   border-left-width: 2px;
+}
+
+/* ===== Mobile-friendly touch targets ===== */
+@media (max-width: 640px) {
+  /* Larger tap targets on mobile */
+  select, input[type="text"], input[type="email"], input[type="password"],
+  input[type="date"], input[type="number"], input[type="tel"], textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+    min-height: 44px;
+  }
+
+  /* Better button sizing on mobile */
+  .btn-mobile, button[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Wider tables scroll hint */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ===== PWA standalone mode adjustments ===== */
+@media (display-mode: standalone) {
+  /* Remove safe-area insets for notched phones */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* ===== Responsive table cards on mobile ===== */
+@media (max-width: 640px) {
+  /* Hide scrollbar on mobile for cleaner look */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
 }
