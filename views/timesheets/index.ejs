@@ -4,9 +4,12 @@
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
   <div>
     <h1 class="text-2xl font-bold text-gray-900">Timesheets</h1>
-    <p class="text-gray-500 text-sm mt-0.5">Track crew hours and approve timesheets</p>
+    <p class="text-gray-500 text-sm mt-0.5">Crew hours &middot; approvals &middot; overtime tracking</p>
   </div>
-  <a href="/timesheets/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Log Timesheet</a>
+  <a href="/timesheets/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+    Log Timesheet
+  </a>
 </div>
 
 <!-- Sub-navigation -->
@@ -23,16 +26,16 @@
     <p class="text-xl font-bold text-gray-900 mt-0.5"><%= stats.totalHours %></p>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pending</p>
-    <p class="text-xl font-bold <%= stats.pendingApproval > 0 ? 'text-orange-600' : 'text-gray-900' %> mt-0.5"><%= stats.pendingApproval %></p>
+    <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Pending</p>
+    <p class="text-xl font-bold <%= stats.pendingApproval > 0 ? 'text-orange-600' : 'text-gray-300' %> mt-0.5"><%= stats.pendingApproval %></p>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Approved</p>
+    <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Approved</p>
     <p class="text-xl font-bold text-emerald-600 mt-0.5"><%= stats.approvedCount %></p>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Crew Logged</p>
-    <p class="text-xl font-bold text-gray-900 mt-0.5"><%= stats.uniqueCrew %></p>
+    <p class="text-[10px] font-bold text-brand-500 uppercase tracking-widest">Crew Logged</p>
+    <p class="text-xl font-bold text-brand-600 mt-0.5"><%= stats.uniqueCrew %></p>
   </div>
 </div>
 
@@ -127,7 +130,12 @@
             <a href="/projects/<%= t.job_id %>" class="text-brand-600 hover:text-brand-700 text-xs"><%= t.job_number %></a>
           </td>
           <td class="px-3 py-2 text-gray-500 text-xs hidden md:table-cell tabular-nums"><%= t.start_time %>-<%= t.end_time %> <span class="text-gray-300">(<%= t.break_minutes %>m brk)</span></td>
-          <td class="px-3 py-2 text-right text-gray-900 font-semibold text-xs tabular-nums"><%= parseFloat(t.total_hours).toFixed(1) %></td>
+          <td class="px-3 py-2 text-right text-xs tabular-nums">
+            <span class="font-semibold <%= parseFloat(t.total_hours) > 10 ? 'text-red-600' : parseFloat(t.total_hours) > 8 ? 'text-amber-600' : 'text-gray-900' %>"><%= parseFloat(t.total_hours).toFixed(1) %></span>
+            <% if (parseFloat(t.total_hours) > 8) { %>
+              <span class="text-[9px] font-bold text-amber-600 ml-0.5">OT</span>
+            <% } %>
+          </td>
           <td class="px-3 py-2 hidden lg:table-cell">
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium
               <% if (t.shift_type === 'night') { %>bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20

@@ -50,7 +50,8 @@ router.get('/', (req, res) => {
     defects,
     jobs,
     filters: req.query,
-    stats
+    stats,
+    today,
   });
 });
 

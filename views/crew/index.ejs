@@ -1,9 +1,41 @@
-<div class="space-y-6">
+<%
+  const roleLabels = {
+    traffic_controller: 'Traffic Controller',
+    leading_hand: 'Leading Hand',
+    supervisor: 'Supervisor',
+    pilot_vehicle: 'Pilot Vehicle',
+    spotter: 'Spotter',
+    labourer: 'Labourer',
+    other: 'Other'
+  };
+
+  function daysUntil(dateStr) {
+    if (!dateStr) return null;
+    const diff = Math.ceil((new Date(dateStr) - new Date(today)) / (1000 * 60 * 60 * 24));
+    return diff;
+  }
+
+  function formatShortDate(dateStr) {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
+  }
+
+  function relativeDate(dateStr) {
+    if (!dateStr) return '-';
+    const d = daysUntil(dateStr);
+    if (d === null) return '-';
+    if (d < 0) return Math.abs(d) + 'd ago';
+    if (d === 0) return 'Today';
+    return d + 'd';
+  }
+%>
+
+<div class="space-y-5">
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">Workforce</h1>
-      <p class="text-sm text-gray-500 mt-1">Operational workforce roster with compliance status</p>
+      <p class="text-sm text-gray-500 mt-1">Operational roster &middot; compliance &middot; allocation status</p>
     </div>
     <a href="/crew/new" class="inline-flex items-center justify-center px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
       <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
@@ -12,34 +44,50 @@
   </div>
 
   <!-- Stat Cards -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Active</p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Active</p>
       <p class="text-2xl font-bold text-gray-900 mt-1"><%= stats.totalActive %></p>
     </div>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Allocatable</p>
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Allocatable</p>
       <p class="text-2xl font-bold text-emerald-600 mt-1"><%= stats.allocatable %></p>
     </div>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Compliance Issues</p>
+      <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Compliance Issues</p>
       <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.complianceIssues %></p>
     </div>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Fatigue Blocked</p>
+      <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Fatigue Blocked</p>
       <p class="text-2xl font-bold text-orange-600 mt-1"><%= stats.fatigueBlocked %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Expiring &lt;30d</p>
+      <p class="text-2xl font-bold text-amber-600 mt-1"><%= stats.expiringSoon %></p>
     </div>
   </div>
 
   <!-- Filters -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
     <form method="GET" action="/crew" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+      <!-- Status Tabs -->
       <div class="flex rounded-lg overflow-hidden border border-gray-300 self-start">
-        <a href="/crew?filter=all&search=<%= search %>" class="px-3 py-2 text-xs font-medium <%= filter === 'all' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">All</a>
-        <a href="/crew?filter=active&search=<%= search %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'active' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Active</a>
-        <a href="/crew?filter=blocked&search=<%= search %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'blocked' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Blocked</a>
-        <a href="/crew?filter=fatigued&search=<%= search %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'fatigued' ? 'bg-orange-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Fatigued</a>
+        <a href="/crew?filter=all&search=<%= search %>&role=<%= roleFilter %>" class="px-3 py-2 text-xs font-medium <%= filter === 'all' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">All</a>
+        <a href="/crew?filter=active&search=<%= search %>&role=<%= roleFilter %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'active' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Active</a>
+        <a href="/crew?filter=blocked&search=<%= search %>&role=<%= roleFilter %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'blocked' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Blocked</a>
+        <a href="/crew?filter=fatigued&search=<%= search %>&role=<%= roleFilter %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'fatigued' ? 'bg-orange-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Fatigued</a>
+        <a href="/crew?filter=expiring&search=<%= search %>&role=<%= roleFilter %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'expiring' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Expiring</a>
       </div>
+
+      <!-- Role Filter -->
+      <select name="role" onchange="this.form.submit()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Roles</option>
+        <% Object.entries(roleLabels).forEach(([val, label]) => { %>
+          <option value="<%= val %>" <%= roleFilter === val ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+
+      <!-- Search -->
       <div class="flex-1 min-w-0 sm:min-w-[200px]">
         <input type="text" name="search" value="<%= search %>" placeholder="Search name, ID, role, company..."
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -66,28 +114,38 @@
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-gray-200">
-            <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Name</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden sm:table-cell">Employee ID</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden md:table-cell">Role</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden lg:table-cell">TC Level</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden lg:table-cell">Company</th>
-            <th class="px-3 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Employee ID</th>
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Role</th>
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+            <th class="px-3 sm:px-4 py-3 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Jobs</th>
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Next Expiry</th>
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Last Worked</th>
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Company</th>
+            <th class="px-3 sm:px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-200">
+        <tbody class="divide-y divide-gray-100">
           <% for (const c of crew) { %>
           <tr class="hover:bg-gray-50 transition <%= !c.active ? 'opacity-50' : '' %>">
+            <!-- Name + mobile subtitle -->
             <td class="px-3 sm:px-4 py-3">
               <a href="/crew/<%= c.id %>" class="text-brand-600 hover:text-brand-700 font-medium"><%= c.full_name %></a>
+              <div class="sm:hidden text-[10px] text-gray-400 mt-0.5"><%= c.employee_id || '' %><% if (c.role) { %> &middot; <%= roleLabels[c.role] || c.role %><% } %></div>
             </td>
-            <td class="px-3 sm:px-4 py-3 text-gray-600 hidden sm:table-cell"><%= c.employee_id || '—' %></td>
+
+            <!-- Employee ID -->
+            <td class="px-3 sm:px-4 py-3 text-gray-500 hidden sm:table-cell font-mono text-xs"><%= c.employee_id || '-' %></td>
+
+            <!-- Role -->
             <td class="px-3 sm:px-4 py-3 hidden md:table-cell">
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white text-gray-600">
-                <%= c.role ? c.role.replace('_', ' ') : '—' %>
-              </span>
+              <span class="text-xs text-gray-600"><%= roleLabels[c.role] || c.role || '-' %></span>
+              <% if (c.tcp_level) { %>
+                <span class="ml-1 text-[10px] text-gray-400">L<%= c.tcp_level %></span>
+              <% } %>
             </td>
-            <td class="px-3 sm:px-4 py-3 text-gray-600 hidden lg:table-cell"><%= c.tcp_level || '—' %></td>
+
+            <!-- Compliance Status Badges -->
             <td class="px-3 sm:px-4 py-3">
               <div class="flex flex-wrap gap-1">
                 <% if (c.compliance.canAllocate) { %>
@@ -114,7 +172,48 @@
                 <% } %>
               </div>
             </td>
-            <td class="px-3 sm:px-4 py-3 text-gray-600 hidden lg:table-cell"><%= c.company || '—' %></td>
+
+            <!-- Active Jobs Count -->
+            <td class="px-3 sm:px-4 py-3 text-center hidden lg:table-cell">
+              <% if (c.activeJobs > 0) { %>
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold bg-brand-50 text-brand-700 ring-1 ring-brand-600/20"><%= c.activeJobs %></span>
+              <% } else { %>
+                <span class="text-gray-300">-</span>
+              <% } %>
+            </td>
+
+            <!-- Next Expiry -->
+            <td class="px-3 sm:px-4 py-3 hidden lg:table-cell">
+              <% if (c.nearestExpiry) { %>
+                <%
+                  const days = daysUntil(c.nearestExpiry.date);
+                  let expiryColor = 'text-gray-500';
+                  if (days !== null) {
+                    if (days < 0) expiryColor = 'text-red-600 font-semibold';
+                    else if (days <= 14) expiryColor = 'text-red-600';
+                    else if (days <= 30) expiryColor = 'text-amber-600';
+                  }
+                %>
+                <span class="<%= expiryColor %> text-xs"><%= formatShortDate(c.nearestExpiry.date) %></span>
+                <span class="block text-[10px] text-gray-400"><%= c.nearestExpiry.label %></span>
+              <% } else { %>
+                <span class="text-gray-300 text-xs">-</span>
+              <% } %>
+            </td>
+
+            <!-- Last Worked -->
+            <td class="px-3 sm:px-4 py-3 hidden xl:table-cell">
+              <% if (c.lastWorked) { %>
+                <span class="text-xs text-gray-500"><%= formatShortDate(c.lastWorked) %></span>
+              <% } else { %>
+                <span class="text-gray-300 text-xs">Never</span>
+              <% } %>
+            </td>
+
+            <!-- Company -->
+            <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden xl:table-cell"><%= c.company || '-' %></td>
+
+            <!-- Actions -->
             <td class="px-3 sm:px-4 py-3 text-right">
               <div class="flex items-center justify-end gap-1">
                 <a href="/crew/<%= c.id %>" class="px-2.5 py-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50 rounded-lg">View</a>

@@ -22,22 +22,26 @@ router.get('/', (req, res) => {
   const equipment = db.prepare(`
     SELECT e.*,
       (SELECT COUNT(*) FROM equipment_assignments ea WHERE ea.equipment_id = e.id AND ea.actual_return_date IS NULL) as currently_deployed,
-      (SELECT j.job_number FROM equipment_assignments ea2 JOIN jobs j ON ea2.job_id = j.id WHERE ea2.equipment_id = e.id AND ea2.actual_return_date IS NULL ORDER BY ea2.assigned_date DESC LIMIT 1) as deployed_to_job
+      (SELECT j.job_number FROM equipment_assignments ea2 JOIN jobs j ON ea2.job_id = j.id WHERE ea2.equipment_id = e.id AND ea2.actual_return_date IS NULL ORDER BY ea2.assigned_date DESC LIMIT 1) as deployed_to_job,
+      (SELECT COUNT(*) FROM equipment_assignments ea3 WHERE ea3.equipment_id = e.id) as total_assignments
     FROM equipment e
     ${whereClause}
     ORDER BY e.category, e.name
   `).all(...params);
 
   const today = new Date().toISOString().split('T')[0];
-  const inspectionsDue = db.prepare("SELECT COUNT(*) as count FROM equipment WHERE active = 1 AND next_inspection_date <= ?").get(today).count;
+  const allActive = db.prepare("SELECT * FROM equipment WHERE active = 1").all();
+  const inspectionsDue = allActive.filter(e => e.next_inspection_date && e.next_inspection_date <= today).length;
   const totalDeployed = db.prepare("SELECT COUNT(DISTINCT equipment_id) as count FROM equipment_assignments WHERE actual_return_date IS NULL").get().count;
+  const poorDamaged = allActive.filter(e => ['poor', 'damaged'].includes(e.current_condition)).length;
 
   res.render('equipment/index', {
     title: 'Equipment Register',
     currentPage: 'equipment',
     equipment,
     filters: req.query,
-    stats: { total: equipment.length, inspectionsDue, totalDeployed }
+    stats: { total: equipment.length, inspectionsDue, totalDeployed, poorDamaged },
+    today,
   });
 });
 

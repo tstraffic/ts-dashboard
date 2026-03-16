@@ -21,7 +21,9 @@ router.get('/', (req, res) => {
   const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
   const contacts = db.prepare(`
-    SELECT cc.*, j.job_number, j.client
+    SELECT cc.*, j.job_number, j.client,
+      (SELECT COUNT(*) FROM communication_log cl WHERE cl.contact_id = cc.id) as comms_count,
+      (SELECT MAX(cl2.comm_date) FROM communication_log cl2 WHERE cl2.contact_id = cc.id) as last_contact_date
     FROM client_contacts cc
     LEFT JOIN jobs j ON cc.job_id = j.id
     ${whereClause}
