@@ -101,10 +101,25 @@ router.post('/:id', (req, res) => {
 
 // Delete plan
 router.post('/:id/delete', (req, res) => {
-  const db = getDb();
-  db.prepare('DELETE FROM traffic_plans WHERE id = ?').run(req.params.id);
-  req.flash('success', 'Traffic plan deleted.');
-  res.redirect('/plans');
+  try {
+    const db = getDb();
+    const plan = db.prepare('SELECT id, plan_number FROM traffic_plans WHERE id = ?').get(req.params.id);
+    if (!plan) {
+      req.flash('error', 'Plan not found.');
+      return res.redirect('/plans');
+    }
+    const result = db.prepare('DELETE FROM traffic_plans WHERE id = ?').run(req.params.id);
+    if (result.changes === 0) {
+      req.flash('error', 'Failed to delete plan — no rows affected.');
+    } else {
+      req.flash('success', `Traffic plan ${plan.plan_number} deleted.`);
+    }
+    res.redirect('/plans');
+  } catch (err) {
+    console.error('[Plans] Delete error:', err.message, err.stack);
+    req.flash('error', 'Failed to delete plan: ' + err.message);
+    res.redirect('/plans');
+  }
 });
 
 module.exports = router;

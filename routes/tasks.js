@@ -3,6 +3,20 @@ const router = express.Router();
 const { getDb } = require('../db/database');
 const { sendTaskAssignmentEmail, sendTaskStatusEmail } = require('../middleware/email');
 
+/**
+ * Check if current user can modify a task.
+ * Allowed: task owner, admin role, management role, or the user who created/assigned it.
+ */
+function canModifyTask(task, user) {
+  if (!user) return false;
+  const role = (user.role || '').toLowerCase();
+  // Admin and management can always modify
+  if (role === 'admin' || role === 'management') return true;
+  // Task owner can modify their own tasks
+  if (task.owner_id && String(task.owner_id) === String(user.id)) return true;
+  return false;
+}
+
 // GET / — Main tasks view with tabs, counts, and filters
 router.get('/', (req, res) => {
   const db = getDb();
@@ -154,9 +168,13 @@ router.get('/:id/edit', (req, res) => {
   const db = getDb();
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!task) { req.flash('error', 'Task not found.'); return res.redirect('/tasks'); }
+
+  // Check ownership — non-owners can view but form will be read-only
+  const editable = canModifyTask(task, req.session.user);
+
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
   const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
-  res.render('tasks/form', { title: 'Edit Task', task, jobs, users, user: req.session.user, prefillJobId: '' });
+  res.render('tasks/form', { title: 'Edit Task', task, jobs, users, user: req.session.user, prefillJobId: '', editable });
 });
 
 // POST /:id — Update task
@@ -165,9 +183,18 @@ router.post('/:id', (req, res) => {
     const db = getDb();
     const b = req.body;
 
-    // Check if owner changed (for email notification)
-    const oldTask = db.prepare('SELECT owner_id FROM tasks WHERE id = ?').get(req.params.id);
-    const ownerChanged = oldTask && String(oldTask.owner_id) !== String(b.owner_id);
+    // Check ownership before allowing update
+    const existingTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+    if (!existingTask) {
+      req.flash('error', 'Task not found.');
+      return res.redirect('/tasks');
+    }
+    if (!canModifyTask(existingTask, req.session.user)) {
+      req.flash('error', 'You can only edit tasks assigned to you.');
+      return res.redirect('/tasks/' + req.params.id + '/edit');
+    }
+
+    const ownerChanged = String(existingTask.owner_id) !== String(b.owner_id);
 
     const updateJobId = b.job_id || null;
     const division = b.division || 'ops';
@@ -202,7 +229,7 @@ router.post('/:id', (req, res) => {
   }
 });
 
-// POST /:id/status — Quick inline status change
+// POST /:id/status — Quick inline status change (owner + admin/management only)
 router.post('/:id/status', (req, res) => {
   try {
     const db = getDb();
@@ -212,6 +239,18 @@ router.post('/:id/status', (req, res) => {
       req.flash('error', 'Invalid status.');
       return res.redirect(req.headers.referer || '/tasks');
     }
+
+    // Check ownership
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+    if (!task) {
+      req.flash('error', 'Task not found.');
+      return res.redirect(req.headers.referer || '/tasks');
+    }
+    if (!canModifyTask(task, req.session.user)) {
+      req.flash('error', 'You can only update status on your own tasks.');
+      return res.redirect(req.headers.referer || '/tasks');
+    }
+
     const today = new Date().toISOString().split('T')[0];
     const completedDate = newStatus === 'complete' ? today : null;
     db.prepare('UPDATE tasks SET status = ?, completed_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
@@ -219,8 +258,7 @@ router.post('/:id/status', (req, res) => {
 
     // Send status change email to task owner (fire-and-forget)
     try {
-      const task = db.prepare('SELECT t.*, j.job_number, j.client FROM tasks t LEFT JOIN jobs j ON t.job_id = j.id WHERE t.id = ?').get(req.params.id);
-      if (task && task.owner_id) {
+      if (task.owner_id) {
         const ownerUser = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(task.owner_id);
         const changedByName = req.session.user ? req.session.user.full_name : '';
         const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
@@ -239,18 +277,28 @@ router.post('/:id/status', (req, res) => {
   }
 });
 
-// POST /:id/complete — Quick complete
+// POST /:id/complete — Quick complete (owner + admin/management only)
 router.post('/:id/complete', (req, res) => {
   const db = getDb();
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  if (task && !canModifyTask(task, req.session.user)) {
+    req.flash('error', 'You can only complete your own tasks.');
+    return res.redirect(req.headers.referer || '/tasks');
+  }
   const today = new Date().toISOString().split('T')[0];
   db.prepare("UPDATE tasks SET status = 'complete', completed_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(today, req.params.id);
   req.flash('success', 'Task completed.');
   res.redirect(req.headers.referer || '/tasks');
 });
 
-// POST /:id/delete — Delete task
+// POST /:id/delete — Delete task (owner + admin/management only)
 router.post('/:id/delete', (req, res) => {
   const db = getDb();
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  if (task && !canModifyTask(task, req.session.user)) {
+    req.flash('error', 'You can only delete your own tasks.');
+    return res.redirect(req.body.return_to || '/tasks');
+  }
   db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
   req.flash('success', 'Task deleted.');
   res.redirect(req.body.return_to || '/tasks');
