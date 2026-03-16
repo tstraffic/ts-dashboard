@@ -24,9 +24,8 @@
   };
 %>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
+<!-- Header -->
+<div class="flex items-center justify-between mb-5">
     <h1 class="text-2xl font-bold text-gray-900">Traffic Plans</h1>
     <a href="/plans/new" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition">
       <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -35,7 +34,7 @@
   </div>
 
   <!-- Filters -->
-  <form method="GET" action="/plans" class="bg-white border border-gray-200 rounded-lg shadow-sm p-4 mb-6">
+  <form method="GET" action="/plans" class="bg-white border border-gray-200 rounded-lg shadow-sm p-4 mb-5">
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
       <!-- Plan Type -->
       <div>
@@ -83,9 +82,14 @@
   <!-- Plans Table -->
   <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
     <% if (plans.length === 0) { %>
-      <div class="p-8 text-center text-gray-500">
-        <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        <p>No traffic plans found.</p>
+      <div class="p-10 text-center">
+        <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <p class="text-gray-500 text-sm font-medium">No traffic plans found</p>
+        <p class="text-gray-400 text-xs mt-1">Traffic plans track TGS, TCP, and TMP submissions, approvals, and expiry dates for your jobs</p>
+        <a href="/plans/new" class="inline-flex items-center mt-3 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+          <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Create First Plan
+        </a>
       </div>
     <% } else { %>
       <div class="overflow-x-auto">
@@ -180,4 +184,3 @@
       </div>
     <% } %>
   </div>
-</div>

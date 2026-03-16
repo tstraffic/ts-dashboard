@@ -102,10 +102,8 @@
   const activeTab = filters.tab || '';
 %>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-  <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+<!-- Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
     <h1 class="text-2xl font-bold text-gray-900">Tasks & Actions</h1>
     <div class="flex items-center gap-2">
       <a href="<%= filterUrl('owner', filters.owner === 'me' ? '' : 'me') %>"
@@ -397,4 +395,3 @@
       Showing <%= tasks.length %> task<%= tasks.length !== 1 ? 's' : '' %>
     </div>
   <% } %>
-</div>
