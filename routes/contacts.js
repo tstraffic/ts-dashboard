@@ -209,12 +209,22 @@ router.get('/:id/edit', (req, res) => {
     return res.redirect('/contacts');
   }
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs ORDER BY job_number DESC").all();
+
+  // Activity log
+  const activityLog = db.prepare(`
+    SELECT al.*, u.full_name as user_name FROM activity_log al
+    LEFT JOIN users u ON al.user_id = u.id
+    WHERE al.entity_type = 'contact' AND al.entity_id = ?
+    ORDER BY al.created_at DESC LIMIT 20
+  `).all(req.params.id);
+
   res.render('contacts/form', {
     title: `Edit ${contact.full_name}`,
     currentPage: 'contacts',
     contact,
     jobs,
-    preselectedJobId: ''
+    preselectedJobId: '',
+    activityLog
   });
 });
 

@@ -16,7 +16,7 @@
 </div>
 
 <!-- Form -->
-<form method="POST" action="<%= isEdit ? '/incidents/' + incident.id : '/incidents' %>" class="space-y-5" data-wizard>
+<form method="POST" action="<%= isEdit ? '/incidents/' + incident.id : '/incidents' %>" class="space-y-5" data-wizard enctype="multipart/form-data">
 
   <!-- Step 1: Incident Details -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="0" data-wizard-title="Details">
@@ -201,6 +201,22 @@
             class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Photo Upload -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Photo / Evidence</h2>
+    <div>
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Upload Photo</label>
+      <input type="file" name="photo" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+      <p class="text-xs text-gray-400 mt-1">Upload a photo of the incident scene (max 10MB, JPEG/PNG/GIF/WebP/PDF)</p>
+      <% if (isEdit && incident.photo_path) { %>
+        <div class="mt-2">
+          <p class="text-xs text-gray-500 mb-1">Current photo:</p>
+          <img src="<%= incident.photo_path %>" alt="Current incident photo" class="rounded-lg border border-gray-200 max-w-xs max-h-32 object-cover">
+        </div>
+      <% } %>
     </div>
   </div>
 

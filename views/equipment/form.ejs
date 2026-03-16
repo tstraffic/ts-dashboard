@@ -73,7 +73,7 @@
   <!-- Step 2: Specifications & Condition -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="1" data-wizard-title="Specifications">
     <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Purchase & Condition</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <div>
         <label for="purchase_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Purchase Date</label>
         <input type="date" id="purchase_date" name="purchase_date"
@@ -96,6 +96,17 @@
           <option value="poor" <%= isEdit && item.current_condition === 'poor' ? 'selected' : '' %>>Poor</option>
           <option value="damaged" <%= isEdit && item.current_condition === 'damaged' ? 'selected' : '' %>>Damaged</option>
           <option value="decommissioned" <%= isEdit && item.current_condition === 'decommissioned' ? 'selected' : '' %>>Decommissioned</option>
+        </select>
+      </div>
+      <div>
+        <label for="status" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Status</label>
+        <select id="status" name="status"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="available" <%= isEdit && item.status === 'available' ? 'selected' : (!isEdit ? 'selected' : '') %>>Available</option>
+          <option value="deployed" <%= isEdit && item.status === 'deployed' ? 'selected' : '' %>>Deployed</option>
+          <option value="maintenance" <%= isEdit && item.status === 'maintenance' ? 'selected' : '' %>>Under Maintenance</option>
+          <option value="inspection_due" <%= isEdit && item.status === 'inspection_due' ? 'selected' : '' %>>Inspection Due</option>
+          <option value="retired" <%= isEdit && item.status === 'retired' ? 'selected' : '' %>>Retired</option>
         </select>
       </div>
     </div>

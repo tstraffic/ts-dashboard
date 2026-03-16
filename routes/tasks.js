@@ -171,6 +171,25 @@ router.post('/', (req, res) => {
   }
 });
 
+// POST /bulk — Bulk actions on tasks
+router.post('/bulk', (req, res) => {
+  const db = getDb();
+  const ids = (req.body.ids || '').split(',').map(Number).filter(n => n > 0);
+  const action = req.body.action;
+  if (ids.length === 0) return res.redirect('/tasks');
+
+  if (action === 'complete') {
+    const stmt = db.prepare("UPDATE tasks SET status = 'complete', completed_date = date('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+    ids.forEach(id => stmt.run(id));
+    req.flash('success', ids.length + ' task(s) marked complete.');
+  } else if (action === 'delete') {
+    const stmt = db.prepare('DELETE FROM tasks WHERE id = ?');
+    ids.forEach(id => stmt.run(id));
+    req.flash('success', ids.length + ' task(s) deleted.');
+  }
+  res.redirect('/tasks');
+});
+
 // GET /:id/edit — Edit form
 router.get('/:id/edit', (req, res) => {
   const db = getDb();
@@ -182,7 +201,55 @@ router.get('/:id/edit', (req, res) => {
 
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
   const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
-  res.render('tasks/form', { title: 'Edit Task', task, jobs, users, user: req.session.user, prefillJobId: '', editable });
+
+  // Load subtasks
+  let subtasks = [];
+  try { subtasks = db.prepare('SELECT * FROM subtasks WHERE task_id = ? ORDER BY sort_order ASC').all(req.params.id); } catch (e) { /* table may not exist yet */ }
+
+  // Load comments with user names
+  let comments = [];
+  try {
+    comments = db.prepare(`
+      SELECT tc.*, u.full_name as user_name FROM task_comments tc
+      JOIN users u ON tc.user_id = u.id
+      WHERE tc.task_id = ? ORDER BY tc.created_at DESC
+    `).all(req.params.id);
+  } catch (e) { /* table may not exist yet */ }
+
+  // Load dependencies (tasks this task depends on)
+  let dependencies = [];
+  try {
+    dependencies = db.prepare(`
+      SELECT td.id as dep_id, td.depends_on_id, t.title, t.status, t.due_date
+      FROM task_dependencies td
+      JOIN tasks t ON td.depends_on_id = t.id
+      WHERE td.task_id = ? ORDER BY t.due_date ASC
+    `).all(req.params.id);
+  } catch (e) { /* table may not exist yet */ }
+
+  // Load tasks that depend on this task (dependents)
+  let dependents = [];
+  try {
+    dependents = db.prepare(`
+      SELECT td.id as dep_id, td.task_id, t.title, t.status, t.due_date
+      FROM task_dependencies td
+      JOIN tasks t ON td.task_id = t.id
+      WHERE td.depends_on_id = ? ORDER BY t.due_date ASC
+    `).all(req.params.id);
+  } catch (e) { /* table may not exist yet */ }
+
+  // All tasks (for dependency picker), excluding current task
+  const allTasks = db.prepare('SELECT id, title, status, due_date FROM tasks WHERE id != ? ORDER BY title').all(req.params.id);
+
+  // Activity log
+  const activityLog = db.prepare(`
+    SELECT al.*, u.full_name as user_name FROM activity_log al
+    LEFT JOIN users u ON al.user_id = u.id
+    WHERE al.entity_type = 'task' AND al.entity_id = ?
+    ORDER BY al.created_at DESC LIMIT 20
+  `).all(req.params.id);
+
+  res.render('tasks/form', { title: 'Edit Task', task, jobs, users, user: req.session.user, prefillJobId: '', editable, subtasks, comments, dependencies, dependents, allTasks, activityLog });
 });
 
 // POST /:id — Update task
@@ -325,6 +392,95 @@ router.post('/:id/delete', (req, res) => {
   db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
   req.flash('success', 'Task deleted.');
   res.redirect(req.body.return_to || '/tasks');
+});
+
+// =============================================
+// Comments
+// =============================================
+
+// POST /:id/comments — Add a comment
+router.post('/:id/comments', (req, res) => {
+  const db = getDb();
+  const { comment } = req.body;
+  if (!comment || !comment.trim()) return res.redirect('/tasks/' + req.params.id + '/edit');
+  db.prepare('INSERT INTO task_comments (task_id, user_id, comment) VALUES (?, ?, ?)').run(req.params.id, req.session.user.id, comment.trim());
+  const task = db.prepare('SELECT title FROM tasks WHERE id = ?').get(req.params.id);
+  if (task) {
+    const { logActivity } = require('../middleware/audit');
+    logActivity({ user: req.session.user, action: 'update', entityType: 'task', entityId: parseInt(req.params.id), entityLabel: task.title, details: 'Added comment', ip: req.ip });
+  }
+  res.redirect('/tasks/' + req.params.id + '/edit');
+});
+
+// =============================================
+// Subtasks
+// =============================================
+
+// POST /:id/subtasks — Add a subtask
+router.post('/:id/subtasks', (req, res) => {
+  const db = getDb();
+  const { title } = req.body;
+  if (!title || !title.trim()) return res.redirect('/tasks/' + req.params.id + '/edit');
+  const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) as m FROM subtasks WHERE task_id = ?').get(req.params.id).m;
+  db.prepare('INSERT INTO subtasks (task_id, title, sort_order) VALUES (?, ?, ?)').run(req.params.id, title.trim(), maxOrder + 1);
+  res.redirect('/tasks/' + req.params.id + '/edit');
+});
+
+// POST /:id/subtasks/:sid/toggle — Toggle subtask completion
+router.post('/:id/subtasks/:sid/toggle', (req, res) => {
+  const db = getDb();
+  const subtask = db.prepare('SELECT * FROM subtasks WHERE id = ? AND task_id = ?').get(req.params.sid, req.params.id);
+  if (subtask) {
+    if (subtask.completed) {
+      db.prepare('UPDATE subtasks SET completed = 0, completed_at = NULL WHERE id = ?').run(req.params.sid);
+    } else {
+      db.prepare("UPDATE subtasks SET completed = 1, completed_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.sid);
+    }
+  }
+  res.redirect('/tasks/' + req.params.id + '/edit');
+});
+
+// POST /:id/subtasks/:sid/delete — Delete a subtask
+router.post('/:id/subtasks/:sid/delete', (req, res) => {
+  const db = getDb();
+  db.prepare('DELETE FROM subtasks WHERE id = ? AND task_id = ?').run(req.params.sid, req.params.id);
+  res.redirect('/tasks/' + req.params.id + '/edit');
+});
+
+// =============================================
+// Task Dependencies
+// =============================================
+
+// POST /:id/dependencies — Add a dependency
+router.post('/:id/dependencies', (req, res) => {
+  const db = getDb();
+  const { depends_on_id } = req.body;
+  if (!depends_on_id) return res.redirect('/tasks/' + req.params.id + '/edit');
+  // Prevent self-dependency
+  if (String(depends_on_id) === String(req.params.id)) {
+    req.flash('error', 'A task cannot depend on itself.');
+    return res.redirect('/tasks/' + req.params.id + '/edit');
+  }
+  // Prevent circular dependencies (check if depends_on_id already depends on this task)
+  const circular = db.prepare('SELECT 1 FROM task_dependencies WHERE task_id = ? AND depends_on_id = ?').get(depends_on_id, req.params.id);
+  if (circular) {
+    req.flash('error', 'Cannot add dependency — it would create a circular reference.');
+    return res.redirect('/tasks/' + req.params.id + '/edit');
+  }
+  try {
+    db.prepare('INSERT INTO task_dependencies (task_id, depends_on_id) VALUES (?, ?)').run(req.params.id, depends_on_id);
+  } catch (e) {
+    // UNIQUE constraint — dependency already exists
+    req.flash('error', 'This dependency already exists.');
+  }
+  res.redirect('/tasks/' + req.params.id + '/edit');
+});
+
+// POST /:id/dependencies/:did/delete — Remove a dependency
+router.post('/:id/dependencies/:did/delete', (req, res) => {
+  const db = getDb();
+  db.prepare('DELETE FROM task_dependencies WHERE id = ? AND task_id = ?').run(req.params.did, req.params.id);
+  res.redirect('/tasks/' + req.params.id + '/edit');
 });
 
 module.exports = router;

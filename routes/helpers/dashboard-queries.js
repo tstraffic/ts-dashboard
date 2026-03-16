@@ -22,6 +22,13 @@ function getUrgencyKpis(db, today) {
     missingUpdates: db.prepare("SELECT COUNT(*) as c FROM jobs WHERE status = 'active' AND (last_update_date IS NULL OR last_update_date < ?)").get(last7).c,
     overdueCorrectiveActions: db.prepare("SELECT COUNT(*) as c FROM corrective_actions WHERE due_date < ? AND status != 'completed'").get(today).c,
     notifiableIncidents: db.prepare("SELECT COUNT(*) as c FROM incidents WHERE notifiable_incident = 1 AND investigation_status NOT IN ('closed', 'resolved')").get().c,
+    pendingTimesheets: db.prepare("SELECT COUNT(*) as c FROM timesheets WHERE approved = 0").get().c,
+    crewGaps: db.prepare(`
+      SELECT COUNT(*) as c FROM crew_allocations ca
+      JOIN jobs j ON ca.job_id = j.id
+      WHERE ca.allocation_date = ? AND ca.status = 'allocated' AND j.status = 'active'
+      AND ca.crew_member_id NOT IN (SELECT id FROM crew_members WHERE active = 1)
+    `).get(today).c,
   };
 }
 

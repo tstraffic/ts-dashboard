@@ -89,6 +89,7 @@
             <label class="block text-sm font-medium text-gray-600 mb-1">Break (minutes)</label>
             <input type="number" name="entries[0][break_minutes]" value="30" min="0" max="120"
               class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+            <div class="ot-display hidden text-xs mt-1"></div>
           </div>
           <!-- Role on Site -->
           <div>
@@ -155,6 +156,7 @@
           <label class="block text-sm font-medium text-gray-600 mb-1">Break (minutes)</label>
           <input type="number" name="entries[${entryIndex}][break_minutes]" value="30" min="0" max="120"
             class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <div class="ot-display hidden text-xs mt-1"></div>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">Role on Site</label>
@@ -198,5 +200,41 @@
       row.querySelector('.text-gray-400').textContent = `Crew Member #${i + 1}`;
     });
   }
+})();
+</script>
+
+<script>
+(function() {
+  function calcHoursForRow(row) {
+    const startEl = row.querySelector('input[type="time"][name*="start_time"]');
+    const endEl = row.querySelector('input[type="time"][name*="end_time"]');
+    const breakEl = row.querySelector('input[type="number"][name*="break_minutes"]');
+    const otDisplay = row.querySelector('.ot-display');
+    if (!startEl || !endEl || !startEl.value || !endEl.value) return;
+    const [sh, sm] = startEl.value.split(':').map(Number);
+    const [eh, em] = endEl.value.split(':').map(Number);
+    let totalMins = (eh * 60 + em) - (sh * 60 + sm);
+    if (totalMins < 0) totalMins += 24 * 60; // overnight shift
+    const breakMins = parseInt(breakEl ? breakEl.value : '30') || 30;
+    totalMins -= breakMins;
+    if (totalMins < 0) totalMins = 0;
+    const hours = Math.round(totalMins / 60 * 100) / 100;
+    const ordinary = Math.min(hours, 7.6);
+    const ot = Math.max(0, Math.round((hours - 7.6) * 100) / 100);
+    if (otDisplay) {
+      otDisplay.innerHTML = '<span class="text-gray-600">' + hours.toFixed(1) + 'h total &mdash; ' + ordinary.toFixed(1) + 'h ordinary</span>' +
+        (ot > 0 ? ' + <span class="text-amber-600 font-semibold">' + ot.toFixed(1) + 'h OT</span>' : '');
+      otDisplay.classList.remove('hidden');
+    }
+  }
+
+  document.getElementById('entriesContainer').addEventListener('change', function(e) {
+    if (e.target.matches('input[type="time"], input[name*="break_minutes"]')) {
+      calcHoursForRow(e.target.closest('.entry-row'));
+    }
+  });
+
+  // Calculate on load for any pre-filled values
+  document.querySelectorAll('.entry-row').forEach(calcHoursForRow);
 })();
 </script>

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { logActivity } = require('../middleware/audit');
+const upload = require('../middleware/upload');
 
 // Helper to generate next incident number
 function nextIncidentNumber(db) {
@@ -24,6 +25,12 @@ router.get('/', (req, res) => {
 
   const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
+  // Sorting
+  const allowedSorts = { 'incident_date': 'i.incident_date', 'severity': 'i.severity', 'investigation_status': 'i.investigation_status', 'title': 'i.title' };
+  const sort = allowedSorts[req.query.sort] ? req.query.sort : 'incident_date';
+  const order = req.query.order === 'asc' ? 'ASC' : 'DESC';
+  const orderByCol = allowedSorts[sort] || 'i.incident_date';
+
   const incidents = db.prepare(`
     SELECT i.*, j.job_number, j.client, u.full_name as reported_by_name,
       (SELECT COUNT(*) FROM corrective_actions ca WHERE ca.incident_id = i.id) as corrective_action_count,
@@ -32,7 +39,7 @@ router.get('/', (req, res) => {
     JOIN jobs j ON i.job_id = j.id
     JOIN users u ON i.reported_by_id = u.id
     ${whereClause}
-    ORDER BY i.incident_date DESC
+    ORDER BY ${orderByCol} ${order}
   `).all(...params);
 
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
@@ -58,6 +65,8 @@ router.get('/', (req, res) => {
     filters: req.query,
     stats,
     today,
+    sort,
+    order: order.toLowerCase(),
   });
 });
 
@@ -88,16 +97,17 @@ router.get('/new', (req, res) => {
 });
 
 // CREATE
-router.post('/', (req, res) => {
+router.post('/', upload.single('photo'), (req, res) => {
   const db = getDb();
   const { job_id, incident_type, severity, title, description, location, incident_date, incident_time, persons_involved, witnesses, immediate_actions, notifiable_incident, traffic_disruption, police_notified, client_notified, close_out_date } = req.body;
   const incident_number = nextIncidentNumber(db);
   const job = db.prepare('SELECT job_number FROM jobs WHERE id = ?').get(job_id);
+  const photo_path = req.file ? '/uploads/' + req.file.filename : '';
 
   const result = db.prepare(`
-    INSERT INTO incidents (job_id, incident_number, incident_type, severity, title, description, location, incident_date, incident_time, reported_by_id, persons_involved, witnesses, immediate_actions, notifiable_incident, traffic_disruption, police_notified, client_notified, close_out_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(job_id, incident_number, incident_type, severity || 'low', title, description, location || '', incident_date, incident_time || '', req.session.user.id, persons_involved || '', witnesses || '', immediate_actions || '', notifiable_incident ? 1 : 0, traffic_disruption ? 1 : 0, police_notified ? 1 : 0, client_notified ? 1 : 0, close_out_date || null);
+    INSERT INTO incidents (job_id, incident_number, incident_type, severity, title, description, location, incident_date, incident_time, reported_by_id, persons_involved, witnesses, immediate_actions, notifiable_incident, traffic_disruption, police_notified, client_notified, close_out_date, photo_path)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(job_id, incident_number, incident_type, severity || 'low', title, description, location || '', incident_date, incident_time || '', req.session.user.id, persons_involved || '', witnesses || '', immediate_actions || '', notifiable_incident ? 1 : 0, traffic_disruption ? 1 : 0, police_notified ? 1 : 0, client_notified ? 1 : 0, close_out_date || null, photo_path);
 
   const incidentId = result.lastInsertRowid;
 
@@ -196,16 +206,19 @@ router.get('/:id/edit', (req, res) => {
 });
 
 // UPDATE
-router.post('/:id', (req, res) => {
+router.post('/:id', upload.single('photo'), (req, res) => {
   const db = getDb();
   const { job_id, incident_type, severity, title, description, location, incident_date, incident_time, persons_involved, witnesses, immediate_actions, root_cause, investigation_status, notifiable_incident, traffic_disruption, police_notified, client_notified, close_out_date } = req.body;
   const job = db.prepare('SELECT job_number FROM jobs WHERE id = ?').get(job_id);
-  const existing = db.prepare('SELECT incident_number FROM incidents WHERE id = ?').get(req.params.id);
+  const existing = db.prepare('SELECT incident_number, photo_path FROM incidents WHERE id = ?').get(req.params.id);
+
+  // Use new photo if uploaded, otherwise keep existing
+  const photo_path = req.file ? '/uploads/' + req.file.filename : (existing ? existing.photo_path : '');
 
   db.prepare(`
-    UPDATE incidents SET job_id=?, incident_type=?, severity=?, title=?, description=?, location=?, incident_date=?, incident_time=?, persons_involved=?, witnesses=?, immediate_actions=?, root_cause=?, investigation_status=?, notifiable_incident=?, traffic_disruption=?, police_notified=?, client_notified=?, close_out_date=?, updated_at=CURRENT_TIMESTAMP
+    UPDATE incidents SET job_id=?, incident_type=?, severity=?, title=?, description=?, location=?, incident_date=?, incident_time=?, persons_involved=?, witnesses=?, immediate_actions=?, root_cause=?, investigation_status=?, notifiable_incident=?, traffic_disruption=?, police_notified=?, client_notified=?, close_out_date=?, photo_path=?, updated_at=CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(job_id, incident_type, severity, title, description, location || '', incident_date, incident_time || '', persons_involved || '', witnesses || '', immediate_actions || '', root_cause || '', investigation_status, notifiable_incident ? 1 : 0, traffic_disruption ? 1 : 0, police_notified ? 1 : 0, client_notified ? 1 : 0, close_out_date || null, req.params.id);
+  `).run(job_id, incident_type, severity, title, description, location || '', incident_date, incident_time || '', persons_involved || '', witnesses || '', immediate_actions || '', root_cause || '', investigation_status, notifiable_incident ? 1 : 0, traffic_disruption ? 1 : 0, police_notified ? 1 : 0, client_notified ? 1 : 0, close_out_date || null, photo_path, req.params.id);
 
   // Sync linked crew members: delete existing, re-insert
   db.prepare('DELETE FROM incident_crew_members WHERE incident_id = ?').run(req.params.id);
@@ -266,6 +279,31 @@ router.post('/:id/corrective-actions/:caId/complete', (req, res) => {
 
   req.flash('success', 'Corrective action completed.');
   res.redirect(`/incidents/${req.params.id}`);
+});
+
+// ESCALATE INCIDENT
+router.post('/:id/escalate', (req, res) => {
+  const db = getDb();
+  const { escalation_level } = req.body;
+  const allowed = ['standard', 'elevated', 'critical', 'regulator'];
+  if (!allowed.includes(escalation_level)) {
+    req.flash('error', 'Invalid escalation level.');
+    return res.redirect('/incidents/' + req.params.id);
+  }
+
+  const incident = db.prepare('SELECT incident_number, job_id, escalation_level as old_level FROM incidents WHERE id = ?').get(req.params.id);
+  if (!incident) {
+    req.flash('error', 'Incident not found.');
+    return res.redirect('/incidents');
+  }
+
+  db.prepare('UPDATE incidents SET escalation_level = ?, escalated_at = CURRENT_TIMESTAMP, escalated_by_id = ? WHERE id = ?')
+    .run(escalation_level, req.session.user.id, req.params.id);
+
+  logActivity({ user: req.session.user, action: 'escalate', entityType: 'incident', entityId: parseInt(req.params.id), entityLabel: `${incident.incident_number} escalation: ${incident.old_level || 'standard'} -> ${escalation_level}`, jobId: incident.job_id, ip: req.ip });
+
+  req.flash('success', `Escalation level updated to ${escalation_level}.`);
+  res.redirect('/incidents/' + req.params.id);
 });
 
 module.exports = router;

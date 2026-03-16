@@ -50,6 +50,16 @@
         <% } %>
       </div>
 
+      <!-- Photo -->
+      <% if (defect.photo_path) { %>
+      <div class="bg-white border border-gray-200 rounded-2xl p-6">
+        <h3 class="text-sm font-bold text-gray-800 mb-3">Photo</h3>
+        <a href="<%= defect.photo_path %>" target="_blank" class="block">
+          <img src="<%= defect.photo_path %>" alt="Defect photo" class="rounded-xl border border-gray-200 max-w-full shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+        </a>
+      </div>
+      <% } %>
+
       <!-- Quick Status Update -->
       <div class="bg-white border border-gray-200 rounded-2xl p-6">
         <h3 class="text-sm font-bold text-gray-800 mb-3">Update Status</h3>

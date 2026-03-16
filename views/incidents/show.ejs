@@ -37,6 +37,19 @@
   </div>
 </div>
 
+<!-- Escalation Banner -->
+<% if (incident.escalation_level && incident.escalation_level !== 'standard') { %>
+<div class="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-xl <%= incident.escalation_level === 'critical' || incident.escalation_level === 'regulator' ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200' %>">
+  <svg class="w-4 h-4 flex-shrink-0 <%= incident.escalation_level === 'critical' || incident.escalation_level === 'regulator' ? 'text-red-500' : 'text-amber-500' %>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+  <span class="text-sm font-semibold <%= incident.escalation_level === 'critical' || incident.escalation_level === 'regulator' ? 'text-red-700' : 'text-amber-700' %>">
+    Escalation: <%= incident.escalation_level.charAt(0).toUpperCase() + incident.escalation_level.slice(1) %>
+  </span>
+  <% if (incident.escalated_at) { %>
+    <span class="text-xs text-gray-400 ml-2">Escalated <%= new Date(incident.escalated_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) %></span>
+  <% } %>
+</div>
+<% } %>
+
 <!-- Incident Title -->
 <div class="mb-6">
   <h2 class="text-lg text-gray-600"><%= incident.title %></h2>
@@ -133,6 +146,16 @@
   <p class="text-sm text-gray-600 whitespace-pre-wrap"><%= incident.description || 'No description provided.' %></p>
 </div>
 
+<!-- Photo -->
+<% if (incident.photo_path) { %>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
+  <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">Photo / Evidence</h3>
+  <a href="<%= incident.photo_path %>" target="_blank" class="block">
+    <img src="<%= incident.photo_path %>" alt="Incident photo" class="rounded-xl border border-gray-200 max-w-full max-h-96 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+  </a>
+</div>
+<% } %>
+
 <!-- Persons Involved & Witnesses -->
 <% if (incident.persons_involved || incident.witnesses) { %>
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -187,6 +210,30 @@
   <p class="text-sm text-gray-600 whitespace-pre-wrap"><%= incident.root_cause %></p>
 </div>
 <% } %>
+
+<!-- Escalation Controls -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
+  <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">Escalation</h3>
+  <div class="flex items-center gap-3 mb-3">
+    <span class="text-sm text-gray-600">Current level:</span>
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+      <% if ((incident.escalation_level || 'standard') === 'regulator') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
+      <% } else if ((incident.escalation_level || 'standard') === 'critical') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
+      <% } else if ((incident.escalation_level || 'standard') === 'elevated') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
+      <% } else { %>bg-gray-100 text-gray-600<% } %>">
+      <%= (incident.escalation_level || 'standard').charAt(0).toUpperCase() + (incident.escalation_level || 'standard').slice(1) %>
+    </span>
+  </div>
+  <form method="POST" action="/incidents/<%= incident.id %>/escalate" class="flex items-center gap-2">
+    <select name="escalation_level" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+      <option value="standard" <%= (incident.escalation_level || 'standard') === 'standard' ? 'selected' : '' %>>Standard</option>
+      <option value="elevated" <%= incident.escalation_level === 'elevated' ? 'selected' : '' %>>Elevated</option>
+      <option value="critical" <%= incident.escalation_level === 'critical' ? 'selected' : '' %>>Critical</option>
+      <option value="regulator" <%= incident.escalation_level === 'regulator' ? 'selected' : '' %>>Regulator Notified</option>
+    </select>
+    <button type="submit" class="px-3 py-1.5 text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white rounded-lg transition-colors">Update</button>
+  </form>
+</div>
 
 <!-- Corrective Actions Section -->
 <div class="mb-6">

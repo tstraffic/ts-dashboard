@@ -581,7 +581,7 @@ function runMigrations(db) {
           CREATE TABLE notifications_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            type TEXT NOT NULL CHECK(type IN ('overdue_task','expiring_compliance','missing_update','corrective_action_due','follow_up_due','equipment_overdue','critical_defect','rol_pending','ticket_expiry','equipment_inspection_due','induction_overdue','over_budget','general')),
+            type TEXT NOT NULL CHECK(type IN ('overdue_task','expiring_compliance','missing_update','corrective_action_due','follow_up_due','equipment_overdue','critical_defect','rol_pending','ticket_expiry','equipment_inspection_due','induction_overdue','over_budget','deadline_reminder','general')),
             title TEXT NOT NULL,
             message TEXT NOT NULL DEFAULT '',
             link TEXT DEFAULT '',
@@ -1603,6 +1603,123 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 31: Task comments, subtasks, and dependencies
+  // =============================================
+  if (!isMigrationApplied.get(31)) {
+    console.log('Running migration 31: Task comments, subtasks, and dependencies');
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_comments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          comment TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS subtasks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          completed INTEGER DEFAULT 0,
+          completed_at DATETIME,
+          sort_order INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS task_dependencies (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          depends_on_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(task_id, depends_on_id)
+        );
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_subtasks_task ON subtasks(task_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_deps_task ON task_dependencies(task_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_deps_depends ON task_dependencies(depends_on_id)');
+      recordMigration.run(31, 'Task comments, subtasks, and dependencies');
+      console.log('Migration 31 complete.');
+    } catch (e) {
+      console.error('Migration 31 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 32: Timesheet OT split
+  // =============================================
+  if (!isMigrationApplied.get(32)) {
+    console.log('Running migration 32: Timesheet OT split');
+    try {
+      const hasOrdinaryHours = db.prepare("SELECT 1 FROM pragma_table_info('timesheets') WHERE name = 'ordinary_hours'").get();
+      if (!hasOrdinaryHours) {
+        db.exec(`
+          ALTER TABLE timesheets ADD COLUMN ordinary_hours REAL DEFAULT 0;
+        `);
+        db.exec(`
+          ALTER TABLE timesheets ADD COLUMN overtime_hours REAL DEFAULT 0;
+        `);
+        // Backfill: assume 7.6 hours is ordinary, rest is OT
+        db.exec(`
+          UPDATE timesheets SET
+            ordinary_hours = CASE WHEN total_hours <= 7.6 THEN total_hours ELSE 7.6 END,
+            overtime_hours = CASE WHEN total_hours > 7.6 THEN ROUND(total_hours - 7.6, 2) ELSE 0 END
+        `);
+      }
+      recordMigration.run(32, 'Timesheet OT split');
+      console.log('Migration 32 complete.');
+    } catch (e) {
+      console.error('Migration 32 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 33: Equipment status states
+  // =============================================
+  if (!isMigrationApplied.get(33)) {
+    console.log('Running migration 33: Equipment status states');
+    try {
+      const hasStatus = db.prepare("SELECT 1 FROM pragma_table_info('equipment') WHERE name = 'status'").get();
+      if (!hasStatus) {
+        db.exec(`ALTER TABLE equipment ADD COLUMN status TEXT DEFAULT 'available'`);
+        // Backfill based on current state
+        db.exec(`UPDATE equipment SET status = 'retired' WHERE active = 0`);
+        db.exec(`UPDATE equipment SET status = 'deployed' WHERE id IN (SELECT equipment_id FROM equipment_assignments WHERE actual_return_date IS NULL) AND active = 1`);
+        db.exec(`UPDATE equipment SET status = 'inspection_due' WHERE next_inspection_date IS NOT NULL AND next_inspection_date <= date('now', '+7 days') AND active = 1 AND status = 'available'`);
+        db.exec(`UPDATE equipment SET status = 'maintenance' WHERE current_condition IN ('poor', 'damaged') AND active = 1 AND status = 'available'`);
+      }
+      recordMigration.run(33, 'Equipment status states');
+      console.log('Migration 33 complete.');
+    } catch (e) {
+      console.error('Migration 33 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 34: Incident escalation + photo columns
+  // =============================================
+  if (!isMigrationApplied.get(34)) {
+    console.log('Running migration 34: Incident escalation columns');
+    try {
+      const hasEscalation = db.prepare("SELECT 1 FROM pragma_table_info('incidents') WHERE name = 'escalation_level'").get();
+      if (!hasEscalation) {
+        db.exec(`ALTER TABLE incidents ADD COLUMN escalation_level TEXT DEFAULT 'standard'`);
+        db.exec(`ALTER TABLE incidents ADD COLUMN escalated_at DATETIME`);
+        db.exec(`ALTER TABLE incidents ADD COLUMN escalated_by_id INTEGER REFERENCES users(id)`);
+        // Backfill: escalate based on severity and notifiable status
+        db.exec(`UPDATE incidents SET escalation_level = 'elevated' WHERE severity = 'high'`);
+        db.exec(`UPDATE incidents SET escalation_level = 'critical' WHERE severity = 'critical'`);
+        db.exec(`UPDATE incidents SET escalation_level = 'regulator' WHERE notifiable_incident = 1`);
+      }
+      recordMigration.run(34, 'Incident escalation columns');
+      console.log('Migration 34 complete.');
+    } catch (e) {
+      console.error('Migration 34 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
@@ -2024,6 +2141,7 @@ function initializeDatabase() {
     insertUser.run('ops_user', bcrypt.hashSync('password', 12), 'Sam Operations', 'sam@tstraffic.com.au', 'operations');
     insertUser.run('planning_user', bcrypt.hashSync('password', 12), 'Alex Planning', 'alex@tstraffic.com.au', 'planning');
     insertUser.run('finance_user', bcrypt.hashSync('password', 12), 'Pat Finance', 'pat@tstraffic.com.au', 'finance');
+    insertUser.run('accounts_user', bcrypt.hashSync('password', 12), 'Jordan Accounts', 'jordan@tstraffic.com.au', 'finance');
 
     // Seed sample jobs (use statuses valid under the new CHECK after migration 1 runs)
     const insertJob = db.prepare(`
@@ -2063,6 +2181,133 @@ function initializeDatabase() {
     `);
     insertUpdate.run(1, '2026-02-28', 'Good progress on barrier installation. Section A 80% complete. Night works approved by council.', 'Section A barriers 80% installed. Council night works approval received.', 'Minor delay due to weather on Tuesday. Subcontractor availability next week uncertain.', '', 1);
     insertUpdate.run(4, '2026-02-14', 'Project nearing completion but facing payment issues. Final inspection scheduled for next week.', 'Pavement marking completed. Signage installed.', 'Client disputing variation claim. Invoice 60 days overdue.', 'Cannot proceed with demobilisation until payment received.', 1);
+
+    // ── Additional jobs (7 more to reach 12 total) ──
+    insertJob.run('J-02456', 'J-02456 | Fulton Hogan | Blacktown | 2026-03-15', 'Fulton Hogan', '5 Main St', 'Blacktown', 'active', 'delivery', 60, '2026-03-15', '2026-08-20', 1, 2, 3, 4, 5, 'green', 'on_track', '2026-03-10');
+    insertJob.run('J-02457', 'J-02457 | CPB Contractors | Mascot | 2026-01-20', 'CPB Contractors', '200 Coward St', 'Mascot', 'active', 'delivery', 90, '2026-01-20', '2026-03-30', 1, 2, 3, 4, 5, 'green', 'on_track', '2026-03-15');
+    insertJob.run('J-02458', 'J-02458 | John Holland | Norwest | 2026-04-01', 'John Holland', '10 Lexington Dr', 'Norwest', 'won', 'prestart', 5, '2026-04-01', '2026-10-15', 1, 2, 3, 4, 5, 'green', 'na', null);
+    insertJob.run('J-02459', 'J-02459 | Transport for NSW | Homebush | 2026-02-10', 'Transport for NSW', '1 Olympic Blvd', 'Homebush', 'active', 'delivery', 55, '2026-02-10', '2026-07-15', 1, 2, 3, 4, 5, 'amber', 'on_track', '2026-03-12');
+    insertJob.run('J-02460', 'J-02460 | Downer EDI | Ryde | 2026-03-01', 'Downer EDI', '45 Victoria Rd', 'Ryde', 'active', 'delivery', 25, '2026-03-01', '2026-09-30', 1, 2, 3, 4, 5, 'green', 'on_track', '2026-03-14');
+    insertJob.run('J-02461', 'J-02461 | Georgiou Group | Campbelltown | 2026-02-20', 'Georgiou Group', '80 Queen St', 'Campbelltown', 'active', 'delivery', 70, '2026-02-20', '2026-06-15', 1, 2, 3, 4, 5, 'red', 'overdue', '2026-03-01');
+    insertJob.run('J-02462', 'J-02462 | Acciona | Wolli Creek | 2026-03-20', 'Acciona', '15 Arncliffe St', 'Wolli Creek', 'lead', 'tender', 0, '2026-03-20', '2026-12-31', 1, 2, 3, 4, 5, 'green', 'na', null);
+
+    // ── Crew members (25 people) ──
+    const insertCrew = db.prepare(`
+      INSERT INTO crew_members (full_name, employee_id, role, phone, email, licence_type, licence_expiry, induction_date, active, hourly_rate)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertCrew.run('John Smith', 'EMP-001', 'supervisor', '0412 345 678', 'john.smith@tstraffic.com.au', 'C', '2027-06-15', '2024-01-10', 1, 65);
+    insertCrew.run('Sarah Johnson', 'EMP-002', 'leading_hand', '0413 456 789', 'sarah.j@tstraffic.com.au', 'C', '2026-11-20', '2024-02-15', 1, 55);
+    insertCrew.run('Mike Chen', 'EMP-003', 'traffic_controller', '0414 567 890', 'mike.c@tstraffic.com.au', 'C', '2026-08-30', '2024-03-01', 1, 45);
+    insertCrew.run('Emma Wilson', 'EMP-004', 'traffic_controller', '0415 678 901', 'emma.w@tstraffic.com.au', 'C', '2027-01-15', '2024-01-20', 1, 45);
+    insertCrew.run('David Brown', 'EMP-005', 'supervisor', '0416 789 012', 'david.b@tstraffic.com.au', 'HR', '2027-03-10', '2023-11-05', 1, 65);
+    insertCrew.run('Lisa Nguyen', 'EMP-006', 'leading_hand', '0417 890 123', 'lisa.n@tstraffic.com.au', 'C', '2026-05-20', '2024-04-10', 1, 55);
+    insertCrew.run('James Taylor', 'EMP-007', 'traffic_controller', '0418 901 234', 'james.t@tstraffic.com.au', 'C', '2026-09-15', '2024-05-01', 1, 45);
+    insertCrew.run('Amy Patel', 'EMP-008', 'traffic_controller', '0419 012 345', 'amy.p@tstraffic.com.au', 'C', '2027-02-28', '2024-06-15', 1, 45);
+    insertCrew.run('Ryan O\'Brien', 'EMP-009', 'pilot_vehicle', '0420 123 456', 'ryan.o@tstraffic.com.au', 'HR', '2026-12-01', '2024-02-20', 1, 50);
+    insertCrew.run('Jessica Martinez', 'EMP-010', 'traffic_controller', '0421 234 567', 'jess.m@tstraffic.com.au', 'C', '2026-04-10', '2024-07-01', 1, 45);
+    insertCrew.run('Tom Anderson', 'EMP-011', 'supervisor', '0422 345 678', 'tom.a@tstraffic.com.au', 'HR', '2027-05-20', '2023-09-15', 1, 65);
+    insertCrew.run('Rachel Kim', 'EMP-012', 'leading_hand', '0423 456 789', 'rachel.k@tstraffic.com.au', 'C', '2026-07-15', '2024-01-05', 1, 55);
+    insertCrew.run('Steve Murray', 'EMP-013', 'traffic_controller', '0424 567 890', 'steve.m@tstraffic.com.au', 'C', '2026-10-30', '2024-08-01', 1, 45);
+    insertCrew.run('Karen White', 'EMP-014', 'spotter', '0425 678 901', 'karen.w@tstraffic.com.au', 'C', '2027-04-15', '2024-03-20', 1, 48);
+    insertCrew.run('Daniel Lee', 'EMP-015', 'traffic_controller', '0426 789 012', 'daniel.l@tstraffic.com.au', 'C', '2026-06-25', '2024-09-01', 1, 45);
+    insertCrew.run('Michelle Harris', 'EMP-016', 'traffic_controller', '0427 890 123', 'michelle.h@tstraffic.com.au', 'C', '2026-03-25', '2024-04-15', 1, 45);
+    insertCrew.run('Chris Thompson', 'EMP-017', 'leading_hand', '0428 901 234', 'chris.t@tstraffic.com.au', 'C', '2027-01-30', '2024-05-10', 1, 55);
+    insertCrew.run('Natalie Cooper', 'EMP-018', 'traffic_controller', '0429 012 345', 'nat.c@tstraffic.com.au', 'C', '2026-08-10', '2024-10-01', 1, 45);
+    insertCrew.run('Ben Walker', 'EMP-019', 'pilot_vehicle', '0430 123 456', 'ben.w@tstraffic.com.au', 'HR', '2026-11-05', '2024-06-20', 1, 50);
+    insertCrew.run('Sophie Young', 'EMP-020', 'traffic_controller', '0431 234 567', 'sophie.y@tstraffic.com.au', 'C', '2027-03-15', '2024-07-15', 1, 45);
+    insertCrew.run('Mark Phillips', 'EMP-021', 'labourer', '0432 345 678', 'mark.p@tstraffic.com.au', 'C', '2026-09-20', '2024-08-10', 1, 40);
+    insertCrew.run('Laura Scott', 'EMP-022', 'traffic_controller', '0433 456 789', 'laura.s@tstraffic.com.au', 'C', '2026-04-30', '2024-11-01', 1, 45);
+    insertCrew.run('Peter Hall', 'EMP-023', 'supervisor', '0434 567 890', 'peter.h@tstraffic.com.au', 'HR', '2027-02-10', '2023-12-01', 1, 65);
+    insertCrew.run('Angela Davis', 'EMP-024', 'traffic_controller', '0435 678 901', 'angela.d@tstraffic.com.au', 'C', '2026-05-15', '2024-09-15', 1, 45);
+    insertCrew.run('Tony Romano', 'EMP-025', 'leading_hand', '0436 789 012', 'tony.r@tstraffic.com.au', 'C', '2026-12-20', '2024-02-01', 1, 55);
+
+    // ── Equipment (15 items) ──
+    const insertEquipment = db.prepare(`
+      INSERT INTO equipment (asset_number, name, category, description, serial_number, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertEquipment.run('EQ-001', 'Arrow Board Trailer #1', 'arrow_board', '15-lamp LED arrow board on single-axle trailer', 'AB-2023-001', '2023-06-15', 8500, 'good', 'Bankstown Depot', '2026-06-15', 90, 'Annual rego due July', 1);
+    insertEquipment.run('EQ-002', 'Arrow Board Trailer #2', 'arrow_board', '15-lamp LED arrow board on single-axle trailer', 'AB-2023-002', '2023-06-15', 8500, 'good', 'Bankstown Depot', '2026-04-20', 90, '', 1);
+    insertEquipment.run('EQ-003', 'VMS Board - Large', 'vms', 'Solar-powered variable message sign 2400x1200', 'VMS-2024-001', '2024-02-01', 22000, 'good', 'Parramatta Yard', '2026-05-01', 90, 'New battery installed Feb 2026', 1);
+    insertEquipment.run('EQ-004', 'VMS Board - Small', 'vms', 'Trailer-mounted VMS 1200x600', 'VMS-2024-002', '2024-03-10', 15000, 'fair', 'Bankstown Depot', '2026-03-30', 90, 'Screen flickering - monitor', 1);
+    insertEquipment.run('EQ-005', 'Traffic Ute #1', 'vehicle', '2024 Toyota Hilux SR5 dual cab, white', 'VEH-HIL-001', '2024-01-20', 58000, 'good', 'Bankstown Depot', '2026-07-20', 180, 'Fleet #T&S-U01', 1);
+    insertEquipment.run('EQ-006', 'Traffic Ute #2', 'vehicle', '2024 Toyota Hilux SR dual cab, white', 'VEH-HIL-002', '2024-04-15', 52000, 'good', 'Parramatta Yard', '2026-10-15', 180, 'Fleet #T&S-U02', 1);
+    insertEquipment.run('EQ-007', 'Barrier Trailer #1', 'barrier', 'Water-filled barrier set (40 units) on flat-top trailer', 'BAR-2023-001', '2023-09-01', 12000, 'good', 'Bankstown Depot', '2026-09-01', 180, '', 1);
+    insertEquipment.run('EQ-008', 'Barrier Trailer #2', 'barrier', 'Water-filled barrier set (40 units) on flat-top trailer', 'BAR-2023-002', '2023-09-01', 12000, 'fair', 'Liverpool Yard', '2026-04-10', 180, '3 barriers cracked, replacement ordered', 1);
+    insertEquipment.run('EQ-009', 'Lighting Tower #1', 'lighting', 'Diesel lighting tower 4-head LED', 'LT-2024-001', '2024-05-20', 18000, 'good', 'Bankstown Depot', '2026-05-20', 90, '', 1);
+    insertEquipment.run('EQ-010', 'Lighting Tower #2', 'lighting', 'Diesel lighting tower 4-head LED', 'LT-2024-002', '2024-05-20', 18000, 'poor', 'Bankstown Depot', '2026-03-20', 90, 'Generator needs service', 1);
+    insertEquipment.run('EQ-011', 'Cone Set A (200)', 'cone', '200x 700mm reflective traffic cones', 'CONE-2024-A', '2024-01-10', 3000, 'good', 'Bankstown Depot', '2026-07-10', 180, '', 1);
+    insertEquipment.run('EQ-012', 'Cone Set B (200)', 'cone', '200x 700mm reflective traffic cones', 'CONE-2024-B', '2024-01-10', 3000, 'fair', 'Parramatta Yard', '2026-07-10', 180, '~30 cones damaged', 1);
+    insertEquipment.run('EQ-013', 'Delineator Set (100)', 'delineator', '100x T-top delineators with bases', 'DEL-2024-001', '2024-06-01', 2500, 'good', 'Bankstown Depot', '2026-12-01', 180, '', 1);
+    insertEquipment.run('EQ-014', 'Sign Kit - Complete', 'sign', 'Full TC sign kit - 120 signs, stands, sandbags', 'SIGN-2023-001', '2023-08-15', 6000, 'good', 'Bankstown Depot', '2026-08-15', 180, '', 1);
+    insertEquipment.run('EQ-015', 'Speed Radar Trailer', 'other', 'Solar-powered speed advisory display trailer', 'SPD-2025-001', '2025-11-01', 14000, 'new', 'Parramatta Yard', '2026-11-01', 90, 'Purchased for TfNSW project', 1);
+
+    // ── Additional tasks (5 more to reach 10 total) ──
+    insertTask.run(6, 'ops', 'Set up night works lane closure', 'Establish contra-flow on Main St between 8pm-5am', 2, '2026-03-20', 'not_started', 'medium');
+    insertTask.run(7, 'ops', 'Complete site demobilisation', 'Remove all barriers, signs, and equipment from Coward St', 2, '2026-03-25', 'in_progress', 'high');
+    insertTask.run(9, 'planning', 'Submit ROL application to TfNSW', 'Road Occupancy Licence for Olympic Blvd night works', 3, '2026-03-18', 'in_progress', 'high');
+    insertTask.run(10, 'ops', 'Conduct crew toolbox talk', 'Weekly safety briefing for Victoria Rd crew', 2, '2026-03-17', 'not_started', 'medium');
+    insertTask.run(11, 'accounts', 'Process progress claim #3', 'Georgiou Group progress claim for February works', 5, '2026-03-15', 'not_started', 'high');
+
+    // ── Contacts (5) ──
+    const insertContact = db.prepare(`
+      INSERT INTO client_contacts (job_id, contact_type, company, full_name, position, phone, email, notes, is_primary)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertContact.run(1, 'client', 'ABC Civil', 'Greg Thompson', 'Project Manager', '0400 111 222', 'greg.t@abccivil.com.au', 'Primary contact for Bankstown project', 1);
+    insertContact.run(2, 'rms', 'Transport for NSW', 'Linda Park', 'Network Coordinator', '0400 222 333', 'linda.park@transport.nsw.gov.au', 'Handles ROL approvals for Parramatta area', 1);
+    insertContact.run(1, 'council', 'Canterbury-Bankstown Council', 'Ahmed Hassan', 'Traffic Engineer', '0400 333 444', 'ahmed.h@cbcity.nsw.gov.au', 'Approves TMPs for Canterbury Rd precinct', 0);
+    insertContact.run(4, 'client', 'Sydney Water', 'Fiona Clarke', 'Site Supervisor', '0400 444 555', 'fiona.c@sydneywater.com.au', 'Day-to-day site contact for Liverpool', 1);
+    insertContact.run(6, 'subcontractor', 'Fulton Hogan', 'Brett Williams', 'Foreman', '0400 555 666', 'brett.w@fultonhogan.com.au', 'Night works coordination', 0);
+
+    // ── Timesheets (10 entries) ──
+    const insertTimesheet = db.prepare(`
+      INSERT INTO timesheets (job_id, crew_member_id, work_date, start_time, end_time, break_minutes, total_hours, shift_type, role_on_site, approved, approved_by_id, notes, submitted_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertTimesheet.run(1, 1, '2026-03-14', '06:00', '14:30', 30, 8.0, 'day', 'Supervisor', 1, 1, 'Barrier install Section A', 1);
+    insertTimesheet.run(1, 3, '2026-03-14', '06:00', '14:30', 30, 8.0, 'day', 'Traffic Controller', 1, 1, 'Barrier install Section A', 1);
+    insertTimesheet.run(1, 4, '2026-03-14', '06:00', '14:30', 30, 8.0, 'day', 'Traffic Controller', 1, 1, 'Barrier install Section A', 1);
+    insertTimesheet.run(1, 2, '2026-03-15', '06:00', '16:00', 30, 9.5, 'day', 'Leading Hand', 0, null, 'Extended shift - barrier completion', 1);
+    insertTimesheet.run(1, 3, '2026-03-15', '06:00', '16:00', 30, 9.5, 'day', 'Traffic Controller', 0, null, 'Extended shift', 1);
+    insertTimesheet.run(6, 5, '2026-03-14', '19:00', '05:00', 30, 9.5, 'night', 'Supervisor', 1, 1, 'Night works - lane closure Main St', 1);
+    insertTimesheet.run(6, 7, '2026-03-14', '19:00', '05:00', 30, 9.5, 'night', 'Traffic Controller', 1, 1, 'Night works', 1);
+    insertTimesheet.run(6, 8, '2026-03-14', '19:00', '05:00', 30, 9.5, 'night', 'Traffic Controller', 0, null, 'Night works - pending approval', 1);
+    insertTimesheet.run(4, 11, '2026-03-13', '06:30', '15:00', 30, 8.0, 'day', 'Supervisor', 1, 1, 'Final inspection prep', 1);
+    insertTimesheet.run(4, 13, '2026-03-13', '06:30', '15:00', 30, 8.0, 'day', 'Traffic Controller', 0, null, 'Final inspection prep - pending', 1);
+
+    // ── Incidents (3) ──
+    const insertIncident = db.prepare(`
+      INSERT INTO incidents (job_id, incident_number, incident_type, severity, title, description, location, incident_date, incident_time, reported_by_id, persons_involved, immediate_actions, root_cause, investigation_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertIncident.run(1, 'INC-0001', 'near_miss', 'medium', 'Vehicle entered work zone', 'Private vehicle ignored signage and entered active work zone on Canterbury Rd. No injuries. Crew members had to move quickly to avoid contact.', '12 Canterbury Rd, Bankstown', '2026-03-10', '10:30', 1, 'Mike Chen (EMP-003), Emma Wilson (EMP-004)', 'Work stopped immediately. Additional signage deployed. RMS notified.', 'Inadequate advance warning signage during peak hour', 'resolved');
+    insertIncident.run(4, 'INC-0002', 'injury', 'high', 'Crew member twisted ankle', 'Steve Murray stepped in pothole while repositioning barriers at Liverpool site. Ankle swelling observed. First aid administered on site.', '45 Macquarie St, Liverpool', '2026-03-12', '14:15', 1, 'Steve Murray (EMP-013)', 'First aid applied. Worker sent home. Incident area cordoned. Site hazard assessment completed.', 'Uneven ground surface not identified in pre-start', 'investigating');
+    insertIncident.run(6, 'INC-0003', 'hazard', 'low', 'Damaged road surface near barrier line', 'Pothole developing at edge of barrier line on Main St near work zone entry point. Could worsen with heavy vehicle traffic.', '5 Main St, Blacktown', '2026-03-15', '08:00', 2, '', 'Area marked with cones. Council notified for repair.', '', 'reported');
+
+    // ── Defects (5) ──
+    const insertDefect = db.prepare(`
+      INSERT INTO defects (job_id, defect_number, title, description, location, severity, status, reported_by_id, assigned_to_id, reported_date, target_close_date, rectification_notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertDefect.run(1, 'DEF-0001', 'Cracked barrier section B12', 'Water-filled barrier unit B12 has visible crack along top edge. Leaking slowly.', 'Canterbury Rd northbound, Section B', 'moderate', 'rectification', 1, 2, '2026-03-08', '2026-03-20', 'Replacement barrier ordered. ETA 18 March.');
+    insertDefect.run(1, 'DEF-0002', 'Faded road marking at detour entry', 'Temporary road marking at detour entry point is worn and hard to see at night.', 'Canterbury Rd / Side St intersection', 'minor', 'open', 2, 3, '2026-03-12', '2026-03-22', '');
+    insertDefect.run(4, 'DEF-0003', 'Missing delineator posts - westbound', '4 delineator posts missing from westbound approach. Likely knocked over by trucks.', 'Macquarie St, Liverpool - westbound', 'major', 'investigating', 1, 2, '2026-03-11', '2026-03-15', 'Replacement delineators sourced. Install scheduled for 15 March.');
+    insertDefect.run(6, 'DEF-0004', 'Arrow board lamp failure', 'Arrow board trailer EQ-002 has 3 lamps not functioning. Reduces visibility.', 'Main St, Blacktown - night works zone', 'moderate', 'open', 2, 2, '2026-03-14', '2026-03-18', '');
+    insertDefect.run(9, 'DEF-0005', 'Damaged VMS screen', 'VMS board showing display artifacts on lower-right quadrant. Intermittent issue.', 'Olympic Blvd approach, Homebush', 'minor', 'deferred', 1, 3, '2026-03-05', '2026-04-05', 'Deferred to next scheduled maintenance window. Not impacting readability.');
+
+    // ── Additional compliance items (5 more) ──
+    insertCompliance.run(6, 'road_occupancy', 'ROL - Main St Night Works', 'Transport for NSW', 2, '2026-03-18', 'submitted');
+    insertCompliance.run(9, 'tmp_approval', 'TMP - Olympic Blvd Detour', 'City of Parramatta Council', 3, '2026-03-25', 'not_started');
+    insertCompliance.run(10, 'swms_review', 'SWMS - Victoria Rd Median Works', '', 2, '2026-03-20', 'approved');
+    insertCompliance.run(11, 'council_permit', 'Road Opening Permit - Queen St', 'Campbelltown City Council', 3, '2026-03-10', 'submitted');
+    insertCompliance.run(7, 'insurance', 'PI Certificate - CPB Project', 'QBE Insurance', 5, '2026-04-01', 'approved');
+
+    // ── Additional project updates (3 more) ──
+    insertUpdate.run(6, '2026-03-14', 'Night works progressing well. Lane closure setup completed ahead of schedule. Minor issue with arrow board lamps resolved.', 'Lane closure established. First 200m of asphalt resurfacing complete.', 'Arrow board EQ-002 had lamp failures. Backup deployed.', '', 1);
+    insertUpdate.run(9, '2026-03-14', 'TfNSW project on track. ROL application submitted, awaiting approval. Crew briefed on traffic staging.', 'ROL application submitted to TfNSW. Crew inductions completed.', 'ROL approval taking longer than expected. Escalated to regional coordinator.', 'Cannot commence night works until ROL is approved.', 1);
+    insertUpdate.run(11, '2026-03-07', 'Campbelltown project facing payment delays. Road opening permit submitted to council. Crew allocated for next 2 weeks.', 'Excavation 70% complete. Permit application lodged.', 'Client progress claim #2 still unpaid (45 days). Escalated to accounts.', 'Cannot order materials for final stage until payment received.', 1);
 
     console.log('Database seeded with sample data.');
   }

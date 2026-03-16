@@ -96,7 +96,7 @@
 <% } %>
 
 <!-- Urgency Tiles -->
-<div class="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-5">
+<div class="grid grid-cols-4 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3 mb-5">
   <a href="/tasks" class="group bg-white border rounded-xl p-3 hover:shadow-md transition-all <%= kpi.overdueTasks > 0 ? 'border-red-200' : 'border-gray-200' %>">
     <p class="text-2xl font-extrabold <%= kpi.overdueTasks > 0 ? 'text-red-600' : 'text-emerald-600' %>"><%= kpi.overdueTasks %></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Overdue Tasks</p>
@@ -105,13 +105,17 @@
     <p class="text-2xl font-extrabold <%= kpi.openIncidents > 0 ? 'text-red-600' : 'text-emerald-600' %>"><%= kpi.openIncidents %></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Open Incidents</p>
   </a>
-  <a href="/defects" class="group bg-white border rounded-xl p-3 hover:shadow-md transition-all <%= kpi.openDefects > 0 ? 'border-amber-200' : 'border-gray-200' %>">
-    <p class="text-2xl font-extrabold <%= kpi.openDefects > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><%= kpi.openDefects %></p>
-    <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Open Defects</p>
+  <a href="/timesheets?approved=0" class="group bg-white border rounded-xl p-3 hover:shadow-md transition-all <%= kpi.pendingTimesheets > 0 ? 'border-amber-200' : 'border-gray-200' %>">
+    <p class="text-2xl font-extrabold <%= kpi.pendingTimesheets > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><%= kpi.pendingTimesheets %></p>
+    <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Pending Timesheets</p>
   </a>
   <a href="/allocations" class="group bg-white border rounded-xl p-3 hover:shadow-md transition-all <%= kpi.unconfirmedAllocations > 0 ? 'border-amber-200' : 'border-gray-200' %>">
     <p class="text-2xl font-extrabold <%= kpi.unconfirmedAllocations > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><%= kpi.unconfirmedAllocations %></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Unconfirmed</p>
+  </a>
+  <a href="/defects" class="group bg-white border rounded-xl p-3 hover:shadow-md transition-all <%= kpi.openDefects > 0 ? 'border-amber-200' : 'border-gray-200' %>">
+    <p class="text-2xl font-extrabold <%= kpi.openDefects > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><%= kpi.openDefects %></p>
+    <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Open Defects</p>
   </a>
   <a href="/compliance" class="group bg-white border rounded-xl p-3 hover:shadow-md transition-all <%= kpi.overdueCompliance > 0 ? 'border-red-200' : 'border-gray-200' %>">
     <p class="text-2xl font-extrabold <%= kpi.overdueCompliance > 0 ? 'text-red-600' : 'text-emerald-600' %>"><%= kpi.overdueCompliance %></p>
@@ -120,6 +124,10 @@
   <a href="/crew" class="group bg-white border rounded-xl p-3 hover:shadow-md transition-all <%= kpi.ticketsExpiring > 0 ? 'border-amber-200' : 'border-gray-200' %>">
     <p class="text-2xl font-extrabold <%= kpi.ticketsExpiring > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><%= kpi.ticketsExpiring %></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Expiring Tickets</p>
+  </a>
+  <a href="/allocations" class="group bg-white border rounded-xl p-3 hover:shadow-md transition-all <%= kpi.crewGaps > 0 ? 'border-red-200' : 'border-gray-200' %>">
+    <p class="text-2xl font-extrabold <%= kpi.crewGaps > 0 ? 'text-red-600' : 'text-emerald-600' %>"><%= kpi.crewGaps %></p>
+    <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Crew Gaps</p>
   </a>
 </div>
 

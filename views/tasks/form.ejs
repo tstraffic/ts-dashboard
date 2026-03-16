@@ -141,6 +141,144 @@
       </div>
     </form>
   </div>
+
+  <% if (isEdit) { %>
+  <!-- Subtasks -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mt-5">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-bold text-gray-900">Subtasks</h3>
+      <% if (typeof subtasks !== 'undefined' && subtasks.length > 0) { %>
+        <span class="text-xs text-gray-400"><%= subtasks.filter(s => s.completed).length %>/<%= subtasks.length %> done</span>
+      <% } %>
+    </div>
+    <% if (typeof subtasks !== 'undefined' && subtasks.length > 0) { %>
+      <!-- Progress bar -->
+      <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+        <div class="bg-brand-600 h-1.5 rounded-full transition-all" style="width: <%= Math.round((subtasks.filter(s => s.completed).length / subtasks.length) * 100) %>%"></div>
+      </div>
+      <div class="space-y-1.5 mb-3">
+        <% subtasks.forEach(s => { %>
+          <div class="flex items-center gap-2 group">
+            <form method="POST" action="/tasks/<%= task.id %>/subtasks/<%= s.id %>/toggle" class="flex items-center">
+              <button type="submit" class="w-5 h-5 rounded border flex items-center justify-center transition-colors <%= s.completed ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 hover:border-brand-400' %>">
+                <% if (s.completed) { %><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg><% } %>
+              </button>
+            </form>
+            <span class="text-sm flex-1 <%= s.completed ? 'text-gray-400 line-through' : 'text-gray-700' %>"><%= s.title %></span>
+            <form method="POST" action="/tasks/<%= task.id %>/subtasks/<%= s.id %>/delete" class="opacity-0 group-hover:opacity-100 transition-opacity">
+              <button type="submit" class="text-gray-300 hover:text-red-500 transition-colors" title="Delete subtask"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </form>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+    <form method="POST" action="/tasks/<%= task.id %>/subtasks" class="flex gap-2">
+      <input type="text" name="title" placeholder="Add a subtask..." class="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none" required>
+      <button type="submit" class="px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">Add</button>
+    </form>
+  </div>
+
+  <!-- Dependencies -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mt-5">
+    <h3 class="text-sm font-bold text-gray-900 mb-3">Dependencies</h3>
+
+    <% if (typeof dependencies !== 'undefined' && dependencies.length > 0) { %>
+      <div class="mb-3">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">This task depends on</p>
+        <div class="space-y-1.5">
+          <% dependencies.forEach(d => { %>
+            <div class="flex items-center gap-2 group">
+              <% const depStatusColor = d.status === 'complete' ? 'bg-green-100 text-green-700' : d.status === 'blocked' ? 'bg-red-100 text-red-700' : d.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'; %>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium <%= depStatusColor %>">
+                <%= d.status === 'not_started' ? 'Not Started' : d.status === 'in_progress' ? 'In Progress' : d.status === 'blocked' ? 'Blocked' : 'Complete' %>
+              </span>
+              <a href="/tasks/<%= d.depends_on_id %>/edit" class="text-sm text-brand-600 hover:text-brand-700 hover:underline flex-1 truncate"><%= d.title %></a>
+              <% if (d.due_date) { %>
+                <span class="text-xs text-gray-400"><%= new Date(d.due_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) %></span>
+              <% } %>
+              <form method="POST" action="/tasks/<%= task.id %>/dependencies/<%= d.dep_id %>/delete" class="opacity-0 group-hover:opacity-100 transition-opacity">
+                <button type="submit" class="text-gray-300 hover:text-red-500 transition-colors" title="Remove dependency"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+              </form>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    <% } %>
+
+    <% if (typeof dependents !== 'undefined' && dependents.length > 0) { %>
+      <div class="mb-3">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Tasks that depend on this</p>
+        <div class="space-y-1.5">
+          <% dependents.forEach(d => { %>
+            <div class="flex items-center gap-2">
+              <% const dntStatusColor = d.status === 'complete' ? 'bg-green-100 text-green-700' : d.status === 'blocked' ? 'bg-red-100 text-red-700' : d.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'; %>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium <%= dntStatusColor %>">
+                <%= d.status === 'not_started' ? 'Not Started' : d.status === 'in_progress' ? 'In Progress' : d.status === 'blocked' ? 'Blocked' : 'Complete' %>
+              </span>
+              <a href="/tasks/<%= d.task_id %>/edit" class="text-sm text-brand-600 hover:text-brand-700 hover:underline flex-1 truncate"><%= d.title %></a>
+              <% if (d.due_date) { %>
+                <span class="text-xs text-gray-400"><%= new Date(d.due_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) %></span>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    <% } %>
+
+    <form method="POST" action="/tasks/<%= task.id %>/dependencies" class="flex gap-2">
+      <select name="depends_on_id" required class="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white">
+        <option value="">Select a task...</option>
+        <% if (typeof allTasks !== 'undefined') { allTasks.forEach(t => { %>
+          <% const alreadyDep = typeof dependencies !== 'undefined' && dependencies.some(d => d.depends_on_id === t.id); %>
+          <% if (!alreadyDep) { %>
+            <option value="<%= t.id %>"><%= t.title %> (<%= t.status === 'not_started' ? 'Not Started' : t.status === 'in_progress' ? 'In Progress' : t.status === 'blocked' ? 'Blocked' : 'Complete' %>)</option>
+          <% } %>
+        <% }) } %>
+      </select>
+      <button type="submit" class="px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">Add</button>
+    </form>
+  </div>
+
+  <!-- Comments -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mt-5">
+    <h3 class="text-sm font-bold text-gray-900 mb-3">Activity & Comments</h3>
+    <form method="POST" action="/tasks/<%= task.id %>/comments" class="mb-4">
+      <textarea name="comment" rows="2" placeholder="Add a comment..." class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none" required></textarea>
+      <div class="flex justify-end mt-2">
+        <button type="submit" class="px-4 py-1.5 text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white rounded-lg transition-colors">Post Comment</button>
+      </div>
+    </form>
+    <% if (typeof comments !== 'undefined' && comments.length > 0) { %>
+      <div class="space-y-3 border-t border-gray-100 pt-3">
+        <% comments.forEach(c => { %>
+          <div class="flex gap-3">
+            <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+              <%= c.user_name ? c.user_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : 'U' %>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-baseline gap-2">
+                <span class="text-sm font-semibold text-gray-900"><%= c.user_name %></span>
+                <span class="text-xs text-gray-400"><%= new Date(c.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></span>
+              </div>
+              <p class="text-sm text-gray-600 mt-0.5 whitespace-pre-wrap"><%= c.comment %></p>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <p class="text-sm text-gray-400 text-center py-3">No comments yet</p>
+    <% } %>
+  </div>
+  <% } %>
+
+  <% if (typeof activityLog !== 'undefined' && activityLog.length > 0) { %>
+  <!-- Activity Timeline -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mt-5">
+    <h3 class="text-sm font-bold text-gray-900 mb-3">Activity</h3>
+    <%- include('../partials/activity-timeline', { activities: activityLog }) %>
+  </div>
+  <% } %>
+
 </div>
 
 <% if (isEdit && canEdit) { %>

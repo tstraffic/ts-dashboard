@@ -111,6 +111,20 @@ router.get('/', (req, res) => {
     );
   }
 
+  // Sorting
+  const allowedSorts = ['full_name', 'employee_id', 'role', 'licence_expiry'];
+  const sort = allowedSorts.includes(req.query.sort) ? req.query.sort : 'full_name';
+  const order = req.query.order === 'desc' ? 'desc' : 'asc';
+  filtered.sort((a, b) => {
+    let valA = a[sort] || '';
+    let valB = b[sort] || '';
+    if (typeof valA === 'string') valA = valA.toLowerCase();
+    if (typeof valB === 'string') valB = valB.toLowerCase();
+    if (valA < valB) return order === 'asc' ? -1 : 1;
+    if (valA > valB) return order === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   // Stats
   const totalActive = crewWithStatus.filter(c => c.active).length;
   const allocatable = crewWithStatus.filter(c => c.active && c.compliance.canAllocate).length;
@@ -127,6 +141,8 @@ router.get('/', (req, res) => {
     search: req.query.search || '',
     stats: { totalActive, allocatable, complianceIssues, fatigueBlocked, expiringSoon },
     today,
+    sort,
+    order,
   });
 });
 
@@ -160,6 +176,22 @@ router.post('/', (req, res) => {
     }
     res.redirect('/crew/new');
   }
+});
+
+// POST /bulk — Bulk actions on crew members
+router.post('/bulk', (req, res) => {
+  const db = getDb();
+  const ids = (req.body.ids || '').split(',').map(Number).filter(n => n > 0);
+  const action = req.body.action;
+  if (ids.length === 0) return res.redirect('/crew');
+
+  if (action === 'deactivate') {
+    const stmt = db.prepare('UPDATE crew_members SET active = 0 WHERE id = ?');
+    ids.forEach(id => stmt.run(id));
+    logActivity({ user: req.session.user, action: 'update', entityType: 'crew_member', entityLabel: `Bulk deactivated ${ids.length} crew members`, ip: req.ip });
+    req.flash('success', ids.length + ' crew member(s) deactivated.');
+  }
+  res.redirect('/crew');
 });
 
 // GET /:id/edit — Edit Crew Member form

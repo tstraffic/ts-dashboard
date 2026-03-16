@@ -124,3 +124,11 @@
     <a href="/contacts" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
   </div>
 </form>
+
+<% if (typeof activityLog !== 'undefined' && activityLog.length > 0) { %>
+<!-- Activity Timeline -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mt-5">
+  <h3 class="text-sm font-bold text-gray-900 mb-3">Activity</h3>
+  <%- include('../partials/activity-timeline', { activities: activityLog }) %>
+</div>
+<% } %>
