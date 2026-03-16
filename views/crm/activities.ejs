@@ -1,0 +1,202 @@
+<% locals.currentPage = 'crm-activities' %>
+<%
+  function formatDate(d) {
+    if (!d) return '-';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function formatDateTime(d) {
+    if (!d) return '-';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }) + ' ' + dt.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+  }
+  const today = new Date().toISOString().split('T')[0];
+
+  const activityTypeColors = {
+    call: 'bg-green-50 text-green-700 ring-1 ring-green-600/20',
+    email: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    meeting: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
+    site_visit: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
+    note: 'bg-gray-50 text-gray-600 ring-1 ring-gray-600/20',
+    task: 'bg-brand-50 text-brand-700 ring-1 ring-brand-600/20'
+  };
+  const activityTypeLabels = {
+    call: 'Call',
+    email: 'Email',
+    meeting: 'Meeting',
+    site_visit: 'Site Visit',
+    note: 'Note',
+    task: 'Task'
+  };
+%>
+
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">CRM Activities</h1>
+    <p class="text-gray-500 text-sm mt-0.5">Track all interactions and follow-ups</p>
+  </div>
+  <a href="/crm/activities/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+    Log Activity
+  </a>
+</div>
+
+<!-- Filter Bar -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-5">
+  <form method="GET" action="/crm/activities" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 sm:gap-3">
+    <div class="flex-1 min-w-0 sm:min-w-[180px]">
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Search</label>
+      <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Subject, notes..."
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+    </div>
+    <div class="flex gap-2 w-full sm:w-auto">
+      <div class="flex-1 sm:flex-none sm:min-w-[120px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Owner</label>
+        <select name="owner" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">All Owners</option>
+          <% (users || []).forEach(function(u) { %>
+            <option value="<%= u.id %>" <%= filters.owner == u.id ? 'selected' : '' %>><%= u.full_name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="flex-1 sm:flex-none sm:min-w-[120px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Type</label>
+        <select name="activity_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">All Types</option>
+          <% if (typeof settingsOptions !== 'undefined' && settingsOptions.crm_activity_types) { %>
+            <% settingsOptions.crm_activity_types.forEach(function(opt) { %>
+              <option value="<%= opt.key %>" <%= filters.activity_type === opt.key ? 'selected' : '' %>><%= opt.label || opt.key %></option>
+            <% }) %>
+          <% } else { %>
+            <option value="call" <%= filters.activity_type === 'call' ? 'selected' : '' %>>Call</option>
+            <option value="email" <%= filters.activity_type === 'email' ? 'selected' : '' %>>Email</option>
+            <option value="meeting" <%= filters.activity_type === 'meeting' ? 'selected' : '' %>>Meeting</option>
+            <option value="site_visit" <%= filters.activity_type === 'site_visit' ? 'selected' : '' %>>Site Visit</option>
+            <option value="note" <%= filters.activity_type === 'note' ? 'selected' : '' %>>Note</option>
+          <% } %>
+        </select>
+      </div>
+    </div>
+    <div class="flex gap-2 w-full sm:w-auto">
+      <div class="flex-1 sm:flex-none sm:min-w-[130px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Date From</label>
+        <input type="date" name="date_from" value="<%= filters.date_from || '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div class="flex-1 sm:flex-none sm:min-w-[130px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Date To</label>
+        <input type="date" name="date_to" value="<%= filters.date_to || '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+    </div>
+    <div class="flex gap-2 w-full sm:w-auto">
+      <div class="flex-1 sm:flex-none sm:min-w-[120px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Status</label>
+        <select name="status" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="" <%= !filters.status ? 'selected' : '' %>>All</option>
+          <option value="completed" <%= filters.status === 'completed' ? 'selected' : '' %>>Completed</option>
+          <option value="overdue" <%= filters.status === 'overdue' ? 'selected' : '' %>>Overdue</option>
+          <option value="pending" <%= filters.status === 'pending' ? 'selected' : '' %>>Pending</option>
+        </select>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Filter</button>
+      <a href="/crm/activities" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Clear</a>
+    </div>
+  </form>
+</div>
+
+<!-- Activities Table -->
+<% if (!activities || activities.length === 0) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+    <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+    </div>
+    <h3 class="text-gray-900 font-semibold text-base mb-1">No activities found</h3>
+    <p class="text-gray-500 text-sm mb-1">CRM activities track your calls, emails, meetings, and other interactions.</p>
+    <p class="text-gray-400 text-xs mb-4">Try adjusting your filters or log a new activity.</p>
+    <a href="/crm/activities/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      Log Activity
+    </a>
+  </div>
+<% } else { %>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-200">
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subject</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Account</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Contact</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Owner</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Next Step</th>
+        <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      <% activities.forEach(function(act) {
+        const isOverdue = !act.completed && act.next_step_due && act.next_step_due.split('T')[0] < today;
+        const isCompleted = !!act.completed;
+      %>
+      <tr class="hover:bg-gray-50 <%= isOverdue ? 'border-l-4 border-l-red-400' : '' %>">
+        <td class="px-3 py-2.5">
+          <span class="text-xs tabular-nums text-gray-600"><%= formatDateTime(act.activity_date) %></span>
+        </td>
+        <td class="px-3 py-2.5">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold <%= activityTypeColors[act.activity_type] || 'bg-gray-50 text-gray-600 ring-1 ring-gray-600/20' %>">
+            <%= activityTypeLabels[act.activity_type] || (act.activity_type || '-').replace(/_/g, ' ') %>
+          </span>
+        </td>
+        <td class="px-3 py-2.5">
+          <a href="/crm/activities/<%= act.id %>/edit" class="text-sm font-medium text-gray-900 hover:text-brand-600 transition"><%= act.subject || '-' %></a>
+          <% if (act.notes) { %>
+            <p class="text-xs text-gray-400 truncate max-w-[200px]"><%= act.notes %></p>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 hidden md:table-cell">
+          <% if (act.client_id) { %>
+            <a href="/clients/<%= act.client_id %>" class="text-xs text-brand-600 hover:text-brand-700 font-medium"><%= act.client_name || '-' %></a>
+          <% } else { %>
+            <span class="text-xs text-gray-300">-</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-xs text-gray-600 hidden lg:table-cell"><%= act.contact_name || '-' %></td>
+        <td class="px-3 py-2.5 text-xs text-gray-600 hidden md:table-cell"><%= act.owner_name || '-' %></td>
+        <td class="px-3 py-2.5 hidden xl:table-cell">
+          <% if (act.next_step) { %>
+            <p class="text-xs text-gray-600 truncate max-w-[140px]"><%= act.next_step %></p>
+            <% if (act.next_step_due) { %>
+              <span class="text-[10px] tabular-nums <%= isOverdue ? 'text-red-600 font-semibold' : 'text-gray-400' %>">Due: <%= formatDate(act.next_step_due) %></span>
+            <% } %>
+          <% } else { %>
+            <span class="text-xs text-gray-300">-</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-center">
+          <% if (isCompleted) { %>
+            <span class="inline-flex items-center gap-1 text-emerald-600" title="Completed">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </span>
+          <% } else if (isOverdue) { %>
+            <span class="inline-flex items-center gap-1 text-red-500" title="Overdue">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            </span>
+          <% } else { %>
+            <form method="POST" action="/crm/activities/<%= act.id %>/complete" class="inline">
+              <button type="submit" class="px-2 py-1 bg-gray-100 hover:bg-emerald-50 text-gray-500 hover:text-emerald-600 text-[10px] font-bold uppercase rounded-lg transition-colors" title="Mark complete">
+                Complete
+              </button>
+            </form>
+          <% } %>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<div class="mt-2 text-xs text-gray-400"><%= activities.length %> activit<%= activities.length !== 1 ? 'ies' : 'y' %> found</div>
+<% } %>

@@ -132,6 +132,64 @@
     </div>
   </div>
 
+  <!-- CRM / Relationship Fields -->
+  <div class="bg-white border border-brand-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-brand-700 uppercase tracking-wide mb-4">Relationship (CRM)</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Relationship Strength</label>
+        <select name="relationship_strength" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Not set</option>
+          <% ['cold','warm','strong','champion'].forEach(v => { %>
+            <option value="<%= v %>" <%= isEdit && contact.relationship_strength === v ? 'selected' : '' %>><%= v.charAt(0).toUpperCase() + v.slice(1) %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Influence Level</label>
+        <select name="influence_level" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Not set</option>
+          <% ['low','medium','high','decision_maker'].forEach(v => { %>
+            <option value="<%= v %>" <%= isEdit && contact.influence_level === v ? 'selected' : '' %>><%= v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Buying Role</label>
+        <select name="buying_role" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Not set</option>
+          <% ['user','influencer','gatekeeper','decision_maker','champion'].forEach(v => { %>
+            <option value="<%= v %>" <%= isEdit && contact.buying_role === v ? 'selected' : '' %>><%= v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Preferred Communication</label>
+        <select name="preferred_comm_method" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Not set</option>
+          <% ['phone','email','meeting','teams'].forEach(v => { %>
+            <option value="<%= v %>" <%= isEdit && contact.preferred_comm_method === v ? 'selected' : '' %>><%= v.charAt(0).toUpperCase() + v.slice(1) %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Referred By</label>
+        <input type="text" name="referred_by" value="<%= isEdit ? (contact.referred_by || '') : '' %>"
+          placeholder="e.g. John from ABC Corp"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Contact Owner</label>
+        <select name="contact_owner_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Unassigned</option>
+          <% (typeof users !== 'undefined' ? users : []).forEach(u => { %>
+            <option value="<%= u.id %>" <%= isEdit && contact.contact_owner_id == u.id ? 'selected' : '' %>><%= u.full_name %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+  </div>
+
   <!-- Actions -->
   <div class="flex items-center gap-3">
     <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">

@@ -1,0 +1,239 @@
+<% locals.currentPage = 'crm-accounts' %>
+<%
+  function formatCurrency(v) {
+    return '$' + (v || 0).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+  function formatDate(d) {
+    if (!d) return '-';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  const today = new Date().toISOString().split('T')[0];
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const typeColors = {
+    lead: 'bg-sky-50 text-sky-700 ring-1 ring-sky-600/20',
+    prospect: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20',
+    client: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+    active_client: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+    inactive_client: 'bg-gray-50 text-gray-600 ring-1 ring-gray-600/20',
+    partner: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
+    contractor: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
+    subcontractor: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
+    supplier: 'bg-teal-50 text-teal-700 ring-1 ring-teal-600/20'
+  };
+  const typeLabels = {
+    lead: 'Lead',
+    prospect: 'Prospect',
+    client: 'Client',
+    active_client: 'Active Client',
+    inactive_client: 'Inactive',
+    partner: 'Partner',
+    contractor: 'Contractor',
+    subcontractor: 'Subcontractor',
+    supplier: 'Supplier'
+  };
+  const priorityColors = {
+    low: 'bg-gray-50 text-gray-600 ring-1 ring-gray-600/20',
+    normal: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    high: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
+    strategic: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20'
+  };
+%>
+
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Accounts</h1>
+    <p class="text-gray-500 text-sm mt-0.5">Manage clients, prospects, and business relationships</p>
+  </div>
+  <a href="/clients/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+    Add Account
+  </a>
+</div>
+
+<!-- Stat Cards -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</p>
+    <p class="text-xl font-bold text-gray-900 mt-0.5"><%= stats.total || 0 %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Leads</p>
+    <p class="text-xl font-bold text-sky-600 mt-0.5"><%= stats.leads || 0 %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Prospects</p>
+    <p class="text-xl font-bold text-indigo-600 mt-0.5"><%= stats.prospects || 0 %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active Clients</p>
+    <p class="text-xl font-bold text-emerald-600 mt-0.5"><%= stats.active_clients || 0 %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Dormant</p>
+    <p class="text-xl font-bold <%= (stats.dormant || 0) > 0 ? 'text-red-600' : 'text-gray-900' %> mt-0.5"><%= stats.dormant || 0 %></p>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-5">
+  <form method="GET" action="/crm/accounts" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 sm:gap-3">
+    <div class="flex-1 min-w-0 sm:min-w-[200px]">
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Search</label>
+      <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Account name, contact..."
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+    </div>
+    <div class="flex gap-2 w-full sm:w-auto">
+      <div class="flex-1 sm:flex-none sm:min-w-[130px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Owner</label>
+        <select name="owner" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">All Owners</option>
+          <% (users || []).forEach(function(u) { %>
+            <option value="<%= u.id %>" <%= filters.owner == u.id ? 'selected' : '' %>><%= u.full_name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="flex-1 sm:flex-none sm:min-w-[130px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Type</label>
+        <select name="type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">All Types</option>
+          <option value="lead" <%= filters.type === 'lead' ? 'selected' : '' %>>Lead</option>
+          <option value="prospect" <%= filters.type === 'prospect' ? 'selected' : '' %>>Prospect</option>
+          <option value="client" <%= filters.type === 'client' ? 'selected' : '' %>>Client</option>
+          <option value="active_client" <%= filters.type === 'active_client' ? 'selected' : '' %>>Active Client</option>
+          <option value="inactive_client" <%= filters.type === 'inactive_client' ? 'selected' : '' %>>Inactive</option>
+          <option value="partner" <%= filters.type === 'partner' ? 'selected' : '' %>>Partner</option>
+          <option value="contractor" <%= filters.type === 'contractor' ? 'selected' : '' %>>Contractor</option>
+          <option value="subcontractor" <%= filters.type === 'subcontractor' ? 'selected' : '' %>>Subcontractor</option>
+          <option value="supplier" <%= filters.type === 'supplier' ? 'selected' : '' %>>Supplier</option>
+        </select>
+      </div>
+    </div>
+    <div class="flex gap-2 w-full sm:w-auto">
+      <div class="flex-1 sm:flex-none sm:min-w-[120px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Priority</label>
+        <select name="priority" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">All Priorities</option>
+          <option value="low" <%= filters.priority === 'low' ? 'selected' : '' %>>Low</option>
+          <option value="normal" <%= filters.priority === 'normal' ? 'selected' : '' %>>Normal</option>
+          <option value="high" <%= filters.priority === 'high' ? 'selected' : '' %>>High</option>
+          <option value="strategic" <%= filters.priority === 'strategic' ? 'selected' : '' %>>Strategic</option>
+        </select>
+      </div>
+      <div class="flex items-end gap-3">
+        <label class="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-600 cursor-pointer hover:bg-gray-50">
+          <input type="checkbox" name="dormant" value="1" <%= filters.dormant ? 'checked' : '' %> class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+          <span class="text-xs">Dormant</span>
+        </label>
+        <label class="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-600 cursor-pointer hover:bg-gray-50">
+          <input type="checkbox" name="no_next_action" value="1" <%= filters.no_next_action ? 'checked' : '' %> class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+          <span class="text-xs whitespace-nowrap">No Next Action</span>
+        </label>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Filter</button>
+      <a href="/crm/accounts" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Clear</a>
+    </div>
+  </form>
+</div>
+
+<!-- Accounts Table -->
+<% if (!accounts || accounts.length === 0) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+    <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+    </div>
+    <h3 class="text-gray-900 font-semibold text-base mb-1">No accounts found</h3>
+    <p class="text-gray-500 text-sm mb-1">Accounts represent your clients, prospects, and partners.</p>
+    <p class="text-gray-400 text-xs mb-4">Try adjusting your filters or add a new account to get started.</p>
+    <a href="/clients/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      Add Account
+    </a>
+  </div>
+<% } else { %>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-200">
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Name</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Owner</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Last Contact</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Next Action</th>
+        <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Open Opps</th>
+        <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Pipeline</th>
+        <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Priority</th>
+        <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Status</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      <% accounts.forEach(function(acct) {
+        const lastContactDate = acct.last_contact_date ? acct.last_contact_date.split('T')[0] : null;
+        const isStale = lastContactDate && lastContactDate < thirtyDaysAgo;
+      %>
+      <tr class="hover:bg-gray-50">
+        <td class="px-3 py-2.5">
+          <a href="/clients/<%= acct.id %>" class="text-brand-600 hover:text-brand-700 font-semibold text-sm hover:underline"><%= acct.company_name || acct.name || '-' %></a>
+          <p class="text-gray-400 text-xs truncate max-w-[180px] sm:hidden"><%= typeLabels[acct.account_type] || acct.account_type || '-' %></p>
+        </td>
+        <td class="px-3 py-2.5">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold <%= typeColors[acct.account_type] || 'bg-gray-50 text-gray-600 ring-1 ring-gray-600/20' %>">
+            <%= typeLabels[acct.account_type] || (acct.account_type || '-').replace(/_/g, ' ') %>
+          </span>
+        </td>
+        <td class="px-3 py-2.5 text-gray-600 text-xs hidden md:table-cell truncate max-w-[120px]"><%= acct.owner_name || '-' %></td>
+        <td class="px-3 py-2.5 hidden lg:table-cell">
+          <% if (lastContactDate) { %>
+            <span class="text-xs tabular-nums <%= isStale ? 'text-red-600 font-semibold' : 'text-gray-500' %>"><%= formatDate(lastContactDate) %></span>
+            <% if (isStale) { %>
+              <svg class="w-3.5 h-3.5 text-red-400 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            <% } %>
+          <% } else { %>
+            <span class="text-xs text-gray-300">Never</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 hidden lg:table-cell">
+          <% if (acct.next_action_date) { %>
+            <span class="text-xs tabular-nums text-gray-500"><%= formatDate(acct.next_action_date) %></span>
+            <% if (acct.next_action_note) { %>
+              <p class="text-[11px] text-gray-400 truncate max-w-[140px]"><%= acct.next_action_note %></p>
+            <% } %>
+          <% } else { %>
+            <span class="text-xs text-gray-300">-</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-center hidden md:table-cell">
+          <span class="text-sm font-medium <%= (acct.open_opps || 0) > 0 ? 'text-brand-600' : 'text-gray-300' %>"><%= acct.open_opps || 0 %></span>
+        </td>
+        <td class="px-3 py-2.5 text-right hidden lg:table-cell">
+          <span class="text-sm tabular-nums <%= (acct.pipeline_value || 0) > 0 ? 'text-gray-900 font-medium' : 'text-gray-300' %>"><%= (acct.pipeline_value || 0) > 0 ? formatCurrency(acct.pipeline_value) : '-' %></span>
+        </td>
+        <td class="px-3 py-2.5 text-center hidden sm:table-cell">
+          <% if (acct.priority) { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold <%= priorityColors[acct.priority] || 'bg-gray-50 text-gray-600 ring-1 ring-gray-600/20' %>">
+              <%= (acct.priority || '').charAt(0).toUpperCase() + (acct.priority || '').slice(1) %>
+            </span>
+          <% } else { %>
+            <span class="text-gray-300">-</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-center hidden xl:table-cell">
+          <% if (acct.status === 'active') { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Active</span>
+          <% } else if (acct.status === 'inactive') { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-50 text-gray-600 ring-1 ring-gray-600/20">Inactive</span>
+          <% } else { %>
+            <span class="text-xs text-gray-400"><%= acct.status || '-' %></span>
+          <% } %>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<div class="mt-2 text-xs text-gray-400"><%= accounts.length %> account<%= accounts.length !== 1 ? 's' : '' %> found</div>
+<% } %>
