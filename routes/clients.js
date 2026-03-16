@@ -75,12 +75,15 @@ router.get('/', (req, res) => {
 
 // New company form
 router.get('/new', (req, res) => {
+  const db = getDb();
   const preselectedType = req.query.type || 'client';
+  const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('clients/form', {
     title: 'Add New Company',
     currentPage: 'clients',
     company: null,
     preselectedType,
+    users,
   });
 });
 
@@ -94,15 +97,23 @@ router.post('/', (req, res) => {
     const result = db.prepare(`
       INSERT INTO clients (company_name, abn, primary_contact_name, primary_contact_phone, primary_contact_email,
         address, billing_address, payment_terms, notes, company_type, trade_specialty, insurance_expiry,
-        insurance_policy, product_categories, account_number, website, approved, rating)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        insurance_policy, product_categories, account_number, website, approved, rating,
+        account_owner_id, bdm_owner_id, lead_source, estimated_annual_value, service_interests,
+        target_regions, priority, prequal_status, vendor_status, contract_status, industry_segment,
+        next_action_date, next_action_note)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       b.company_name, b.abn || '', b.primary_contact_name || '', b.primary_contact_phone || '',
       b.primary_contact_email || '', b.address || '', b.billing_address || '',
       b.payment_terms || '', b.notes || '', companyType,
       b.trade_specialty || '', b.insurance_expiry || null,
       b.insurance_policy || '', b.product_categories || '', b.account_number || '',
-      b.website || '', b.approved ? 1 : (companyType === 'client' ? 1 : 0), parseInt(b.rating) || 0
+      b.website || '', b.approved ? 1 : (companyType === 'client' ? 1 : 0), parseInt(b.rating) || 0,
+      b.account_owner_id || null, b.bdm_owner_id || null, b.lead_source || '',
+      parseFloat(b.estimated_annual_value) || 0, b.service_interests || '',
+      b.target_regions || '', b.priority || 'normal', b.prequal_status || 'none',
+      b.vendor_status || 'none', b.contract_status || '', b.industry_segment || '',
+      b.next_action_date || null, b.next_action_note || ''
     );
 
     const typeLabel = companyType.charAt(0).toUpperCase() + companyType.slice(1);
@@ -134,7 +145,15 @@ router.post('/', (req, res) => {
 router.get('/:id', (req, res, next) => {
   try {
   const db = getDb();
-  const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
+  const client = db.prepare(`
+    SELECT c.*,
+      u_owner.full_name as owner_name,
+      u_bdm.full_name as bdm_name
+    FROM clients c
+    LEFT JOIN users u_owner ON c.account_owner_id = u_owner.id
+    LEFT JOIN users u_bdm ON c.bdm_owner_id = u_bdm.id
+    WHERE c.id = ?
+  `).get(req.params.id);
   if (!client) {
     req.flash('error', 'Company not found.');
     return res.redirect('/clients');
@@ -181,6 +200,41 @@ router.get('/:id', (req, res, next) => {
     LIMIT 10
   `).all(client.id);
 
+  // CRM: Open opportunities for this account
+  const opportunities = db.prepare(`
+    SELECT o.*, u.full_name as owner_name
+    FROM opportunities o
+    LEFT JOIN users u ON o.owner_id = u.id
+    WHERE o.client_id = ?
+    ORDER BY CASE o.status WHEN 'open' THEN 0 WHEN 'on_hold' THEN 1 WHEN 'won' THEN 2 ELSE 3 END, o.expected_close_date ASC
+  `).all(client.id);
+
+  // CRM: Recent activities for this account
+  const crmActivities = db.prepare(`
+    SELECT ca.*, u.full_name as owner_name, cc.full_name as contact_name,
+      o.opportunity_number, o.title as opp_title
+    FROM crm_activities ca
+    LEFT JOIN users u ON ca.owner_id = u.id
+    LEFT JOIN client_contacts cc ON ca.contact_id = cc.id
+    LEFT JOIN opportunities o ON ca.opportunity_id = o.id
+    WHERE ca.client_id = ?
+    ORDER BY ca.activity_date DESC
+    LIMIT 20
+  `).all(client.id);
+
+  // CRM: Pipeline summary for this account
+  const pipelineSummary = db.prepare(`
+    SELECT
+      COUNT(CASE WHEN status = 'open' THEN 1 END) as open_count,
+      COALESCE(SUM(CASE WHEN status = 'open' THEN estimated_value ELSE 0 END), 0) as open_value,
+      COUNT(CASE WHEN status = 'won' THEN 1 END) as won_count,
+      COALESCE(SUM(CASE WHEN status = 'won' THEN estimated_value ELSE 0 END), 0) as won_value
+    FROM opportunities WHERE client_id = ?
+  `).get(client.id);
+
+  // Users for owner dropdowns
+  const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
+
   res.render('clients/show', {
     title: client.company_name,
     currentPage: 'clients',
@@ -189,6 +243,10 @@ router.get('/:id', (req, res, next) => {
     recentShifts,
     contacts,
     comms,
+    opportunities,
+    crmActivities,
+    pipelineSummary,
+    users,
   });
   } catch (err) {
     console.error('Client detail error:', err);
@@ -204,11 +262,13 @@ router.get('/:id/edit', (req, res) => {
     req.flash('error', 'Company not found.');
     return res.redirect('/clients');
   }
+  const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('clients/form', {
     title: 'Edit ' + client.company_name,
     currentPage: 'clients',
     company: client,
     preselectedType: client.company_type || 'client',
+    users,
   });
 });
 
@@ -223,6 +283,9 @@ router.post('/:id', (req, res) => {
         primary_contact_email=?, address=?, billing_address=?, payment_terms=?, notes=?,
         active=?, company_type=?, trade_specialty=?, insurance_expiry=?, insurance_policy=?,
         product_categories=?, account_number=?, website=?, approved=?, rating=?,
+        account_owner_id=?, bdm_owner_id=?, lead_source=?, estimated_annual_value=?,
+        service_interests=?, target_regions=?, priority=?, prequal_status=?, vendor_status=?,
+        contract_status=?, industry_segment=?, next_action_date=?, next_action_note=?,
         updated_at=CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
@@ -232,6 +295,11 @@ router.post('/:id', (req, res) => {
       companyType, b.trade_specialty || '', b.insurance_expiry || null,
       b.insurance_policy || '', b.product_categories || '', b.account_number || '',
       b.website || '', b.approved ? 1 : (companyType === 'client' ? 1 : 0), parseInt(b.rating) || 0,
+      b.account_owner_id || null, b.bdm_owner_id || null, b.lead_source || '',
+      parseFloat(b.estimated_annual_value) || 0, b.service_interests || '',
+      b.target_regions || '', b.priority || 'normal', b.prequal_status || 'none',
+      b.vendor_status || 'none', b.contract_status || '', b.industry_segment || '',
+      b.next_action_date || null, b.next_action_note || '',
       req.params.id
     );
 

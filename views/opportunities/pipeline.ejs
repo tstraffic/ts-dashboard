@@ -1,0 +1,308 @@
+<% locals.currentPage = 'pipeline' %>
+<%
+  function formatCurrency(v) {
+    return '$' + (v || 0).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+  function formatDate(d) {
+    if (!d) return '-';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
+  }
+
+  // pipelineStages is passed from the route (already excludes won/lost/on_hold)
+  const boardStages = (pipelineStages || []).map(function(s) {
+    return {
+      key: s.key,
+      label: s.label || (s.key || '').replace(/_/g, ' '),
+      color: s.color || 'gray'
+    };
+  });
+
+  // Collapsed stages = won, lost, on_hold from all stages
+  const allStages = (typeof settingsOptions !== 'undefined' && settingsOptions.opportunity_stages) ? settingsOptions.opportunity_stages : [];
+  const collapsedStages = allStages.filter(function(s) { return ['won', 'lost', 'on_hold'].includes(s.key); }).map(function(s) {
+    return { key: s.key, label: s.label || s.key, color: s.color || 'gray' };
+  });
+
+  // Group opportunities by stage
+  const oppsByStage = {};
+  (opportunities || []).forEach(function(opp) {
+    const stage = opp.stage || 'unknown';
+    if (!oppsByStage[stage]) oppsByStage[stage] = [];
+    oppsByStage[stage].push(opp);
+  });
+
+  // Initials helper
+  function getInitials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    return parts.length >= 2 ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
+  }
+  const initialsColors = ['bg-brand-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-violet-500', 'bg-cyan-500', 'bg-orange-500', 'bg-teal-500'];
+  function initialsColor(name) {
+    if (!name) return initialsColors[0];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return initialsColors[Math.abs(hash) % initialsColors.length];
+  }
+
+  // Color map for stage headers
+  const stageHeaderColors = {
+    sky: 'border-sky-300 bg-sky-50 text-sky-800',
+    blue: 'border-blue-300 bg-blue-50 text-blue-800',
+    indigo: 'border-indigo-300 bg-indigo-50 text-indigo-800',
+    purple: 'border-purple-300 bg-purple-50 text-purple-800',
+    amber: 'border-amber-300 bg-amber-50 text-amber-800',
+    emerald: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+    green: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+    red: 'border-red-300 bg-red-50 text-red-800',
+    gray: 'border-gray-300 bg-gray-50 text-gray-700',
+    orange: 'border-orange-300 bg-orange-50 text-orange-800',
+    teal: 'border-teal-300 bg-teal-50 text-teal-800',
+    rose: 'border-rose-300 bg-rose-50 text-rose-800'
+  };
+  const stageDotColors = {
+    sky: 'bg-sky-500', blue: 'bg-blue-500', indigo: 'bg-indigo-500', purple: 'bg-purple-500',
+    amber: 'bg-amber-500', emerald: 'bg-emerald-500', green: 'bg-emerald-500', red: 'bg-red-500',
+    gray: 'bg-gray-400', orange: 'bg-orange-500', teal: 'bg-teal-500', rose: 'bg-rose-500'
+  };
+%>
+
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Sales Pipeline</h1>
+    <p class="text-gray-500 text-sm mt-0.5">Drag opportunities between stages to update</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/opportunities" class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+      List View
+    </a>
+    <a href="/opportunities/new" class="inline-flex items-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      New Opportunity
+    </a>
+  </div>
+</div>
+
+<!-- Kanban Board -->
+<div class="overflow-x-auto pb-4 -mx-4 px-4">
+  <div class="inline-flex gap-4 min-w-full" id="pipeline-board">
+    <% boardStages.forEach(function(stage) {
+      const stageOpps = oppsByStage[stage.key] || [];
+      const stageValue = stageOpps.reduce(function(sum, o) { return sum + (o.estimated_value || 0); }, 0);
+      const headerColor = stageHeaderColors[stage.color] || stageHeaderColors.gray;
+      const dotColor = stageDotColors[stage.color] || 'bg-gray-400';
+    %>
+    <div class="flex-shrink-0 w-72 sm:w-80" data-stage="<%= stage.key %>" id="stage-<%= stage.key %>">
+      <!-- Column Header -->
+      <div class="rounded-t-xl border-t-4 <%= headerColor %> px-3 py-2.5 mb-0">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full <%= dotColor %>"></span>
+            <h3 class="text-sm font-bold uppercase tracking-wider"><%= stage.label %></h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-medium opacity-75" id="count-<%= stage.key %>"><%= stageOpps.length %></span>
+          </div>
+        </div>
+        <p class="text-[10px] font-medium opacity-60 mt-0.5 tabular-nums" id="value-<%= stage.key %>"><%= formatCurrency(stageValue) %></p>
+      </div>
+
+      <!-- Drop Zone -->
+      <div class="bg-gray-50/50 border border-gray-200 border-t-0 rounded-b-xl min-h-[200px] p-2 space-y-2 pipeline-column"
+           data-stage="<%= stage.key %>"
+           ondragover="handleDragOver(event)"
+           ondragleave="handleDragLeave(event)"
+           ondrop="handleDrop(event)">
+
+        <% stageOpps.forEach(function(opp) { %>
+        <!-- Opportunity Card -->
+        <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow pipeline-card"
+             draggable="true"
+             data-opportunity-id="<%= opp.id %>"
+             data-current-stage="<%= stage.key %>"
+             data-value="<%= opp.estimated_value || 0 %>"
+             ondragstart="handleDragStart(event)"
+             ondragend="handleDragEnd(event)">
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <a href="/opportunities/<%= opp.id %>" class="text-sm font-semibold text-gray-900 hover:text-brand-600 transition line-clamp-2 flex-1"><%= opp.title %></a>
+            <span class="text-[10px] text-gray-400 flex-shrink-0 tabular-nums">OPP-<%= String(opp.id).padStart(3, '0') %></span>
+          </div>
+          <% if (opp.client_name) { %>
+          <p class="text-xs text-gray-500 mb-2 truncate"><%= opp.client_name %></p>
+          <% } %>
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-gray-900 tabular-nums"><%= formatCurrency(opp.estimated_value) %></span>
+            <% if (opp.expected_close_date) { %>
+              <span class="text-[10px] text-gray-400 tabular-nums"><%= formatDate(opp.expected_close_date) %></span>
+            <% } %>
+          </div>
+          <div class="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+            <% if (opp.owner_name) { %>
+              <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white <%= initialsColor(opp.owner_name) %>" title="<%= opp.owner_name %>"><%= getInitials(opp.owner_name) %></div>
+            <% } else { %>
+              <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-400 bg-gray-100">?</div>
+            <% } %>
+            <% if (opp.next_step) { %>
+              <p class="text-[10px] text-gray-400 truncate max-w-[140px]"><%= opp.next_step %></p>
+            <% } %>
+          </div>
+        </div>
+        <% }) %>
+
+        <% if (stageOpps.length === 0) { %>
+        <div class="text-center py-6 text-xs text-gray-300">
+          <p>Drop opportunities here</p>
+        </div>
+        <% } %>
+      </div>
+    </div>
+    <% }) %>
+  </div>
+</div>
+
+<!-- Collapsed Sections (Won / Lost / On Hold) -->
+<% collapsedStages.forEach(function(stage) {
+  const stageOpps = oppsByStage[stage.key] || [];
+  if (stageOpps.length === 0) return;
+  const stageValue = stageOpps.reduce(function(sum, o) { return sum + (o.estimated_value || 0); }, 0);
+  const dotColor = stageDotColors[stage.color] || 'bg-gray-400';
+%>
+<details class="mt-4">
+  <summary class="bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-3 cursor-pointer hover:bg-gray-50 transition">
+    <div class="inline-flex items-center gap-3">
+      <span class="w-2.5 h-2.5 rounded-full <%= dotColor %>"></span>
+      <span class="text-sm font-bold text-gray-700 uppercase tracking-wider"><%= stage.label %></span>
+      <span class="text-xs text-gray-400">(<%= stageOpps.length %> &middot; <%= formatCurrency(stageValue) %>)</span>
+    </div>
+  </summary>
+  <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+    <% stageOpps.forEach(function(opp) { %>
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-3 <%= stage.key === 'lost' ? 'opacity-60' : '' %>">
+      <div class="flex items-start justify-between gap-2 mb-1">
+        <a href="/opportunities/<%= opp.id %>" class="text-sm font-semibold text-gray-900 hover:text-brand-600 transition truncate flex-1"><%= opp.title %></a>
+        <span class="text-[10px] text-gray-400 flex-shrink-0">OPP-<%= String(opp.id).padStart(3, '0') %></span>
+      </div>
+      <% if (opp.client_name) { %>
+        <p class="text-xs text-gray-500 truncate"><%= opp.client_name %></p>
+      <% } %>
+      <div class="flex items-center justify-between mt-2">
+        <span class="text-sm font-bold text-gray-900 tabular-nums"><%= formatCurrency(opp.estimated_value) %></span>
+        <% if (opp.owner_name) { %>
+          <span class="text-xs text-gray-400"><%= opp.owner_name %></span>
+        <% } %>
+      </div>
+    </div>
+    <% }) %>
+  </div>
+</details>
+<% }) %>
+
+<!-- Drag and Drop Script -->
+<script>
+  let draggedCard = null;
+  let draggedId = null;
+  let sourceStage = null;
+  let draggedValue = 0;
+
+  function handleDragStart(e) {
+    draggedCard = e.target.closest('.pipeline-card');
+    draggedId = draggedCard.dataset.opportunityId;
+    sourceStage = draggedCard.dataset.currentStage;
+    draggedValue = parseFloat(draggedCard.dataset.value) || 0;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', draggedId);
+    setTimeout(function() {
+      draggedCard.style.opacity = '0.5';
+    }, 0);
+  }
+
+  function handleDragEnd(e) {
+    if (draggedCard) {
+      draggedCard.style.opacity = '1';
+    }
+    document.querySelectorAll('.pipeline-column').forEach(function(col) {
+      col.classList.remove('ring-2', 'ring-brand-500', 'ring-offset-2', 'bg-brand-50/30');
+    });
+    draggedCard = null;
+    draggedId = null;
+    sourceStage = null;
+    draggedValue = 0;
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const col = e.target.closest('.pipeline-column');
+    if (col) {
+      col.classList.add('ring-2', 'ring-brand-500', 'ring-offset-2', 'bg-brand-50/30');
+    }
+  }
+
+  function handleDragLeave(e) {
+    const col = e.target.closest('.pipeline-column');
+    if (col && !col.contains(e.relatedTarget)) {
+      col.classList.remove('ring-2', 'ring-brand-500', 'ring-offset-2', 'bg-brand-50/30');
+    }
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    const col = e.target.closest('.pipeline-column');
+    if (!col || !draggedCard) return;
+
+    col.classList.remove('ring-2', 'ring-brand-500', 'ring-offset-2', 'bg-brand-50/30');
+
+    const newStage = col.dataset.stage;
+    if (newStage === sourceStage) return;
+
+    // Move card in DOM
+    const emptyMsg = col.querySelector('.text-center.py-6');
+    if (emptyMsg) emptyMsg.remove();
+    col.appendChild(draggedCard);
+    draggedCard.dataset.currentStage = newStage;
+    draggedCard.style.opacity = '1';
+
+    // Update counts
+    updateColumnStats(sourceStage, -1, -draggedValue);
+    updateColumnStats(newStage, 1, draggedValue);
+
+    // Remove empty state placeholder from source if it has items
+    const sourceCol = document.querySelector('.pipeline-column[data-stage="' + sourceStage + '"]');
+    if (sourceCol && sourceCol.querySelectorAll('.pipeline-card').length === 0) {
+      sourceCol.innerHTML = '<div class="text-center py-6 text-xs text-gray-300"><p>Drop opportunities here</p></div>';
+    }
+
+    // POST to server
+    fetch('/opportunities/' + draggedId + '/stage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage: newStage })
+    }).then(function(res) {
+      if (!res.ok) {
+        console.error('Failed to update stage');
+        window.location.reload();
+      }
+    }).catch(function(err) {
+      console.error('Error updating stage:', err);
+      window.location.reload();
+    });
+  }
+
+  function updateColumnStats(stage, countDelta, valueDelta) {
+    var countEl = document.getElementById('count-' + stage);
+    var valueEl = document.getElementById('value-' + stage);
+    if (countEl) {
+      var newCount = Math.max(0, parseInt(countEl.textContent) + countDelta);
+      countEl.textContent = newCount;
+    }
+    if (valueEl) {
+      var currentText = valueEl.textContent.replace(/[^0-9.-]/g, '');
+      var currentVal = parseFloat(currentText) || 0;
+      var newVal = Math.max(0, currentVal + valueDelta);
+      valueEl.textContent = '$' + newVal.toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+  }
+</script>

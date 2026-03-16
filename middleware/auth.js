@@ -41,6 +41,7 @@ const PERMISSIONS = {
   reports:       ['admin', 'operations', 'planning', 'finance'],
   exports:       ['admin', 'operations', 'planning', 'finance'],
   notifications: ['admin', 'operations', 'planning', 'finance'],
+  crm:           ['admin', 'operations', 'planning'],
   admin:         ['admin'],
   activity:      ['admin'],
   settings:      ['admin'],

@@ -1752,6 +1752,201 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 36: CRM / BDM Module
+  // =============================================
+  if (!isMigrationApplied.get(36)) {
+    console.log('Running migration 36: CRM / BDM Module — opportunities, activities, account enhancements');
+    try {
+      // A. New CRM columns on clients table
+      const crmClientCols = [
+        "ALTER TABLE clients ADD COLUMN account_status TEXT DEFAULT 'active'",
+        "ALTER TABLE clients ADD COLUMN account_owner_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE clients ADD COLUMN bdm_owner_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE clients ADD COLUMN lead_source TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN estimated_annual_value REAL DEFAULT 0",
+        "ALTER TABLE clients ADD COLUMN last_contacted_date DATE",
+        "ALTER TABLE clients ADD COLUMN next_action_date DATE",
+        "ALTER TABLE clients ADD COLUMN next_action_note TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN service_interests TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN target_regions TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN priority TEXT DEFAULT 'normal'",
+        "ALTER TABLE clients ADD COLUMN prequal_status TEXT DEFAULT 'none'",
+        "ALTER TABLE clients ADD COLUMN vendor_status TEXT DEFAULT 'none'",
+        "ALTER TABLE clients ADD COLUMN contract_status TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN industry_segment TEXT DEFAULT ''",
+      ];
+      for (const sql of crmClientCols) {
+        try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+      }
+
+      // B. New CRM columns on client_contacts table
+      const crmContactCols = [
+        "ALTER TABLE client_contacts ADD COLUMN relationship_strength TEXT DEFAULT ''",
+        "ALTER TABLE client_contacts ADD COLUMN influence_level TEXT DEFAULT ''",
+        "ALTER TABLE client_contacts ADD COLUMN buying_role TEXT DEFAULT ''",
+        "ALTER TABLE client_contacts ADD COLUMN preferred_comm_method TEXT DEFAULT ''",
+        "ALTER TABLE client_contacts ADD COLUMN last_contact_date DATE",
+        "ALTER TABLE client_contacts ADD COLUMN next_contact_date DATE",
+        "ALTER TABLE client_contacts ADD COLUMN contact_owner_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE client_contacts ADD COLUMN referred_by TEXT DEFAULT ''",
+      ];
+      for (const sql of crmContactCols) {
+        try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+      }
+
+      // C. Opportunities table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS opportunities (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          opportunity_number TEXT UNIQUE,
+          title TEXT NOT NULL,
+          client_id INTEGER REFERENCES clients(id),
+          contact_id INTEGER REFERENCES client_contacts(id),
+          owner_id INTEGER REFERENCES users(id),
+          service_type TEXT DEFAULT '',
+          stage TEXT DEFAULT 'new_lead',
+          probability INTEGER DEFAULT 10,
+          estimated_value REAL DEFAULT 0,
+          weighted_value REAL DEFAULT 0,
+          expected_close_date DATE,
+          source TEXT DEFAULT '',
+          region TEXT DEFAULT '',
+          notes TEXT DEFAULT '',
+          next_step TEXT DEFAULT '',
+          next_step_due_date DATE,
+          status TEXT DEFAULT 'open' CHECK(status IN ('open','won','lost','on_hold')),
+          loss_reason TEXT DEFAULT '',
+          related_job_id INTEGER REFERENCES jobs(id),
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_opportunities_client ON opportunities(client_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_opportunities_owner ON opportunities(owner_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_opportunities_stage ON opportunities(stage)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_opportunities_status ON opportunities(status)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_opportunities_close_date ON opportunities(expected_close_date)'); } catch (e) {}
+
+      // D. CRM Activities table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS crm_activities (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          activity_type TEXT NOT NULL,
+          subject TEXT NOT NULL,
+          notes TEXT DEFAULT '',
+          outcome TEXT DEFAULT '',
+          client_id INTEGER REFERENCES clients(id),
+          contact_id INTEGER REFERENCES client_contacts(id),
+          opportunity_id INTEGER REFERENCES opportunities(id),
+          job_id INTEGER REFERENCES jobs(id),
+          owner_id INTEGER REFERENCES users(id),
+          activity_date DATETIME,
+          next_step TEXT DEFAULT '',
+          next_step_due_date DATE,
+          location TEXT DEFAULT '',
+          is_completed INTEGER DEFAULT 0,
+          reminder INTEGER DEFAULT 0,
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_activities_client ON crm_activities(client_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_activities_contact ON crm_activities(contact_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_activities_opportunity ON crm_activities(opportunity_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_activities_owner ON crm_activities(owner_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_activities_date ON crm_activities(activity_date)'); } catch (e) {}
+
+      // E. Seed CRM settings
+      const seedSetting = db.prepare(`
+        INSERT OR IGNORE INTO app_settings (category, key, label, color, display_order, is_active)
+        VALUES (?, ?, ?, ?, ?, 1)
+      `);
+
+      const crmSeeds = {
+        opportunity_stages: [
+          { key: 'new_lead', label: 'New Lead', color: 'sky' },
+          { key: 'qualified', label: 'Qualified', color: 'blue' },
+          { key: 'contacted', label: 'Contacted', color: 'indigo' },
+          { key: 'meeting_booked', label: 'Meeting Booked', color: 'purple' },
+          { key: 'proposal_pending', label: 'Proposal Pending', color: 'amber' },
+          { key: 'quote_sent', label: 'Quote Sent', color: 'orange' },
+          { key: 'negotiation', label: 'Negotiation', color: 'red' },
+          { key: 'awaiting_decision', label: 'Awaiting Decision', color: 'pink' },
+          { key: 'won', label: 'Won', color: 'emerald' },
+          { key: 'lost', label: 'Lost', color: 'gray' },
+          { key: 'on_hold', label: 'On Hold', color: 'slate' },
+        ],
+        crm_activity_types: [
+          { key: 'call', label: 'Call', color: 'blue' },
+          { key: 'email', label: 'Email', color: 'sky' },
+          { key: 'meeting', label: 'Meeting', color: 'purple' },
+          { key: 'site_visit', label: 'Site Visit', color: 'emerald' },
+          { key: 'proposal_sent', label: 'Proposal Sent', color: 'amber' },
+          { key: 'follow_up', label: 'Follow Up', color: 'orange' },
+          { key: 'tender_submitted', label: 'Tender Submitted', color: 'indigo' },
+          { key: 'onboarding', label: 'Onboarding', color: 'teal' },
+          { key: 'intro_networking', label: 'Intro / Networking', color: 'pink' },
+          { key: 'other', label: 'Other', color: 'gray' },
+        ],
+        lead_sources: [
+          { key: 'inbound', label: 'Inbound', color: 'blue' },
+          { key: 'outbound', label: 'Outbound', color: 'purple' },
+          { key: 'referral', label: 'Referral', color: 'emerald' },
+          { key: 'website', label: 'Website', color: 'sky' },
+          { key: 'tender_portal', label: 'Tender Portal', color: 'amber' },
+          { key: 'networking', label: 'Networking', color: 'pink' },
+          { key: 'existing_client', label: 'Existing Client', color: 'teal' },
+          { key: 'cold_call', label: 'Cold Call', color: 'orange' },
+          { key: 'event', label: 'Event', color: 'indigo' },
+          { key: 'other', label: 'Other', color: 'gray' },
+        ],
+        loss_reasons: [
+          { key: 'price', label: 'Price', color: 'red' },
+          { key: 'timing', label: 'Timing', color: 'amber' },
+          { key: 'competitor', label: 'Competitor', color: 'orange' },
+          { key: 'no_budget', label: 'No Budget', color: 'gray' },
+          { key: 'no_response', label: 'No Response', color: 'slate' },
+          { key: 'scope', label: 'Scope Mismatch', color: 'purple' },
+          { key: 'relationship', label: 'Relationship', color: 'pink' },
+          { key: 'other', label: 'Other', color: 'gray' },
+        ],
+        service_categories: [
+          { key: 'traffic_control', label: 'Traffic Control', color: 'blue' },
+          { key: 'traffic_plans', label: 'Traffic Plans', color: 'indigo' },
+          { key: 'rol_permits', label: 'ROL / Permits', color: 'purple' },
+          { key: 'equipment_hire', label: 'Equipment Hire', color: 'amber' },
+          { key: 'events', label: 'Events', color: 'pink' },
+          { key: 'shutdown_emergency', label: 'Shutdown / Emergency', color: 'red' },
+          { key: 'civil_support', label: 'Civil Support', color: 'emerald' },
+        ],
+        priority_levels: [
+          { key: 'low', label: 'Low', color: 'gray' },
+          { key: 'normal', label: 'Normal', color: 'blue' },
+          { key: 'high', label: 'High', color: 'amber' },
+          { key: 'strategic', label: 'Strategic', color: 'purple' },
+        ],
+      };
+
+      for (const [category, items] of Object.entries(crmSeeds)) {
+        items.forEach((item, idx) => {
+          seedSetting.run(category, item.key, item.label, item.color || '', idx);
+        });
+      }
+
+      // Client CRM indexes
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_clients_account_owner ON clients(account_owner_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_clients_bdm_owner ON clients(bdm_owner_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_clients_next_action ON clients(next_action_date)'); } catch (e) {}
+
+      recordMigration.run(36, 'CRM / BDM Module — opportunities, activities, account enhancements');
+      console.log('Migration 36 complete.');
+    } catch (e) {
+      console.error('Migration 36 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

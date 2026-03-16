@@ -49,12 +49,14 @@ router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs ORDER BY job_number DESC").all();
   const companies = db.prepare("SELECT id, company_name, company_type FROM clients WHERE active = 1 ORDER BY company_name").all();
+  const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('contacts/form', {
     title: 'New Contact',
     currentPage: 'contacts',
     contact: null,
     jobs,
     companies,
+    users,
     preselectedJobId: req.query.job_id || '',
     preselectedCompanyId: req.query.company_id || ''
   });
@@ -65,11 +67,14 @@ router.get('/new', (req, res) => {
 // ============================================
 router.post('/', (req, res) => {
   const db = getDb();
-  const { job_id, company_id, contact_type, company, full_name, position, phone, email, notes, is_primary } = req.body;
+  const { job_id, company_id, contact_type, company, full_name, position, phone, email, notes, is_primary,
+    relationship_strength, influence_level, buying_role, preferred_comm_method, referred_by, contact_owner_id } = req.body;
   const result = db.prepare(`
-    INSERT INTO client_contacts (job_id, company_id, contact_type, company, full_name, position, phone, email, notes, is_primary)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(job_id || null, company_id || null, contact_type, company, full_name, position || '', phone || '', email || '', notes || '', is_primary ? 1 : 0);
+    INSERT INTO client_contacts (job_id, company_id, contact_type, company, full_name, position, phone, email, notes, is_primary,
+      relationship_strength, influence_level, buying_role, preferred_comm_method, referred_by, contact_owner_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(job_id || null, company_id || null, contact_type, company, full_name, position || '', phone || '', email || '', notes || '', is_primary ? 1 : 0,
+    relationship_strength || '', influence_level || '', buying_role || '', preferred_comm_method || '', referred_by || '', contact_owner_id || null);
 
   logActivity({
     user: req.session.user,
@@ -214,6 +219,7 @@ router.get('/:id/edit', (req, res) => {
   }
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs ORDER BY job_number DESC").all();
   const companies = db.prepare("SELECT id, company_name, company_type FROM clients WHERE active = 1 ORDER BY company_name").all();
+  const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
 
   // Activity log
   const activityLog = db.prepare(`
@@ -229,6 +235,7 @@ router.get('/:id/edit', (req, res) => {
     contact,
     jobs,
     companies,
+    users,
     preselectedJobId: '',
     preselectedCompanyId: '',
     activityLog
@@ -240,11 +247,14 @@ router.get('/:id/edit', (req, res) => {
 // ============================================
 router.post('/:id', (req, res) => {
   const db = getDb();
-  const { job_id, company_id, contact_type, company, full_name, position, phone, email, notes, is_primary } = req.body;
+  const { job_id, company_id, contact_type, company, full_name, position, phone, email, notes, is_primary,
+    relationship_strength, influence_level, buying_role, preferred_comm_method, referred_by, contact_owner_id } = req.body;
   db.prepare(`
-    UPDATE client_contacts SET job_id=?, company_id=?, contact_type=?, company=?, full_name=?, position=?, phone=?, email=?, notes=?, is_primary=?
+    UPDATE client_contacts SET job_id=?, company_id=?, contact_type=?, company=?, full_name=?, position=?, phone=?, email=?, notes=?, is_primary=?,
+      relationship_strength=?, influence_level=?, buying_role=?, preferred_comm_method=?, referred_by=?, contact_owner_id=?
     WHERE id=?
-  `).run(job_id || null, company_id || null, contact_type, company, full_name, position || '', phone || '', email || '', notes || '', is_primary ? 1 : 0, req.params.id);
+  `).run(job_id || null, company_id || null, contact_type, company, full_name, position || '', phone || '', email || '', notes || '', is_primary ? 1 : 0,
+    relationship_strength || '', influence_level || '', buying_role || '', preferred_comm_method || '', referred_by || '', contact_owner_id || null, req.params.id);
 
   logActivity({
     user: req.session.user,
