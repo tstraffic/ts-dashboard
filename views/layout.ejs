@@ -44,11 +44,11 @@
 <body class="h-full bg-gray-50 text-gray-900">
   <%- include('partials/header') %>
 
-  <div class="flex flex-1" style="min-height: calc(100vh - 64px);">
+  <div class="flex flex-1" style="min-height: calc(100vh - 56px);">
     <%- include('partials/sidebar') %>
 
-    <main class="flex-1 overflow-auto lg:ml-0">
-      <div class="px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+    <main class="flex-1 overflow-auto min-w-0">
+      <div class="px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
         <% if (typeof flash_success !== 'undefined' && flash_success.length > 0) { %>
           <% flash_success.forEach(msg => { %>
             <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-sm flex items-center justify-between">

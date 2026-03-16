@@ -1,32 +1,32 @@
-<nav class="bg-white border-b border-gray-200 shadow-sm">
-  <div class="px-4 sm:px-6">
-    <div class="flex items-center justify-between h-16">
-      <div class="flex items-center space-x-3">
+<nav class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
+  <div class="px-3 sm:px-6">
+    <div class="flex items-center justify-between h-14 sm:h-16">
+      <div class="flex items-center gap-2 sm:gap-3">
         <% if (user) { %>
-        <button id="sidebar-toggle" class="lg:hidden p-2 -ml-2 mr-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg focus:outline-none" aria-label="Toggle menu">
+        <button id="sidebar-toggle" class="lg:hidden p-2 -ml-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg focus:outline-none active:bg-gray-200 transition-colors" aria-label="Toggle menu">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
         <% } %>
-        <a href="/dashboard" class="flex items-center space-x-3">
-          <img src="/images/logo-colour.jpg" alt="T&S Traffic Control" class="h-10 w-auto rounded">
-          <span class="text-gray-900 font-semibold text-lg hidden sm:inline">Operations Dashboard</span>
+        <a href="/dashboard" class="flex items-center gap-2 sm:gap-3">
+          <img src="/images/logo-colour.jpg" alt="T&S" class="h-8 sm:h-10 w-auto rounded">
+          <span class="text-gray-900 font-semibold text-base sm:text-lg hidden sm:inline">Operations Dashboard</span>
         </a>
       </div>
-      <div class="flex items-center space-x-4">
+      <div class="flex items-center gap-2 sm:gap-4">
         <% if (user) { %>
           <!-- Notification Bell + Popup -->
           <div class="relative" id="notif-container">
-            <button onclick="toggleNotifDropdown()" class="relative text-gray-400 hover:text-gray-700 transition-colors focus:outline-none" title="Notifications" id="notif-bell">
+            <button onclick="toggleNotifDropdown()" class="relative p-2 text-gray-400 hover:text-gray-700 transition-colors focus:outline-none rounded-lg hover:bg-gray-100" title="Notifications" id="notif-bell">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
               <% if (typeof unreadNotifications !== 'undefined' && unreadNotifications > 0) { %>
-                <span id="notif-badge" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"><%= unreadNotifications > 9 ? '9+' : unreadNotifications %></span>
+                <span id="notif-badge" class="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"><%= unreadNotifications > 9 ? '9+' : unreadNotifications %></span>
               <% } else { %>
-                <span id="notif-badge" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center hidden">0</span>
+                <span id="notif-badge" class="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center hidden">0</span>
               <% } %>
             </button>
 
             <!-- Dropdown Popup -->
-            <div id="notif-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50" style="min-height:120px">
+            <div id="notif-dropdown" class="hidden absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm bg-white border border-gray-200 rounded-xl shadow-xl z-50" style="min-height:120px">
               <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                 <span class="font-semibold text-sm text-gray-900">Notifications</span>
                 <span id="notif-unread-label" class="text-xs text-gray-400"></span>
@@ -41,8 +41,15 @@
             </div>
           </div>
 
-          <a href="/profile" class="text-gray-600 hover:text-brand-600 text-sm font-medium hidden md:inline transition-colors"><%= user.full_name %></a>
-          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1
+          <!-- Profile avatar (clickable) -->
+          <a href="/profile" class="hidden sm:flex items-center gap-2 hover:opacity-80 transition-opacity" title="My Profile">
+            <span class="text-gray-600 text-sm font-medium hidden lg:inline"><%= user.full_name %></span>
+            <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold">
+              <%= user.full_name ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : 'U' %>
+            </div>
+          </a>
+
+          <span class="hidden lg:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1
             <% if (user.role === 'admin') { %>bg-purple-50 text-purple-700 ring-purple-600/20
             <% } else if (user.role === 'operations') { %>bg-blue-50 text-blue-700 ring-blue-600/20
             <% } else if (user.role === 'planning') { %>bg-teal-50 text-teal-700 ring-teal-600/20
@@ -50,7 +57,7 @@
             <% } %>">
             <%= user.role.charAt(0).toUpperCase() + user.role.slice(1) %>
           </span>
-          <a href="/logout" class="text-gray-500 hover:text-gray-700 text-sm">Logout</a>
+          <a href="/logout" class="hidden lg:inline text-gray-400 hover:text-gray-700 text-sm transition-colors">Logout</a>
         <% } %>
       </div>
     </div>
