@@ -202,7 +202,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /:id/delete — Delete Crew Member
-router.post('/:id/delete', requireRole('management', 'operations'), (req, res) => {
+router.post('/:id/delete', requireRole('admin', 'operations'), (req, res) => {
   const db = getDb();
   const member = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(req.params.id);
   if (!member) { req.flash('error', 'Crew member not found'); return res.redirect('/crew'); }
@@ -222,7 +222,7 @@ router.post('/:id/delete', requireRole('management', 'operations'), (req, res) =
 });
 
 // POST /:id/supervisor-approve — Toggle supervisor approval
-router.post('/:id/supervisor-approve', requireRole('management', 'operations'), (req, res) => {
+router.post('/:id/supervisor-approve', requireRole('admin', 'operations'), (req, res) => {
   const db = getDb();
   const member = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(req.params.id);
   if (!member) {
@@ -256,7 +256,7 @@ router.post('/:id/supervisor-approve', requireRole('management', 'operations'), 
 });
 
 // POST /:id/set-pin — Set or reset worker portal PIN
-router.post('/:id/set-pin', requireRole('management', 'operations'), (req, res) => {
+router.post('/:id/set-pin', requireRole('admin', 'operations'), (req, res) => {
   const db = getDb();
   const member = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(req.params.id);
   if (!member) {
@@ -293,7 +293,7 @@ router.post('/:id/set-pin', requireRole('management', 'operations'), (req, res) 
 });
 
 // POST /:id/send-invite — Send email invitation for worker portal
-router.post('/:id/send-invite', requireRole('management', 'operations'), async (req, res) => {
+router.post('/:id/send-invite', requireRole('admin', 'operations'), async (req, res) => {
   const db = getDb();
   const member = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(req.params.id);
   if (!member) {
@@ -325,7 +325,7 @@ router.post('/:id/send-invite', requireRole('management', 'operations'), async (
 });
 
 // POST /:id/clear-pin — Remove worker portal PIN
-router.post('/:id/clear-pin', requireRole('management', 'operations'), (req, res) => {
+router.post('/:id/clear-pin', requireRole('admin', 'operations'), (req, res) => {
   const db = getDb();
   const member = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(req.params.id);
   if (!member) {

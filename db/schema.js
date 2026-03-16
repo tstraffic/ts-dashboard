@@ -1139,7 +1139,7 @@ function runMigrations(db) {
         CREATE TABLE tasks_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
-          division TEXT NOT NULL CHECK(division IN ('ops','planning','marketing','accounts','management')),
+          division TEXT NOT NULL CHECK(division IN ('ops','planning','finance','admin','marketing','accounts','management')),
           title TEXT NOT NULL,
           description TEXT DEFAULT '',
           owner_id INTEGER REFERENCES users(id),
@@ -1186,7 +1186,7 @@ function runMigrations(db) {
           CREATE TABLE tasks_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
-            division TEXT NOT NULL CHECK(division IN ('ops','planning','marketing','accounts','management')),
+            division TEXT NOT NULL CHECK(division IN ('ops','planning','finance','admin','marketing','accounts','management')),
             title TEXT NOT NULL,
             description TEXT DEFAULT '',
             owner_id INTEGER NOT NULL REFERENCES users(id),
@@ -1343,6 +1343,25 @@ function runMigrations(db) {
     console.log('Migration 22 complete.');
   }
 
+  // Migration 23: Rename roles (management→admin, accounts→finance, remove marketing)
+  // =============================================
+  if (!isMigrationApplied.get(23)) {
+    console.log('Running migration 23: Rename company divisions/roles');
+
+    // Update existing user roles
+    try { db.prepare("UPDATE users SET role = 'admin' WHERE role = 'management'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
+    try { db.prepare("UPDATE users SET role = 'finance' WHERE role = 'accounts'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
+    try { db.prepare("UPDATE users SET role = 'operations' WHERE role = 'marketing'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
+
+    // Update tasks division references
+    try { db.prepare("UPDATE tasks SET division = 'admin' WHERE division = 'management'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
+    try { db.prepare("UPDATE tasks SET division = 'finance' WHERE division = 'accounts'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
+    try { db.prepare("UPDATE tasks SET division = 'ops' WHERE division = 'marketing'").run(); } catch (e) { console.log('Migration 23 note:', e.message); }
+
+    recordMigration.run(23, 'Rename roles: management->admin, accounts->finance, remove marketing');
+    console.log('Migration 23 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
@@ -1363,7 +1382,7 @@ function initializeDatabase() {
       password_hash TEXT NOT NULL,
       full_name TEXT NOT NULL,
       email TEXT,
-      role TEXT NOT NULL CHECK(role IN ('management','operations','planning','marketing','accounts')),
+      role TEXT NOT NULL CHECK(role IN ('admin','operations','planning','finance','management','marketing','accounts')),
       active INTEGER NOT NULL DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -1409,7 +1428,7 @@ function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
-      division TEXT NOT NULL CHECK(division IN ('ops','planning','marketing','accounts','management')),
+      division TEXT NOT NULL CHECK(division IN ('ops','planning','finance','admin','marketing','accounts','management')),
       title TEXT NOT NULL,
       description TEXT DEFAULT '',
       owner_id INTEGER NOT NULL REFERENCES users(id),
@@ -1760,11 +1779,10 @@ function initializeDatabase() {
       INSERT INTO users (username, password_hash, full_name, email, role) VALUES (?, ?, ?, ?, ?)
     `);
 
-    insertUser.run('admin', hash, 'Admin User', 'admin@tstraffic.com.au', 'management');
+    insertUser.run('admin', hash, 'Admin User', 'admin@tstraffic.com.au', 'admin');
     insertUser.run('ops_user', bcrypt.hashSync('password', 12), 'Sam Operations', 'sam@tstraffic.com.au', 'operations');
     insertUser.run('planning_user', bcrypt.hashSync('password', 12), 'Alex Planning', 'alex@tstraffic.com.au', 'planning');
-    insertUser.run('marketing_user', bcrypt.hashSync('password', 12), 'Jordan Marketing', 'jordan@tstraffic.com.au', 'marketing');
-    insertUser.run('accounts_user', bcrypt.hashSync('password', 12), 'Pat Accounts', 'pat@tstraffic.com.au', 'accounts');
+    insertUser.run('finance_user', bcrypt.hashSync('password', 12), 'Pat Finance', 'pat@tstraffic.com.au', 'finance');
 
     // Seed sample jobs (use statuses valid under the new CHECK after migration 1 runs)
     const insertJob = db.prepare(`

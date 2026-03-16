@@ -38,11 +38,10 @@
 
           <span class="text-gray-500 text-sm hidden md:inline"><%= user.full_name %></span>
           <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1
-            <% if (user.role === 'management') { %>bg-purple-50 text-purple-700 ring-purple-600/20
+            <% if (user.role === 'admin') { %>bg-purple-50 text-purple-700 ring-purple-600/20
             <% } else if (user.role === 'operations') { %>bg-blue-50 text-blue-700 ring-blue-600/20
             <% } else if (user.role === 'planning') { %>bg-teal-50 text-teal-700 ring-teal-600/20
-            <% } else if (user.role === 'marketing') { %>bg-pink-50 text-pink-700 ring-pink-600/20
-            <% } else if (user.role === 'accounts') { %>bg-amber-50 text-amber-700 ring-amber-600/20
+            <% } else if (user.role === 'finance') { %>bg-amber-50 text-amber-700 ring-amber-600/20
             <% } %>">
             <%= user.role.charAt(0).toUpperCase() + user.role.slice(1) %>
           </span>

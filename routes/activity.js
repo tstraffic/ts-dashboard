@@ -3,7 +3,7 @@ const router = express.Router();
 const { getDb } = require('../db/database');
 const { requireRole } = require('../middleware/auth');
 
-router.get('/', requireRole('management'), (req, res) => {
+router.get('/', requireRole('admin'), (req, res) => {
   const db = getDb();
   const page = parseInt(req.query.page) || 1;
   const limit = 50;

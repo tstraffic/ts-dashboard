@@ -97,7 +97,7 @@
       <p class="text-xs text-gray-400">CSV download</p>
     </a>
 
-    <% if (user && (user.role === 'management' || user.role === 'accounts')) { %>
+    <% if (user && (user.role === 'admin' || user.role === 'finance')) { %>
     <!-- Budgets -->
     <a href="/exports/budgets.csv" class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 hover:border-brand-500/50 hover:bg-gray-50 transition-colors group">
       <div class="flex items-center gap-3 mb-2">

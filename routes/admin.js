@@ -8,8 +8,8 @@ const { sendEmail } = require('../services/email');
 const { adminInviteEmail } = require('../services/emailTemplates');
 const { logActivity } = require('../middleware/audit');
 
-// Only management can access admin
-router.use(requireRole('management'));
+// Only admin can access admin panel
+router.use(requireRole('admin'));
 
 router.get('/users', (req, res) => {
   const db = getDb();
