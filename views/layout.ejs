@@ -78,7 +78,7 @@
   <!-- Register admin service worker -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/js/admin-sw.js')
+      navigator.serviceWorker.register('/admin-sw.js')
         .then(function(reg) { console.log('Admin SW registered, scope:', reg.scope); })
         .catch(function(err) { console.log('Admin SW registration failed:', err); });
     }
