@@ -1,31 +1,49 @@
 <% locals.currentPage = 'incidents' %>
 
+<%
+  function daysAgo(dateStr) {
+    if (!dateStr) return null;
+    return Math.floor((new Date(today) - new Date(dateStr)) / (1000 * 60 * 60 * 24));
+  }
+  function formatShortDate(dateStr) {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
+  }
+%>
+
 <!-- Page Header -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
   <div>
     <h1 class="text-2xl font-bold text-gray-900">Incidents</h1>
-    <p class="text-gray-500 text-sm mt-0.5">Track and manage all safety incidents</p>
+    <p class="text-gray-500 text-sm mt-0.5">Safety register &middot; investigations &middot; corrective actions</p>
   </div>
-  <a href="/incidents/new" class="inline-flex items-center justify-center px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg transition-colors">+ Report Incident</a>
+  <a href="/incidents/new" class="inline-flex items-center justify-center px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg transition-colors">
+    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+    Report Incident
+  </a>
 </div>
 
 <!-- Stat Cards -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</p>
     <p class="text-xl font-bold text-gray-900 mt-0.5"><%= stats.total %></p>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Open</p>
-    <p class="text-xl font-bold <%= stats.open > 0 ? 'text-amber-600' : 'text-gray-900' %> mt-0.5"><%= stats.open %></p>
+    <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Open</p>
+    <p class="text-xl font-bold <%= stats.open > 0 ? 'text-amber-600' : 'text-gray-300' %> mt-0.5"><%= stats.open %></p>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Critical/High</p>
-    <p class="text-xl font-bold <%= stats.critical > 0 ? 'text-red-600' : 'text-gray-900' %> mt-0.5"><%= stats.critical %></p>
+    <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Critical / High</p>
+    <p class="text-xl font-bold <%= stats.critical > 0 ? 'text-red-600' : 'text-gray-300' %> mt-0.5"><%= stats.critical %></p>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">This Month</p>
-    <p class="text-xl font-bold text-gray-900 mt-0.5"><%= stats.thisMonth %></p>
+    <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Open Actions</p>
+    <p class="text-xl font-bold <%= stats.openActions > 0 ? 'text-orange-600' : 'text-gray-300' %> mt-0.5"><%= stats.openActions %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-brand-500 uppercase tracking-widest">This Month</p>
+    <p class="text-xl font-bold text-brand-600 mt-0.5"><%= stats.thisMonth %></p>
   </div>
 </div>
 
@@ -101,9 +119,10 @@
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Type</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Severity</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Job</th>
-        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Reported By</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-        <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Days Open</th>
+        <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Age</th>
+        <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Actions</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Reported By</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
@@ -111,38 +130,38 @@
         const isCritical = incident.severity === 'critical';
         const isHigh = incident.severity === 'high';
         const isOpen = ['reported','investigating'].includes(incident.investigation_status);
-        const daysOpen = incident.incident_date ? Math.floor((new Date() - new Date(incident.incident_date)) / 86400000) : 0;
+        const age = daysAgo(incident.incident_date);
       %>
       <tr class="hover:bg-gray-50 <%= isCritical && isOpen ? 'border-l-4 border-l-red-500' : isHigh && isOpen ? 'border-l-4 border-l-amber-400' : '' %>">
         <td class="px-3 py-2.5">
           <a href="/incidents/<%= incident.id %>" class="text-brand-600 hover:text-brand-700 font-semibold text-sm hover:underline"><%= incident.incident_number %></a>
           <p class="text-gray-400 text-xs truncate max-w-[180px]"><%= incident.title %></p>
+          <p class="text-gray-400 text-[10px] lg:hidden"><%= incident.job_number %></p>
         </td>
-        <td class="px-3 py-2.5 text-gray-500 text-xs hidden sm:table-cell tabular-nums"><%= incident.incident_date || '-' %></td>
+        <td class="px-3 py-2.5 text-gray-500 text-xs hidden sm:table-cell"><%= formatShortDate(incident.incident_date) %></td>
         <td class="px-3 py-2.5 hidden md:table-cell">
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
             <% if (['injury','worker_injury','traffic_incident'].includes(incident.incident_type)) { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
             <% } else if (['near_miss','property_damage'].includes(incident.incident_type)) { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
             <% } else if (['hazard'].includes(incident.incident_type)) { %>bg-yellow-50 text-yellow-700 ring-1 ring-yellow-600/20
             <% } else if (['vehicle','vehicle_damage'].includes(incident.incident_type)) { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
-            <% } else { %>bg-gray-50 text-gray-600<% } %>">
-            <%= incident.incident_type ? incident.incident_type.replace(/_/g, ' ') : '-' %>
+            <% } else { %>bg-gray-100 text-gray-600<% } %>">
+            <%= incident.incident_type ? incident.incident_type.replace(/_/g, ' ').toUpperCase() : '-' %>
           </span>
         </td>
         <td class="px-3 py-2.5">
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
             <% if (incident.severity === 'critical') { %>bg-red-100 text-red-800
             <% } else if (incident.severity === 'high') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
             <% } else if (incident.severity === 'medium') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
-            <% } else { %>bg-gray-50 text-gray-600<% } %>">
+            <% } else { %>bg-gray-100 text-gray-600<% } %>">
             <%= (incident.severity || 'low').toUpperCase() %>
           </span>
         </td>
-        <td class="px-3 py-2.5 text-gray-500 text-xs hidden lg:table-cell"><%= incident.job_number %></td>
-        <td class="px-3 py-2.5 text-gray-600 text-xs hidden lg:table-cell"><%= incident.reported_by_name %></td>
+        <td class="px-3 py-2.5 text-gray-600 text-xs hidden lg:table-cell"><%= incident.job_number %></td>
         <td class="px-3 py-2.5">
           <form method="POST" action="/incidents/<%= incident.id %>/status" class="inline">
-            <select name="status" onchange="this.form.submit()" class="text-[11px] font-medium px-2 py-1 rounded-full border-0 cursor-pointer appearance-none
+            <select name="status" onchange="this.form.submit()" class="text-[10px] font-bold px-2 py-1 rounded-full border-0 cursor-pointer appearance-none
               <% if (incident.investigation_status === 'reported') { %>bg-gray-100 text-gray-600
               <% } else if (incident.investigation_status === 'investigating') { %>bg-blue-50 text-blue-700
               <% } else if (incident.investigation_status === 'resolved') { %>bg-emerald-50 text-emerald-700
@@ -155,13 +174,29 @@
             </select>
           </form>
         </td>
-        <td class="px-3 py-2.5 text-right hidden sm:table-cell">
-          <% if (isOpen) { %>
-            <span class="text-xs tabular-nums font-medium <%= daysOpen > 14 ? 'text-red-600' : daysOpen > 7 ? 'text-amber-600' : 'text-gray-500' %>"><%= daysOpen %>d</span>
+        <!-- Days Open -->
+        <td class="px-3 py-2.5 text-center hidden sm:table-cell">
+          <% if (age !== null && isOpen) { %>
+            <span class="inline-flex items-center justify-center min-w-[2rem] px-1.5 py-0.5 rounded-full text-[10px] font-bold
+              <%= age > 14 ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20' : age > 7 ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' : 'bg-gray-100 text-gray-600' %>"><%= age %>d</span>
+          <% } else if (!isOpen) { %>
+            <span class="text-gray-300 text-[10px]">Closed</span>
           <% } else { %>
-            <span class="text-xs text-gray-300">-</span>
+            <span class="text-gray-300">-</span>
           <% } %>
         </td>
+        <!-- Corrective Actions -->
+        <td class="px-3 py-2.5 text-center hidden lg:table-cell">
+          <% if (incident.corrective_action_count > 0) { %>
+            <span class="inline-flex items-center justify-center min-w-[2rem] px-1.5 py-0.5 rounded-full text-[10px] font-bold
+              <%= incident.open_actions > 0 ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' %>">
+              <% if (incident.open_actions > 0) { %><%= incident.open_actions %>/<%= incident.corrective_action_count %><% } else { %><%= incident.corrective_action_count %>✓<% } %>
+            </span>
+          <% } else { %>
+            <span class="text-gray-300">-</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-gray-500 text-xs hidden xl:table-cell"><%= incident.reported_by_name %></td>
       </tr>
       <% }) %>
     </tbody>

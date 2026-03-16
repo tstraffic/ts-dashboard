@@ -1,12 +1,30 @@
 <% locals.currentPage = 'defects' %>
 
+<%
+  function daysAgo(dateStr) {
+    if (!dateStr) return null;
+    return Math.floor((new Date(today) - new Date(dateStr)) / (1000 * 60 * 60 * 24));
+  }
+  function daysUntil(dateStr) {
+    if (!dateStr) return null;
+    return Math.ceil((new Date(dateStr) - new Date(today)) / (1000 * 60 * 60 * 24));
+  }
+  function formatShortDate(dateStr) {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
+  }
+%>
+
 <!-- Page Header -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
   <div>
     <h1 class="text-2xl font-bold text-gray-900">Defects</h1>
-    <p class="text-gray-500 text-sm mt-0.5">Track defects, snags, and rectification items</p>
+    <p class="text-gray-500 text-sm mt-0.5">Defect register &middot; rectification tracking</p>
   </div>
-  <a href="/defects/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Report Defect</a>
+  <a href="/defects/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+    Report Defect
+  </a>
 </div>
 
 <!-- Stat Cards -->
@@ -16,16 +34,16 @@
     <p class="text-xl font-bold text-gray-900 mt-0.5"><%= stats.total %></p>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Open</p>
-    <p class="text-xl font-bold <%= stats.open > 0 ? 'text-amber-600' : 'text-gray-900' %> mt-0.5"><%= stats.open %></p>
+    <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Open</p>
+    <p class="text-xl font-bold <%= stats.open > 0 ? 'text-amber-600' : 'text-gray-300' %> mt-0.5"><%= stats.open %></p>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Critical/Major</p>
-    <p class="text-xl font-bold <%= stats.criticalMajor > 0 ? 'text-red-600' : 'text-gray-900' %> mt-0.5"><%= stats.criticalMajor %></p>
+    <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Critical / Major</p>
+    <p class="text-xl font-bold <%= stats.criticalMajor > 0 ? 'text-red-600' : 'text-gray-300' %> mt-0.5"><%= stats.criticalMajor %></p>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Overdue</p>
-    <p class="text-xl font-bold <%= stats.overdue > 0 ? 'text-red-600' : 'text-gray-900' %> mt-0.5"><%= stats.overdue %></p>
+    <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Overdue</p>
+    <p class="text-xl font-bold <%= stats.overdue > 0 ? 'text-red-600' : 'text-gray-300' %> mt-0.5"><%= stats.overdue %></p>
   </div>
 </div>
 
@@ -87,41 +105,44 @@
     <thead>
       <tr class="border-b border-gray-200">
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Defect</th>
-        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Date</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Job</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Severity</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+        <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Age</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Assigned</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Reported By</th>
         <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Target</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
       <% defects.forEach(defect => {
-        const today = new Date().toISOString().split('T')[0];
         const isOverdue = defect.target_close_date && defect.target_close_date < today && !['closed','deferred'].includes(defect.status);
         const isCritical = defect.severity === 'critical';
-        const isMajor = defect.severity === 'major';
         const isOpen = !['closed','deferred'].includes(defect.status);
+        const age = daysAgo(defect.reported_date);
+        const targetDays = daysUntil(defect.target_close_date);
       %>
       <tr class="hover:bg-gray-50 <%= isCritical && isOpen ? 'border-l-4 border-l-red-500' : isOverdue ? 'border-l-4 border-l-amber-400' : '' %>">
         <td class="px-3 py-2.5">
           <a href="/defects/<%= defect.id %>" class="text-brand-600 hover:text-brand-700 font-semibold text-sm hover:underline"><%= defect.defect_number %></a>
           <p class="text-gray-400 text-xs truncate max-w-[180px]"><%= defect.title %></p>
+          <p class="text-gray-400 text-[10px] lg:hidden"><%= defect.job_number %></p>
         </td>
-        <td class="px-3 py-2.5 text-gray-500 text-xs hidden sm:table-cell tabular-nums"><%= defect.reported_date || '-' %></td>
-        <td class="px-3 py-2.5 text-gray-500 text-xs hidden lg:table-cell"><%= defect.job_number %></td>
+        <td class="px-3 py-2.5 hidden lg:table-cell">
+          <span class="text-xs text-gray-600"><%= defect.job_number %></span>
+        </td>
         <td class="px-3 py-2.5">
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
             <% if (defect.severity === 'critical') { %>bg-red-100 text-red-800
             <% } else if (defect.severity === 'major') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
             <% } else if (defect.severity === 'moderate') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
-            <% } else { %>bg-gray-50 text-gray-600<% } %>">
+            <% } else { %>bg-gray-100 text-gray-600<% } %>">
             <%= (defect.severity || 'minor').toUpperCase() %>
           </span>
         </td>
         <td class="px-3 py-2.5">
           <form method="POST" action="/defects/<%= defect.id %>/status" class="inline">
-            <select name="status" onchange="this.form.submit()" class="text-[11px] font-medium px-2 py-1 rounded-full border-0 cursor-pointer appearance-none
+            <select name="status" onchange="this.form.submit()" class="text-[10px] font-bold px-2 py-1 rounded-full border-0 cursor-pointer appearance-none
               <% if (defect.status === 'open') { %>bg-gray-100 text-gray-600
               <% } else if (defect.status === 'investigating') { %>bg-blue-50 text-blue-700
               <% } else if (defect.status === 'rectification') { %>bg-amber-50 text-amber-700
@@ -136,13 +157,41 @@
             </select>
           </form>
         </td>
-        <td class="px-3 py-2.5 text-gray-600 text-xs hidden md:table-cell"><%= defect.assigned_to_name || '<span class="text-gray-300">Unassigned</span>' %></td>
+        <!-- Days Open -->
+        <td class="px-3 py-2.5 text-center hidden sm:table-cell">
+          <% if (age !== null && isOpen) { %>
+            <span class="inline-flex items-center justify-center min-w-[2rem] px-1.5 py-0.5 rounded-full text-[10px] font-bold
+              <%= age > 30 ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20' : age > 14 ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' : 'bg-gray-100 text-gray-600' %>"><%= age %>d</span>
+          <% } else if (!isOpen) { %>
+            <span class="text-gray-300 text-[10px]">Closed</span>
+          <% } else { %>
+            <span class="text-gray-300">-</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-xs hidden md:table-cell">
+          <% if (defect.assigned_to_name) { %>
+            <span class="text-gray-600"><%= defect.assigned_to_name %></span>
+          <% } else { %>
+            <span class="text-gray-300 italic">Unassigned</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-xs text-gray-500 hidden xl:table-cell"><%= defect.reported_by_name || '-' %></td>
         <td class="px-3 py-2.5 text-right hidden sm:table-cell">
           <% if (defect.target_close_date) { %>
-            <span class="text-xs tabular-nums <%= isOverdue ? 'text-red-600 font-semibold' : 'text-gray-500' %>">
-              <% if (isOverdue) { %><svg class="w-3 h-3 inline mr-0.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg><% } %>
-              <%= defect.target_close_date %>
-            </span>
+            <%
+              let targetColor = 'text-gray-500';
+              let targetLabel = formatShortDate(defect.target_close_date);
+              if (isOverdue) {
+                targetColor = 'text-red-600 font-semibold';
+                targetLabel = Math.abs(targetDays) + 'd overdue';
+              } else if (isOpen && targetDays !== null && targetDays <= 3) {
+                targetColor = 'text-amber-600';
+              }
+            %>
+            <span class="text-xs <%= targetColor %>"><%= targetLabel %></span>
+            <% if (isOverdue) { %>
+              <span class="block text-[10px] text-red-500">OVERDUE</span>
+            <% } %>
           <% } else { %>
             <span class="text-gray-300 text-xs">-</span>
           <% } %>

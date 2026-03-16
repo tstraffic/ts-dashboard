@@ -1,27 +1,49 @@
 <% locals.currentPage = 'equipment' %>
 
+<%
+  function daysUntil(dateStr) {
+    if (!dateStr) return null;
+    return Math.ceil((new Date(dateStr) - new Date(today)) / (1000 * 60 * 60 * 24));
+  }
+  function formatShortDate(dateStr) {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
+  }
+%>
+
 <!-- Page Header -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
   <div>
     <h1 class="text-2xl font-bold text-gray-900">Equipment</h1>
-    <p class="text-gray-500 text-sm mt-0.5">Track and manage traffic management equipment and assets</p>
+    <p class="text-gray-500 text-sm mt-0.5">Asset register &middot; deployment &middot; inspections</p>
   </div>
-  <a href="/equipment/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Add Equipment</a>
+  <a href="/equipment/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+    Add Equipment
+  </a>
 </div>
 
 <!-- Stats Row -->
-<div class="grid grid-cols-3 gap-3 mb-5">
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Items</p>
     <p class="text-xl font-bold text-gray-900 mt-0.5"><%= stats.total %></p>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Deployed</p>
+    <p class="text-[10px] font-bold text-brand-500 uppercase tracking-widest">Deployed</p>
     <p class="text-xl font-bold text-brand-600 mt-0.5"><%= stats.totalDeployed %></p>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Inspections Due</p>
-    <p class="text-xl font-bold <%= stats.inspectionsDue > 0 ? 'text-red-600' : 'text-emerald-600' %> mt-0.5"><%= stats.inspectionsDue %></p>
+    <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Available</p>
+    <p class="text-xl font-bold text-emerald-600 mt-0.5"><%= stats.total - stats.totalDeployed %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Inspections Due</p>
+    <p class="text-xl font-bold <%= stats.inspectionsDue > 0 ? 'text-red-600' : 'text-gray-300' %> mt-0.5"><%= stats.inspectionsDue %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Poor / Damaged</p>
+    <p class="text-xl font-bold <%= stats.poorDamaged > 0 ? 'text-orange-600' : 'text-gray-300' %> mt-0.5"><%= stats.poorDamaged %></p>
   </div>
 </div>
 
@@ -91,13 +113,14 @@
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Category</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Condition</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Deployed</th>
+        <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Uses</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Inspection</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
       <% equipment.forEach(eq => {
-        const today = new Date().toISOString().split('T')[0];
         const inspOverdue = eq.next_inspection_date && eq.next_inspection_date <= today;
+        const inspDays = daysUntil(eq.next_inspection_date);
         const isPoorDamaged = ['poor','damaged'].includes(eq.current_condition);
       %>
       <tr class="hover:bg-gray-50 <%= isPoorDamaged ? 'border-l-4 border-l-red-400' : inspOverdue ? 'border-l-4 border-l-amber-400' : '' %> <%= !eq.active ? 'opacity-50' : '' %>" onclick="window.location='/equipment/<%= eq.id %>'" style="cursor:pointer">
@@ -106,32 +129,49 @@
           <p class="text-gray-400 text-xs truncate max-w-[140px] sm:hidden"><%= eq.name %></p>
         </td>
         <td class="px-3 py-2.5 text-gray-600 text-xs hidden sm:table-cell truncate max-w-[160px]"><%= eq.name %></td>
-        <td class="px-3 py-2.5 text-gray-500 text-xs hidden lg:table-cell"><%= eq.registration || '-' %></td>
+        <td class="px-3 py-2.5 text-gray-500 text-xs font-mono hidden lg:table-cell"><%= eq.registration || '-' %></td>
         <td class="px-3 py-2.5 hidden md:table-cell">
           <span class="text-xs text-gray-500"><%= eq.category ? eq.category.replace(/_/g, ' ') : '-' %></span>
         </td>
         <td class="px-3 py-2.5">
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
             <% if (['new','good'].includes(eq.current_condition)) { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
             <% } else if (eq.current_condition === 'fair') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
             <% } else if (['poor','damaged'].includes(eq.current_condition)) { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
             <% } else { %>bg-gray-50 text-gray-500<% } %>">
-            <%= eq.current_condition %>
+            <%= eq.current_condition ? eq.current_condition.toUpperCase() : '-' %>
           </span>
         </td>
         <td class="px-3 py-2.5">
           <% if (eq.currently_deployed > 0 && eq.deployed_to_job) { %>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-600/20"><%= eq.deployed_to_job %></span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 ring-1 ring-blue-600/20"><%= eq.deployed_to_job %></span>
           <% } else { %>
-            <span class="text-emerald-600 text-[11px] font-medium">Available</span>
+            <span class="text-emerald-600 text-[10px] font-bold">AVAILABLE</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-center hidden lg:table-cell">
+          <% if (eq.total_assignments > 0) { %>
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600"><%= eq.total_assignments %></span>
+          <% } else { %>
+            <span class="text-gray-300">-</span>
           <% } %>
         </td>
         <td class="px-3 py-2.5 hidden md:table-cell">
           <% if (eq.next_inspection_date) { %>
-            <span class="text-xs tabular-nums <%= inspOverdue ? 'text-red-600 font-semibold' : 'text-gray-500' %>">
-              <% if (inspOverdue) { %><svg class="w-3 h-3 inline mr-0.5 -mt-0.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg><% } %>
-              <%= eq.next_inspection_date %>
-            </span>
+            <%
+              let inspColor = 'text-gray-500';
+              let inspLabel = '';
+              if (inspDays !== null) {
+                if (inspDays < 0) { inspColor = 'text-red-600 font-semibold'; inspLabel = Math.abs(inspDays) + 'd overdue'; }
+                else if (inspDays === 0) { inspColor = 'text-red-600 font-semibold'; inspLabel = 'Today'; }
+                else if (inspDays <= 7) { inspColor = 'text-amber-600'; inspLabel = inspDays + 'd'; }
+                else { inspLabel = formatShortDate(eq.next_inspection_date); }
+              }
+            %>
+            <span class="text-xs <%= inspColor %>"><%= inspLabel %></span>
+            <% if (inspDays !== null && inspDays < 0) { %>
+              <span class="block text-[10px] text-red-500">OVERDUE</span>
+            <% } %>
           <% } else { %>
             <span class="text-gray-300 text-xs">-</span>
           <% } %>

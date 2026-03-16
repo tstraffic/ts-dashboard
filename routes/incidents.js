@@ -25,7 +25,9 @@ router.get('/', (req, res) => {
   const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
   const incidents = db.prepare(`
-    SELECT i.*, j.job_number, j.client, u.full_name as reported_by_name
+    SELECT i.*, j.job_number, j.client, u.full_name as reported_by_name,
+      (SELECT COUNT(*) FROM corrective_actions ca WHERE ca.incident_id = i.id) as corrective_action_count,
+      (SELECT COUNT(*) FROM corrective_actions ca2 WHERE ca2.incident_id = i.id AND ca2.status != 'completed') as open_actions
     FROM incidents i
     JOIN jobs j ON i.job_id = j.id
     JOIN users u ON i.reported_by_id = u.id
@@ -35,13 +37,17 @@ router.get('/', (req, res) => {
 
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
 
+  const today = new Date().toISOString().split('T')[0];
+
   // Compute stats
-  const allIncidents = db.prepare('SELECT severity, investigation_status, incident_date FROM incidents').all();
+  const allIncidents = db.prepare('SELECT severity, investigation_status, incident_date, close_out_date FROM incidents').all();
+  const openActions = db.prepare("SELECT COUNT(*) as count FROM corrective_actions WHERE status != 'completed'").get().count;
   const stats = {
     total: allIncidents.length,
     open: allIncidents.filter(i => ['reported', 'investigating'].includes(i.investigation_status)).length,
     critical: allIncidents.filter(i => ['critical', 'high'].includes(i.severity) && ['reported', 'investigating'].includes(i.investigation_status)).length,
-    thisMonth: allIncidents.filter(i => i.incident_date && i.incident_date >= new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]).length
+    thisMonth: allIncidents.filter(i => i.incident_date && i.incident_date >= new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]).length,
+    openActions,
   };
 
   res.render('incidents/index', {
@@ -50,7 +56,8 @@ router.get('/', (req, res) => {
     incidents,
     jobs,
     filters: req.query,
-    stats
+    stats,
+    today,
   });
 });
 

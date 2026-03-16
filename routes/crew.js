@@ -17,7 +17,8 @@ const {
 router.get('/', (req, res) => {
   const db = getDb();
   const today = new Date().toISOString().split('T')[0];
-  const filter = req.query.filter || 'all'; // all | active | blocked | fatigued
+  const filter = req.query.filter || 'all'; // all | active | blocked | fatigued | expiring
+  const roleFilter = req.query.role || '';
   const search = (req.query.search || '').trim().toLowerCase();
 
   // Fetch all crew (active + inactive)
@@ -25,14 +26,63 @@ router.get('/', (req, res) => {
     SELECT * FROM crew_members ORDER BY active DESC, full_name ASC
   `).all();
 
+  // Batch: active allocation counts per crew member (today or future, not cancelled)
+  const allocCountRows = db.prepare(`
+    SELECT crew_member_id, COUNT(*) as cnt
+    FROM crew_allocations
+    WHERE allocation_date >= ? AND status != 'cancelled'
+    GROUP BY crew_member_id
+  `).all(today);
+  const allocCountMap = {};
+  allocCountRows.forEach(r => { allocCountMap[r.crew_member_id] = r.cnt; });
+
+  // Batch: last worked date per crew member (from timesheets)
+  const lastWorkedRows = db.prepare(`
+    SELECT crew_member_id, MAX(work_date) as last_worked
+    FROM timesheets
+    GROUP BY crew_member_id
+  `).all();
+  const lastWorkedMap = {};
+  lastWorkedRows.forEach(r => { lastWorkedMap[r.crew_member_id] = r.last_worked; });
+
   // Batch fatigue lookup for performance
   const fatigueMap = getBatchFatigue(today);
 
-  // Compute compliance status for each
-  const crewWithStatus = crew.map(m => ({
-    ...m,
-    compliance: getComplianceStatusBatch(m, fatigueMap, today),
-  }));
+  // Compute nearest expiry from all date fields
+  function getNearestExpiry(m) {
+    const fields = [
+      { label: 'Licence', date: m.licence_expiry },
+      { label: 'White Card', date: m.white_card_expiry },
+      { label: 'Medical', date: m.medical_expiry },
+      { label: 'TC Ticket', date: m.tc_ticket_expiry },
+      { label: 'TI Ticket', date: m.ti_ticket_expiry },
+      { label: 'First Aid', date: m.first_aid_expiry },
+    ];
+    let nearest = null;
+    for (const f of fields) {
+      if (f.date && (!nearest || f.date < nearest.date)) {
+        nearest = { label: f.label, date: f.date };
+      }
+    }
+    return nearest;
+  }
+
+  // Compute compliance status for each + enrich with extra data
+  const crewWithStatus = crew.map(m => {
+    const nearestExpiry = getNearestExpiry(m);
+    return {
+      ...m,
+      compliance: getComplianceStatusBatch(m, fatigueMap, today),
+      activeJobs: allocCountMap[m.id] || 0,
+      lastWorked: lastWorkedMap[m.id] || null,
+      nearestExpiry,
+    };
+  });
+
+  // 30-day expiry window for "expiring" filter
+  const thirtyDaysOut = new Date();
+  thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
+  const expiryThreshold = thirtyDaysOut.toISOString().split('T')[0];
 
   // Apply filters
   let filtered = crewWithStatus;
@@ -42,6 +92,13 @@ router.get('/', (req, res) => {
     filtered = filtered.filter(c => c.active && !c.compliance.canAllocate);
   } else if (filter === 'fatigued') {
     filtered = filtered.filter(c => c.compliance.fatigueBlocked);
+  } else if (filter === 'expiring') {
+    filtered = filtered.filter(c => c.active && c.nearestExpiry && c.nearestExpiry.date <= expiryThreshold);
+  }
+
+  // Apply role filter
+  if (roleFilter) {
+    filtered = filtered.filter(c => c.role === roleFilter);
   }
 
   // Apply search
@@ -59,14 +116,17 @@ router.get('/', (req, res) => {
   const allocatable = crewWithStatus.filter(c => c.active && c.compliance.canAllocate).length;
   const complianceIssues = crewWithStatus.filter(c => c.active && (!c.compliance.allTicketsValid || !c.compliance.licenceValid || !c.compliance.inductionComplete)).length;
   const fatigueBlocked = crewWithStatus.filter(c => c.compliance.fatigueBlocked).length;
+  const expiringSoon = crewWithStatus.filter(c => c.active && c.nearestExpiry && c.nearestExpiry.date <= expiryThreshold).length;
 
   res.render('crew/index', {
     title: 'Workforce',
     currentPage: 'crew',
     crew: filtered,
     filter,
+    roleFilter,
     search: req.query.search || '',
-    stats: { totalActive, allocatable, complianceIssues, fatigueBlocked },
+    stats: { totalActive, allocatable, complianceIssues, fatigueBlocked, expiringSoon },
+    today,
   });
 });
 

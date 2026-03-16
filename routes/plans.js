@@ -20,7 +20,8 @@ router.get('/', (req, res) => {
   const plans = db.prepare(query).all(...params);
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
 
-  res.render('plans/index', { title: 'Traffic Plans', plans, jobs, filters: { status, job_id, plan_type }, user: req.session.user });
+  const today = new Date().toISOString().split('T')[0];
+  res.render('plans/index', { title: 'Traffic Plans', plans, jobs, filters: { status, job_id, plan_type }, user: req.session.user, today });
 });
 
 // New plan form
