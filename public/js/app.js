@@ -3,10 +3,11 @@
 // ===== Mobile Sidebar Toggle =====
 (function() {
   const toggle = document.getElementById('sidebar-toggle');
+  const closeBtn = document.getElementById('sidebar-close');
   const sidebar = document.getElementById('sidebar');
   const backdrop = document.getElementById('sidebar-backdrop');
 
-  if (toggle && sidebar && backdrop) {
+  if (sidebar && backdrop) {
     function openSidebar() {
       sidebar.classList.add('sidebar-open');
       backdrop.classList.add('backdrop-visible');
@@ -19,14 +20,24 @@
       document.body.style.overflow = '';
     }
 
-    toggle.addEventListener('click', function(e) {
-      e.stopPropagation();
-      if (sidebar.classList.contains('sidebar-open')) {
+    if (toggle) {
+      toggle.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (sidebar.classList.contains('sidebar-open')) {
+          closeSidebar();
+        } else {
+          openSidebar();
+        }
+      });
+    }
+
+    // Close button inside sidebar
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
         closeSidebar();
-      } else {
-        openSidebar();
-      }
-    });
+      });
+    }
 
     // Close on backdrop tap
     backdrop.addEventListener('click', closeSidebar);
@@ -37,7 +48,7 @@
     });
 
     // Close sidebar when a nav link is tapped (mobile)
-    sidebar.querySelectorAll('a').forEach(function(link) {
+    sidebar.querySelectorAll('nav a').forEach(function(link) {
       link.addEventListener('click', function() {
         if (window.innerWidth < 1024) {
           closeSidebar();
@@ -51,6 +62,21 @@
         closeSidebar();
       }
     });
+
+    // Handle swipe-to-close on mobile
+    var touchStartX = 0;
+    sidebar.addEventListener('touchstart', function(e) {
+      touchStartX = e.touches[0].clientX;
+    }, { passive: true });
+
+    sidebar.addEventListener('touchend', function(e) {
+      var touchEndX = e.changedTouches[0].clientX;
+      var diff = touchStartX - touchEndX;
+      // Swipe left to close (>80px threshold)
+      if (diff > 80 && window.innerWidth < 1024) {
+        closeSidebar();
+      }
+    }, { passive: true });
   }
 })();
 
