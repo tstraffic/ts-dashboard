@@ -158,11 +158,10 @@ async function sendEmail(to, subject, html) {
 async function testConnection() {
   const resendConfig = getResendConfig();
   if (resendConfig) {
-    // Resend doesn't have a verify endpoint — send a lightweight API call
-    const client = getResendClient();
-    // List domains as a connectivity check
-    const { error } = await client.domains.list();
-    if (error) throw new Error(error.message || 'Resend API key invalid');
+    // Resend send-only keys can't call domains.list, so just validate the key is set
+    if (!resendConfig.apiKey || !resendConfig.apiKey.startsWith('re_')) {
+      throw new Error('Invalid Resend API key');
+    }
     return true;
   }
 
