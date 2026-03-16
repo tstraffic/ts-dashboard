@@ -1554,6 +1554,31 @@ function runMigrations(db) {
     console.log('Migration 28 complete.');
   }
 
+  // =============================================
+  // Migration 29: Push notification subscriptions
+  // =============================================
+  if (!isMigrationApplied.get(29)) {
+    console.log('Running migration 29: Push notification subscriptions table');
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          endpoint TEXT NOT NULL UNIQUE,
+          p256dh TEXT NOT NULL,
+          auth TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id)');
+      recordMigration.run(29, 'Push notification subscriptions table');
+      console.log('Migration 29 complete.');
+    } catch (e) {
+      console.error('Migration 29 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

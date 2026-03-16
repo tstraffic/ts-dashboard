@@ -9,6 +9,7 @@ const { requireLogin, requirePermission, canAccess } = require('./middleware/aut
 const { requireWorker, blockWorkerFromAdmin, workerLocals } = require('./middleware/workerAuth');
 const { notificationCountMiddleware, generateNotifications, sendDailyDigests } = require('./middleware/notifications');
 const { settingsMiddleware } = require('./middleware/settings');
+const { initVapid } = require('./services/pushNotification');
 
 // Initialize database and seed data
 initializeDatabase();
@@ -143,6 +144,9 @@ app.use((err, req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`T&S Operations Dashboard running at http://localhost:${PORT}`);
   console.log(`Default login: admin / admin123`);
+
+  // Initialize web push VAPID keys
+  initVapid();
 
   // Generate notifications on startup and every 15 minutes
   generateNotifications();

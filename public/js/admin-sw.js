@@ -75,3 +75,58 @@ self.addEventListener('fetch', event => {
   // API/other requests — network only
   event.respondWith(fetch(request));
 });
+
+// ===== Push Notification Handler =====
+self.addEventListener('push', event => {
+  if (!event.data) return;
+
+  let data;
+  try {
+    data = event.data.json();
+  } catch (e) {
+    data = { title: 'T&S Notification', body: event.data.text() };
+  }
+
+  const title = data.title || 'T&S Operations';
+  const options = {
+    body: data.body || '',
+    icon: '/images/logo-colour.jpg',
+    badge: '/images/logo-colour.jpg',
+    tag: data.type || 'general',
+    renotify: true,
+    data: { url: data.url || '/notifications' },
+    actions: [
+      { action: 'open', title: 'View' },
+      { action: 'dismiss', title: 'Dismiss' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+// Handle notification click — open the relevant page
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+
+  if (event.action === 'dismiss') return;
+
+  const url = event.notification.data && event.notification.data.url
+    ? event.notification.data.url
+    : '/notifications';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      // Focus existing tab if one is open
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      // Otherwise open new tab
+      return clients.openWindow(url);
+    })
+  );
+});

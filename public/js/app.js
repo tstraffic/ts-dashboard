@@ -104,3 +104,108 @@ function initTabs() {
 }
 
 document.addEventListener('DOMContentLoaded', initTabs);
+
+// ===== Push Notification Subscription =====
+(function() {
+  // Only run for logged-in users (notification bell exists) and browsers that support push
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (!document.getElementById('notif-bell')) return;
+
+  // Wait for service worker to be ready, then check/request push permission
+  navigator.serviceWorker.ready.then(function(registration) {
+    // Check existing subscription
+    registration.pushManager.getSubscription().then(function(subscription) {
+      if (subscription) {
+        // Already subscribed — send to server in case it's a new device login
+        sendSubscriptionToServer(subscription);
+        return;
+      }
+
+      // Not subscribed yet — show a prompt after a short delay (non-intrusive)
+      if (Notification.permission === 'granted') {
+        subscribeToPush(registration);
+      } else if (Notification.permission !== 'denied') {
+        // Ask after 3 seconds so it's not immediate on page load
+        setTimeout(function() { showPushPrompt(registration); }, 3000);
+      }
+    });
+  });
+
+  function showPushPrompt(registration) {
+    // Create a subtle in-app banner instead of relying solely on browser prompt
+    var banner = document.createElement('div');
+    banner.id = 'push-prompt';
+    banner.className = 'fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 bg-white border border-gray-200 rounded-xl shadow-xl p-4 z-50 flex items-start gap-3';
+    banner.innerHTML = '<div class="flex-shrink-0 w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center">' +
+      '<svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>' +
+      '</div>' +
+      '<div class="flex-1">' +
+      '<p class="text-sm font-semibold text-gray-900">Enable notifications?</p>' +
+      '<p class="text-xs text-gray-500 mt-0.5">Get alerts for task assignments, deadlines, and updates on your phone.</p>' +
+      '<div class="flex gap-2 mt-2">' +
+      '<button id="push-enable" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg">Enable</button>' +
+      '<button id="push-dismiss" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg">Not now</button>' +
+      '</div></div>';
+    document.body.appendChild(banner);
+
+    document.getElementById('push-enable').addEventListener('click', function() {
+      banner.remove();
+      subscribeToPush(registration);
+    });
+    document.getElementById('push-dismiss').addEventListener('click', function() {
+      banner.remove();
+      // Remember dismissal so we don't ask again this session
+      sessionStorage.setItem('push-dismissed', '1');
+    });
+
+    // Don't show if already dismissed this session
+    if (sessionStorage.getItem('push-dismissed')) {
+      banner.remove();
+    }
+  }
+
+  function subscribeToPush(registration) {
+    // Fetch VAPID public key from server
+    fetch('/notifications/push/vapid-key')
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (!data.publicKey) return;
+
+        var key = urlBase64ToUint8Array(data.publicKey);
+        return registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: key
+        });
+      })
+      .then(function(subscription) {
+        if (subscription) {
+          sendSubscriptionToServer(subscription);
+        }
+      })
+      .catch(function(err) {
+        console.log('[Push] Subscribe error:', err);
+      });
+  }
+
+  function sendSubscriptionToServer(subscription) {
+    fetch('/notifications/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(subscription)
+    }).catch(function(err) {
+      console.log('[Push] Failed to send subscription to server:', err);
+    });
+  }
+
+  // Convert base64 VAPID key to Uint8Array for the Push API
+  function urlBase64ToUint8Array(base64String) {
+    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+    var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    var rawData = window.atob(base64);
+    var outputArray = new Uint8Array(rawData.length);
+    for (var i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+})();
