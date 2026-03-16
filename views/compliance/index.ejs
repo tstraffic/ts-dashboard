@@ -2,7 +2,7 @@
 
 <%
   const TYPE_CONFIG = {
-    traffic_guidance: { label: 'TCP / TGS', short: 'TCP/TGS', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' },
+    traffic_guidance: { label: 'TGS', short: 'TGS', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' },
     tmp_approval:     { label: 'CTMP',       short: 'CTMP',    color: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20' },
     spa:              { label: 'SPA',         short: 'SPA',     color: 'bg-orange-50 text-orange-700 ring-1 ring-orange-600/20' },
     rol:              { label: 'ROL',         short: 'ROL',     color: 'bg-teal-50 text-teal-700 ring-1 ring-teal-600/20' },
@@ -43,7 +43,7 @@
   <div class="flex items-center justify-between mb-6">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">Plans &amp; Approvals</h1>
-      <p class="text-sm text-gray-500 mt-0.5">TCP/TGS plans, CTMPs, SPAs, ROLs and other approvals</p>
+      <p class="text-sm text-gray-500 mt-0.5">TGS plans, CTMPs, SPAs, ROLs and other approvals</p>
     </div>
     <a href="/compliance/new" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition text-sm">
       <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -86,7 +86,7 @@
       </a>
       <a href="<%= buildUrl({ item_type: 'traffic_guidance', view: filters.view, ref: filters.ref }) %>"
         class="px-3 py-1 rounded-full text-sm font-medium transition <%= filters.item_type === 'traffic_guidance' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100' %>">
-        TCP / TGS
+        TGS
       </a>
       <a href="<%= buildUrl({ item_type: 'tmp_approval', view: filters.view, ref: filters.ref }) %>"
         class="px-3 py-1 rounded-full text-sm font-medium transition <%= filters.item_type === 'tmp_approval' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100' %>">

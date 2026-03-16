@@ -254,7 +254,7 @@ router.get('/allocations.csv', (req, res) => {
     { key: 'allocation_date', label: 'Date' },
     { key: 'full_name', label: 'Crew Member' },
     { key: 'role', label: 'Role' },
-    { key: 'tcp_level', label: 'TCP Level' },
+    { key: 'tcp_level', label: 'TC Level' },
     { key: 'job_number', label: 'Job #' },
     { key: 'client', label: 'Client' },
     { key: 'start_time', label: 'Start' },

@@ -196,13 +196,15 @@ function getComplianceStatusBatch(member, fatigueMap, referenceDate) {
 }
 
 /**
- * Check if a TCP level meets a job requirement.
- * TCP3 > TCP2 > TCP1. Empty requirement means anything passes.
+ * Check if a TC level meets a job requirement.
+ * supervisor > team_leader > intermediate > beginner.
+ * Empty requirement means anything passes.
+ * Also accepts legacy TCP/TGS values for backwards compatibility.
  */
 function tcpLevelMeetsRequirement(workerLevel, requiredLevel) {
   if (!requiredLevel || requiredLevel === '') return true;
   if (!workerLevel || workerLevel === '') return false;
-  const levels = { 'TCP1': 1, 'TCP2': 2, 'TCP3': 3 };
+  const levels = { 'beginner': 1, 'intermediate': 2, 'team_leader': 3, 'supervisor': 4, 'TCP1': 1, 'TCP2': 2, 'TCP3': 3, 'TGS1': 1, 'TGS2': 2, 'TGS3': 3 };
   return (levels[workerLevel] || 0) >= (levels[requiredLevel] || 0);
 }
 
@@ -232,9 +234,9 @@ function checkAllocationBlocks(crewMemberId, jobId, allocationDate, startTime, e
     blocks.push(member.full_name + ': induction not completed (status: ' + (member.induction_status || 'pending') + ')');
   }
 
-  // Block 3: Required competency (TCP level)
+  // Block 3: Required competency (TC level)
   if (!tcpLevelMeetsRequirement(member.tcp_level, job.required_tcp_level)) {
-    blocks.push(member.full_name + ' has ' + (member.tcp_level || 'no TCP') + ' but job requires ' + job.required_tcp_level);
+    blocks.push(member.full_name + ' has ' + (member.tcp_level || 'no TC level') + ' but job requires ' + job.required_tcp_level);
   }
 
   // Block 4: Fatigue

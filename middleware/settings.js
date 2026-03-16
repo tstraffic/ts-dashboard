@@ -20,7 +20,7 @@ const CATEGORY_META = {
   job_stage:          { label: 'Job Stages',           group: 'Jobs',      icon: 'layers' },
   job_health:         { label: 'Job Health',           group: 'Jobs',      icon: 'heart' },
   accounts_status:    { label: 'Accounts Status',      group: 'Jobs',      icon: 'dollar' },
-  tcp_level:          { label: 'TCP Levels',           group: 'Jobs',      icon: 'shield' },
+  tcp_level:          { label: 'TC Levels',            group: 'Jobs',      icon: 'shield' },
   crew_role:          { label: 'Crew Roles',           group: 'Workforce', icon: 'users' },
   employment_type:    { label: 'Employment Types',     group: 'Workforce', icon: 'id-card' },
   shift_type:         { label: 'Shift Types',          group: 'Workforce', icon: 'clock' },
