@@ -191,14 +191,12 @@
               const soon30 = new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0];
               const typeLabels = {
                 traffic_guidance: 'TGS', tmp_approval: 'CTMP', spa: 'SPA', rol: 'ROL',
-                council_permit: 'Council', insurance: 'Insurance', insurance_certificate: 'Ins. Cert',
-                public_liability: 'PL', vehicle_registration: 'Rego', plant_inspection: 'Plant',
-                staff_certification: 'Staff Cert', swms_review: 'SWMS', induction: 'Induction',
-                road_occupancy: 'RO', utility_clearance: 'Utility', environmental: 'Env.', other: 'Other'
+                council_permit: 'Council'
               };
               const typeColors = {
                 traffic_guidance: 'bg-blue-50 text-blue-700', tmp_approval: 'bg-purple-50 text-purple-700',
-                spa: 'bg-orange-50 text-orange-700', rol: 'bg-teal-50 text-teal-700'
+                spa: 'bg-orange-50 text-orange-700', rol: 'bg-teal-50 text-teal-700',
+                council_permit: 'bg-amber-50 text-amber-700'
               };
               const statusLabels = { not_started: 'Not Started', submitted: 'Submitted', approved: 'Approved', rejected: 'Rejected', expired: 'Expired' };
             %>

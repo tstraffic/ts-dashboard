@@ -6,19 +6,7 @@
     tmp_approval:     { label: 'CTMP',       short: 'CTMP',    color: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20' },
     spa:              { label: 'SPA',         short: 'SPA',     color: 'bg-orange-50 text-orange-700 ring-1 ring-orange-600/20' },
     rol:              { label: 'ROL',         short: 'ROL',     color: 'bg-teal-50 text-teal-700 ring-1 ring-teal-600/20' },
-    council_permit:        { label: 'Council Permit',      short: 'Council',  color: 'bg-gray-100 text-gray-600' },
-    insurance:             { label: 'Insurance',           short: 'Insurance',color: 'bg-gray-100 text-gray-600' },
-    insurance_certificate: { label: 'Insurance Cert',      short: 'Ins. Cert',color: 'bg-gray-100 text-gray-600' },
-    public_liability:      { label: 'Public Liability',    short: 'PL',       color: 'bg-gray-100 text-gray-600' },
-    vehicle_registration:  { label: 'Vehicle Rego',        short: 'Rego',     color: 'bg-gray-100 text-gray-600' },
-    plant_inspection:      { label: 'Plant Inspection',    short: 'Plant',    color: 'bg-gray-100 text-gray-600' },
-    staff_certification:   { label: 'Staff Cert',          short: 'Staff',    color: 'bg-gray-100 text-gray-600' },
-    swms_review:           { label: 'SWMS Review',         short: 'SWMS',     color: 'bg-gray-100 text-gray-600' },
-    induction:             { label: 'Induction',           short: 'Induction',color: 'bg-gray-100 text-gray-600' },
-    road_occupancy:        { label: 'Road Occupancy',      short: 'RO',       color: 'bg-gray-100 text-gray-600' },
-    utility_clearance:     { label: 'Utility Clearance',   short: 'Utility',  color: 'bg-gray-100 text-gray-600' },
-    environmental:         { label: 'Environmental',       short: 'Env.',     color: 'bg-gray-100 text-gray-600' },
-    other:                 { label: 'Other',               short: 'Other',    color: 'bg-gray-100 text-gray-600' },
+    council_permit:   { label: 'Council Permit', short: 'Council', color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' },
   };
   const STATUS_CONFIG = {
     not_started: { label: 'Not Started', color: 'bg-gray-100 text-gray-600' },
@@ -99,6 +87,10 @@
       <a href="<%= buildUrl({ item_type: 'rol', view: filters.view, ref: filters.ref }) %>"
         class="px-3 py-1 rounded-full text-sm font-medium transition <%= filters.item_type === 'rol' ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-700 hover:bg-teal-100' %>">
         ROL
+      </a>
+      <a href="<%= buildUrl({ item_type: 'council_permit', view: filters.view, ref: filters.ref }) %>"
+        class="px-3 py-1 rounded-full text-sm font-medium transition <%= filters.item_type === 'council_permit' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100' %>">
+        Council
       </a>
     </div>
 
