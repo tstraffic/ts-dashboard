@@ -113,33 +113,39 @@ router.get('/new', (req, res) => {
 
 // POST / — Create task
 router.post('/', (req, res) => {
-  const db = getDb();
-  const b = req.body;
-  const jobId = b.job_id || null;
-  const result = db.prepare(`
-    INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority, task_type, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(jobId, b.division, b.title, b.description || '', b.owner_id, b.due_date,
-    b.status || 'not_started', b.priority || 'medium', b.task_type || 'one_off', b.notes || '');
+  try {
+    const db = getDb();
+    const b = req.body;
+    const jobId = b.job_id || null;
+    const result = db.prepare(`
+      INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority, task_type, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(jobId, b.division, b.title, b.description || '', b.owner_id, b.due_date,
+      b.status || 'not_started', b.priority || 'medium', b.task_type || 'one_off', b.notes || '');
 
-  // Send email notification to assigned owner
-  if (b.owner_id) {
-    try {
-      const newTaskId = result.lastInsertRowid;
-      const ownerUser = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(b.owner_id);
-      const job = jobId ? db.prepare('SELECT job_number, client FROM jobs WHERE id = ?').get(jobId) : null;
-      const jobLabel = job ? `${job.job_number} - ${job.client}` : 'General';
-      const assignedByName = req.session.user ? req.session.user.full_name : '';
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const taskData = { id: newTaskId, title: b.title, description: b.description || '', due_date: b.due_date, priority: b.priority || 'medium', task_type: b.task_type || 'one_off' };
-      sendTaskAssignmentEmail(taskData, ownerUser, jobLabel, assignedByName, baseUrl);
-    } catch (emailErr) {
-      console.error('[Tasks] Email send error on create:', emailErr.message);
+    // Send email notification to assigned owner (fire-and-forget)
+    if (b.owner_id) {
+      try {
+        const newTaskId = result.lastInsertRowid;
+        const ownerUser = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(b.owner_id);
+        const job = jobId ? db.prepare('SELECT job_number, client FROM jobs WHERE id = ?').get(jobId) : null;
+        const jobLabel = job ? `${job.job_number} - ${job.client}` : 'General';
+        const assignedByName = req.session.user ? req.session.user.full_name : '';
+        const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const taskData = { id: newTaskId, title: b.title, description: b.description || '', due_date: b.due_date, priority: b.priority || 'medium', task_type: b.task_type || 'one_off' };
+        sendTaskAssignmentEmail(taskData, ownerUser, jobLabel, assignedByName, baseUrl).catch(e => console.error('[Tasks] Email async error:', e.message));
+      } catch (emailErr) {
+        console.error('[Tasks] Email send error on create:', emailErr.message);
+      }
     }
-  }
 
-  req.flash('success', 'Task created.');
-  res.redirect(b.return_to || '/tasks');
+    req.flash('success', 'Task created.');
+    res.redirect(b.return_to || '/tasks');
+  } catch (err) {
+    console.error('[Tasks] Create error:', err.message, err.stack);
+    req.flash('error', 'Failed to create task: ' + err.message);
+    res.redirect('/tasks/new');
+  }
 });
 
 // GET /:id/edit — Edit form
@@ -154,69 +160,81 @@ router.get('/:id/edit', (req, res) => {
 
 // POST /:id — Update task
 router.post('/:id', (req, res) => {
-  const db = getDb();
-  const b = req.body;
+  try {
+    const db = getDb();
+    const b = req.body;
 
-  // Check if owner changed (for email notification)
-  const oldTask = db.prepare('SELECT owner_id FROM tasks WHERE id = ?').get(req.params.id);
-  const ownerChanged = oldTask && String(oldTask.owner_id) !== String(b.owner_id);
+    // Check if owner changed (for email notification)
+    const oldTask = db.prepare('SELECT owner_id FROM tasks WHERE id = ?').get(req.params.id);
+    const ownerChanged = oldTask && String(oldTask.owner_id) !== String(b.owner_id);
 
-  const updateJobId = b.job_id || null;
-  const completedDate = b.status === 'complete' ? new Date().toISOString().split('T')[0] : null;
-  db.prepare(`
-    UPDATE tasks SET job_id=?, division=?, title=?, description=?, owner_id=?, due_date=?,
-    status=?, priority=?, task_type=?, notes=?, completed_date=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
-  `).run(updateJobId, b.division, b.title, b.description || '', b.owner_id, b.due_date,
-    b.status, b.priority, b.task_type || 'one_off', b.notes || '', completedDate, req.params.id);
+    const updateJobId = b.job_id || null;
+    const completedDate = b.status === 'complete' ? new Date().toISOString().split('T')[0] : null;
+    db.prepare(`
+      UPDATE tasks SET job_id=?, division=?, title=?, description=?, owner_id=?, due_date=?,
+      status=?, priority=?, task_type=?, notes=?, completed_date=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
+    `).run(updateJobId, b.division, b.title, b.description || '', b.owner_id, b.due_date,
+      b.status, b.priority, b.task_type || 'one_off', b.notes || '', completedDate, req.params.id);
 
-  // Send email to new owner if reassigned
-  if (ownerChanged && b.owner_id) {
-    try {
-      const ownerUser = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(b.owner_id);
-      const job = updateJobId ? db.prepare('SELECT job_number, client FROM jobs WHERE id = ?').get(updateJobId) : null;
-      const jobLabel = job ? `${job.job_number} - ${job.client}` : 'General';
-      const assignedByName = req.session.user ? req.session.user.full_name : '';
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const taskData = { id: req.params.id, title: b.title, description: b.description || '', due_date: b.due_date, priority: b.priority || 'medium', task_type: b.task_type || 'one_off' };
-      sendTaskAssignmentEmail(taskData, ownerUser, jobLabel, assignedByName, baseUrl);
-    } catch (emailErr) {
-      console.error('[Tasks] Email send error on reassign:', emailErr.message);
+    // Send email to new owner if reassigned (fire-and-forget)
+    if (ownerChanged && b.owner_id) {
+      try {
+        const ownerUser = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(b.owner_id);
+        const job = updateJobId ? db.prepare('SELECT job_number, client FROM jobs WHERE id = ?').get(updateJobId) : null;
+        const jobLabel = job ? `${job.job_number} - ${job.client}` : 'General';
+        const assignedByName = req.session.user ? req.session.user.full_name : '';
+        const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const taskData = { id: req.params.id, title: b.title, description: b.description || '', due_date: b.due_date, priority: b.priority || 'medium', task_type: b.task_type || 'one_off' };
+        sendTaskAssignmentEmail(taskData, ownerUser, jobLabel, assignedByName, baseUrl).catch(e => console.error('[Tasks] Email async error:', e.message));
+      } catch (emailErr) {
+        console.error('[Tasks] Email send error on reassign:', emailErr.message);
+      }
     }
-  }
 
-  req.flash('success', 'Task updated.');
-  res.redirect(b.return_to || '/tasks');
+    req.flash('success', 'Task updated.');
+    res.redirect(b.return_to || '/tasks');
+  } catch (err) {
+    console.error('[Tasks] Update error:', err.message, err.stack);
+    req.flash('error', 'Failed to update task: ' + err.message);
+    res.redirect('/tasks/' + req.params.id + '/edit');
+  }
 });
 
 // POST /:id/status — Quick inline status change
 router.post('/:id/status', (req, res) => {
-  const db = getDb();
-  const newStatus = req.body.status;
-  const validStatuses = ['not_started', 'in_progress', 'blocked', 'complete'];
-  if (!validStatuses.includes(newStatus)) {
-    req.flash('error', 'Invalid status.');
-    return res.redirect(req.headers.referer || '/tasks');
-  }
-  const today = new Date().toISOString().split('T')[0];
-  const completedDate = newStatus === 'complete' ? today : null;
-  db.prepare('UPDATE tasks SET status = ?, completed_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    .run(newStatus, completedDate, req.params.id);
-
-  // Send status change email to task owner
   try {
-    const task = db.prepare('SELECT t.*, j.job_number, j.client FROM tasks t JOIN jobs j ON t.job_id = j.id WHERE t.id = ?').get(req.params.id);
-    if (task && task.owner_id) {
-      const ownerUser = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(task.owner_id);
-      const changedByName = req.session.user ? req.session.user.full_name : '';
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      sendTaskStatusEmail(task, ownerUser, newStatus, changedByName, baseUrl);
+    const db = getDb();
+    const newStatus = req.body.status;
+    const validStatuses = ['not_started', 'in_progress', 'blocked', 'complete'];
+    if (!validStatuses.includes(newStatus)) {
+      req.flash('error', 'Invalid status.');
+      return res.redirect(req.headers.referer || '/tasks');
     }
-  } catch (emailErr) {
-    console.error('[Tasks] Email send error on status change:', emailErr.message);
-  }
+    const today = new Date().toISOString().split('T')[0];
+    const completedDate = newStatus === 'complete' ? today : null;
+    db.prepare('UPDATE tasks SET status = ?, completed_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(newStatus, completedDate, req.params.id);
 
-  req.flash('success', 'Status updated.');
-  res.redirect(req.headers.referer || '/tasks');
+    // Send status change email to task owner (fire-and-forget)
+    try {
+      const task = db.prepare('SELECT t.*, j.job_number, j.client FROM tasks t LEFT JOIN jobs j ON t.job_id = j.id WHERE t.id = ?').get(req.params.id);
+      if (task && task.owner_id) {
+        const ownerUser = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(task.owner_id);
+        const changedByName = req.session.user ? req.session.user.full_name : '';
+        const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        sendTaskStatusEmail(task, ownerUser, newStatus, changedByName, baseUrl).catch(e => console.error('[Tasks] Email async error:', e.message));
+      }
+    } catch (emailErr) {
+      console.error('[Tasks] Email send error on status change:', emailErr.message);
+    }
+
+    req.flash('success', 'Status updated.');
+    res.redirect(req.headers.referer || '/tasks');
+  } catch (err) {
+    console.error('[Tasks] Status change error:', err.message, err.stack);
+    req.flash('error', 'Failed to update status.');
+    res.redirect(req.headers.referer || '/tasks');
+  }
 });
 
 // POST /:id/complete — Quick complete
