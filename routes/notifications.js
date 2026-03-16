@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
+const { getVapidPublicKey, saveSubscription, removeSubscription } = require('../services/pushNotification');
 
 // ============================================
 // LIST NOTIFICATIONS FOR CURRENT USER
@@ -77,6 +78,46 @@ router.post('/clear-old', (req, res) => {
   db.prepare('DELETE FROM notifications WHERE user_id = ? AND created_at < ?').run(req.session.user.id, thirtyDaysAgo);
   req.flash('success', 'Old notifications cleared.');
   res.redirect('/notifications');
+});
+
+// ============================================
+// PUSH NOTIFICATION: GET VAPID PUBLIC KEY
+// ============================================
+router.get('/push/vapid-key', (req, res) => {
+  const key = getVapidPublicKey();
+  if (!key) return res.status(500).json({ error: 'Push not configured' });
+  res.json({ publicKey: key });
+});
+
+// ============================================
+// PUSH NOTIFICATION: SUBSCRIBE
+// ============================================
+router.post('/push/subscribe', (req, res) => {
+  try {
+    const subscription = req.body;
+    if (!subscription || !subscription.endpoint) {
+      return res.status(400).json({ error: 'Invalid subscription' });
+    }
+    saveSubscription(req.session.user.id, subscription);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Push] Subscribe error:', err.message);
+    res.status(500).json({ error: 'Failed to save subscription' });
+  }
+});
+
+// ============================================
+// PUSH NOTIFICATION: UNSUBSCRIBE
+// ============================================
+router.post('/push/unsubscribe', (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    if (endpoint) removeSubscription(endpoint);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Push] Unsubscribe error:', err.message);
+    res.status(500).json({ error: 'Failed to unsubscribe' });
+  }
 });
 
 module.exports = router;

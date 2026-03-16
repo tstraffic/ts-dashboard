@@ -2,6 +2,7 @@ const { getDb } = require('../db/database');
 const { sendTeamsNotification } = require('./integrations');
 const { sendEmail } = require('../services/email');
 const { notificationEmail, dailyDigestEmail } = require('../services/emailTemplates');
+const { sendPushForNotifications } = require('../services/pushNotification');
 
 /**
  * Middleware that attaches unread notification count to res.locals for the header bell icon.
@@ -285,6 +286,9 @@ function generateNotifications() {
 
     // Send immediate email notifications for newly created notifications
     sendImmediateEmails(db, newNotificationIds);
+
+    // Send push notifications to subscribed devices
+    sendPushForNotifications(db, newNotificationIds);
 
   } catch (err) {
     console.error('Notification generation error:', err.message);

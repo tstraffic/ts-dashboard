@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { sendTaskAssignmentEmail, sendTaskStatusEmail } = require('../middleware/email');
+const { sendPushToUser } = require('../services/pushNotification');
 
 /**
  * Check if current user can modify a task.
@@ -149,6 +150,13 @@ router.post('/', (req, res) => {
         const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
         const taskData = { id: newTaskId, title: b.title, description: b.description || '', due_date: b.due_date, priority: b.priority || 'medium', task_type: b.task_type || 'one_off' };
         sendTaskAssignmentEmail(taskData, ownerUser, jobLabel, assignedByName, baseUrl).catch(e => console.error('[Tasks] Email async error:', e.message));
+        // Push notification to assigned user's devices
+        sendPushToUser(b.owner_id, {
+          title: 'New Task Assigned',
+          body: `${b.title} — assigned by ${assignedByName}`,
+          url: '/tasks/' + newTaskId + '/edit',
+          type: 'task_assignment'
+        });
       } catch (emailErr) {
         console.error('[Tasks] Email send error on create:', emailErr.message);
       }
@@ -215,6 +223,13 @@ router.post('/:id', (req, res) => {
         const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
         const taskData = { id: req.params.id, title: b.title, description: b.description || '', due_date: b.due_date, priority: b.priority || 'medium', task_type: b.task_type || 'one_off' };
         sendTaskAssignmentEmail(taskData, ownerUser, jobLabel, assignedByName, baseUrl).catch(e => console.error('[Tasks] Email async error:', e.message));
+        // Push notification for reassignment
+        sendPushToUser(b.owner_id, {
+          title: 'Task Reassigned to You',
+          body: `${b.title} — assigned by ${assignedByName}`,
+          url: '/tasks/' + req.params.id + '/edit',
+          type: 'task_assignment'
+        });
       } catch (emailErr) {
         console.error('[Tasks] Email send error on reassign:', emailErr.message);
       }
@@ -263,6 +278,14 @@ router.post('/:id/status', (req, res) => {
         const changedByName = req.session.user ? req.session.user.full_name : '';
         const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
         sendTaskStatusEmail(task, ownerUser, newStatus, changedByName, baseUrl).catch(e => console.error('[Tasks] Email async error:', e.message));
+        // Push notification for status change
+        const statusLabel = newStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        sendPushToUser(task.owner_id, {
+          title: 'Task Status: ' + statusLabel,
+          body: `"${task.title}" marked as ${statusLabel} by ${changedByName}`,
+          url: '/tasks/' + req.params.id + '/edit',
+          type: 'task_status'
+        });
       }
     } catch (emailErr) {
       console.error('[Tasks] Email send error on status change:', emailErr.message);

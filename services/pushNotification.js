@@ -1,0 +1,157 @@
+/**
+ * Web Push Notification Service
+ * Uses the Web Push protocol (VAPID) to send push notifications to subscribed browsers/devices.
+ */
+const webpush = require('web-push');
+const { getDb } = require('../db/database');
+
+let vapidConfigured = false;
+
+/**
+ * Initialize VAPID keys — call once on server startup.
+ * Uses env vars VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY if set,
+ * otherwise auto-generates and stores in system_config DB table.
+ */
+function initVapid() {
+  try {
+    const db = getDb();
+    let publicKey = process.env.VAPID_PUBLIC_KEY || '';
+    let privateKey = process.env.VAPID_PRIVATE_KEY || '';
+    const contactEmail = process.env.VAPID_EMAIL || process.env.SMTP_FROM_EMAIL || 'admin@tstc.com.au';
+
+    // Try loading from DB if not in env
+    if (!publicKey || !privateKey) {
+      try {
+        const pubRow = db.prepare("SELECT value FROM system_config WHERE key = 'vapid_public_key'").get();
+        const privRow = db.prepare("SELECT value FROM system_config WHERE key = 'vapid_private_key'").get();
+        if (pubRow && privRow) {
+          publicKey = pubRow.value;
+          privateKey = privRow.value;
+        }
+      } catch (e) { /* system_config may not exist yet */ }
+    }
+
+    // Generate new keys if we still don't have any
+    if (!publicKey || !privateKey) {
+      console.log('[Push] Generating new VAPID keys...');
+      const keys = webpush.generateVAPIDKeys();
+      publicKey = keys.publicKey;
+      privateKey = keys.privateKey;
+
+      // Save to DB for persistence across restarts
+      try {
+        db.prepare("INSERT OR REPLACE INTO system_config (key, value) VALUES ('vapid_public_key', ?)").run(publicKey);
+        db.prepare("INSERT OR REPLACE INTO system_config (key, value) VALUES ('vapid_private_key', ?)").run(privateKey);
+        console.log('[Push] VAPID keys saved to database.');
+      } catch (e) {
+        console.warn('[Push] Could not save VAPID keys to DB:', e.message);
+      }
+    }
+
+    webpush.setVapidDetails('mailto:' + contactEmail, publicKey, privateKey);
+    vapidConfigured = true;
+    console.log('[Push] VAPID configured. Public key:', publicKey.substring(0, 20) + '...');
+    return publicKey;
+  } catch (err) {
+    console.error('[Push] VAPID init error:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Get the VAPID public key (needed by the browser to subscribe)
+ */
+function getVapidPublicKey() {
+  const db = getDb();
+  const pubKey = process.env.VAPID_PUBLIC_KEY || '';
+  if (pubKey) return pubKey;
+  try {
+    const row = db.prepare("SELECT value FROM system_config WHERE key = 'vapid_public_key'").get();
+    return row ? row.value : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Save a push subscription for a user
+ */
+function saveSubscription(userId, subscription) {
+  const db = getDb();
+  const endpoint = subscription.endpoint;
+  const p256dh = subscription.keys ? subscription.keys.p256dh : '';
+  const auth = subscription.keys ? subscription.keys.auth : '';
+
+  // Upsert — same endpoint = update keys
+  db.prepare(`
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(endpoint) DO UPDATE SET user_id=?, p256dh=?, auth=?, updated_at=CURRENT_TIMESTAMP
+  `).run(userId, endpoint, p256dh, auth, userId, p256dh, auth);
+}
+
+/**
+ * Remove a push subscription
+ */
+function removeSubscription(endpoint) {
+  const db = getDb();
+  db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(endpoint);
+}
+
+/**
+ * Send a push notification to a specific user (all their subscribed devices)
+ */
+function sendPushToUser(userId, payload) {
+  if (!vapidConfigured) return;
+
+  const db = getDb();
+  const subscriptions = db.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').all(userId);
+
+  if (subscriptions.length === 0) return;
+
+  const payloadStr = JSON.stringify(payload);
+
+  for (const sub of subscriptions) {
+    const pushSub = {
+      endpoint: sub.endpoint,
+      keys: { p256dh: sub.p256dh, auth: sub.auth }
+    };
+
+    webpush.sendNotification(pushSub, payloadStr)
+      .catch(err => {
+        // 410 Gone or 404 = subscription expired, remove it
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          console.log('[Push] Removing expired subscription:', sub.endpoint.substring(0, 50));
+          removeSubscription(sub.endpoint);
+        } else {
+          console.error('[Push] Send error:', err.statusCode || err.message);
+        }
+      });
+  }
+}
+
+/**
+ * Send push notifications for newly created notification records.
+ * Called from the notification generation engine.
+ */
+function sendPushForNotifications(db, newNotifications) {
+  if (!vapidConfigured || newNotifications.length === 0) return;
+
+  for (const n of newNotifications) {
+    sendPushToUser(n.userId, {
+      title: n.title,
+      body: n.message,
+      url: n.link || '/notifications',
+      type: n.type || 'general'
+    });
+  }
+}
+
+module.exports = {
+  initVapid,
+  getVapidPublicKey,
+  saveSubscription,
+  removeSubscription,
+  sendPushToUser,
+  sendPushForNotifications
+};
