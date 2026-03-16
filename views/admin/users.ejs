@@ -1,12 +1,14 @@
 <% locals.currentPage = 'admin' %>
 
 <%
+  const roleAliases = { management: 'admin', accounts: 'finance', marketing: 'operations' };
   const roleColors = {
     admin: 'bg-purple-600 text-purple-100',
     operations: 'bg-blue-600 text-blue-100',
     planning: 'bg-teal-600 text-teal-100',
     finance: 'bg-amber-600 text-amber-100'
   };
+  function displayRole(r) { return roleAliases[r] || r; }
 %>
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -48,7 +50,8 @@
                 <td class="px-4 py-3 text-gray-600"><%= user.email || '-' %></td>
                 <td class="px-4 py-3">
                   <% if (user.role) { %>
-                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= roleColors[user.role] || 'bg-gray-100 text-gray-700' %>"><%= user.role.charAt(0).toUpperCase() + user.role.slice(1) %></span>
+                    <% const dr = displayRole(user.role); %>
+                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= roleColors[dr] || 'bg-gray-100 text-gray-700' %>"><%= dr.charAt(0).toUpperCase() + dr.slice(1) %></span>
                   <% } else { %>
                     <span class="text-gray-400">-</span>
                   <% } %>
