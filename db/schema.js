@@ -1603,6 +1603,93 @@ function runMigrations(db) {
     }
   }
 
+  // Migration 31: Seed realistic demo budget data for active jobs
+  if (!isMigrationApplied.get(31)) {
+    try {
+      // Only seed if job_budgets is empty (don't overwrite real data)
+      const existingBudgets = db.prepare('SELECT COUNT(*) as c FROM job_budgets').get().c;
+      if (existingBudgets === 0) {
+        const activeJobs = db.prepare("SELECT id, job_number, contract_value FROM jobs WHERE status IN ('active','won','on_hold') ORDER BY job_number").all();
+        if (activeJobs.length > 0) {
+          const insertBudget = db.prepare(`INSERT OR IGNORE INTO job_budgets (job_id, contract_value, budget_labour, budget_materials, budget_subcontractors, budget_equipment, budget_other, budget_contingency, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+          const insertCost = db.prepare(`INSERT INTO cost_entries (job_id, budget_id, category, description, amount, entry_date, invoice_ref, supplier, entered_by_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+          // Get an admin user for entered_by
+          const adminUser = db.prepare("SELECT id FROM users WHERE role IN ('admin','finance') LIMIT 1").get();
+          const enteredBy = adminUser ? adminUser.id : 1;
+
+          // Budget profiles: [contractMul, labourPct, matPct, subPct, equipPct, otherPct, contingencyPct, spendPct]
+          const profiles = [
+            { labourPct: 0.50, matPct: 0.08, subPct: 0.18, equipPct: 0.14, otherPct: 0.03, contPct: 0.07 },
+            { labourPct: 0.52, matPct: 0.06, subPct: 0.20, equipPct: 0.12, otherPct: 0.04, contPct: 0.06 },
+            { labourPct: 0.48, matPct: 0.10, subPct: 0.15, equipPct: 0.16, otherPct: 0.03, contPct: 0.08 },
+            { labourPct: 0.55, matPct: 0.05, subPct: 0.17, equipPct: 0.13, otherPct: 0.04, contPct: 0.06 },
+          ];
+
+          // Realistic contract values if jobs don't already have them
+          const contractValues = [185000, 320000, 95000, 450000, 78000, 520000, 125000, 680000, 210000, 145000];
+          // Spend percentage per job (simulate varying progress)
+          const spendPcts = [0.38, 0.62, 0.78, 0.22, 0.45, 0.05, 0.55, 0.12, 0.35, 0.68];
+
+          const today = new Date().toISOString().split('T')[0];
+          const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().split('T')[0];
+
+          activeJobs.forEach((job, i) => {
+            const contractVal = job.contract_value || contractValues[i % contractValues.length];
+            const p = profiles[i % profiles.length];
+            const totalBudget = contractVal * 0.92; // 8% margin target
+
+            const budgetLabour = Math.round(totalBudget * p.labourPct);
+            const budgetMat = Math.round(totalBudget * p.matPct);
+            const budgetSub = Math.round(totalBudget * p.subPct);
+            const budgetEquip = Math.round(totalBudget * p.equipPct);
+            const budgetOther = Math.round(totalBudget * p.otherPct);
+            const budgetCont = Math.round(totalBudget * p.contPct);
+
+            insertBudget.run(job.id, contractVal, budgetLabour, budgetMat, budgetSub, budgetEquip, budgetOther, budgetCont, 'Auto-seeded budget');
+
+            // Get the budget_id we just inserted
+            const budgetRow = db.prepare('SELECT id FROM job_budgets WHERE job_id = ?').get(job.id);
+            if (!budgetRow) return;
+            const budgetId = budgetRow.id;
+
+            // Seed cost entries based on spend percentage
+            const spendPct = spendPcts[i % spendPcts.length];
+            const totalSpend = totalBudget * spendPct;
+
+            // Distribute spend across categories
+            const costEntries = [
+              { cat: 'labour', pct: 0.55, desc: 'Crew labour — weeks 1-' + Math.ceil(spendPct * 20), supplier: 'Internal', invoicePrefix: 'LAB' },
+              { cat: 'equipment', pct: 0.18, desc: 'TMA & equipment hire', supplier: 'T&S Fleet', invoicePrefix: 'EQP' },
+              { cat: 'materials', pct: 0.10, desc: 'Signage, cones & delineators', supplier: 'Traffix Devices', invoicePrefix: 'MAT' },
+              { cat: 'subcontractors', pct: 0.14, desc: 'Line marking & civil sub', supplier: 'Roadline Markings', invoicePrefix: 'SUB' },
+              { cat: 'other', pct: 0.03, desc: 'Permits & admin', supplier: 'Various', invoicePrefix: 'OTH' },
+            ];
+
+            costEntries.forEach((ce, ci) => {
+              const amount = Math.round(totalSpend * ce.pct);
+              if (amount <= 0) return;
+              const entryDate = daysAgo(Math.max(1, Math.round((ci + 1) * 7 * spendPct)));
+              const invoiceRef = ce.invoicePrefix + '-' + job.job_number + '-' + String(ci + 1).padStart(3, '0');
+              insertCost.run(job.id, budgetId, ce.cat, ce.desc, amount, entryDate, invoiceRef, ce.supplier, enteredBy);
+            });
+
+            // Update job contract_value if it was 0
+            if (!job.contract_value) {
+              db.prepare('UPDATE jobs SET contract_value = ? WHERE id = ?').run(contractVal, job.id);
+            }
+          });
+
+          console.log('Migration 31: Seeded budget data for ' + activeJobs.length + ' jobs');
+        }
+      }
+      recordMigration.run(31, 'Seed realistic demo budget data');
+      console.log('Migration 31 complete.');
+    } catch (e) {
+      console.error('Migration 31 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
