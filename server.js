@@ -62,6 +62,8 @@ app.use(sidebarBadges);
 // Public invite/setup routes (no auth required, must be BEFORE blockWorkerFromAdmin)
 app.use('/invite', require('./routes/invite'));
 app.use('/w/setup', require('./routes/worker/setup'));
+// Induction admin routes (must be BEFORE public /induction/:type to avoid catch-all)
+app.use('/induction/admin', requireLogin, requirePermission('induction'), require('./routes/induction-admin'));
 app.use('/induction', require('./routes/induction'));
 
 // Worker Portal routes (must be BEFORE blockWorkerFromAdmin)
@@ -100,7 +102,6 @@ app.use('/hr', requireLogin, require('./routes/hr'));
 app.use('/crm', requireLogin, requirePermission('crm'), require('./routes/crm'));
 app.use('/opportunities', requireLogin, requirePermission('crm'), require('./routes/opportunities'));
 app.use('/notifications', requireLogin, requirePermission('notifications'), require('./routes/notifications'));
-app.use('/induction/admin', requireLogin, requirePermission('induction'), require('./routes/induction-admin'));
 app.use('/admin/integrations', requireLogin, requirePermission('admin'), require('./routes/integrations'));
 app.use('/admin', requireLogin, requirePermission('admin'), require('./routes/admin'));
 app.use('/settings', requireLogin, requirePermission('settings'), require('./routes/settings'));
