@@ -84,6 +84,48 @@ router.get('/', requirePermission('hr_dashboard'), (req, res) => {
   // Recent employees
   const recentEmployees = db.prepare(`SELECT e.*, m.full_name as manager_name FROM employees e LEFT JOIN employees m ON e.manager_id = m.id WHERE ${baseWhere.replace(/e\./g, 'e.')} AND e.active = 1 ORDER BY e.created_at DESC LIMIT 10`).all(...params);
 
+  // Expiring competencies (next 30 days) for licence/expiry section
+  const expiringCompetencies = db.prepare(`
+    SELECT ec.*, e.full_name, e.employee_code, e.id as employee_id
+    FROM employee_competencies ec
+    JOIN employees e ON ec.employee_id = e.id
+    WHERE ec.expiry_date BETWEEN DATE('now') AND DATE('now', '+30 days') AND e.active = 1
+    ORDER BY ec.expiry_date ASC LIMIT 15
+  `).all();
+
+  // Blocked workers
+  const blockedWorkers = db.prepare(`
+    SELECT id, full_name, employee_code, company, block_reason
+    FROM employees WHERE blocked_from_allocation = 1 AND active = 1
+    ORDER BY full_name
+  `).all();
+
+  // Missing mandatory documents
+  const missingDocs = db.prepare(`
+    SELECT e.id, e.full_name, e.employee_code, e.company,
+      COUNT(CASE WHEN ed.verification_status != 'verified' THEN 1 END) as unverified_count
+    FROM employees e
+    LEFT JOIN employee_documents ed ON ed.employee_id = e.id AND ed.mandatory = 1
+    WHERE e.active = 1
+    GROUP BY e.id
+    HAVING unverified_count > 0
+    ORDER BY unverified_count DESC LIMIT 10
+  `).all();
+
+  // Employment type breakdown for reports section
+  const employmentTypes = db.prepare(`
+    SELECT employment_type, COUNT(*) as count
+    FROM employees WHERE active = 1
+    GROUP BY employment_type ORDER BY count DESC
+  `).all();
+
+  // Headcount by division for bar chart
+  const headcountByDivision = db.prepare(`
+    SELECT division, COUNT(*) as count
+    FROM employees WHERE active = 1 AND division != ''
+    GROUP BY division ORDER BY count DESC
+  `).all();
+
   // Filter options (map to plain string arrays for view templates)
   const companies = db.prepare("SELECT DISTINCT company FROM employees WHERE company != '' ORDER BY company").all().map(r => r.company);
   const divisions = db.prepare("SELECT DISTINCT division FROM employees WHERE division != '' ORDER BY division").all().map(r => r.division);
@@ -95,6 +137,11 @@ router.get('/', requirePermission('hr_dashboard'), (req, res) => {
     currentPage: 'hr-dashboard',
     stats: { total, active, casual, subcontractor, onLeave, onboarding, expiring7, expiring30, expired, blocked, pendingVerification },
     recentEmployees,
+    expiringCompetencies,
+    blockedWorkers,
+    missingDocs,
+    employmentTypes,
+    headcountByDivision,
     filters: { company, division, region, employment_type, manager_id },
     filterOptions: { companies, divisions, regions, managers },
     user: req.session.user

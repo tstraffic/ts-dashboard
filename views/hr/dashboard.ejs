@@ -4,6 +4,10 @@
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
   }
+  function formatType(type) {
+    if (!type) return '-';
+    return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
 
   const statusBadge = {
     active:     'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
@@ -15,15 +19,15 @@
   };
 %>
 
-<div class="space-y-5">
+<div class="space-y-6">
 
   <!-- Page Header -->
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">HR Dashboard</h1>
-      <p class="text-sm text-gray-500 mt-1">Employee management &middot; compliance tracking &middot; workforce overview</p>
+      <p class="text-sm text-gray-500 mt-1">Workforce overview, compliance tracking & reporting</p>
     </div>
-    <a href="/hr/employees/new" class="inline-flex items-center justify-center px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+    <a href="/hr/employees/new" class="inline-flex items-center justify-center px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition shadow-sm">
       <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
       Add Employee
     </a>
@@ -59,113 +63,372 @@
         <option value="subcontractor" <%= filters.employment_type === 'subcontractor' ? 'selected' : '' %>>Subcontractor</option>
       </select>
       <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition">Apply</button>
+      <% if (filters.company || filters.division || filters.region || filters.employment_type) { %>
+        <a href="/hr" class="text-xs text-gray-500 hover:text-red-500 transition">Clear filters</a>
+      <% } %>
     </form>
   </div>
 
-  <!-- Row 1: Headcount -->
+  <!-- ===================== HEADCOUNT STATS ===================== -->
   <div>
-    <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Headcount</p>
+    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Headcount</p>
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Employees</p>
-        <p class="text-2xl font-bold text-gray-900 mt-1"><%= stats.total %></p>
+      <div class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between">
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</p>
+          <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-gray-900 mt-2"><%= stats.total %></p>
       </div>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Active</p>
-        <p class="text-2xl font-bold text-emerald-600 mt-1"><%= stats.active %></p>
+      <div class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between">
+          <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Active</p>
+          <div class="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-emerald-600 mt-2"><%= stats.active %></p>
       </div>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Casual</p>
-        <p class="text-2xl font-bold text-blue-600 mt-1"><%= stats.casual %></p>
+      <div class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between">
+          <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Casual</p>
+          <div class="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-blue-600 mt-2"><%= stats.casual %></p>
       </div>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Subcontractors</p>
-        <p class="text-2xl font-bold text-indigo-600 mt-1"><%= stats.subcontractor %></p>
+      <div class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between">
+          <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Subcontractors</p>
+          <div class="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-indigo-600 mt-2"><%= stats.subcontractor %></p>
       </div>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">On Leave</p>
-        <p class="text-2xl font-bold text-amber-600 mt-1"><%= stats.onLeave %></p>
+      <div class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between">
+          <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">On Leave</p>
+          <div class="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-amber-600 mt-2"><%= stats.onLeave %></p>
       </div>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <p class="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Onboarding</p>
-        <p class="text-2xl font-bold text-purple-600 mt-1"><%= stats.onboarding %></p>
+      <div class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between">
+          <p class="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Onboarding</p>
+          <div class="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-purple-600 mt-2"><%= stats.onboarding %></p>
       </div>
     </div>
   </div>
 
-  <!-- Row 2: Compliance -->
+  <!-- ===================== COMPLIANCE OVERVIEW ===================== -->
   <div>
-    <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Compliance</p>
+    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Compliance Overview</p>
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Expiring in 7 Days</p>
-        <p class="text-2xl font-bold text-orange-600 mt-1"><%= stats.expiring7 %></p>
+      <div class="bg-gradient-to-br from-orange-50 to-white border border-orange-200/60 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-7 h-7 bg-orange-100 rounded-lg flex items-center justify-center">
+            <svg class="w-3.5 h-3.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+          </div>
+          <p class="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Expiring 7d</p>
+        </div>
+        <p class="text-3xl font-bold text-orange-600"><%= stats.expiring7 %></p>
       </div>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Expiring in 30 Days</p>
-        <p class="text-2xl font-bold text-amber-600 mt-1"><%= stats.expiring30 %></p>
+      <div class="bg-gradient-to-br from-amber-50 to-white border border-amber-200/60 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-7 h-7 bg-amber-100 rounded-lg flex items-center justify-center">
+            <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Expiring 30d</p>
+        </div>
+        <p class="text-3xl font-bold text-amber-600"><%= stats.expiring30 %></p>
       </div>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Expired Items</p>
-        <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.expired %></p>
+      <div class="bg-gradient-to-br from-red-50 to-white border border-red-200/60 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-7 h-7 bg-red-100 rounded-lg flex items-center justify-center">
+            <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </div>
+          <p class="text-[10px] font-bold text-red-500 uppercase tracking-widest">Expired</p>
+        </div>
+        <p class="text-3xl font-bold text-red-600"><%= stats.expired %></p>
       </div>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Blocked Workers</p>
-        <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.blocked %></p>
+      <div class="bg-gradient-to-br from-red-50 to-white border border-red-200/60 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-7 h-7 bg-red-100 rounded-lg flex items-center justify-center">
+            <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+          </div>
+          <p class="text-[10px] font-bold text-red-500 uppercase tracking-widest">Blocked</p>
+        </div>
+        <p class="text-3xl font-bold text-red-600"><%= stats.blocked %></p>
       </div>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <p class="text-[10px] font-bold text-yellow-500 uppercase tracking-widest">Pending Verification</p>
-        <p class="text-2xl font-bold text-yellow-600 mt-1"><%= stats.pendingVerification %></p>
+      <div class="bg-gradient-to-br from-yellow-50 to-white border border-yellow-200/60 rounded-xl p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-7 h-7 bg-yellow-100 rounded-lg flex items-center justify-center">
+            <svg class="w-3.5 h-3.5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          </div>
+          <p class="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">Pending Docs</p>
+        </div>
+        <p class="text-3xl font-bold text-yellow-600"><%= stats.pendingVerification %></p>
       </div>
     </div>
   </div>
 
-  <!-- Recent Employees Table -->
+  <!-- ===================== TWO-COLUMN: LICENCES + WORKFORCE ===================== -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+    <!-- Expiring Licences & Competencies -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-amber-50/50 to-white">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-gray-900">Expiring Licences</h2>
+            <p class="text-[10px] text-gray-400">Next 30 days</p>
+          </div>
+        </div>
+        <a href="/hr/competencies?view=30days" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View All</a>
+      </div>
+      <% if (expiringCompetencies && expiringCompetencies.length > 0) { %>
+      <div class="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
+        <% expiringCompetencies.forEach(comp => {
+          const daysLeft = Math.ceil((new Date(comp.expiry_date) - new Date()) / (1000*60*60*24));
+          const urgent = daysLeft <= 7;
+        %>
+        <div class="px-5 py-3 flex items-center justify-between hover:bg-gray-50/50 transition">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 <%= urgent ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600' %>">
+              <%= comp.full_name ? comp.full_name.split(' ').map(n => n[0]).join('').substring(0,2) : '?' %>
+            </div>
+            <div class="min-w-0">
+              <a href="/hr/employees/<%= comp.employee_id %>#competencies" class="text-sm font-medium text-gray-900 hover:text-brand-600 transition truncate block"><%= comp.full_name %></a>
+              <p class="text-[11px] text-gray-400 truncate"><%= formatType(comp.competency_type) %><% if (comp.competency_name) { %> &mdash; <%= comp.competency_name %><% } %></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0 ml-3">
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold <%= urgent ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' %>">
+              <%= daysLeft %>d left
+            </span>
+          </div>
+        </div>
+        <% }); %>
+      </div>
+      <% } else { %>
+      <div class="p-8 text-center">
+        <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+          <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <p class="text-sm text-gray-500">All licences are up to date</p>
+      </div>
+      <% } %>
+    </div>
+
+    <!-- Workforce Breakdown -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-2.5 bg-gradient-to-r from-brand-50/50 to-white">
+        <div class="w-8 h-8 bg-brand-100 rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        </div>
+        <div>
+          <h2 class="text-sm font-bold text-gray-900">Workforce Breakdown</h2>
+          <p class="text-[10px] text-gray-400">By type & division</p>
+        </div>
+      </div>
+      <div class="p-5 space-y-5">
+        <!-- Employment Types -->
+        <% if (employmentTypes && employmentTypes.length > 0) { %>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">By Employment Type</p>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <% employmentTypes.forEach(t => {
+              const colors = { full_time: 'bg-emerald-50 text-emerald-700 border-emerald-200', part_time: 'bg-blue-50 text-blue-700 border-blue-200', casual: 'bg-cyan-50 text-cyan-700 border-cyan-200', contractor: 'bg-violet-50 text-violet-700 border-violet-200', subcontractor: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+              const colorClass = colors[t.employment_type] || 'bg-gray-50 text-gray-700 border-gray-200';
+            %>
+            <div class="text-center p-3 rounded-lg border <%= colorClass %>">
+              <p class="text-xl font-bold"><%= t.count %></p>
+              <p class="text-[10px] mt-0.5 opacity-80"><%= formatType(t.employment_type) %></p>
+            </div>
+            <% }); %>
+          </div>
+        </div>
+        <% } %>
+
+        <!-- Division Bars -->
+        <% if (headcountByDivision && headcountByDivision.length > 0) { %>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">By Division</p>
+          <div class="space-y-2">
+            <% const maxDiv = Math.max(...headcountByDivision.map(d => d.count), 1); %>
+            <% headcountByDivision.forEach(d => { %>
+            <div class="flex items-center gap-3">
+              <span class="text-xs text-gray-600 w-24 shrink-0 truncate font-medium"><%= formatType(d.division) %></span>
+              <div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+                <div class="bg-gradient-to-r from-brand-500 to-brand-400 h-full rounded-full flex items-center justify-end pr-2.5 transition-all" style="width: <%= Math.max((d.count / maxDiv) * 100, 12) %>%">
+                  <span class="text-[10px] text-white font-bold"><%= d.count %></span>
+                </div>
+              </div>
+            </div>
+            <% }); %>
+          </div>
+        </div>
+        <% } %>
+
+        <% if ((!employmentTypes || employmentTypes.length === 0) && (!headcountByDivision || headcountByDivision.length === 0)) { %>
+        <div class="text-center py-4">
+          <p class="text-sm text-gray-400">No workforce data available yet.</p>
+        </div>
+        <% } %>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===================== TWO-COLUMN: BLOCKED + MISSING DOCS ===================== -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+    <!-- Blocked Workers -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-2.5 bg-gradient-to-r from-red-50/50 to-white">
+        <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+        </div>
+        <div>
+          <h2 class="text-sm font-bold text-gray-900">Blocked Workers</h2>
+          <p class="text-[10px] text-gray-400">Cannot be allocated</p>
+        </div>
+      </div>
+      <% if (blockedWorkers && blockedWorkers.length > 0) { %>
+      <div class="divide-y divide-gray-100 max-h-[300px] overflow-y-auto">
+        <% blockedWorkers.forEach(emp => { %>
+        <div class="px-5 py-3 flex items-center justify-between hover:bg-gray-50/50 transition">
+          <div class="min-w-0">
+            <a href="/hr/employees/<%= emp.id %>" class="text-sm font-medium text-gray-900 hover:text-brand-600 transition truncate block"><%= emp.full_name %></a>
+            <p class="text-[11px] text-gray-400"><%= emp.company || 'No company' %></p>
+          </div>
+          <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-red-50 text-red-600 ring-1 ring-red-500/20 shrink-0 ml-3 max-w-[150px] truncate">
+            <%= emp.block_reason || 'No reason' %>
+          </span>
+        </div>
+        <% }); %>
+      </div>
+      <% } else { %>
+      <div class="p-8 text-center">
+        <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+          <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <p class="text-sm text-gray-500">No workers are blocked</p>
+      </div>
+      <% } %>
+    </div>
+
+    <!-- Missing Mandatory Documents -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-yellow-50/50 to-white">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-gray-900">Missing Documents</h2>
+            <p class="text-[10px] text-gray-400">Unverified mandatory docs</p>
+          </div>
+        </div>
+        <a href="/hr/documents?mandatory=1&verification_status=pending" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View All</a>
+      </div>
+      <% if (missingDocs && missingDocs.length > 0) { %>
+      <div class="divide-y divide-gray-100 max-h-[300px] overflow-y-auto">
+        <% missingDocs.forEach(emp => { %>
+        <div class="px-5 py-3 flex items-center justify-between hover:bg-gray-50/50 transition">
+          <div class="min-w-0">
+            <a href="/hr/employees/<%= emp.id %>#documents" class="text-sm font-medium text-gray-900 hover:text-brand-600 transition truncate block"><%= emp.full_name %></a>
+            <p class="text-[11px] text-gray-400"><%= emp.company || 'No company' %></p>
+          </div>
+          <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold bg-yellow-50 text-yellow-700 ring-1 ring-yellow-500/20 shrink-0 ml-3">
+            <%= emp.unverified_count %> unverified
+          </span>
+        </div>
+        <% }); %>
+      </div>
+      <% } else { %>
+      <div class="p-8 text-center">
+        <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+          <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <p class="text-sm text-gray-500">All mandatory documents verified</p>
+      </div>
+      <% } %>
+    </div>
+
+  </div>
+
+  <!-- ===================== RECENT EMPLOYEES ===================== -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Recent Employees</h2>
-      <a href="/hr/employees" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View All</a>
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        </div>
+        <h2 class="text-sm font-bold text-gray-900">Recent Employees</h2>
+      </div>
+      <a href="/hr/employees" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View All Employees</a>
     </div>
     <% if (recentEmployees && recentEmployees.length > 0) { %>
     <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-200">
         <thead>
           <tr class="border-b border-gray-200">
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Company</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Role</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Start Date</th>
+            <th class="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
+            <th class="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Company</th>
+            <th class="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Role</th>
+            <th class="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+            <th class="px-5 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Start Date</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
           <% recentEmployees.forEach(emp => { %>
-          <tr class="hover:bg-gray-50 transition">
-            <td class="px-3 sm:px-4 py-3">
-              <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %> <%= emp.last_name %></a>
-              <% if (emp.manager_name) { %>
-                <p class="text-[10px] text-gray-400 mt-0.5">Manager: <%= emp.manager_name %></p>
-              <% } %>
+          <tr class="hover:bg-gray-50/50 transition">
+            <td class="px-5 py-3">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-bold shrink-0">
+                  <%= emp.first_name ? emp.first_name[0] : '' %><%= emp.last_name ? emp.last_name[0] : '' %>
+                </div>
+                <div>
+                  <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %> <%= emp.last_name %></a>
+                  <% if (emp.manager_name) { %>
+                    <p class="text-[10px] text-gray-400 mt-0.5">Manager: <%= emp.manager_name %></p>
+                  <% } %>
+                </div>
+              </div>
             </td>
-            <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden sm:table-cell"><%= emp.company || '-' %></td>
-            <td class="px-3 sm:px-4 py-3 text-gray-600 text-xs hidden md:table-cell"><%= emp.role_title || '-' %></td>
-            <td class="px-3 sm:px-4 py-3">
+            <td class="px-5 py-3 text-gray-500 text-xs hidden sm:table-cell"><%= emp.company || '-' %></td>
+            <td class="px-5 py-3 text-gray-600 text-xs hidden md:table-cell"><%= emp.role_title || '-' %></td>
+            <td class="px-5 py-3">
               <% const badgeClass = statusBadge[emp.employment_status] || statusBadge.inactive; %>
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= badgeClass %>">
                 <%= (emp.employment_status || 'unknown').replace(/_/g, ' ') %>
               </span>
             </td>
-            <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs tabular-nums hidden lg:table-cell"><%= formatDate(emp.start_date) %></td>
+            <td class="px-5 py-3 text-gray-500 text-xs tabular-nums hidden lg:table-cell"><%= formatDate(emp.start_date) %></td>
           </tr>
           <% }); %>
         </tbody>
       </table>
     </div>
-    <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
-      Showing <%= recentEmployees.length %> most recent employee<%= recentEmployees.length !== 1 ? 's' : '' %>
+    <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-400">
+      Showing <%= recentEmployees.length %> most recent
     </div>
     <% } else { %>
-    <div class="p-10 text-center">
+    <div class="p-12 text-center">
       <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
         <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
       </div>
