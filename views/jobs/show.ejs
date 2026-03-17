@@ -46,37 +46,44 @@
 <!-- Info Grid -->
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
   <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+    <% /* Always show these core fields */ %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Client</p>
       <p class="text-sm text-gray-900 mt-1"><%= job.client %></p>
     </div>
+    <% if (job.project_name) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Project Name</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.project_name || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.project_name %></p>
     </div>
+    <% } %>
+    <% if (job.client_project_number) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Client Project Number</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.client_project_number || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.client_project_number %></p>
     </div>
+    <% } %>
+    <% if (job.principal_contractor) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Principal Contractor</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.principal_contractor || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.principal_contractor %></p>
     </div>
+    <% } %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">State</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.state || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.state || 'NSW' %></p>
     </div>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Site Address</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.site_address || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.site_address || 'TBC' %></p>
     </div>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Suburb</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.suburb || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.suburb || 'TBC' %></p>
     </div>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Stage</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.stage ? job.stage.replace(/_/g, ' ') : '-' %></p>
+      <p class="text-sm text-gray-600 mt-1 capitalize"><%= job.stage ? job.stage.replace(/_/g, ' ') : 'Not set' %></p>
     </div>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">% Complete</p>
@@ -87,18 +94,24 @@
         <span class="text-sm text-gray-900"><%= job.percent_complete || 0 %>%</span>
       </div>
     </div>
+    <% if (job.contract_value) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Contract Value</p>
-      <p class="text-sm text-gray-900 mt-1"><%= job.contract_value ? '$' + Number(job.contract_value).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-' %></p>
+      <p class="text-sm text-gray-900 mt-1">$<%= Number(job.contract_value).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></p>
     </div>
+    <% } %>
+    <% if (job.estimated_hours) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Estimated Hours</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.estimated_hours || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.estimated_hours %></p>
     </div>
+    <% } %>
+    <% if (job.crew_size) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Crew Size</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.crew_size || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.crew_size %></p>
     </div>
+    <% } %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">ROL Required</p>
       <p class="text-sm mt-1 <%= job.rol_required ? 'text-emerald-600' : 'text-gray-400' %>"><%= job.rol_required ? 'Yes' : 'No' %></p>
@@ -109,36 +122,48 @@
     </div>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Start Date</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.start_date || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.start_date || 'TBC' %></p>
     </div>
+    <% if (job.end_date) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">End Date</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.end_date || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.end_date %></p>
     </div>
+    <% } %>
+    <% if (job.pm_name) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Project Manager</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.pm_name || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.pm_name %></p>
     </div>
+    <% } %>
+    <% if (job.ops_name) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Ops Supervisor</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.ops_name || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.ops_name %></p>
     </div>
+    <% } %>
+    <% if (job.traffic_supervisor_name) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Traffic Supervisor</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.traffic_supervisor_name || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.traffic_supervisor_name %></p>
     </div>
+    <% } %>
+    <% if (job.planning_name) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Planning Owner</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.planning_name || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.planning_name %></p>
     </div>
+    <% } %>
+    <% if (job.marketing_name) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Marketing Owner</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.marketing_name || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.marketing_name %></p>
     </div>
-    <% if (canViewAccounts) { %>
+    <% } %>
+    <% if (canViewAccounts && job.accounts_name) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Accounts Owner</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.accounts_name || '-' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.accounts_name %></p>
     </div>
     <% } %>
     <% if (job.sharepoint_url) { %>
