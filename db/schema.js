@@ -2126,6 +2126,218 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 38: HR / People Ops Foundation
+  // =============================================
+  if (!isMigrationApplied.get(38)) {
+    console.log('Running migration 38: HR / People Ops Foundation');
+    try {
+      // --- A. employees table ---
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS employees (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          employee_code TEXT UNIQUE,
+          first_name TEXT NOT NULL,
+          last_name TEXT NOT NULL,
+          full_name TEXT NOT NULL,
+          preferred_name TEXT DEFAULT '',
+          company TEXT DEFAULT '',
+          division TEXT DEFAULT '',
+          role_title TEXT DEFAULT '',
+          employment_type TEXT DEFAULT 'full_time',
+          employment_status TEXT DEFAULT 'active',
+          start_date DATE,
+          end_date DATE,
+          probation_end_date DATE,
+          manager_id INTEGER REFERENCES employees(id),
+          email TEXT DEFAULT '',
+          phone TEXT DEFAULT '',
+          address TEXT DEFAULT '',
+          suburb TEXT DEFAULT '',
+          state TEXT DEFAULT '',
+          postcode TEXT DEFAULT '',
+          traffic_role_level TEXT DEFAULT '',
+          ticket_classification TEXT DEFAULT '',
+          white_card_required INTEGER DEFAULT 0,
+          medical_required INTEGER DEFAULT 0,
+          allocatable INTEGER DEFAULT 1,
+          blocked_from_allocation INTEGER DEFAULT 0,
+          block_reason TEXT DEFAULT '',
+          induction_status TEXT DEFAULT 'pending',
+          ppe_issued_status TEXT DEFAULT 'not_issued',
+          uniform_issued_status TEXT DEFAULT 'not_issued',
+          company_vehicle_assigned TEXT DEFAULT '',
+          primary_work_region TEXT DEFAULT '',
+          base_location TEXT DEFAULT '',
+          emergency_contact_name TEXT DEFAULT '',
+          emergency_contact_phone TEXT DEFAULT '',
+          emergency_contact_relationship TEXT DEFAULT '',
+          date_of_birth DATE,
+          payroll_reference TEXT DEFAULT '',
+          internal_notes TEXT DEFAULT '',
+          active INTEGER DEFAULT 1,
+          linked_crew_member_id INTEGER REFERENCES crew_members(id),
+          linked_user_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_code ON employees(employee_code)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_company ON employees(company)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(employment_status)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_manager ON employees(manager_id)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_crew ON employees(linked_crew_member_id)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_user ON employees(linked_user_id)'); } catch(e) {}
+
+      // --- B. employee_documents table ---
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS employee_documents (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+          document_type TEXT NOT NULL DEFAULT 'other',
+          document_name TEXT NOT NULL,
+          filename TEXT NOT NULL,
+          original_name TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          file_size INTEGER DEFAULT 0,
+          issue_date DATE,
+          expiry_date DATE,
+          mandatory INTEGER DEFAULT 0,
+          verification_status TEXT DEFAULT 'pending',
+          verified_by_id INTEGER REFERENCES users(id),
+          verified_at DATETIME,
+          notes TEXT DEFAULT '',
+          uploaded_by_id INTEGER NOT NULL REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empdocs_employee ON employee_documents(employee_id)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empdocs_type ON employee_documents(document_type)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empdocs_expiry ON employee_documents(expiry_date)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empdocs_verification ON employee_documents(verification_status)'); } catch(e) {}
+
+      // --- C. employee_competencies table ---
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS employee_competencies (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+          competency_type TEXT NOT NULL DEFAULT 'other',
+          competency_name TEXT NOT NULL,
+          competency_level TEXT DEFAULT '',
+          issue_date DATE,
+          expiry_date DATE,
+          status TEXT DEFAULT 'valid',
+          mandatory_for_role INTEGER DEFAULT 0,
+          linked_document_id INTEGER REFERENCES employee_documents(id),
+          notes TEXT DEFAULT '',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empcomp_employee ON employee_competencies(employee_id)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empcomp_type ON employee_competencies(competency_type)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empcomp_expiry ON employee_competencies(expiry_date)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empcomp_status ON employee_competencies(status)'); } catch(e) {}
+
+      // --- D. Expand users role CHECK to include 'hr' and 'sales' ---
+      const userCols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+      const userSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
+      if (userSql && userSql.sql && !userSql.sql.includes("'hr'")) {
+        db.pragma('foreign_keys = OFF');
+        db.exec(`
+          CREATE TABLE users_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            full_name TEXT NOT NULL,
+            email TEXT,
+            role TEXT NOT NULL CHECK(role IN ('admin','operations','planning','finance','hr','sales')),
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            email_notifications_enabled INTEGER DEFAULT 1,
+            notification_frequency TEXT DEFAULT 'immediate'
+          );
+        `);
+        db.exec(`
+          INSERT INTO users_new (id, username, password_hash, full_name, email, role, active, created_at, email_notifications_enabled, notification_frequency)
+          SELECT id, username, password_hash, full_name, email, role, active, created_at,
+            COALESCE(email_notifications_enabled, 1),
+            COALESCE(notification_frequency, 'immediate')
+          FROM users;
+        `);
+        db.exec('DROP TABLE users;');
+        db.exec('ALTER TABLE users_new RENAME TO users;');
+        db.pragma('foreign_keys = ON');
+      }
+
+      // --- E. Auto-seed employees from crew_members ---
+      const crewRows = db.prepare('SELECT * FROM crew_members WHERE active = 1').all();
+      const insertEmp = db.prepare(`
+        INSERT OR IGNORE INTO employees (employee_code, first_name, last_name, full_name, company, employment_type, email, phone, traffic_role_level, induction_status, active, linked_crew_member_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, CURRENT_TIMESTAMP)
+      `);
+      for (const cm of crewRows) {
+        const parts = (cm.full_name || '').trim().split(/\s+/);
+        const firstName = parts[0] || '';
+        const lastName = parts.slice(1).join(' ') || '';
+        const empType = cm.employment_type || 'full_time';
+        const inductionStatus = cm.induction_status || (cm.induction_date ? 'completed' : 'pending');
+        insertEmp.run(
+          cm.employee_id || null,
+          firstName, lastName, cm.full_name || '',
+          cm.company || '',
+          empType,
+          cm.email || '', cm.phone || '',
+          cm.tcp_level || cm.role || '',
+          inductionStatus,
+          cm.id
+        );
+      }
+
+      // --- F. Seed HR settings categories ---
+      const insertSetting = db.prepare(`
+        INSERT OR IGNORE INTO app_settings (category, key, label, display_order, is_active)
+        VALUES (?, ?, ?, ?, 1)
+      `);
+      // Employment types
+      [['full_time','Full Time'],['part_time','Part Time'],['casual','Casual'],['subcontractor','Subcontractor']].forEach(([k,l], i) => {
+        insertSetting.run('hr_employment_types', k, l, i+1);
+      });
+      // Employment statuses
+      [['active','Active'],['onboarding','Onboarding'],['on_leave','On Leave'],['suspended','Suspended'],['inactive','Inactive'],['offboarded','Offboarded']].forEach(([k,l], i) => {
+        insertSetting.run('hr_employment_statuses', k, l, i+1);
+      });
+      // Divisions
+      [['operations','Operations'],['planning','Planning'],['admin','Admin'],['safety','Safety'],['finance','Finance'],['hr','Human Resources'],['sales','Sales']].forEach(([k,l], i) => {
+        insertSetting.run('hr_divisions', k, l, i+1);
+      });
+      // Document types
+      [['contract','Contract'],['licence','Licence'],['white_card','White Card'],['induction_record','Induction Record'],['training_certificate','Training Certificate'],['voc','VOC'],['medical','Medical'],['id','ID'],['policy_acknowledgement','Policy Acknowledgement'],['other','Other']].forEach(([k,l], i) => {
+        insertSetting.run('hr_document_types', k, l, i+1);
+      });
+      // Competency types
+      [['traffic_ticket','Traffic Ticket'],['white_card','White Card'],['first_aid','First Aid'],['plant_ticket','Plant Ticket'],['driver_licence','Driver Licence'],['hr_licence','HR Licence'],['voc','VOC'],['induction','Induction'],['medical_clearance','Medical Clearance'],['other','Other']].forEach(([k,l], i) => {
+        insertSetting.run('hr_competency_types', k, l, i+1);
+      });
+      // PPE statuses
+      [['not_issued','Not Issued'],['issued','Issued'],['partial','Partial'],['returned','Returned']].forEach(([k,l], i) => {
+        insertSetting.run('hr_ppe_statuses', k, l, i+1);
+      });
+      // Block reasons
+      [['expired_licence','Expired Licence'],['missing_induction','Missing Induction'],['medical_expired','Medical Expired'],['disciplinary','Disciplinary'],['other','Other']].forEach(([k,l], i) => {
+        insertSetting.run('hr_block_reasons', k, l, i+1);
+      });
+
+      recordMigration.run(38, 'HR / People Ops Foundation — employees, documents, competencies, role expansion');
+      console.log('Migration 38 complete.');
+    } catch (e) {
+      try { db.pragma('foreign_keys = ON'); } catch(re) {}
+      try { db.exec('DROP TABLE IF EXISTS users_new'); } catch(re) {}
+      console.error('Migration 38 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
