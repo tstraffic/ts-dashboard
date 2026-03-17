@@ -46,6 +46,8 @@ const PERMISSIONS = {
   admin:         ['admin'],
   activity:      ['admin'],
   settings:      ['admin'],
+  // Induction
+  induction:          ['admin', 'operations', 'hr'],
   // HR modules
   hr_dashboard:       ['admin', 'hr'],
   hr_employees:       ['admin', 'hr'],

@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>T&S Traffic Control — Induction</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwindcss.config={theme:{extend:{colors:{brand:{50:'#EBF3FF',100:'#D6E7FF',200:'#ADC9FF',300:'#85ABFF',400:'#5C8DFF',500:'#2B7FFF',600:'#1D6AE5',700:'#1554CC',800:'#0D3FB2',900:'#052A99',950:'#001A66'}}}}}</script>
+  <style>
+    .step-fade-enter { animation: fadeIn 0.35s ease forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .file-preview { max-height: 80px; border-radius: 8px; object-fit: cover; }
+    input[type="file"]::file-selector-button {
+      background: #2B7FFF; color: #fff; border: none; padding: 0.45rem 1rem;
+      border-radius: 0.5rem; cursor: pointer; font-weight: 500; margin-right: 0.75rem;
+    }
+    input[type="file"]::file-selector-button:hover { background: #1D6AE5; }
+    .carousel-dot.active { background: #2B7FFF; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800 font-sans">
+
+  <!-- Header -->
+  <header class="bg-white shadow-sm sticky top-0 z-50">
+    <div class="max-w-2xl mx-auto flex items-center justify-center py-3 px-4">
+      <img src="/images/logo-colour.jpg" alt="T&S Traffic Control" class="h-10" />
+    </div>
+  </header>
+
+  <!-- Progress Stepper -->
+  <div class="max-w-2xl mx-auto px-4 pt-6 pb-2">
+    <div class="flex items-center justify-between" id="stepper">
+      <% const stepLabels = ['Details','Fitness','Documents','Payment','About T&S','PPE']; %>
+      <% for (let i = 0; i < 6; i++) { %>
+        <div class="flex flex-col items-center flex-1 step-indicator" data-step="<%= i + 1 %>">
+          <div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300
+            <%= i === 0 ? 'bg-brand-500 text-white border-brand-500' : 'bg-white text-gray-400 border-gray-300' %>"
+            id="stepCircle<%= i + 1 %>">
+            <span id="stepNum<%= i + 1 %>"><%= i + 1 %></span>
+            <svg id="stepCheck<%= i + 1 %>" class="hidden w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <span class="text-[10px] mt-1 text-center leading-tight font-medium text-gray-400" id="stepLabel<%= i + 1 %>"><%= stepLabels[i] %></span>
+        </div>
+        <% if (i < 5) { %>
+          <div class="flex-1 h-0.5 bg-gray-200 mx-1 mt-[-12px] transition-all duration-300" id="stepLine<%= i + 1 %>"></div>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <form id="inductionForm" action="/induction/<%= paymentType %>/submit" method="POST" enctype="multipart/form-data" novalidate>
+    <input type="hidden" name="access_token" value="<%= accessToken %>" />
+
+    <div class="max-w-2xl mx-auto px-4 pb-12 pt-2">
+
+      <!-- ===================== STEP 1: Personal Details ===================== -->
+      <div class="step-panel step-fade-enter" id="step1">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+          <h2 class="text-xl font-bold text-gray-900">Personal Details</h2>
+          <p class="text-sm text-gray-500">Let's start with your basic information.</p>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Full Name <span class="text-red-500">*</span></label>
+            <input type="text" name="fullName" required placeholder="e.g. John Smith"
+              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
+            <input type="email" name="email" required placeholder="you@example.com"
+              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
+            <input type="tel" name="phone" required placeholder="04XX XXX XXX"
+              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+            <input type="date" name="dob"
+              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+            <input type="text" name="address" placeholder="Street address"
+              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Suburb</label>
+              <input type="text" name="suburb" placeholder="Suburb"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">State</label>
+              <select name="state"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition bg-white">
+                <option value="">Select</option>
+                <option>NSW</option><option>VIC</option><option>QLD</option><option>SA</option>
+                <option>WA</option><option>TAS</option><option>NT</option><option>ACT</option>
+              </select>
+            </div>
+          </div>
+          <div class="w-1/2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Postcode</label>
+            <input type="text" name="postcode" maxlength="4" placeholder="2000"
+              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+          </div>
+
+          <div class="pt-3 flex justify-end">
+            <button type="button" onclick="goToStep(2)" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl px-8 py-3 text-sm transition shadow-sm">
+              Next &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 2: Fitness & Suitability ===================== -->
+      <div class="step-panel hidden" id="step2">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+          <h2 class="text-xl font-bold text-gray-900">Fitness & Suitability</h2>
+          <p class="text-sm text-gray-500">A few quick questions to make sure you're ready to work safely.</p>
+
+          <!-- Q1 -->
+          <fieldset class="space-y-2">
+            <legend class="text-sm font-medium text-gray-700">Can you legally drive in Australia? <span class="text-red-500">*</span></legend>
+            <div class="flex gap-4">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="canDrive" value="yes" required class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
+                <span class="text-sm">Yes</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="canDrive" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
+                <span class="text-sm">No</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <!-- Q2 -->
+          <fieldset class="space-y-2">
+            <legend class="text-sm font-medium text-gray-700">Can you drive a truck (MR/HR licence)? <span class="text-red-500">*</span></legend>
+            <div class="flex gap-4">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="canDriveTruck" value="yes" required class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
+                <span class="text-sm">Yes</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="canDriveTruck" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
+                <span class="text-sm">No</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <!-- Q3 -->
+          <fieldset class="space-y-2">
+            <legend class="text-sm font-medium text-gray-700">Do you have any injuries or medical conditions that may affect your ability to work as a traffic controller? <span class="text-red-500">*</span></legend>
+            <div class="flex gap-4">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="hasInjury" value="yes" required class="w-4 h-4 text-brand-500 focus:ring-brand-500" onchange="document.getElementById('injuryDetails').classList.remove('hidden')" />
+                <span class="text-sm">Yes</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="hasInjury" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" onchange="document.getElementById('injuryDetails').classList.add('hidden')" />
+                <span class="text-sm">No</span>
+              </label>
+            </div>
+            <div id="injuryDetails" class="hidden mt-2">
+              <textarea name="injuryDescription" rows="3" placeholder="Please describe your condition..."
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition"></textarea>
+            </div>
+          </fieldset>
+
+          <!-- Q4 -->
+          <fieldset class="space-y-2">
+            <legend class="text-sm font-medium text-gray-700">Do you identify as Aboriginal or Torres Strait Islander?</legend>
+            <div class="flex flex-wrap gap-4">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="indigenous" value="yes" class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
+                <span class="text-sm">Yes</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="indigenous" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
+                <span class="text-sm">No</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="indigenous" value="prefer_not" class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
+                <span class="text-sm">Prefer not to say</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="pt-3 flex justify-between">
+            <button type="button" onclick="goToStep(1)" class="text-gray-500 hover:text-gray-700 font-medium rounded-xl px-6 py-3 text-sm transition">
+              &larr; Back
+            </button>
+            <button type="button" onclick="goToStep(3)" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl px-8 py-3 text-sm transition shadow-sm">
+              Next &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 3: Documents & Licences ===================== -->
+      <div class="step-panel hidden" id="step3">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+          <h2 class="text-xl font-bold text-gray-900">Documents & Licences</h2>
+          <p class="text-sm text-gray-500">Enter your licence numbers and upload photos of each document.</p>
+
+          <!-- White Card -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">White Card Number <span class="text-red-500">*</span></label>
+            <input type="text" name="whiteCardNumber" required placeholder="Enter your White Card number"
+              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Upload White Card Photo <span class="text-red-500">*</span></label>
+            <input type="file" name="whiteCardPhoto" accept="image/*,.pdf" required onchange="previewFile(this,'previewWhiteCard')"
+              class="w-full text-sm text-gray-500 file:mr-3" />
+            <div id="previewWhiteCard" class="mt-2"></div>
+          </div>
+
+          <!-- TC Licence -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">TC Licence Number <span class="text-red-500">*</span></label>
+            <input type="text" name="tcLicenceNumber" required placeholder="Enter your TC Licence number"
+              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Upload TC Licence Photo <span class="text-red-500">*</span></label>
+            <input type="file" name="tcLicencePhoto" accept="image/*,.pdf" required onchange="previewFile(this,'previewTCLicence')"
+              class="w-full text-sm text-gray-500 file:mr-3" />
+            <div id="previewTCLicence" class="mt-2"></div>
+          </div>
+
+          <!-- Driver's Licence -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Driver's Licence Number <span class="text-red-500">*</span></label>
+            <input type="text" name="driversLicenceNumber" required placeholder="Enter your Driver's Licence number"
+              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Upload Driver's Licence Photo <span class="text-red-500">*</span></label>
+            <input type="file" name="driversLicencePhoto" accept="image/*,.pdf" required onchange="previewFile(this,'previewDriversLicence')"
+              class="w-full text-sm text-gray-500 file:mr-3" />
+            <div id="previewDriversLicence" class="mt-2"></div>
+          </div>
+
+          <div class="pt-3 flex justify-between">
+            <button type="button" onclick="goToStep(2)" class="text-gray-500 hover:text-gray-700 font-medium rounded-xl px-6 py-3 text-sm transition">
+              &larr; Back
+            </button>
+            <button type="button" onclick="goToStep(4)" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl px-8 py-3 text-sm transition shadow-sm">
+              Next &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 4: Banking & Payment ===================== -->
+      <div class="step-panel hidden" id="step4">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+          <h2 class="text-xl font-bold text-gray-900">Banking & Payment</h2>
+
+          <% if (paymentType === 'cash') { %>
+            <div class="flex items-center gap-4 bg-green-50 border border-green-200 rounded-xl p-5">
+              <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+              </div>
+              <div>
+                <p class="font-semibold text-green-800">Cash Payment Selected</p>
+                <p class="text-sm text-green-700 mt-0.5">No banking details required. You'll be paid in cash.</p>
+              </div>
+            </div>
+          <% } else if (paymentType === 'tfn') { %>
+            <p class="text-sm text-gray-500">Enter your tax and banking details below.</p>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Tax File Number (TFN) <span class="text-red-500">*</span></label>
+              <input type="text" name="tfn" required placeholder="XXX XXX XXX"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">BSB <span class="text-red-500">*</span></label>
+              <input type="text" name="bsb" required maxlength="7" placeholder="XXX-XXX"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Account Number <span class="text-red-500">*</span></label>
+              <input type="text" name="accountNumber" required placeholder="Enter account number"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Account Name <span class="text-red-500">*</span></label>
+              <input type="text" name="accountName" required placeholder="Name on bank account"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+            </div>
+          <% } else if (paymentType === 'abn') { %>
+            <p class="text-sm text-gray-500">Enter your ABN and banking details below.</p>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">ABN Number <span class="text-red-500">*</span></label>
+              <input type="text" name="abn" required placeholder="XX XXX XXX XXX"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">BSB <span class="text-red-500">*</span></label>
+              <input type="text" name="bsb" required maxlength="7" placeholder="XXX-XXX"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Account Number <span class="text-red-500">*</span></label>
+              <input type="text" name="accountNumber" required placeholder="Enter account number"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Account Name <span class="text-red-500">*</span></label>
+              <input type="text" name="accountName" required placeholder="Name on bank account"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
+            </div>
+          <% } %>
+
+          <div class="pt-3 flex justify-between">
+            <button type="button" onclick="goToStep(3)" class="text-gray-500 hover:text-gray-700 font-medium rounded-xl px-6 py-3 text-sm transition">
+              &larr; Back
+            </button>
+            <button type="button" onclick="goToStep(5)" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl px-8 py-3 text-sm transition shadow-sm">
+              Next &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 5: About T&S ===================== -->
+      <div class="step-panel hidden" id="step5">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+          <h2 class="text-xl font-bold text-gray-900">About T&S Traffic Control</h2>
+          <p class="text-sm text-gray-500">Get to know us before you start. Swipe through each card.</p>
+
+          <!-- Carousel -->
+          <div class="relative overflow-hidden rounded-xl">
+            <div id="carouselTrack" class="flex transition-transform duration-400 ease-in-out">
+
+              <!-- Card 1 -->
+              <div class="min-w-full p-1">
+                <div class="bg-gradient-to-br from-brand-50 to-brand-100 rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
+                  <div>
+                    <div class="inline-flex items-center gap-2 bg-brand-500 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">1 / 4</div>
+                    <h3 class="text-lg font-bold text-brand-900 mb-2">Who We Are</h3>
+                    <p class="text-sm text-brand-800 leading-relaxed">T&S Traffic Control is a family-owned business established in 2021, raising the standards of safety in NSW traffic control. Founded by Taj and Saadat, we bring a personal touch to every project and treat our team like family.</p>
+                  </div>
+                  <div class="flex justify-end mt-4">
+                    <button type="button" onclick="carouselNext()" class="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg px-5 py-2 transition">Next &rarr;</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 2 -->
+              <div class="min-w-full p-1">
+                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
+                  <div>
+                    <div class="inline-flex items-center gap-2 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">2 / 4</div>
+                    <h3 class="text-lg font-bold text-emerald-900 mb-2">Our Mission</h3>
+                    <p class="text-sm text-emerald-800 leading-relaxed"><strong>"A Safe Way Home"</strong> &mdash; Our mission is to protect lives on every worksite we operate. We strive to create a workplace where every team member can grow, succeed, and return home safely at the end of each day.</p>
+                  </div>
+                  <div class="flex justify-between mt-4">
+                    <button type="button" onclick="carouselPrev()" class="text-emerald-700 hover:text-emerald-900 text-sm font-medium transition">&larr; Back</button>
+                    <button type="button" onclick="carouselNext()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg px-5 py-2 transition">Next &rarr;</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 3 -->
+              <div class="min-w-full p-1">
+                <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
+                  <div>
+                    <div class="inline-flex items-center gap-2 bg-amber-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">3 / 4</div>
+                    <h3 class="text-lg font-bold text-amber-900 mb-2">What We've Accomplished</h3>
+                    <p class="text-sm text-amber-800 leading-relaxed">We've worked on major projects across NSW, including hospital roundabouts, road pavement upgrades, and hotel construction projects. Our reputation is built on delivering safe, reliable traffic management every time.</p>
+                  </div>
+                  <div class="flex justify-between mt-4">
+                    <button type="button" onclick="carouselPrev()" class="text-amber-700 hover:text-amber-900 text-sm font-medium transition">&larr; Back</button>
+                    <button type="button" onclick="carouselNext()" class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg px-5 py-2 transition">Next &rarr;</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 4 -->
+              <div class="min-w-full p-1">
+                <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
+                  <div>
+                    <div class="inline-flex items-center gap-2 bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">4 / 4</div>
+                    <h3 class="text-lg font-bold text-purple-900 mb-2">Our Values</h3>
+                    <ul class="text-sm text-purple-800 leading-relaxed space-y-1.5 mt-1">
+                      <li class="flex items-start gap-2"><span class="mt-0.5">&#9679;</span> Respect everyone on and off site</li>
+                      <li class="flex items-start gap-2"><span class="mt-0.5">&#9679;</span> Report unsafe actions immediately</li>
+                      <li class="flex items-start gap-2"><span class="mt-0.5">&#9679;</span> Zero tolerance for harassment of any kind</li>
+                      <li class="flex items-start gap-2"><span class="mt-0.5">&#9679;</span> Keep sites professional and orderly at all times</li>
+                    </ul>
+                  </div>
+                  <div class="flex justify-start mt-4">
+                    <button type="button" onclick="carouselPrev()" class="text-purple-700 hover:text-purple-900 text-sm font-medium transition">&larr; Back</button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Carousel dots -->
+          <div class="flex justify-center gap-2" id="carouselDots">
+            <span class="carousel-dot active w-2.5 h-2.5 rounded-full bg-brand-500 transition"></span>
+            <span class="carousel-dot w-2.5 h-2.5 rounded-full bg-gray-300 transition"></span>
+            <span class="carousel-dot w-2.5 h-2.5 rounded-full bg-gray-300 transition"></span>
+            <span class="carousel-dot w-2.5 h-2.5 rounded-full bg-gray-300 transition"></span>
+          </div>
+
+          <!-- Mark as read -->
+          <label class="flex items-center gap-3 bg-gray-50 rounded-xl p-4 cursor-pointer border border-gray-200 hover:border-brand-300 transition">
+            <input type="checkbox" id="markAsRead" name="aboutRead" value="yes" class="w-5 h-5 rounded text-brand-500 focus:ring-brand-500" />
+            <span class="text-sm font-medium text-gray-700">I have read and understood the information about T&S Traffic Control</span>
+          </label>
+
+          <div class="pt-3 flex justify-between">
+            <button type="button" onclick="goToStep(4)" class="text-gray-500 hover:text-gray-700 font-medium rounded-xl px-6 py-3 text-sm transition">
+              &larr; Back
+            </button>
+            <button type="button" onclick="goToStep(6)" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl px-8 py-3 text-sm transition shadow-sm">
+              Next &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 6: PPE & Expectations ===================== -->
+      <div class="step-panel hidden" id="step6">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+          <h2 class="text-xl font-bold text-gray-900">PPE & Workplace Expectations</h2>
+          <p class="text-sm text-gray-500">Please read each rule carefully. These are non-negotiable.</p>
+
+          <div class="space-y-3">
+            <div class="flex items-start gap-3 bg-brand-50 rounded-xl p-4 border border-brand-100">
+              <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-brand-900">Correct PPE at All Times</p>
+                <p class="text-xs text-brand-700 mt-0.5">Hi-vis vest, hard hat, and steel-cap boots must be worn every time you're on site.</p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-3 bg-red-50 rounded-xl p-4 border border-red-100">
+              <div class="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-red-900">No Mobile Phones on Site</p>
+                <p class="text-xs text-red-700 mt-0.5">Phones reduce situational awareness and delay reaction times. Keep them stored away.</p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-3 bg-red-50 rounded-xl p-4 border border-red-100">
+              <div class="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-red-900">No Earbuds or AirPods</p>
+                <p class="text-xs text-red-700 mt-0.5">You must be able to hear traffic, machinery, and supervisor instructions at all times.</p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-3 bg-amber-50 rounded-xl p-4 border border-amber-100">
+              <div class="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-amber-900">No Slacking Off</p>
+                <p class="text-xs text-amber-700 mt-0.5">Maintain full focus at all times. Complacency puts lives at risk.</p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-3 bg-brand-50 rounded-xl p-4 border border-brand-100">
+              <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-brand-900">Follow All Supervisor Instructions</p>
+                <p class="text-xs text-brand-700 mt-0.5">Your supervisor's word is final on site. Always comply with their directions.</p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-3 bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+              <div class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-emerald-900">Be Polite & Professional</p>
+                <p class="text-xs text-emerald-700 mt-0.5">Treat road users, pedestrians, and colleagues with courtesy and respect.</p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-3 bg-red-50 rounded-xl p-4 border border-red-100">
+              <div class="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-red-900">Zero Tolerance for Inappropriate Behaviour</p>
+                <p class="text-xs text-red-700 mt-0.5">Any form of misconduct, harassment, or unprofessional behaviour will result in immediate removal from site.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Acknowledgement checkbox -->
+          <label class="flex items-start gap-3 bg-gray-50 rounded-xl p-4 cursor-pointer border border-gray-200 hover:border-brand-300 transition">
+            <input type="checkbox" id="ppeAcknowledge" name="ppeAcknowledge" value="yes" required class="w-5 h-5 rounded text-brand-500 focus:ring-brand-500 mt-0.5" />
+            <span class="text-sm font-medium text-gray-700">I have read and agree to follow all T&S Traffic Control PPE and workplace conduct expectations.</span>
+          </label>
+          <div id="ppeError" class="hidden text-red-500 text-xs font-medium -mt-3">You must agree to the PPE and workplace conduct expectations to continue.</div>
+
+          <div class="pt-3 flex justify-between">
+            <button type="button" onclick="goToStep(5)" class="text-gray-500 hover:text-gray-700 font-medium rounded-xl px-6 py-3 text-sm transition">
+              &larr; Back
+            </button>
+            <button type="submit" id="submitBtn" class="bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-xl px-8 py-3.5 text-sm transition shadow-md shadow-brand-500/20">
+              Submit Application
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </form>
+
+  <script>
+    let currentStep = 1;
+    let carouselIndex = 0;
+
+    /* ───── Step navigation ───── */
+    function goToStep(step) {
+      if (step > currentStep && !validateStep(currentStep)) return;
+
+      // hide current
+      document.getElementById('step' + currentStep).classList.add('hidden');
+      document.getElementById('step' + currentStep).classList.remove('step-fade-enter');
+
+      // update stepper UI
+      for (let i = 1; i <= 6; i++) {
+        const circle = document.getElementById('stepCircle' + i);
+        const num = document.getElementById('stepNum' + i);
+        const check = document.getElementById('stepCheck' + i);
+        const label = document.getElementById('stepLabel' + i);
+
+        if (i < step) {
+          // completed
+          circle.className = 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-brand-500 text-white border-brand-500';
+          num.classList.add('hidden');
+          check.classList.remove('hidden');
+          label.classList.remove('text-gray-400');
+          label.classList.add('text-brand-600');
+        } else if (i === step) {
+          // current
+          circle.className = 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-brand-500 text-white border-brand-500';
+          num.classList.remove('hidden');
+          check.classList.add('hidden');
+          label.classList.remove('text-gray-400');
+          label.classList.add('text-brand-600');
+        } else {
+          // upcoming
+          circle.className = 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-white text-gray-400 border-gray-300';
+          num.classList.remove('hidden');
+          check.classList.add('hidden');
+          label.classList.remove('text-brand-600');
+          label.classList.add('text-gray-400');
+        }
+
+        // lines
+        if (i < 6) {
+          const line = document.getElementById('stepLine' + i);
+          line.className = i < step
+            ? 'flex-1 h-0.5 mx-1 mt-[-12px] transition-all duration-300 bg-brand-500'
+            : 'flex-1 h-0.5 mx-1 mt-[-12px] transition-all duration-300 bg-gray-200';
+        }
+      }
+
+      currentStep = step;
+
+      // show new step
+      const newPanel = document.getElementById('step' + step);
+      newPanel.classList.remove('hidden');
+      newPanel.classList.add('step-fade-enter');
+
+      // scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    /* ───── Validation ───── */
+    function validateStep(step) {
+      const panel = document.getElementById('step' + step);
+      const requiredInputs = panel.querySelectorAll('[required]');
+      let valid = true;
+
+      requiredInputs.forEach(input => {
+        if (input.type === 'radio') {
+          const name = input.name;
+          const group = panel.querySelectorAll('input[name="' + name + '"]');
+          const checked = panel.querySelector('input[name="' + name + '"]:checked');
+          if (!checked) {
+            valid = false;
+            group.forEach(r => r.closest('fieldset')?.classList.add('ring-2', 'ring-red-300', 'rounded-xl', 'p-3'));
+          } else {
+            group.forEach(r => r.closest('fieldset')?.classList.remove('ring-2', 'ring-red-300', 'rounded-xl', 'p-3'));
+          }
+        } else if (input.type === 'checkbox') {
+          if (!input.checked) {
+            valid = false;
+            input.closest('label')?.classList.add('ring-2', 'ring-red-300');
+          } else {
+            input.closest('label')?.classList.remove('ring-2', 'ring-red-300');
+          }
+        } else if (input.type === 'file') {
+          if (!input.files || input.files.length === 0) {
+            valid = false;
+            input.classList.add('ring-2', 'ring-red-300', 'rounded-xl');
+          } else {
+            input.classList.remove('ring-2', 'ring-red-300', 'rounded-xl');
+          }
+        } else {
+          if (!input.value.trim()) {
+            valid = false;
+            input.classList.add('ring-2', 'ring-red-300');
+          } else {
+            input.classList.remove('ring-2', 'ring-red-300');
+          }
+        }
+      });
+
+      // Step 5 special: markAsRead
+      if (step === 5) {
+        const mr = document.getElementById('markAsRead');
+        if (!mr.checked) {
+          valid = false;
+          mr.closest('label')?.classList.add('ring-2', 'ring-red-300');
+        } else {
+          mr.closest('label')?.classList.remove('ring-2', 'ring-red-300');
+        }
+      }
+
+      if (!valid) {
+        // scroll to first error
+        const firstError = panel.querySelector('.ring-red-300');
+        if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      return valid;
+    }
+
+    /* ───── Form submit validation ───── */
+    document.getElementById('inductionForm').addEventListener('submit', function(e) {
+      const ppe = document.getElementById('ppeAcknowledge');
+      const ppeErr = document.getElementById('ppeError');
+      if (!ppe.checked) {
+        e.preventDefault();
+        ppeErr.classList.remove('hidden');
+        ppe.closest('label')?.classList.add('ring-2', 'ring-red-300');
+        ppe.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      ppeErr.classList.add('hidden');
+
+      // Disable submit button
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<svg class="animate-spin inline -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Submitting...';
+    });
+
+    /* ───── File preview ───── */
+    function previewFile(input, previewId) {
+      const container = document.getElementById(previewId);
+      container.innerHTML = '';
+
+      if (!input.files || !input.files[0]) return;
+
+      const file = input.files[0];
+
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = document.createElement('img');
+          img.src = e.target.result;
+          img.className = 'file-preview border border-gray-200 shadow-sm';
+          container.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const badge = document.createElement('div');
+        badge.className = 'inline-flex items-center gap-2 bg-gray-100 text-gray-700 text-xs font-medium px-3 py-2 rounded-lg';
+        badge.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>' + file.name;
+        container.appendChild(badge);
+      }
+
+      // clear validation ring
+      input.classList.remove('ring-2', 'ring-red-300', 'rounded-xl');
+    }
+
+    /* ───── Carousel ───── */
+    function carouselTo(index) {
+      const track = document.getElementById('carouselTrack');
+      const dots = document.querySelectorAll('#carouselDots .carousel-dot');
+      carouselIndex = index;
+      track.style.transform = 'translateX(-' + (index * 100) + '%)';
+      dots.forEach((d, i) => {
+        d.classList.toggle('active', i === index);
+        d.classList.toggle('bg-brand-500', i === index);
+        d.classList.toggle('bg-gray-300', i !== index);
+      });
+    }
+
+    function carouselNext() { if (carouselIndex < 3) carouselTo(carouselIndex + 1); }
+    function carouselPrev() { if (carouselIndex > 0) carouselTo(carouselIndex - 1); }
+
+    /* ───── Touch swipe support for carousel ───── */
+    (function() {
+      const track = document.getElementById('carouselTrack');
+      let startX = 0;
+      track.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+      track.addEventListener('touchend', e => {
+        const diff = startX - e.changedTouches[0].clientX;
+        if (Math.abs(diff) > 50) {
+          if (diff > 0) carouselNext();
+          else carouselPrev();
+        }
+      }, { passive: true });
+    })();
+  </script>
+
+</body>
+</html>

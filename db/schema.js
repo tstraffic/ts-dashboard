@@ -2425,6 +2425,86 @@ function runMigrations(db) {
     console.log('Migration 40 complete (schema marker).');
   }
 
+  // =============================================
+  // Migration 41: Induction Module
+  // =============================================
+  if (!isMigrationApplied.get(41)) {
+    console.log('Running migration 41: Induction Module');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS induction_submissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        access_token TEXT UNIQUE NOT NULL,
+        payment_type TEXT NOT NULL CHECK(payment_type IN ('cash', 'tfn', 'abn')),
+        status TEXT NOT NULL DEFAULT 'submitted' CHECK(status IN ('draft', 'submitted', 'approved', 'rejected')),
+
+        full_name TEXT NOT NULL DEFAULT '',
+        email TEXT DEFAULT '',
+        phone TEXT DEFAULT '',
+        date_of_birth DATE,
+        address TEXT DEFAULT '',
+        suburb TEXT DEFAULT '',
+        state TEXT DEFAULT '',
+        postcode TEXT DEFAULT '',
+
+        can_drive TEXT DEFAULT '',
+        can_drive_truck TEXT DEFAULT '',
+        has_injuries TEXT DEFAULT '',
+        injury_details TEXT DEFAULT '',
+        is_indigenous TEXT DEFAULT '',
+
+        white_card_number TEXT DEFAULT '',
+        tc_licence_number TEXT DEFAULT '',
+        drivers_licence_number TEXT DEFAULT '',
+
+        white_card_photo TEXT DEFAULT '',
+        tc_licence_photo TEXT DEFAULT '',
+        drivers_licence_photo TEXT DEFAULT '',
+
+        tax_file_number TEXT DEFAULT '',
+        bank_bsb TEXT DEFAULT '',
+        bank_account_number TEXT DEFAULT '',
+        bank_account_name TEXT DEFAULT '',
+        abn_number TEXT DEFAULT '',
+
+        company_intro_completed INTEGER DEFAULT 0,
+        ppe_acknowledged INTEGER DEFAULT 0,
+
+        reviewed_by_id INTEGER REFERENCES users(id),
+        reviewed_at DATETIME,
+        review_notes TEXT DEFAULT '',
+
+        linked_crew_member_id INTEGER REFERENCES crew_members(id),
+
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        submitted_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_induction_token ON induction_submissions(access_token);
+      CREATE INDEX IF NOT EXISTS idx_induction_status ON induction_submissions(status);
+      CREATE INDEX IF NOT EXISTS idx_induction_payment ON induction_submissions(payment_type);
+      CREATE INDEX IF NOT EXISTS idx_induction_submitted ON induction_submissions(submitted_at);
+
+      CREATE TABLE IF NOT EXISTS induction_presentations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        module TEXT NOT NULL CHECK(module IN ('employee_guide', 'tc_training_1')),
+        presented_by_id INTEGER NOT NULL REFERENCES users(id),
+        attendee_names TEXT DEFAULT '',
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME,
+        last_slide INTEGER DEFAULT 1,
+        total_slides INTEGER NOT NULL,
+        notes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_presentations_module ON induction_presentations(module);
+    `);
+
+    recordMigration.run(41, 'Induction Module — submissions and presentations tables');
+    console.log('Migration 41 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
