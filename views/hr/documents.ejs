@@ -1,0 +1,200 @@
+<% locals.currentPage = 'hr-documents' %>
+
+<%
+  const todayStr = new Date().toISOString().split('T')[0];
+  const soon30Str = new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0];
+
+  const VERIFICATION_BADGES = {
+    pending:  { label: 'Pending',  color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' },
+    verified: { label: 'Verified', color: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' },
+    rejected: { label: 'Rejected', color: 'bg-red-50 text-red-700 ring-1 ring-red-600/20' },
+    expired:  { label: 'Expired',  color: 'bg-gray-100 text-gray-600' },
+  };
+
+  const defaultDocTypes = [
+    'contract', 'licence', 'white_card', 'induction_record',
+    'training_certificate', 'VOC', 'medical', 'ID',
+    'policy_acknowledgement', 'other'
+  ];
+  const rawDocTypes = (settingsOptions && settingsOptions.hr_document_types) || defaultDocTypes;
+  // Normalise to [{val,label}] — settings returns objects {key,label}, fallback is plain strings
+  const docTypes = rawDocTypes.map(t => typeof t === 'string' ? { val: t, label: t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) } : { val: t.key || t.val || t, label: t.label || t.key || t });
+
+  function buildUrl(overrides) {
+    const q = Object.assign({}, filters, overrides);
+    return '/hr/documents?' + Object.keys(q).filter(k => q[k] !== '' && q[k] != null).map(k => k + '=' + encodeURIComponent(q[k])).join('&');
+  }
+
+  function formatDocType(type) {
+    if (!type) return '-';
+    if (typeof type !== 'string') return String(type);
+    return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+%>
+
+<div class="space-y-5">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">HR Documents</h1>
+      <p class="text-sm text-gray-500 mt-1">Central document management for all employees</p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <form method="GET" action="/hr/documents" id="docFilterForm" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+
+      <!-- Document Type -->
+      <select name="document_type" onchange="document.getElementById('docFilterForm').submit()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Types</option>
+        <% docTypes.forEach(function(dt) { %>
+          <option value="<%= dt.val %>" <%= filters.document_type === dt.val ? 'selected' : '' %>><%= dt.label %></option>
+        <% }) %>
+      </select>
+
+      <!-- Verification Status -->
+      <select name="verification_status" onchange="document.getElementById('docFilterForm').submit()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Statuses</option>
+        <option value="pending" <%= filters.verification_status === 'pending' ? 'selected' : '' %>>Pending</option>
+        <option value="verified" <%= filters.verification_status === 'verified' ? 'selected' : '' %>>Verified</option>
+        <option value="rejected" <%= filters.verification_status === 'rejected' ? 'selected' : '' %>>Rejected</option>
+        <option value="expired" <%= filters.verification_status === 'expired' ? 'selected' : '' %>>Expired</option>
+      </select>
+
+      <!-- Expiry -->
+      <select name="expiry" onchange="document.getElementById('docFilterForm').submit()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Expiry</option>
+        <option value="expired" <%= filters.expiry === 'expired' ? 'selected' : '' %>>Expired</option>
+        <option value="7days" <%= filters.expiry === '7days' ? 'selected' : '' %>>Expiring in 7 days</option>
+        <option value="30days" <%= filters.expiry === '30days' ? 'selected' : '' %>>Expiring in 30 days</option>
+      </select>
+
+      <!-- Company -->
+      <select name="company" onchange="document.getElementById('docFilterForm').submit()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Companies</option>
+        <% if (filterOptions && filterOptions.companies) { filterOptions.companies.forEach(function(c) { %>
+          <option value="<%= c %>" <%= filters.company === c ? 'selected' : '' %>><%= c %></option>
+        <% }) } %>
+      </select>
+
+      <!-- Mandatory -->
+      <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" name="mandatory" value="1" <%= filters.mandatory === '1' || filters.mandatory === 1 ? 'checked' : '' %> onchange="document.getElementById('docFilterForm').submit()" class="rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500">
+        Mandatory only
+      </label>
+
+      <% if (filters.document_type || filters.verification_status || filters.expiry || filters.company || filters.mandatory) { %>
+        <a href="/hr/documents" class="text-sm text-gray-400 hover:text-gray-600 transition">Clear filters</a>
+      <% } %>
+    </form>
+  </div>
+
+  <!-- Documents Table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <% if (!documents || documents.length === 0) { %>
+      <div class="p-10 text-center">
+        <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        </div>
+        <h3 class="text-gray-900 font-semibold text-base mb-1">No documents found</h3>
+        <p class="text-gray-500 text-sm">Try adjusting your filters or upload documents from employee profiles.</p>
+      </div>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-200">
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Employee</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Document Type</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Name</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Issue Date</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Expiry Date</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Mandatory</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Uploaded By</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% documents.forEach(function(doc) {
+              const vb = VERIFICATION_BADGES[doc.verification_status] || { label: doc.verification_status || '-', color: 'bg-gray-100 text-gray-600' };
+              const isExpired = doc.expiry_date && doc.expiry_date < todayStr;
+              const isExpiringSoon = !isExpired && doc.expiry_date && doc.expiry_date <= soon30Str;
+            %>
+              <tr class="hover:bg-gray-50 transition-colors">
+                <!-- Employee -->
+                <td class="px-4 py-3">
+                  <a href="/hr/employees/<%= doc.employee_id %>" class="text-brand-600 hover:text-brand-700 font-medium"><%= doc.employee_name %></a>
+                  <div class="text-xs text-gray-400 mt-0.5"><%= doc.employee_code || '' %><% if (doc.employee_company) { %> &middot; <%= doc.employee_company %><% } %></div>
+                </td>
+
+                <!-- Document Type -->
+                <td class="px-4 py-3">
+                  <span class="text-sm text-gray-700"><%= formatDocType(doc.document_type) %></span>
+                </td>
+
+                <!-- Name -->
+                <td class="px-4 py-3 hidden md:table-cell">
+                  <span class="text-sm text-gray-700 truncate block max-w-xs"><%= doc.name || '-' %></span>
+                </td>
+
+                <!-- Issue Date -->
+                <td class="px-4 py-3 hidden lg:table-cell whitespace-nowrap">
+                  <% if (doc.issue_date) { %>
+                    <span class="text-sm text-gray-600"><%= new Date(doc.issue_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+                  <% } else { %>
+                    <span class="text-gray-300">-</span>
+                  <% } %>
+                </td>
+
+                <!-- Expiry Date -->
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <% if (doc.expiry_date) { %>
+                    <span class="<%= isExpired ? 'text-red-600 font-semibold' : isExpiringSoon ? 'text-amber-600 font-medium' : 'text-gray-600' %>">
+                      <%= new Date(doc.expiry_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
+                    </span>
+                    <% if (isExpired) { %><span class="block text-xs text-red-500 font-medium">EXPIRED</span><% } %>
+                    <% if (isExpiringSoon) { %><span class="block text-xs text-amber-500 font-medium">EXPIRING</span><% } %>
+                  <% } else { %>
+                    <span class="text-gray-300">-</span>
+                  <% } %>
+                </td>
+
+                <!-- Verification Status -->
+                <td class="px-4 py-3">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= vb.color %>"><%= vb.label %></span>
+                </td>
+
+                <!-- Mandatory -->
+                <td class="px-4 py-3 hidden lg:table-cell">
+                  <% if (doc.mandatory) { %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20">Required</span>
+                  <% } else { %>
+                    <span class="text-gray-300">-</span>
+                  <% } %>
+                </td>
+
+                <!-- Uploaded By -->
+                <td class="px-4 py-3 hidden xl:table-cell">
+                  <span class="text-xs text-gray-500"><%= doc.uploaded_by_name || '-' %></span>
+                </td>
+
+                <!-- Actions -->
+                <td class="px-4 py-3 text-right">
+                  <a href="/hr/documents/<%= doc.id %>/download" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-brand-50 hover:text-brand-700 rounded-lg transition" title="Download">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Download
+                  </a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
+        Showing <%= documents.length %> document<%= documents.length !== 1 ? 's' : '' %>
+      </div>
+    <% } %>
+  </div>
+</div>
