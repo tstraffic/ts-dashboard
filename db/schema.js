@@ -2414,7 +2414,269 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 40: Seed comprehensive demo data (schema-only marker)
+  // Actual data seeded in seedDemoData() after initial user/job seed
+  // =============================================
+  if (!isMigrationApplied.get(40)) {
+    // Add preferences column to users if missing
+    try { db.exec("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'"); } catch (e) { /* already exists */ }
+    recordMigration.run(40, 'Seed comprehensive demo data — allocations, equipment, activity, CRM, updates');
+    console.log('Migration 40 complete (schema marker).');
+  }
+
   console.log('All migrations checked/applied.');
+}
+
+// Separate function to seed demo data (called AFTER initial user/job seed)
+function seedDemoData(db) {
+  // Only run if migration 40 was applied and seed data hasn't been done yet
+  const existingAllocs = db.prepare('SELECT COUNT(*) as c FROM crew_allocations').get().c;
+  if (existingAllocs > 0) return; // Already seeded
+
+  const jobCount = db.prepare('SELECT COUNT(*) as c FROM jobs').get().c;
+  if (jobCount === 0) return; // No base seed data yet
+
+  console.log('Seeding comprehensive demo data...');
+  try {
+      const today40 = new Date().toISOString().split('T')[0];
+      const daysAgo40 = (n) => new Date(Date.now() - n * 86400000).toISOString().split('T')[0];
+      const daysFromNow40 = (n) => new Date(Date.now() + n * 86400000).toISOString().split('T')[0];
+
+      // --- 0. Seed budget data if migration 39 ran but found no jobs ---
+      const existingBudgets = db.prepare('SELECT COUNT(*) as c FROM job_budgets').get().c;
+      if (existingBudgets === 0) {
+        const activeJobs = db.prepare("SELECT id, job_number, contract_value FROM jobs WHERE status IN ('active','won','on_hold') ORDER BY job_number").all();
+        if (activeJobs.length > 0) {
+          const insertBudget = db.prepare(`INSERT OR IGNORE INTO job_budgets (job_id, contract_value, budget_labour, budget_materials, budget_subcontractors, budget_equipment, budget_other, budget_contingency, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+          const insertCost = db.prepare(`INSERT INTO cost_entries (job_id, budget_id, category, description, amount, entry_date, invoice_ref, supplier, entered_by_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+          const enteredBy = db.prepare("SELECT id FROM users WHERE role IN ('admin','finance') LIMIT 1").get()?.id || 1;
+          const profiles = [
+            { labourPct: 0.50, matPct: 0.08, subPct: 0.18, equipPct: 0.14, otherPct: 0.03, contPct: 0.07 },
+            { labourPct: 0.52, matPct: 0.06, subPct: 0.20, equipPct: 0.12, otherPct: 0.04, contPct: 0.06 },
+            { labourPct: 0.48, matPct: 0.10, subPct: 0.15, equipPct: 0.16, otherPct: 0.03, contPct: 0.08 },
+            { labourPct: 0.55, matPct: 0.05, subPct: 0.17, equipPct: 0.13, otherPct: 0.04, contPct: 0.06 },
+          ];
+          const contractValues = [185000, 320000, 95000, 450000, 78000, 520000, 125000, 680000, 210000, 145000];
+          const spendPcts = [0.38, 0.62, 0.78, 0.22, 0.45, 0.05, 0.55, 0.12, 0.35, 0.68];
+          activeJobs.forEach((job, i) => {
+            const contractVal = job.contract_value || contractValues[i % contractValues.length];
+            const p = profiles[i % profiles.length];
+            const totalBudget = contractVal * 0.92;
+            insertBudget.run(job.id, contractVal,
+              Math.round(totalBudget * p.labourPct), Math.round(totalBudget * p.matPct),
+              Math.round(totalBudget * p.subPct), Math.round(totalBudget * p.equipPct),
+              Math.round(totalBudget * p.otherPct), Math.round(totalBudget * p.contPct),
+              'Auto-seeded budget');
+            const budgetRow = db.prepare('SELECT id FROM job_budgets WHERE job_id = ?').get(job.id);
+            if (!budgetRow) return;
+            const spendPct = spendPcts[i % spendPcts.length];
+            const totalSpend = totalBudget * spendPct;
+            const costEntries = [
+              { cat: 'labour', pct: 0.55, desc: 'Crew labour — weeks 1-' + Math.ceil(spendPct * 20), supplier: 'Internal', pre: 'LAB' },
+              { cat: 'equipment', pct: 0.18, desc: 'TMA & equipment hire', supplier: 'T&S Fleet', pre: 'EQP' },
+              { cat: 'materials', pct: 0.10, desc: 'Signage, cones & delineators', supplier: 'Traffix Devices', pre: 'MAT' },
+              { cat: 'subcontractors', pct: 0.14, desc: 'Line marking & civil sub', supplier: 'Roadline Markings', pre: 'SUB' },
+              { cat: 'other', pct: 0.03, desc: 'Permits & admin', supplier: 'Various', pre: 'OTH' },
+            ];
+            costEntries.forEach((ce, ci) => {
+              const amount = Math.round(totalSpend * ce.pct);
+              if (amount <= 0) return;
+              insertCost.run(job.id, budgetRow.id, ce.cat, ce.desc, amount,
+                daysAgo40(Math.max(1, Math.round((ci + 1) * 7 * spendPct))),
+                ce.pre + '-' + job.job_number + '-' + String(ci + 1).padStart(3, '0'),
+                ce.supplier, enteredBy);
+            });
+            if (!job.contract_value) {
+              db.prepare('UPDATE jobs SET contract_value = ? WHERE id = ?').run(contractVal, job.id);
+            }
+          });
+          console.log('  Seeded budgets for ' + activeJobs.length + ' jobs');
+        }
+      }
+
+      // --- A. Crew allocations for today + recent days ---
+      const existingAllocs = db.prepare('SELECT COUNT(*) as c FROM crew_allocations').get().c;
+      if (existingAllocs === 0) {
+        const insertAlloc = db.prepare(`
+          INSERT INTO crew_allocations (job_id, crew_member_id, allocation_date, start_time, end_time, shift_type, role_on_site, status, notes, allocated_by_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        `);
+        // Today's allocations — 14 crew across 5 active jobs
+        const todayAllocs = [
+          [1, 1, '06:00', '14:30', 'day', 'Supervisor', 'confirmed', 'Barrier install Section A'],
+          [1, 3, '06:00', '14:30', 'day', 'Traffic Controller', 'confirmed', ''],
+          [1, 4, '06:00', '14:30', 'day', 'Traffic Controller', 'confirmed', ''],
+          [1, 2, '06:00', '14:30', 'day', 'Leading Hand', 'allocated', 'Pending confirmation'],
+          [6, 5, '19:00', '05:00', 'night', 'Supervisor', 'confirmed', 'Night works Main St'],
+          [6, 7, '19:00', '05:00', 'night', 'Traffic Controller', 'confirmed', ''],
+          [6, 8, '19:00', '05:00', 'night', 'Traffic Controller', 'allocated', ''],
+          [6, 14, '19:00', '05:00', 'night', 'Spotter', 'confirmed', ''],
+          [9, 11, '06:00', '14:30', 'day', 'Supervisor', 'confirmed', 'Olympic Blvd works'],
+          [9, 12, '06:00', '14:30', 'day', 'Leading Hand', 'confirmed', ''],
+          [9, 13, '06:00', '14:30', 'day', 'Traffic Controller', 'allocated', ''],
+          [10, 17, '06:00', '14:30', 'day', 'Leading Hand', 'confirmed', 'Victoria Rd setup'],
+          [10, 15, '06:00', '14:30', 'day', 'Traffic Controller', 'confirmed', ''],
+          [4, 23, '06:00', '14:30', 'day', 'Supervisor', 'confirmed', 'Final inspection prep'],
+        ];
+        todayAllocs.forEach(a => insertAlloc.run(a[0], a[1], today40, a[2], a[3], a[4], a[5], a[6], a[7]));
+
+        // Yesterday allocations
+        const yAllocs = [
+          [1, 1, '06:00', '14:30', 'day', 'Supervisor', 'confirmed', ''],
+          [1, 3, '06:00', '14:30', 'day', 'Traffic Controller', 'confirmed', ''],
+          [1, 4, '06:00', '14:30', 'day', 'Traffic Controller', 'confirmed', ''],
+          [6, 5, '19:00', '05:00', 'night', 'Supervisor', 'confirmed', ''],
+          [6, 7, '19:00', '05:00', 'night', 'Traffic Controller', 'confirmed', ''],
+          [9, 11, '06:00', '14:30', 'day', 'Supervisor', 'confirmed', ''],
+          [9, 12, '06:00', '14:30', 'day', 'Leading Hand', 'confirmed', ''],
+          [10, 17, '06:00', '14:30', 'day', 'Leading Hand', 'confirmed', ''],
+          [7, 6, '06:00', '16:00', 'day', 'Leading Hand', 'confirmed', 'Demob Coward St'],
+          [7, 18, '06:00', '16:00', 'day', 'Traffic Controller', 'confirmed', ''],
+        ];
+        yAllocs.forEach(a => insertAlloc.run(a[0], a[1], daysAgo40(1), a[2], a[3], a[4], a[5], a[6], a[7]));
+
+        // Tomorrow allocations
+        const tAllocs = [
+          [1, 1, '06:00', '14:30', 'day', 'Supervisor', 'allocated', ''],
+          [1, 2, '06:00', '14:30', 'day', 'Leading Hand', 'allocated', ''],
+          [1, 3, '06:00', '14:30', 'day', 'Traffic Controller', 'allocated', ''],
+          [6, 5, '19:00', '05:00', 'night', 'Supervisor', 'allocated', ''],
+          [6, 7, '19:00', '05:00', 'night', 'Traffic Controller', 'allocated', ''],
+          [6, 8, '19:00', '05:00', 'night', 'Traffic Controller', 'allocated', ''],
+          [9, 11, '06:00', '14:30', 'day', 'Supervisor', 'allocated', ''],
+          [10, 17, '06:00', '14:30', 'day', 'Leading Hand', 'allocated', ''],
+        ];
+        tAllocs.forEach(a => insertAlloc.run(a[0], a[1], daysFromNow40(1), a[2], a[3], a[4], a[5], a[6], a[7]));
+      }
+
+      // --- B. Equipment assignments (deployed to jobs) ---
+      const existingEqAssign = db.prepare('SELECT COUNT(*) as c FROM equipment_assignments').get().c;
+      if (existingEqAssign === 0) {
+        const insertEqAssign = db.prepare(`
+          INSERT INTO equipment_assignments (equipment_id, job_id, assigned_date, expected_return_date, actual_return_date, assigned_by_id, notes)
+          VALUES (?, ?, ?, ?, ?, 1, ?)
+        `);
+        // Currently deployed (no actual_return_date)
+        insertEqAssign.run(1, 1, daysAgo40(30), daysFromNow40(30), null, 'Arrow board for Canterbury Rd northbound');
+        insertEqAssign.run(3, 9, daysAgo40(14), daysFromNow40(60), null, 'VMS Olympic Blvd detour info');
+        insertEqAssign.run(5, 1, daysAgo40(30), daysFromNow40(30), null, 'Supervisor ute');
+        insertEqAssign.run(6, 6, daysAgo40(10), daysFromNow40(45), null, 'Night works ute');
+        insertEqAssign.run(7, 1, daysAgo40(30), daysFromNow40(30), null, 'Barriers Section A');
+        insertEqAssign.run(9, 6, daysAgo40(10), daysFromNow40(45), null, 'Night works lighting');
+        insertEqAssign.run(11, 9, daysAgo40(14), daysFromNow40(60), null, 'Traffic cones Olympic Blvd');
+        insertEqAssign.run(14, 10, daysAgo40(7), daysFromNow40(90), null, 'Sign kit for Victoria Rd');
+        // Previously deployed and returned
+        insertEqAssign.run(2, 4, daysAgo40(60), daysAgo40(5), daysAgo40(5), 'Arrow board returned from Liverpool');
+        insertEqAssign.run(8, 7, daysAgo40(45), daysAgo40(2), daysAgo40(2), 'Barriers returned from Mascot');
+        insertEqAssign.run(12, 4, daysAgo40(60), daysAgo40(5), daysAgo40(5), 'Cone set B returned');
+      }
+
+      // --- C. Activity log entries (realistic recent activity) ---
+      const existingActivity = db.prepare('SELECT COUNT(*) as c FROM activity_log').get().c;
+      if (existingActivity < 5) {
+        const insertActivity = db.prepare(`
+          INSERT INTO activity_log (user_id, user_name, action, entity_type, entity_id, details, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        const userNames = { 1: 'Admin User', 2: 'Sam Operations', 3: 'Alex Planning', 4: 'Pat Finance', 5: 'Jordan Accounts' };
+        const activities = [
+          [1, 'create', 'job', 12, 'Created job J-02462 — Acciona Wolli Creek', daysAgo40(0) + ' 09:15:00'],
+          [2, 'update', 'allocation', null, 'Confirmed 14 crew allocations for today', daysAgo40(0) + ' 07:30:00'],
+          [1, 'update', 'job', 7, 'Updated J-02457 progress to 90%', daysAgo40(0) + ' 08:45:00'],
+          [3, 'create', 'compliance', 5, 'Submitted ROL Extension for J-02454', daysAgo40(1) + ' 14:20:00'],
+          [5, 'update', 'task', 5, 'Marked "Chase overdue invoice #INV-4421" as in_progress', daysAgo40(1) + ' 10:00:00'],
+          [2, 'update', 'incident', null, 'Closed incident INC-003 — near miss resolved', daysAgo40(1) + ' 16:30:00'],
+          [1, 'create', 'budget', 1, 'Set budget for J-02451 — $185,000 contract', daysAgo40(2) + ' 11:00:00'],
+          [3, 'update', 'compliance', 1, 'TMP approved for Canterbury Rd', daysAgo40(2) + ' 09:15:00'],
+          [2, 'create', 'allocation', null, 'Created allocations for week of ' + daysAgo40(7), daysAgo40(3) + ' 15:45:00'],
+          [5, 'create', 'cost_entry', null, 'Added $12,400 labour cost to J-02456', daysAgo40(3) + ' 13:20:00'],
+          [1, 'update', 'job', 4, 'Changed J-02454 health to red — payment overdue', daysAgo40(4) + ' 10:30:00'],
+          [2, 'create', 'timesheet', null, 'Submitted 8 timesheets for March 14', daysAgo40(4) + ' 17:00:00'],
+          [3, 'create', 'plan', null, 'Created TMP for Church St closure', daysAgo40(5) + ' 11:30:00'],
+          [1, 'update', 'crew', 16, 'Updated Michelle Harris licence expiry', daysAgo40(5) + ' 14:00:00'],
+          [4, 'create', 'opportunity', null, 'New lead: Penrith Council road upgrade $340k', daysAgo40(6) + ' 09:00:00'],
+          [1, 'create', 'job', 8, 'Created job J-02458 — John Holland Norwest', daysAgo40(7) + ' 10:15:00'],
+          [2, 'update', 'equipment', 10, 'Flagged Lighting Tower #2 condition as poor', daysAgo40(8) + ' 08:30:00'],
+          [5, 'create', 'invoice', null, 'Sent progress claim #2 to Fulton Hogan', daysAgo40(9) + ' 14:45:00'],
+          [3, 'update', 'plan', null, 'ROL approved for Olympic Blvd night works', daysAgo40(10) + ' 16:00:00'],
+          [1, 'update', 'settings', null, 'Updated defect severity dropdown options', daysAgo40(12) + ' 11:00:00'],
+        ];
+        activities.forEach(a => insertActivity.run(a[0], userNames[a[0]], a[1], a[2], a[3], a[4], a[5]));
+      }
+
+      // --- D. Update job last_update_date for active jobs (fix "missing weekly update") ---
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 1").run(daysAgo40(2));
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 6").run(daysAgo40(3));
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 7").run(daysAgo40(1));
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 9").run(daysAgo40(4));
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 10").run(daysAgo40(5));
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 11").run(daysAgo40(3));
+      // Leave J-02454 (id=4) and J-02455 (id=5) with old dates to show realistic "missing update"
+
+      // --- E. Seed CRM opportunities ---
+      const existingOpps = db.prepare('SELECT COUNT(*) as c FROM opportunities').get().c;
+      if (existingOpps === 0) {
+        const insertOpp = db.prepare(`
+          INSERT INTO opportunities (opportunity_number, title, client_id, owner_id, service_type, stage, probability, estimated_value, weighted_value, expected_close_date, source, region, notes, next_step, next_step_due_date, status, created_by_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        insertOpp.run('OPP-001', 'Penrith Council — Road Upgrade TCP', null, 4, 'traffic_management', 'proposal_pending', 60, 340000, 204000, daysFromNow40(30), 'referral', 'Western Sydney', 'Large road upgrade project. Council wants dedicated TCP for 6 months.', 'Follow up on proposal', daysFromNow40(5), 'open', 4);
+        insertOpp.run('OPP-002', 'Laing O\'Rourke — M4 Widening', null, 4, 'traffic_management', 'qualified', 40, 580000, 232000, daysFromNow40(60), 'tender_portal', 'Western Sydney', 'Tier 1 project. Long-term opportunity if we get in.', 'Submit EOI', daysFromNow40(10), 'open', 4);
+        insertOpp.run('OPP-003', 'Ausgrid — Cable Replacement', null, 4, 'traffic_management', 'quote_sent', 75, 125000, 93750, daysFromNow40(14), 'existing_client', 'Inner West', 'Follow-on from Penrith job. Good relationship with PM.', 'Chase quote response', daysFromNow40(3), 'open', 4);
+        insertOpp.run('OPP-004', 'City of Sydney — Bike Lane Install', null, 4, 'traffic_management', 'meeting_booked', 30, 210000, 63000, daysFromNow40(45), 'website', 'CBD', 'Green infrastructure project. Needs night works capability.', 'Attend site meeting', daysFromNow40(7), 'open', 4);
+        insertOpp.run('OPP-005', 'Downer EDI — Intersection Upgrade', null, 4, 'traffic_management', 'negotiation', 80, 195000, 156000, daysFromNow40(7), 'existing_client', 'Northern Sydney', 'Almost closed. Waiting on final PO.', 'Follow up PO', daysFromNow40(2), 'open', 4);
+        insertOpp.run('OPP-006', 'Fulton Hogan — Night Works Package', 5, 4, 'traffic_management', 'won', 100, 320000, 320000, daysAgo40(10), 'existing_client', 'Western Sydney', 'Converted to J-02456', 'Mobilise crew', null, 'won', 4);
+        insertOpp.run('OPP-007', 'Ventia — Water Main Repair', null, 4, 'traffic_management', 'new_lead', 15, 85000, 12750, daysFromNow40(90), 'cold_call', 'South West Sydney', 'Initial enquiry. Small job but good foot in the door.', 'Call back to qualify', daysFromNow40(5), 'open', 4);
+      }
+
+      // --- F. Seed CRM activities ---
+      const existingCrmAct = db.prepare('SELECT COUNT(*) as c FROM crm_activities').get().c;
+      if (existingCrmAct === 0) {
+        const insertCrmAct = db.prepare(`
+          INSERT INTO crm_activities (activity_type, subject, notes, outcome, opportunity_id, owner_id, activity_date, is_completed, created_by_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        insertCrmAct.run('call', 'Follow up with Penrith Council', 'Discussed project timeline and crew requirements', 'Positive — submitting proposal this week', 1, 4, daysAgo40(3) + ' 10:00:00', 1, 4);
+        insertCrmAct.run('meeting', 'Site visit — M4 Widening', 'Walked site with Laing PM. Assessed TCP requirements.', 'Good fit for our capability. Large mobilisation needed.', 2, 4, daysAgo40(5) + ' 14:00:00', 1, 4);
+        insertCrmAct.run('email', 'Quote sent to Ausgrid', 'Sent formal quote for cable replacement TCP', 'Awaiting response', 3, 4, daysAgo40(2) + ' 09:30:00', 1, 4);
+        insertCrmAct.run('call', 'Intro call — City of Sydney', 'Discussed bike lane project scope and our night works experience', 'Meeting booked for next week', 4, 4, daysAgo40(7) + ' 11:00:00', 1, 4);
+        insertCrmAct.run('meeting', 'Negotiation — Downer EDI intersection', 'Final rates discussion. Agreed terms.', 'PO expected this week', 5, 4, daysAgo40(1) + ' 15:00:00', 1, 4);
+      }
+
+      // --- G. Update Test Worker (crew_member id=1) with fuller data ---
+      try {
+        db.prepare(`UPDATE crew_members SET
+          emergency_contact_name = 'Jane Smith',
+          emergency_contact_phone = '0402 111 222'
+          WHERE id = 1 AND (emergency_contact_name IS NULL OR emergency_contact_name = '')
+        `).run();
+      } catch (e) { /* columns may not exist */ }
+
+      // --- H. Dismiss onboarding for admin user (demo should look production-ready) ---
+      try {
+        // Add preferences column if missing
+        try { db.exec("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'"); } catch (e) { /* already exists */ }
+        db.prepare("UPDATE users SET preferences = ? WHERE id = 1").run(JSON.stringify({ onboarding_dismissed: true }));
+      } catch (e) { /* ignore */ }
+
+      // --- I. Add more project updates so "missing weekly update" count is realistic ---
+      try {
+        const insertUpdate40 = db.prepare(`
+          INSERT OR IGNORE INTO project_updates (job_id, week_ending, summary, milestones, issues_risks, blockers, submitted_by_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        insertUpdate40.run(6, daysAgo40(3), 'Night works progressing well. Lane closure setup efficient. No incidents.', 'Main St section 1 complete. Section 2 starting.', 'Noise complaints from residents — adjusted generator placement.', '', 2);
+        insertUpdate40.run(7, daysAgo40(1), 'Demobilisation 80% complete. Final equipment collection scheduled.', 'All barriers removed. Signs collected.', 'None — clean finish expected.', '', 2);
+        insertUpdate40.run(9, daysAgo40(4), 'Olympic Blvd works on track. ROL approved. Night crew performing well.', 'Stage 1 traffic switch complete.', 'Wet weather risk next week.', '', 3);
+        insertUpdate40.run(10, daysAgo40(5), 'Victoria Rd setup progressing. Crew familiarised with TGS.', 'Initial setup 25% complete.', 'Heavy traffic volumes requiring additional spotter.', '', 2);
+        insertUpdate40.run(11, daysAgo40(3), 'Campbelltown job approaching deadline. Progress claim dispute ongoing.', 'Barrier install 70% done.', 'Payment delay from Georgiou. Accounts following up.', 'Cannot order additional materials until payment received.', 1);
+      } catch (e) { /* ignore duplicates */ }
+
+      console.log('Demo data seeded successfully.');
+    } catch (e) {
+      console.error('Demo data seed error:', e.message);
+    }
 }
 
 function initializeDatabase() {
@@ -3031,6 +3293,9 @@ function initializeDatabase() {
     insertUpdate.run(11, '2026-03-07', 'Campbelltown project facing payment delays. Road opening permit submitted to council. Crew allocated for next 2 weeks.', 'Excavation 70% complete. Permit application lodged.', 'Client progress claim #2 still unpaid (45 days). Escalated to accounts.', 'Cannot order materials for final stage until payment received.', 1);
 
     console.log('Database seeded with sample data.');
+
+    // Seed comprehensive demo data (allocations, equipment assignments, activity log, CRM, etc.)
+    seedDemoData(db);
   }
 
   db.close();
