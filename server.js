@@ -95,6 +95,9 @@ app.use('/equipment', requireLogin, requirePermission('equipment'), require('./r
 app.use('/exports', requireLogin, requirePermission('exports'), require('./routes/exports'));
 app.use('/reports', requireLogin, requirePermission('reports'), require('./routes/reports'));
 app.use('/defects', requireLogin, requirePermission('defects'), require('./routes/defects'));
+app.use('/hr', requireLogin, require('./routes/hr'));
+app.use('/crm', requireLogin, requirePermission('crm'), require('./routes/crm'));
+app.use('/opportunities', requireLogin, requirePermission('crm'), require('./routes/opportunities'));
 app.use('/notifications', requireLogin, requirePermission('notifications'), require('./routes/notifications'));
 app.use('/admin/integrations', requireLogin, requirePermission('admin'), require('./routes/integrations'));
 app.use('/admin', requireLogin, requirePermission('admin'), require('./routes/admin'));

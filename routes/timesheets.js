@@ -29,6 +29,12 @@ router.get('/', (req, res) => {
 
   const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
+  // Sorting
+  const allowedSorts = { 'work_date': 't.work_date', 'crew_name': 'c.full_name', 'total_hours': 't.total_hours', 'approved': 't.approved' };
+  const sort = allowedSorts[req.query.sort] ? req.query.sort : 'work_date';
+  const order = req.query.order === 'asc' ? 'ASC' : 'DESC';
+  const orderByCol = allowedSorts[sort] || 't.work_date';
+
   const timesheets = db.prepare(`
     SELECT t.*, c.full_name as crew_name, c.role as crew_role, j.job_number, j.client, u.full_name as submitted_by_name, a.full_name as approved_by_name
     FROM timesheets t
@@ -37,7 +43,7 @@ router.get('/', (req, res) => {
     JOIN users u ON t.submitted_by_id = u.id
     LEFT JOIN users a ON t.approved_by_id = a.id
     ${whereClause}
-    ORDER BY t.work_date DESC, c.full_name ASC
+    ORDER BY ${orderByCol} ${order}
     LIMIT 200
   `).all(...params);
 
@@ -57,7 +63,9 @@ router.get('/', (req, res) => {
     jobs,
     crew,
     filters: req.query,
-    stats: { totalHours: totalHours.toFixed(1), pendingApproval, approvedCount, uniqueCrew }
+    stats: { totalHours: totalHours.toFixed(1), pendingApproval, approvedCount, uniqueCrew },
+    sort,
+    order: order.toLowerCase(),
   });
 });
 
@@ -84,8 +92,8 @@ router.post('/', (req, res) => {
 
   // entries is an array of { crew_member_id, start_time, end_time, break_minutes, role_on_site, notes }
   const insert = db.prepare(`
-    INSERT INTO timesheets (job_id, crew_member_id, work_date, start_time, end_time, break_minutes, total_hours, shift_type, role_on_site, notes, submitted_by_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO timesheets (job_id, crew_member_id, work_date, start_time, end_time, break_minutes, total_hours, ordinary_hours, overtime_hours, shift_type, role_on_site, notes, submitted_by_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   let count = 0;
@@ -101,8 +109,10 @@ router.post('/', (req, res) => {
       if (totalMin < 0) totalMin += 24 * 60; // overnight
       const breakMin = parseInt(entry.break_minutes) || 30;
       const totalHours = Math.max(0, (totalMin - breakMin) / 60);
+      const ordinaryHours = Math.min(totalHours, 7.6);
+      const overtimeHours = Math.max(0, Math.round((totalHours - 7.6) * 100) / 100);
 
-      insert.run(job_id, entry.crew_member_id, work_date, entry.start_time, entry.end_time, breakMin, totalHours.toFixed(2), shift_type || 'day', entry.role_on_site || '', entry.notes || '', req.session.user.id);
+      insert.run(job_id, entry.crew_member_id, work_date, entry.start_time, entry.end_time, breakMin, totalHours.toFixed(2), ordinaryHours.toFixed(2), overtimeHours.toFixed(2), shift_type || 'day', entry.role_on_site || '', entry.notes || '', req.session.user.id);
       count++;
     }
   });
@@ -112,6 +122,27 @@ router.post('/', (req, res) => {
   logActivity({ user: req.session.user, action: 'create', entityType: 'timesheet', entityLabel: `${count} entries for ${work_date}`, jobId: parseInt(job_id), jobNumber: job ? job.job_number : '', ip: req.ip });
 
   req.flash('success', `${count} timesheet entries logged.`);
+  res.redirect('/timesheets');
+});
+
+// POST /bulk — Bulk actions on timesheets
+router.post('/bulk', (req, res) => {
+  const db = getDb();
+  const ids = (req.body.ids || '').split(',').map(Number).filter(n => n > 0);
+  const action = req.body.action;
+  if (ids.length === 0) return res.redirect('/timesheets');
+
+  if (action === 'approve') {
+    const stmt = db.prepare('UPDATE timesheets SET approved = 1, approved_by_id = ?, approved_at = CURRENT_TIMESTAMP WHERE id = ?');
+    ids.forEach(id => stmt.run(req.session.user.id, id));
+    logActivity({ user: req.session.user, action: 'approve', entityType: 'timesheet', entityLabel: `Bulk approved ${ids.length} entries`, ip: req.ip });
+    req.flash('success', ids.length + ' timesheet(s) approved.');
+  } else if (action === 'delete') {
+    const stmt = db.prepare('DELETE FROM timesheets WHERE id = ?');
+    ids.forEach(id => stmt.run(id));
+    logActivity({ user: req.session.user, action: 'delete', entityType: 'timesheet', entityLabel: `Bulk deleted ${ids.length} entries`, ip: req.ip });
+    req.flash('success', ids.length + ' timesheet(s) deleted.');
+  }
   res.redirect('/timesheets');
 });
 

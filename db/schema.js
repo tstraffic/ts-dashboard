@@ -581,7 +581,7 @@ function runMigrations(db) {
           CREATE TABLE notifications_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            type TEXT NOT NULL CHECK(type IN ('overdue_task','expiring_compliance','missing_update','corrective_action_due','follow_up_due','equipment_overdue','critical_defect','rol_pending','ticket_expiry','equipment_inspection_due','induction_overdue','over_budget','general')),
+            type TEXT NOT NULL CHECK(type IN ('overdue_task','expiring_compliance','missing_update','corrective_action_due','follow_up_due','equipment_overdue','critical_defect','rol_pending','ticket_expiry','equipment_inspection_due','induction_overdue','over_budget','deadline_reminder','general')),
             title TEXT NOT NULL,
             message TEXT NOT NULL DEFAULT '',
             link TEXT DEFAULT '',
@@ -1603,8 +1603,745 @@ function runMigrations(db) {
     }
   }
 
-  // Migration 31: Seed realistic demo budget data for active jobs
+  // =============================================
+  // Migration 31: Task comments, subtasks, and dependencies
+  // =============================================
   if (!isMigrationApplied.get(31)) {
+    console.log('Running migration 31: Task comments, subtasks, and dependencies');
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_comments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          comment TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS subtasks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          completed INTEGER DEFAULT 0,
+          completed_at DATETIME,
+          sort_order INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS task_dependencies (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          depends_on_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(task_id, depends_on_id)
+        );
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_subtasks_task ON subtasks(task_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_deps_task ON task_dependencies(task_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_task_deps_depends ON task_dependencies(depends_on_id)');
+      recordMigration.run(31, 'Task comments, subtasks, and dependencies');
+      console.log('Migration 31 complete.');
+    } catch (e) {
+      console.error('Migration 31 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 32: Timesheet OT split
+  // =============================================
+  if (!isMigrationApplied.get(32)) {
+    console.log('Running migration 32: Timesheet OT split');
+    try {
+      const hasOrdinaryHours = db.prepare("SELECT 1 FROM pragma_table_info('timesheets') WHERE name = 'ordinary_hours'").get();
+      if (!hasOrdinaryHours) {
+        db.exec(`
+          ALTER TABLE timesheets ADD COLUMN ordinary_hours REAL DEFAULT 0;
+        `);
+        db.exec(`
+          ALTER TABLE timesheets ADD COLUMN overtime_hours REAL DEFAULT 0;
+        `);
+        // Backfill: assume 7.6 hours is ordinary, rest is OT
+        db.exec(`
+          UPDATE timesheets SET
+            ordinary_hours = CASE WHEN total_hours <= 7.6 THEN total_hours ELSE 7.6 END,
+            overtime_hours = CASE WHEN total_hours > 7.6 THEN ROUND(total_hours - 7.6, 2) ELSE 0 END
+        `);
+      }
+      recordMigration.run(32, 'Timesheet OT split');
+      console.log('Migration 32 complete.');
+    } catch (e) {
+      console.error('Migration 32 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 33: Equipment status states
+  // =============================================
+  if (!isMigrationApplied.get(33)) {
+    console.log('Running migration 33: Equipment status states');
+    try {
+      const hasStatus = db.prepare("SELECT 1 FROM pragma_table_info('equipment') WHERE name = 'status'").get();
+      if (!hasStatus) {
+        db.exec(`ALTER TABLE equipment ADD COLUMN status TEXT DEFAULT 'available'`);
+        // Backfill based on current state
+        db.exec(`UPDATE equipment SET status = 'retired' WHERE active = 0`);
+        db.exec(`UPDATE equipment SET status = 'deployed' WHERE id IN (SELECT equipment_id FROM equipment_assignments WHERE actual_return_date IS NULL) AND active = 1`);
+        db.exec(`UPDATE equipment SET status = 'inspection_due' WHERE next_inspection_date IS NOT NULL AND next_inspection_date <= date('now', '+7 days') AND active = 1 AND status = 'available'`);
+        db.exec(`UPDATE equipment SET status = 'maintenance' WHERE current_condition IN ('poor', 'damaged') AND active = 1 AND status = 'available'`);
+      }
+      recordMigration.run(33, 'Equipment status states');
+      console.log('Migration 33 complete.');
+    } catch (e) {
+      console.error('Migration 33 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 34: Incident escalation + photo columns
+  // =============================================
+  if (!isMigrationApplied.get(34)) {
+    console.log('Running migration 34: Incident escalation columns');
+    try {
+      const hasEscalation = db.prepare("SELECT 1 FROM pragma_table_info('incidents') WHERE name = 'escalation_level'").get();
+      if (!hasEscalation) {
+        db.exec(`ALTER TABLE incidents ADD COLUMN escalation_level TEXT DEFAULT 'standard'`);
+        db.exec(`ALTER TABLE incidents ADD COLUMN escalated_at DATETIME`);
+        db.exec(`ALTER TABLE incidents ADD COLUMN escalated_by_id INTEGER REFERENCES users(id)`);
+        // Backfill: escalate based on severity and notifiable status
+        db.exec(`UPDATE incidents SET escalation_level = 'elevated' WHERE severity = 'high'`);
+        db.exec(`UPDATE incidents SET escalation_level = 'critical' WHERE severity = 'critical'`);
+        db.exec(`UPDATE incidents SET escalation_level = 'regulator' WHERE notifiable_incident = 1`);
+      }
+      recordMigration.run(34, 'Incident escalation columns');
+      console.log('Migration 34 complete.');
+    } catch (e) {
+      console.error('Migration 34 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 35: Company Directory — add company_type + type-specific fields to clients, company_id to client_contacts
+  // =============================================
+  if (!isMigrationApplied.get(35)) {
+    console.log('Running migration 35: Company Directory — company_type + type-specific fields');
+    try {
+      const newCols = [
+        "ALTER TABLE clients ADD COLUMN company_type TEXT NOT NULL DEFAULT 'client'",
+        "ALTER TABLE clients ADD COLUMN trade_specialty TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN insurance_expiry DATE",
+        "ALTER TABLE clients ADD COLUMN insurance_policy TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN product_categories TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN account_number TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN website TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN approved INTEGER NOT NULL DEFAULT 1",
+        "ALTER TABLE clients ADD COLUMN rating INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE client_contacts ADD COLUMN company_id INTEGER REFERENCES clients(id) ON DELETE SET NULL",
+      ];
+      for (const sql of newCols) {
+        try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+      }
+      // Indexes
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_clients_company_type ON clients(company_type)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_client_contacts_company ON client_contacts(company_id)'); } catch (e) {}
+
+      recordMigration.run(35, 'Company Directory — company_type, type-specific fields, company_id on contacts');
+      console.log('Migration 35 complete.');
+    } catch (e) {
+      console.error('Migration 35 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 36: CRM / BDM Module
+  // =============================================
+  if (!isMigrationApplied.get(36)) {
+    console.log('Running migration 36: CRM / BDM Module — opportunities, activities, account enhancements');
+    try {
+      // A. New CRM columns on clients table
+      const crmClientCols = [
+        "ALTER TABLE clients ADD COLUMN account_status TEXT DEFAULT 'active'",
+        "ALTER TABLE clients ADD COLUMN account_owner_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE clients ADD COLUMN bdm_owner_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE clients ADD COLUMN lead_source TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN estimated_annual_value REAL DEFAULT 0",
+        "ALTER TABLE clients ADD COLUMN last_contacted_date DATE",
+        "ALTER TABLE clients ADD COLUMN next_action_date DATE",
+        "ALTER TABLE clients ADD COLUMN next_action_note TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN service_interests TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN target_regions TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN priority TEXT DEFAULT 'normal'",
+        "ALTER TABLE clients ADD COLUMN prequal_status TEXT DEFAULT 'none'",
+        "ALTER TABLE clients ADD COLUMN vendor_status TEXT DEFAULT 'none'",
+        "ALTER TABLE clients ADD COLUMN contract_status TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN industry_segment TEXT DEFAULT ''",
+      ];
+      for (const sql of crmClientCols) {
+        try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+      }
+
+      // B. New CRM columns on client_contacts table
+      const crmContactCols = [
+        "ALTER TABLE client_contacts ADD COLUMN relationship_strength TEXT DEFAULT ''",
+        "ALTER TABLE client_contacts ADD COLUMN influence_level TEXT DEFAULT ''",
+        "ALTER TABLE client_contacts ADD COLUMN buying_role TEXT DEFAULT ''",
+        "ALTER TABLE client_contacts ADD COLUMN preferred_comm_method TEXT DEFAULT ''",
+        "ALTER TABLE client_contacts ADD COLUMN last_contact_date DATE",
+        "ALTER TABLE client_contacts ADD COLUMN next_contact_date DATE",
+        "ALTER TABLE client_contacts ADD COLUMN contact_owner_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE client_contacts ADD COLUMN referred_by TEXT DEFAULT ''",
+      ];
+      for (const sql of crmContactCols) {
+        try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+      }
+
+      // C. Opportunities table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS opportunities (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          opportunity_number TEXT UNIQUE,
+          title TEXT NOT NULL,
+          client_id INTEGER REFERENCES clients(id),
+          contact_id INTEGER REFERENCES client_contacts(id),
+          owner_id INTEGER REFERENCES users(id),
+          service_type TEXT DEFAULT '',
+          stage TEXT DEFAULT 'new_lead',
+          probability INTEGER DEFAULT 10,
+          estimated_value REAL DEFAULT 0,
+          weighted_value REAL DEFAULT 0,
+          expected_close_date DATE,
+          source TEXT DEFAULT '',
+          region TEXT DEFAULT '',
+          notes TEXT DEFAULT '',
+          next_step TEXT DEFAULT '',
+          next_step_due_date DATE,
+          status TEXT DEFAULT 'open' CHECK(status IN ('open','won','lost','on_hold')),
+          loss_reason TEXT DEFAULT '',
+          related_job_id INTEGER REFERENCES jobs(id),
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_opportunities_client ON opportunities(client_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_opportunities_owner ON opportunities(owner_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_opportunities_stage ON opportunities(stage)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_opportunities_status ON opportunities(status)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_opportunities_close_date ON opportunities(expected_close_date)'); } catch (e) {}
+
+      // D. CRM Activities table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS crm_activities (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          activity_type TEXT NOT NULL,
+          subject TEXT NOT NULL,
+          notes TEXT DEFAULT '',
+          outcome TEXT DEFAULT '',
+          client_id INTEGER REFERENCES clients(id),
+          contact_id INTEGER REFERENCES client_contacts(id),
+          opportunity_id INTEGER REFERENCES opportunities(id),
+          job_id INTEGER REFERENCES jobs(id),
+          owner_id INTEGER REFERENCES users(id),
+          activity_date DATETIME,
+          next_step TEXT DEFAULT '',
+          next_step_due_date DATE,
+          location TEXT DEFAULT '',
+          is_completed INTEGER DEFAULT 0,
+          reminder INTEGER DEFAULT 0,
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_activities_client ON crm_activities(client_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_activities_contact ON crm_activities(contact_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_activities_opportunity ON crm_activities(opportunity_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_activities_owner ON crm_activities(owner_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_activities_date ON crm_activities(activity_date)'); } catch (e) {}
+
+      // E. Seed CRM settings
+      const seedSetting = db.prepare(`
+        INSERT OR IGNORE INTO app_settings (category, key, label, color, display_order, is_active)
+        VALUES (?, ?, ?, ?, ?, 1)
+      `);
+
+      const crmSeeds = {
+        opportunity_stages: [
+          { key: 'new_lead', label: 'New Lead', color: 'sky' },
+          { key: 'qualified', label: 'Qualified', color: 'blue' },
+          { key: 'contacted', label: 'Contacted', color: 'indigo' },
+          { key: 'meeting_booked', label: 'Meeting Booked', color: 'purple' },
+          { key: 'proposal_pending', label: 'Proposal Pending', color: 'amber' },
+          { key: 'quote_sent', label: 'Quote Sent', color: 'orange' },
+          { key: 'negotiation', label: 'Negotiation', color: 'red' },
+          { key: 'awaiting_decision', label: 'Awaiting Decision', color: 'pink' },
+          { key: 'won', label: 'Won', color: 'emerald' },
+          { key: 'lost', label: 'Lost', color: 'gray' },
+          { key: 'on_hold', label: 'On Hold', color: 'slate' },
+        ],
+        crm_activity_types: [
+          { key: 'call', label: 'Call', color: 'blue' },
+          { key: 'email', label: 'Email', color: 'sky' },
+          { key: 'meeting', label: 'Meeting', color: 'purple' },
+          { key: 'site_visit', label: 'Site Visit', color: 'emerald' },
+          { key: 'proposal_sent', label: 'Proposal Sent', color: 'amber' },
+          { key: 'follow_up', label: 'Follow Up', color: 'orange' },
+          { key: 'tender_submitted', label: 'Tender Submitted', color: 'indigo' },
+          { key: 'onboarding', label: 'Onboarding', color: 'teal' },
+          { key: 'intro_networking', label: 'Intro / Networking', color: 'pink' },
+          { key: 'other', label: 'Other', color: 'gray' },
+        ],
+        lead_sources: [
+          { key: 'inbound', label: 'Inbound', color: 'blue' },
+          { key: 'outbound', label: 'Outbound', color: 'purple' },
+          { key: 'referral', label: 'Referral', color: 'emerald' },
+          { key: 'website', label: 'Website', color: 'sky' },
+          { key: 'tender_portal', label: 'Tender Portal', color: 'amber' },
+          { key: 'networking', label: 'Networking', color: 'pink' },
+          { key: 'existing_client', label: 'Existing Client', color: 'teal' },
+          { key: 'cold_call', label: 'Cold Call', color: 'orange' },
+          { key: 'event', label: 'Event', color: 'indigo' },
+          { key: 'other', label: 'Other', color: 'gray' },
+        ],
+        loss_reasons: [
+          { key: 'price', label: 'Price', color: 'red' },
+          { key: 'timing', label: 'Timing', color: 'amber' },
+          { key: 'competitor', label: 'Competitor', color: 'orange' },
+          { key: 'no_budget', label: 'No Budget', color: 'gray' },
+          { key: 'no_response', label: 'No Response', color: 'slate' },
+          { key: 'scope', label: 'Scope Mismatch', color: 'purple' },
+          { key: 'relationship', label: 'Relationship', color: 'pink' },
+          { key: 'other', label: 'Other', color: 'gray' },
+        ],
+        service_categories: [
+          { key: 'traffic_control', label: 'Traffic Control', color: 'blue' },
+          { key: 'traffic_plans', label: 'Traffic Plans', color: 'indigo' },
+          { key: 'rol_permits', label: 'ROL / Permits', color: 'purple' },
+          { key: 'equipment_hire', label: 'Equipment Hire', color: 'amber' },
+          { key: 'events', label: 'Events', color: 'pink' },
+          { key: 'shutdown_emergency', label: 'Shutdown / Emergency', color: 'red' },
+          { key: 'civil_support', label: 'Civil Support', color: 'emerald' },
+        ],
+        priority_levels: [
+          { key: 'low', label: 'Low', color: 'gray' },
+          { key: 'normal', label: 'Normal', color: 'blue' },
+          { key: 'high', label: 'High', color: 'amber' },
+          { key: 'strategic', label: 'Strategic', color: 'purple' },
+        ],
+      };
+
+      for (const [category, items] of Object.entries(crmSeeds)) {
+        items.forEach((item, idx) => {
+          seedSetting.run(category, item.key, item.label, item.color || '', idx);
+        });
+      }
+
+      // Client CRM indexes
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_clients_account_owner ON clients(account_owner_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_clients_bdm_owner ON clients(bdm_owner_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_clients_next_action ON clients(next_action_date)'); } catch (e) {}
+
+      recordMigration.run(36, 'CRM / BDM Module — opportunities, activities, account enhancements');
+      console.log('Migration 36 complete.');
+    } catch (e) {
+      console.error('Migration 36 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 37: CRM Sprint 2 — meetings, missing fields, settings
+  // =============================================
+  if (!isMigrationApplied.get(37)) {
+    console.log('Running migration 37: CRM Sprint 2 — meetings, missing fields, settings');
+    try {
+      // A. New columns on clients
+      const clientCols37 = [
+        "ALTER TABLE clients ADD COLUMN phone TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN email_general TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN suburb TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN state TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN postcode TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN client_category TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN onboarding_stage TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN tender_panel_status TEXT DEFAULT ''",
+      ];
+      for (const sql of clientCols37) {
+        try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+      }
+
+      // B. Remove CHECK constraint on client_contacts.contact_type by recreating table
+      // SQLite does not support ALTER TABLE DROP CONSTRAINT, so we must recreate
+      try {
+        const hasCheck = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='client_contacts'").get();
+        if (hasCheck && hasCheck.sql && hasCheck.sql.includes("CHECK(contact_type IN")) {
+          db.exec(`
+            CREATE TABLE client_contacts_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+              company_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+              contact_type TEXT NOT NULL DEFAULT 'other',
+              company TEXT NOT NULL DEFAULT '',
+              full_name TEXT NOT NULL DEFAULT '',
+              position TEXT DEFAULT '',
+              phone TEXT DEFAULT '',
+              email TEXT DEFAULT '',
+              notes TEXT DEFAULT '',
+              is_primary INTEGER NOT NULL DEFAULT 0,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              relationship_strength TEXT DEFAULT '',
+              influence_level TEXT DEFAULT '',
+              buying_role TEXT DEFAULT '',
+              preferred_comm_method TEXT DEFAULT '',
+              referred_by TEXT DEFAULT '',
+              contact_owner_id INTEGER REFERENCES users(id),
+              last_contact_date DATE,
+              next_contact_date DATE,
+              first_name TEXT DEFAULT '',
+              last_name TEXT DEFAULT '',
+              mobile TEXT DEFAULT '',
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+          // Copy existing data
+          const existingCols = db.pragma('table_info(client_contacts)').map(c => c.name);
+          const commonCols = existingCols.filter(c =>
+            ['id','job_id','company_id','contact_type','company','full_name','position','phone','email',
+             'notes','is_primary','created_at','relationship_strength','influence_level','buying_role',
+             'preferred_comm_method','referred_by','contact_owner_id','last_contact_date','next_contact_date',
+             'first_name','last_name','mobile','updated_at'].includes(c)
+          );
+          const colList = commonCols.join(', ');
+          db.exec(`INSERT INTO client_contacts_new (${colList}) SELECT ${colList} FROM client_contacts`);
+          db.exec('DROP TABLE client_contacts');
+          db.exec('ALTER TABLE client_contacts_new RENAME TO client_contacts');
+          console.log('  Recreated client_contacts without CHECK constraint');
+        }
+      } catch (e) {
+        console.warn('  Could not recreate client_contacts:', e.message);
+        // Fallback: just add new columns
+        const contactCols37 = [
+          "ALTER TABLE client_contacts ADD COLUMN first_name TEXT DEFAULT ''",
+          "ALTER TABLE client_contacts ADD COLUMN last_name TEXT DEFAULT ''",
+          "ALTER TABLE client_contacts ADD COLUMN mobile TEXT DEFAULT ''",
+          "ALTER TABLE client_contacts ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+        ];
+        for (const sql of contactCols37) {
+          try { db.exec(sql); } catch (e2) { /* column likely already exists */ }
+        }
+      }
+
+      // C. New columns on opportunities
+      const oppCols37 = [
+        "ALTER TABLE opportunities ADD COLUMN won_date DATE",
+        "ALTER TABLE opportunities ADD COLUMN lost_date DATE",
+        "ALTER TABLE opportunities ADD COLUMN last_activity_at DATETIME",
+      ];
+      for (const sql of oppCols37) {
+        try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+      }
+
+      // D. New column on crm_activities
+      try { db.exec("ALTER TABLE crm_activities ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP"); } catch (e) {}
+
+      // E. crm_meetings table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS crm_meetings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          activity_id INTEGER REFERENCES crm_activities(id) ON DELETE SET NULL,
+          account_id INTEGER REFERENCES clients(id),
+          opportunity_id INTEGER REFERENCES opportunities(id),
+          owner_id INTEGER REFERENCES users(id),
+          title TEXT NOT NULL,
+          meeting_date DATETIME NOT NULL,
+          duration_minutes INTEGER,
+          location_type TEXT DEFAULT '',
+          location_text TEXT DEFAULT '',
+          attendees TEXT DEFAULT '',
+          purpose TEXT DEFAULT '',
+          notes TEXT DEFAULT '',
+          outcome TEXT DEFAULT '',
+          follow_up_actions TEXT DEFAULT '',
+          next_meeting_date DATE,
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Indexes on crm_meetings
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_meetings_account ON crm_meetings(account_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_meetings_opportunity ON crm_meetings(opportunity_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_meetings_owner ON crm_meetings(owner_id)'); } catch (e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_crm_meetings_date ON crm_meetings(meeting_date)'); } catch (e) {}
+
+      // F. Seed new settings categories
+      const seedSetting37 = db.prepare(`
+        INSERT OR IGNORE INTO app_settings (category, key, label, color, display_order, is_active)
+        VALUES (?, ?, ?, ?, ?, 1)
+      `);
+
+      const newSeeds = {
+        industry_segments: [
+          { key: 'civil', label: 'Civil', color: 'blue' },
+          { key: 'utilities', label: 'Utilities', color: 'amber' },
+          { key: 'government', label: 'Government', color: 'indigo' },
+          { key: 'council', label: 'Council', color: 'teal' },
+          { key: 'events', label: 'Events', color: 'pink' },
+          { key: 'commercial_builder', label: 'Commercial Builder', color: 'orange' },
+          { key: 'rail', label: 'Rail', color: 'purple' },
+          { key: 'other', label: 'Other', color: 'gray' },
+        ],
+        client_categories: [
+          { key: 'principal_contractor', label: 'Principal Contractor', color: 'blue' },
+          { key: 'subcontractor', label: 'Subcontractor', color: 'amber' },
+          { key: 'builder', label: 'Builder', color: 'orange' },
+          { key: 'utility', label: 'Utility', color: 'teal' },
+          { key: 'council', label: 'Council', color: 'indigo' },
+          { key: 'event_organiser', label: 'Event Organiser', color: 'pink' },
+          { key: 'government', label: 'Government', color: 'purple' },
+          { key: 'private_client', label: 'Private Client', color: 'emerald' },
+        ],
+        contact_types: [
+          { key: 'decision_maker', label: 'Decision Maker', color: 'red' },
+          { key: 'project_manager', label: 'Project Manager', color: 'blue' },
+          { key: 'estimator', label: 'Estimator', color: 'amber' },
+          { key: 'procurement', label: 'Procurement', color: 'purple' },
+          { key: 'safety', label: 'Safety', color: 'emerald' },
+          { key: 'planner', label: 'Planner', color: 'indigo' },
+          { key: 'accounts', label: 'Accounts', color: 'teal' },
+          { key: 'site_contact', label: 'Site Contact', color: 'orange' },
+          { key: 'other', label: 'Other', color: 'gray' },
+        ],
+      };
+
+      for (const [category, items] of Object.entries(newSeeds)) {
+        items.forEach((item, idx) => {
+          seedSetting37.run(category, item.key, item.label, item.color || '', idx);
+        });
+      }
+
+      recordMigration.run(37, 'CRM Sprint 2 — meetings table, missing fields, new settings');
+      console.log('Migration 37 complete.');
+    } catch (e) {
+      console.error('Migration 37 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 38: HR / People Ops Foundation
+  // =============================================
+  if (!isMigrationApplied.get(38)) {
+    console.log('Running migration 38: HR / People Ops Foundation');
+    try {
+      // --- A. employees table ---
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS employees (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          employee_code TEXT UNIQUE,
+          first_name TEXT NOT NULL,
+          last_name TEXT NOT NULL,
+          full_name TEXT NOT NULL,
+          preferred_name TEXT DEFAULT '',
+          company TEXT DEFAULT '',
+          division TEXT DEFAULT '',
+          role_title TEXT DEFAULT '',
+          employment_type TEXT DEFAULT 'full_time',
+          employment_status TEXT DEFAULT 'active',
+          start_date DATE,
+          end_date DATE,
+          probation_end_date DATE,
+          manager_id INTEGER REFERENCES employees(id),
+          email TEXT DEFAULT '',
+          phone TEXT DEFAULT '',
+          address TEXT DEFAULT '',
+          suburb TEXT DEFAULT '',
+          state TEXT DEFAULT '',
+          postcode TEXT DEFAULT '',
+          traffic_role_level TEXT DEFAULT '',
+          ticket_classification TEXT DEFAULT '',
+          white_card_required INTEGER DEFAULT 0,
+          medical_required INTEGER DEFAULT 0,
+          allocatable INTEGER DEFAULT 1,
+          blocked_from_allocation INTEGER DEFAULT 0,
+          block_reason TEXT DEFAULT '',
+          induction_status TEXT DEFAULT 'pending',
+          ppe_issued_status TEXT DEFAULT 'not_issued',
+          uniform_issued_status TEXT DEFAULT 'not_issued',
+          company_vehicle_assigned TEXT DEFAULT '',
+          primary_work_region TEXT DEFAULT '',
+          base_location TEXT DEFAULT '',
+          emergency_contact_name TEXT DEFAULT '',
+          emergency_contact_phone TEXT DEFAULT '',
+          emergency_contact_relationship TEXT DEFAULT '',
+          date_of_birth DATE,
+          payroll_reference TEXT DEFAULT '',
+          internal_notes TEXT DEFAULT '',
+          active INTEGER DEFAULT 1,
+          linked_crew_member_id INTEGER REFERENCES crew_members(id),
+          linked_user_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_code ON employees(employee_code)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_company ON employees(company)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(employment_status)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_manager ON employees(manager_id)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_crew ON employees(linked_crew_member_id)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_employees_user ON employees(linked_user_id)'); } catch(e) {}
+
+      // --- B. employee_documents table ---
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS employee_documents (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+          document_type TEXT NOT NULL DEFAULT 'other',
+          document_name TEXT NOT NULL,
+          filename TEXT NOT NULL,
+          original_name TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          file_size INTEGER DEFAULT 0,
+          issue_date DATE,
+          expiry_date DATE,
+          mandatory INTEGER DEFAULT 0,
+          verification_status TEXT DEFAULT 'pending',
+          verified_by_id INTEGER REFERENCES users(id),
+          verified_at DATETIME,
+          notes TEXT DEFAULT '',
+          uploaded_by_id INTEGER NOT NULL REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empdocs_employee ON employee_documents(employee_id)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empdocs_type ON employee_documents(document_type)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empdocs_expiry ON employee_documents(expiry_date)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empdocs_verification ON employee_documents(verification_status)'); } catch(e) {}
+
+      // --- C. employee_competencies table ---
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS employee_competencies (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+          competency_type TEXT NOT NULL DEFAULT 'other',
+          competency_name TEXT NOT NULL,
+          competency_level TEXT DEFAULT '',
+          issue_date DATE,
+          expiry_date DATE,
+          status TEXT DEFAULT 'valid',
+          mandatory_for_role INTEGER DEFAULT 0,
+          linked_document_id INTEGER REFERENCES employee_documents(id),
+          notes TEXT DEFAULT '',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empcomp_employee ON employee_competencies(employee_id)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empcomp_type ON employee_competencies(competency_type)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empcomp_expiry ON employee_competencies(expiry_date)'); } catch(e) {}
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_empcomp_status ON employee_competencies(status)'); } catch(e) {}
+
+      // --- D. Expand users role CHECK to include 'hr' and 'sales' ---
+      const userCols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+      const userSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
+      if (userSql && userSql.sql && !userSql.sql.includes("'hr'")) {
+        db.pragma('foreign_keys = OFF');
+        db.exec(`
+          CREATE TABLE users_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            full_name TEXT NOT NULL,
+            email TEXT,
+            role TEXT NOT NULL CHECK(role IN ('admin','operations','planning','finance','hr','sales')),
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            email_notifications_enabled INTEGER DEFAULT 1,
+            notification_frequency TEXT DEFAULT 'immediate'
+          );
+        `);
+        db.exec(`
+          INSERT INTO users_new (id, username, password_hash, full_name, email, role, active, created_at, email_notifications_enabled, notification_frequency)
+          SELECT id, username, password_hash, full_name, email, role, active, created_at,
+            COALESCE(email_notifications_enabled, 1),
+            COALESCE(notification_frequency, 'immediate')
+          FROM users;
+        `);
+        db.exec('DROP TABLE users;');
+        db.exec('ALTER TABLE users_new RENAME TO users;');
+        db.pragma('foreign_keys = ON');
+      }
+
+      // --- E. Auto-seed employees from crew_members ---
+      const crewRows = db.prepare('SELECT * FROM crew_members WHERE active = 1').all();
+      const insertEmp = db.prepare(`
+        INSERT OR IGNORE INTO employees (employee_code, first_name, last_name, full_name, company, employment_type, email, phone, traffic_role_level, induction_status, active, linked_crew_member_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, CURRENT_TIMESTAMP)
+      `);
+      for (const cm of crewRows) {
+        const parts = (cm.full_name || '').trim().split(/\s+/);
+        const firstName = parts[0] || '';
+        const lastName = parts.slice(1).join(' ') || '';
+        const empType = cm.employment_type || 'full_time';
+        const inductionStatus = cm.induction_status || (cm.induction_date ? 'completed' : 'pending');
+        insertEmp.run(
+          cm.employee_id || null,
+          firstName, lastName, cm.full_name || '',
+          cm.company || '',
+          empType,
+          cm.email || '', cm.phone || '',
+          cm.tcp_level || cm.role || '',
+          inductionStatus,
+          cm.id
+        );
+      }
+
+      // --- F. Seed HR settings categories ---
+      const insertSetting = db.prepare(`
+        INSERT OR IGNORE INTO app_settings (category, key, label, display_order, is_active)
+        VALUES (?, ?, ?, ?, 1)
+      `);
+      // Employment types
+      [['full_time','Full Time'],['part_time','Part Time'],['casual','Casual'],['subcontractor','Subcontractor']].forEach(([k,l], i) => {
+        insertSetting.run('hr_employment_types', k, l, i+1);
+      });
+      // Employment statuses
+      [['active','Active'],['onboarding','Onboarding'],['on_leave','On Leave'],['suspended','Suspended'],['inactive','Inactive'],['offboarded','Offboarded']].forEach(([k,l], i) => {
+        insertSetting.run('hr_employment_statuses', k, l, i+1);
+      });
+      // Divisions
+      [['operations','Operations'],['planning','Planning'],['admin','Admin'],['safety','Safety'],['finance','Finance'],['hr','Human Resources'],['sales','Sales']].forEach(([k,l], i) => {
+        insertSetting.run('hr_divisions', k, l, i+1);
+      });
+      // Document types
+      [['contract','Contract'],['licence','Licence'],['white_card','White Card'],['induction_record','Induction Record'],['training_certificate','Training Certificate'],['voc','VOC'],['medical','Medical'],['id','ID'],['policy_acknowledgement','Policy Acknowledgement'],['other','Other']].forEach(([k,l], i) => {
+        insertSetting.run('hr_document_types', k, l, i+1);
+      });
+      // Competency types
+      [['traffic_ticket','Traffic Ticket'],['white_card','White Card'],['first_aid','First Aid'],['plant_ticket','Plant Ticket'],['driver_licence','Driver Licence'],['hr_licence','HR Licence'],['voc','VOC'],['induction','Induction'],['medical_clearance','Medical Clearance'],['other','Other']].forEach(([k,l], i) => {
+        insertSetting.run('hr_competency_types', k, l, i+1);
+      });
+      // PPE statuses
+      [['not_issued','Not Issued'],['issued','Issued'],['partial','Partial'],['returned','Returned']].forEach(([k,l], i) => {
+        insertSetting.run('hr_ppe_statuses', k, l, i+1);
+      });
+      // Block reasons
+      [['expired_licence','Expired Licence'],['missing_induction','Missing Induction'],['medical_expired','Medical Expired'],['disciplinary','Disciplinary'],['other','Other']].forEach(([k,l], i) => {
+        insertSetting.run('hr_block_reasons', k, l, i+1);
+      });
+
+      recordMigration.run(38, 'HR / People Ops Foundation — employees, documents, competencies, role expansion');
+      console.log('Migration 38 complete.');
+    } catch (e) {
+      try { db.pragma('foreign_keys = ON'); } catch(re) {}
+      try { db.exec('DROP TABLE IF EXISTS users_new'); } catch(re) {}
+      console.error('Migration 38 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 39: Seed realistic demo budget data for active jobs
+  // =============================================
+  if (!isMigrationApplied.get(39)) {
     try {
       // Only seed if job_budgets is empty (don't overwrite real data)
       const existingBudgets = db.prepare('SELECT COUNT(*) as c FROM job_budgets').get().c;
@@ -1614,11 +2351,9 @@ function runMigrations(db) {
           const insertBudget = db.prepare(`INSERT OR IGNORE INTO job_budgets (job_id, contract_value, budget_labour, budget_materials, budget_subcontractors, budget_equipment, budget_other, budget_contingency, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
           const insertCost = db.prepare(`INSERT INTO cost_entries (job_id, budget_id, category, description, amount, entry_date, invoice_ref, supplier, entered_by_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
-          // Get an admin user for entered_by
           const adminUser = db.prepare("SELECT id FROM users WHERE role IN ('admin','finance') LIMIT 1").get();
           const enteredBy = adminUser ? adminUser.id : 1;
 
-          // Budget profiles: [contractMul, labourPct, matPct, subPct, equipPct, otherPct, contingencyPct, spendPct]
           const profiles = [
             { labourPct: 0.50, matPct: 0.08, subPct: 0.18, equipPct: 0.14, otherPct: 0.03, contPct: 0.07 },
             { labourPct: 0.52, matPct: 0.06, subPct: 0.20, equipPct: 0.12, otherPct: 0.04, contPct: 0.06 },
@@ -1626,67 +2361,56 @@ function runMigrations(db) {
             { labourPct: 0.55, matPct: 0.05, subPct: 0.17, equipPct: 0.13, otherPct: 0.04, contPct: 0.06 },
           ];
 
-          // Realistic contract values if jobs don't already have them
           const contractValues = [185000, 320000, 95000, 450000, 78000, 520000, 125000, 680000, 210000, 145000];
-          // Spend percentage per job (simulate varying progress)
           const spendPcts = [0.38, 0.62, 0.78, 0.22, 0.45, 0.05, 0.55, 0.12, 0.35, 0.68];
-
-          const today = new Date().toISOString().split('T')[0];
-          const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().split('T')[0];
+          const daysAgo39 = (n) => new Date(Date.now() - n * 86400000).toISOString().split('T')[0];
 
           activeJobs.forEach((job, i) => {
             const contractVal = job.contract_value || contractValues[i % contractValues.length];
             const p = profiles[i % profiles.length];
-            const totalBudget = contractVal * 0.92; // 8% margin target
+            const totalBudget = contractVal * 0.92;
 
-            const budgetLabour = Math.round(totalBudget * p.labourPct);
-            const budgetMat = Math.round(totalBudget * p.matPct);
-            const budgetSub = Math.round(totalBudget * p.subPct);
-            const budgetEquip = Math.round(totalBudget * p.equipPct);
-            const budgetOther = Math.round(totalBudget * p.otherPct);
-            const budgetCont = Math.round(totalBudget * p.contPct);
+            insertBudget.run(job.id, contractVal,
+              Math.round(totalBudget * p.labourPct), Math.round(totalBudget * p.matPct),
+              Math.round(totalBudget * p.subPct), Math.round(totalBudget * p.equipPct),
+              Math.round(totalBudget * p.otherPct), Math.round(totalBudget * p.contPct),
+              'Auto-seeded budget');
 
-            insertBudget.run(job.id, contractVal, budgetLabour, budgetMat, budgetSub, budgetEquip, budgetOther, budgetCont, 'Auto-seeded budget');
-
-            // Get the budget_id we just inserted
             const budgetRow = db.prepare('SELECT id FROM job_budgets WHERE job_id = ?').get(job.id);
             if (!budgetRow) return;
-            const budgetId = budgetRow.id;
 
-            // Seed cost entries based on spend percentage
             const spendPct = spendPcts[i % spendPcts.length];
             const totalSpend = totalBudget * spendPct;
 
-            // Distribute spend across categories
             const costEntries = [
-              { cat: 'labour', pct: 0.55, desc: 'Crew labour — weeks 1-' + Math.ceil(spendPct * 20), supplier: 'Internal', invoicePrefix: 'LAB' },
-              { cat: 'equipment', pct: 0.18, desc: 'TMA & equipment hire', supplier: 'T&S Fleet', invoicePrefix: 'EQP' },
-              { cat: 'materials', pct: 0.10, desc: 'Signage, cones & delineators', supplier: 'Traffix Devices', invoicePrefix: 'MAT' },
-              { cat: 'subcontractors', pct: 0.14, desc: 'Line marking & civil sub', supplier: 'Roadline Markings', invoicePrefix: 'SUB' },
-              { cat: 'other', pct: 0.03, desc: 'Permits & admin', supplier: 'Various', invoicePrefix: 'OTH' },
+              { cat: 'labour', pct: 0.55, desc: 'Crew labour — weeks 1-' + Math.ceil(spendPct * 20), supplier: 'Internal', pre: 'LAB' },
+              { cat: 'equipment', pct: 0.18, desc: 'TMA & equipment hire', supplier: 'T&S Fleet', pre: 'EQP' },
+              { cat: 'materials', pct: 0.10, desc: 'Signage, cones & delineators', supplier: 'Traffix Devices', pre: 'MAT' },
+              { cat: 'subcontractors', pct: 0.14, desc: 'Line marking & civil sub', supplier: 'Roadline Markings', pre: 'SUB' },
+              { cat: 'other', pct: 0.03, desc: 'Permits & admin', supplier: 'Various', pre: 'OTH' },
             ];
 
             costEntries.forEach((ce, ci) => {
               const amount = Math.round(totalSpend * ce.pct);
               if (amount <= 0) return;
-              const entryDate = daysAgo(Math.max(1, Math.round((ci + 1) * 7 * spendPct)));
-              const invoiceRef = ce.invoicePrefix + '-' + job.job_number + '-' + String(ci + 1).padStart(3, '0');
-              insertCost.run(job.id, budgetId, ce.cat, ce.desc, amount, entryDate, invoiceRef, ce.supplier, enteredBy);
+              insertCost.run(job.id, budgetRow.id, ce.cat, ce.desc, amount,
+                daysAgo39(Math.max(1, Math.round((ci + 1) * 7 * spendPct))),
+                ce.pre + '-' + job.job_number + '-' + String(ci + 1).padStart(3, '0'),
+                ce.supplier, enteredBy);
             });
 
-            // Update job contract_value if it was 0
             if (!job.contract_value) {
               db.prepare('UPDATE jobs SET contract_value = ? WHERE id = ?').run(contractVal, job.id);
             }
           });
 
-          console.log('Migration 31: Seeded budget data for ' + activeJobs.length + ' jobs');
+          console.log('Migration 39: Seeded budget data for ' + activeJobs.length + ' jobs');
         }
       }
-      recordMigration.run(31, 'Seed realistic demo budget data');
-      console.log('Migration 31 complete.');
+      recordMigration.run(39, 'Seed realistic demo budget data');
+      console.log('Migration 39 complete.');
     } catch (e) {
-      console.error('Migration 31 error:', e.message);
+      console.error('Migration 39 error:', e.message);
     }
   }
 
@@ -2111,6 +2835,7 @@ function initializeDatabase() {
     insertUser.run('ops_user', bcrypt.hashSync('password', 12), 'Sam Operations', 'sam@tstraffic.com.au', 'operations');
     insertUser.run('planning_user', bcrypt.hashSync('password', 12), 'Alex Planning', 'alex@tstraffic.com.au', 'planning');
     insertUser.run('finance_user', bcrypt.hashSync('password', 12), 'Pat Finance', 'pat@tstraffic.com.au', 'finance');
+    insertUser.run('accounts_user', bcrypt.hashSync('password', 12), 'Jordan Accounts', 'jordan@tstraffic.com.au', 'finance');
 
     // Seed sample jobs (use statuses valid under the new CHECK after migration 1 runs)
     const insertJob = db.prepare(`
@@ -2150,6 +2875,160 @@ function initializeDatabase() {
     `);
     insertUpdate.run(1, '2026-02-28', 'Good progress on barrier installation. Section A 80% complete. Night works approved by council.', 'Section A barriers 80% installed. Council night works approval received.', 'Minor delay due to weather on Tuesday. Subcontractor availability next week uncertain.', '', 1);
     insertUpdate.run(4, '2026-02-14', 'Project nearing completion but facing payment issues. Final inspection scheduled for next week.', 'Pavement marking completed. Signage installed.', 'Client disputing variation claim. Invoice 60 days overdue.', 'Cannot proceed with demobilisation until payment received.', 1);
+
+    // ── Additional jobs (7 more to reach 12 total) ──
+    insertJob.run('J-02456', 'J-02456 | Fulton Hogan | Blacktown | 2026-03-15', 'Fulton Hogan', '5 Main St', 'Blacktown', 'active', 'delivery', 60, '2026-03-15', '2026-08-20', 1, 2, 3, 4, 5, 'green', 'on_track', '2026-03-10');
+    insertJob.run('J-02457', 'J-02457 | CPB Contractors | Mascot | 2026-01-20', 'CPB Contractors', '200 Coward St', 'Mascot', 'active', 'delivery', 90, '2026-01-20', '2026-03-30', 1, 2, 3, 4, 5, 'green', 'on_track', '2026-03-15');
+    insertJob.run('J-02458', 'J-02458 | John Holland | Norwest | 2026-04-01', 'John Holland', '10 Lexington Dr', 'Norwest', 'won', 'prestart', 5, '2026-04-01', '2026-10-15', 1, 2, 3, 4, 5, 'green', 'na', null);
+    insertJob.run('J-02459', 'J-02459 | Transport for NSW | Homebush | 2026-02-10', 'Transport for NSW', '1 Olympic Blvd', 'Homebush', 'active', 'delivery', 55, '2026-02-10', '2026-07-15', 1, 2, 3, 4, 5, 'amber', 'on_track', '2026-03-12');
+    insertJob.run('J-02460', 'J-02460 | Downer EDI | Ryde | 2026-03-01', 'Downer EDI', '45 Victoria Rd', 'Ryde', 'active', 'delivery', 25, '2026-03-01', '2026-09-30', 1, 2, 3, 4, 5, 'green', 'on_track', '2026-03-14');
+    insertJob.run('J-02461', 'J-02461 | Georgiou Group | Campbelltown | 2026-02-20', 'Georgiou Group', '80 Queen St', 'Campbelltown', 'active', 'delivery', 70, '2026-02-20', '2026-06-15', 1, 2, 3, 4, 5, 'red', 'overdue', '2026-03-01');
+    insertJob.run('J-02462', 'J-02462 | Acciona | Wolli Creek | 2026-03-20', 'Acciona', '15 Arncliffe St', 'Wolli Creek', 'lead', 'tender', 0, '2026-03-20', '2026-12-31', 1, 2, 3, 4, 5, 'green', 'na', null);
+
+    // ── Crew members (25 people) ──
+    const insertCrew = db.prepare(`
+      INSERT INTO crew_members (full_name, employee_id, role, phone, email, licence_type, licence_expiry, induction_date, active, hourly_rate)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertCrew.run('John Smith', 'EMP-001', 'supervisor', '0412 345 678', 'john.smith@tstraffic.com.au', 'C', '2027-06-15', '2024-01-10', 1, 65);
+    insertCrew.run('Sarah Johnson', 'EMP-002', 'leading_hand', '0413 456 789', 'sarah.j@tstraffic.com.au', 'C', '2026-11-20', '2024-02-15', 1, 55);
+    insertCrew.run('Mike Chen', 'EMP-003', 'traffic_controller', '0414 567 890', 'mike.c@tstraffic.com.au', 'C', '2026-08-30', '2024-03-01', 1, 45);
+    insertCrew.run('Emma Wilson', 'EMP-004', 'traffic_controller', '0415 678 901', 'emma.w@tstraffic.com.au', 'C', '2027-01-15', '2024-01-20', 1, 45);
+    insertCrew.run('David Brown', 'EMP-005', 'supervisor', '0416 789 012', 'david.b@tstraffic.com.au', 'HR', '2027-03-10', '2023-11-05', 1, 65);
+    insertCrew.run('Lisa Nguyen', 'EMP-006', 'leading_hand', '0417 890 123', 'lisa.n@tstraffic.com.au', 'C', '2026-05-20', '2024-04-10', 1, 55);
+    insertCrew.run('James Taylor', 'EMP-007', 'traffic_controller', '0418 901 234', 'james.t@tstraffic.com.au', 'C', '2026-09-15', '2024-05-01', 1, 45);
+    insertCrew.run('Amy Patel', 'EMP-008', 'traffic_controller', '0419 012 345', 'amy.p@tstraffic.com.au', 'C', '2027-02-28', '2024-06-15', 1, 45);
+    insertCrew.run('Ryan O\'Brien', 'EMP-009', 'pilot_vehicle', '0420 123 456', 'ryan.o@tstraffic.com.au', 'HR', '2026-12-01', '2024-02-20', 1, 50);
+    insertCrew.run('Jessica Martinez', 'EMP-010', 'traffic_controller', '0421 234 567', 'jess.m@tstraffic.com.au', 'C', '2026-04-10', '2024-07-01', 1, 45);
+    insertCrew.run('Tom Anderson', 'EMP-011', 'supervisor', '0422 345 678', 'tom.a@tstraffic.com.au', 'HR', '2027-05-20', '2023-09-15', 1, 65);
+    insertCrew.run('Rachel Kim', 'EMP-012', 'leading_hand', '0423 456 789', 'rachel.k@tstraffic.com.au', 'C', '2026-07-15', '2024-01-05', 1, 55);
+    insertCrew.run('Steve Murray', 'EMP-013', 'traffic_controller', '0424 567 890', 'steve.m@tstraffic.com.au', 'C', '2026-10-30', '2024-08-01', 1, 45);
+    insertCrew.run('Karen White', 'EMP-014', 'spotter', '0425 678 901', 'karen.w@tstraffic.com.au', 'C', '2027-04-15', '2024-03-20', 1, 48);
+    insertCrew.run('Daniel Lee', 'EMP-015', 'traffic_controller', '0426 789 012', 'daniel.l@tstraffic.com.au', 'C', '2026-06-25', '2024-09-01', 1, 45);
+    insertCrew.run('Michelle Harris', 'EMP-016', 'traffic_controller', '0427 890 123', 'michelle.h@tstraffic.com.au', 'C', '2026-03-25', '2024-04-15', 1, 45);
+    insertCrew.run('Chris Thompson', 'EMP-017', 'leading_hand', '0428 901 234', 'chris.t@tstraffic.com.au', 'C', '2027-01-30', '2024-05-10', 1, 55);
+    insertCrew.run('Natalie Cooper', 'EMP-018', 'traffic_controller', '0429 012 345', 'nat.c@tstraffic.com.au', 'C', '2026-08-10', '2024-10-01', 1, 45);
+    insertCrew.run('Ben Walker', 'EMP-019', 'pilot_vehicle', '0430 123 456', 'ben.w@tstraffic.com.au', 'HR', '2026-11-05', '2024-06-20', 1, 50);
+    insertCrew.run('Sophie Young', 'EMP-020', 'traffic_controller', '0431 234 567', 'sophie.y@tstraffic.com.au', 'C', '2027-03-15', '2024-07-15', 1, 45);
+    insertCrew.run('Mark Phillips', 'EMP-021', 'labourer', '0432 345 678', 'mark.p@tstraffic.com.au', 'C', '2026-09-20', '2024-08-10', 1, 40);
+    insertCrew.run('Laura Scott', 'EMP-022', 'traffic_controller', '0433 456 789', 'laura.s@tstraffic.com.au', 'C', '2026-04-30', '2024-11-01', 1, 45);
+    insertCrew.run('Peter Hall', 'EMP-023', 'supervisor', '0434 567 890', 'peter.h@tstraffic.com.au', 'HR', '2027-02-10', '2023-12-01', 1, 65);
+    insertCrew.run('Angela Davis', 'EMP-024', 'traffic_controller', '0435 678 901', 'angela.d@tstraffic.com.au', 'C', '2026-05-15', '2024-09-15', 1, 45);
+    insertCrew.run('Tony Romano', 'EMP-025', 'leading_hand', '0436 789 012', 'tony.r@tstraffic.com.au', 'C', '2026-12-20', '2024-02-01', 1, 55);
+
+    // ── Equipment (15 items) ──
+    const insertEquipment = db.prepare(`
+      INSERT INTO equipment (asset_number, name, category, description, serial_number, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertEquipment.run('EQ-001', 'Arrow Board Trailer #1', 'arrow_board', '15-lamp LED arrow board on single-axle trailer', 'AB-2023-001', '2023-06-15', 8500, 'good', 'Bankstown Depot', '2026-06-15', 90, 'Annual rego due July', 1);
+    insertEquipment.run('EQ-002', 'Arrow Board Trailer #2', 'arrow_board', '15-lamp LED arrow board on single-axle trailer', 'AB-2023-002', '2023-06-15', 8500, 'good', 'Bankstown Depot', '2026-04-20', 90, '', 1);
+    insertEquipment.run('EQ-003', 'VMS Board - Large', 'vms', 'Solar-powered variable message sign 2400x1200', 'VMS-2024-001', '2024-02-01', 22000, 'good', 'Parramatta Yard', '2026-05-01', 90, 'New battery installed Feb 2026', 1);
+    insertEquipment.run('EQ-004', 'VMS Board - Small', 'vms', 'Trailer-mounted VMS 1200x600', 'VMS-2024-002', '2024-03-10', 15000, 'fair', 'Bankstown Depot', '2026-03-30', 90, 'Screen flickering - monitor', 1);
+    insertEquipment.run('EQ-005', 'Traffic Ute #1', 'vehicle', '2024 Toyota Hilux SR5 dual cab, white', 'VEH-HIL-001', '2024-01-20', 58000, 'good', 'Bankstown Depot', '2026-07-20', 180, 'Fleet #T&S-U01', 1);
+    insertEquipment.run('EQ-006', 'Traffic Ute #2', 'vehicle', '2024 Toyota Hilux SR dual cab, white', 'VEH-HIL-002', '2024-04-15', 52000, 'good', 'Parramatta Yard', '2026-10-15', 180, 'Fleet #T&S-U02', 1);
+    insertEquipment.run('EQ-007', 'Barrier Trailer #1', 'barrier', 'Water-filled barrier set (40 units) on flat-top trailer', 'BAR-2023-001', '2023-09-01', 12000, 'good', 'Bankstown Depot', '2026-09-01', 180, '', 1);
+    insertEquipment.run('EQ-008', 'Barrier Trailer #2', 'barrier', 'Water-filled barrier set (40 units) on flat-top trailer', 'BAR-2023-002', '2023-09-01', 12000, 'fair', 'Liverpool Yard', '2026-04-10', 180, '3 barriers cracked, replacement ordered', 1);
+    insertEquipment.run('EQ-009', 'Lighting Tower #1', 'lighting', 'Diesel lighting tower 4-head LED', 'LT-2024-001', '2024-05-20', 18000, 'good', 'Bankstown Depot', '2026-05-20', 90, '', 1);
+    insertEquipment.run('EQ-010', 'Lighting Tower #2', 'lighting', 'Diesel lighting tower 4-head LED', 'LT-2024-002', '2024-05-20', 18000, 'poor', 'Bankstown Depot', '2026-03-20', 90, 'Generator needs service', 1);
+    insertEquipment.run('EQ-011', 'Cone Set A (200)', 'cone', '200x 700mm reflective traffic cones', 'CONE-2024-A', '2024-01-10', 3000, 'good', 'Bankstown Depot', '2026-07-10', 180, '', 1);
+    insertEquipment.run('EQ-012', 'Cone Set B (200)', 'cone', '200x 700mm reflective traffic cones', 'CONE-2024-B', '2024-01-10', 3000, 'fair', 'Parramatta Yard', '2026-07-10', 180, '~30 cones damaged', 1);
+    insertEquipment.run('EQ-013', 'Delineator Set (100)', 'delineator', '100x T-top delineators with bases', 'DEL-2024-001', '2024-06-01', 2500, 'good', 'Bankstown Depot', '2026-12-01', 180, '', 1);
+    insertEquipment.run('EQ-014', 'Sign Kit - Complete', 'sign', 'Full TC sign kit - 120 signs, stands, sandbags', 'SIGN-2023-001', '2023-08-15', 6000, 'good', 'Bankstown Depot', '2026-08-15', 180, '', 1);
+    insertEquipment.run('EQ-015', 'Speed Radar Trailer', 'other', 'Solar-powered speed advisory display trailer', 'SPD-2025-001', '2025-11-01', 14000, 'new', 'Parramatta Yard', '2026-11-01', 90, 'Purchased for TfNSW project', 1);
+
+    // ── Additional tasks (5 more to reach 10 total) ──
+    insertTask.run(6, 'ops', 'Set up night works lane closure', 'Establish contra-flow on Main St between 8pm-5am', 2, '2026-03-20', 'not_started', 'medium');
+    insertTask.run(7, 'ops', 'Complete site demobilisation', 'Remove all barriers, signs, and equipment from Coward St', 2, '2026-03-25', 'in_progress', 'high');
+    insertTask.run(9, 'planning', 'Submit ROL application to TfNSW', 'Road Occupancy Licence for Olympic Blvd night works', 3, '2026-03-18', 'in_progress', 'high');
+    insertTask.run(10, 'ops', 'Conduct crew toolbox talk', 'Weekly safety briefing for Victoria Rd crew', 2, '2026-03-17', 'not_started', 'medium');
+    insertTask.run(11, 'accounts', 'Process progress claim #3', 'Georgiou Group progress claim for February works', 5, '2026-03-15', 'not_started', 'high');
+
+    // ── Clients / Subcontractors / Suppliers ──
+    const insertClient = db.prepare(`
+      INSERT INTO clients (company_name, abn, primary_contact_name, primary_contact_phone, primary_contact_email, address, billing_address, payment_terms, notes, active, company_type, trade_specialty, insurance_expiry, insurance_policy, product_categories, account_number, website, approved, rating)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    // Clients
+    insertClient.run('ABC Civil', '51 234 567 890', 'Greg Thompson', '0400 111 222', 'greg.t@abccivil.com.au', '100 George St, Sydney NSW 2000', 'PO Box 100, Sydney NSW 2001', '30 days', 'Major civil contractor, long-term client', 1, 'client', '', null, '', '', '', 'www.abccivil.com.au', 1, 4);
+    insertClient.run('RMS NSW', '20 345 678 901', 'Linda Park', '0400 222 333', 'linda.park@transport.nsw.gov.au', '20 Lee St, Chippendale NSW 2008', '', 'EOM+30', 'Government - Transport for NSW', 1, 'client', '', null, '', '', '', 'www.transport.nsw.gov.au', 1, 5);
+    insertClient.run('Lendlease', '40 456 789 012', 'Rebecca Walsh', '0400 888 999', 'r.walsh@lendlease.com', '30 The Bond, Millers Point NSW 2000', 'Level 14, 30 The Bond, Millers Point NSW 2000', '45 days', 'Tier 1 builder', 1, 'client', '', null, '', '', '', 'www.lendlease.com', 1, 4);
+    insertClient.run('Sydney Water', '49 776 225 038', 'Fiona Clarke', '0400 444 555', 'fiona.c@sydneywater.com.au', '1 Smith St, Parramatta NSW 2150', '', '30 days', '', 1, 'client', '', null, '', '', '', 'www.sydneywater.com.au', 1, 3);
+    // Subcontractors
+    insertClient.run('Sydney Line Marking', '33 111 222 333', 'Dave Russo', '0411 222 333', 'dave@sydneylinemarking.com.au', '18 Industrial Ave, Bankstown NSW 2200', '', '14 days', 'Reliable line marking subbie. Available most nights.', 1, 'subcontractor', 'line_marking', '2026-09-30', 'QBE-PL-445566', '', '', 'www.sydneylinemarking.com.au', 1, 4);
+    insertClient.run('PowerGrid Electrical', '44 222 333 444', 'Maria Santos', '0422 333 444', 'maria@powergridelectrical.com.au', '7 Sparks Rd, Penrith NSW 2750', '', '14 days', 'Licensed electrician for street lighting and signal work', 1, 'subcontractor', 'electrical', '2027-01-15', 'AIG-PL-778899', '', '', 'www.powergridelectrical.com.au', 1, 5);
+    insertClient.run('Metro Fencing Solutions', '55 333 444 555', 'Trent O\'Neill', '0433 444 555', 'trent@metrofencing.com.au', '22 Boundary St, Granville NSW 2142', '', '7 days', 'Temp fencing and hoarding. Quick turnaround.', 1, 'subcontractor', 'fencing', '2026-06-15', 'ZURICH-PL-112233', '', '', '', 1, 3);
+    // Suppliers
+    insertClient.run('Barrier Systems Australia', '66 444 555 666', 'Kim Tran', '0444 555 666', 'kim@barriersystems.com.au', '5 Factory Rd, Wetherill Park NSW 2164', 'PO Box 55, Wetherill Park NSW 2164', '30 days', 'Plastic and concrete barriers. Water-fill available.', 1, 'supplier', '', null, '', 'barriers,delineators', 'BSA-2200', 'www.barriersystems.com.au', 1, 4);
+    insertClient.run('Kennards Hire', '22 555 666 777', 'Account Team', '13 15 64', 'hire@kennards.com.au', '126 Silverwater Rd, Silverwater NSW 2128', '', 'EOM', 'General equipment hire. Use national account rate.', 1, 'supplier', '', null, '', 'lighting,vehicles,other', 'KH-NAT-5540', 'www.kennards.com.au', 1, 4);
+    insertClient.run('SignPac', '77 666 777 888', 'Ross Brennan', '0455 666 777', 'ross@signpac.com.au', '40 Industry Rd, Padstow NSW 2211', '', '14 days', 'Custom and standard traffic signs. 48hr turnaround on stock items.', 1, 'supplier', '', null, '', 'signs,cones,delineators', 'SP-1180', 'www.signpac.com.au', 1, 5);
+
+    // Link jobs to clients
+    try {
+      db.exec("UPDATE jobs SET client_id = 1 WHERE client = 'ABC Civil'");
+      db.exec("UPDATE jobs SET client_id = 2 WHERE client = 'RMS NSW'");
+      db.exec("UPDATE jobs SET client_id = 3 WHERE client = 'Lendlease'");
+      db.exec("UPDATE jobs SET client_id = 4 WHERE client = 'Sydney Water'");
+    } catch (e) { /* client_id column may not exist yet */ }
+
+    // ── Contacts (5) ──
+    const insertContact = db.prepare(`
+      INSERT INTO client_contacts (job_id, contact_type, company, full_name, position, phone, email, notes, is_primary)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertContact.run(1, 'client', 'ABC Civil', 'Greg Thompson', 'Project Manager', '0400 111 222', 'greg.t@abccivil.com.au', 'Primary contact for Bankstown project', 1);
+    insertContact.run(2, 'rms', 'Transport for NSW', 'Linda Park', 'Network Coordinator', '0400 222 333', 'linda.park@transport.nsw.gov.au', 'Handles ROL approvals for Parramatta area', 1);
+    insertContact.run(1, 'council', 'Canterbury-Bankstown Council', 'Ahmed Hassan', 'Traffic Engineer', '0400 333 444', 'ahmed.h@cbcity.nsw.gov.au', 'Approves TMPs for Canterbury Rd precinct', 0);
+    insertContact.run(4, 'client', 'Sydney Water', 'Fiona Clarke', 'Site Supervisor', '0400 444 555', 'fiona.c@sydneywater.com.au', 'Day-to-day site contact for Liverpool', 1);
+    insertContact.run(6, 'subcontractor', 'Fulton Hogan', 'Brett Williams', 'Foreman', '0400 555 666', 'brett.w@fultonhogan.com.au', 'Night works coordination', 0);
+
+    // ── Timesheets (10 entries) ──
+    const insertTimesheet = db.prepare(`
+      INSERT INTO timesheets (job_id, crew_member_id, work_date, start_time, end_time, break_minutes, total_hours, shift_type, role_on_site, approved, approved_by_id, notes, submitted_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertTimesheet.run(1, 1, '2026-03-14', '06:00', '14:30', 30, 8.0, 'day', 'Supervisor', 1, 1, 'Barrier install Section A', 1);
+    insertTimesheet.run(1, 3, '2026-03-14', '06:00', '14:30', 30, 8.0, 'day', 'Traffic Controller', 1, 1, 'Barrier install Section A', 1);
+    insertTimesheet.run(1, 4, '2026-03-14', '06:00', '14:30', 30, 8.0, 'day', 'Traffic Controller', 1, 1, 'Barrier install Section A', 1);
+    insertTimesheet.run(1, 2, '2026-03-15', '06:00', '16:00', 30, 9.5, 'day', 'Leading Hand', 0, null, 'Extended shift - barrier completion', 1);
+    insertTimesheet.run(1, 3, '2026-03-15', '06:00', '16:00', 30, 9.5, 'day', 'Traffic Controller', 0, null, 'Extended shift', 1);
+    insertTimesheet.run(6, 5, '2026-03-14', '19:00', '05:00', 30, 9.5, 'night', 'Supervisor', 1, 1, 'Night works - lane closure Main St', 1);
+    insertTimesheet.run(6, 7, '2026-03-14', '19:00', '05:00', 30, 9.5, 'night', 'Traffic Controller', 1, 1, 'Night works', 1);
+    insertTimesheet.run(6, 8, '2026-03-14', '19:00', '05:00', 30, 9.5, 'night', 'Traffic Controller', 0, null, 'Night works - pending approval', 1);
+    insertTimesheet.run(4, 11, '2026-03-13', '06:30', '15:00', 30, 8.0, 'day', 'Supervisor', 1, 1, 'Final inspection prep', 1);
+    insertTimesheet.run(4, 13, '2026-03-13', '06:30', '15:00', 30, 8.0, 'day', 'Traffic Controller', 0, null, 'Final inspection prep - pending', 1);
+
+    // ── Incidents (3) ──
+    const insertIncident = db.prepare(`
+      INSERT INTO incidents (job_id, incident_number, incident_type, severity, title, description, location, incident_date, incident_time, reported_by_id, persons_involved, immediate_actions, root_cause, investigation_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertIncident.run(1, 'INC-0001', 'near_miss', 'medium', 'Vehicle entered work zone', 'Private vehicle ignored signage and entered active work zone on Canterbury Rd. No injuries. Crew members had to move quickly to avoid contact.', '12 Canterbury Rd, Bankstown', '2026-03-10', '10:30', 1, 'Mike Chen (EMP-003), Emma Wilson (EMP-004)', 'Work stopped immediately. Additional signage deployed. RMS notified.', 'Inadequate advance warning signage during peak hour', 'resolved');
+    insertIncident.run(4, 'INC-0002', 'injury', 'high', 'Crew member twisted ankle', 'Steve Murray stepped in pothole while repositioning barriers at Liverpool site. Ankle swelling observed. First aid administered on site.', '45 Macquarie St, Liverpool', '2026-03-12', '14:15', 1, 'Steve Murray (EMP-013)', 'First aid applied. Worker sent home. Incident area cordoned. Site hazard assessment completed.', 'Uneven ground surface not identified in pre-start', 'investigating');
+    insertIncident.run(6, 'INC-0003', 'hazard', 'low', 'Damaged road surface near barrier line', 'Pothole developing at edge of barrier line on Main St near work zone entry point. Could worsen with heavy vehicle traffic.', '5 Main St, Blacktown', '2026-03-15', '08:00', 2, '', 'Area marked with cones. Council notified for repair.', '', 'reported');
+
+    // ── Defects (5) ──
+    const insertDefect = db.prepare(`
+      INSERT INTO defects (job_id, defect_number, title, description, location, severity, status, reported_by_id, assigned_to_id, reported_date, target_close_date, rectification_notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertDefect.run(1, 'DEF-0001', 'Cracked barrier section B12', 'Water-filled barrier unit B12 has visible crack along top edge. Leaking slowly.', 'Canterbury Rd northbound, Section B', 'moderate', 'rectification', 1, 2, '2026-03-08', '2026-03-20', 'Replacement barrier ordered. ETA 18 March.');
+    insertDefect.run(1, 'DEF-0002', 'Faded road marking at detour entry', 'Temporary road marking at detour entry point is worn and hard to see at night.', 'Canterbury Rd / Side St intersection', 'minor', 'open', 2, 3, '2026-03-12', '2026-03-22', '');
+    insertDefect.run(4, 'DEF-0003', 'Missing delineator posts - westbound', '4 delineator posts missing from westbound approach. Likely knocked over by trucks.', 'Macquarie St, Liverpool - westbound', 'major', 'investigating', 1, 2, '2026-03-11', '2026-03-15', 'Replacement delineators sourced. Install scheduled for 15 March.');
+    insertDefect.run(6, 'DEF-0004', 'Arrow board lamp failure', 'Arrow board trailer EQ-002 has 3 lamps not functioning. Reduces visibility.', 'Main St, Blacktown - night works zone', 'moderate', 'open', 2, 2, '2026-03-14', '2026-03-18', '');
+    insertDefect.run(9, 'DEF-0005', 'Damaged VMS screen', 'VMS board showing display artifacts on lower-right quadrant. Intermittent issue.', 'Olympic Blvd approach, Homebush', 'minor', 'deferred', 1, 3, '2026-03-05', '2026-04-05', 'Deferred to next scheduled maintenance window. Not impacting readability.');
+
+    // ── Additional compliance items (5 more) ──
+    insertCompliance.run(6, 'road_occupancy', 'ROL - Main St Night Works', 'Transport for NSW', 2, '2026-03-18', 'submitted');
+    insertCompliance.run(9, 'tmp_approval', 'TMP - Olympic Blvd Detour', 'City of Parramatta Council', 3, '2026-03-25', 'not_started');
+    insertCompliance.run(10, 'swms_review', 'SWMS - Victoria Rd Median Works', '', 2, '2026-03-20', 'approved');
+    insertCompliance.run(11, 'council_permit', 'Road Opening Permit - Queen St', 'Campbelltown City Council', 3, '2026-03-10', 'submitted');
+    insertCompliance.run(7, 'insurance', 'PI Certificate - CPB Project', 'QBE Insurance', 5, '2026-04-01', 'approved');
+
+    // ── Additional project updates (3 more) ──
+    insertUpdate.run(6, '2026-03-14', 'Night works progressing well. Lane closure setup completed ahead of schedule. Minor issue with arrow board lamps resolved.', 'Lane closure established. First 200m of asphalt resurfacing complete.', 'Arrow board EQ-002 had lamp failures. Backup deployed.', '', 1);
+    insertUpdate.run(9, '2026-03-14', 'TfNSW project on track. ROL application submitted, awaiting approval. Crew briefed on traffic staging.', 'ROL application submitted to TfNSW. Crew inductions completed.', 'ROL approval taking longer than expected. Escalated to regional coordinator.', 'Cannot commence night works until ROL is approved.', 1);
+    insertUpdate.run(11, '2026-03-07', 'Campbelltown project facing payment delays. Road opening permit submitted to council. Crew allocated for next 2 weeks.', 'Excavation 70% complete. Permit application lodged.', 'Client progress claim #2 still unpaid (45 days). Escalated to accounts.', 'Cannot order materials for final stage until payment received.', 1);
 
     console.log('Database seeded with sample data.');
   }

@@ -103,23 +103,30 @@
 
 <!-- Incidents Table -->
 <% if (incidents.length === 0) { %>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-12 text-center">
-    <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-    <p class="text-gray-500 text-sm font-medium">No incidents found</p>
-    <p class="text-gray-400 text-xs mt-1">No incidents match your current filters</p>
-    <a href="/incidents/new" class="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg transition-colors">Report Incident</a>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+    <div class="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+    </div>
+    <h3 class="text-gray-900 font-semibold text-base mb-1">No incidents recorded</h3>
+    <p class="text-gray-500 text-sm mb-1">Track injuries, near misses, hazards, and property damage across all job sites.</p>
+    <p class="text-gray-400 text-xs mb-4">Report incidents to trigger investigations, corrective actions, and compliance reporting.</p>
+    <a href="/incidents/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      Report Incident
+    </a>
   </div>
 <% } else { %>
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
   <table class="w-full text-sm">
     <thead>
+      <% const incSortParams = '&job_id=' + encodeURIComponent(filters.job_id || '') + '&incident_type=' + encodeURIComponent(filters.incident_type || '') + '&severity=' + encodeURIComponent(filters.severity || '') + '&status=' + encodeURIComponent(filters.status || ''); %>
       <tr class="border-b border-gray-200">
-        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Incident</th>
-        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Date</th>
+        <th class="px-3 py-2.5 text-left"><%- include('../partials/sort-header', { label: 'Incident', field: 'title', currentSort: sort, currentOrder: order, baseUrl: '/incidents', extraParams: incSortParams }) %></th>
+        <th class="px-3 py-2.5 text-left hidden sm:table-cell"><%- include('../partials/sort-header', { label: 'Date', field: 'incident_date', currentSort: sort, currentOrder: order, baseUrl: '/incidents', extraParams: incSortParams }) %></th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Type</th>
-        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Severity</th>
+        <th class="px-3 py-2.5 text-left"><%- include('../partials/sort-header', { label: 'Severity', field: 'severity', currentSort: sort, currentOrder: order, baseUrl: '/incidents', extraParams: incSortParams }) %></th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Job</th>
-        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+        <th class="px-3 py-2.5 text-left"><%- include('../partials/sort-header', { label: 'Status', field: 'investigation_status', currentSort: sort, currentOrder: order, baseUrl: '/incidents', extraParams: incSortParams }) %></th>
         <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Age</th>
         <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Actions</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Reported By</th>

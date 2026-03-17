@@ -1,0 +1,165 @@
+<% locals.currentPage = 'crm-activities' %>
+<% const isEdit = activity !== null && typeof activity !== 'undefined' && activity %>
+
+<!-- Breadcrumb -->
+<div class="flex items-center gap-2 text-sm text-gray-400 mb-4">
+  <a href="/crm/activities" class="hover:text-gray-900 transition">Activities</a>
+  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <span class="text-gray-900"><%= isEdit ? 'Edit Activity' : 'Log Activity' %></span>
+</div>
+
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit Activity' : 'Log Activity' %></h1>
+    <p class="text-gray-500 text-sm mt-0.5"><%= isEdit ? 'Update activity details' : 'Record a new interaction or follow-up' %></p>
+  </div>
+</div>
+
+<!-- Form -->
+<form method="POST" action="<%= isEdit ? '/crm/activities/' + activity.id : '/crm/activities' %>" class="space-y-5">
+
+  <!-- 1. Activity Details -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Activity Details</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label for="activity_type" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Type <span class="text-red-500">*</span></label>
+        <select id="activity_type" name="activity_type" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">Select type...</option>
+          <% if (typeof settingsOptions !== 'undefined' && settingsOptions.crm_activity_types) { %>
+            <% settingsOptions.crm_activity_types.forEach(function(opt) { %>
+              <option value="<%= opt.key %>" <%= isEdit && activity.activity_type === opt.key ? 'selected' : (!isEdit && typeof query !== 'undefined' && query.type === opt.key) ? 'selected' : '' %>>
+                <%= opt.label || opt.key %>
+              </option>
+            <% }) %>
+          <% } else { %>
+            <option value="call" <%= isEdit && activity.activity_type === 'call' ? 'selected' : '' %>>Call</option>
+            <option value="email" <%= isEdit && activity.activity_type === 'email' ? 'selected' : '' %>>Email</option>
+            <option value="meeting" <%= isEdit && activity.activity_type === 'meeting' ? 'selected' : '' %>>Meeting</option>
+            <option value="site_visit" <%= isEdit && activity.activity_type === 'site_visit' ? 'selected' : '' %>>Site Visit</option>
+            <option value="note" <%= isEdit && activity.activity_type === 'note' ? 'selected' : '' %>>Note</option>
+          <% } %>
+        </select>
+      </div>
+      <div>
+        <label for="subject" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Subject <span class="text-red-500">*</span></label>
+        <input type="text" id="subject" name="subject" required value="<%= isEdit ? (activity.subject || '') : '' %>" placeholder="Brief description"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label for="activity_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date & Time <span class="text-red-500">*</span></label>
+        <input type="datetime-local" id="activity_date" name="activity_date" required
+          value="<%= isEdit && activity.activity_date ? activity.activity_date.replace(' ', 'T').substring(0, 16) : new Date().toISOString().substring(0, 16) %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Linked Records -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Linked Records</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label for="client_id" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Account</label>
+        <select id="client_id" name="client_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">No account linked</option>
+          <% (clients || []).forEach(function(c) { %>
+            <option value="<%= c.id %>" <%= (isEdit && activity.client_id == c.id) || (!isEdit && typeof query !== 'undefined' && query.client_id == c.id) ? 'selected' : '' %>>
+              <%= c.company_name || c.name %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label for="contact_id" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Contact</label>
+        <select id="contact_id" name="contact_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">No contact linked</option>
+          <% (contacts || []).forEach(function(ct) { %>
+            <option value="<%= ct.id %>" data-client-id="<%= ct.client_id || '' %>"
+              <%= (isEdit && activity.contact_id == ct.id) || (!isEdit && typeof query !== 'undefined' && query.contact_id == ct.id) ? 'selected' : '' %>>
+              <%= ct.name || (ct.first_name + ' ' + ct.last_name) %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label for="opportunity_id" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Opportunity</label>
+        <select id="opportunity_id" name="opportunity_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">No opportunity linked</option>
+          <% (opportunities || []).forEach(function(opp) { %>
+            <option value="<%= opp.id %>" data-client-id="<%= opp.client_id || '' %>"
+              <%= (isEdit && activity.opportunity_id == opp.id) || (!isEdit && typeof query !== 'undefined' && query.opportunity_id == opp.id) ? 'selected' : '' %>>
+              OPP-<%= String(opp.id).padStart(3, '0') %> &mdash; <%= opp.title %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Notes & Outcome -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Notes & Outcome</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div>
+        <label for="notes" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Notes</label>
+        <textarea id="notes" name="notes" rows="4" placeholder="What was discussed, key points..."
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"><%= isEdit ? (activity.notes || '') : '' %></textarea>
+      </div>
+      <div>
+        <label for="outcome" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Outcome</label>
+        <textarea id="outcome" name="outcome" rows="4" placeholder="Result of the interaction..."
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"><%= isEdit ? (activity.outcome || '') : '' %></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Follow-up -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Follow-up</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label for="next_step" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Next Step</label>
+        <input type="text" id="next_step" name="next_step" value="<%= isEdit ? (activity.next_step || '') : '' %>" placeholder="What happens next..."
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label for="next_step_due" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Due Date</label>
+        <input type="date" id="next_step_due" name="next_step_due" value="<%= isEdit && activity.next_step_due ? activity.next_step_due.split('T')[0] : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div class="flex items-end">
+        <label class="inline-flex items-center gap-2 px-3 py-2 cursor-pointer">
+          <input type="checkbox" name="set_reminder" value="1" <%= isEdit && activity.set_reminder ? 'checked' : '' %>
+            class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+          <span class="text-sm text-gray-700">Set reminder</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Location -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Location</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label for="location" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Location</label>
+        <input type="text" id="location" name="location" value="<%= isEdit ? (activity.location || '') : '' %>" placeholder="Meeting location or site address"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+    </div>
+  </div>
+
+  <!-- Submit -->
+  <div class="flex items-center justify-end gap-3">
+    <a href="/crm/activities" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
+    <button type="submit" class="px-6 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <%= isEdit ? 'Update Activity' : 'Log Activity' %>
+    </button>
+  </div>
+</form>

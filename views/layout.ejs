@@ -43,12 +43,13 @@
   <style>/* Hide Tailwind CDN dev indicator */#__tailwind_indicator,div[style*="z-index: 2147483647"]{display:none!important}</style>
 </head>
 <body class="h-full bg-gray-50 text-gray-900">
-  <%- include('partials/header') %>
-
-  <div class="flex" style="min-height: calc(100vh - 56px);">
+  <div class="flex h-full">
     <%- include('partials/sidebar') %>
 
-    <main class="flex-1 overflow-auto min-w-0">
+    <div class="flex-1 flex flex-col min-w-0 min-h-screen">
+      <%- include('partials/header') %>
+
+      <main class="flex-1 overflow-auto min-w-0">
       <div class="px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
         <% if (typeof flash_success !== 'undefined' && flash_success.length > 0) { %>
           <% flash_success.forEach(msg => { %>
@@ -71,6 +72,7 @@
       </div>
       <%- include('partials/footer') %>
     </main>
+    </div>
   </div>
 
   <script src="/js/step-wizard.js"></script>

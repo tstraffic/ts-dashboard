@@ -22,11 +22,11 @@ function initVapid() {
     // Try loading from DB if not in env
     if (!publicKey || !privateKey) {
       try {
-        const pubRow = db.prepare("SELECT value FROM system_config WHERE key = 'vapid_public_key'").get();
-        const privRow = db.prepare("SELECT value FROM system_config WHERE key = 'vapid_private_key'").get();
+        const pubRow = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'vapid_public_key'").get();
+        const privRow = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'vapid_private_key'").get();
         if (pubRow && privRow) {
-          publicKey = pubRow.value;
-          privateKey = privRow.value;
+          publicKey = pubRow.config_value;
+          privateKey = privRow.config_value;
         }
       } catch (e) { /* system_config may not exist yet */ }
     }
@@ -40,8 +40,8 @@ function initVapid() {
 
       // Save to DB for persistence across restarts
       try {
-        db.prepare("INSERT OR REPLACE INTO system_config (key, value) VALUES ('vapid_public_key', ?)").run(publicKey);
-        db.prepare("INSERT OR REPLACE INTO system_config (key, value) VALUES ('vapid_private_key', ?)").run(privateKey);
+        db.prepare("INSERT OR REPLACE INTO system_config (config_key, config_value) VALUES ('vapid_public_key', ?)").run(publicKey);
+        db.prepare("INSERT OR REPLACE INTO system_config (config_key, config_value) VALUES ('vapid_private_key', ?)").run(privateKey);
         console.log('[Push] VAPID keys saved to database.');
       } catch (e) {
         console.warn('[Push] Could not save VAPID keys to DB:', e.message);
@@ -66,8 +66,8 @@ function getVapidPublicKey() {
   const pubKey = process.env.VAPID_PUBLIC_KEY || '';
   if (pubKey) return pubKey;
   try {
-    const row = db.prepare("SELECT value FROM system_config WHERE key = 'vapid_public_key'").get();
-    return row ? row.value : null;
+    const row = db.prepare("SELECT config_value FROM system_config WHERE config_key = 'vapid_public_key'").get();
+    return row ? row.config_value : null;
   } catch (e) {
     return null;
   }

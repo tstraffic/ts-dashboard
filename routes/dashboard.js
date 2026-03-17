@@ -48,6 +48,8 @@ router.get('/', (req, res) => {
   if (urgency.unconfirmedAllocations > 0) actionItems.push({ icon: 'crew', color: 'orange', text: `${urgency.unconfirmedAllocations} unconfirmed allocation${urgency.unconfirmedAllocations !== 1 ? 's' : ''} today`, link: '/allocations' });
   if (urgency.ticketsExpiring > 0) actionItems.push({ icon: 'ticket', color: 'orange', text: `${urgency.ticketsExpiring} crew ticket${urgency.ticketsExpiring !== 1 ? 's' : ''} expiring soon`, link: '/crew' });
   if (urgency.openDefects > 0) actionItems.push({ icon: 'defect', color: 'orange', text: `${urgency.openDefects} open defect${urgency.openDefects !== 1 ? 's' : ''}`, link: '/defects' });
+  if (urgency.pendingTimesheets > 0) actionItems.push({ icon: 'clock', color: 'orange', text: `${urgency.pendingTimesheets} pending timesheet${urgency.pendingTimesheets !== 1 ? 's' : ''}`, link: '/timesheets?approved=0' });
+  if (urgency.crewGaps > 0) actionItems.push({ icon: 'crew', color: 'red', text: `${urgency.crewGaps} crew gap${urgency.crewGaps !== 1 ? 's' : ''} today`, link: '/allocations' });
 
   // Onboarding checklist
   let onboarding = null;

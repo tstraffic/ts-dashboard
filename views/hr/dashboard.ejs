@@ -1,0 +1,182 @@
+<% locals.currentPage = 'hr-dashboard' %>
+<%
+  function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  const statusBadge = {
+    active:     'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+    onboarding: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
+    on_leave:   'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    suspended:  'bg-red-50 text-red-700 ring-1 ring-red-600/20',
+    inactive:   'bg-gray-100 text-gray-500',
+    offboarded: 'bg-gray-100 text-gray-500',
+  };
+%>
+
+<div class="space-y-5">
+
+  <!-- Page Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">HR Dashboard</h1>
+      <p class="text-sm text-gray-500 mt-1">Employee management &middot; compliance tracking &middot; workforce overview</p>
+    </div>
+    <a href="/hr/employees/new" class="inline-flex items-center justify-center px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      Add Employee
+    </a>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <form method="GET" action="/hr" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+      <select name="company" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Companies</option>
+        <% if (filterOptions && filterOptions.companies) { filterOptions.companies.forEach(c => { %>
+          <option value="<%= c %>" <%= filters.company === c ? 'selected' : '' %>><%= c %></option>
+        <% }); } %>
+      </select>
+      <select name="division" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Divisions</option>
+        <% if (filterOptions && filterOptions.divisions) { filterOptions.divisions.forEach(d => { %>
+          <option value="<%= d %>" <%= filters.division === d ? 'selected' : '' %>><%= d %></option>
+        <% }); } %>
+      </select>
+      <select name="region" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Regions</option>
+        <% if (filterOptions && filterOptions.regions) { filterOptions.regions.forEach(r => { %>
+          <option value="<%= r %>" <%= filters.region === r ? 'selected' : '' %>><%= r %></option>
+        <% }); } %>
+      </select>
+      <select name="employment_type" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Types</option>
+        <option value="full_time" <%= filters.employment_type === 'full_time' ? 'selected' : '' %>>Full Time</option>
+        <option value="part_time" <%= filters.employment_type === 'part_time' ? 'selected' : '' %>>Part Time</option>
+        <option value="casual" <%= filters.employment_type === 'casual' ? 'selected' : '' %>>Casual</option>
+        <option value="contractor" <%= filters.employment_type === 'contractor' ? 'selected' : '' %>>Contractor</option>
+        <option value="subcontractor" <%= filters.employment_type === 'subcontractor' ? 'selected' : '' %>>Subcontractor</option>
+      </select>
+      <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition">Apply</button>
+    </form>
+  </div>
+
+  <!-- Row 1: Headcount -->
+  <div>
+    <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Headcount</p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Employees</p>
+        <p class="text-2xl font-bold text-gray-900 mt-1"><%= stats.total %></p>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Active</p>
+        <p class="text-2xl font-bold text-emerald-600 mt-1"><%= stats.active %></p>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Casual</p>
+        <p class="text-2xl font-bold text-blue-600 mt-1"><%= stats.casual %></p>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Subcontractors</p>
+        <p class="text-2xl font-bold text-indigo-600 mt-1"><%= stats.subcontractor %></p>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">On Leave</p>
+        <p class="text-2xl font-bold text-amber-600 mt-1"><%= stats.onLeave %></p>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <p class="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Onboarding</p>
+        <p class="text-2xl font-bold text-purple-600 mt-1"><%= stats.onboarding %></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Compliance -->
+  <div>
+    <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Compliance</p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Expiring in 7 Days</p>
+        <p class="text-2xl font-bold text-orange-600 mt-1"><%= stats.expiring7 %></p>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Expiring in 30 Days</p>
+        <p class="text-2xl font-bold text-amber-600 mt-1"><%= stats.expiring30 %></p>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Expired Items</p>
+        <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.expired %></p>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Blocked Workers</p>
+        <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.blocked %></p>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <p class="text-[10px] font-bold text-yellow-500 uppercase tracking-widest">Pending Verification</p>
+        <p class="text-2xl font-bold text-yellow-600 mt-1"><%= stats.pendingVerification %></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Employees Table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Recent Employees</h2>
+      <a href="/hr/employees" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View All</a>
+    </div>
+    <% if (recentEmployees && recentEmployees.length > 0) { %>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Company</th>
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Role</th>
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Start Date</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% recentEmployees.forEach(emp => { %>
+          <tr class="hover:bg-gray-50 transition">
+            <td class="px-3 sm:px-4 py-3">
+              <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %> <%= emp.last_name %></a>
+              <% if (emp.manager_name) { %>
+                <p class="text-[10px] text-gray-400 mt-0.5">Manager: <%= emp.manager_name %></p>
+              <% } %>
+            </td>
+            <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden sm:table-cell"><%= emp.company || '-' %></td>
+            <td class="px-3 sm:px-4 py-3 text-gray-600 text-xs hidden md:table-cell"><%= emp.role_title || '-' %></td>
+            <td class="px-3 sm:px-4 py-3">
+              <% const badgeClass = statusBadge[emp.employment_status] || statusBadge.inactive; %>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= badgeClass %>">
+                <%= (emp.employment_status || 'unknown').replace(/_/g, ' ') %>
+              </span>
+            </td>
+            <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs tabular-nums hidden lg:table-cell"><%= formatDate(emp.start_date) %></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
+      Showing <%= recentEmployees.length %> most recent employee<%= recentEmployees.length !== 1 ? 's' : '' %>
+    </div>
+    <% } else { %>
+    <div class="p-10 text-center">
+      <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </div>
+      <h3 class="text-gray-900 font-semibold text-base mb-1">No employees found</h3>
+      <p class="text-gray-500 text-sm mb-4">Get started by adding your first employee to the HR system.</p>
+      <a href="/hr/employees/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+        Add Employee
+      </a>
+    </div>
+    <% } %>
+  </div>
+
+</div>

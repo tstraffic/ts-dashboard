@@ -12,7 +12,7 @@
   </div>
 
   <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
-    <form method="POST" action="<%= formAction %>">
+    <form method="POST" action="<%= formAction %>" enctype="multipart/form-data">
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Job -->
@@ -76,6 +76,19 @@
         <div>
           <label for="target_close_date" class="block text-sm font-medium text-gray-600 mb-1">Target Close Date</label>
           <input type="date" id="target_close_date" name="target_close_date" value="<%= isEdit && defect.target_close_date ? defect.target_close_date : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <!-- Photo Upload -->
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-600 mb-1">Photo</label>
+          <input type="file" name="photo" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+          <p class="text-xs text-gray-400 mt-1">Upload a photo of the defect (max 10MB, JPEG/PNG/GIF/WebP/PDF)</p>
+          <% if (isEdit && defect.photo_path) { %>
+            <div class="mt-2">
+              <p class="text-xs text-gray-500 mb-1">Current photo:</p>
+              <img src="<%= defect.photo_path %>" alt="Current defect photo" class="rounded-lg border border-gray-200 max-w-xs max-h-32 object-cover">
+            </div>
+          <% } %>
         </div>
 
         <% if (isEdit) { %>

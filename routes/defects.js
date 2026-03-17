@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { logActivity } = require('../middleware/audit');
+const upload = require('../middleware/upload');
 
 // Generate next defect number
 function nextDefectNumber(db) {
@@ -22,6 +23,12 @@ router.get('/', (req, res) => {
 
   const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
+  // Sorting
+  const allowedSorts = { 'reported_date': 'd.reported_date', 'severity': "CASE d.severity WHEN 'critical' THEN 1 WHEN 'major' THEN 2 WHEN 'moderate' THEN 3 ELSE 4 END", 'status': 'd.status', 'title': 'd.title' };
+  const sort = allowedSorts[req.query.sort] ? req.query.sort : 'severity';
+  const order = req.query.order === 'desc' ? 'DESC' : 'ASC';
+  const orderByCol = allowedSorts[sort] || allowedSorts['severity'];
+
   const defects = db.prepare(`
     SELECT d.*, j.job_number, j.client, u.full_name as reported_by_name, a.full_name as assigned_to_name
     FROM defects d
@@ -29,7 +36,7 @@ router.get('/', (req, res) => {
     JOIN users u ON d.reported_by_id = u.id
     LEFT JOIN users a ON d.assigned_to_id = a.id
     ${whereClause}
-    ORDER BY CASE d.severity WHEN 'critical' THEN 1 WHEN 'major' THEN 2 WHEN 'moderate' THEN 3 ELSE 4 END, d.reported_date DESC
+    ORDER BY ${orderByCol} ${order}
   `).all(...params);
 
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
@@ -52,6 +59,8 @@ router.get('/', (req, res) => {
     filters: req.query,
     stats,
     today,
+    sort,
+    order: order.toLowerCase(),
   });
 });
 
@@ -81,16 +90,17 @@ router.get('/new', (req, res) => {
 });
 
 // CREATE
-router.post('/', (req, res) => {
+router.post('/', upload.single('photo'), (req, res) => {
   const db = getDb();
   const { job_id, title, description, location, severity, assigned_to_id, reported_date, target_close_date } = req.body;
   const defect_number = nextDefectNumber(db);
   const job = db.prepare('SELECT job_number FROM jobs WHERE id = ?').get(job_id);
+  const photo_path = req.file ? '/uploads/' + req.file.filename : '';
 
   const result = db.prepare(`
-    INSERT INTO defects (job_id, defect_number, title, description, location, severity, reported_by_id, assigned_to_id, reported_date, target_close_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(job_id, defect_number, title, description, location || '', severity || 'minor', req.session.user.id, assigned_to_id || null, reported_date, target_close_date || null);
+    INSERT INTO defects (job_id, defect_number, title, description, location, severity, reported_by_id, assigned_to_id, reported_date, target_close_date, photo_path)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(job_id, defect_number, title, description, location || '', severity || 'minor', req.session.user.id, assigned_to_id || null, reported_date, target_close_date || null, photo_path);
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'defect', entityId: result.lastInsertRowid, entityLabel: `${defect_number} - ${title}`, jobId: parseInt(job_id), jobNumber: job ? job.job_number : '', ip: req.ip });
   req.flash('success', `Defect ${defect_number} reported.`);
@@ -147,10 +157,10 @@ router.get('/:id/edit', (req, res) => {
 });
 
 // UPDATE
-router.post('/:id', (req, res) => {
+router.post('/:id', upload.single('photo'), (req, res) => {
   const db = getDb();
   const { job_id, title, description, location, severity, status, assigned_to_id, reported_date, target_close_date, rectification_notes } = req.body;
-  const existing = db.prepare('SELECT defect_number FROM defects WHERE id = ?').get(req.params.id);
+  const existing = db.prepare('SELECT defect_number, photo_path FROM defects WHERE id = ?').get(req.params.id);
   const job = db.prepare('SELECT job_number FROM jobs WHERE id = ?').get(job_id);
 
   // Auto-set close date if status changed to closed
@@ -159,9 +169,12 @@ router.post('/:id', (req, res) => {
     actual_close_date = new Date().toISOString().split('T')[0];
   }
 
+  // Use new photo if uploaded, otherwise keep existing
+  const photo_path = req.file ? '/uploads/' + req.file.filename : (existing ? existing.photo_path : '');
+
   db.prepare(`
-    UPDATE defects SET job_id=?, title=?, description=?, location=?, severity=?, status=?, assigned_to_id=?, reported_date=?, target_close_date=?, actual_close_date=COALESCE(?, actual_close_date), rectification_notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
-  `).run(job_id, title, description, location || '', severity, status, assigned_to_id || null, reported_date, target_close_date || null, actual_close_date, rectification_notes || '', req.params.id);
+    UPDATE defects SET job_id=?, title=?, description=?, location=?, severity=?, status=?, assigned_to_id=?, reported_date=?, target_close_date=?, actual_close_date=COALESCE(?, actual_close_date), rectification_notes=?, photo_path=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
+  `).run(job_id, title, description, location || '', severity, status, assigned_to_id || null, reported_date, target_close_date || null, actual_close_date, rectification_notes || '', photo_path, req.params.id);
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'defect', entityId: parseInt(req.params.id), entityLabel: existing ? existing.defect_number : title, jobId: parseInt(job_id), jobNumber: job ? job.job_number : '', ip: req.ip });
   req.flash('success', 'Defect updated.');

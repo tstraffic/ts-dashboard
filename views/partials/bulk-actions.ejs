@@ -1,0 +1,61 @@
+<div id="bulk-bar" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 text-sm">
+  <span id="bulk-count" class="font-semibold">0 selected</span>
+  <form method="POST" action="<%= formAction %>" id="bulk-form" class="flex items-center gap-2">
+    <input type="hidden" name="ids" id="bulk-ids" value="">
+    <select name="action" class="bg-gray-800 text-white text-sm rounded-lg px-3 py-1.5 border border-gray-700">
+      <% actions.forEach(a => { %>
+        <option value="<%= a.value %>"><%= a.label %></option>
+      <% }) %>
+    </select>
+    <button type="submit" class="px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-medium transition-colors">Apply</button>
+  </form>
+  <button onclick="clearBulkSelection()" class="text-gray-400 hover:text-white transition-colors">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+  </button>
+</div>
+
+<script>
+(function() {
+  var selected = new Set();
+  var bulkBar = document.getElementById('bulk-bar');
+  var bulkCount = document.getElementById('bulk-count');
+  var bulkIds = document.getElementById('bulk-ids');
+
+  document.querySelectorAll('.bulk-checkbox').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+      if (this.checked) selected.add(this.value);
+      else selected.delete(this.value);
+      updateBulkBar();
+    });
+  });
+
+  var selectAll = document.getElementById('select-all');
+  if (selectAll) {
+    selectAll.addEventListener('change', function() {
+      document.querySelectorAll('.bulk-checkbox').forEach(function(cb) {
+        cb.checked = selectAll.checked;
+        if (selectAll.checked) selected.add(cb.value);
+        else selected.delete(cb.value);
+      });
+      updateBulkBar();
+    });
+  }
+
+  function updateBulkBar() {
+    if (selected.size > 0) {
+      bulkBar.classList.remove('hidden');
+      bulkCount.textContent = selected.size + ' selected';
+      bulkIds.value = Array.from(selected).join(',');
+    } else {
+      bulkBar.classList.add('hidden');
+    }
+  }
+
+  window.clearBulkSelection = function() {
+    selected.clear();
+    document.querySelectorAll('.bulk-checkbox').forEach(function(cb) { cb.checked = false; });
+    if (selectAll) selectAll.checked = false;
+    updateBulkBar();
+  };
+})();
+</script>

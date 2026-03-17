@@ -1,0 +1,158 @@
+<% locals.currentPage = 'hr-compliance' %>
+<%
+  function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  const readinessBadge = {
+    ready:                'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+    ready_with_warnings:  'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
+    non_compliant:        'bg-red-50 text-red-700 ring-1 ring-red-600/20',
+    blocked:              'bg-red-50 text-red-700 ring-1 ring-red-600/20',
+    on_leave:             'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+  };
+
+  const readinessLabel = {
+    ready:                'Ready',
+    ready_with_warnings:  'Warnings',
+    non_compliant:        'Non-Compliant',
+    blocked:              'Blocked',
+    on_leave:             'On Leave',
+  };
+
+  // Compute summary stats
+  const totalReady = employees.filter(e => e.readiness && e.readiness.status === 'ready').length;
+  const totalWarnings = employees.filter(e => e.readiness && e.readiness.status === 'ready_with_warnings').length;
+  const totalNonCompliant = employees.filter(e => e.readiness && e.readiness.status === 'non_compliant').length;
+  const totalBlocked = employees.filter(e => e.readiness && e.readiness.status === 'blocked').length;
+%>
+
+<div class="space-y-5">
+
+  <!-- Header -->
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Workforce Compliance</h1>
+    <p class="text-sm text-gray-500 mt-1">Read-only compliance status for all active employees &middot; used by operations and planning teams</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Ready</p>
+      <p class="text-2xl font-bold text-emerald-600 mt-1"><%= totalReady %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Warnings</p>
+      <p class="text-2xl font-bold text-amber-600 mt-1"><%= totalWarnings %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Non-Compliant</p>
+      <p class="text-2xl font-bold text-red-600 mt-1"><%= totalNonCompliant %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Blocked</p>
+      <p class="text-2xl font-bold text-red-600 mt-1"><%= totalBlocked %></p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <form method="GET" action="/hr/compliance" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+      <select name="company" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Companies</option>
+        <% if (filterOptions && filterOptions.companies) { filterOptions.companies.forEach(c => { %>
+          <option value="<%= c %>" <%= filters.company === c ? 'selected' : '' %>><%= c %></option>
+        <% }); } %>
+      </select>
+      <div class="flex-1 min-w-0 sm:min-w-[200px]">
+        <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Search name or employee code..."
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition">Search</button>
+      <% if (filters.company || filters.search) { %>
+        <a href="/hr/compliance" class="text-sm text-gray-400 hover:text-gray-600 transition">Clear</a>
+      <% } %>
+    </form>
+  </div>
+
+  <!-- Compliance Table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <% if (employees.length > 0) { %>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200">
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Code</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Company</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Division</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Role</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Readiness</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Allocatable</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Induction</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Expired</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Expiring</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Next Expiry</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Block Reason</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% employees.forEach(emp => {
+            const rBadge = emp.readiness ? (readinessBadge[emp.readiness.status] || 'bg-gray-100 text-gray-500') : 'bg-gray-100 text-gray-500';
+            const rLabel = emp.readiness ? (readinessLabel[emp.readiness.status] || emp.readiness.status) : '-';
+          %>
+          <tr class="hover:bg-gray-50 transition">
+            <td class="px-4 py-3 text-xs font-mono text-gray-500"><%= emp.employee_code || '-' %></td>
+            <td class="px-4 py-3">
+              <span class="text-sm font-medium text-gray-900"><%= emp.full_name %></span>
+              <div class="sm:hidden text-[10px] text-gray-400 mt-0.5"><%= emp.company || '' %><% if (emp.division) { %> &middot; <%= emp.division %><% } %></div>
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell"><%= emp.company || '-' %></td>
+            <td class="px-4 py-3 text-sm text-gray-600 hidden md:table-cell"><%= emp.division || '-' %></td>
+            <td class="px-4 py-3 text-sm text-gray-600 hidden md:table-cell"><%= emp.role_title || '-' %></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= rBadge %>"><%= rLabel %></span>
+            </td>
+            <td class="px-4 py-3 hidden sm:table-cell">
+              <% if (emp.blocked_from_allocation) { %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20">Blocked</span>
+              <% } else if (emp.allocatable) { %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Yes</span>
+              <% } else { %>
+                <span class="text-gray-300 text-xs">No</span>
+              <% } %>
+            </td>
+            <td class="px-4 py-3 text-xs text-gray-600 hidden lg:table-cell"><%= emp.induction_status ? emp.induction_status.replace(/_/g, ' ') : '-' %></td>
+            <td class="px-4 py-3 hidden lg:table-cell">
+              <% if (emp.expired_count > 0) { %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20"><%= emp.expired_count %></span>
+              <% } else { %><span class="text-gray-300 text-xs">0</span><% } %>
+            </td>
+            <td class="px-4 py-3 hidden lg:table-cell">
+              <% if (emp.expiring_count > 0) { %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-600/20"><%= emp.expiring_count %></span>
+              <% } else { %><span class="text-gray-300 text-xs">0</span><% } %>
+            </td>
+            <td class="px-4 py-3 text-xs text-gray-500 tabular-nums hidden xl:table-cell"><%= formatDate(emp.next_expiry) %></td>
+            <td class="px-4 py-3 text-xs text-red-600 hidden xl:table-cell"><%= emp.block_reason || '-' %></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
+      Showing <%= employees.length %> active employee<%= employees.length !== 1 ? 's' : '' %>
+    </div>
+    <% } else { %>
+    <div class="p-10 text-center">
+      <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      </div>
+      <h3 class="text-gray-900 font-semibold text-base mb-1">No employees found</h3>
+      <p class="text-gray-500 text-sm">Try adjusting your search criteria.</p>
+    </div>
+    <% } %>
+  </div>
+
+</div>

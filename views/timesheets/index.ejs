@@ -89,28 +89,34 @@
 
 <!-- Timesheets Table -->
 <% if (timesheets.length === 0) { %>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-12 text-center">
-    <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    <p class="text-gray-500 text-sm font-medium">No timesheet entries found</p>
-    <p class="text-gray-400 text-xs mt-1">Adjust your filters or log a new timesheet</p>
-    <a href="/timesheets/new" class="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Log Timesheet</a>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+    <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </div>
+    <h3 class="text-gray-900 font-semibold text-base mb-1">No timesheets found</h3>
+    <p class="text-gray-500 text-sm mb-1">Timesheets record crew hours, shift types, and on-site roles for each job.</p>
+    <p class="text-gray-400 text-xs mb-4">Log timesheets to track labour costs, calculate overtime, and manage approvals.</p>
+    <a href="/timesheets/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      Log Timesheet
+    </a>
   </div>
 <% } else { %>
-<form method="POST" action="/timesheets/approve-bulk" id="bulkApproveForm">
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
     <table class="w-full text-sm">
       <thead>
+        <% const tsSortParams = '&job_id=' + encodeURIComponent(filters.job_id || '') + '&crew_member_id=' + encodeURIComponent(filters.crew_member_id || '') + '&work_date=' + encodeURIComponent(filters.work_date || '') + '&approved=' + encodeURIComponent(filters.approved || ''); %>
         <tr class="border-b border-gray-200">
           <th class="px-2 py-2.5 text-left w-8">
-            <input type="checkbox" id="selectAll" class="rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500" title="Select all">
+            <input type="checkbox" id="select-all" class="rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500" title="Select all">
           </th>
-          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date</th>
-          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Crew</th>
+          <th class="px-3 py-2.5 text-left"><%- include('../partials/sort-header', { label: 'Date', field: 'work_date', currentSort: sort, currentOrder: order, baseUrl: '/timesheets', extraParams: tsSortParams }) %></th>
+          <th class="px-3 py-2.5 text-left"><%- include('../partials/sort-header', { label: 'Crew', field: 'crew_name', currentSort: sort, currentOrder: order, baseUrl: '/timesheets', extraParams: tsSortParams }) %></th>
           <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Job</th>
           <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Time</th>
-          <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hours</th>
+          <th class="px-3 py-2.5 text-right"><%- include('../partials/sort-header', { label: 'Hours', field: 'total_hours', currentSort: sort, currentOrder: order, baseUrl: '/timesheets', extraParams: tsSortParams }) %></th>
           <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Shift</th>
-          <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+          <th class="px-3 py-2.5 text-center"><%- include('../partials/sort-header', { label: 'Status', field: 'approved', currentSort: sort, currentOrder: order, baseUrl: '/timesheets', extraParams: tsSortParams }) %></th>
           <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest w-16">Actions</th>
         </tr>
       </thead>
@@ -118,9 +124,7 @@
         <% timesheets.forEach(t => { %>
         <tr class="hover:bg-gray-50 <%= !t.approved ? 'bg-orange-50/30' : '' %>">
           <td class="px-2 py-2">
-            <% if (!t.approved) { %>
-              <input type="checkbox" name="timesheet_ids" value="<%= t.id %>" class="bulk-checkbox rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500">
-            <% } %>
+            <input type="checkbox" name="timesheet_ids" value="<%= t.id %>" class="bulk-checkbox rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500">
           </td>
           <td class="px-3 py-2 text-gray-600 text-xs tabular-nums">
             <%= new Date(t.work_date).toLocaleDateString('en-AU', { weekday: 'short', day: '2-digit', month: 'short' }) %>
@@ -132,7 +136,9 @@
           <td class="px-3 py-2 text-gray-500 text-xs hidden md:table-cell tabular-nums"><%= t.start_time %>-<%= t.end_time %> <span class="text-gray-300">(<%= t.break_minutes %>m brk)</span></td>
           <td class="px-3 py-2 text-right text-xs tabular-nums">
             <span class="font-semibold <%= parseFloat(t.total_hours) > 10 ? 'text-red-600' : parseFloat(t.total_hours) > 8 ? 'text-amber-600' : 'text-gray-900' %>"><%= parseFloat(t.total_hours).toFixed(1) %></span>
-            <% if (parseFloat(t.total_hours) > 8) { %>
+            <% if (t.overtime_hours && parseFloat(t.overtime_hours) > 0) { %>
+              <span class="text-amber-600 text-[9px] font-medium ml-0.5">(<%= parseFloat(t.overtime_hours).toFixed(1) %>h OT)</span>
+            <% } else if (parseFloat(t.total_hours) > 8) { %>
               <span class="text-[9px] font-bold text-amber-600 ml-0.5">OT</span>
             <% } %>
           </td>
@@ -173,32 +179,6 @@
     </table>
   </div>
 
-  <!-- Bulk Approve -->
-  <div class="mt-3 flex items-center justify-between">
-    <div class="text-xs text-gray-400"><%= timesheets.length %> entr<%= timesheets.length !== 1 ? 'ies' : 'y' %></div>
-    <button type="submit" id="bulkApproveBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-      Approve Selected
-    </button>
-  </div>
-</form>
+  <div class="mt-2 text-xs text-gray-400"><%= timesheets.length %> entr<%= timesheets.length !== 1 ? 'ies' : 'y' %></div>
+  <%- include('../partials/bulk-actions', { actions: [{ value: 'approve', label: 'Approve Selected' }, { value: 'delete', label: 'Delete Selected' }], formAction: '/timesheets/bulk' }) %>
 <% } %>
-
-<script>
-  const selectAll = document.getElementById('selectAll');
-  const bulkBtn = document.getElementById('bulkApproveBtn');
-  if (selectAll) {
-    selectAll.addEventListener('change', function() {
-      document.querySelectorAll('.bulk-checkbox').forEach(cb => { cb.checked = this.checked; });
-      updateBulkBtn();
-    });
-    document.querySelectorAll('.bulk-checkbox').forEach(cb => {
-      cb.addEventListener('change', updateBulkBtn);
-    });
-  }
-  function updateBulkBtn() {
-    if (!bulkBtn) return;
-    const checked = document.querySelectorAll('.bulk-checkbox:checked').length;
-    bulkBtn.disabled = checked === 0;
-    bulkBtn.textContent = checked > 0 ? `Approve Selected (${checked})` : 'Approve Selected';
-  }
-</script>

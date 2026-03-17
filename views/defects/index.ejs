@@ -93,25 +93,32 @@
 
 <!-- Defects Table -->
 <% if (defects.length === 0) { %>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-12 text-center">
-    <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    <p class="text-gray-500 text-sm font-medium">No defects found</p>
-    <p class="text-gray-400 text-xs mt-1">No defects match your current filters</p>
-    <a href="/defects/new" class="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Report Defect</a>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+    <div class="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </div>
+    <h3 class="text-gray-900 font-semibold text-base mb-1">No defects reported</h3>
+    <p class="text-gray-500 text-sm mb-1">Defects track damaged equipment, site issues, and snags that need rectification.</p>
+    <p class="text-gray-400 text-xs mb-4">Report defects to assign owners, track rectification progress, and close them out.</p>
+    <a href="/defects/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      Report Defect
+    </a>
   </div>
 <% } else { %>
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
   <table class="w-full text-sm">
     <thead>
+      <% const defSortParams = '&job_id=' + encodeURIComponent(filters.job_id || '') + '&severity=' + encodeURIComponent(filters.severity || '') + '&status=' + encodeURIComponent(filters.status || ''); %>
       <tr class="border-b border-gray-200">
-        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Defect</th>
+        <th class="px-3 py-2.5 text-left"><%- include('../partials/sort-header', { label: 'Defect', field: 'title', currentSort: sort, currentOrder: order, baseUrl: '/defects', extraParams: defSortParams }) %></th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Job</th>
-        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Severity</th>
-        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+        <th class="px-3 py-2.5 text-left"><%- include('../partials/sort-header', { label: 'Severity', field: 'severity', currentSort: sort, currentOrder: order, baseUrl: '/defects', extraParams: defSortParams }) %></th>
+        <th class="px-3 py-2.5 text-left"><%- include('../partials/sort-header', { label: 'Status', field: 'status', currentSort: sort, currentOrder: order, baseUrl: '/defects', extraParams: defSortParams }) %></th>
         <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Age</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Assigned</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Reported By</th>
-        <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Target</th>
+        <th class="px-3 py-2.5 text-right hidden sm:table-cell"><%- include('../partials/sort-header', { label: 'Target', field: 'reported_date', currentSort: sort, currentOrder: order, baseUrl: '/defects', extraParams: defSortParams }) %></th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">

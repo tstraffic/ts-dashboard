@@ -37,6 +37,24 @@ const CATEGORY_META = {
   plan_status:        { label: 'Traffic Plan Status',  group: 'Planning',  icon: 'clipboard' },
   equipment_category: { label: 'Equipment Categories', group: 'Assets',    icon: 'truck' },
   state:              { label: 'Australian States',    group: 'General',   icon: 'globe' },
+  // CRM categories
+  opportunity_stages: { label: 'Opportunity Stages',   group: 'CRM',       icon: 'layers' },
+  activity_types:     { label: 'Activity Types',       group: 'CRM',       icon: 'calendar' },
+  lead_sources:       { label: 'Lead Sources',         group: 'CRM',       icon: 'target' },
+  loss_reasons:       { label: 'Loss Reasons',         group: 'CRM',       icon: 'x-circle' },
+  service_categories: { label: 'Service Categories',   group: 'CRM',       icon: 'briefcase' },
+  priority_levels:    { label: 'Priority Levels',      group: 'CRM',       icon: 'flag' },
+  industry_segments:  { label: 'Industry Segments',    group: 'CRM',       icon: 'globe' },
+  client_categories:  { label: 'Client Categories',    group: 'CRM',       icon: 'users' },
+  contact_types:      { label: 'Contact Types',        group: 'CRM',       icon: 'user' },
+  // HR categories
+  hr_employment_types:    { label: 'Employment Types',    group: 'HR',  icon: 'briefcase' },
+  hr_employment_statuses: { label: 'Employment Statuses', group: 'HR',  icon: 'activity' },
+  hr_divisions:           { label: 'Divisions',           group: 'HR',  icon: 'grid' },
+  hr_document_types:      { label: 'Document Types',      group: 'HR',  icon: 'file-text' },
+  hr_competency_types:    { label: 'Competency Types',    group: 'HR',  icon: 'award' },
+  hr_ppe_statuses:        { label: 'PPE Statuses',        group: 'HR',  icon: 'shield' },
+  hr_block_reasons:       { label: 'Block Reasons',       group: 'HR',  icon: 'alert-circle' },
 };
 
 /**

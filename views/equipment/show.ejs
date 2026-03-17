@@ -23,6 +23,13 @@
         <% } else { %>bg-white text-gray-500<% } %>">
         <%= item.current_condition %>
       </span>
+      <%
+        const statusColors = { available: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', deployed: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20', maintenance: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20', inspection_due: 'bg-red-50 text-red-700 ring-1 ring-red-600/20', retired: 'bg-gray-100 text-gray-500' };
+        const eqStatus = item.status || 'available';
+      %>
+      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= statusColors[eqStatus] || 'bg-gray-100 text-gray-600' %>">
+        <%= eqStatus.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) %>
+      </span>
       <% if (!item.active) { %>
         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white text-gray-500">Inactive</span>
       <% } %>

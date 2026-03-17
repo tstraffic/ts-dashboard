@@ -18,18 +18,19 @@ function normaliseRole(role) {
 // ---- Centralised Permission Map ----
 // Single source of truth: which roles can access which modules.
 // Admin always has full access. Crew uses separate portal.
-// Roles: admin (full access), operations (no finance), planning (no finance), finance (finance + reporting)
+// Roles: admin (full), operations (no finance), planning (no finance), finance (finance + reporting),
+//        hr (HR modules + limited ops), sales (CRM + limited ops)
 const PERMISSIONS = {
-  dashboard:     ['admin', 'operations', 'planning', 'finance'],
-  jobs:          ['admin', 'operations', 'planning', 'finance'],
-  projects:      ['admin', 'operations', 'planning', 'finance'],
-  clients:       ['admin', 'operations', 'planning', 'finance'],
+  dashboard:     ['admin', 'operations', 'planning', 'finance', 'hr', 'sales'],
+  jobs:          ['admin', 'operations', 'planning', 'finance', 'sales'],
+  projects:      ['admin', 'operations', 'planning', 'finance', 'sales'],
+  clients:       ['admin', 'operations', 'planning', 'finance', 'sales'],
   tasks:         ['admin', 'operations', 'planning'],
   updates:       ['admin', 'operations', 'planning'],
   compliance:    ['admin', 'operations', 'planning'],
   plans:         ['admin', 'operations', 'planning'],
   incidents:     ['admin', 'operations', 'planning'],
-  contacts:      ['admin', 'operations', 'planning'],
+  contacts:      ['admin', 'operations', 'planning', 'hr', 'sales'],
   timesheets:    ['admin', 'operations', 'planning', 'finance'],
   crew:          ['admin', 'operations', 'planning'],
   allocations:   ['admin', 'operations', 'planning'],
@@ -38,12 +39,21 @@ const PERMISSIONS = {
   defects:       ['admin', 'operations', 'planning'],
   documents:     ['admin', 'operations', 'planning', 'finance'],
   budgets:       ['admin', 'finance'],
-  reports:       ['admin', 'operations', 'planning', 'finance'],
-  exports:       ['admin', 'operations', 'planning', 'finance'],
-  notifications: ['admin', 'operations', 'planning', 'finance'],
+  reports:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales'],
+  exports:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales'],
+  notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'sales'],
+  crm:           ['admin', 'operations', 'planning', 'sales'],
   admin:         ['admin'],
   activity:      ['admin'],
   settings:      ['admin'],
+  // HR modules
+  hr_dashboard:       ['admin', 'hr'],
+  hr_employees:       ['admin', 'hr'],
+  hr_documents:       ['admin', 'hr'],
+  hr_competencies:    ['admin', 'hr'],
+  hr_reports:         ['admin', 'hr'],
+  hr_settings:        ['admin'],
+  hr_compliance_view: ['admin', 'hr', 'operations', 'planning'],
 };
 
 // ---- Helpers ----
@@ -123,4 +133,11 @@ function canViewAccounts(user) {
   return role === 'finance' || role === 'admin';
 }
 
-module.exports = { requireLogin, requireRole, requirePermission, requireAccountsAccess, canViewAccounts, canAccess, normaliseRole, PERMISSIONS };
+/** Check if user can view sensitive HR data (DOB, emergency contacts, disciplinary, etc.) */
+function canViewSensitiveHR(user) {
+  if (!user) return false;
+  const role = normaliseRole(user.role);
+  return role === 'admin' || role === 'hr';
+}
+
+module.exports = { requireLogin, requireRole, requirePermission, requireAccountsAccess, canViewAccounts, canViewSensitiveHR, canAccess, normaliseRole, PERMISSIONS };

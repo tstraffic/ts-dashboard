@@ -1,0 +1,258 @@
+<% locals.currentPage = 'hr-competencies' %>
+
+<%
+  const todayStr = new Date().toISOString().split('T')[0];
+  const soon7Str = new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
+  const soon30Str = new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0];
+
+  const STATUS_BADGES = {
+    valid:         { label: 'Valid',         color: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' },
+    expiring_soon: { label: 'Expiring Soon', color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' },
+    expired:       { label: 'Expired',       color: 'bg-red-50 text-red-700 ring-1 ring-red-600/20' },
+    missing:       { label: 'Missing',       color: 'bg-red-50 text-red-700 ring-1 ring-red-600/20' },
+    suspended:     { label: 'Suspended',     color: 'bg-gray-100 text-gray-600' },
+  };
+
+  const defaultCompTypes = [
+    'white_card', 'traffic_controller_licence', 'first_aid',
+    'working_at_heights', 'confined_space', 'EWP',
+    'forklift', 'drivers_licence', 'other'
+  ];
+  const rawCompTypes = (settingsOptions && settingsOptions.hr_competency_types) || defaultCompTypes;
+  // Normalise to [{val,label}] — settings returns objects {key,label}, fallback is plain strings
+  const compTypes = rawCompTypes.map(t => typeof t === 'string' ? { val: t, label: t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) } : { val: t.key || t.val || t, label: t.label || t.key || t });
+
+  function buildUrl(overrides) {
+    const q = Object.assign({}, filters, overrides);
+    return '/hr/competencies?' + Object.keys(q).filter(k => q[k] !== '' && q[k] != null).map(k => k + '=' + encodeURIComponent(q[k])).join('&');
+  }
+
+  function formatCompType(type) {
+    if (!type) return '-';
+    if (typeof type !== 'string') return String(type);
+    return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+%>
+
+<div class="space-y-5">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Licences & Competencies</h1>
+      <p class="text-sm text-gray-500 mt-1">Track qualifications, licences, and certifications across the workforce</p>
+    </div>
+  </div>
+
+  <!-- Stat Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Expired</p>
+          <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.totalExpired %></p>
+        </div>
+        <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Expiring Soon</p>
+          <p class="text-2xl font-bold text-amber-600 mt-1"><%= stats.totalExpiring %></p>
+        </div>
+        <div class="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Missing</p>
+          <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.totalMissing %></p>
+        </div>
+        <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick View Tabs -->
+  <div class="flex flex-wrap gap-2">
+    <a href="<%= buildUrl({ view: '' }) %>"
+       class="px-3 py-1.5 rounded-full text-sm font-medium transition <%= !filters.view ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">
+      All
+    </a>
+    <a href="<%= buildUrl({ view: '7days' }) %>"
+       class="px-3 py-1.5 rounded-full text-sm font-medium transition <%= filters.view === '7days' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100' %>">
+      Expiring 7 Days
+    </a>
+    <a href="<%= buildUrl({ view: '30days' }) %>"
+       class="px-3 py-1.5 rounded-full text-sm font-medium transition <%= filters.view === '30days' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100' %>">
+      Expiring 30 Days
+    </a>
+    <a href="<%= buildUrl({ view: 'expired' }) %>"
+       class="px-3 py-1.5 rounded-full text-sm font-medium transition <%= filters.view === 'expired' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100' %>">
+      Expired
+    </a>
+    <a href="<%= buildUrl({ view: 'missing' }) %>"
+       class="px-3 py-1.5 rounded-full text-sm font-medium transition <%= filters.view === 'missing' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100' %>">
+      Missing
+    </a>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <form method="GET" action="/hr/competencies" id="compFilterForm" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+      <input type="hidden" name="view" value="<%= filters.view || '' %>">
+
+      <!-- Competency Type -->
+      <select name="competency_type" onchange="document.getElementById('compFilterForm').submit()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Types</option>
+        <% compTypes.forEach(function(ct) { %>
+          <option value="<%= ct.val %>" <%= filters.competency_type === ct.val ? 'selected' : '' %>><%= ct.label %></option>
+        <% }) %>
+      </select>
+
+      <!-- Status -->
+      <select name="status" onchange="document.getElementById('compFilterForm').submit()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Statuses</option>
+        <option value="valid" <%= filters.status === 'valid' ? 'selected' : '' %>>Valid</option>
+        <option value="expiring_soon" <%= filters.status === 'expiring_soon' ? 'selected' : '' %>>Expiring Soon</option>
+        <option value="expired" <%= filters.status === 'expired' ? 'selected' : '' %>>Expired</option>
+        <option value="missing" <%= filters.status === 'missing' ? 'selected' : '' %>>Missing</option>
+        <option value="suspended" <%= filters.status === 'suspended' ? 'selected' : '' %>>Suspended</option>
+      </select>
+
+      <!-- Company -->
+      <select name="company" onchange="document.getElementById('compFilterForm').submit()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Companies</option>
+        <% if (filterOptions && filterOptions.companies) { filterOptions.companies.forEach(function(c) { %>
+          <option value="<%= c %>" <%= filters.company === c ? 'selected' : '' %>><%= c %></option>
+        <% }) } %>
+      </select>
+
+      <!-- Mandatory -->
+      <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" name="mandatory" value="1" <%= filters.mandatory === '1' || filters.mandatory === 1 ? 'checked' : '' %> onchange="document.getElementById('compFilterForm').submit()" class="rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500">
+        Mandatory only
+      </label>
+
+      <% if (filters.competency_type || filters.status || filters.company || filters.mandatory) { %>
+        <a href="/hr/competencies<%= filters.view ? '?view=' + filters.view : '' %>" class="text-sm text-gray-400 hover:text-gray-600 transition">Clear filters</a>
+      <% } %>
+    </form>
+  </div>
+
+  <!-- Competencies Table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <% if (!competencies || competencies.length === 0) { %>
+      <div class="p-10 text-center">
+        <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </div>
+        <h3 class="text-gray-900 font-semibold text-base mb-1">No competencies found</h3>
+        <p class="text-gray-500 text-sm">Try adjusting your filters or add competencies from employee profiles.</p>
+      </div>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-200">
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Employee</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Name</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Level</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Issue Date</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Expiry Date</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Mandatory</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden xl:table-cell">Linked Document</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% competencies.forEach(function(comp) {
+              const sb = STATUS_BADGES[comp.status] || { label: comp.status || '-', color: 'bg-gray-100 text-gray-600' };
+              const isExpired = comp.expiry_date && comp.expiry_date < todayStr;
+              const isExpiringSoon = !isExpired && comp.expiry_date && comp.expiry_date <= soon30Str;
+            %>
+              <tr class="hover:bg-gray-50 transition-colors">
+                <!-- Employee -->
+                <td class="px-4 py-3">
+                  <a href="/hr/employees/<%= comp.employee_id %>" class="text-brand-600 hover:text-brand-700 font-medium"><%= comp.employee_name %></a>
+                  <div class="text-xs text-gray-400 mt-0.5"><%= comp.employee_code || '' %><% if (comp.employee_company) { %> &middot; <%= comp.employee_company %><% } %></div>
+                </td>
+
+                <!-- Type -->
+                <td class="px-4 py-3">
+                  <span class="text-sm text-gray-700"><%= formatCompType(comp.competency_type) %></span>
+                </td>
+
+                <!-- Name -->
+                <td class="px-4 py-3 hidden md:table-cell">
+                  <span class="text-sm text-gray-700 truncate block max-w-xs"><%= comp.name || '-' %></span>
+                </td>
+
+                <!-- Level -->
+                <td class="px-4 py-3 hidden lg:table-cell">
+                  <span class="text-sm text-gray-600"><%= comp.level || '-' %></span>
+                </td>
+
+                <!-- Issue Date -->
+                <td class="px-4 py-3 hidden lg:table-cell whitespace-nowrap">
+                  <% if (comp.issue_date) { %>
+                    <span class="text-sm text-gray-600"><%= new Date(comp.issue_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+                  <% } else { %>
+                    <span class="text-gray-300">-</span>
+                  <% } %>
+                </td>
+
+                <!-- Expiry Date -->
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <% if (comp.expiry_date) { %>
+                    <span class="<%= isExpired ? 'text-red-600 font-semibold' : isExpiringSoon ? 'text-amber-600 font-medium' : 'text-gray-600' %>">
+                      <%= new Date(comp.expiry_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
+                    </span>
+                    <% if (isExpired) { %><span class="block text-xs text-red-500 font-medium">EXPIRED</span><% } %>
+                    <% if (isExpiringSoon) { %><span class="block text-xs text-amber-500 font-medium">EXPIRING</span><% } %>
+                  <% } else { %>
+                    <span class="text-gray-300">-</span>
+                  <% } %>
+                </td>
+
+                <!-- Status -->
+                <td class="px-4 py-3">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= sb.color %>"><%= sb.label %></span>
+                </td>
+
+                <!-- Mandatory -->
+                <td class="px-4 py-3 hidden lg:table-cell">
+                  <% if (comp.mandatory) { %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20">Required</span>
+                  <% } else { %>
+                    <span class="text-gray-300">-</span>
+                  <% } %>
+                </td>
+
+                <!-- Linked Document -->
+                <td class="px-4 py-3 hidden xl:table-cell">
+                  <% if (comp.linked_doc_name) { %>
+                    <span class="text-xs text-gray-500"><%= comp.linked_doc_name %></span>
+                  <% } else { %>
+                    <span class="text-gray-300">-</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
+        Showing <%= competencies.length %> competenc<%= competencies.length !== 1 ? 'ies' : 'y' %>
+      </div>
+    <% } %>
+  </div>
+</div>

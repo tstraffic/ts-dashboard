@@ -10,6 +10,7 @@ router.get('/', (req, res) => {
   let params = [];
   if (req.query.category) { where.push('e.category = ?'); params.push(req.query.category); }
   if (req.query.condition) { where.push('e.current_condition = ?'); params.push(req.query.condition); }
+  if (req.query.status) { where.push('e.status = ?'); params.push(req.query.status); }
   if (req.query.search) { where.push("(e.name LIKE ? OR e.asset_number LIKE ? OR e.serial_number LIKE ?)"); const s = `%${req.query.search}%`; params.push(s, s, s); }
   if (req.query.active === '0') {
     // Show all including inactive
@@ -19,6 +20,12 @@ router.get('/', (req, res) => {
 
   const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
+  // Sorting
+  const allowedSorts = { 'name': 'e.name', 'category': 'e.category', 'current_condition': 'e.current_condition', 'next_inspection_date': 'e.next_inspection_date', 'asset_number': 'e.asset_number' };
+  const sort = allowedSorts[req.query.sort] ? req.query.sort : 'name';
+  const order = req.query.order === 'desc' ? 'DESC' : 'ASC';
+  const orderByCol = allowedSorts[sort] || 'e.name';
+
   const equipment = db.prepare(`
     SELECT e.*,
       (SELECT COUNT(*) FROM equipment_assignments ea WHERE ea.equipment_id = e.id AND ea.actual_return_date IS NULL) as currently_deployed,
@@ -26,7 +33,7 @@ router.get('/', (req, res) => {
       (SELECT COUNT(*) FROM equipment_assignments ea3 WHERE ea3.equipment_id = e.id) as total_assignments
     FROM equipment e
     ${whereClause}
-    ORDER BY e.category, e.name
+    ORDER BY ${orderByCol} ${order}
   `).all(...params);
 
   const today = new Date().toISOString().split('T')[0];
@@ -42,6 +49,8 @@ router.get('/', (req, res) => {
     filters: req.query,
     stats: { total: equipment.length, inspectionsDue, totalDeployed, poorDamaged },
     today,
+    sort,
+    order: order.toLowerCase(),
   });
 });
 
@@ -53,15 +62,39 @@ router.get('/new', (req, res) => {
 // CREATE EQUIPMENT
 router.post('/', (req, res) => {
   const db = getDb();
-  const { asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes } = req.body;
+  const { asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, status } = req.body;
+
+  const validStatuses = ['available', 'deployed', 'maintenance', 'inspection_due', 'retired'];
+  const equipStatus = validStatuses.includes(status) ? status : 'available';
 
   const result = db.prepare(`
-    INSERT INTO equipment (asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(asset_number, name, category, description || '', serial_number || '', registration || '', location || '', purchase_date || null, parseFloat(purchase_cost) || 0, current_condition || 'good', storage_location || '', next_inspection_date || null, parseInt(inspection_interval_days) || 90, notes || '');
+    INSERT INTO equipment (asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(asset_number, name, category, description || '', serial_number || '', registration || '', location || '', purchase_date || null, parseFloat(purchase_cost) || 0, current_condition || 'good', storage_location || '', next_inspection_date || null, parseInt(inspection_interval_days) || 90, notes || '', equipStatus);
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'equipment', entityId: result.lastInsertRowid, entityLabel: `${asset_number} - ${name}`, ip: req.ip });
   req.flash('success', `Equipment ${asset_number} added.`);
+  res.redirect('/equipment');
+});
+
+// POST /bulk — Bulk actions on equipment
+router.post('/bulk', (req, res) => {
+  const db = getDb();
+  const ids = (req.body.ids || '').split(',').map(Number).filter(n => n > 0);
+  const action = req.body.action;
+  if (ids.length === 0) return res.redirect('/equipment');
+
+  if (action === 'retire') {
+    const stmt = db.prepare('UPDATE equipment SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+    ids.forEach(id => stmt.run(id));
+    logActivity({ user: req.session.user, action: 'update', entityType: 'equipment', entityLabel: `Bulk retired ${ids.length} items`, ip: req.ip });
+    req.flash('success', ids.length + ' equipment item(s) retired.');
+  } else if (action === 'set_maintenance') {
+    const stmt = db.prepare("UPDATE equipment SET current_condition = 'fair', updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+    ids.forEach(id => stmt.run(id));
+    logActivity({ user: req.session.user, action: 'update', entityType: 'equipment', entityLabel: `Bulk set maintenance for ${ids.length} items`, ip: req.ip });
+    req.flash('success', ids.length + ' equipment item(s) flagged for maintenance.');
+  }
   res.redirect('/equipment');
 });
 
@@ -115,11 +148,14 @@ router.get('/:id/edit', (req, res) => {
 // UPDATE EQUIPMENT
 router.post('/:id', (req, res) => {
   const db = getDb();
-  const { asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, active } = req.body;
+  const { asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, active, status } = req.body;
+
+  const validStatuses = ['available', 'deployed', 'maintenance', 'inspection_due', 'retired'];
+  const equipStatus = validStatuses.includes(status) ? status : 'available';
 
   db.prepare(`
-    UPDATE equipment SET asset_number=?, name=?, category=?, description=?, serial_number=?, registration=?, location=?, purchase_date=?, purchase_cost=?, current_condition=?, storage_location=?, next_inspection_date=?, inspection_interval_days=?, notes=?, active=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
-  `).run(asset_number, name, category, description || '', serial_number || '', registration || '', location || '', purchase_date || null, parseFloat(purchase_cost) || 0, current_condition, storage_location || '', next_inspection_date || null, parseInt(inspection_interval_days) || 90, notes || '', active !== undefined ? (active ? 1 : 0) : 1, req.params.id);
+    UPDATE equipment SET asset_number=?, name=?, category=?, description=?, serial_number=?, registration=?, location=?, purchase_date=?, purchase_cost=?, current_condition=?, storage_location=?, next_inspection_date=?, inspection_interval_days=?, notes=?, active=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
+  `).run(asset_number, name, category, description || '', serial_number || '', registration || '', location || '', purchase_date || null, parseFloat(purchase_cost) || 0, current_condition, storage_location || '', next_inspection_date || null, parseInt(inspection_interval_days) || 90, notes || '', active !== undefined ? (active ? 1 : 0) : 1, equipStatus, req.params.id);
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'equipment', entityId: parseInt(req.params.id), entityLabel: `${asset_number} - ${name}`, ip: req.ip });
   req.flash('success', 'Equipment updated.');

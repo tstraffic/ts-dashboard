@@ -21,11 +21,12 @@ router.get('/', (req, res) => {
   const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
 
   const contacts = db.prepare(`
-    SELECT cc.*, j.job_number, j.client,
+    SELECT cc.*, j.job_number, j.client, cl2.company_name as linked_company_name,
       (SELECT COUNT(*) FROM communication_log cl WHERE cl.contact_id = cc.id) as comms_count,
-      (SELECT MAX(cl2.comm_date) FROM communication_log cl2 WHERE cl2.contact_id = cc.id) as last_contact_date
+      (SELECT MAX(cl3.comm_date) FROM communication_log cl3 WHERE cl3.contact_id = cc.id) as last_contact_date
     FROM client_contacts cc
     LEFT JOIN jobs j ON cc.job_id = j.id
+    LEFT JOIN clients cl2 ON cc.company_id = cl2.id
     ${whereClause}
     ORDER BY cc.company, cc.full_name
   `).all(...params);
@@ -47,12 +48,17 @@ router.get('/', (req, res) => {
 router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs ORDER BY job_number DESC").all();
+  const companies = db.prepare("SELECT id, company_name, company_type FROM clients WHERE active = 1 ORDER BY company_name").all();
+  const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('contacts/form', {
     title: 'New Contact',
     currentPage: 'contacts',
     contact: null,
     jobs,
-    preselectedJobId: req.query.job_id || ''
+    companies,
+    users,
+    preselectedJobId: req.query.job_id || '',
+    preselectedCompanyId: req.query.company_id || ''
   });
 });
 
@@ -61,11 +67,14 @@ router.get('/new', (req, res) => {
 // ============================================
 router.post('/', (req, res) => {
   const db = getDb();
-  const { job_id, contact_type, company, full_name, position, phone, email, notes, is_primary } = req.body;
+  const { job_id, company_id, contact_type, company, full_name, position, phone, mobile, email, notes, is_primary,
+    relationship_strength, influence_level, buying_role, preferred_comm_method, referred_by, contact_owner_id } = req.body;
   const result = db.prepare(`
-    INSERT INTO client_contacts (job_id, contact_type, company, full_name, position, phone, email, notes, is_primary)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(job_id || null, contact_type, company, full_name, position || '', phone || '', email || '', notes || '', is_primary ? 1 : 0);
+    INSERT INTO client_contacts (job_id, company_id, contact_type, company, full_name, position, phone, mobile, email, notes, is_primary,
+      relationship_strength, influence_level, buying_role, preferred_comm_method, referred_by, contact_owner_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(job_id || null, company_id || null, contact_type, company, full_name, position || '', phone || '', mobile || '', email || '', notes || '', is_primary ? 1 : 0,
+    relationship_strength || '', influence_level || '', buying_role || '', preferred_comm_method || '', referred_by || '', contact_owner_id || null);
 
   logActivity({
     user: req.session.user,
@@ -199,6 +208,78 @@ router.post('/comms/:id/delete', (req, res) => {
 });
 
 // ============================================
+// CONTACT DETAIL PAGE
+// ============================================
+router.get('/:id', (req, res, next) => {
+  // Skip if this looks like an edit route (handled below)
+  if (req.params.id === 'comms' || req.params.id === 'new') return next('route');
+  const db = getDb();
+  const contact = db.prepare(`
+    SELECT cc.*, c.company_name, c.id as account_id
+    FROM client_contacts cc
+    LEFT JOIN clients c ON cc.company_id = c.id
+    ${/* fallback to old company text matching */''}
+    WHERE cc.id = ?
+  `).get(req.params.id);
+
+  if (!contact) {
+    req.flash('error', 'Contact not found.');
+    return res.redirect('/contacts');
+  }
+
+  // Linked account (try company_id first, then text match)
+  let company = null;
+  if (contact.company_id) {
+    company = db.prepare('SELECT * FROM clients WHERE id = ?').get(contact.company_id);
+  } else if (contact.company) {
+    company = db.prepare('SELECT * FROM clients WHERE company_name = ?').get(contact.company);
+  }
+
+  // Opportunities linked to this contact
+  const opportunities = db.prepare(`
+    SELECT o.*, c.company_name as client_name, u.full_name as owner_name
+    FROM opportunities o
+    LEFT JOIN clients c ON o.client_id = c.id
+    LEFT JOIN users u ON o.owner_id = u.id
+    WHERE o.contact_id = ?
+    ORDER BY CASE o.status WHEN 'open' THEN 0 WHEN 'on_hold' THEN 1 WHEN 'won' THEN 2 ELSE 3 END, o.updated_at DESC
+  `).all(req.params.id);
+
+  // CRM Activities for this contact
+  const activities = db.prepare(`
+    SELECT ca.*, c.company_name as client_name, u.full_name as owner_name,
+      o.title as opp_title, o.opportunity_number
+    FROM crm_activities ca
+    LEFT JOIN clients c ON ca.client_id = c.id
+    LEFT JOIN users u ON ca.owner_id = u.id
+    LEFT JOIN opportunities o ON ca.opportunity_id = o.id
+    WHERE ca.contact_id = ?
+    ORDER BY ca.activity_date DESC
+    LIMIT 50
+  `).all(req.params.id);
+
+  // Users list (for owner display etc.)
+  const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
+
+  // Owner user
+  let ownerUser = null;
+  if (contact.contact_owner_id) {
+    ownerUser = users.find(u => u.id === contact.contact_owner_id) || null;
+  }
+
+  res.render('contacts/show', {
+    title: contact.full_name || contact.name || 'Contact Detail',
+    currentPage: 'contacts',
+    contact,
+    company,
+    opportunities,
+    activities,
+    users,
+    ownerUser,
+  });
+});
+
+// ============================================
 // EDIT CONTACT
 // ============================================
 router.get('/:id/edit', (req, res) => {
@@ -209,12 +290,27 @@ router.get('/:id/edit', (req, res) => {
     return res.redirect('/contacts');
   }
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs ORDER BY job_number DESC").all();
+  const companies = db.prepare("SELECT id, company_name, company_type FROM clients WHERE active = 1 ORDER BY company_name").all();
+  const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
+
+  // Activity log
+  const activityLog = db.prepare(`
+    SELECT al.*, u.full_name as user_name FROM activity_log al
+    LEFT JOIN users u ON al.user_id = u.id
+    WHERE al.entity_type = 'contact' AND al.entity_id = ?
+    ORDER BY al.created_at DESC LIMIT 20
+  `).all(req.params.id);
+
   res.render('contacts/form', {
     title: `Edit ${contact.full_name}`,
     currentPage: 'contacts',
     contact,
     jobs,
-    preselectedJobId: ''
+    companies,
+    users,
+    preselectedJobId: '',
+    preselectedCompanyId: '',
+    activityLog
   });
 });
 
@@ -223,11 +319,15 @@ router.get('/:id/edit', (req, res) => {
 // ============================================
 router.post('/:id', (req, res) => {
   const db = getDb();
-  const { job_id, contact_type, company, full_name, position, phone, email, notes, is_primary } = req.body;
+  const { job_id, company_id, contact_type, company, full_name, position, phone, mobile, email, notes, is_primary,
+    relationship_strength, influence_level, buying_role, preferred_comm_method, referred_by, contact_owner_id } = req.body;
   db.prepare(`
-    UPDATE client_contacts SET job_id=?, contact_type=?, company=?, full_name=?, position=?, phone=?, email=?, notes=?, is_primary=?
+    UPDATE client_contacts SET job_id=?, company_id=?, contact_type=?, company=?, full_name=?, position=?, phone=?, mobile=?, email=?, notes=?, is_primary=?,
+      relationship_strength=?, influence_level=?, buying_role=?, preferred_comm_method=?, referred_by=?, contact_owner_id=?,
+      updated_at=CURRENT_TIMESTAMP
     WHERE id=?
-  `).run(job_id || null, contact_type, company, full_name, position || '', phone || '', email || '', notes || '', is_primary ? 1 : 0, req.params.id);
+  `).run(job_id || null, company_id || null, contact_type, company, full_name, position || '', phone || '', mobile || '', email || '', notes || '', is_primary ? 1 : 0,
+    relationship_strength || '', influence_level || '', buying_role || '', preferred_comm_method || '', referred_by || '', contact_owner_id || null, req.params.id);
 
   logActivity({
     user: req.session.user,

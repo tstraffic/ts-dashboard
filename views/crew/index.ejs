@@ -100,11 +100,14 @@
   <!-- Crew Table -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
     <% if (crew.length === 0) { %>
-      <div class="p-12 text-center">
-        <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-        <p class="text-gray-500 text-sm font-medium">No crew members match your filters</p>
-        <p class="text-gray-400 text-xs mt-1">Try a different search term or filter setting</p>
-        <a href="/crew/new" class="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <div class="p-10 text-center">
+        <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </div>
+        <h3 class="text-gray-900 font-semibold text-base mb-1">No crew members found</h3>
+        <p class="text-gray-500 text-sm mb-1">Your crew roster tracks traffic controllers, leading hands, supervisors, and other field staff.</p>
+        <p class="text-gray-400 text-xs mb-4">Add crew members to manage allocations, compliance, and timesheets.</p>
+        <a href="/crew/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
           Add Crew Member
         </a>
@@ -113,13 +116,17 @@
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
+          <% const crewSortParams = '&filter=' + encodeURIComponent(filter) + '&search=' + encodeURIComponent(search) + '&role=' + encodeURIComponent(roleFilter); %>
           <tr class="border-b border-gray-200">
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Employee ID</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Role</th>
+            <th class="px-2 py-3 text-left w-8">
+              <input type="checkbox" id="select-all" class="rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500" title="Select all">
+            </th>
+            <th class="px-3 sm:px-4 py-3 text-left"><%- include('../partials/sort-header', { label: 'Name', field: 'full_name', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
+            <th class="px-3 sm:px-4 py-3 text-left hidden sm:table-cell"><%- include('../partials/sort-header', { label: 'Employee ID', field: 'employee_id', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
+            <th class="px-3 sm:px-4 py-3 text-left hidden md:table-cell"><%- include('../partials/sort-header', { label: 'Role', field: 'role', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
             <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
             <th class="px-3 sm:px-4 py-3 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Jobs</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Next Expiry</th>
+            <th class="px-3 sm:px-4 py-3 text-left hidden lg:table-cell"><%- include('../partials/sort-header', { label: 'Next Expiry', field: 'licence_expiry', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
             <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Last Worked</th>
             <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Company</th>
             <th class="px-3 sm:px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actions</th>
@@ -128,6 +135,9 @@
         <tbody class="divide-y divide-gray-100">
           <% for (const c of crew) { %>
           <tr class="hover:bg-gray-50 transition <%= !c.active ? 'opacity-50' : '' %>">
+            <td class="px-2 py-3">
+              <input type="checkbox" class="bulk-checkbox rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500" value="<%= c.id %>">
+            </td>
             <!-- Name + mobile subtitle -->
             <td class="px-3 sm:px-4 py-3">
               <a href="/crew/<%= c.id %>" class="text-brand-600 hover:text-brand-700 font-medium"><%= c.full_name %></a>
@@ -228,6 +238,7 @@
     <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
       Showing <%= crew.length %> crew member<%= crew.length !== 1 ? 's' : '' %>
     </div>
+    <%- include('../partials/bulk-actions', { actions: [{ value: 'deactivate', label: 'Deactivate Selected' }], formAction: '/crew/bulk' }) %>
     <% } %>
   </div>
 </div>

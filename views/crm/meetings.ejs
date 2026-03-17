@@ -1,0 +1,294 @@
+<% locals.currentPage = 'crm-meetings' %>
+<%
+  function formatDate(d) {
+    if (!d) return '-';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function formatDateTime(d) {
+    if (!d) return '-';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }) + ' ' + dt.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+  }
+  function formatTime(d) {
+    if (!d) return '';
+    const dt = new Date(d);
+    return dt.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+  }
+  const today = new Date().toISOString().split('T')[0];
+
+  const locationTypeColors = {
+    office: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    site: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+    phone: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
+    teams: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
+    zoom: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20',
+    other: 'bg-gray-50 text-gray-600 ring-1 ring-gray-600/20'
+  };
+  const locationTypeLabels = {
+    office: 'Office',
+    site: 'Site',
+    phone: 'Phone',
+    teams: 'Teams',
+    zoom: 'Zoom',
+    other: 'Other'
+  };
+
+  // Compute stats
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Monday
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const allMeetings = meetings || [];
+  const todayMeetings = allMeetings.filter(function(m) {
+    return m.meeting_date && m.meeting_date.split('T')[0] === todayStr;
+  });
+  const weekMeetings = allMeetings.filter(function(m) {
+    if (!m.meeting_date) return false;
+    const d = m.meeting_date.split('T')[0];
+    return d >= startOfWeek.toISOString().split('T')[0] && d <= endOfWeek.toISOString().split('T')[0];
+  });
+  const monthMeetings = allMeetings.filter(function(m) {
+    if (!m.meeting_date) return false;
+    const d = m.meeting_date.split('T')[0];
+    return d >= startOfMonth.toISOString().split('T')[0] && d <= endOfMonth.toISOString().split('T')[0];
+  });
+  const overdueFollowups = allMeetings.filter(function(m) {
+    return m.follow_up_actions && m.next_meeting_date && m.next_meeting_date.split('T')[0] < todayStr;
+  });
+%>
+
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">CRM Meetings</h1>
+    <p class="text-gray-500 text-sm mt-0.5">Schedule and track client meetings</p>
+  </div>
+  <a href="/crm/meetings/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+    Schedule Meeting
+  </a>
+</div>
+
+<!-- Stat Cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+  <!-- Today's Meetings -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
+        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Today</p>
+        <p class="text-xl font-bold text-gray-900"><%= todayMeetings.length %></p>
+      </div>
+    </div>
+  </div>
+  <!-- This Week -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">This Week</p>
+        <p class="text-xl font-bold text-gray-900"><%= weekMeetings.length %></p>
+      </div>
+    </div>
+  </div>
+  <!-- Overdue Follow-ups -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
+        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Overdue</p>
+        <p class="text-xl font-bold <%= overdueFollowups.length > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= overdueFollowups.length %></p>
+      </div>
+    </div>
+  </div>
+  <!-- Total This Month -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center">
+        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">This Month</p>
+        <p class="text-xl font-bold text-gray-900"><%= monthMeetings.length %></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-5">
+  <form method="GET" action="/crm/meetings" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 sm:gap-3">
+    <div class="flex-1 min-w-0 sm:min-w-[180px]">
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Search</label>
+      <input type="text" name="search" value="<%= typeof filters !== 'undefined' && filters.search ? filters.search : '' %>" placeholder="Title, account..."
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+    </div>
+    <div class="flex gap-2 w-full sm:w-auto">
+      <div class="flex-1 sm:flex-none sm:min-w-[120px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Owner</label>
+        <select name="owner" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">All Owners</option>
+          <% (users || []).forEach(function(u) { %>
+            <option value="<%= u.id %>" <%= typeof filters !== 'undefined' && filters.owner == u.id ? 'selected' : '' %>><%= u.full_name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="flex-1 sm:flex-none sm:min-w-[140px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Account</label>
+        <select name="client_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">All Accounts</option>
+          <% (clients || []).forEach(function(c) { %>
+            <option value="<%= c.id %>" <%= typeof filters !== 'undefined' && filters.client_id == c.id ? 'selected' : '' %>><%= c.company_name || c.name %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+    <div class="flex gap-2 w-full sm:w-auto">
+      <div class="flex-1 sm:flex-none sm:min-w-[130px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Date From</label>
+        <input type="date" name="date_from" value="<%= typeof filters !== 'undefined' && filters.date_from ? filters.date_from : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div class="flex-1 sm:flex-none sm:min-w-[130px]">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Date To</label>
+        <input type="date" name="date_to" value="<%= typeof filters !== 'undefined' && filters.date_to ? filters.date_to : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+    </div>
+    <!-- View Tabs -->
+    <div class="flex gap-1 w-full sm:w-auto">
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5 w-full sm:hidden">View</label>
+      <div class="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+        <% const currentView = typeof filters !== 'undefined' && filters.view ? filters.view : 'upcoming'; %>
+        <a href="/crm/meetings?view=upcoming" class="px-3 py-2 <%= currentView === 'upcoming' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' %> transition-colors">Upcoming</a>
+        <a href="/crm/meetings?view=today" class="px-3 py-2 border-l border-gray-200 <%= currentView === 'today' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' %> transition-colors">Today</a>
+        <a href="/crm/meetings?view=week" class="px-3 py-2 border-l border-gray-200 <%= currentView === 'week' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' %> transition-colors">This Week</a>
+        <a href="/crm/meetings?view=past" class="px-3 py-2 border-l border-gray-200 <%= currentView === 'past' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' %> transition-colors">Past</a>
+        <a href="/crm/meetings?view=all" class="px-3 py-2 border-l border-gray-200 <%= currentView === 'all' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' %> transition-colors">All</a>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Filter</button>
+      <a href="/crm/meetings" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Clear</a>
+    </div>
+  </form>
+</div>
+
+<!-- Meetings Table -->
+<% if (!meetings || meetings.length === 0) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+    <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+    </div>
+    <h3 class="text-gray-900 font-semibold text-base mb-1">No meetings found</h3>
+    <p class="text-gray-500 text-sm mb-1">Schedule meetings to track client interactions and follow-ups.</p>
+    <p class="text-gray-400 text-xs mb-4">Try adjusting your filters or schedule a new meeting.</p>
+    <a href="/crm/meetings/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      Schedule Meeting
+    </a>
+  </div>
+<% } else { %>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-200">
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date / Time</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Title</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Account</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Owner</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Location</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Opportunity</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Duration</th>
+        <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Outcome</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      <% meetings.forEach(function(mtg) {
+        const mtgDate = mtg.meeting_date ? mtg.meeting_date.split('T')[0] : '';
+        const isPast = mtgDate && mtgDate < todayStr;
+        const isToday = mtgDate === todayStr;
+        const hasOutcome = mtg.outcome && mtg.outcome.trim().length > 0;
+        const isOverdue = isPast && !hasOutcome;
+      %>
+      <tr class="hover:bg-gray-50 <%= isOverdue ? 'border-l-4 border-l-red-400' : '' %> <%= isToday ? 'bg-blue-50/40' : '' %>">
+        <td class="px-3 py-2.5">
+          <span class="text-xs tabular-nums text-gray-600"><%= formatDateTime(mtg.meeting_date) %></span>
+        </td>
+        <td class="px-3 py-2.5">
+          <a href="/crm/meetings/<%= mtg.id %>/edit" class="text-sm font-medium text-gray-900 hover:text-brand-600 transition"><%= mtg.title || '-' %></a>
+          <% if (mtg.purpose) { %>
+            <p class="text-xs text-gray-400 truncate max-w-[200px]"><%= mtg.purpose %></p>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 hidden md:table-cell">
+          <% if (mtg.client_id) { %>
+            <a href="/clients/<%= mtg.client_id %>" class="text-xs text-brand-600 hover:text-brand-700 font-medium"><%= mtg.client_name || '-' %></a>
+          <% } else { %>
+            <span class="text-xs text-gray-300">-</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-xs text-gray-600 hidden lg:table-cell"><%= mtg.owner_name || '-' %></td>
+        <td class="px-3 py-2.5 hidden md:table-cell">
+          <% if (mtg.location_type) { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold <%= locationTypeColors[mtg.location_type] || locationTypeColors.other %>">
+              <%= locationTypeLabels[mtg.location_type] || mtg.location_type %>
+            </span>
+          <% } %>
+          <% if (mtg.location_text) { %>
+            <span class="text-xs text-gray-500 ml-1 truncate max-w-[120px] inline-block align-middle"><%= mtg.location_text %></span>
+          <% } %>
+          <% if (!mtg.location_type && !mtg.location_text) { %>
+            <span class="text-xs text-gray-300">-</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 hidden xl:table-cell">
+          <% if (mtg.opportunity_id) { %>
+            <a href="/crm/opportunities/<%= mtg.opportunity_id %>" class="text-xs text-brand-600 hover:text-brand-700 font-medium">
+              OPP-<%= String(mtg.opportunity_id).padStart(3, '0') %><% if (mtg.opportunity_title) { %> &mdash; <%= mtg.opportunity_title %><% } %>
+            </a>
+          <% } else { %>
+            <span class="text-xs text-gray-300">-</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-xs text-gray-600 hidden lg:table-cell">
+          <% if (mtg.duration) { %>
+            <%= mtg.duration >= 60 ? Math.floor(mtg.duration / 60) + 'h' + (mtg.duration % 60 ? ' ' + (mtg.duration % 60) + 'm' : '') : mtg.duration + 'm' %>
+          <% } else { %>
+            <span class="text-gray-300">-</span>
+          <% } %>
+        </td>
+        <td class="px-3 py-2.5 text-center">
+          <% if (hasOutcome) { %>
+            <span class="inline-flex items-center gap-1 text-emerald-600" title="Outcome recorded">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </span>
+          <% } else if (isPast) { %>
+            <span class="inline-flex items-center gap-1 text-amber-500" title="No outcome recorded">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            </span>
+          <% } else { %>
+            <span class="inline-flex items-center gap-1 text-gray-300" title="Upcoming">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </span>
+          <% } %>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<div class="mt-2 text-xs text-gray-400"><%= meetings.length %> meeting<%= meetings.length !== 1 ? 's' : '' %> found</div>
+<% } %>

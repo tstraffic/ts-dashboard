@@ -22,9 +22,25 @@
           placeholder="John Smith"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
-      <!-- Company -->
+      <!-- Linked Company (from directory) -->
       <div>
-        <label for="company" class="block text-sm font-medium text-gray-600 mb-1">Company <span class="text-red-600">*</span></label>
+        <label for="company_id" class="block text-sm font-medium text-gray-600 mb-1">Company <span class="text-gray-400 text-xs">(from directory)</span></label>
+        <select id="company_id" name="company_id" onchange="onCompanySelect(this)"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select from directory or type below --</option>
+          <% if (typeof companies !== 'undefined' && companies) { %>
+            <% companies.forEach(comp => { %>
+              <option value="<%= comp.id %>" data-name="<%= comp.company_name %>"
+                <%= (isEdit && contact.company_id == comp.id) || (!isEdit && preselectedCompanyId == comp.id) ? 'selected' : '' %>>
+                <%= comp.company_name %> <% if (comp.company_type !== 'client') { %>(<%= comp.company_type %>)<% } %>
+              </option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <!-- Company (text fallback) -->
+      <div>
+        <label for="company" class="block text-sm font-medium text-gray-600 mb-1">Company Name <span class="text-red-600">*</span></label>
         <input type="text" id="company" name="company" required
           value="<%= isEdit ? contact.company : '' %>"
           placeholder="Company name"
@@ -36,13 +52,10 @@
         <select id="contact_type" name="contact_type" required
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select Type --</option>
-          <option value="client" <%= isEdit && contact.contact_type === 'client' ? 'selected' : '' %>>Client</option>
-          <option value="council" <%= isEdit && contact.contact_type === 'council' ? 'selected' : '' %>>Council</option>
-          <option value="utility" <%= isEdit && contact.contact_type === 'utility' ? 'selected' : '' %>>Utility</option>
-          <option value="rms" <%= isEdit && contact.contact_type === 'rms' ? 'selected' : '' %>>RMS / TfNSW</option>
-          <option value="subcontractor" <%= isEdit && contact.contact_type === 'subcontractor' ? 'selected' : '' %>>Subcontractor</option>
-          <option value="consultant" <%= isEdit && contact.contact_type === 'consultant' ? 'selected' : '' %>>Consultant</option>
-          <option value="other" <%= isEdit && contact.contact_type === 'other' ? 'selected' : '' %>>Other</option>
+          <% const ctOptions = (typeof settingsOptions !== 'undefined' && settingsOptions.contact_types && settingsOptions.contact_types.length > 0) ? settingsOptions.contact_types : [{key:'client'},{key:'council'},{key:'utility'},{key:'rms'},{key:'subcontractor'},{key:'consultant'},{key:'decision_maker'},{key:'project_manager'},{key:'estimator'},{key:'procurement'},{key:'safety'},{key:'planner'},{key:'accounts'},{key:'site_contact'},{key:'other'}]; %>
+          <% ctOptions.forEach(opt => { %>
+            <option value="<%= opt.key %>" <%= isEdit && contact.contact_type === opt.key ? 'selected' : '' %>><%= opt.label || opt.key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) %></option>
+          <% }) %>
         </select>
       </div>
       <!-- Position -->
@@ -65,6 +78,14 @@
         <label for="phone" class="block text-sm font-medium text-gray-600 mb-1">Phone</label>
         <input type="tel" id="phone" name="phone"
           value="<%= isEdit && contact.phone ? contact.phone : '' %>"
+          placeholder="02 XXXX XXXX"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <!-- Mobile -->
+      <div>
+        <label for="mobile" class="block text-sm font-medium text-gray-600 mb-1">Mobile</label>
+        <input type="tel" id="mobile" name="mobile"
+          value="<%= isEdit && contact.mobile ? contact.mobile : '' %>"
           placeholder="04XX XXX XXX"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
@@ -116,6 +137,64 @@
     </div>
   </div>
 
+  <!-- CRM / Relationship Fields -->
+  <div class="bg-white border border-brand-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-semibold text-brand-700 uppercase tracking-wide mb-4">Relationship (CRM)</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Relationship Strength</label>
+        <select name="relationship_strength" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Not set</option>
+          <% ['cold','warm','strong','champion'].forEach(v => { %>
+            <option value="<%= v %>" <%= isEdit && contact.relationship_strength === v ? 'selected' : '' %>><%= v.charAt(0).toUpperCase() + v.slice(1) %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Influence Level</label>
+        <select name="influence_level" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Not set</option>
+          <% ['low','medium','high','decision_maker'].forEach(v => { %>
+            <option value="<%= v %>" <%= isEdit && contact.influence_level === v ? 'selected' : '' %>><%= v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Buying Role</label>
+        <select name="buying_role" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Not set</option>
+          <% ['user','influencer','gatekeeper','decision_maker','champion'].forEach(v => { %>
+            <option value="<%= v %>" <%= isEdit && contact.buying_role === v ? 'selected' : '' %>><%= v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Preferred Communication</label>
+        <select name="preferred_comm_method" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Not set</option>
+          <% ['phone','email','meeting','teams'].forEach(v => { %>
+            <option value="<%= v %>" <%= isEdit && contact.preferred_comm_method === v ? 'selected' : '' %>><%= v.charAt(0).toUpperCase() + v.slice(1) %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Referred By</label>
+        <input type="text" name="referred_by" value="<%= isEdit ? (contact.referred_by || '') : '' %>"
+          placeholder="e.g. John from ABC Corp"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Contact Owner</label>
+        <select name="contact_owner_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Unassigned</option>
+          <% (typeof users !== 'undefined' ? users : []).forEach(u => { %>
+            <option value="<%= u.id %>" <%= isEdit && contact.contact_owner_id == u.id ? 'selected' : '' %>><%= u.full_name %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+  </div>
+
   <!-- Actions -->
   <div class="flex items-center gap-3">
     <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
@@ -124,3 +203,29 @@
     <a href="/contacts" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
   </div>
 </form>
+
+<script>
+function onCompanySelect(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.name) {
+    document.getElementById('company').value = opt.dataset.name;
+  }
+}
+// On load: if a company is preselected, auto-fill
+(function() {
+  const sel = document.getElementById('company_id');
+  const companyInput = document.getElementById('company');
+  if (sel && sel.value && !companyInput.value) {
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.name) companyInput.value = opt.dataset.name;
+  }
+})();
+</script>
+
+<% if (typeof activityLog !== 'undefined' && activityLog.length > 0) { %>
+<!-- Activity Timeline -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mt-5">
+  <h3 class="text-sm font-bold text-gray-900 mb-3">Activity</h3>
+  <%- include('../partials/activity-timeline', { activities: activityLog }) %>
+</div>
+<% } %>
