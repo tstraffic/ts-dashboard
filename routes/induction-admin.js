@@ -225,10 +225,14 @@ router.post('/submissions/:id/convert', (req, res) => {
 // Serve uploaded induction files (authenticated)
 // View URLs: /induction/admin/uploads/:id/:filename — :id is for context only, files are stored flat
 router.get('/uploads/:id/:filename', (req, res) => {
-  const filePath = path.join(__dirname, '..', 'uploads', 'inductions', req.params.filename);
-  if (!fs.existsSync(filePath)) {
+  // Sanitize filename — prevent path traversal attacks
+  const filename = path.basename(req.params.filename);
+  const uploadsDir = path.resolve(__dirname, '..', 'uploads', 'inductions');
+  const filePath = path.resolve(uploadsDir, filename);
+  if (!filePath.startsWith(uploadsDir) || !fs.existsSync(filePath)) {
     return res.status(404).send('File not found');
   }
+  res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
   res.sendFile(filePath);
 });
 

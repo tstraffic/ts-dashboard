@@ -3,6 +3,8 @@ const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
 const flash = require('connect-flash');
 const ejsLayouts = require('express-ejs-layouts');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { initializeDatabase } = require('./db/schema');
 const { requireLogin, requirePermission, canAccess } = require('./middleware/auth');
@@ -25,19 +27,34 @@ app.use(ejsLayouts);
 app.set('layout', 'layout');
 app.set('layout extractScripts', true);
 
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disabled for Tailwind CDN + inline scripts
+  crossOriginEmbedderPolicy: false,
+}));
+
 // Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Sessions
+// Sessions (secure cookies in production)
+const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production';
 app.use(session({
   store: new SQLiteStore({ db: 'sessions.db', dir: path.join(__dirname, 'data') }),
   secret: process.env.SESSION_SECRET || 'ts-traffic-dashboard-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+  }
 }));
+
+// Trust proxy for Railway (needed for secure cookies behind load balancer)
+if (isProduction) app.set('trust proxy', 1);
 
 app.use(flash());
 
@@ -65,6 +82,17 @@ app.use('/w/setup', require('./routes/worker/setup'));
 // Induction admin routes (must be BEFORE public /induction/:type to avoid catch-all)
 app.use('/induction/admin', requireLogin, requirePermission('induction'), require('./routes/induction-admin'));
 app.use('/induction', require('./routes/induction'));
+
+// Rate limiting on login endpoints (prevent brute force)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per window
+  message: 'Too many login attempts, please try again in 15 minutes.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.post('/login', loginLimiter);
+app.post('/w/login', loginLimiter);
 
 // Worker Portal routes (must be BEFORE blockWorkerFromAdmin)
 app.use('/w', require('./routes/worker/auth'));
@@ -156,7 +184,7 @@ app.use((err, req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`T&S Operations Dashboard running at http://localhost:${PORT}`);
-  console.log(`Default login: admin / admin123`);
+  if (!isProduction) console.log(`Dev login: admin / admin123`);
 
   // Initialize web push VAPID keys
   initVapid();

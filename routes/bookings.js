@@ -19,7 +19,12 @@ const bookingStorage = multer.diskStorage({
     cb(null, Date.now() + '-' + Math.random().toString(36).substring(7) + ext);
   }
 });
-const uploadDoc = multer({ storage: bookingStorage, limits: { fileSize: 50 * 1024 * 1024 } });
+const ALLOWED_FILE_TYPES = /\.(pdf|doc|docx|xls|xlsx|png|jpg|jpeg|gif|csv|txt|zip)$/i;
+const fileFilter = (req, file, cb) => {
+  if (ALLOWED_FILE_TYPES.test(file.originalname)) cb(null, true);
+  else cb(new Error('File type not allowed. Accepted: PDF, DOC, XLS, images, CSV, TXT, ZIP'), false);
+};
+const uploadDoc = multer({ storage: bookingStorage, limits: { fileSize: 50 * 1024 * 1024 }, fileFilter });
 
 const DEPOTS = ['Villawood', 'Penrith', 'Campbelltown', 'Parramatta'];
 const VALID_STATUSES = ['unconfirmed', 'confirmed', 'green_to_go', 'in_progress', 'completed', 'cancelled', 'on_hold'];
