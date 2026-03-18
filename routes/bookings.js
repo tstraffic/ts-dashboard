@@ -97,7 +97,22 @@ function loadBookingDetail(db, bookingId) {
   let documents = [];
   try { documents = db.prepare("SELECT bd.*, u.full_name as uploader_name FROM booking_documents bd LEFT JOIN users u ON u.id = bd.uploaded_by_id WHERE bd.booking_id = ? ORDER BY bd.created_at DESC").all(bookingId); } catch(e) {}
   const activity = db.prepare("SELECT al.*, u.full_name as user_name FROM activity_log al LEFT JOIN users u ON u.id = al.user_id WHERE al.entity_type = 'booking' AND al.entity_id = ? ORDER BY al.created_at DESC LIMIT 30").all(bookingId);
-  return { ...row, supervisor_name: supervisorName, crew, notes, vehicles, dockets, documents, activity, job: jobInfo, client: clientInfo };
+  let requirements = [];
+  try { requirements = db.prepare("SELECT * FROM booking_requirements WHERE booking_id = ? ORDER BY resource_type").all(bookingId); } catch(e) {}
+  let equipmentList = [];
+  try { equipmentList = db.prepare("SELECT be.*, e.asset_name, e.category as eq_category FROM booking_equipment be LEFT JOIN equipment e ON e.id = be.equipment_id WHERE be.booking_id = ? ORDER BY be.created_at").all(bookingId); } catch(e) {}
+
+  // Compute requirement fulfillment
+  requirements.forEach(r => {
+    const assigned = crew.filter(c => {
+      const role = (c.role_on_site || c.crew_role || '').toLowerCase().replace(/_/g, ' ');
+      return role.includes(r.resource_type.toLowerCase().replace(/_/g, ' '));
+    }).length;
+    r.quantity_assigned = assigned;
+    r.status = assigned >= r.quantity_required ? 'fulfilled' : assigned > 0 ? 'partial' : 'unfulfilled';
+  });
+
+  return { ...row, supervisor_name: supervisorName, crew, notes, vehicles, dockets, documents, activity, requirements, equipment: equipmentList, job: jobInfo, client: clientInfo };
 }
 
 // GET / — Board view
@@ -183,7 +198,7 @@ router.get('/:id', (req, res) => {
   if (!booking) { if (req.headers.accept && req.headers.accept.includes('application/json')) return res.status(404).json({ error: 'Booking not found' }); req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
   if (req.headers.accept && req.headers.accept.includes('application/json')) {
     const t = transformBooking(db, booking);
-    return res.json({ ...t, booking_number: booking.booking_number, description: booking.description, requirements_text: booking.requirements_text, order_number: booking.order_number, billing_code: booking.billing_code, client_contact: booking.client_contact, is_emergency: booking.is_emergency, is_callout: booking.is_callout, billable: booking.billable, invoiced: booking.invoiced, site_address: booking.site_address, suburb: booking.suburb, state: booking.state, postcode: booking.postcode, crew: booking.crew, allNotes: booking.notes, allVehicles: booking.vehicles, job: booking.job, client: booking.client });
+    return res.json({ ...t, booking_number: booking.booking_number, description: booking.description, requirements_text: booking.requirements_text, order_number: booking.order_number, billing_code: booking.billing_code, client_contact: booking.client_contact, is_emergency: booking.is_emergency, is_callout: booking.is_callout, billable: booking.billable, invoiced: booking.invoiced, site_address: booking.site_address, suburb: booking.suburb, state: booking.state, postcode: booking.postcode, crew: booking.crew, allNotes: booking.notes, allVehicles: booking.vehicles, dockets: booking.dockets, documents: booking.documents, activity: booking.activity, requirements: booking.requirements, equipment: booking.equipment, job: booking.job, client: booking.client });
   }
   const allCrew = db.prepare("SELECT id, full_name, role, employee_id FROM crew_members WHERE active = 1 ORDER BY full_name").all();
   res.render('bookings/show', {
@@ -194,8 +209,12 @@ router.get('/:id', (req, res) => {
       allVehicles: booking.vehicles,
       dockets: booking.dockets || [],
       documents: booking.documents || [],
-      activity: booking.activity || [] },
-    allCrew, user: req.session.user,
+      activity: booking.activity || [],
+      requirements: booking.requirements || [],
+      equipment: booking.equipment || [] },
+    allCrew,
+    allEquipment: (() => { try { return getDb().prepare("SELECT id, asset_name, category FROM equipment WHERE status != 'decommissioned' ORDER BY asset_name").all(); } catch(e) { return []; } })(),
+    user: req.session.user,
   });
 });
 
@@ -443,6 +462,51 @@ router.post('/:id/documents/:docId/delete', (req, res) => {
   if (doc && doc.file_path && fs.existsSync(doc.file_path)) { try { fs.unlinkSync(doc.file_path); } catch(e) {} }
   db.prepare("DELETE FROM booking_documents WHERE id=? AND booking_id=?").run(req.params.docId, req.params.id);
   req.flash('success', 'Document deleted.');
+  res.redirect('/bookings/' + req.params.id);
+});
+
+// ===========================================================================
+// REQUIREMENTS (resource quantities)
+// ===========================================================================
+router.post('/:id/requirements', (req, res) => {
+  const db = getDb();
+  const { resource_type, quantity_required } = req.body;
+  if (!resource_type) { req.flash('error', 'Select a resource type.'); return res.redirect('/bookings/' + req.params.id); }
+  db.prepare("INSERT INTO booking_requirements (booking_id, resource_type, quantity_required) VALUES (?, ?, ?)")
+    .run(req.params.id, resource_type, parseInt(quantity_required) || 1);
+  req.flash('success', 'Requirement added.');
+  res.redirect('/bookings/' + req.params.id);
+});
+
+router.post('/:id/requirements/:reqId/delete', (req, res) => {
+  getDb().prepare("DELETE FROM booking_requirements WHERE id=? AND booking_id=?").run(req.params.reqId, req.params.id);
+  req.flash('success', 'Requirement removed.');
+  res.redirect('/bookings/' + req.params.id);
+});
+
+// ===========================================================================
+// EQUIPMENT assignments
+// ===========================================================================
+router.post('/:id/equipment', (req, res) => {
+  const db = getDb();
+  const b = req.body;
+  if (b.equipment_id) {
+    const eq = db.prepare("SELECT * FROM equipment WHERE id = ?").get(b.equipment_id);
+    if (eq) {
+      db.prepare("INSERT INTO booking_equipment (booking_id, equipment_id, equipment_name, equipment_type, quantity) VALUES (?, ?, ?, ?, ?)")
+        .run(req.params.id, eq.id, eq.name || eq.asset_name || '', eq.category || '', parseInt(b.quantity) || 1);
+    }
+  } else if (b.equipment_name) {
+    db.prepare("INSERT INTO booking_equipment (booking_id, equipment_name, equipment_type, quantity) VALUES (?, ?, ?, ?)")
+      .run(req.params.id, b.equipment_name, b.equipment_type || '', parseInt(b.quantity) || 1);
+  }
+  req.flash('success', 'Equipment added.');
+  res.redirect('/bookings/' + req.params.id);
+});
+
+router.post('/:id/equipment/:eqId/remove', (req, res) => {
+  getDb().prepare("DELETE FROM booking_equipment WHERE id=? AND booking_id=?").run(req.params.eqId, req.params.id);
+  req.flash('success', 'Equipment removed.');
   res.redirect('/bookings/' + req.params.id);
 });
 

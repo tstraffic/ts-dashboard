@@ -778,11 +778,15 @@ function handleCalDrop(event, targetDate) {
     });
   });
 
-  // Modal tabs
+  // Modal tabs — switch visible content
   document.querySelectorAll('.modal-tab').forEach(tab => {
     tab.addEventListener('click', function() {
       document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
       this.classList.add('active');
+      const tabName = this.getAttribute('data-tab');
+      document.querySelectorAll('.modal-tab-content').forEach(c => c.style.display = 'none');
+      const target = document.getElementById('tab-' + tabName);
+      if (target) target.style.display = '';
     });
   });
 
@@ -956,6 +960,56 @@ function openBookingDetail(id) {
           </div>
         </div>
       `;
+
+      // Add tab wrapper and other tab content
+      const overviewHtml = content.innerHTML;
+      const bkId = booking.id;
+
+      // Build Resources tab
+      const crewHtml = (booking.crew || []).map(c => `
+        <div class="flex items-center gap-3 p-2 rounded-lg bg-gray-50 mb-1">
+          <div class="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-[10px] font-bold">${(c.full_name||'?').split(' ').map(n=>n[0]).join('').substring(0,2)}</div>
+          <div class="flex-1"><span class="text-sm font-medium">${c.full_name||'Unknown'}</span> <span class="text-xs text-gray-400">${c.role_on_site||c.crew_role||''}</span></div>
+          <span class="text-[10px] font-medium ${c.status==='confirmed'?'text-emerald-600':'text-amber-600'}">${c.status||'assigned'}</span>
+        </div>
+      `).join('') || '<p class="text-sm text-gray-400">No crew assigned yet.</p>';
+
+      // Build Notes tab
+      const notesHtml = (booking.allNotes || []).map(n => `
+        <div class="p-3 rounded-lg bg-gray-50 border border-gray-100 mb-2">
+          <div class="flex justify-between mb-1"><span class="text-xs font-medium text-gray-600">${n.author_name||'System'}</span><span class="text-[10px] text-gray-400">${n.created_at ? new Date(n.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</span></div>
+          <p class="text-sm text-gray-700">${(n.content||'').replace(/</g,'&lt;')}</p>
+        </div>
+      `).join('') || '<p class="text-sm text-gray-400">No notes.</p>';
+
+      // Build Dockets tab
+      const docketsHtml = (booking.dockets || []).length > 0
+        ? booking.dockets.map(d => `<a href="/bookings/${bkId}/dockets/${d.id}" class="block p-3 rounded-lg bg-gray-50 hover:bg-gray-100 mb-2 transition"><span class="text-sm font-medium">${d.docket_number}</span> <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 ml-2">${(d.status||'draft').replace(/_/g,' ')}</span></a>`).join('')
+        : '<p class="text-sm text-gray-400">No dockets yet. <a href="/bookings/' + bkId + '" class="text-brand-600 hover:underline">Go to booking</a> to create one.</p>';
+
+      // Build Documents tab
+      const docsHtml = (booking.documents || []).length > 0
+        ? booking.documents.map(d => `<div class="flex items-center gap-2 p-2 rounded-lg bg-gray-50 mb-1"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><a href="/bookings/${bkId}/documents/${d.id}/download" class="text-sm font-medium text-brand-600 hover:text-brand-700">${d.title||d.original_name}</a></div>`).join('')
+        : '<p class="text-sm text-gray-400">No documents.</p>';
+
+      // Build History tab
+      const historyHtml = (booking.activity || []).length > 0
+        ? booking.activity.map(a => `<div class="flex items-start gap-3 mb-3"><div class="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5"><svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><div><p class="text-sm text-gray-700">${a.details||a.action}</p><p class="text-[10px] text-gray-400">${a.user_name||'System'} · ${a.created_at ? new Date(a.created_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</p></div></div>`).join('')
+        : '<p class="text-sm text-gray-400">No activity recorded.</p>';
+
+      content.innerHTML = `
+        <div class="modal-tab-content" id="tab-overview">${overviewHtml}</div>
+        <div class="modal-tab-content" id="tab-resources" style="display:none"><div class="modal-section"><h4 class="modal-section-title">CREW (${(booking.crew||[]).length})</h4>${crewHtml}</div></div>
+        <div class="modal-tab-content" id="tab-tasks" style="display:none"><div class="modal-section"><p class="text-sm text-gray-400">Tasks linked to this booking will appear here.</p></div></div>
+        <div class="modal-tab-content" id="tab-dockets" style="display:none"><div class="modal-section"><h4 class="modal-section-title">DOCKETS</h4>${docketsHtml}</div></div>
+        <div class="modal-tab-content" id="tab-notes" style="display:none"><div class="modal-section"><h4 class="modal-section-title">NOTES</h4>${notesHtml}</div></div>
+        <div class="modal-tab-content" id="tab-history" style="display:none"><div class="modal-section"><h4 class="modal-section-title">ACTIVITY LOG</h4>${historyHtml}</div></div>
+        <div class="modal-tab-content" id="tab-documents" style="display:none"><div class="modal-section"><h4 class="modal-section-title">DOCUMENTS</h4>${docsHtml}</div></div>
+      `;
+
+      // Reset to overview tab
+      document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+      document.querySelector('.modal-tab[data-tab="overview"]').classList.add('active');
 
       skeleton.style.display = 'none';
       content.style.display = 'block';

@@ -2930,6 +2930,37 @@ function runMigrations(db) {
     console.log('Migration 52 complete.');
   }
 
+  // Migration 53: Booking resource requirements + equipment assignments
+  if (!isMigrationApplied.get(53)) {
+    console.log('Running migration 53: Booking requirements + equipment');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS booking_requirements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        resource_type TEXT NOT NULL,
+        quantity_required INTEGER DEFAULT 1,
+        quantity_assigned INTEGER DEFAULT 0,
+        notes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_booking_req_booking ON booking_requirements(booking_id);
+
+      CREATE TABLE IF NOT EXISTS booking_equipment (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        equipment_id INTEGER REFERENCES equipment(id),
+        equipment_name TEXT DEFAULT '',
+        equipment_type TEXT DEFAULT '',
+        quantity INTEGER DEFAULT 1,
+        notes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_booking_equip_booking ON booking_equipment(booking_id);
+    `);
+    recordMigration.run(53, 'Booking requirements + equipment');
+    console.log('Migration 53 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
