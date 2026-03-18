@@ -2537,6 +2537,136 @@ function runMigrations(db) {
     console.log('Migration 44 complete.');
   }
 
+  // =============================================
+  // Migration 45: Client operational fields + import real client data
+  // =============================================
+  if (!isMigrationApplied.get(45)) {
+    console.log('Running migration 45: Client operational fields + real client data');
+    try {
+      // Add operational columns to clients
+      const clientCols45 = [
+        "ALTER TABLE clients ADD COLUMN cancellation_window_hrs INTEGER DEFAULT 3",
+        "ALTER TABLE clients ADD COLUMN is_non_billable INTEGER DEFAULT 0",
+        "ALTER TABLE clients ADD COLUMN is_cash_only INTEGER DEFAULT 0",
+        "ALTER TABLE clients ADD COLUMN credit_stop INTEGER DEFAULT 0",
+        "ALTER TABLE clients ADD COLUMN credit_stop_reason TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN default_purchase_order TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN billing_suburb TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN billing_state TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN billing_postcode TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN billing_attention TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN external_id TEXT DEFAULT ''",
+      ];
+      for (const sql of clientCols45) {
+        try { db.exec(sql); } catch (e) { /* column likely exists */ }
+      }
+
+      // Add send_docket / send_invoice to client_contacts
+      const contactCols45 = [
+        "ALTER TABLE client_contacts ADD COLUMN send_docket INTEGER DEFAULT 0",
+        "ALTER TABLE client_contacts ADD COLUMN send_invoice INTEGER DEFAULT 0",
+      ];
+      for (const sql of contactCols45) {
+        try { db.exec(sql); } catch (e) { /* column likely exists */ }
+      }
+
+      // Import real client data
+      const insertClient45 = db.prepare(`
+        INSERT INTO clients (external_id, company_name, abn, cancellation_window_hrs, is_non_billable, is_cash_only, credit_stop, credit_stop_reason, payment_terms, default_purchase_order, company_type, active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'client', 1)
+      `);
+      const insertContact45 = db.prepare(`
+        INSERT INTO client_contacts (company_id, contact_type, company, full_name, phone, email, send_docket, send_invoice, is_primary)
+        VALUES (?, 'client', ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const clients45 = [
+        {id:"74577",name:"2 Way Concrete",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Frank 2-Way",phone:"0410428084",email:null,docket:false,invoice:false}]},
+        {id:"94296",name:"Abergeldie Complex Infrastructure",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Harry Iqbal",phone:"0499 516 282",email:null,docket:false,invoice:false}]},
+        {id:"73797",name:"Active Civil Group",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Adam Mourad",phone:"0490333329",email:null,docket:false,invoice:false}]},
+        {id:"73796",name:"AGM Constructions",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Ghassan Al-Kamisie",phone:"0401272829",email:null,docket:false,invoice:false}]},
+        {id:"93884",name:"Al-Faisal College",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Waed Khalifeh",phone:"0405 288 828",email:null,docket:false,invoice:false}]},
+        {id:"74461",name:"All Civil Works",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Charbel Younan",phone:"0433922290",email:null,docket:false,invoice:false}]},
+        {id:"27671",name:"Alpha Cranes & Rigging",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Aaron Alpha",phone:"0414 525 556",email:null,docket:false,invoice:false}]},
+        {id:"74154",name:"AM2PM Group",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Craig AM2PM",phone:"0412393300",email:null,docket:false,invoice:false}]},
+        {id:"36003",name:"ANR Engineering",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Sami ANR",phone:"0439 038 993",email:null,docket:false,invoice:false}]},
+        {id:"75094",name:"Apex Sewer & Water",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Matthew Clancey",phone:"0432073840",email:null,docket:false,invoice:false}]},
+        {id:"90622",name:"Atlantis",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Sarah Atlantis",phone:"0432 282 380",email:null,docket:false,invoice:false}]},
+        {id:"74215",name:"Atlas Plumbing",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Pat Atlas",phone:"0404604050",email:null,docket:false,invoice:false}]},
+        {id:"73798",name:"Axial Construction",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Michael Cassisi",phone:"0407727170",email:null,docket:false,invoice:false}]},
+        {id:"34044",name:"Blaq Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Wasim Blaq",phone:"0430 838 488",email:null,docket:false,invoice:false}]},
+        {id:"73799",name:"Brushwood Engineering",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Jason Brushwood",phone:"0412898983",email:null,docket:false,invoice:false}]},
+        {id:"77632",name:"Build Life",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Elias Saad",phone:"0404676767",email:null,docket:false,invoice:false}]},
+        {id:"86602",name:"Builtwise Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Ahmed Builtwise",phone:"0423188888",email:null,docket:false,invoice:false}]},
+        {id:"35767",name:"BXD Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Jacob BXD",phone:"0425 696 969",email:null,docket:false,invoice:false}]},
+        {id:"94092",name:"Carlton Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Marwan Nassar",phone:"0403 077 887",email:null,docket:false,invoice:false}]},
+        {id:"90484",name:"CIP Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Alex CIP",phone:"0416 838 288",email:null,docket:false,invoice:false}]},
+        {id:"75913",name:"City Line Marking",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Walid City",phone:"0414140004",email:null,docket:false,invoice:false}]},
+        {id:"87649",name:"City Traffic",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Peter City Traffic",phone:"0413254000",email:null,docket:false,invoice:false}]},
+        {id:"88399",name:"Civil Com Group",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"George Civil",phone:"0413 060 506",email:null,docket:false,invoice:false}]},
+        {id:"35733",name:"Civil Environmental Services",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Steve CES",phone:"0434616113",email:null,docket:false,invoice:false}]},
+        {id:"73800",name:"Civil Environmental Services",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Ahmed CES",phone:"0426041882",email:null,docket:false,invoice:false}]},
+        {id:"32043",name:"Civil Ops",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[]},
+        {id:"32044",name:"Civil Ops",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Mitch",phone:"0473549737",email:null,docket:false,invoice:false}]},
+        {id:"33209",name:"Combined",abn:null,cancel:3,nonBill:true,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Taj",phone:"+61 416 221 801",email:null,docket:false,invoice:false}]},
+        {id:"92421",name:"Compass Developments",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Liam Marshall",phone:"0451 006 293",email:null,docket:false,invoice:false},{name:"Adnan Compass",phone:"0421316669",email:null,docket:false,invoice:false}]},
+        {id:"83863",name:"Conquest",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Danny Conquest",phone:"0413 803 386",email:null,docket:false,invoice:false}]},
+        {id:"73801",name:"Construx Solutions",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Jack Construx",phone:"0400 777 666",email:null,docket:false,invoice:false}]},
+        {id:"85666",name:"Cubic Construction",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Luke Cubic",phone:"0404 770 900",email:null,docket:false,invoice:false}]},
+        {id:"73805",name:"D&M Asphalt",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Danny D&M",phone:"0424 897 733",email:null,docket:false,invoice:false}]},
+        {id:"89044",name:"Daracon Group",abn:"82 002 344 667",cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Nathan Hillier",phone:"0499 941 623",email:"nathan.hillier@daracon.com.au",docket:true,invoice:false},{name:"Simpson Wong",phone:"0427 000 834",email:"simpson.wong@daracon.com.au",docket:false,invoice:false},{name:"Chandan Naidu",phone:"0432 987 654",email:"chandan.naidu@daracon.com.au",docket:false,invoice:false}]},
+        {id:"91246",name:"Daracon Group",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[]},
+        {id:"74792",name:"Delaney Civil",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Michael Delaney",phone:"0407414714",email:null,docket:false,invoice:false}]},
+        {id:"78459",name:"Designline Building",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Maysam Designline",phone:"0449 225 885",email:null,docket:false,invoice:false}]},
+        {id:"84307",name:"Domain Constructions",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Frank Domain",phone:"0402338831",email:null,docket:false,invoice:false}]},
+        {id:"78546",name:"Dynamic Lanemarking",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Ross Dynamic",phone:"0418 428 080",email:null,docket:false,invoice:false}]},
+        {id:"88257",name:"E.M.O Civil",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Jihad EMO",phone:"0414 660 090",email:null,docket:false,invoice:false}]},
+        {id:"31906",name:"Earthbuilt",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Ahmad Earthbuilt",phone:"0421 601 061",email:null,docket:false,invoice:false}]},
+        {id:"86054",name:"Easter's Pacific",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Greg Easter",phone:"0414 242 829",email:null,docket:false,invoice:false}]},
+        {id:"29781",name:"Fleek Constructions",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Jason Fleek",phone:"0410335556",email:null,docket:false,invoice:false}]},
+        {id:"33644",name:"Ghass",abn:null,cancel:3,nonBill:true,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[]},
+        {id:"73807",name:"Greenbrook",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Nathaniel Greenbrook",phone:"0408 727 343",email:null,docket:false,invoice:false}]},
+        {id:"73802",name:"Ground King Civil",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Marcus King",phone:"0424448000",email:null,docket:false,invoice:false}]},
+        {id:"73803",name:"H Lap Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Hisham H-Lap",phone:"0412040030",email:null,docket:false,invoice:false}]},
+        {id:"91325",name:"Hacer Group",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Weston Hacer",phone:"0436 083 663",email:null,docket:false,invoice:false}]},
+        {id:"87594",name:"HPAC",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Steve HPAC",phone:"0410 696 060",email:null,docket:false,invoice:false}]},
+        {id:"73807",name:"I Connected",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Fatih Cantas",phone:"0477 777 877",email:null,docket:false,invoice:false},{name:"Harry ICA",phone:"0487409488",email:null,docket:false,invoice:false}]},
+        {id:"74156",name:"I Connected",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Fatih Cantas",phone:"0477 777 877",email:null,docket:false,invoice:false}]},
+      ];
+
+      for (const c of clients45) {
+        // Check if client with same name + external_id already exists
+        const existing = db.prepare('SELECT id FROM clients WHERE company_name = ? AND external_id = ?').get(c.name, c.id);
+        let clientDbId;
+        if (existing) {
+          clientDbId = existing.id;
+          // Update operational fields
+          db.prepare(`UPDATE clients SET cancellation_window_hrs = ?, is_non_billable = ?, is_cash_only = ?, credit_stop = ?, credit_stop_reason = ?, abn = COALESCE(NULLIF(?, ''), abn), external_id = ? WHERE id = ?`)
+            .run(c.cancel, c.nonBill ? 1 : 0, c.cash ? 1 : 0, c.creditStop ? 1 : 0, c.creditReason || '', c.abn || '', c.id, clientDbId);
+        } else {
+          const r = insertClient45.run(c.id, c.name, c.abn || '', c.cancel, c.nonBill ? 1 : 0, c.cash ? 1 : 0, c.creditStop ? 1 : 0, c.creditReason || '', c.payTerm || '', c.po || '');
+          clientDbId = r.lastInsertRowid;
+        }
+
+        // Insert contacts
+        for (let i = 0; i < c.contacts.length; i++) {
+          const ct = c.contacts[i];
+          // Check if contact already exists for this company
+          const existingContact = db.prepare('SELECT id FROM client_contacts WHERE company_id = ? AND full_name = ?').get(clientDbId, ct.name);
+          if (!existingContact) {
+            insertContact45.run(clientDbId, c.name, ct.name, ct.phone || '', ct.email || '', ct.docket ? 1 : 0, ct.invoice ? 1 : 0, i === 0 ? 1 : 0);
+          }
+        }
+      }
+
+      console.log('Migration 45: Imported ' + clients45.length + ' clients with contacts');
+    } catch (e) {
+      console.error('Migration 45 error:', e.message);
+    }
+    recordMigration.run(45, 'Client operational fields + real client data');
+    console.log('Migration 45 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
