@@ -1,0 +1,255 @@
+<% locals.currentPage = 'bookings' %>
+<%
+  const isEdit = typeof booking !== 'undefined' && booking;
+
+  function val(field) {
+    if (!isEdit || booking[field] == null) return '';
+    return booking[field];
+  }
+
+  function selected(field, value) {
+    if (!isEdit) return '';
+    return String(booking[field]) === String(value) ? 'selected' : '';
+  }
+
+  function checked(field) {
+    if (!isEdit) return '';
+    return booking[field] ? 'checked' : '';
+  }
+
+  const statusOptions = [
+    { val: 'unconfirmed', label: 'Unconfirmed' },
+    { val: 'confirmed', label: 'Confirmed' },
+    { val: 'green_to_go', label: 'Green to Go' },
+    { val: 'in_progress', label: 'In Progress' },
+    { val: 'completed', label: 'Completed' },
+    { val: 'cancelled', label: 'Cancelled' },
+    { val: 'on_hold', label: 'On Hold' },
+  ];
+%>
+
+<!-- Breadcrumb -->
+<div class="flex items-center gap-2 text-sm text-gray-400 mb-4">
+  <a href="/bookings" class="hover:text-gray-900 transition">Bookings</a>
+  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <span class="text-gray-900"><%= isEdit ? 'Edit: ' + booking.booking_number : 'New Booking' %></span>
+</div>
+
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit Booking' : 'New Booking' %></h1>
+    <p class="text-gray-500 text-sm mt-0.5"><%= isEdit ? 'Update booking details and schedule' : 'Create a new booking for scheduling' %></p>
+  </div>
+</div>
+
+<form method="POST" action="<%= isEdit ? '/bookings/' + booking.id : '/bookings' %>" class="space-y-5">
+
+  <!-- Section 1: Basic Info -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Basic Information</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="sm:col-span-2 lg:col-span-2">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Title <span class="text-red-500">*</span></label>
+        <input type="text" name="title" value="<%= val('title') %>" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. Lane closure — Main St resurfacing">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Status</label>
+        <select name="status" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <% statusOptions.forEach(s => { %>
+            <option value="<%= s.val %>" <%= selected('status', s.val) %>><%= s.label %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Depot</label>
+        <select name="depot" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select Depot --</option>
+          <% depots.forEach(d => { %>
+            <option value="<%= d %>" <%= val('depot') === d ? 'selected' : '' %>><%= d %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Supervisor</label>
+        <select name="supervisor_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select Supervisor --</option>
+          <% supervisors.forEach(s => { %>
+            <option value="<%= s.id %>" <%= isEdit && booking.supervisor_id == s.id ? 'selected' : '' %>><%= s.full_name %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="flex items-end gap-6">
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="is_emergency" id="is_emergency" value="1" <%= checked('is_emergency') %>
+            class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+          <label for="is_emergency" class="text-sm text-gray-700">Emergency</label>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="is_callout" id="is_callout" value="1" <%= checked('is_callout') %>
+            class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+          <label for="is_callout" class="text-sm text-gray-700">Callout</label>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="billable" id="billable" value="1" <%= isEdit ? checked('billable') : 'checked' %>
+            class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+          <label for="billable" class="text-sm text-gray-700">Billable</label>
+        </div>
+      </div>
+    </div>
+    <div class="mt-4">
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Description</label>
+      <textarea name="description" rows="2"
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+        placeholder="Brief description of the booking..."><%= val('description') %></textarea>
+    </div>
+  </div>
+
+  <!-- Section 2: Client & Project -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Client & Project</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client</label>
+        <select name="client_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select Client --</option>
+          <% if (typeof clients !== 'undefined' && clients.length) { clients.forEach(c => { %>
+            <option value="<%= c.id %>" <%= isEdit && booking.client_id == c.id ? 'selected' : '' %>><%= c.company_name %></option>
+          <% }); } %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job / Project</label>
+        <select name="job_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select Job --</option>
+          <% if (typeof jobs !== 'undefined' && jobs.length) { jobs.forEach(j => { %>
+            <option value="<%= j.id %>" <%= isEdit && booking.job_id == j.id ? 'selected' : '' %>><%= j.job_number ? j.job_number + ' — ' : '' %><%= j.job_name %></option>
+          <% }); } %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client Contact</label>
+        <input type="text" name="client_contact" value="<%= val('client_contact') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="Contact name or phone">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Order Number</label>
+        <input type="text" name="order_number" value="<%= val('order_number') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="PO or order number">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Billing Code</label>
+        <input type="text" name="billing_code" value="<%= val('billing_code') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="Cost centre or billing code">
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Schedule -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Schedule</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Start Date <span class="text-red-500">*</span></label>
+        <input type="date" name="start_date" value="<%= isEdit ? (val('start_date') || '') : '' %>" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Start Time <span class="text-red-500">*</span></label>
+        <input type="time" name="start_time" value="<%= isEdit ? (val('start_time') || '') : '06:00' %>" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">End Date <span class="text-red-500">*</span></label>
+        <input type="date" name="end_date" value="<%= isEdit ? (val('end_date') || '') : '' %>" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">End Time <span class="text-red-500">*</span></label>
+        <input type="time" name="end_time" value="<%= isEdit ? (val('end_time') || '') : '14:30' %>" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: Location -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Location</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="sm:col-span-2">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Site Address</label>
+        <input type="text" name="site_address" value="<%= val('site_address') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="Street address">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Suburb</label>
+        <input type="text" name="suburb" value="<%= val('suburb') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. Parramatta">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">State</label>
+          <input type="text" name="state" value="<%= val('state') %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+            placeholder="NSW">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Postcode</label>
+          <input type="text" name="postcode" value="<%= val('postcode') %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+            placeholder="2000">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 5: Requirements -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Requirements</h2>
+    <div>
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Requirements / Special Instructions</label>
+      <textarea name="requirements_text" rows="3"
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+        placeholder="PPE requirements, site-specific rules, equipment needed..."><%= val('requirements_text') %></textarea>
+    </div>
+  </div>
+
+  <!-- Section 6: Notes -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Notes</h2>
+    <div>
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Internal Notes</label>
+      <textarea name="notes" rows="3"
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+        placeholder="Internal notes about this booking..."><%= val('notes') %></textarea>
+    </div>
+  </div>
+
+  <!-- Submit -->
+  <div class="flex items-center gap-3">
+    <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+      <%= isEdit ? 'Update Booking' : 'Create Booking' %>
+    </button>
+    <a href="<%= isEdit ? '/bookings/' + booking.id : '/bookings' %>" class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+  </div>
+
+</form>
+
+<script>
+  // Auto-sync end date with start date if end date is empty
+  const startDate = document.querySelector('input[name="start_date"]');
+  const endDate = document.querySelector('input[name="end_date"]');
+  if (startDate && endDate) {
+    startDate.addEventListener('change', function() {
+      if (!endDate.value) {
+        endDate.value = this.value;
+      }
+    });
+  }
+</script>

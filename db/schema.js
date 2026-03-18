@@ -2756,6 +2756,81 @@ function runMigrations(db) {
     console.log('Migration 48 complete.');
   }
 
+  // Migration 49: Bookings module tables
+  if (!isMigrationApplied.get(49)) {
+    console.log('Running migration 49: Bookings module');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bookings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_number TEXT UNIQUE,
+        job_id INTEGER REFERENCES jobs(id),
+        client_id INTEGER REFERENCES clients(id),
+        title TEXT NOT NULL DEFAULT '',
+        description TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'unconfirmed' CHECK(status IN ('unconfirmed','confirmed','green_to_go','in_progress','completed','cancelled','on_hold')),
+        depot TEXT DEFAULT '',
+        start_datetime TEXT NOT NULL,
+        end_datetime TEXT NOT NULL,
+        site_address TEXT DEFAULT '',
+        suburb TEXT DEFAULT '',
+        state TEXT DEFAULT '',
+        postcode TEXT DEFAULT '',
+        order_number TEXT DEFAULT '',
+        billing_code TEXT DEFAULT '',
+        client_contact TEXT DEFAULT '',
+        supervisor_id INTEGER REFERENCES crew_members(id),
+        requirements_text TEXT DEFAULT '',
+        is_emergency INTEGER DEFAULT 0,
+        is_callout INTEGER DEFAULT 0,
+        billable INTEGER DEFAULT 1,
+        invoiced INTEGER DEFAULT 0,
+        notes TEXT DEFAULT '',
+        created_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(start_datetime);
+      CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+      CREATE INDEX IF NOT EXISTS idx_bookings_depot ON bookings(depot);
+      CREATE INDEX IF NOT EXISTS idx_bookings_job ON bookings(job_id);
+
+      CREATE TABLE IF NOT EXISTS booking_crew (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        role_on_site TEXT DEFAULT '',
+        status TEXT DEFAULT 'assigned' CHECK(status IN ('assigned','confirmed','declined','completed')),
+        confirmed_at DATETIME,
+        notes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_booking_crew_booking ON booking_crew(booking_id);
+      CREATE INDEX IF NOT EXISTS idx_booking_crew_member ON booking_crew(crew_member_id);
+
+      CREATE TABLE IF NOT EXISTS booking_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id),
+        content TEXT NOT NULL,
+        is_private INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_booking_notes_booking ON booking_notes(booking_id);
+
+      CREATE TABLE IF NOT EXISTS booking_vehicles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        vehicle_name TEXT DEFAULT '',
+        registration TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_booking_vehicles_booking ON booking_vehicles(booking_id);
+    `);
+    recordMigration.run(49, 'Bookings module tables');
+    console.log('Migration 49 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
