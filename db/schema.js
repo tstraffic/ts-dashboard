@@ -2831,6 +2831,32 @@ function runMigrations(db) {
     console.log('Migration 49 complete.');
   }
 
+  // Migration 50: Plans register — add missing fields from Excel register
+  if (!isMigrationApplied.get(50)) {
+    console.log('Running migration 50: Plans register extra fields');
+    const cols = [
+      ['reference_number', 'TEXT DEFAULT \'\''],
+      ['rol_required', 'INTEGER DEFAULT 0'],
+      ['rol_response', 'TEXT DEFAULT \'\''],
+      ['bus_approvals_required', 'INTEGER DEFAULT 0'],
+      ['bus_approvals_response', 'TEXT DEFAULT \'\''],
+      ['client_pm', 'TEXT DEFAULT \'\''],
+      ['costs', 'REAL DEFAULT 0'],
+      ['action_required', 'TEXT DEFAULT \'\''],
+      ['charge_client', 'INTEGER DEFAULT 0'],
+      ['charge_amount', 'REAL DEFAULT 0'],
+      ['invoiced', 'INTEGER DEFAULT 0'],
+      ['invoice_number', 'TEXT DEFAULT \'\''],
+      ['police_notification', 'INTEGER DEFAULT 0'],
+      ['letter_drop', 'INTEGER DEFAULT 0'],
+    ];
+    cols.forEach(([col, type]) => {
+      try { db.exec(`ALTER TABLE compliance ADD COLUMN ${col} ${type}`); } catch(e) {}
+    });
+    recordMigration.run(50, 'Plans register extra fields');
+    console.log('Migration 50 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
