@@ -20,6 +20,7 @@
 
   <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
     <form method="POST" action="<%= formAction %>">
+      <%- include('../partials/csrf') %>
       <input type="hidden" name="return_to" value="<%= returnTo %>">
 
       <div class="space-y-6">

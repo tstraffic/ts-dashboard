@@ -58,6 +58,7 @@
     <div class="flex items-center gap-3">
       <span class="text-gray-900 font-semibold"><%= dayLabel %></span>
       <form method="GET" class="flex items-center gap-2">
+        <%- include('../partials/csrf') %>
         <input type="hidden" name="view" value="<%= view %>">
         <input type="date" name="date" value="<%= selectedDate %>" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-1.5">
         <button type="submit" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm rounded-lg transition-colors">Go</button>
@@ -95,11 +96,13 @@
 <!-- Action Bar -->
 <div class="flex items-center gap-3 mb-6 flex-wrap">
   <form method="POST" action="/allocations/copy-day" class="flex items-center gap-2">
+    <%- include('../partials/csrf') %>
     <input type="hidden" name="to_date" value="<%= selectedDate %>">
     <input type="date" name="from_date" value="<%= prevStr %>" class="bg-white border border-gray-300 text-gray-900 text-xs rounded-lg px-2 py-1.5">
     <button type="submit" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors border border-gray-300">Copy From &rarr; <%= selectedDate %></button>
   </form>
   <form method="POST" action="/allocations/confirm-all">
+    <%- include('../partials/csrf') %>
     <input type="hidden" name="allocation_date" value="<%= selectedDate %>">
     <button type="submit" class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-medium rounded-lg transition-colors">Confirm All</button>
   </form>
@@ -270,13 +273,16 @@
                       <% } else { %>bg-white text-gray-600<% } %>"><%= a.shift_type %></span>
                     <% if (a.status === 'allocated') { %>
                       <form method="POST" action="/allocations/<%= a.id %>/confirm?date=<%= selectedDate %>" class="inline">
+                        <%- include('../partials/csrf') %>
                         <button class="px-1.5 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] rounded transition-colors">Confirm</button>
                       </form>
                     <% } %>
                     <form method="POST" action="/allocations/<%= a.id %>/cancel?date=<%= selectedDate %>" class="inline">
+                      <%- include('../partials/csrf') %>
                       <button class="px-1.5 py-0.5 bg-red-700 hover:bg-red-600 text-white text-[10px] rounded transition-colors">Cancel</button>
                     </form>
                     <form method="POST" action="/allocations/<%= a.id %>/delete?date=<%= selectedDate %>" class="inline">
+                      <%- include('../partials/csrf') %>
                       <button class="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-300 text-gray-700 text-[10px] rounded transition-colors">Del</button>
                     </form>
                   </div>
@@ -310,6 +316,7 @@
           <tr id="form-row-<%= job.id %>" class="hidden bg-gray-50">
             <td colspan="6" class="px-4 py-3">
               <form method="POST" action="/allocations" class="flex items-end gap-3 flex-wrap">
+                <%- include('../partials/csrf') %>
                 <input type="hidden" name="job_id" value="<%= job.id %>">
                 <input type="hidden" name="allocation_date" value="<%= selectedDate %>">
                 <div>
@@ -595,6 +602,7 @@
       </button>
     </div>
     <form method="POST" action="/allocations/create-shift" class="space-y-4">
+      <%- include('../partials/csrf') %>
       <!-- Client -->
       <div>
         <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Client <span class="text-red-500">*</span></label>
@@ -785,9 +793,10 @@ document.querySelectorAll('.drop-target').forEach(target => {
 
 async function allocateCrew(jobId, crewId, crewName) {
   try {
+    const _ct = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const resp = await fetch('/allocations/api/allocate.json', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-csrf-token': _ct },
       body: JSON.stringify({
         job_id: jobId,
         crew_member_id: crewId,
@@ -822,7 +831,7 @@ async function moveAllocation(allocId, newJobId) {
   try {
     const resp = await fetch('/allocations/api/move.json', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' },
       body: JSON.stringify({ allocation_id: allocId, new_job_id: newJobId })
     });
     const result = await resp.json();
@@ -867,7 +876,7 @@ document.getElementById('override-btn')?.addEventListener('click', async () => {
   try {
     const resp = await fetch('/allocations/api/allocate.json', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' },
       body: JSON.stringify({ ...pendingDrop, force_override: true })
     });
     const result = await resp.json();
@@ -938,7 +947,7 @@ document.querySelectorAll('.drop-target').forEach(target => {
     try {
       const resp = await fetch('/allocations/api/assign-equipment.json', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' },
         body: JSON.stringify({ equipment_id: data.equip_id, job_id: jobId, date: ALLOC_DATE })
       });
       const result = await resp.json();

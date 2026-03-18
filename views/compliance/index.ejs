@@ -99,6 +99,7 @@
 
     <!-- Second filter row -->
     <form method="GET" action="/compliance" id="filterForm">
+      <%- include('../partials/csrf') %>
       <input type="hidden" name="item_type" value="<%= filters.item_type %>">
       <div class="flex flex-wrap gap-3 items-center">
 

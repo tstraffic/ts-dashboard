@@ -17,6 +17,7 @@
 
 <!-- Form -->
 <form method="POST" action="<%= isEdit ? '/incidents/' + incident.id : '/incidents' %>" class="space-y-5" data-wizard enctype="multipart/form-data">
+  <%- include('../partials/csrf') %>
 
   <!-- Step 1: Incident Details -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="0" data-wizard-title="Details">

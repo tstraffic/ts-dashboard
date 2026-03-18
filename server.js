@@ -13,6 +13,7 @@ const { notificationCountMiddleware, generateNotifications, sendDailyDigests } =
 const { settingsMiddleware } = require('./middleware/settings');
 const { sidebarBadges } = require('./middleware/sidebarBadges');
 const { initVapid } = require('./services/pushNotification');
+const { csrfProtection } = require('./middleware/csrf');
 
 // Initialize database and seed data
 initializeDatabase();
@@ -66,6 +67,9 @@ app.use((req, res, next) => {
   res.locals.canAccess = canAccess;
   next();
 });
+
+// CSRF protection (after session + flash, before routes)
+app.use(csrfProtection);
 
 // Notification count available in all templates (header bell badge)
 app.use(notificationCountMiddleware);

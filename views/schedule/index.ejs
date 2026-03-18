@@ -8,6 +8,7 @@
 <!-- Date Range Controls -->
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-6">
   <form method="GET" class="flex items-end gap-4 flex-wrap">
+    <%- include('../partials/csrf') %>
     <div>
       <label class="block text-xs text-gray-500 mb-1">From</label>
       <input type="date" name="from" value="<%= rangeStart %>" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2">

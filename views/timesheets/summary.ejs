@@ -27,6 +27,7 @@
 <!-- Week Selector -->
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-6">
   <form method="GET" action="/timesheets/summary" class="flex flex-wrap items-end gap-4">
+    <%- include('../partials/csrf') %>
     <div class="min-w-[180px]">
       <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Week Of</label>
       <input type="date" name="week_of" value="<%= weekOf %>"

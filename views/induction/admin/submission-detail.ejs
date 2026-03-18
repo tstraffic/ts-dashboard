@@ -73,6 +73,7 @@
         </button>
       <% } else if (s.status === 'approved' && !s.linked_crew_member_id) { %>
         <form method="POST" action="/induction/admin/submissions/<%= s.id %>/convert" onsubmit="return confirm('Convert this submission to an employee record?')">
+          <%- include('../../partials/csrf') %>
           <button type="submit" class="inline-flex items-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
             <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
             Convert to Employee
@@ -372,6 +373,7 @@
       </div>
     </div>
     <form method="POST" action="/induction/admin/submissions/<%= s.id %>/status">
+      <%- include('../../partials/csrf') %>
       <input type="hidden" name="status" value="approved">
       <div class="mb-4">
         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Review Notes (optional)</label>
@@ -400,6 +402,7 @@
       </div>
     </div>
     <form method="POST" action="/induction/admin/submissions/<%= s.id %>/status" onsubmit="if(!this.review_notes.value.trim()){alert('Please provide a reason for rejection.');return false;}">
+      <%- include('../../partials/csrf') %>
       <input type="hidden" name="status" value="rejected">
       <div class="mb-4">
         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Reason for Rejection <span class="text-red-500">*</span></label>

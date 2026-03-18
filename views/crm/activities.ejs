@@ -45,6 +45,7 @@
 <!-- Filter Bar -->
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-5">
   <form method="GET" action="/crm/activities" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 sm:gap-3">
+    <%- include('../partials/csrf') %>
     <div class="flex-1 min-w-0 sm:min-w-[180px]">
       <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Search</label>
       <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Subject, notes..."
@@ -187,6 +188,7 @@
             </span>
           <% } else { %>
             <form method="POST" action="/crm/activities/<%= act.id %>/complete" class="inline">
+              <%- include('../partials/csrf') %>
               <button type="submit" class="px-2 py-1 bg-gray-100 hover:bg-emerald-50 text-gray-500 hover:text-emerald-600 text-[10px] font-bold uppercase rounded-lg transition-colors" title="Mark complete">
                 Complete
               </button>

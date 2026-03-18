@@ -6,6 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#1D6AE5">
+  <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
   <link rel="manifest" href="/manifest.json">
   <title><%= typeof title !== 'undefined' ? title + ' | ' : '' %>T&S Worker Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>

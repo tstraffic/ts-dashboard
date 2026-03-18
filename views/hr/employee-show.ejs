@@ -112,6 +112,7 @@
       </a>
       <% if (employee.blocked_from_allocation) { %>
         <form method="POST" action="/hr/employees/<%= employee.id %>/block" class="inline">
+          <%- include('../partials/csrf') %>
           <input type="hidden" name="action" value="unblock">
           <button type="submit" class="inline-flex items-center px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium rounded-lg hover:bg-emerald-100 transition">
             <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
@@ -337,10 +338,10 @@
                 <div class="flex items-center justify-end gap-1">
                   <a href="/hr/documents/<%= doc.id %>/download" class="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-brand-50 hover:text-brand-700 rounded-lg transition" title="Download">Download</a>
                   <% if (doc.verification_status === 'pending') { %>
-                    <form method="POST" action="/hr/documents/<%= doc.id %>/verify" class="inline"><input type="hidden" name="action" value="verify"><button type="submit" class="px-2 py-1 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition">Verify</button></form>
-                    <form method="POST" action="/hr/documents/<%= doc.id %>/verify" class="inline"><input type="hidden" name="action" value="reject"><button type="submit" class="px-2 py-1 text-xs text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition">Reject</button></form>
+                    <form method="POST" action="/hr/documents/<%= doc.id %>/verify" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="verify"><button type="submit" class="px-2 py-1 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition">Verify</button></form>
+                    <form method="POST" action="/hr/documents/<%= doc.id %>/verify" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="reject"><button type="submit" class="px-2 py-1 text-xs text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition">Reject</button></form>
                   <% } %>
-                  <form method="POST" action="/hr/documents/<%= doc.id %>/delete" class="inline" onsubmit="return confirm('Delete this document?')"><button type="submit" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-lg transition">Delete</button></form>
+                  <form method="POST" action="/hr/documents/<%= doc.id %>/delete" class="inline" onsubmit="return confirm('Delete this document?')"><%- include('../partials/csrf') %><button type="submit" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-lg transition">Delete</button></form>
                 </div>
               </td>
             </tr>
@@ -408,7 +409,7 @@
                 <% if (comp.mandatory_for_role) { %><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20">Required</span><% } else { %><span class="text-gray-300 text-xs">-</span><% } %>
               </td>
               <td class="px-4 py-3 text-right">
-                <form method="POST" action="/hr/competencies/<%= comp.id %>/delete" class="inline" onsubmit="return confirm('Remove this competency?')"><button type="submit" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-lg transition">Remove</button></form>
+                <form method="POST" action="/hr/competencies/<%= comp.id %>/delete" class="inline" onsubmit="return confirm('Remove this competency?')"><%- include('../partials/csrf') %><button type="submit" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-lg transition">Remove</button></form>
               </td>
             </tr>
             <% }); %>
@@ -512,6 +513,7 @@
       <button onclick="document.getElementById('uploadDocModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <form method="POST" action="/hr/employees/<%= employee.id %>/documents/upload" enctype="multipart/form-data" class="space-y-4">
+      <%- include('../partials/csrf') %>
       <div>
         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Document Type <span class="text-red-500">*</span></label>
         <select name="document_type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -561,6 +563,7 @@
       <button onclick="document.getElementById('addCompModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <form method="POST" action="/hr/employees/<%= employee.id %>/competencies" class="space-y-4">
+      <%- include('../partials/csrf') %>
       <div>
         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Competency Type <span class="text-red-500">*</span></label>
         <select name="competency_type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -617,6 +620,7 @@
   <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
     <h3 class="text-lg font-bold text-gray-900 mb-4">Block from Allocation</h3>
     <form method="POST" action="/hr/employees/<%= employee.id %>/block" class="space-y-4">
+      <%- include('../partials/csrf') %>
       <input type="hidden" name="action" value="block">
       <div>
         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Reason</label>

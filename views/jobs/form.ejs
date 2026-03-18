@@ -18,6 +18,7 @@
 
 <!-- Form -->
 <form method="POST" action="<%= isEdit ? '/jobs/' + job.id : '/jobs' %>" class="space-y-5" data-wizard>
+  <%- include('../partials/csrf') %>
 
   <!-- 1. Job Identification -->
   <div id="section-0" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="0" data-wizard-title="Identification">

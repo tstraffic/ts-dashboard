@@ -44,6 +44,7 @@
   <!-- Filters -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
     <form method="GET" action="/hr/documents" id="docFilterForm" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+      <%- include('../partials/csrf') %>
 
       <!-- Document Type -->
       <select name="document_type" onchange="document.getElementById('docFilterForm').submit()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">

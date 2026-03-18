@@ -18,6 +18,7 @@
 
 <!-- Form -->
 <form method="POST" action="<%= isEdit ? '/opportunities/' + opportunity.id : '/opportunities' %>" class="space-y-5">
+  <%- include('../partials/csrf') %>
 
   <!-- 1. Opportunity Details -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">

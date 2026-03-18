@@ -278,7 +278,7 @@
     // POST to server
     fetch('/opportunities/' + draggedId + '/stage', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' },
       body: JSON.stringify({ stage: newStage })
     }).then(function(res) {
       if (!res.ok) {

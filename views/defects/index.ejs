@@ -50,6 +50,7 @@
 <!-- Filter Bar -->
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-5">
   <form method="GET" action="/defects" data-module="defects" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 sm:gap-3">
+    <%- include('../partials/csrf') %>
     <div class="flex-1 min-w-0 sm:min-w-[180px]">
       <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Job</label>
       <select name="job_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
@@ -149,6 +150,7 @@
         </td>
         <td class="px-3 py-2.5">
           <form method="POST" action="/defects/<%= defect.id %>/status" class="inline">
+            <%- include('../partials/csrf') %>
             <select name="status" onchange="this.form.submit()" class="text-[10px] font-bold px-2 py-1 rounded-full border-0 cursor-pointer appearance-none
               <% if (defect.status === 'open') { %>bg-gray-100 text-gray-600
               <% } else if (defect.status === 'investigating') { %>bg-blue-50 text-blue-700

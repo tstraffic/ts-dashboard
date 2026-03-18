@@ -130,6 +130,7 @@
 <!-- Filter Bar -->
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-5">
   <form method="GET" action="/crm/meetings" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 sm:gap-3">
+    <%- include('../partials/csrf') %>
     <div class="flex-1 min-w-0 sm:min-w-[180px]">
       <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Search</label>
       <input type="text" name="search" value="<%= typeof filters !== 'undefined' && filters.search ? filters.search : '' %>" placeholder="Title, account..."

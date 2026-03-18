@@ -543,7 +543,7 @@ function handleCalDrop(event, targetDate) {
   // Move booking to new date via API
   fetch('/bookings/' + bookingId + '/move', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' },
     body: 'new_date=' + encodeURIComponent(targetDate)
   }).then(r => {
     if (r.ok) window.location.reload();
@@ -824,7 +824,7 @@ function handleCrewDrop(event, bookingId) {
     const crew = JSON.parse(crewData);
     fetch('/bookings/' + bookingId + '/crew', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' },
       body: 'crew_member_id=' + crew.id + '&role_on_site=' + encodeURIComponent(crew.role.replace(/_/g, ' '))
     }).then(r => {
       if (r.redirected || r.ok) {
