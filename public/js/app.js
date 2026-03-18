@@ -1,5 +1,22 @@
 // T&S Dashboard - Client-side JavaScript
 
+// ===== Auto-submit filter forms on change =====
+(function() {
+  // Auto-submit GET forms when selects, checkboxes, or date inputs change
+  document.querySelectorAll('form[method="GET"] select, form[method="GET"] input[type="checkbox"], form[method="GET"] input[type="date"]').forEach(function(el) {
+    el.addEventListener('change', function() { this.form.submit(); });
+  });
+  // For text search inputs in GET forms, submit on Enter (default) and after typing stops (500ms debounce)
+  var debounceTimer;
+  document.querySelectorAll('form[method="GET"] input[type="text"]').forEach(function(el) {
+    el.addEventListener('input', function() {
+      var form = this.form;
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function() { form.submit(); }, 600);
+    });
+  });
+})();
+
 // ===== Mobile Sidebar Toggle =====
 (function() {
   const toggle = document.getElementById('sidebar-toggle');
