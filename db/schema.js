@@ -3174,6 +3174,7 @@ function initializeDatabase() {
     `);
 
     insertUser.run('admin', hash, 'Admin User', 'admin@tstraffic.com.au', 'admin');
+    insertUser.run('suhail.a', bcrypt.hashSync('Suhail123', 12), 'Suhail Ahmed', 'suhail@tstc.com.au', 'admin');
     insertUser.run('ops_user', bcrypt.hashSync('password', 12), 'Sam Operations', 'sam@tstraffic.com.au', 'operations');
     insertUser.run('planning_user', bcrypt.hashSync('password', 12), 'Alex Planning', 'alex@tstraffic.com.au', 'planning');
     insertUser.run('finance_user', bcrypt.hashSync('password', 12), 'Pat Finance', 'pat@tstraffic.com.au', 'finance');
@@ -3376,6 +3377,16 @@ function initializeDatabase() {
 
     // Seed comprehensive demo data (allocations, equipment assignments, activity log, CRM, etc.)
     seedDemoData(db);
+  }
+
+  // Ensure key users always exist (survives DB resets)
+  const ensureUser = db.prepare(`
+    INSERT OR IGNORE INTO users (username, password_hash, full_name, email, role) VALUES (?, ?, ?, ?, ?)
+  `);
+  const suhailExists = db.prepare('SELECT id FROM users WHERE username = ?').get('suhail.a');
+  if (!suhailExists) {
+    ensureUser.run('suhail.a', bcrypt.hashSync('Suhail123', 12), 'Suhail Ahmed', 'suhail@tstc.com.au', 'admin');
+    console.log('Created suhail.a user.');
   }
 
   db.close();
