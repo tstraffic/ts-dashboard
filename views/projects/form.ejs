@@ -18,11 +18,9 @@
       <div>
         <label for="job_number" class="block text-sm font-medium text-gray-600 mb-1">Job Number <span class="text-red-600">*</span></label>
         <input type="text" id="job_number" name="job_number" required
-          pattern="J-\d{5}" title="Format: J-NNNNN (e.g. J-00123)"
-          placeholder="J-00123"
+          placeholder="e.g. J-00123"
           value="<%= isEdit ? job.job_number : '' %>"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-        <p class="text-xs text-gray-400 mt-1">Format: J-NNNNN</p>
       </div>
       <!-- Client (Dropdown) -->
       <div>
