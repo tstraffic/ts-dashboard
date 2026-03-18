@@ -2338,7 +2338,587 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 39: Seed realistic demo budget data for active jobs
+  // =============================================
+  if (!isMigrationApplied.get(39)) {
+    try {
+      // Only seed if job_budgets is empty (don't overwrite real data)
+      const existingBudgets = db.prepare('SELECT COUNT(*) as c FROM job_budgets').get().c;
+      if (existingBudgets === 0) {
+        const activeJobs = db.prepare("SELECT id, job_number, contract_value FROM jobs WHERE status IN ('active','won','on_hold') ORDER BY job_number").all();
+        if (activeJobs.length > 0) {
+          const insertBudget = db.prepare(`INSERT OR IGNORE INTO job_budgets (job_id, contract_value, budget_labour, budget_materials, budget_subcontractors, budget_equipment, budget_other, budget_contingency, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+          const insertCost = db.prepare(`INSERT INTO cost_entries (job_id, budget_id, category, description, amount, entry_date, invoice_ref, supplier, entered_by_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+          const adminUser = db.prepare("SELECT id FROM users WHERE role IN ('admin','finance') LIMIT 1").get();
+          const enteredBy = adminUser ? adminUser.id : 1;
+
+          const profiles = [
+            { labourPct: 0.50, matPct: 0.08, subPct: 0.18, equipPct: 0.14, otherPct: 0.03, contPct: 0.07 },
+            { labourPct: 0.52, matPct: 0.06, subPct: 0.20, equipPct: 0.12, otherPct: 0.04, contPct: 0.06 },
+            { labourPct: 0.48, matPct: 0.10, subPct: 0.15, equipPct: 0.16, otherPct: 0.03, contPct: 0.08 },
+            { labourPct: 0.55, matPct: 0.05, subPct: 0.17, equipPct: 0.13, otherPct: 0.04, contPct: 0.06 },
+          ];
+
+          const contractValues = [185000, 320000, 95000, 450000, 78000, 520000, 125000, 680000, 210000, 145000];
+          const spendPcts = [0.38, 0.62, 0.78, 0.22, 0.45, 0.05, 0.55, 0.12, 0.35, 0.68];
+          const daysAgo39 = (n) => new Date(Date.now() - n * 86400000).toISOString().split('T')[0];
+
+          activeJobs.forEach((job, i) => {
+            const contractVal = job.contract_value || contractValues[i % contractValues.length];
+            const p = profiles[i % profiles.length];
+            const totalBudget = contractVal * 0.92;
+
+            insertBudget.run(job.id, contractVal,
+              Math.round(totalBudget * p.labourPct), Math.round(totalBudget * p.matPct),
+              Math.round(totalBudget * p.subPct), Math.round(totalBudget * p.equipPct),
+              Math.round(totalBudget * p.otherPct), Math.round(totalBudget * p.contPct),
+              'Auto-seeded budget');
+
+            const budgetRow = db.prepare('SELECT id FROM job_budgets WHERE job_id = ?').get(job.id);
+            if (!budgetRow) return;
+
+            const spendPct = spendPcts[i % spendPcts.length];
+            const totalSpend = totalBudget * spendPct;
+
+            const costEntries = [
+              { cat: 'labour', pct: 0.55, desc: 'Crew labour — weeks 1-' + Math.ceil(spendPct * 20), supplier: 'Internal', pre: 'LAB' },
+              { cat: 'equipment', pct: 0.18, desc: 'TMA & equipment hire', supplier: 'T&S Fleet', pre: 'EQP' },
+              { cat: 'materials', pct: 0.10, desc: 'Signage, cones & delineators', supplier: 'Traffix Devices', pre: 'MAT' },
+              { cat: 'subcontractors', pct: 0.14, desc: 'Line marking & civil sub', supplier: 'Roadline Markings', pre: 'SUB' },
+              { cat: 'other', pct: 0.03, desc: 'Permits & admin', supplier: 'Various', pre: 'OTH' },
+            ];
+
+            costEntries.forEach((ce, ci) => {
+              const amount = Math.round(totalSpend * ce.pct);
+              if (amount <= 0) return;
+              insertCost.run(job.id, budgetRow.id, ce.cat, ce.desc, amount,
+                daysAgo39(Math.max(1, Math.round((ci + 1) * 7 * spendPct))),
+                ce.pre + '-' + job.job_number + '-' + String(ci + 1).padStart(3, '0'),
+                ce.supplier, enteredBy);
+            });
+
+            if (!job.contract_value) {
+              db.prepare('UPDATE jobs SET contract_value = ? WHERE id = ?').run(contractVal, job.id);
+            }
+          });
+
+          console.log('Migration 39: Seeded budget data for ' + activeJobs.length + ' jobs');
+        }
+      }
+      recordMigration.run(39, 'Seed realistic demo budget data');
+      console.log('Migration 39 complete.');
+    } catch (e) {
+      console.error('Migration 39 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 40: Seed comprehensive demo data (schema-only marker)
+  // Actual data seeded in seedDemoData() after initial user/job seed
+  // =============================================
+  if (!isMigrationApplied.get(40)) {
+    // Add preferences column to users if missing
+    try { db.exec("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'"); } catch (e) { /* already exists */ }
+    recordMigration.run(40, 'Seed comprehensive demo data — allocations, equipment, activity, CRM, updates');
+    console.log('Migration 40 complete (schema marker).');
+  }
+
+  // =============================================
+  // Migration 41: Induction Module
+  // =============================================
+  if (!isMigrationApplied.get(41)) {
+    console.log('Running migration 41: Induction Module');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS induction_submissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        access_token TEXT UNIQUE NOT NULL,
+        payment_type TEXT NOT NULL CHECK(payment_type IN ('cash', 'tfn', 'abn')),
+        status TEXT NOT NULL DEFAULT 'submitted' CHECK(status IN ('draft', 'submitted', 'approved', 'rejected')),
+
+        full_name TEXT NOT NULL DEFAULT '',
+        email TEXT DEFAULT '',
+        phone TEXT DEFAULT '',
+        date_of_birth DATE,
+        address TEXT DEFAULT '',
+        suburb TEXT DEFAULT '',
+        state TEXT DEFAULT '',
+        postcode TEXT DEFAULT '',
+
+        can_drive TEXT DEFAULT '',
+        can_drive_truck TEXT DEFAULT '',
+        has_injuries TEXT DEFAULT '',
+        injury_details TEXT DEFAULT '',
+        is_indigenous TEXT DEFAULT '',
+
+        white_card_number TEXT DEFAULT '',
+        tc_licence_number TEXT DEFAULT '',
+        drivers_licence_number TEXT DEFAULT '',
+
+        white_card_photo TEXT DEFAULT '',
+        tc_licence_photo TEXT DEFAULT '',
+        drivers_licence_photo TEXT DEFAULT '',
+
+        tax_file_number TEXT DEFAULT '',
+        bank_bsb TEXT DEFAULT '',
+        bank_account_number TEXT DEFAULT '',
+        bank_account_name TEXT DEFAULT '',
+        abn_number TEXT DEFAULT '',
+
+        company_intro_completed INTEGER DEFAULT 0,
+        ppe_acknowledged INTEGER DEFAULT 0,
+
+        reviewed_by_id INTEGER REFERENCES users(id),
+        reviewed_at DATETIME,
+        review_notes TEXT DEFAULT '',
+
+        linked_crew_member_id INTEGER REFERENCES crew_members(id),
+
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        submitted_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_induction_token ON induction_submissions(access_token);
+      CREATE INDEX IF NOT EXISTS idx_induction_status ON induction_submissions(status);
+      CREATE INDEX IF NOT EXISTS idx_induction_payment ON induction_submissions(payment_type);
+      CREATE INDEX IF NOT EXISTS idx_induction_submitted ON induction_submissions(submitted_at);
+
+      CREATE TABLE IF NOT EXISTS induction_presentations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        module TEXT NOT NULL CHECK(module IN ('employee_guide', 'tc_training_1')),
+        presented_by_id INTEGER NOT NULL REFERENCES users(id),
+        attendee_names TEXT DEFAULT '',
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME,
+        last_slide INTEGER DEFAULT 1,
+        total_slides INTEGER NOT NULL,
+        notes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_presentations_module ON induction_presentations(module);
+    `);
+
+    recordMigration.run(41, 'Induction Module — submissions and presentations tables');
+    console.log('Migration 41 complete.');
+  }
+
+  // =============================================
+  // Migration 42: Add created_by to tasks
+  // =============================================
+  if (!isMigrationApplied.get(42)) {
+    console.log('Running migration 42: Add created_by to tasks');
+    try { db.exec('ALTER TABLE tasks ADD COLUMN created_by INTEGER REFERENCES users(id)'); } catch (e) { /* column may already exist */ }
+    recordMigration.run(42, 'Add created_by column to tasks table');
+    console.log('Migration 42 complete.');
+  }
+
+  // =============================================
+  // Migration 43: Backfill created_by on existing tasks
+  // =============================================
+  if (!isMigrationApplied.get(43)) {
+    console.log('Running migration 43: Backfill created_by on existing tasks');
+    // Set created_by to the first admin user for any tasks missing it
+    const firstAdmin = db.prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1").get();
+    if (firstAdmin) {
+      db.prepare('UPDATE tasks SET created_by = ? WHERE created_by IS NULL').run(firstAdmin.id);
+    }
+    recordMigration.run(43, 'Backfill created_by on existing tasks');
+    console.log('Migration 43 complete.');
+  }
+
+  // Migration 44: Add bank_name column to induction_submissions
+  if (!isMigrationApplied.get(44)) {
+    console.log('Running migration 44: Add bank_name to induction_submissions');
+    db.exec(`ALTER TABLE induction_submissions ADD COLUMN bank_name TEXT DEFAULT ''`);
+    recordMigration.run(44, 'Add bank_name to induction_submissions');
+    console.log('Migration 44 complete.');
+  }
+
+  // =============================================
+  // Migration 45: Client operational fields + import real client data
+  // =============================================
+  if (!isMigrationApplied.get(45)) {
+    console.log('Running migration 45: Client operational fields + real client data');
+    try {
+      // Add operational columns to clients
+      const clientCols45 = [
+        "ALTER TABLE clients ADD COLUMN cancellation_window_hrs INTEGER DEFAULT 3",
+        "ALTER TABLE clients ADD COLUMN is_non_billable INTEGER DEFAULT 0",
+        "ALTER TABLE clients ADD COLUMN is_cash_only INTEGER DEFAULT 0",
+        "ALTER TABLE clients ADD COLUMN credit_stop INTEGER DEFAULT 0",
+        "ALTER TABLE clients ADD COLUMN credit_stop_reason TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN default_purchase_order TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN billing_suburb TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN billing_state TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN billing_postcode TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN billing_attention TEXT DEFAULT ''",
+        "ALTER TABLE clients ADD COLUMN external_id TEXT DEFAULT ''",
+      ];
+      for (const sql of clientCols45) {
+        try { db.exec(sql); } catch (e) { /* column likely exists */ }
+      }
+
+      // Add send_docket / send_invoice to client_contacts
+      const contactCols45 = [
+        "ALTER TABLE client_contacts ADD COLUMN send_docket INTEGER DEFAULT 0",
+        "ALTER TABLE client_contacts ADD COLUMN send_invoice INTEGER DEFAULT 0",
+      ];
+      for (const sql of contactCols45) {
+        try { db.exec(sql); } catch (e) { /* column likely exists */ }
+      }
+
+      // Import real client data
+      const insertClient45 = db.prepare(`
+        INSERT INTO clients (external_id, company_name, abn, cancellation_window_hrs, is_non_billable, is_cash_only, credit_stop, credit_stop_reason, payment_terms, default_purchase_order, company_type, active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'client', 1)
+      `);
+      const insertContact45 = db.prepare(`
+        INSERT INTO client_contacts (company_id, contact_type, company, full_name, phone, email, send_docket, send_invoice, is_primary)
+        VALUES (?, 'client', ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const clients45 = [
+        {id:"74577",name:"2 Way Concrete",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Frank 2-Way",phone:"0410428084",email:null,docket:false,invoice:false}]},
+        {id:"94296",name:"Abergeldie Complex Infrastructure",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Harry Iqbal",phone:"0499 516 282",email:null,docket:false,invoice:false}]},
+        {id:"73797",name:"Active Civil Group",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Adam Mourad",phone:"0490333329",email:null,docket:false,invoice:false}]},
+        {id:"73796",name:"AGM Constructions",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Ghassan Al-Kamisie",phone:"0401272829",email:null,docket:false,invoice:false}]},
+        {id:"93884",name:"Al-Faisal College",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Waed Khalifeh",phone:"0405 288 828",email:null,docket:false,invoice:false}]},
+        {id:"74461",name:"All Civil Works",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Charbel Younan",phone:"0433922290",email:null,docket:false,invoice:false}]},
+        {id:"27671",name:"Alpha Cranes & Rigging",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Aaron Alpha",phone:"0414 525 556",email:null,docket:false,invoice:false}]},
+        {id:"74154",name:"AM2PM Group",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Craig AM2PM",phone:"0412393300",email:null,docket:false,invoice:false}]},
+        {id:"36003",name:"ANR Engineering",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Sami ANR",phone:"0439 038 993",email:null,docket:false,invoice:false}]},
+        {id:"75094",name:"Apex Sewer & Water",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Matthew Clancey",phone:"0432073840",email:null,docket:false,invoice:false}]},
+        {id:"90622",name:"Atlantis",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Sarah Atlantis",phone:"0432 282 380",email:null,docket:false,invoice:false}]},
+        {id:"74215",name:"Atlas Plumbing",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Pat Atlas",phone:"0404604050",email:null,docket:false,invoice:false}]},
+        {id:"73798",name:"Axial Construction",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Michael Cassisi",phone:"0407727170",email:null,docket:false,invoice:false}]},
+        {id:"34044",name:"Blaq Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Wasim Blaq",phone:"0430 838 488",email:null,docket:false,invoice:false}]},
+        {id:"73799",name:"Brushwood Engineering",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Jason Brushwood",phone:"0412898983",email:null,docket:false,invoice:false}]},
+        {id:"77632",name:"Build Life",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Elias Saad",phone:"0404676767",email:null,docket:false,invoice:false}]},
+        {id:"86602",name:"Builtwise Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Ahmed Builtwise",phone:"0423188888",email:null,docket:false,invoice:false}]},
+        {id:"35767",name:"BXD Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Jacob BXD",phone:"0425 696 969",email:null,docket:false,invoice:false}]},
+        {id:"94092",name:"Carlton Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Marwan Nassar",phone:"0403 077 887",email:null,docket:false,invoice:false}]},
+        {id:"90484",name:"CIP Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Alex CIP",phone:"0416 838 288",email:null,docket:false,invoice:false}]},
+        {id:"75913",name:"City Line Marking",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Walid City",phone:"0414140004",email:null,docket:false,invoice:false}]},
+        {id:"87649",name:"City Traffic",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Peter City Traffic",phone:"0413254000",email:null,docket:false,invoice:false}]},
+        {id:"88399",name:"Civil Com Group",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"George Civil",phone:"0413 060 506",email:null,docket:false,invoice:false}]},
+        {id:"35733",name:"Civil Environmental Services",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Steve CES",phone:"0434616113",email:null,docket:false,invoice:false}]},
+        {id:"73800",name:"Civil Environmental Services",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Ahmed CES",phone:"0426041882",email:null,docket:false,invoice:false}]},
+        {id:"32043",name:"Civil Ops",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[]},
+        {id:"32044",name:"Civil Ops",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Mitch",phone:"0473549737",email:null,docket:false,invoice:false}]},
+        {id:"33209",name:"Combined",abn:null,cancel:3,nonBill:true,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Taj",phone:"+61 416 221 801",email:null,docket:false,invoice:false}]},
+        {id:"92421",name:"Compass Developments",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Liam Marshall",phone:"0451 006 293",email:null,docket:false,invoice:false},{name:"Adnan Compass",phone:"0421316669",email:null,docket:false,invoice:false}]},
+        {id:"83863",name:"Conquest",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Danny Conquest",phone:"0413 803 386",email:null,docket:false,invoice:false}]},
+        {id:"73801",name:"Construx Solutions",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Jack Construx",phone:"0400 777 666",email:null,docket:false,invoice:false}]},
+        {id:"85666",name:"Cubic Construction",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Luke Cubic",phone:"0404 770 900",email:null,docket:false,invoice:false}]},
+        {id:"73805",name:"D&M Asphalt",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Danny D&M",phone:"0424 897 733",email:null,docket:false,invoice:false}]},
+        {id:"89044",name:"Daracon Group",abn:"82 002 344 667",cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Nathan Hillier",phone:"0499 941 623",email:"nathan.hillier@daracon.com.au",docket:true,invoice:false},{name:"Simpson Wong",phone:"0427 000 834",email:"simpson.wong@daracon.com.au",docket:false,invoice:false},{name:"Chandan Naidu",phone:"0432 987 654",email:"chandan.naidu@daracon.com.au",docket:false,invoice:false}]},
+        {id:"91246",name:"Daracon Group",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[]},
+        {id:"74792",name:"Delaney Civil",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Michael Delaney",phone:"0407414714",email:null,docket:false,invoice:false}]},
+        {id:"78459",name:"Designline Building",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Maysam Designline",phone:"0449 225 885",email:null,docket:false,invoice:false}]},
+        {id:"84307",name:"Domain Constructions",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Frank Domain",phone:"0402338831",email:null,docket:false,invoice:false}]},
+        {id:"78546",name:"Dynamic Lanemarking",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Ross Dynamic",phone:"0418 428 080",email:null,docket:false,invoice:false}]},
+        {id:"88257",name:"E.M.O Civil",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Jihad EMO",phone:"0414 660 090",email:null,docket:false,invoice:false}]},
+        {id:"31906",name:"Earthbuilt",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Ahmad Earthbuilt",phone:"0421 601 061",email:null,docket:false,invoice:false}]},
+        {id:"86054",name:"Easter's Pacific",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Greg Easter",phone:"0414 242 829",email:null,docket:false,invoice:false}]},
+        {id:"29781",name:"Fleek Constructions",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Jason Fleek",phone:"0410335556",email:null,docket:false,invoice:false}]},
+        {id:"33644",name:"Ghass",abn:null,cancel:3,nonBill:true,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[]},
+        {id:"73807",name:"Greenbrook",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Nathaniel Greenbrook",phone:"0408 727 343",email:null,docket:false,invoice:false}]},
+        {id:"73802",name:"Ground King Civil",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Marcus King",phone:"0424448000",email:null,docket:false,invoice:false}]},
+        {id:"73803",name:"H Lap Projects",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Hisham H-Lap",phone:"0412040030",email:null,docket:false,invoice:false}]},
+        {id:"91325",name:"Hacer Group",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Weston Hacer",phone:"0436 083 663",email:null,docket:false,invoice:false}]},
+        {id:"87594",name:"HPAC",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Steve HPAC",phone:"0410 696 060",email:null,docket:false,invoice:false}]},
+        {id:"73807",name:"I Connected",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Fatih Cantas",phone:"0477 777 877",email:null,docket:false,invoice:false},{name:"Harry ICA",phone:"0487409488",email:null,docket:false,invoice:false}]},
+        {id:"74156",name:"I Connected",abn:null,cancel:3,nonBill:false,cash:false,creditStop:false,creditReason:null,payTerm:null,po:null,contacts:[{name:"Fatih Cantas",phone:"0477 777 877",email:null,docket:false,invoice:false}]},
+      ];
+
+      for (const c of clients45) {
+        // Check if client with same name + external_id already exists
+        const existing = db.prepare('SELECT id FROM clients WHERE company_name = ? AND external_id = ?').get(c.name, c.id);
+        let clientDbId;
+        if (existing) {
+          clientDbId = existing.id;
+          // Update operational fields
+          db.prepare(`UPDATE clients SET cancellation_window_hrs = ?, is_non_billable = ?, is_cash_only = ?, credit_stop = ?, credit_stop_reason = ?, abn = COALESCE(NULLIF(?, ''), abn), external_id = ? WHERE id = ?`)
+            .run(c.cancel, c.nonBill ? 1 : 0, c.cash ? 1 : 0, c.creditStop ? 1 : 0, c.creditReason || '', c.abn || '', c.id, clientDbId);
+        } else {
+          const r = insertClient45.run(c.id, c.name, c.abn || '', c.cancel, c.nonBill ? 1 : 0, c.cash ? 1 : 0, c.creditStop ? 1 : 0, c.creditReason || '', c.payTerm || '', c.po || '');
+          clientDbId = r.lastInsertRowid;
+        }
+
+        // Insert contacts
+        for (let i = 0; i < c.contacts.length; i++) {
+          const ct = c.contacts[i];
+          // Check if contact already exists for this company
+          const existingContact = db.prepare('SELECT id FROM client_contacts WHERE company_id = ? AND full_name = ?').get(clientDbId, ct.name);
+          if (!existingContact) {
+            insertContact45.run(clientDbId, c.name, ct.name, ct.phone || '', ct.email || '', ct.docket ? 1 : 0, ct.invoice ? 1 : 0, i === 0 ? 1 : 0);
+          }
+        }
+      }
+
+      console.log('Migration 45: Imported ' + clients45.length + ' clients with contacts');
+    } catch (e) {
+      console.error('Migration 45 error:', e.message);
+    }
+    recordMigration.run(45, 'Client operational fields + real client data');
+    console.log('Migration 45 complete.');
+  }
+
   console.log('All migrations checked/applied.');
+}
+
+// Separate function to seed demo data (called AFTER initial user/job seed)
+function seedDemoData(db) {
+  // Only run if migration 40 was applied and seed data hasn't been done yet
+  const existingAllocs = db.prepare('SELECT COUNT(*) as c FROM crew_allocations').get().c;
+  if (existingAllocs > 0) return; // Already seeded
+
+  const jobCount = db.prepare('SELECT COUNT(*) as c FROM jobs').get().c;
+  if (jobCount === 0) return; // No base seed data yet
+
+  console.log('Seeding comprehensive demo data...');
+  try {
+      const today40 = new Date().toISOString().split('T')[0];
+      const daysAgo40 = (n) => new Date(Date.now() - n * 86400000).toISOString().split('T')[0];
+      const daysFromNow40 = (n) => new Date(Date.now() + n * 86400000).toISOString().split('T')[0];
+
+      // --- 0. Seed budget data if migration 39 ran but found no jobs ---
+      const existingBudgets = db.prepare('SELECT COUNT(*) as c FROM job_budgets').get().c;
+      if (existingBudgets === 0) {
+        const activeJobs = db.prepare("SELECT id, job_number, contract_value FROM jobs WHERE status IN ('active','won','on_hold') ORDER BY job_number").all();
+        if (activeJobs.length > 0) {
+          const insertBudget = db.prepare(`INSERT OR IGNORE INTO job_budgets (job_id, contract_value, budget_labour, budget_materials, budget_subcontractors, budget_equipment, budget_other, budget_contingency, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+          const insertCost = db.prepare(`INSERT INTO cost_entries (job_id, budget_id, category, description, amount, entry_date, invoice_ref, supplier, entered_by_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+          const enteredBy = db.prepare("SELECT id FROM users WHERE role IN ('admin','finance') LIMIT 1").get()?.id || 1;
+          const profiles = [
+            { labourPct: 0.50, matPct: 0.08, subPct: 0.18, equipPct: 0.14, otherPct: 0.03, contPct: 0.07 },
+            { labourPct: 0.52, matPct: 0.06, subPct: 0.20, equipPct: 0.12, otherPct: 0.04, contPct: 0.06 },
+            { labourPct: 0.48, matPct: 0.10, subPct: 0.15, equipPct: 0.16, otherPct: 0.03, contPct: 0.08 },
+            { labourPct: 0.55, matPct: 0.05, subPct: 0.17, equipPct: 0.13, otherPct: 0.04, contPct: 0.06 },
+          ];
+          const contractValues = [185000, 320000, 95000, 450000, 78000, 520000, 125000, 680000, 210000, 145000];
+          const spendPcts = [0.38, 0.62, 0.78, 0.22, 0.45, 0.05, 0.55, 0.12, 0.35, 0.68];
+          activeJobs.forEach((job, i) => {
+            const contractVal = job.contract_value || contractValues[i % contractValues.length];
+            const p = profiles[i % profiles.length];
+            const totalBudget = contractVal * 0.92;
+            insertBudget.run(job.id, contractVal,
+              Math.round(totalBudget * p.labourPct), Math.round(totalBudget * p.matPct),
+              Math.round(totalBudget * p.subPct), Math.round(totalBudget * p.equipPct),
+              Math.round(totalBudget * p.otherPct), Math.round(totalBudget * p.contPct),
+              'Auto-seeded budget');
+            const budgetRow = db.prepare('SELECT id FROM job_budgets WHERE job_id = ?').get(job.id);
+            if (!budgetRow) return;
+            const spendPct = spendPcts[i % spendPcts.length];
+            const totalSpend = totalBudget * spendPct;
+            const costEntries = [
+              { cat: 'labour', pct: 0.55, desc: 'Crew labour — weeks 1-' + Math.ceil(spendPct * 20), supplier: 'Internal', pre: 'LAB' },
+              { cat: 'equipment', pct: 0.18, desc: 'TMA & equipment hire', supplier: 'T&S Fleet', pre: 'EQP' },
+              { cat: 'materials', pct: 0.10, desc: 'Signage, cones & delineators', supplier: 'Traffix Devices', pre: 'MAT' },
+              { cat: 'subcontractors', pct: 0.14, desc: 'Line marking & civil sub', supplier: 'Roadline Markings', pre: 'SUB' },
+              { cat: 'other', pct: 0.03, desc: 'Permits & admin', supplier: 'Various', pre: 'OTH' },
+            ];
+            costEntries.forEach((ce, ci) => {
+              const amount = Math.round(totalSpend * ce.pct);
+              if (amount <= 0) return;
+              insertCost.run(job.id, budgetRow.id, ce.cat, ce.desc, amount,
+                daysAgo40(Math.max(1, Math.round((ci + 1) * 7 * spendPct))),
+                ce.pre + '-' + job.job_number + '-' + String(ci + 1).padStart(3, '0'),
+                ce.supplier, enteredBy);
+            });
+            if (!job.contract_value) {
+              db.prepare('UPDATE jobs SET contract_value = ? WHERE id = ?').run(contractVal, job.id);
+            }
+          });
+          console.log('  Seeded budgets for ' + activeJobs.length + ' jobs');
+        }
+      }
+
+      // --- A. Crew allocations for today + recent days ---
+      const existingAllocs = db.prepare('SELECT COUNT(*) as c FROM crew_allocations').get().c;
+      if (existingAllocs === 0) {
+        const insertAlloc = db.prepare(`
+          INSERT INTO crew_allocations (job_id, crew_member_id, allocation_date, start_time, end_time, shift_type, role_on_site, status, notes, allocated_by_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        `);
+        // Today's allocations — 14 crew across 5 active jobs
+        const todayAllocs = [
+          [1, 1, '06:00', '14:30', 'day', 'Supervisor', 'confirmed', 'Barrier install Section A'],
+          [1, 3, '06:00', '14:30', 'day', 'Traffic Controller', 'confirmed', ''],
+          [1, 4, '06:00', '14:30', 'day', 'Traffic Controller', 'confirmed', ''],
+          [1, 2, '06:00', '14:30', 'day', 'Leading Hand', 'allocated', 'Pending confirmation'],
+          [6, 5, '19:00', '05:00', 'night', 'Supervisor', 'confirmed', 'Night works Main St'],
+          [6, 7, '19:00', '05:00', 'night', 'Traffic Controller', 'confirmed', ''],
+          [6, 8, '19:00', '05:00', 'night', 'Traffic Controller', 'allocated', ''],
+          [6, 14, '19:00', '05:00', 'night', 'Spotter', 'confirmed', ''],
+          [9, 11, '06:00', '14:30', 'day', 'Supervisor', 'confirmed', 'Olympic Blvd works'],
+          [9, 12, '06:00', '14:30', 'day', 'Leading Hand', 'confirmed', ''],
+          [9, 13, '06:00', '14:30', 'day', 'Traffic Controller', 'allocated', ''],
+          [10, 17, '06:00', '14:30', 'day', 'Leading Hand', 'confirmed', 'Victoria Rd setup'],
+          [10, 15, '06:00', '14:30', 'day', 'Traffic Controller', 'confirmed', ''],
+          [4, 23, '06:00', '14:30', 'day', 'Supervisor', 'confirmed', 'Final inspection prep'],
+        ];
+        todayAllocs.forEach(a => insertAlloc.run(a[0], a[1], today40, a[2], a[3], a[4], a[5], a[6], a[7]));
+
+        // Yesterday allocations
+        const yAllocs = [
+          [1, 1, '06:00', '14:30', 'day', 'Supervisor', 'confirmed', ''],
+          [1, 3, '06:00', '14:30', 'day', 'Traffic Controller', 'confirmed', ''],
+          [1, 4, '06:00', '14:30', 'day', 'Traffic Controller', 'confirmed', ''],
+          [6, 5, '19:00', '05:00', 'night', 'Supervisor', 'confirmed', ''],
+          [6, 7, '19:00', '05:00', 'night', 'Traffic Controller', 'confirmed', ''],
+          [9, 11, '06:00', '14:30', 'day', 'Supervisor', 'confirmed', ''],
+          [9, 12, '06:00', '14:30', 'day', 'Leading Hand', 'confirmed', ''],
+          [10, 17, '06:00', '14:30', 'day', 'Leading Hand', 'confirmed', ''],
+          [7, 6, '06:00', '16:00', 'day', 'Leading Hand', 'confirmed', 'Demob Coward St'],
+          [7, 18, '06:00', '16:00', 'day', 'Traffic Controller', 'confirmed', ''],
+        ];
+        yAllocs.forEach(a => insertAlloc.run(a[0], a[1], daysAgo40(1), a[2], a[3], a[4], a[5], a[6], a[7]));
+
+        // Tomorrow allocations
+        const tAllocs = [
+          [1, 1, '06:00', '14:30', 'day', 'Supervisor', 'allocated', ''],
+          [1, 2, '06:00', '14:30', 'day', 'Leading Hand', 'allocated', ''],
+          [1, 3, '06:00', '14:30', 'day', 'Traffic Controller', 'allocated', ''],
+          [6, 5, '19:00', '05:00', 'night', 'Supervisor', 'allocated', ''],
+          [6, 7, '19:00', '05:00', 'night', 'Traffic Controller', 'allocated', ''],
+          [6, 8, '19:00', '05:00', 'night', 'Traffic Controller', 'allocated', ''],
+          [9, 11, '06:00', '14:30', 'day', 'Supervisor', 'allocated', ''],
+          [10, 17, '06:00', '14:30', 'day', 'Leading Hand', 'allocated', ''],
+        ];
+        tAllocs.forEach(a => insertAlloc.run(a[0], a[1], daysFromNow40(1), a[2], a[3], a[4], a[5], a[6], a[7]));
+      }
+
+      // --- B. Equipment assignments (deployed to jobs) ---
+      const existingEqAssign = db.prepare('SELECT COUNT(*) as c FROM equipment_assignments').get().c;
+      if (existingEqAssign === 0) {
+        const insertEqAssign = db.prepare(`
+          INSERT INTO equipment_assignments (equipment_id, job_id, assigned_date, expected_return_date, actual_return_date, assigned_by_id, notes)
+          VALUES (?, ?, ?, ?, ?, 1, ?)
+        `);
+        // Currently deployed (no actual_return_date)
+        insertEqAssign.run(1, 1, daysAgo40(30), daysFromNow40(30), null, 'Arrow board for Canterbury Rd northbound');
+        insertEqAssign.run(3, 9, daysAgo40(14), daysFromNow40(60), null, 'VMS Olympic Blvd detour info');
+        insertEqAssign.run(5, 1, daysAgo40(30), daysFromNow40(30), null, 'Supervisor ute');
+        insertEqAssign.run(6, 6, daysAgo40(10), daysFromNow40(45), null, 'Night works ute');
+        insertEqAssign.run(7, 1, daysAgo40(30), daysFromNow40(30), null, 'Barriers Section A');
+        insertEqAssign.run(9, 6, daysAgo40(10), daysFromNow40(45), null, 'Night works lighting');
+        insertEqAssign.run(11, 9, daysAgo40(14), daysFromNow40(60), null, 'Traffic cones Olympic Blvd');
+        insertEqAssign.run(14, 10, daysAgo40(7), daysFromNow40(90), null, 'Sign kit for Victoria Rd');
+        // Previously deployed and returned
+        insertEqAssign.run(2, 4, daysAgo40(60), daysAgo40(5), daysAgo40(5), 'Arrow board returned from Liverpool');
+        insertEqAssign.run(8, 7, daysAgo40(45), daysAgo40(2), daysAgo40(2), 'Barriers returned from Mascot');
+        insertEqAssign.run(12, 4, daysAgo40(60), daysAgo40(5), daysAgo40(5), 'Cone set B returned');
+      }
+
+      // --- C. Activity log entries (realistic recent activity) ---
+      const existingActivity = db.prepare('SELECT COUNT(*) as c FROM activity_log').get().c;
+      if (existingActivity < 5) {
+        const insertActivity = db.prepare(`
+          INSERT INTO activity_log (user_id, user_name, action, entity_type, entity_id, details, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        const userNames = { 1: 'Admin User', 2: 'Sam Operations', 3: 'Alex Planning', 4: 'Pat Finance', 5: 'Jordan Accounts' };
+        const activities = [
+          [1, 'create', 'job', 12, 'Created job J-02462 — Acciona Wolli Creek', daysAgo40(0) + ' 09:15:00'],
+          [2, 'update', 'allocation', null, 'Confirmed 14 crew allocations for today', daysAgo40(0) + ' 07:30:00'],
+          [1, 'update', 'job', 7, 'Updated J-02457 progress to 90%', daysAgo40(0) + ' 08:45:00'],
+          [3, 'create', 'compliance', 5, 'Submitted ROL Extension for J-02454', daysAgo40(1) + ' 14:20:00'],
+          [5, 'update', 'task', 5, 'Marked "Chase overdue invoice #INV-4421" as in_progress', daysAgo40(1) + ' 10:00:00'],
+          [2, 'update', 'incident', null, 'Closed incident INC-003 — near miss resolved', daysAgo40(1) + ' 16:30:00'],
+          [1, 'create', 'budget', 1, 'Set budget for J-02451 — $185,000 contract', daysAgo40(2) + ' 11:00:00'],
+          [3, 'update', 'compliance', 1, 'TMP approved for Canterbury Rd', daysAgo40(2) + ' 09:15:00'],
+          [2, 'create', 'allocation', null, 'Created allocations for week of ' + daysAgo40(7), daysAgo40(3) + ' 15:45:00'],
+          [5, 'create', 'cost_entry', null, 'Added $12,400 labour cost to J-02456', daysAgo40(3) + ' 13:20:00'],
+          [1, 'update', 'job', 4, 'Changed J-02454 health to red — payment overdue', daysAgo40(4) + ' 10:30:00'],
+          [2, 'create', 'timesheet', null, 'Submitted 8 timesheets for March 14', daysAgo40(4) + ' 17:00:00'],
+          [3, 'create', 'plan', null, 'Created TMP for Church St closure', daysAgo40(5) + ' 11:30:00'],
+          [1, 'update', 'crew', 16, 'Updated Michelle Harris licence expiry', daysAgo40(5) + ' 14:00:00'],
+          [4, 'create', 'opportunity', null, 'New lead: Penrith Council road upgrade $340k', daysAgo40(6) + ' 09:00:00'],
+          [1, 'create', 'job', 8, 'Created job J-02458 — John Holland Norwest', daysAgo40(7) + ' 10:15:00'],
+          [2, 'update', 'equipment', 10, 'Flagged Lighting Tower #2 condition as poor', daysAgo40(8) + ' 08:30:00'],
+          [5, 'create', 'invoice', null, 'Sent progress claim #2 to Fulton Hogan', daysAgo40(9) + ' 14:45:00'],
+          [3, 'update', 'plan', null, 'ROL approved for Olympic Blvd night works', daysAgo40(10) + ' 16:00:00'],
+          [1, 'update', 'settings', null, 'Updated defect severity dropdown options', daysAgo40(12) + ' 11:00:00'],
+        ];
+        activities.forEach(a => insertActivity.run(a[0], userNames[a[0]], a[1], a[2], a[3], a[4], a[5]));
+      }
+
+      // --- D. Update job last_update_date for active jobs (fix "missing weekly update") ---
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 1").run(daysAgo40(2));
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 6").run(daysAgo40(3));
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 7").run(daysAgo40(1));
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 9").run(daysAgo40(4));
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 10").run(daysAgo40(5));
+      db.prepare("UPDATE jobs SET last_update_date = ? WHERE id = 11").run(daysAgo40(3));
+      // Leave J-02454 (id=4) and J-02455 (id=5) with old dates to show realistic "missing update"
+
+      // --- E. Seed CRM opportunities ---
+      const existingOpps = db.prepare('SELECT COUNT(*) as c FROM opportunities').get().c;
+      if (existingOpps === 0) {
+        const insertOpp = db.prepare(`
+          INSERT INTO opportunities (opportunity_number, title, client_id, owner_id, service_type, stage, probability, estimated_value, weighted_value, expected_close_date, source, region, notes, next_step, next_step_due_date, status, created_by_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        insertOpp.run('OPP-001', 'Penrith Council — Road Upgrade TCP', null, 4, 'traffic_management', 'proposal_pending', 60, 340000, 204000, daysFromNow40(30), 'referral', 'Western Sydney', 'Large road upgrade project. Council wants dedicated TCP for 6 months.', 'Follow up on proposal', daysFromNow40(5), 'open', 4);
+        insertOpp.run('OPP-002', 'Laing O\'Rourke — M4 Widening', null, 4, 'traffic_management', 'qualified', 40, 580000, 232000, daysFromNow40(60), 'tender_portal', 'Western Sydney', 'Tier 1 project. Long-term opportunity if we get in.', 'Submit EOI', daysFromNow40(10), 'open', 4);
+        insertOpp.run('OPP-003', 'Ausgrid — Cable Replacement', null, 4, 'traffic_management', 'quote_sent', 75, 125000, 93750, daysFromNow40(14), 'existing_client', 'Inner West', 'Follow-on from Penrith job. Good relationship with PM.', 'Chase quote response', daysFromNow40(3), 'open', 4);
+        insertOpp.run('OPP-004', 'City of Sydney — Bike Lane Install', null, 4, 'traffic_management', 'meeting_booked', 30, 210000, 63000, daysFromNow40(45), 'website', 'CBD', 'Green infrastructure project. Needs night works capability.', 'Attend site meeting', daysFromNow40(7), 'open', 4);
+        insertOpp.run('OPP-005', 'Downer EDI — Intersection Upgrade', null, 4, 'traffic_management', 'negotiation', 80, 195000, 156000, daysFromNow40(7), 'existing_client', 'Northern Sydney', 'Almost closed. Waiting on final PO.', 'Follow up PO', daysFromNow40(2), 'open', 4);
+        insertOpp.run('OPP-006', 'Fulton Hogan — Night Works Package', 5, 4, 'traffic_management', 'won', 100, 320000, 320000, daysAgo40(10), 'existing_client', 'Western Sydney', 'Converted to J-02456', 'Mobilise crew', null, 'won', 4);
+        insertOpp.run('OPP-007', 'Ventia — Water Main Repair', null, 4, 'traffic_management', 'new_lead', 15, 85000, 12750, daysFromNow40(90), 'cold_call', 'South West Sydney', 'Initial enquiry. Small job but good foot in the door.', 'Call back to qualify', daysFromNow40(5), 'open', 4);
+      }
+
+      // --- F. Seed CRM activities ---
+      const existingCrmAct = db.prepare('SELECT COUNT(*) as c FROM crm_activities').get().c;
+      if (existingCrmAct === 0) {
+        const insertCrmAct = db.prepare(`
+          INSERT INTO crm_activities (activity_type, subject, notes, outcome, opportunity_id, owner_id, activity_date, is_completed, created_by_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        insertCrmAct.run('call', 'Follow up with Penrith Council', 'Discussed project timeline and crew requirements', 'Positive — submitting proposal this week', 1, 4, daysAgo40(3) + ' 10:00:00', 1, 4);
+        insertCrmAct.run('meeting', 'Site visit — M4 Widening', 'Walked site with Laing PM. Assessed TCP requirements.', 'Good fit for our capability. Large mobilisation needed.', 2, 4, daysAgo40(5) + ' 14:00:00', 1, 4);
+        insertCrmAct.run('email', 'Quote sent to Ausgrid', 'Sent formal quote for cable replacement TCP', 'Awaiting response', 3, 4, daysAgo40(2) + ' 09:30:00', 1, 4);
+        insertCrmAct.run('call', 'Intro call — City of Sydney', 'Discussed bike lane project scope and our night works experience', 'Meeting booked for next week', 4, 4, daysAgo40(7) + ' 11:00:00', 1, 4);
+        insertCrmAct.run('meeting', 'Negotiation — Downer EDI intersection', 'Final rates discussion. Agreed terms.', 'PO expected this week', 5, 4, daysAgo40(1) + ' 15:00:00', 1, 4);
+      }
+
+      // --- G. Update Test Worker (crew_member id=1) with fuller data ---
+      try {
+        db.prepare(`UPDATE crew_members SET
+          emergency_contact_name = 'Jane Smith',
+          emergency_contact_phone = '0402 111 222'
+          WHERE id = 1 AND (emergency_contact_name IS NULL OR emergency_contact_name = '')
+        `).run();
+      } catch (e) { /* columns may not exist */ }
+
+      // --- H. Dismiss onboarding for admin user (demo should look production-ready) ---
+      try {
+        // Add preferences column if missing
+        try { db.exec("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'"); } catch (e) { /* already exists */ }
+        db.prepare("UPDATE users SET preferences = ? WHERE id = 1").run(JSON.stringify({ onboarding_dismissed: true }));
+      } catch (e) { /* ignore */ }
+
+      // --- I. Add more project updates so "missing weekly update" count is realistic ---
+      try {
+        const insertUpdate40 = db.prepare(`
+          INSERT OR IGNORE INTO project_updates (job_id, week_ending, summary, milestones, issues_risks, blockers, submitted_by_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        insertUpdate40.run(6, daysAgo40(3), 'Night works progressing well. Lane closure setup efficient. No incidents.', 'Main St section 1 complete. Section 2 starting.', 'Noise complaints from residents — adjusted generator placement.', '', 2);
+        insertUpdate40.run(7, daysAgo40(1), 'Demobilisation 80% complete. Final equipment collection scheduled.', 'All barriers removed. Signs collected.', 'None — clean finish expected.', '', 2);
+        insertUpdate40.run(9, daysAgo40(4), 'Olympic Blvd works on track. ROL approved. Night crew performing well.', 'Stage 1 traffic switch complete.', 'Wet weather risk next week.', '', 3);
+        insertUpdate40.run(10, daysAgo40(5), 'Victoria Rd setup progressing. Crew familiarised with TGS.', 'Initial setup 25% complete.', 'Heavy traffic volumes requiring additional spotter.', '', 2);
+        insertUpdate40.run(11, daysAgo40(3), 'Campbelltown job approaching deadline. Progress claim dispute ongoing.', 'Barrier install 70% done.', 'Payment delay from Georgiou. Accounts following up.', 'Cannot order additional materials until payment received.', 1);
+      } catch (e) { /* ignore duplicates */ }
+
+      console.log('Demo data seeded successfully.');
+    } catch (e) {
+      console.error('Demo data seed error:', e.message);
+    }
 }
 
 function initializeDatabase() {
@@ -2756,6 +3336,10 @@ function initializeDatabase() {
     `);
 
     insertUser.run('admin', hash, 'Admin User', 'admin@tstraffic.com.au', 'admin');
+    insertUser.run('suhail.a', bcrypt.hashSync('Suhail123', 12), 'Suhail Ahmed', 'suhail@tstc.com.au', 'admin');
+    insertUser.run('saadat', bcrypt.hashSync('TandS2026.', 12), 'Saadat', 'saadat@tstc.com.au', 'admin');
+    insertUser.run('savanah', bcrypt.hashSync('Savanah123', 12), 'Savanah', 'savanah@tstc.com.au', 'admin');
+    insertUser.run('taj', bcrypt.hashSync('Taj123', 12), 'Taj', 'taj@tstc.com.au', 'admin');
     insertUser.run('ops_user', bcrypt.hashSync('password', 12), 'Sam Operations', 'sam@tstraffic.com.au', 'operations');
     insertUser.run('planning_user', bcrypt.hashSync('password', 12), 'Alex Planning', 'alex@tstraffic.com.au', 'planning');
     insertUser.run('finance_user', bcrypt.hashSync('password', 12), 'Pat Finance', 'pat@tstraffic.com.au', 'finance');
@@ -2955,6 +3539,26 @@ function initializeDatabase() {
     insertUpdate.run(11, '2026-03-07', 'Campbelltown project facing payment delays. Road opening permit submitted to council. Crew allocated for next 2 weeks.', 'Excavation 70% complete. Permit application lodged.', 'Client progress claim #2 still unpaid (45 days). Escalated to accounts.', 'Cannot order materials for final stage until payment received.', 1);
 
     console.log('Database seeded with sample data.');
+
+    // Seed comprehensive demo data (allocations, equipment assignments, activity log, CRM, etc.)
+    seedDemoData(db);
+  }
+
+  // Ensure key users always exist (survives DB resets)
+  const ensureUser = db.prepare(`
+    INSERT OR IGNORE INTO users (username, password_hash, full_name, email, role) VALUES (?, ?, ?, ?, ?)
+  `);
+  const ensureUsers = [
+    ['suhail.a', 'Suhail123', 'Suhail Ahmed', 'suhail@tstc.com.au', 'admin'],
+    ['saadat', 'TandS2026.', 'Saadat', 'saadat@tstc.com.au', 'admin'],
+    ['savanah', 'Savanah123', 'Savanah', 'savanah@tstc.com.au', 'admin'],
+    ['taj', 'Taj123', 'Taj', 'taj@tstc.com.au', 'admin'],
+  ];
+  for (const [uname, pwd, fullName, email, role] of ensureUsers) {
+    if (!db.prepare('SELECT id FROM users WHERE username = ?').get(uname)) {
+      ensureUser.run(uname, bcrypt.hashSync(pwd, 12), fullName, email, role);
+      console.log(`Created ${uname} user.`);
+    }
   }
 
   db.close();

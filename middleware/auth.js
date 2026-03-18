@@ -42,10 +42,13 @@ const PERMISSIONS = {
   reports:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales'],
   exports:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales'],
   notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'sales'],
+  bookings:      ['admin', 'operations', 'planning'],
   crm:           ['admin', 'operations', 'planning', 'sales'],
   admin:         ['admin'],
   activity:      ['admin'],
   settings:      ['admin'],
+  // Induction
+  induction:          ['admin', 'operations', 'hr'],
   // HR modules
   hr_dashboard:       ['admin', 'hr'],
   hr_employees:       ['admin', 'hr'],

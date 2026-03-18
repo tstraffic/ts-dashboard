@@ -1,0 +1,426 @@
+<% locals.currentPage = 'induction' %>
+<%
+  function formatDate(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function maskField(value, visibleChars) {
+    if (!value) return '—';
+    const str = String(value);
+    if (str.length <= visibleChars) return str;
+    return '*'.repeat(str.length - visibleChars) + str.slice(-visibleChars);
+  }
+
+  function statusBadgeClass(status) {
+    switch (status) {
+      case 'submitted': return 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20';
+      case 'approved': return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20';
+      case 'rejected': return 'bg-red-50 text-red-700 ring-1 ring-red-600/20';
+      case 'converted': return 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  }
+
+  function paymentBadgeClass(type) {
+    switch (type) {
+      case 'tfn': return 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20';
+      case 'abn': return 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  }
+
+  const s = submission;
+%>
+
+<!-- Breadcrumb -->
+<div class="flex items-center gap-2 text-sm text-gray-400 mb-4">
+  <a href="/induction/admin/submissions" class="hover:text-gray-900 transition">Induction Submissions</a>
+  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <span class="text-gray-900"><%= s.full_name %></span>
+</div>
+
+<!-- Header Card -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 mb-5">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-14 h-14 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
+        <%= s.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() %>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold text-gray-900"><%= s.full_name %></h1>
+        <div class="flex flex-wrap items-center gap-1.5 mt-1">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize <%= statusBadgeClass(s.status) %>">
+            <%= s.status %>
+          </span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium uppercase <%= paymentBadgeClass(s.payment_type) %>">
+            <%= s.payment_type || 'N/A' %>
+          </span>
+          <span class="text-xs text-gray-400">Submitted <%= formatDate(s.submitted_at || s.created_at) %></span>
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <% if (s.status === 'submitted') { %>
+        <button onclick="document.getElementById('approveModal').classList.remove('hidden')" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">
+          <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          Approve
+        </button>
+        <button onclick="document.getElementById('rejectModal').classList.remove('hidden')" class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg transition">
+          <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          Reject
+        </button>
+      <% } else if (s.status === 'approved') { %>
+        <form method="POST" action="/induction/admin/submissions/<%= s.id %>/convert" onsubmit="return confirm('Convert this submission to an employee record?')">
+          <button type="submit" class="inline-flex items-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+            Convert to Employee
+          </button>
+        </form>
+      <% } else if (s.status === 'converted') { %>
+        <% if (s.linked_crew_member_id) { %>
+          <a href="/crew/<%= s.linked_crew_member_id %>" class="inline-flex items-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            View in Crew Roster
+          </a>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Content Cards -->
+<div class="space-y-5">
+
+  <!-- Personal Details -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Personal Details</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Full Name</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.full_name %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.email || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.phone || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date of Birth</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.date_of_birth || '—' %></p>
+      </div>
+      <div class="sm:col-span-2">
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Address</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5">
+          <%= [s.address, s.suburb, s.state, s.postcode].filter(Boolean).join(', ') || '—' %>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fitness & Suitability -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Fitness & Suitability</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+      <div class="flex items-center gap-2">
+        <% if (s.can_drive) { %>
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </span>
+        <% } else { %>
+          <span class="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </span>
+        <% } %>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Can Drive</p>
+          <p class="text-sm text-gray-900 font-medium"><%= s.can_drive ? 'Yes' : 'No' %></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <% if (s.can_drive_truck) { %>
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </span>
+        <% } else { %>
+          <span class="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </span>
+        <% } %>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Can Drive Truck</p>
+          <p class="text-sm text-gray-900 font-medium"><%= s.can_drive_truck ? 'Yes' : 'No' %></p>
+        </div>
+      </div>
+      <div class="flex items-start gap-2 sm:col-span-2">
+        <% if (s.has_injuries) { %>
+          <span class="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+          </span>
+        <% } else { %>
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </span>
+        <% } %>
+        <div class="flex-1">
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Has Injuries / Medical Conditions</p>
+          <p class="text-sm text-gray-900 font-medium"><%= s.has_injuries ? 'Yes' : 'No' %></p>
+          <% if (s.has_injuries && s.injury_details) { %>
+            <div class="mt-1.5 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
+              <%= s.injury_details %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Aboriginal / Torres Strait Islander</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.is_indigenous ? 'Yes' : 'No' %></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Documents & Licences -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Documents & Licences</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- White Card -->
+      <div class="border border-gray-100 rounded-lg p-3">
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">White Card</p>
+        <p class="text-sm text-gray-900 font-medium"><%= s.white_card_number || '—' %></p>
+        <% if (s.white_card_photo) { %>
+          <div class="mt-2">
+            <img src="/induction/admin/uploads/<%= s.id %>/<%= s.white_card_photo %>" alt="White Card" class="w-full h-24 object-cover rounded border border-gray-200 cursor-pointer" onclick="window.open(this.src, '_blank')">
+            <a href="/induction/admin/uploads/<%= s.id %>/<%= s.white_card_photo %>" target="_blank" class="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium mt-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              View Full Size
+            </a>
+          </div>
+        <% } else { %>
+          <p class="text-xs text-gray-400 mt-2">Not uploaded</p>
+        <% } %>
+      </div>
+
+      <!-- TC Licence -->
+      <div class="border border-gray-100 rounded-lg p-3">
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TC Licence</p>
+        <p class="text-sm text-gray-900 font-medium"><%= s.tc_licence_number || '—' %></p>
+        <% if (s.tc_licence_photo) { %>
+          <div class="mt-2">
+            <img src="/induction/admin/uploads/<%= s.id %>/<%= s.tc_licence_photo %>" alt="TC Licence" class="w-full h-24 object-cover rounded border border-gray-200 cursor-pointer" onclick="window.open(this.src, '_blank')">
+            <a href="/induction/admin/uploads/<%= s.id %>/<%= s.tc_licence_photo %>" target="_blank" class="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium mt-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              View Full Size
+            </a>
+          </div>
+        <% } else { %>
+          <p class="text-xs text-gray-400 mt-2">Not uploaded</p>
+        <% } %>
+      </div>
+
+      <!-- Driver's Licence -->
+      <div class="border border-gray-100 rounded-lg p-3">
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Driver's Licence</p>
+        <p class="text-sm text-gray-900 font-medium"><%= s.drivers_licence_number || '—' %></p>
+        <% if (s.drivers_licence_photo) { %>
+          <div class="mt-2">
+            <img src="/induction/admin/uploads/<%= s.id %>/<%= s.drivers_licence_photo %>" alt="Driver's Licence" class="w-full h-24 object-cover rounded border border-gray-200 cursor-pointer" onclick="window.open(this.src, '_blank')">
+            <a href="/induction/admin/uploads/<%= s.id %>/<%= s.drivers_licence_photo %>" target="_blank" class="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium mt-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              View Full Size
+            </a>
+          </div>
+        <% } else { %>
+          <p class="text-xs text-gray-400 mt-2">Not uploaded</p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Banking Details -->
+  <% if (s.payment_type === 'tfn' || s.payment_type === 'abn' || s.payment_type === 'cash') { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Banking Details</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+      <% if (s.payment_type === 'tfn') { %>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tax File Number</p>
+          <div class="flex items-center gap-2 mt-0.5">
+            <p class="text-sm text-gray-900 font-medium sensitive-field" data-full="<%= s.tax_file_number || '' %>" data-masked="<%= maskField(s.tax_file_number, 4) %>"><%= maskField(s.tax_file_number, 4) %></p>
+            <% if (s.tax_file_number) { %>
+              <button type="button" onclick="toggleSensitive(this)" class="text-[10px] text-brand-600 hover:text-brand-700 font-medium toggle-btn">Show</button>
+            <% } %>
+          </div>
+        </div>
+      <% } else { %>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">ABN</p>
+          <div class="flex items-center gap-2 mt-0.5">
+            <p class="text-sm text-gray-900 font-medium sensitive-field" data-full="<%= s.abn_number || '' %>" data-masked="<%= maskField(s.abn_number, 4) %>"><%= maskField(s.abn_number, 4) %></p>
+            <% if (s.abn_number) { %>
+              <button type="button" onclick="toggleSensitive(this)" class="text-[10px] text-brand-600 hover:text-brand-700 font-medium toggle-btn">Show</button>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bank Name</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.bank_name || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">BSB</p>
+        <div class="flex items-center gap-2 mt-0.5">
+          <p class="text-sm text-gray-900 font-medium sensitive-field" data-full="<%= s.bank_bsb || '' %>" data-masked="<%= maskField(s.bank_bsb, 4) %>"><%= maskField(s.bank_bsb, 4) %></p>
+          <% if (s.bank_bsb) { %>
+            <button type="button" onclick="toggleSensitive(this)" class="text-[10px] text-brand-600 hover:text-brand-700 font-medium toggle-btn">Show</button>
+          <% } %>
+        </div>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Number</p>
+        <div class="flex items-center gap-2 mt-0.5">
+          <p class="text-sm text-gray-900 font-medium sensitive-field" data-full="<%= s.bank_account_number || '' %>" data-masked="<%= maskField(s.bank_account_number, 4) %>"><%= maskField(s.bank_account_number, 4) %></p>
+          <% if (s.bank_account_number) { %>
+            <button type="button" onclick="toggleSensitive(this)" class="text-[10px] text-brand-600 hover:text-brand-700 font-medium toggle-btn">Show</button>
+          <% } %>
+        </div>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Name</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.bank_account_name || '—' %></p>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Acknowledgements -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Acknowledgements</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+      <div class="flex items-center gap-2">
+        <% if (s.company_intro_completed) { %>
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </span>
+        <% } else { %>
+          <span class="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </span>
+        <% } %>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Company Intro Completed</p>
+          <p class="text-sm text-gray-900 font-medium"><%= s.company_intro_completed ? 'Yes' : 'No' %></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <% if (s.ppe_acknowledged) { %>
+          <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </span>
+        <% } else { %>
+          <span class="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </span>
+        <% } %>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">PPE Acknowledged</p>
+          <p class="text-sm text-gray-900 font-medium"><%= s.ppe_acknowledged ? 'Yes' : 'No' %></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Review Details -->
+  <% if (s.reviewed_at) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Review Details</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reviewed By</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.reviewed_by_name || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reviewed At</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= formatDate(s.reviewed_at) %></p>
+      </div>
+      <% if (s.review_notes) { %>
+      <div class="sm:col-span-2">
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Review Notes</p>
+        <div class="mt-1.5 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+          <%= s.review_notes %>
+        </div>
+      </div>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+</div>
+
+<!-- Approve Modal -->
+<div id="approveModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="fixed inset-0 bg-black/50" onclick="document.getElementById('approveModal').classList.add('hidden')"></div>
+  <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6 z-10">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-gray-900">Approve Submission</h3>
+        <p class="text-sm text-gray-500">Approve <%= s.full_name %>'s induction submission</p>
+      </div>
+    </div>
+    <form method="POST" action="/induction/admin/submissions/<%= s.id %>/status">
+      <input type="hidden" name="status" value="approved">
+      <div class="mb-4">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Review Notes (optional)</label>
+        <textarea name="review_notes" rows="3" placeholder="Add any notes about this approval..."
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"></textarea>
+      </div>
+      <div class="flex items-center gap-3 justify-end">
+        <button type="button" onclick="document.getElementById('approveModal').classList.add('hidden')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</button>
+        <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Approve</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Reject Modal -->
+<div id="rejectModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="fixed inset-0 bg-black/50" onclick="document.getElementById('rejectModal').classList.add('hidden')"></div>
+  <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6 z-10">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-gray-900">Reject Submission</h3>
+        <p class="text-sm text-gray-500">Reject <%= s.full_name %>'s induction submission</p>
+      </div>
+    </div>
+    <form method="POST" action="/induction/admin/submissions/<%= s.id %>/status" onsubmit="if(!this.review_notes.value.trim()){alert('Please provide a reason for rejection.');return false;}">
+      <input type="hidden" name="status" value="rejected">
+      <div class="mb-4">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Reason for Rejection <span class="text-red-500">*</span></label>
+        <textarea name="review_notes" rows="3" required placeholder="Explain why this submission is being rejected..."
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"></textarea>
+      </div>
+      <div class="flex items-center gap-3 justify-end">
+        <button type="button" onclick="document.getElementById('rejectModal').classList.add('hidden')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</button>
+        <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg transition">Reject</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function toggleSensitive(btn) {
+    const field = btn.previousElementSibling;
+    const isMasked = field.textContent === field.dataset.masked;
+    field.textContent = isMasked ? field.dataset.full : field.dataset.masked;
+    btn.textContent = isMasked ? 'Hide' : 'Show';
+  }
+</script>

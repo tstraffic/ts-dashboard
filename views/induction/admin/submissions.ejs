@@ -1,0 +1,282 @@
+<% locals.currentPage = 'induction' %>
+
+<%
+  const STATUS_BADGES = {
+    submitted: { label: 'Pending', color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' },
+    approved:  { label: 'Approved', color: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' },
+    rejected:  { label: 'Rejected', color: 'bg-red-50 text-red-700 ring-1 ring-red-600/20' },
+    converted: { label: 'Employee', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' },
+  };
+
+  const PAYMENT_BADGES = {
+    tfn:  { label: 'TFN',  color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' },
+    abn:  { label: 'ABN',  color: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' },
+    cash: { label: 'Cash', color: 'bg-gray-100 text-gray-600' },
+  };
+
+  function timeAgo(dateStr) {
+    if (!dateStr) return '-';
+    const now = new Date();
+    const then = new Date(dateStr);
+    const diffMs = now - then;
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return diffMins + 'm ago';
+    const diffHrs = Math.floor(diffMins / 60);
+    if (diffHrs < 24) return diffHrs + 'h ago';
+    const diffDays = Math.floor(diffHrs / 24);
+    if (diffDays === 1) return '1 day ago';
+    if (diffDays < 30) return diffDays + ' days ago';
+    return then.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function docCount(s) {
+    let filled = 0;
+    let total = 3;
+    if (s.white_card_number) filled++;
+    if (s.tc_licence_number) filled++;
+    if (s.has_injuries !== null && s.has_injuries !== undefined) filled++;
+    return { filled, total };
+  }
+%>
+
+<div class="space-y-5">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Induction</h1>
+      <p class="text-sm text-gray-500 mt-1">Manage soft induction submissions</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button onclick="copyLink('cash')" class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg border border-gray-200 transition" title="Copy Cash induction link">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+        Copy Cash Link
+      </button>
+      <button onclick="copyLink('tfn')" class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg border border-gray-200 transition" title="Copy TFN induction link">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+        Copy TFN Link
+      </button>
+      <button onclick="copyLink('abn')" class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg border border-gray-200 transition" title="Copy ABN induction link">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+        Copy ABN Link
+      </button>
+    </div>
+  </div>
+
+  <!-- Stat Cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1"><%= stats.total %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Pending Review</p>
+      <p class="text-2xl font-bold text-amber-600 mt-1"><%= stats.submitted %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Approved</p>
+      <p class="text-2xl font-bold text-emerald-600 mt-1"><%= stats.approved %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Rejected</p>
+      <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.rejected %></p>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <form method="GET" action="/induction/admin/submissions" id="filterForm" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+
+      <!-- Search -->
+      <div class="flex-1 min-w-0 sm:min-w-[200px]">
+        <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Search name or email..."
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+
+      <!-- Status -->
+      <select name="status" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Statuses</option>
+        <option value="submitted" <%= filters.status === 'submitted' ? 'selected' : '' %>>Submitted</option>
+        <option value="approved" <%= filters.status === 'approved' ? 'selected' : '' %>>Approved</option>
+        <option value="rejected" <%= filters.status === 'rejected' ? 'selected' : '' %>>Rejected</option>
+      </select>
+
+      <!-- Payment Type -->
+      <select name="payment_type" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Types</option>
+        <option value="cash" <%= filters.payment_type === 'cash' ? 'selected' : '' %>>Cash</option>
+        <option value="tfn" <%= filters.payment_type === 'tfn' ? 'selected' : '' %>>TFN</option>
+        <option value="abn" <%= filters.payment_type === 'abn' ? 'selected' : '' %>>ABN</option>
+      </select>
+
+      <!-- Date From -->
+      <input type="date" name="date_from" value="<%= filters.date_from || '' %>"
+        class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        title="From date">
+
+      <!-- Date To -->
+      <input type="date" name="date_to" value="<%= filters.date_to || '' %>"
+        class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        title="To date">
+
+      <!-- Filter Button -->
+      <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Filter</button>
+
+      <!-- Reset -->
+      <% if (filters.search || filters.status || filters.payment_type || filters.date_from || filters.date_to) { %>
+        <a href="/induction/admin/submissions" class="text-sm text-gray-400 hover:text-gray-600 transition">Reset</a>
+      <% } %>
+    </form>
+  </div>
+
+  <!-- Results Table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <% if (submissions.length === 0) { %>
+      <div class="p-10 text-center">
+        <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        </div>
+        <h3 class="text-gray-900 font-semibold text-base mb-1">No submissions found</h3>
+        <p class="text-gray-500 text-sm mb-1">Induction submissions will appear here once workers complete the online form.</p>
+        <p class="text-gray-400 text-xs">Share the induction links using the buttons above.</p>
+      </div>
+    <% } else { %>
+
+      <!-- Desktop Table -->
+      <div class="hidden md:block overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
+              <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone</th>
+              <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Payment</th>
+              <th class="px-4 py-3 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Can Drive?</th>
+              <th class="px-4 py-3 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documents</th>
+              <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+              <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Submitted</th>
+              <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% submissions.forEach(function(s) {
+              const sb = STATUS_BADGES[s.status] || { label: s.status, color: 'bg-gray-100 text-gray-600' };
+              const pb = PAYMENT_BADGES[s.payment_type] || { label: s.payment_type, color: 'bg-gray-100 text-gray-600' };
+              const docs = docCount(s);
+            %>
+              <tr class="hover:bg-gray-50 transition-colors">
+                <!-- Name -->
+                <td class="px-4 py-3">
+                  <span class="font-medium text-gray-900"><%= s.full_name %></span>
+                  <div class="text-xs text-gray-400 mt-0.5"><%= s.email %></div>
+                </td>
+
+                <!-- Phone -->
+                <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><%= s.phone || '-' %></td>
+
+                <!-- Payment Type -->
+                <td class="px-4 py-3">
+                  <span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full <%= pb.color %>"><%= pb.label %></span>
+                </td>
+
+                <!-- Can Drive -->
+                <td class="px-4 py-3 text-center">
+                  <% if (s.can_drive) { %>
+                    <span class="inline-flex items-center text-emerald-600" title="Can drive<%= s.can_drive_truck ? ' (incl. truck)' : '' %>">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    </span>
+                  <% } else { %>
+                    <span class="inline-flex items-center text-red-400">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </span>
+                  <% } %>
+                </td>
+
+                <!-- Documents -->
+                <td class="px-4 py-3 text-center">
+                  <span class="text-xs font-medium <%= docs.filled === docs.total ? 'text-emerald-600' : 'text-amber-600' %>"><%= docs.filled %>/<%= docs.total %></span>
+                </td>
+
+                <!-- Status -->
+                <td class="px-4 py-3">
+                  <span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full <%= sb.color %>"><%= sb.label %></span>
+                </td>
+
+                <!-- Submitted -->
+                <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap" title="<%= s.submitted_at ? new Date(s.submitted_at).toLocaleString('en-AU') : '' %>">
+                  <%= timeAgo(s.submitted_at) %>
+                </td>
+
+                <!-- Actions -->
+                <td class="px-4 py-3 text-right">
+                  <a href="/induction/admin/submissions/<%= s.id %>"
+                    class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50 rounded-lg transition">
+                    View
+                  </a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile Card Layout -->
+      <div class="md:hidden divide-y divide-gray-100">
+        <% submissions.forEach(function(s) {
+          const sb = STATUS_BADGES[s.status] || { label: s.status, color: 'bg-gray-100 text-gray-600' };
+          const pb = PAYMENT_BADGES[s.payment_type] || { label: s.payment_type, color: 'bg-gray-100 text-gray-600' };
+          const docs = docCount(s);
+        %>
+          <a href="/induction/admin/submissions/<%= s.id %>" class="block p-4 hover:bg-gray-50 transition-colors">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <p class="font-medium text-gray-900 truncate"><%= s.full_name %></p>
+                <p class="text-xs text-gray-400 mt-0.5 truncate"><%= s.email %></p>
+              </div>
+              <span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 <%= sb.color %>"><%= sb.label %></span>
+            </div>
+            <div class="flex items-center gap-3 mt-2 text-xs text-gray-500">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold <%= pb.color %>"><%= pb.label %></span>
+              <% if (s.phone) { %>
+                <span><%= s.phone %></span>
+              <% } %>
+              <span class="ml-auto text-gray-400"><%= timeAgo(s.submitted_at) %></span>
+            </div>
+            <div class="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+              <span>Drive: <% if (s.can_drive) { %><span class="text-emerald-600 font-medium">Yes</span><% } else { %><span class="text-red-500 font-medium">No</span><% } %></span>
+              <span>Docs: <span class="<%= docs.filled === docs.total ? 'text-emerald-600' : 'text-amber-600' %> font-medium"><%= docs.filled %>/<%= docs.total %></span></span>
+            </div>
+          </a>
+        <% }) %>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
+        Showing <%= submissions.length %> submission<%= submissions.length !== 1 ? 's' : '' %>
+      </div>
+    <% } %>
+  </div>
+
+</div>
+
+<!-- Copy Link Toast -->
+<div id="copyToast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg transition-all duration-300 opacity-0 pointer-events-none z-50">
+  Link copied to clipboard!
+</div>
+
+<script>
+  function copyLink(type) {
+    var url = window.location.origin + '/induction/' + type;
+    navigator.clipboard.writeText(url).then(function() {
+      var toast = document.getElementById('copyToast');
+      toast.style.opacity = '1';
+      toast.style.pointerEvents = 'auto';
+      setTimeout(function() {
+        toast.style.opacity = '0';
+        toast.style.pointerEvents = 'none';
+      }, 2000);
+    }).catch(function() {
+      prompt('Copy this link:', url);
+    });
+  }
+</script>

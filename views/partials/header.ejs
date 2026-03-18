@@ -1,16 +1,17 @@
-<nav class="bg-white/80 backdrop-blur-lg border-b border-gray-200/80 sticky top-0 z-30">
+<nav class="bg-white/70 backdrop-blur-xl border-b border-gray-200/60 sticky top-0 z-30">
   <div class="px-3 sm:px-6">
     <div class="flex items-center justify-between h-14 sm:h-16">
       <div class="flex items-center gap-2 sm:gap-3">
         <% if (user) { %>
-        <button id="sidebar-toggle" class="lg:hidden p-2 -ml-1 text-gray-500 hover:text-brand-600 hover:bg-brand-50 rounded-xl focus:outline-none active:scale-95 transition-all" aria-label="Toggle menu">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <button id="sidebar-toggle" class="lg:hidden p-2 -ml-1 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl focus:outline-none active:scale-95 transition-all" aria-label="Toggle menu">
+          <svg class="w-5.5 h-5.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
         </button>
         <% } %>
-        <a href="/dashboard" class="flex items-center gap-2 sm:gap-3">
-          <img src="/images/logo-colour.jpg" alt="T&S" class="h-8 sm:h-10 w-auto rounded-lg shadow-sm">
+        <a href="/dashboard" class="header-logo-wrap flex items-center gap-2.5 sm:gap-3 group">
+          <img src="/images/logo-colour.jpg" alt="T&S" class="h-8 sm:h-9 w-auto rounded-lg shadow-sm ring-1 ring-black/5 group-hover:shadow-md transition-shadow">
           <div class="hidden sm:block">
-            <span class="text-gray-900 font-bold text-base sm:text-lg leading-tight block">Operations Dashboard</span>
+            <span class="text-gray-900 font-bold text-[15px] leading-tight block tracking-tight"><%= typeof title !== 'undefined' && title ? title : 'T&S Dashboard' %></span>
+            <span class="text-[10px] text-gray-400 font-medium tracking-wide uppercase">Traffic Control</span>
           </div>
         </a>
       </div>
@@ -96,25 +97,27 @@
             </div>
           </div>
 
+          <!-- Divider -->
+          <div class="hidden lg:block w-px h-6 bg-gray-200/80 mx-1"></div>
+
           <!-- Profile avatar (clickable) -->
-          <a href="/profile" class="flex items-center gap-2 hover:opacity-80 transition-all active:scale-95" title="My Profile">
-            <span class="text-gray-600 text-sm font-medium hidden lg:inline"><%= user.full_name %></span>
-            <div class="w-9 h-9 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center text-xs font-bold shadow-sm">
+          <a href="/profile" class="flex items-center gap-2.5 hover:opacity-90 transition-all active:scale-[0.97] group" title="My Profile">
+            <div class="hidden lg:block text-right">
+              <span class="text-gray-800 text-sm font-semibold block leading-tight"><%= user.full_name %></span>
+              <span class="text-[10px] font-medium leading-tight
+                <% if (user.role === 'admin') { %>text-purple-500
+                <% } else if (user.role === 'operations') { %>text-blue-500
+                <% } else if (user.role === 'planning') { %>text-teal-500
+                <% } else if (user.role === 'finance') { %>text-amber-500
+                <% } else { %>text-gray-400<% } %>"><%= user.role.charAt(0).toUpperCase() + user.role.slice(1) %></span>
+            </div>
+            <div class="w-9 h-9 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center text-xs font-bold shadow-sm ring-2 ring-white group-hover:ring-brand-100 transition-all">
               <%= user.full_name ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : 'U' %>
             </div>
           </a>
 
-          <span class="hidden lg:inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold
-            <% if (user.role === 'admin') { %>bg-purple-50 text-purple-700 ring-1 ring-purple-600/20
-            <% } else if (user.role === 'operations') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
-            <% } else if (user.role === 'planning') { %>bg-teal-50 text-teal-700 ring-1 ring-teal-600/20
-            <% } else if (user.role === 'finance') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
-            <% } %>">
-            <%= user.role.charAt(0).toUpperCase() + user.role.slice(1) %>
-          </span>
-          <a href="/logout" class="hidden lg:inline-flex items-center gap-1.5 text-gray-400 hover:text-red-500 text-sm transition-colors px-2 py-1 rounded-lg hover:bg-red-50">
+          <a href="/logout" class="hidden lg:inline-flex items-center gap-1.5 text-gray-400 hover:text-red-500 text-sm transition-colors p-2 rounded-xl hover:bg-red-50" title="Sign out">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-            Logout
           </a>
         <% } %>
       </div>

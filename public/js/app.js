@@ -1,5 +1,22 @@
 // T&S Dashboard - Client-side JavaScript
 
+// ===== Auto-submit filter forms on change =====
+(function() {
+  // Auto-submit GET forms when selects, checkboxes, or date inputs change
+  document.querySelectorAll('form[method="GET"] select, form[method="GET"] input[type="checkbox"], form[method="GET"] input[type="date"]').forEach(function(el) {
+    el.addEventListener('change', function() { this.form.submit(); });
+  });
+  // For text search inputs in GET forms, submit on Enter (default) and after typing stops (500ms debounce)
+  var debounceTimer;
+  document.querySelectorAll('form[method="GET"] input[type="text"]').forEach(function(el) {
+    el.addEventListener('input', function() {
+      var form = this.form;
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function() { form.submit(); }, 600);
+    });
+  });
+})();
+
 // ===== Mobile Sidebar Toggle =====
 (function() {
   const toggle = document.getElementById('sidebar-toggle');
@@ -112,7 +129,7 @@ function initTabs() {
 
   if (tabLinks.length === 0) return;
 
-  function activateTab(tabName) {
+  function activateTab(tabName, animate) {
     tabLinks.forEach(link => {
       const isActive = link.dataset.tab === tabName;
       link.classList.toggle('border-brand-600', isActive);
@@ -121,7 +138,18 @@ function initTabs() {
       link.classList.toggle('text-gray-500', !isActive);
     });
     tabPanels.forEach(panel => {
-      panel.classList.toggle('hidden', panel.dataset.tabPanel !== tabName);
+      const isTarget = panel.dataset.tabPanel === tabName;
+      if (isTarget) {
+        panel.classList.remove('hidden');
+        if (animate) {
+          // Re-trigger the CSS animation by removing/re-adding the element briefly
+          panel.style.animation = 'none';
+          panel.offsetHeight; // force reflow
+          panel.style.animation = '';
+        }
+      } else {
+        panel.classList.add('hidden');
+      }
     });
   }
 
@@ -129,7 +157,7 @@ function initTabs() {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const tabName = link.dataset.tab;
-      activateTab(tabName);
+      activateTab(tabName, true);
       history.replaceState(null, '', '#' + tabName);
     });
   });
@@ -137,10 +165,68 @@ function initTabs() {
   // Activate from hash or default to first tab
   const hash = window.location.hash.slice(1);
   const validTab = [...tabLinks].find(l => l.dataset.tab === hash);
-  activateTab(validTab ? hash : tabLinks[0].dataset.tab);
+  activateTab(validTab ? hash : tabLinks[0].dataset.tab, false);
 }
 
 document.addEventListener('DOMContentLoaded', initTabs);
+
+// ===== Animated KPI Counter =====
+function initCountUp() {
+  const counters = document.querySelectorAll('.kpi-number[data-count]');
+  if (counters.length === 0) return;
+
+  const observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (!entry.isIntersecting) return;
+      const el = entry.target;
+      if (el.dataset.counted) return;
+      el.dataset.counted = '1';
+
+      const target = parseInt(el.dataset.count, 10);
+      if (isNaN(target) || target === 0) {
+        el.textContent = '0';
+        return;
+      }
+
+      const duration = Math.min(1200, Math.max(400, target * 40));
+      const startTime = performance.now();
+
+      function update(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // Ease-out cubic
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(eased * target);
+        el.textContent = current.toLocaleString();
+
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        } else {
+          el.textContent = target.toLocaleString();
+          el.classList.add('counted');
+        }
+      }
+      requestAnimationFrame(update);
+    });
+  }, { threshold: 0.2 });
+
+  counters.forEach(function(el) { observer.observe(el); });
+}
+
+document.addEventListener('DOMContentLoaded', initCountUp);
+
+// ===== Notification Bell Ring Animation on New Notifications =====
+(function() {
+  var badge = document.getElementById('notif-badge');
+  var bell = document.getElementById('notif-bell');
+  if (badge && bell && !badge.classList.contains('hidden')) {
+    // Slight delay so it plays after page loads
+    setTimeout(function() {
+      bell.classList.add('bell-animate');
+      setTimeout(function() { bell.classList.remove('bell-animate'); }, 1100);
+    }, 800);
+  }
+})();
 
 // ===== Saved Views =====
 (function() {

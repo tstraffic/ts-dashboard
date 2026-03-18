@@ -3,130 +3,125 @@
 <%
   function fmtCurrency(val) {
     const n = Number(val) || 0;
+    if (Math.abs(n) >= 1000000) return '$' + (n / 1000000).toFixed(1) + 'M';
+    if (Math.abs(n) >= 1000) return '$' + (n / 1000).toFixed(0) + 'k';
+    return '$' + n.toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+  function fmtFull(val) {
+    const n = Number(val) || 0;
     return '$' + n.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 %>
 
 <!-- Page Header -->
-<div class="flex items-center justify-between mb-6">
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
   <div>
     <h1 class="text-2xl font-bold text-gray-900">Budget & Cost Tracking</h1>
-    <p class="text-gray-500 text-sm mt-1">Financial overview across all active jobs</p>
+    <p class="text-gray-500 text-xs mt-0.5">Financial overview across all active jobs</p>
   </div>
   <a href="/exports/budgets.csv"
-    class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
     Export CSV
   </a>
 </div>
 
-<!-- Summary Cards -->
-<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-  <!-- Total Contract Value -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Contract Value</p>
-    <p class="text-2xl font-bold text-gray-900 mt-2"><%= fmtCurrency(totals.contract) %></p>
-  </div>
-  <!-- Total Budget -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Budget</p>
-    <p class="text-2xl font-bold text-gray-900 mt-2"><%= fmtCurrency(totals.budget) %></p>
-  </div>
-  <!-- Total Spent -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Spent</p>
-    <p class="text-2xl font-bold mt-2 <%= totals.spent > totals.budget ? 'text-red-600' : 'text-emerald-600' %>"><%= fmtCurrency(totals.spent) %></p>
-    <% if (totals.budget > 0) { %>
-      <p class="text-xs mt-1 <%= totals.spent > totals.budget ? 'text-red-500' : 'text-gray-400' %>">
-        <%= ((totals.spent / totals.budget) * 100).toFixed(1) %>% of budget consumed
-      </p>
-    <% } %>
-  </div>
-  <!-- Overall Margin -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Overall Margin</p>
-    <p class="text-2xl font-bold mt-2 <% if (totals.overallMargin > 20) { %>text-emerald-600<% } else if (totals.overallMargin >= 0) { %>text-orange-600<% } else { %>text-red-600<% } %>"><%= totals.overallMargin.toFixed(1) %>%</p>
-  </div>
-  <!-- Over Budget Jobs -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 <%= totals.overBudgetCount > 0 ? 'border-red-700' : '' %>">
-    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Over Budget Jobs</p>
-    <p class="text-2xl font-bold mt-2 <%= totals.overBudgetCount > 0 ? 'text-red-600' : 'text-emerald-600' %>"><%= totals.overBudgetCount %></p>
+<!-- Financial Summary — Different layout from typical stat cards -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
+  <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+    <!-- Budget health bar -->
+    <div class="flex-1">
+      <div class="flex items-baseline justify-between mb-1">
+        <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Portfolio Budget</span>
+        <span class="text-xs text-gray-500"><%= totals.budget > 0 ? ((totals.spent / totals.budget) * 100).toFixed(0) : 0 %>% consumed</span>
+      </div>
+      <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+        <% const pct = totals.budget > 0 ? Math.min((totals.spent / totals.budget) * 100, 100) : 0; %>
+        <div class="h-full rounded-full transition-all <%= pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-emerald-500' %>" style="width: <%= pct %>%"></div>
+      </div>
+      <div class="flex justify-between mt-1.5 text-xs">
+        <span class="text-gray-500">Spent: <span class="font-semibold text-gray-700"><%= fmtFull(totals.spent) %></span></span>
+        <span class="text-gray-500">Budget: <span class="font-semibold text-gray-700"><%= fmtFull(totals.budget) %></span></span>
+      </div>
+    </div>
+    <!-- Key metrics -->
+    <div class="flex gap-4 sm:gap-6 sm:border-l sm:border-gray-200 sm:pl-6">
+      <div class="text-center">
+        <p class="text-lg font-extrabold text-gray-900"><%= fmtCurrency(totals.contract) %></p>
+        <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Contract</p>
+      </div>
+      <div class="text-center">
+        <p class="text-lg font-extrabold <% if (totals.overallMargin > 20) { %>text-emerald-600<% } else if (totals.overallMargin >= 0) { %>text-amber-600<% } else { %>text-red-600<% } %>"><%= totals.overallMargin.toFixed(1) %>%</p>
+        <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Margin</p>
+      </div>
+      <div class="text-center">
+        <p class="text-lg font-extrabold <%= totals.overBudgetCount > 0 ? 'text-red-600' : 'text-emerald-600' %>"><%= totals.overBudgetCount %></p>
+        <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Over Budget</p>
+      </div>
+    </div>
   </div>
 </div>
 
 <!-- Jobs Budget Table -->
 <% if (budgets.length === 0) { %>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
-    <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <svg class="w-10 h-10 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     <p class="text-gray-500 text-sm font-medium">No job budgets yet</p>
-    <p class="text-gray-400 text-xs mt-1">Add a contract value or budget to a job to start tracking costs, margins, and spend</p>
-    <a href="/jobs" class="inline-flex items-center mt-3 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
-      View Jobs
-    </a>
+    <p class="text-gray-400 text-xs mt-1">Add a contract value or budget to a job to start tracking costs and margins</p>
+    <a href="/jobs" class="inline-flex items-center mt-3 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">View Jobs</a>
   </div>
 <% } else { %>
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
   <table class="w-full text-sm">
     <thead>
       <tr class="border-b border-gray-200">
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Job #</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Client</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Contract Value</th>
-        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Budget</th>
-        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Spent</th>
-        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Remaining</th>
-        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Margin %</th>
-        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wide">Health</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Job</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Client</th>
+        <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Contract</th>
+        <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Budget</th>
+        <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Spent</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Usage</th>
+        <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Margin</th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-gray-200">
+    <tbody class="divide-y divide-gray-100">
       <% budgets.forEach(b => {
         const contractVal = b.contract_value || 0;
         const budgetVal = b.total_budget || 0;
         const spentVal = b.total_spent || 0;
         const remaining = budgetVal - spentVal;
+        const usagePct = budgetVal > 0 ? Math.min((spentVal / budgetVal) * 100, 120) : 0;
         const marginPct = contractVal > 0 ? ((contractVal - spentVal) / contractVal * 100) : 0;
+        const isOver = spentVal > budgetVal;
       %>
-      <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/budgets/job/<%= b.job_id %>'">
-        <td class="px-4 py-3 font-medium">
-          <a href="/budgets/job/<%= b.job_id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= b.job_number %></a>
+      <tr class="hover:bg-gray-50 cursor-pointer <%= isOver ? 'border-l-3 border-l-red-500' : '' %>" onclick="window.location='/budgets/job/<%= b.job_id %>'">
+        <td class="px-3 py-2.5">
+          <a href="/budgets/job/<%= b.job_id %>" class="text-brand-600 hover:text-brand-700 font-semibold text-sm hover:underline"><%= b.job_number %></a>
+          <p class="text-gray-400 text-xs sm:hidden truncate"><%= b.client %></p>
         </td>
-        <td class="px-4 py-3 text-gray-600"><%= b.client %></td>
-        <td class="px-4 py-3">
-          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-            <% if (b.status === 'active') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
-            <% } else if (b.status === 'on_hold') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
-            <% } else if (b.status === 'completed') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
-            <% } else if (b.status === 'won') { %>bg-teal-50 text-teal-700 ring-1 ring-teal-600/20
-            <% } else { %>bg-white text-gray-600<% } %>">
-            <%= b.status ? b.status.replace('_', ' ') : '-' %>
-          </span>
+        <td class="px-3 py-2.5 text-gray-600 text-xs hidden sm:table-cell truncate max-w-[140px]"><%= b.client %></td>
+        <td class="px-3 py-2.5 text-right text-gray-600 text-xs tabular-nums"><%= fmtCurrency(contractVal) %></td>
+        <td class="px-3 py-2.5 text-right text-gray-500 text-xs tabular-nums hidden md:table-cell"><%= fmtCurrency(budgetVal) %></td>
+        <td class="px-3 py-2.5 text-right text-xs tabular-nums font-medium <%= isOver ? 'text-red-600' : 'text-gray-700' %>"><%= fmtCurrency(spentVal) %></td>
+        <td class="px-3 py-2.5">
+          <div class="flex items-center gap-2">
+            <div class="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+              <div class="h-full rounded-full <%= usagePct > 90 ? 'bg-red-500' : usagePct > 70 ? 'bg-amber-500' : 'bg-emerald-500' %>" style="width: <%= Math.min(usagePct, 100) %>%"></div>
+            </div>
+            <span class="text-[11px] text-gray-500 tabular-nums"><%= usagePct.toFixed(0) %>%</span>
+          </div>
         </td>
-        <td class="px-4 py-3 text-right text-gray-600 font-mono text-xs"><%= fmtCurrency(contractVal) %></td>
-        <td class="px-4 py-3 text-right text-gray-600 font-mono text-xs"><%= fmtCurrency(budgetVal) %></td>
-        <td class="px-4 py-3 text-right font-mono text-xs <%= spentVal > budgetVal ? 'text-red-600' : 'text-gray-600' %>"><%= fmtCurrency(spentVal) %></td>
-        <td class="px-4 py-3 text-right font-mono text-xs <%= remaining < 0 ? 'text-red-600' : 'text-emerald-600' %>"><%= fmtCurrency(remaining) %></td>
-        <td class="px-4 py-3 text-right">
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-            <% if (marginPct > 20) { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
-            <% } else if (marginPct >= 0) { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
-            <% } else { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
-            <% } %>">
-            <%= marginPct.toFixed(1) %>%
-          </span>
-        </td>
-        <td class="px-4 py-3 text-center">
-          <% if (!b.contract_value) { %>
-            <span class="text-gray-400">—</span>
-          <% } else { %>
-            <span class="inline-block w-3 h-3 rounded-full <% if (marginPct > 20) { %>bg-emerald-500<% } else if (marginPct >= 0) { %>bg-orange-500<% } else { %>bg-red-500<% } %>"></span>
-          <% } %>
+        <td class="px-3 py-2.5 text-right hidden lg:table-cell">
+          <span class="text-xs font-medium tabular-nums px-1.5 py-0.5 rounded
+            <% if (marginPct > 20) { %>text-emerald-700 bg-emerald-50
+            <% } else if (marginPct >= 0) { %>text-amber-700 bg-amber-50
+            <% } else { %>text-red-700 bg-red-50
+            <% } %>"><%= marginPct.toFixed(1) %>%</span>
         </td>
       </tr>
       <% }) %>
     </tbody>
   </table>
 </div>
-<div class="mt-3 text-xs text-gray-400"><%= budgets.length %> job<%= budgets.length !== 1 ? 's' : '' %> shown</div>
+<div class="mt-2 text-xs text-gray-400"><%= budgets.length %> job<%= budgets.length !== 1 ? 's' : '' %> with budgets</div>
 <% } %>

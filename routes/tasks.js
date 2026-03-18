@@ -48,9 +48,10 @@ router.get('/', (req, res) => {
     params.push(monday.toISOString().split('T')[0], sunday.toISOString().split('T')[0]);
   }
 
-  // Additional filters
-  if (owner === 'me') { baseWhere += ' AND t.owner_id = ?'; params.push(req.session.user.id); }
-  else if (owner && owner !== 'all') { baseWhere += ' AND t.owner_id = ?'; params.push(owner); }
+  // Additional filters — default to showing only my tasks unless 'all' is explicitly selected
+  if (owner === 'all') { /* show all tasks */ }
+  else if (owner && owner !== 'me') { baseWhere += ' AND t.owner_id = ?'; params.push(owner); }
+  else { /* default: show my tasks */ baseWhere += ' AND t.owner_id = ?'; params.push(req.session.user.id); }
   if (priority && priority !== 'all') { baseWhere += ' AND t.priority = ?'; params.push(priority); }
   if (division && division !== 'all') { baseWhere += ' AND t.division = ?'; params.push(division); }
   if (job_id) { baseWhere += ' AND t.job_id = ?'; params.push(job_id); }
@@ -83,8 +84,9 @@ router.get('/', (req, res) => {
     countWhere += ' AND t.due_date BETWEEN ? AND ?';
     countParams.push(mon2.toISOString().split('T')[0], sun2.toISOString().split('T')[0]);
   }
-  if (owner === 'me') { countWhere += ' AND t.owner_id = ?'; countParams.push(req.session.user.id); }
-  else if (owner && owner !== 'all') { countWhere += ' AND t.owner_id = ?'; countParams.push(owner); }
+  if (owner === 'all') { /* count all */ }
+  else if (owner && owner !== 'me') { countWhere += ' AND t.owner_id = ?'; countParams.push(owner); }
+  else { countWhere += ' AND t.owner_id = ?'; countParams.push(req.session.user.id); }
   if (priority && priority !== 'all') { countWhere += ' AND t.priority = ?'; countParams.push(priority); }
   if (division && division !== 'all') { countWhere += ' AND t.division = ?'; countParams.push(division); }
   if (job_id) { countWhere += ' AND t.job_id = ?'; countParams.push(job_id); }
@@ -134,10 +136,10 @@ router.post('/', (req, res) => {
     const jobId = b.job_id || null;
     const division = b.division || 'ops';
     const result = db.prepare(`
-      INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority, task_type, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority, task_type, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(jobId, division, b.title, b.description || '', b.owner_id, b.due_date,
-      b.status || 'not_started', b.priority || 'medium', b.task_type || 'one_off', b.notes || '');
+      b.status || 'not_started', b.priority || 'medium', b.task_type || 'one_off', b.notes || '', req.session.user.id);
 
     // Send email notification to assigned owner (fire-and-forget)
     if (b.owner_id) {
@@ -392,6 +394,49 @@ router.post('/:id/delete', (req, res) => {
   db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
   req.flash('success', 'Task deleted.');
   res.redirect(req.body.return_to || '/tasks');
+});
+
+// POST /:id/renotify — Re-send notification to assigned user
+router.post('/:id/renotify', (req, res) => {
+  try {
+    const db = getDb();
+    const task = db.prepare(`
+      SELECT t.*, j.job_number, j.client, u.full_name as owner_name, u.email as owner_email
+      FROM tasks t
+      LEFT JOIN jobs j ON t.job_id = j.id
+      LEFT JOIN users u ON t.owner_id = u.id
+      WHERE t.id = ?
+    `).get(req.params.id);
+
+    if (!task || !task.owner_id) {
+      req.flash('error', 'Task not found or no one assigned.');
+      return res.redirect(req.headers.referer || '/dashboard');
+    }
+
+    const senderName = req.session.user.full_name;
+    const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+
+    // Push notification
+    sendPushToUser(task.owner_id, {
+      title: 'Task Reminder',
+      body: `"${task.title}" — reminder from ${senderName}`,
+      url: '/tasks/' + task.id + '/edit',
+      type: 'task_reminder'
+    });
+
+    // Email reminder
+    const jobLabel = task.job_number ? `${task.job_number} - ${task.client}` : 'General';
+    const ownerUser = { id: task.owner_id, full_name: task.owner_name, email: task.owner_email };
+    const taskData = { id: task.id, title: task.title, description: task.description || '', due_date: task.due_date, priority: task.priority, task_type: task.task_type };
+    sendTaskAssignmentEmail(taskData, ownerUser, jobLabel, senderName + ' (reminder)', baseUrl).catch(e => console.error('[Tasks] Renotify email error:', e.message));
+
+    req.flash('success', `Reminder sent to ${task.owner_name}.`);
+    res.redirect(req.headers.referer || '/dashboard');
+  } catch (err) {
+    console.error('[Tasks] Renotify error:', err.message);
+    req.flash('error', 'Failed to send reminder.');
+    res.redirect(req.headers.referer || '/dashboard');
+  }
 });
 
 // =============================================
