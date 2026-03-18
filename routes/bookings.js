@@ -100,7 +100,7 @@ function loadBookingDetail(db, bookingId) {
   let requirements = [];
   try { requirements = db.prepare("SELECT * FROM booking_requirements WHERE booking_id = ? ORDER BY resource_type").all(bookingId); } catch(e) {}
   let equipmentList = [];
-  try { equipmentList = db.prepare("SELECT be.*, e.asset_name, e.category as eq_category FROM booking_equipment be LEFT JOIN equipment e ON e.id = be.equipment_id WHERE be.booking_id = ? ORDER BY be.created_at").all(bookingId); } catch(e) {}
+  try { equipmentList = db.prepare("SELECT be.*, e.name as asset_name, e.category as eq_category FROM booking_equipment be LEFT JOIN equipment e ON e.id = be.equipment_id WHERE be.booking_id = ? ORDER BY be.created_at").all(bookingId); } catch(e) {}
 
   // Compute requirement fulfillment
   requirements.forEach(r => {
@@ -213,7 +213,7 @@ router.get('/:id', (req, res) => {
       requirements: booking.requirements || [],
       equipment: booking.equipment || [] },
     allCrew,
-    allEquipment: (() => { try { return getDb().prepare("SELECT id, asset_name, category FROM equipment WHERE status != 'decommissioned' ORDER BY asset_name").all(); } catch(e) { return []; } })(),
+    allEquipment: (() => { try { return getDb().prepare("SELECT id, name as asset_name, category FROM equipment WHERE active = 1 ORDER BY name").all(); } catch(e) { return []; } })(),
     user: req.session.user,
   });
 });

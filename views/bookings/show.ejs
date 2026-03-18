@@ -387,14 +387,28 @@
         <p class="text-sm text-gray-400 mb-3">No vehicles assigned.</p>
       <% } %>
 
-      <form method="POST" action="/bookings/<%= b.id %>/vehicles" class="flex items-end gap-2">
-        <div class="flex-1">
-          <input type="text" name="vehicle_name" placeholder="Vehicle name" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      <form method="POST" action="/bookings/<%= b.id %>/vehicles" class="space-y-2">
+        <div class="flex items-end gap-2">
+          <div class="flex-1">
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">From Register</label>
+            <select name="from_register" id="vehicle-select" onchange="if(this.value){var o=this.options[this.selectedIndex];document.getElementById('vn').value=o.text.split(' (')[0];document.getElementById('vr').value=o.getAttribute('data-rego')||''}"
+              class="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">-- Select vehicle --</option>
+              <% if (typeof allEquipment !== 'undefined') { allEquipment.filter(eq => ['vehicle','vms','lighting'].includes(eq.category) || (eq.asset_name||'').toLowerCase().includes('ute') || (eq.asset_name||'').toLowerCase().includes('truck')).forEach(eq => { %>
+                <option value="<%= eq.id %>" data-rego=""><%= eq.asset_name %> (<%= eq.category %>)</option>
+              <% }); } %>
+            </select>
+          </div>
         </div>
-        <div>
-          <input type="text" name="registration" placeholder="Rego" class="w-24 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <div class="flex items-end gap-2">
+          <div class="flex-1">
+            <input type="text" name="vehicle_name" id="vn" placeholder="Vehicle name" class="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <div>
+            <input type="text" name="registration" id="vr" placeholder="Rego" class="w-20 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <button type="submit" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition">Add</button>
         </div>
-        <button type="submit" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Add</button>
       </form>
     </div>
 
