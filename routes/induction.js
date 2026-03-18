@@ -73,7 +73,9 @@ router.post('/:type/submit', (req, res, next) => {
     try {
       const {
         access_token,
-        full_name, email, phone, date_of_birth,
+        first_name, middle_name, last_name,
+        full_name: legacyFullName,
+        email, phone, date_of_birth,
         address, suburb, state, postcode,
         can_drive, can_drive_truck, has_injuries, injury_details, is_indigenous,
         white_card_number, tc_licence_number, drivers_licence_number,
@@ -81,6 +83,12 @@ router.post('/:type/submit', (req, res, next) => {
         abn_number,
         company_intro_completed, ppe_acknowledged
       } = req.body;
+
+      // Compute full_name from split fields (or use legacy field)
+      const fn = (first_name || '').trim();
+      const mn = (middle_name || '').trim();
+      const ln = (last_name || '').trim();
+      const computedFullName = [fn, mn, ln].filter(Boolean).join(' ') || (legacyFullName || '').trim();
 
       // Get uploaded file paths
       const whiteCardPhoto = req.files?.white_card_photo?.[0]?.filename || '';
@@ -90,7 +98,8 @@ router.post('/:type/submit', (req, res, next) => {
       const stmt = getDb().prepare(`
         INSERT INTO induction_submissions (
           access_token, payment_type, status,
-          full_name, email, phone, date_of_birth,
+          full_name, first_name, middle_name, last_name,
+          email, phone, date_of_birth,
           address, suburb, state, postcode,
           can_drive, can_drive_truck, has_injuries, injury_details, is_indigenous,
           white_card_number, tc_licence_number, drivers_licence_number,
@@ -102,6 +111,7 @@ router.post('/:type/submit', (req, res, next) => {
         ) VALUES (
           ?, ?, 'submitted',
           ?, ?, ?, ?,
+          ?, ?, ?,
           ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
           ?, ?, ?,
@@ -116,7 +126,8 @@ router.post('/:type/submit', (req, res, next) => {
       stmt.run(
         access_token || crypto.randomBytes(24).toString('hex'),
         type,
-        full_name || '', email || '', phone || '', date_of_birth || null,
+        computedFullName, fn, mn, ln,
+        email || '', phone || '', date_of_birth || null,
         address || '', suburb || '', state || '', postcode || '',
         can_drive || '', can_drive_truck || '', has_injuries || '', injury_details || '', is_indigenous || '',
         white_card_number || '', tc_licence_number || '', drivers_licence_number || '',

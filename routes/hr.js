@@ -153,10 +153,11 @@ router.get('/', requirePermission('hr_dashboard'), (req, res) => {
 // ============================================
 router.get('/employees', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
-  const { company, division, employment_type, status, manager_id, search, allocatable, sort, order } = req.query;
+  const { company, division, employment_type, status, manager_id, search, allocatable, sort, order, payment_type } = req.query;
 
   let where = '1=1';
   const params = [];
+  if (payment_type) { where += ' AND e.payment_type = ?'; params.push(payment_type); }
   if (company) { where += ' AND e.company = ?'; params.push(company); }
   if (division) { where += ' AND e.division = ?'; params.push(division); }
   if (employment_type) { where += ' AND e.employment_type = ?'; params.push(employment_type); }
@@ -189,6 +190,9 @@ router.get('/employees', requirePermission('hr_employees'), (req, res) => {
   const totalActive = db.prepare("SELECT COUNT(*) as c FROM employees WHERE active = 1").get().c;
   const totalOnboarding = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'onboarding'").get().c;
   const totalBlocked = db.prepare("SELECT COUNT(*) as c FROM employees WHERE blocked_from_allocation = 1 AND active = 1").get().c;
+  const totalCash = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'cash' AND active = 1").get().c;
+  const totalTfn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'tfn' AND active = 1").get().c;
+  const totalAbn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'abn' AND active = 1").get().c;
 
   // Filter options (map to plain string arrays for view templates)
   const companies = db.prepare("SELECT DISTINCT company FROM employees WHERE company != '' ORDER BY company").all().map(r => r.company);
@@ -201,8 +205,8 @@ router.get('/employees', requirePermission('hr_employees'), (req, res) => {
     title: 'Employees',
     currentPage: 'hr-employees',
     employees,
-    stats: { totalActive, totalOnboarding, totalBlocked },
-    filters: { company, division, employment_type, status, manager_id, search, allocatable, sort, order },
+    stats: { totalActive, totalOnboarding, totalBlocked, totalCash, totalTfn, totalAbn },
+    filters: { company, division, employment_type, status, manager_id, search, allocatable, sort, order, payment_type },
     filterOptions: { companies, divisions, managers },
     settingsOptions,
     user: req.session.user
@@ -239,11 +243,11 @@ router.post('/employees', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
   const b = req.body;
 
-  const fullName = `${(b.first_name || '').trim()} ${(b.last_name || '').trim()}`.trim();
+  const fullName = [(b.first_name || '').trim(), (b.middle_name || '').trim(), (b.last_name || '').trim()].filter(Boolean).join(' ');
 
   const result = db.prepare(`
-    INSERT INTO employees (employee_code, first_name, last_name, full_name, preferred_name, company, division, role_title,
-      employment_type, employment_status, start_date, end_date, probation_end_date, manager_id,
+    INSERT INTO employees (employee_code, first_name, middle_name, last_name, full_name, preferred_name, company, division, role_title,
+      employment_type, employment_status, payment_type, start_date, end_date, probation_end_date, manager_id,
       email, phone, address, suburb, state, postcode,
       traffic_role_level, ticket_classification, white_card_required, medical_required,
       allocatable, blocked_from_allocation, block_reason, induction_status,
@@ -252,11 +256,11 @@ router.post('/employees', requirePermission('hr_employees'), (req, res) => {
       emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
       date_of_birth, payroll_reference, internal_notes, active,
       linked_crew_member_id, linked_user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
   `).run(
-    b.employee_code || null, b.first_name, b.last_name, fullName, b.preferred_name || '',
+    b.employee_code || null, b.first_name, b.middle_name || '', b.last_name, fullName, b.preferred_name || '',
     b.company || '', b.division || '', b.role_title || '',
-    b.employment_type || 'full_time', b.employment_status || 'active',
+    b.employment_type || 'full_time', b.employment_status || 'active', b.payment_type || '',
     b.start_date || null, b.end_date || null, b.probation_end_date || null, b.manager_id || null,
     b.email || '', b.phone || '', b.address || '', b.suburb || '', b.state || '', b.postcode || '',
     b.traffic_role_level || '', b.ticket_classification || '',
@@ -361,13 +365,13 @@ router.get('/employees/:id/edit', requirePermission('hr_employees'), (req, res) 
 router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
   const b = req.body;
-  const fullName = `${(b.first_name || '').trim()} ${(b.last_name || '').trim()}`.trim();
+  const fullName = [(b.first_name || '').trim(), (b.middle_name || '').trim(), (b.last_name || '').trim()].filter(Boolean).join(' ');
 
   db.prepare(`
     UPDATE employees SET
-      employee_code = ?, first_name = ?, last_name = ?, full_name = ?, preferred_name = ?,
+      employee_code = ?, first_name = ?, middle_name = ?, last_name = ?, full_name = ?, preferred_name = ?,
       company = ?, division = ?, role_title = ?,
-      employment_type = ?, employment_status = ?,
+      employment_type = ?, employment_status = ?, payment_type = ?,
       start_date = ?, end_date = ?, probation_end_date = ?, manager_id = ?,
       email = ?, phone = ?, address = ?, suburb = ?, state = ?, postcode = ?,
       traffic_role_level = ?, ticket_classification = ?,
@@ -382,9 +386,9 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
-    b.employee_code || null, b.first_name, b.last_name, fullName, b.preferred_name || '',
+    b.employee_code || null, b.first_name, b.middle_name || '', b.last_name, fullName, b.preferred_name || '',
     b.company || '', b.division || '', b.role_title || '',
-    b.employment_type || 'full_time', b.employment_status || 'active',
+    b.employment_type || 'full_time', b.employment_status || 'active', b.payment_type || '',
     b.start_date || null, b.end_date || null, b.probation_end_date || null, b.manager_id || null,
     b.email || '', b.phone || '', b.address || '', b.suburb || '', b.state || '', b.postcode || '',
     b.traffic_role_level || '', b.ticket_classification || '',

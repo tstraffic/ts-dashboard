@@ -2667,6 +2667,20 @@ function runMigrations(db) {
     console.log('Migration 45 complete.');
   }
 
+  // Migration 46: Split name fields + payment_type on employees & induction_submissions
+  if (!isMigrationApplied.get(46)) {
+    console.log('Running migration 46: Split name fields + payment_type');
+    // Add middle_name and payment_type to employees
+    try { db.exec(`ALTER TABLE employees ADD COLUMN middle_name TEXT DEFAULT ''`); } catch(e) {}
+    try { db.exec(`ALTER TABLE employees ADD COLUMN payment_type TEXT DEFAULT ''`); } catch(e) {}
+    // Add split name fields to induction_submissions
+    try { db.exec(`ALTER TABLE induction_submissions ADD COLUMN first_name TEXT DEFAULT ''`); } catch(e) {}
+    try { db.exec(`ALTER TABLE induction_submissions ADD COLUMN middle_name TEXT DEFAULT ''`); } catch(e) {}
+    try { db.exec(`ALTER TABLE induction_submissions ADD COLUMN last_name TEXT DEFAULT ''`); } catch(e) {}
+    recordMigration.run(46, 'Split name fields + payment_type');
+    console.log('Migration 46 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

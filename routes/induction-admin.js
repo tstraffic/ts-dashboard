@@ -48,7 +48,7 @@ router.get('/submissions', (req, res) => {
     submitted: getDb().prepare("SELECT COUNT(*) as c FROM induction_submissions WHERE status = 'submitted'").get().c,
     approved: getDb().prepare("SELECT COUNT(*) as c FROM induction_submissions WHERE status = 'approved'").get().c,
     rejected: getDb().prepare("SELECT COUNT(*) as c FROM induction_submissions WHERE status = 'rejected'").get().c,
-    converted: getDb().prepare("SELECT COUNT(*) as c FROM induction_submissions WHERE status = 'converted'").get().c,
+    converted: getDb().prepare("SELECT COUNT(*) as c FROM induction_submissions WHERE status = 'approved' AND linked_crew_member_id IS NOT NULL").get().c,
   };
 
   res.render('induction/admin/submissions', {
@@ -110,10 +110,16 @@ router.post('/submissions/:id/status', (req, res) => {
       }
       const employeeId = `EMP-${String(nextNum).padStart(3, '0')}`;
 
-      // Split full name into first/last
-      const nameParts = (s.full_name || '').trim().split(/\s+/);
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+      // Use split name fields (fall back to splitting full_name for old submissions)
+      let firstName = (s.first_name || '').trim();
+      let middleName = (s.middle_name || '').trim();
+      let lastName = (s.last_name || '').trim();
+      if (!firstName && !lastName && s.full_name) {
+        const nameParts = s.full_name.trim().split(/\s+/);
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
+      }
+      const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ') || s.full_name || '';
 
       // Determine employment type from payment type
       const employmentType = s.payment_type === 'abn' ? 'subcontractor' : 'casual';
@@ -124,32 +130,33 @@ router.post('/submissions/:id/status', (req, res) => {
           white_card, licence_type, induction_date, induction_status, active, status)
         VALUES (?, ?, 'TC', ?, ?, 'T&S Traffic Control', ?, ?, ?, date('now'), 'completed', 1, 'active')
       `).run(
-        s.full_name, employeeId, s.phone || '', s.email || '', employmentType,
+        fullName, employeeId, s.phone || '', s.email || '', employmentType,
         s.white_card_number || '', s.drivers_licence_number || ''
       );
       const crewMemberId = crewResult.lastInsertRowid;
 
       // 2. Create Employee record linked to crew member
-      const empResult = db.prepare(`
-        INSERT INTO employees (employee_code, first_name, last_name, full_name, company,
-          employment_type, employment_status, start_date,
+      db.prepare(`
+        INSERT INTO employees (employee_code, first_name, middle_name, last_name, full_name, company,
+          employment_type, employment_status, payment_type, start_date,
           email, phone, address, suburb, state, postcode,
           date_of_birth, induction_status, allocatable, active,
           linked_crew_member_id, internal_notes)
-        VALUES (?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?)
+        VALUES (?, ?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', ?, date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?)
       `).run(
-        employeeId, firstName, lastName, s.full_name, employmentType,
+        employeeId, firstName, middleName, lastName, fullName, employmentType,
+        s.payment_type || '',
         s.email || '', s.phone || '', s.address || '', s.suburb || '', s.state || '', s.postcode || '',
         s.date_of_birth || null, crewMemberId,
         `Auto-created from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''} AccName: ${s.bank_account_name || ''}`
       );
 
-      // 3. Update submission with link to crew member and mark as converted
+      // 3. Update submission with link to crew member (stay as 'approved' — conversion tracked by linked_crew_member_id)
       db.prepare(`
-        UPDATE induction_submissions SET status = 'converted', linked_crew_member_id = ?, updated_at = datetime('now') WHERE id = ?
+        UPDATE induction_submissions SET linked_crew_member_id = ?, updated_at = datetime('now') WHERE id = ?
       `).run(crewMemberId, s.id);
 
-      req.flash('success', `${s.full_name} approved and added as employee ${employeeId}. They now appear in Crew Roster and Employees.`);
+      req.flash('success', `${fullName} approved and added as employee ${employeeId}. They now appear in Crew Roster and Employees.`);
       return res.redirect(`/induction/admin/submissions/${req.params.id}`);
     } catch (err) {
       console.error('Auto-convert error:', err);

@@ -65,6 +65,11 @@
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Middle Name</label>
+        <input type="text" name="middle_name" value="<%= val('middle_name') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
         <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Last Name <span class="text-red-500">*</span></label>
         <input type="text" name="last_name" value="<%= val('last_name') %>" required
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
@@ -160,6 +165,15 @@
           <% defaultStatuses.forEach(s => { %>
             <option value="<%= s.val %>" <%= selected('employment_status', s.val) %>><%= s.label %></option>
           <% }); %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Payment Type</label>
+        <select name="payment_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- None --</option>
+          <option value="cash" <%= val('payment_type') === 'cash' ? 'selected' : '' %>>Cash</option>
+          <option value="tfn" <%= val('payment_type') === 'tfn' ? 'selected' : '' %>>TFN</option>
+          <option value="abn" <%= val('payment_type') === 'abn' ? 'selected' : '' %>>ABN</option>
         </select>
       </div>
       <div>

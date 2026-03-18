@@ -95,6 +95,7 @@
           <% if (employee.employee_code) { %><span class="text-xs font-mono text-gray-500"><%= employee.employee_code %></span><% } %>
           <% if (employee.role_title) { %><span class="text-xs text-gray-500">&middot; <%= employee.role_title %></span><% } %>
           <% if (employee.company) { %><span class="text-xs text-gray-500">&middot; <%= employee.company %></span><% } %>
+          <% if (employee.payment_type) { %><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase <%= employee.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600' : employee.payment_type === 'tfn' ? 'bg-blue-50 text-blue-600' : employee.payment_type === 'abn' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500' %>"><%= employee.payment_type %></span><% } %>
           <% const sBadge = statusBadge[employee.employment_status] || statusBadge.inactive; %>
           <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= sBadge %>"><%= (employee.employment_status || 'unknown').replace(/_/g, ' ') %></span>
           <% if (readiness) { %>

@@ -63,9 +63,26 @@
     </div>
   </div>
 
+  <!-- Payment Type Tabs -->
+  <div class="flex gap-2 overflow-x-auto pb-1">
+    <a href="/hr/employees" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all <%= !filters.payment_type ? 'bg-brand-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' %>">
+      All <span class="text-xs font-bold opacity-70"><%= stats.totalActive %></span>
+    </a>
+    <a href="/hr/employees?payment_type=cash" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all <%= filters.payment_type === 'cash' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' %>">
+      Cash <span class="text-xs font-bold opacity-70"><%= stats.totalCash %></span>
+    </a>
+    <a href="/hr/employees?payment_type=tfn" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all <%= filters.payment_type === 'tfn' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' %>">
+      TFN <span class="text-xs font-bold opacity-70"><%= stats.totalTfn %></span>
+    </a>
+    <a href="/hr/employees?payment_type=abn" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all <%= filters.payment_type === 'abn' ? 'bg-purple-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' %>">
+      ABN <span class="text-xs font-bold opacity-70"><%= stats.totalAbn %></span>
+    </a>
+  </div>
+
   <!-- Filters -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
     <form method="GET" action="/hr/employees" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+      <% if (filters.payment_type) { %><input type="hidden" name="payment_type" value="<%= filters.payment_type %>"><% } %>
       <select name="company" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
         <option value="">All Companies</option>
         <% if (filterOptions && filterOptions.companies) { filterOptions.companies.forEach(c => { %>
@@ -128,8 +145,14 @@
           <tr class="hover:bg-gray-50 transition">
             <td class="px-3 sm:px-4 py-3 text-gray-500 font-mono text-xs"><%= emp.employee_code || '-' %></td>
             <td class="px-3 sm:px-4 py-3">
-              <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %> <%= emp.last_name %></a>
-              <div class="sm:hidden text-[10px] text-gray-400 mt-0.5"><%= emp.company || '' %><% if (emp.role_title) { %> &middot; <%= emp.role_title %><% } %></div>
+              <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %><% if (emp.middle_name) { %> <%= emp.middle_name %><% } %> <%= emp.last_name %></a>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <% if (emp.payment_type) { %>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase
+                    <%= emp.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600' : emp.payment_type === 'tfn' ? 'bg-blue-50 text-blue-600' : emp.payment_type === 'abn' ? 'bg-purple-50 text-purple-600' : 'bg-gray-50 text-gray-500' %>"><%= emp.payment_type %></span>
+                <% } %>
+                <span class="sm:hidden text-[10px] text-gray-400"><%= emp.company || '' %><% if (emp.role_title) { %> &middot; <%= emp.role_title %><% } %></span>
+              </div>
             </td>
             <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden sm:table-cell"><%= emp.company || '-' %></td>
             <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden md:table-cell"><%= emp.division || '-' %></td>
