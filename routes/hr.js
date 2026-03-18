@@ -29,7 +29,12 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+const ALLOWED_HR_FILES = /\.(pdf|doc|docx|xls|xlsx|png|jpg|jpeg|gif|csv|txt|zip)$/i;
+const hrFileFilter = (req, file, cb) => {
+  if (ALLOWED_HR_FILES.test(file.originalname)) cb(null, true);
+  else cb(new Error('File type not allowed'), false);
+};
+const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 }, fileFilter: hrFileFilter });
 
 // --- Readiness computation ---
 function computeReadiness(employee, competencies, documents) {

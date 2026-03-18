@@ -67,10 +67,10 @@ router.get('/', (req, res) => {
     LEFT JOIN users cb ON t.created_by = cb.id
     WHERE ${baseWhere}
     ORDER BY
-      CASE WHEN t.status != 'complete' AND t.due_date < '${today}' THEN 0 ELSE 1 END,
+      CASE WHEN t.status != 'complete' AND t.due_date < ? THEN 0 ELSE 1 END,
       t.due_date ASC,
       CASE t.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END
-  `).all(...params);
+  `).all(...params, today);
 
   // Status counts (ignoring tab filter but respecting view + other filters)
   let countWhere = '1=1';

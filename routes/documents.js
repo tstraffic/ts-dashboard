@@ -23,7 +23,12 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB limit
+const ALLOWED_DOC_FILES = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|png|jpg|jpeg|gif|csv|txt|zip|dwg)$/i;
+const docFileFilter = (req, file, cb) => {
+  if (ALLOWED_DOC_FILES.test(file.originalname)) cb(null, true);
+  else cb(new Error('File type not allowed'), false);
+};
+const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 }, fileFilter: docFileFilter }); // 50MB limit
 
 // Documents index - browse all jobs with document counts
 router.get('/', (req, res) => {

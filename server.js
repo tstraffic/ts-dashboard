@@ -42,7 +42,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production';
 app.use(session({
   store: new SQLiteStore({ db: 'sessions.db', dir: path.join(__dirname, 'data') }),
-  secret: process.env.SESSION_SECRET || 'ts-traffic-dashboard-secret-change-in-production',
+  secret: process.env.SESSION_SECRET || (isProduction ? (() => { console.warn('WARNING: SESSION_SECRET not set in production!'); return require('crypto').randomBytes(32).toString('hex'); })() : 'dev-session-secret'),
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -164,7 +164,7 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, _next) => {
-  console.error(err.stack);
+  console.error('Server error:', err.message, isProduction ? '' : err.stack);
   // Worker routes get worker error page
   if (req.path.startsWith('/w') && req.session && req.session.worker) {
     return res.status(500).render('worker/error', {
