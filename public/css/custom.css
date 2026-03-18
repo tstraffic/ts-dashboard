@@ -973,7 +973,7 @@ canvas {
   transition: all 0.15s ease;
 }
 .subnav-tab:hover { color: #1D6AE5; background: #F0F5FF; }
-.subnav-tab.active { color: #1D6AE5; border-bottom-color: #1D6AE5; font-weight: 600; }
+.subnav-tab.active { color: #1D6AE5; border-bottom: 3px solid #1D6AE5; font-weight: 600; }
 
 /* --- Page header --- */
 .bookings-header {
@@ -1274,7 +1274,14 @@ canvas {
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  border-left: 3px solid transparent;
 }
+.booking-card[data-status="green_to_go"] { border-left-color: #16A34A; }
+.booking-card[data-status="confirmed"] { border-left-color: #2563EB; }
+.booking-card[data-status="in_progress"] { border-left-color: #D97706; }
+.booking-card[data-status="completed"] { border-left-color: #7C3AED; }
+.booking-card[data-status="unconfirmed"] { border-left-color: #9333EA; }
+.booking-card[data-status="cancelled"] { border-left-color: #6B7280; }
 .booking-card:hover {
   box-shadow: 0 8px 24px rgba(0,0,0,0.12);
   transform: translateY(-2px);
@@ -1334,7 +1341,7 @@ canvas {
 
 /* Card body — clean layout */
 .booking-card-body {
-  padding: 12px;
+  padding: 16px;
   cursor: pointer;
 }
 .booking-title-row { margin-bottom: 8px; }
@@ -1395,8 +1402,8 @@ canvas {
   padding: 1px 7px;
   border-radius: 99px;
 }
-.crew-count-badge.all-confirmed { background: #F0FDF4; color: #16A34A; }
-.crew-count-badge.partial { background: #FEF3C7; color: #D97706; }
+.crew-count-badge.all-confirmed { background: #DCFCE7; color: #15803D; font-weight: 700; }
+.crew-count-badge.partial { background: #FDE68A; color: #92400E; font-weight: 700; }
 .vehicle-badge {
   display: flex;
   align-items: center;

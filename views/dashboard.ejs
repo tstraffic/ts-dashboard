@@ -99,35 +99,35 @@
 
 <!-- Urgency Tiles -->
 <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3 mb-5 stagger-children">
-  <a href="/tasks" class="urgency-tile group bg-white border rounded-xl p-3 <%= kpi.overdueTasks > 0 ? 'border-red-200' : 'border-gray-200' %>">
+  <a href="/tasks" class="urgency-tile group border rounded-xl p-3 <%= kpi.overdueTasks > 0 ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
     <p class="text-2xl font-extrabold <%= kpi.overdueTasks > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.overdueTasks %>">0</span></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Overdue Tasks</p>
   </a>
-  <a href="/incidents" class="urgency-tile group bg-white border rounded-xl p-3 <%= kpi.openIncidents > 0 ? 'border-red-200' : 'border-gray-200' %>">
+  <a href="/incidents" class="urgency-tile group border rounded-xl p-3 <%= kpi.openIncidents > 0 ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
     <p class="text-2xl font-extrabold <%= kpi.openIncidents > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.openIncidents %>">0</span></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Open Incidents</p>
   </a>
-  <a href="/timesheets?approved=0" class="urgency-tile group bg-white border rounded-xl p-3 <%= kpi.pendingTimesheets > 0 ? 'border-amber-200' : 'border-gray-200' %>">
+  <a href="/timesheets?approved=0" class="urgency-tile group border rounded-xl p-3 <%= kpi.pendingTimesheets > 0 ? 'bg-amber-50/60 border-amber-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
     <p class="text-2xl font-extrabold <%= kpi.pendingTimesheets > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.pendingTimesheets %>">0</span></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Pending Timesheets</p>
   </a>
-  <a href="/allocations" class="urgency-tile group bg-white border rounded-xl p-3 <%= kpi.unconfirmedAllocations > 0 ? 'border-amber-200' : 'border-gray-200' %>">
+  <a href="/allocations" class="urgency-tile group border rounded-xl p-3 <%= kpi.unconfirmedAllocations > 0 ? 'bg-amber-50/60 border-amber-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
     <p class="text-2xl font-extrabold <%= kpi.unconfirmedAllocations > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.unconfirmedAllocations %>">0</span></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Unconfirmed</p>
   </a>
-  <a href="/defects" class="urgency-tile group bg-white border rounded-xl p-3 <%= kpi.openDefects > 0 ? 'border-amber-200' : 'border-gray-200' %>">
+  <a href="/defects" class="urgency-tile group border rounded-xl p-3 <%= kpi.openDefects > 0 ? 'bg-amber-50/60 border-amber-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
     <p class="text-2xl font-extrabold <%= kpi.openDefects > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.openDefects %>">0</span></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Open Defects</p>
   </a>
-  <a href="/compliance" class="urgency-tile group bg-white border rounded-xl p-3 <%= kpi.overdueCompliance > 0 ? 'border-red-200' : 'border-gray-200' %>">
+  <a href="/compliance" class="urgency-tile group border rounded-xl p-3 <%= kpi.overdueCompliance > 0 ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
     <p class="text-2xl font-extrabold <%= kpi.overdueCompliance > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.overdueCompliance %>">0</span></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Overdue Plans</p>
   </a>
-  <a href="/crew" class="urgency-tile group bg-white border rounded-xl p-3 <%= kpi.ticketsExpiring > 0 ? 'border-amber-200' : 'border-gray-200' %>">
+  <a href="/crew" class="urgency-tile group border rounded-xl p-3 <%= kpi.ticketsExpiring > 0 ? 'bg-amber-50/60 border-amber-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
     <p class="text-2xl font-extrabold <%= kpi.ticketsExpiring > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.ticketsExpiring %>">0</span></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Expiring Tickets</p>
   </a>
-  <a href="/allocations" class="urgency-tile group bg-white border rounded-xl p-3 <%= kpi.crewGaps > 0 ? 'border-red-200' : 'border-gray-200' %>">
+  <a href="/allocations" class="urgency-tile group border rounded-xl p-3 <%= kpi.crewGaps > 0 ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
     <p class="text-2xl font-extrabold <%= kpi.crewGaps > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.crewGaps %>">0</span></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Crew Gaps</p>
   </a>
@@ -334,7 +334,7 @@
           <a href="/projects/<%= u.job_id %>" class="block group">
             <p class="text-xs font-medium text-brand-600 group-hover:text-brand-500"><%= u.job_number %> &mdash; <%= u.client %></p>
             <p class="text-[11px] text-gray-500 mt-0.5 line-clamp-2"><%= u.summary.length > 100 ? u.summary.substring(0, 100) + '...' : u.summary %></p>
-            <p class="text-[10px] text-gray-300 mt-0.5"><%= u.submitted_by_name %> &middot; <%= u.week_ending %></p>
+            <p class="text-[10px] text-gray-300 mt-0.5"><%= u.submitted_by_name %> &middot; <%= u.week_ending ? new Date(u.week_ending).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '' %></p>
           </a>
           <% }) %>
         </div>
@@ -717,7 +717,7 @@
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         New Job
       </a>
-      <a href="/tasks" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium rounded-lg transition">
+      <a href="/tasks" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-medium rounded-lg transition">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
         Tasks
       </a>
@@ -725,18 +725,18 @@
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
         Report Incident
       </a>
-      <a href="/defects/new" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium rounded-lg transition">
+      <a href="/defects/new" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-medium rounded-lg transition">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         Report Defect
       </a>
       <% if (isOps) { %>
-      <a href="/allocations" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium rounded-lg transition">
+      <a href="/allocations" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-medium rounded-lg transition">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
         Allocations
       </a>
       <% } %>
       <% if (isPlanning) { %>
-      <a href="/compliance" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium rounded-lg transition">
+      <a href="/compliance" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-medium rounded-lg transition">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
         Compliance
       </a>
