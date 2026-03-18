@@ -1,0 +1,58 @@
+<% locals.currentPage = 'bookings' %>
+
+<div class="mb-4">
+  <a href="/bookings" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-brand-600 transition">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back to Bookings
+  </a>
+</div>
+
+<div class="bg-white rounded-xl shadow-card p-6">
+  <div class="flex items-start justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Booking #<%= booking.id %></h1>
+      <p class="text-brand-600 font-medium mt-1"><%= booking.project.name %></p>
+    </div>
+    <span class="booking-status-pill status-<%= booking.status %>">
+      <%= booking.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) %>
+    </span>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div>
+      <h3 class="dash-section-title mb-3">Client Information</h3>
+      <div class="space-y-2 text-sm">
+        <div><span class="text-gray-500">Client:</span> <span class="font-medium"><%= booking.project.client %></span></div>
+        <div><span class="text-gray-500">Order #:</span> <%= booking.project.orderNumber %></div>
+        <div><span class="text-gray-500">Billing Code:</span> <%= booking.project.billingCode %></div>
+        <div><span class="text-gray-500">Supervisor:</span> <%= booking.supervisor %></div>
+      </div>
+    </div>
+    <div>
+      <h3 class="dash-section-title mb-3">Booking Details</h3>
+      <div class="space-y-2 text-sm">
+        <div><span class="text-gray-500">Depot:</span> <%= booking.depot %></div>
+        <div><span class="text-gray-500">Location:</span> <%= booking.project.address %></div>
+        <div><span class="text-gray-500">Start:</span> <%= new Date(booking.startDateTime).toLocaleString('en-AU') %></div>
+        <div><span class="text-gray-500">End:</span> <%= new Date(booking.endDateTime).toLocaleString('en-AU') %></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-6">
+    <h3 class="dash-section-title mb-3">Personnel (<%= booking.personnel.length %>)</h3>
+    <div class="space-y-2">
+      <% booking.personnel.forEach(p => { %>
+      <div class="flex items-center gap-3 p-2 rounded-lg bg-gray-50">
+        <span class="text-xs font-bold text-gray-500 w-6"><%= p.role === 'Team Leader' ? 'TL' : 'TC' %></span>
+        <span class="flex-1 text-sm font-medium"><%= p.name %></span>
+        <% if (p.confirmed) { %>
+        <span class="text-xs text-emerald-600 font-medium">Confirmed</span>
+        <% } else { %>
+        <span class="text-xs text-red-500 font-medium">Unconfirmed</span>
+        <% } %>
+      </div>
+      <% }) %>
+    </div>
+  </div>
+</div>

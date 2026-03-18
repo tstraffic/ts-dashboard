@@ -92,6 +92,7 @@ app.use('/activity', requireLogin, requirePermission('activity'), require('./rou
 app.use('/budgets', requireLogin, requirePermission('budgets'), require('./routes/budgets'));
 app.use('/timesheets', requireLogin, requirePermission('timesheets'), require('./routes/timesheets'));
 app.use('/crew', requireLogin, requirePermission('crew'), require('./routes/crew'));
+app.use('/bookings', requireLogin, requirePermission('bookings'), require('./routes/bookings'));
 app.use('/allocations', requireLogin, requirePermission('allocations'), require('./routes/allocations'));
 app.use('/schedule', requireLogin, requirePermission('schedule'), require('./routes/schedule'));
 app.use('/equipment', requireLogin, requirePermission('equipment'), require('./routes/equipment'));
