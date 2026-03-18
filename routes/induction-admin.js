@@ -128,7 +128,7 @@ router.post('/submissions/:id/status', (req, res) => {
       const crewResult = db.prepare(`
         INSERT INTO crew_members (full_name, employee_id, role, phone, email, company, employment_type,
           white_card, licence_type, induction_date, induction_status, active, status)
-        VALUES (?, ?, 'TC', ?, ?, 'T&S Traffic Control', ?, ?, ?, date('now'), 'completed', 1, 'active')
+        VALUES (?, ?, 'traffic_controller', ?, ?, 'T&S Traffic Control', ?, ?, ?, date('now'), 'completed', 1, 'active')
       `).run(
         fullName, employeeId, s.phone || '', s.email || '', employmentType,
         s.white_card_number || '', s.drivers_licence_number || ''

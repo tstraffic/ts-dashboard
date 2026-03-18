@@ -2696,6 +2696,66 @@ function runMigrations(db) {
     console.log('Migration 47 complete.');
   }
 
+  // Migration 48: Fix CHECK constraints — users role + incidents type
+  if (!isMigrationApplied.get(48)) {
+    console.log('Running migration 48: Fix CHECK constraints');
+    db.pragma('foreign_keys = OFF');
+
+    // Fix users table — add hr, sales roles alongside management, marketing, accounts
+    try {
+      const allRoles = "'admin','operations','planning','finance','hr','sales','management','marketing','accounts'";
+      const userCols = db.pragma('table_info(users)').map(c => c.name);
+      db.exec(`CREATE TABLE users_fix (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        full_name TEXT NOT NULL,
+        email TEXT,
+        role TEXT NOT NULL CHECK(role IN (${allRoles})),
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        email_notifications_enabled INTEGER DEFAULT 1,
+        notification_frequency TEXT DEFAULT 'immediate'
+      )`);
+      const cols = ['id','username','password_hash','full_name','email','role','active','created_at',
+        'email_notifications_enabled','notification_frequency'].filter(c => userCols.includes(c));
+      db.exec(`INSERT INTO users_fix (${cols.join(',')}) SELECT ${cols.join(',')} FROM users`);
+      db.exec('DROP TABLE users');
+      db.exec('ALTER TABLE users_fix RENAME TO users');
+      console.log('  Fixed users CHECK constraint');
+    } catch(e) { console.error('  Users fix error:', e.message); }
+
+    // Fix incidents table — add all incident types
+    try {
+      const allTypes = "'near_miss','traffic_incident','worker_injury','vehicle_damage','public_complaint','environmental','injury','hazard','property_damage','vehicle','other'";
+      const incCols = db.pragma('table_info(incidents)').map(c => c.name);
+      if (incCols.length > 0) {
+        const colDefs = db.pragma('table_info(incidents)');
+        // Build new table with same columns but fixed CHECK
+        let createSQL = 'CREATE TABLE incidents_fix (';
+        const colParts = colDefs.map(c => {
+          let def = `${c.name} ${c.type || 'TEXT'}`;
+          if (c.pk) def = `${c.name} INTEGER PRIMARY KEY AUTOINCREMENT`;
+          if (c.name === 'incident_type') def = `incident_type TEXT NOT NULL CHECK(incident_type IN (${allTypes}))`;
+          if (c.notnull && !c.pk && c.name !== 'incident_type') def += ' NOT NULL';
+          if (c.dflt_value !== null && !c.pk) def += ` DEFAULT ${c.dflt_value}`;
+          return def;
+        });
+        createSQL += colParts.join(', ') + ')';
+        db.exec(createSQL);
+        const safeCols = incCols.join(',');
+        db.exec(`INSERT INTO incidents_fix (${safeCols}) SELECT ${safeCols} FROM incidents`);
+        db.exec('DROP TABLE incidents');
+        db.exec('ALTER TABLE incidents_fix RENAME TO incidents');
+        console.log('  Fixed incidents CHECK constraint');
+      }
+    } catch(e) { console.error('  Incidents fix error:', e.message); }
+
+    db.pragma('foreign_keys = ON');
+    recordMigration.run(48, 'Fix CHECK constraints');
+    console.log('Migration 48 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
@@ -2967,7 +3027,7 @@ function initializeDatabase() {
       password_hash TEXT NOT NULL,
       full_name TEXT NOT NULL,
       email TEXT,
-      role TEXT NOT NULL CHECK(role IN ('admin','operations','planning','finance','management','marketing','accounts')),
+      role TEXT NOT NULL CHECK(role IN ('admin','operations','planning','finance','hr','sales','management','marketing','accounts')),
       active INTEGER NOT NULL DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -3083,7 +3143,7 @@ function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
       incident_number TEXT UNIQUE NOT NULL,
-      incident_type TEXT NOT NULL CHECK(incident_type IN ('injury','near_miss','hazard','property_damage','environmental','vehicle','other')),
+      incident_type TEXT NOT NULL CHECK(incident_type IN ('near_miss','traffic_incident','worker_injury','vehicle_damage','public_complaint','environmental','injury','hazard','property_damage','vehicle','other')),
       severity TEXT NOT NULL DEFAULT 'low' CHECK(severity IN ('low','medium','high','critical')),
       title TEXT NOT NULL,
       description TEXT NOT NULL,
