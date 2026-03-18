@@ -1,12 +1,12 @@
 <!-- Mobile sidebar backdrop -->
-<div id="sidebar-backdrop" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-40 hidden lg:hidden" aria-hidden="true"></div>
+<div id="sidebar-backdrop" class="fixed inset-0 bg-gray-950/50 backdrop-blur-sm z-40 hidden lg:hidden" aria-hidden="true"></div>
 
 <%
   const b = typeof sidebarBadges !== 'undefined' ? sidebarBadges : {};
 %>
 
 <!-- Sidebar -->
-<aside id="sidebar" class="w-[280px] lg:w-64 bg-brand-900 flex-shrink-0 hidden lg:flex lg:flex-col fixed lg:sticky z-50 inset-y-0 left-0 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-out lg:top-0" style="min-height: 100vh; max-height: 100vh;">
+<aside id="sidebar" class="w-[280px] lg:w-[260px] bg-gradient-to-b from-brand-900 via-brand-900 to-brand-950 flex-shrink-0 hidden lg:flex lg:flex-col fixed lg:sticky z-50 inset-y-0 left-0 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-out lg:top-0" style="min-height: 100vh; max-height: 100vh;">
 
   <!-- Mobile sidebar header -->
   <div class="lg:hidden px-5 pt-6 pb-4 bg-gradient-to-b from-brand-950 to-brand-900">
@@ -40,6 +40,15 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
         Alerts
       </a>
+    </div>
+  </div>
+
+  <!-- Desktop logo area -->
+  <div class="hidden lg:flex items-center gap-2.5 px-5 py-4 border-b border-white/8">
+    <img src="/images/logo-colour.jpg" alt="T&S" class="h-8 w-auto rounded-lg shadow-lg ring-1 ring-white/10">
+    <div>
+      <span class="text-white font-bold text-sm block leading-tight tracking-tight">T&S Traffic</span>
+      <span class="text-brand-400 text-[10px] font-medium tracking-wide uppercase">Operations</span>
     </div>
   </div>
 

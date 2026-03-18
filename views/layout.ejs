@@ -15,11 +15,19 @@
   <link rel="manifest" href="/manifest-admin.json">
   <link rel="apple-touch-icon" href="/images/logo-colour.jpg">
 
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
           colors: {
             brand: {
               50: '#EFF6FF',
@@ -34,6 +42,15 @@
               900: '#0A2D66',
               950: '#051B3F',
             }
+          },
+          boxShadow: {
+            'card': '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)',
+            'card-hover': '0 10px 25px -5px rgba(0,0,0,0.08), 0 4px 10px -5px rgba(0,0,0,0.04)',
+            'glow': '0 0 20px rgba(43,127,255,0.15)',
+          },
+          borderRadius: {
+            '2xl': '1rem',
+            '3xl': '1.25rem',
           }
         }
       }
@@ -42,7 +59,7 @@
   <link rel="stylesheet" href="/css/custom.css">
   <style>/* Hide Tailwind CDN dev indicator */#__tailwind_indicator,div[style*="z-index: 2147483647"]{display:none!important}</style>
 </head>
-<body class="h-full bg-gray-50 text-gray-900">
+<body class="h-full bg-gray-50 text-gray-900 font-sans antialiased">
   <div class="flex h-full">
     <%- include('partials/sidebar') %>
 
@@ -53,17 +70,27 @@
       <div class="px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
         <% if (typeof flash_success !== 'undefined' && flash_success.length > 0) { %>
           <% flash_success.forEach(msg => { %>
-            <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-sm flex items-center justify-between">
-              <span><%= msg %></span>
-              <button onclick="this.parentElement.remove()" class="text-emerald-600 hover:text-emerald-800 ml-2 flex-shrink-0">&times;</button>
+            <div class="flash-msg mb-4 p-3.5 bg-emerald-50 border border-emerald-200/80 rounded-xl text-emerald-800 text-sm flex items-center gap-3 shadow-sm">
+              <div class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+              </div>
+              <span class="flex-1 font-medium"><%= msg %></span>
+              <button onclick="this.parentElement.style.opacity='0';this.parentElement.style.transform='translateY(-8px)';setTimeout(()=>this.parentElement.remove(),200)" class="text-emerald-400 hover:text-emerald-600 flex-shrink-0 p-1 rounded-lg hover:bg-emerald-100 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
             </div>
           <% }) %>
         <% } %>
         <% if (typeof flash_error !== 'undefined' && flash_error.length > 0) { %>
           <% flash_error.forEach(msg => { %>
-            <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm flex items-center justify-between">
-              <span><%= msg %></span>
-              <button onclick="this.parentElement.remove()" class="text-red-600 hover:text-red-800 ml-2 flex-shrink-0">&times;</button>
+            <div class="flash-msg mb-4 p-3.5 bg-red-50 border border-red-200/80 rounded-xl text-red-800 text-sm flex items-center gap-3 shadow-sm">
+              <div class="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-3.5 h-3.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01"/></svg>
+              </div>
+              <span class="flex-1 font-medium"><%= msg %></span>
+              <button onclick="this.parentElement.style.opacity='0';this.parentElement.style.transform='translateY(-8px)';setTimeout(()=>this.parentElement.remove(),200)" class="text-red-400 hover:text-red-600 flex-shrink-0 p-1 rounded-lg hover:bg-red-100 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
             </div>
           <% }) %>
         <% } %>
