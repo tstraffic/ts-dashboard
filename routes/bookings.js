@@ -103,11 +103,17 @@ router.get('/', (req, res) => {
 
 // GET /new
 router.get('/new', (req, res) => {
-  const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, job_name, client FROM jobs WHERE status != 'cancelled' ORDER BY job_name").all();
-  let clients = []; try { clients = db.prepare("SELECT id, company_name FROM clients ORDER BY company_name").all(); } catch (e) {}
-  const supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all();
-  res.render('bookings/form', { title: 'New Booking', booking: null, jobs, clients, supervisors, depots: DEPOTS, user: req.session.user });
+  try {
+    const db = getDb();
+    let jobs = []; try { jobs = db.prepare("SELECT id, job_number, job_name, client FROM jobs WHERE status NOT IN ('closed','completed') ORDER BY job_name").all(); } catch (e) {}
+    let clients = []; try { clients = db.prepare("SELECT id, company_name FROM clients ORDER BY company_name").all(); } catch (e) {}
+    let supervisors = []; try { supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
+    res.render('bookings/form', { title: 'New Booking', booking: null, jobs, clients, supervisors, depots: DEPOTS, user: req.session.user });
+  } catch (err) {
+    console.error('Bookings /new error:', err);
+    req.flash('error', 'Failed to load form: ' + err.message);
+    res.redirect('/bookings');
+  }
 });
 
 // POST / — Create booking
@@ -160,7 +166,7 @@ router.get('/:id/edit', (req, res) => {
   if (!booking) { req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
   if (booking.start_datetime) { const p = booking.start_datetime.split('T'); booking.start_date = p[0]; booking.start_time = (p[1] || '').substring(0, 5); }
   if (booking.end_datetime) { const p = booking.end_datetime.split('T'); booking.end_date = p[0]; booking.end_time = (p[1] || '').substring(0, 5); }
-  const jobs = db.prepare("SELECT id, job_number, job_name, client FROM jobs WHERE status != 'cancelled' ORDER BY job_name").all();
+  const jobs = db.prepare("SELECT id, job_number, job_name, client FROM jobs WHERE status NOT IN ('closed','completed') ORDER BY job_name").all();
   let clients = []; try { clients = db.prepare("SELECT id, company_name FROM clients ORDER BY company_name").all(); } catch (e) {}
   const supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all();
   res.render('bookings/form', { title: 'Edit Booking ' + booking.booking_number, booking, jobs, clients, supervisors, depots: DEPOTS, user: req.session.user });
