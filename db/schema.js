@@ -3175,6 +3175,9 @@ function initializeDatabase() {
 
     insertUser.run('admin', hash, 'Admin User', 'admin@tstraffic.com.au', 'admin');
     insertUser.run('suhail.a', bcrypt.hashSync('Suhail123', 12), 'Suhail Ahmed', 'suhail@tstc.com.au', 'admin');
+    insertUser.run('saadat', bcrypt.hashSync('TandS2026.', 12), 'Saadat', 'saadat@tstc.com.au', 'admin');
+    insertUser.run('savanah', bcrypt.hashSync('Savanah123', 12), 'Savanah', 'savanah@tstc.com.au', 'admin');
+    insertUser.run('taj', bcrypt.hashSync('Taj123', 12), 'Taj', 'taj@tstc.com.au', 'admin');
     insertUser.run('ops_user', bcrypt.hashSync('password', 12), 'Sam Operations', 'sam@tstraffic.com.au', 'operations');
     insertUser.run('planning_user', bcrypt.hashSync('password', 12), 'Alex Planning', 'alex@tstraffic.com.au', 'planning');
     insertUser.run('finance_user', bcrypt.hashSync('password', 12), 'Pat Finance', 'pat@tstraffic.com.au', 'finance');
@@ -3383,10 +3386,17 @@ function initializeDatabase() {
   const ensureUser = db.prepare(`
     INSERT OR IGNORE INTO users (username, password_hash, full_name, email, role) VALUES (?, ?, ?, ?, ?)
   `);
-  const suhailExists = db.prepare('SELECT id FROM users WHERE username = ?').get('suhail.a');
-  if (!suhailExists) {
-    ensureUser.run('suhail.a', bcrypt.hashSync('Suhail123', 12), 'Suhail Ahmed', 'suhail@tstc.com.au', 'admin');
-    console.log('Created suhail.a user.');
+  const ensureUsers = [
+    ['suhail.a', 'Suhail123', 'Suhail Ahmed', 'suhail@tstc.com.au', 'admin'],
+    ['saadat', 'TandS2026.', 'Saadat', 'saadat@tstc.com.au', 'admin'],
+    ['savanah', 'Savanah123', 'Savanah', 'savanah@tstc.com.au', 'admin'],
+    ['taj', 'Taj123', 'Taj', 'taj@tstc.com.au', 'admin'],
+  ];
+  for (const [uname, pwd, fullName, email, role] of ensureUsers) {
+    if (!db.prepare('SELECT id FROM users WHERE username = ?').get(uname)) {
+      ensureUser.run(uname, bcrypt.hashSync(pwd, 12), fullName, email, role);
+      console.log(`Created ${uname} user.`);
+    }
   }
 
   db.close();
