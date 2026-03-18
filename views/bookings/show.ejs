@@ -320,5 +320,73 @@
         <button type="submit" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Add</button>
       </form>
     </div>
+
+    <!-- Documents -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Documents (<%= b.documents ? b.documents.length : 0 %>)</h2>
+
+      <% if (b.documents && b.documents.length > 0) { %>
+        <div class="space-y-2 mb-3">
+          <% b.documents.forEach(doc => {
+            const sizeKb = doc.file_size ? (doc.file_size / 1024).toFixed(0) + ' KB' : '';
+          %>
+            <div class="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+              <div class="flex items-center gap-2 min-w-0">
+                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                <div class="min-w-0">
+                  <a href="/bookings/<%= b.id %>/documents/<%= doc.id %>/download" class="text-sm font-medium text-brand-600 hover:text-brand-700 truncate block"><%= doc.title || doc.original_name %></a>
+                  <p class="text-[10px] text-gray-400"><%= sizeKb %><%= doc.uploader_name ? ' · ' + doc.uploader_name : '' %></p>
+                </div>
+              </div>
+              <form method="POST" action="/bookings/<%= b.id %>/documents/<%= doc.id %>/delete" class="inline">
+                <button type="submit" class="text-gray-300 hover:text-red-500 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+              </form>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+
+      <form method="POST" action="/bookings/<%= b.id %>/documents" enctype="multipart/form-data" class="space-y-2">
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Upload Document</label>
+          <input type="file" name="file" required class="w-full text-sm text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+        </div>
+        <div class="flex items-end gap-2">
+          <div class="flex-1">
+            <input type="text" name="title" placeholder="Document title (optional)" class="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <select name="document_type" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="other">Other</option>
+            <option value="tgs">TGS</option>
+            <option value="ctmp">CTMP</option>
+            <option value="rol">ROL</option>
+            <option value="permit">Permit</option>
+            <option value="invoice">Invoice</option>
+            <option value="photo">Photo</option>
+          </select>
+          <button type="submit" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition">Upload</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Activity History -->
+    <% if (b.activity && b.activity.length > 0) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">History</h2>
+      <div class="space-y-3">
+        <% b.activity.forEach(a => { %>
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-gray-700"><%= a.details || a.action %></p>
+              <p class="text-[10px] text-gray-400"><%= a.user_name || 'System' %> &middot; <%= a.created_at ? new Date(a.created_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '' %></p>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+    <% } %>
   </div>
 </div>

@@ -1,7 +1,25 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const { getDb } = require('../db/database');
 const { logActivity } = require('../middleware/audit');
+
+// Multer config for booking document uploads
+const BOOKING_UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'bookings');
+const bookingStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(BOOKING_UPLOAD_DIR, 'booking_' + req.params.id);
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, Date.now() + '-' + Math.random().toString(36).substring(7) + ext);
+  }
+});
+const uploadDoc = multer({ storage: bookingStorage, limits: { fileSize: 50 * 1024 * 1024 } });
 
 const DEPOTS = ['Villawood', 'Penrith', 'Campbelltown', 'Parramatta'];
 const VALID_STATUSES = ['unconfirmed', 'confirmed', 'green_to_go', 'in_progress', 'completed', 'cancelled', 'on_hold'];
@@ -59,7 +77,8 @@ function transformBooking(db, row) {
     vehicles: vehicles.map(v => ({ id: v.id, registration: v.registration || '', name: v.vehicle_name || '' })),
     scheduleWarning,
     dockets: db.prepare("SELECT COUNT(*) as c FROM booking_dockets WHERE booking_id = ?").get(row.id).c,
-    notes: noteCount, tasks: 0, docs: 0,
+    notes: noteCount, tasks: 0,
+    docs: (() => { try { return db.prepare("SELECT COUNT(*) as c FROM booking_documents WHERE booking_id = ?").get(row.id).c; } catch(e) { return 0; } })(),
   };
 }
 
@@ -75,7 +94,10 @@ function loadBookingDetail(db, bookingId) {
   let clientInfo = null;
   if (row.client_id) { try { clientInfo = db.prepare("SELECT id, company_name, primary_contact_name, primary_contact_phone, primary_contact_email FROM clients WHERE id = ?").get(row.client_id); } catch (e) {} }
   const dockets = db.prepare("SELECT * FROM booking_dockets WHERE booking_id = ? ORDER BY created_at DESC").all(bookingId);
-  return { ...row, supervisor_name: supervisorName, crew, notes, vehicles, dockets, job: jobInfo, client: clientInfo };
+  let documents = [];
+  try { documents = db.prepare("SELECT bd.*, u.full_name as uploader_name FROM booking_documents bd LEFT JOIN users u ON u.id = bd.uploaded_by_id WHERE bd.booking_id = ? ORDER BY bd.created_at DESC").all(bookingId); } catch(e) {}
+  const activity = db.prepare("SELECT al.*, u.full_name as user_name FROM activity_log al LEFT JOIN users u ON u.id = al.user_id WHERE al.entity_type = 'booking' AND al.entity_id = ? ORDER BY al.created_at DESC LIMIT 30").all(bookingId);
+  return { ...row, supervisor_name: supervisorName, crew, notes, vehicles, dockets, documents, activity, job: jobInfo, client: clientInfo };
 }
 
 // GET / — Board view
@@ -170,7 +192,9 @@ router.get('/:id', (req, res) => {
       startDateTime: booking.start_datetime, endDateTime: booking.end_datetime,
       personnel: booking.crew.map(c => ({ id: c.crew_member_id, name: c.full_name || 'Unknown', role: c.role_on_site || '', confirmed: c.status === 'confirmed', bcStatus: c.status })),
       allVehicles: booking.vehicles,
-      dockets: booking.dockets || [] },
+      dockets: booking.dockets || [],
+      documents: booking.documents || [],
+      activity: booking.activity || [] },
     allCrew, user: req.session.user,
   });
 });
@@ -382,6 +406,43 @@ router.post('/:id/dockets/:docketId/sign', (req, res) => {
 router.post('/:id/dockets/:docketId/delete', (req, res) => {
   getDb().prepare("DELETE FROM booking_dockets WHERE id=? AND booking_id=?").run(req.params.docketId, req.params.id);
   req.flash('success', 'Docket deleted.');
+  res.redirect('/bookings/' + req.params.id);
+});
+
+// ===========================================================================
+// DOCUMENTS
+// ===========================================================================
+
+// POST /:id/documents — Upload document
+router.post('/:id/documents', uploadDoc.single('file'), (req, res) => {
+  const db = getDb();
+  if (!db.prepare("SELECT id FROM bookings WHERE id=?").get(req.params.id)) { req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
+  if (!req.file) { req.flash('error', 'No file selected.'); return res.redirect('/bookings/' + req.params.id); }
+  const b = req.body;
+  db.prepare(`
+    INSERT INTO booking_documents (booking_id, document_type, title, description, filename, original_name, file_path, file_size, uploaded_by_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(req.params.id, b.document_type || 'other', b.title || req.file.originalname, b.description || '',
+    req.file.filename, req.file.originalname, req.file.path, req.file.size, req.session.user.id);
+  logActivity({ user: req.session.user, action: 'create', entityType: 'booking_document', entityId: req.params.id, details: `Uploaded ${req.file.originalname}`, req });
+  req.flash('success', 'Document uploaded.');
+  res.redirect('/bookings/' + req.params.id);
+});
+
+// GET /:id/documents/:docId/download — Download document
+router.get('/:id/documents/:docId/download', (req, res) => {
+  const doc = getDb().prepare("SELECT * FROM booking_documents WHERE id=? AND booking_id=?").get(req.params.docId, req.params.id);
+  if (!doc || !fs.existsSync(doc.file_path)) { req.flash('error', 'File not found.'); return res.redirect('/bookings/' + req.params.id); }
+  res.download(doc.file_path, doc.original_name);
+});
+
+// POST /:id/documents/:docId/delete — Delete document
+router.post('/:id/documents/:docId/delete', (req, res) => {
+  const db = getDb();
+  const doc = db.prepare("SELECT * FROM booking_documents WHERE id=? AND booking_id=?").get(req.params.docId, req.params.id);
+  if (doc && doc.file_path && fs.existsSync(doc.file_path)) { try { fs.unlinkSync(doc.file_path); } catch(e) {} }
+  db.prepare("DELETE FROM booking_documents WHERE id=? AND booking_id=?").run(req.params.docId, req.params.id);
+  req.flash('success', 'Document deleted.');
   res.redirect('/bookings/' + req.params.id);
 });
 

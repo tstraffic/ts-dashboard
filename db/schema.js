@@ -2907,6 +2907,29 @@ function runMigrations(db) {
     console.log('Migration 51 complete.');
   }
 
+  // Migration 52: Booking documents
+  if (!isMigrationApplied.get(52)) {
+    console.log('Running migration 52: Booking documents');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS booking_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        document_type TEXT DEFAULT 'other',
+        title TEXT NOT NULL DEFAULT '',
+        description TEXT DEFAULT '',
+        filename TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_size INTEGER DEFAULT 0,
+        uploaded_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_booking_docs_booking ON booking_documents(booking_id);
+    `);
+    recordMigration.run(52, 'Booking documents');
+    console.log('Migration 52 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
