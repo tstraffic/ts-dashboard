@@ -169,6 +169,59 @@ router.post('/submissions/:id/status', (req, res) => {
   res.redirect(`/induction/admin/submissions/${req.params.id}`);
 });
 
+// POST /submissions/:id/convert — Manual convert approved submission to employee
+router.post('/submissions/:id/convert', (req, res) => {
+  const db = getDb();
+  const s = db.prepare('SELECT * FROM induction_submissions WHERE id = ?').get(req.params.id);
+  if (!s) { req.flash('error', 'Submission not found.'); return res.redirect('/induction/admin/submissions'); }
+  if (s.linked_crew_member_id) { req.flash('error', 'Already converted to employee.'); return res.redirect(`/induction/admin/submissions/${req.params.id}`); }
+
+  try {
+    const lastCrew = db.prepare("SELECT employee_id FROM crew_members WHERE employee_id LIKE 'EMP-%' ORDER BY employee_id DESC LIMIT 1").get();
+    let nextNum = 1;
+    if (lastCrew && lastCrew.employee_id) { const num = parseInt(lastCrew.employee_id.replace('EMP-', ''), 10); if (!isNaN(num)) nextNum = num + 1; }
+    const employeeId = `EMP-${String(nextNum).padStart(3, '0')}`;
+
+    let firstName = (s.first_name || '').trim();
+    let middleName = (s.middle_name || '').trim();
+    let lastName = (s.last_name || '').trim();
+    if (!firstName && !lastName && s.full_name) {
+      const nameParts = s.full_name.trim().split(/\s+/);
+      firstName = nameParts[0] || '';
+      lastName = nameParts.slice(1).join(' ') || '';
+    }
+    const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ') || s.full_name || '';
+    const employmentType = s.payment_type === 'abn' ? 'subcontractor' : 'casual';
+
+    const crewResult = db.prepare(`
+      INSERT INTO crew_members (full_name, employee_id, role, phone, email, company, employment_type,
+        white_card, licence_type, induction_date, induction_status, active, status)
+      VALUES (?, ?, 'traffic_controller', ?, ?, 'T&S Traffic Control', ?, ?, ?, date('now'), 'completed', 1, 'active')
+    `).run(fullName, employeeId, s.phone || '', s.email || '', employmentType, s.white_card_number || '', s.drivers_licence_number || '');
+    const crewMemberId = crewResult.lastInsertRowid;
+
+    db.prepare(`
+      INSERT INTO employees (employee_code, first_name, middle_name, last_name, full_name, company,
+        employment_type, employment_status, payment_type, start_date,
+        email, phone, address, suburb, state, postcode,
+        date_of_birth, induction_status, allocatable, active,
+        linked_crew_member_id, internal_notes)
+      VALUES (?, ?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', ?, date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?)
+    `).run(employeeId, firstName, middleName, lastName, fullName, employmentType, s.payment_type || '',
+      s.email || '', s.phone || '', s.address || '', s.suburb || '', s.state || '', s.postcode || '',
+      s.date_of_birth || null, crewMemberId,
+      `Converted from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''}`);
+
+    db.prepare("UPDATE induction_submissions SET linked_crew_member_id = ?, updated_at = datetime('now') WHERE id = ?").run(crewMemberId, s.id);
+
+    req.flash('success', `${fullName} converted to employee ${employeeId}.`);
+  } catch (err) {
+    console.error('Convert error:', err);
+    req.flash('error', `Failed to convert: ${err.message}`);
+  }
+  res.redirect(`/induction/admin/submissions/${req.params.id}`);
+});
+
 // Serve uploaded induction files (authenticated)
 // View URLs: /induction/admin/uploads/:id/:filename — :id is for context only, files are stored flat
 router.get('/uploads/:id/:filename', (req, res) => {
