@@ -8,6 +8,8 @@ const {
   getFinanceData,
   getChartData,
   getMyWork,
+  getMyTasks,
+  getTasksIAssigned,
   getComplianceUrgent,
   getRecentActivity,
 } = require('./helpers/dashboard-queries');
@@ -22,6 +24,8 @@ router.get('/', (req, res) => {
   const ops = getOpsData(db, today);
   const charts = getChartData(db);
   const myWork = getMyWork(db, user.id, today);
+  const myTasks = getMyTasks(db, user.id, today);
+  const tasksIAssigned = getTasksIAssigned(db, user.id, today);
   const complianceUrgent = getComplianceUrgent(db, today);
   const recentActivity = getRecentActivity(db);
 
@@ -103,6 +107,8 @@ router.get('/', (req, res) => {
     allocatedToday: ops.allocatedToday,
     availableCrew: ops.availableCrew,
     recentActivity,
+    myTasks,
+    tasksIAssigned,
     userRole: user.role,
   });
 });

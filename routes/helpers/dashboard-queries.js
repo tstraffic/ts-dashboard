@@ -96,11 +96,11 @@ function getMyWork(db, userId, today) {
   const overdueTasksList = db.prepare(`
     SELECT t.*, j.job_number, j.client, u.full_name as owner_name
     FROM tasks t
-    JOIN jobs j ON t.job_id = j.id
-    JOIN users u ON t.owner_id = u.id
-    WHERE t.due_date < ? AND t.status != 'complete'
+    LEFT JOIN jobs j ON t.job_id = j.id
+    LEFT JOIN users u ON t.owner_id = u.id
+    WHERE t.owner_id = ? AND t.due_date < ? AND t.status != 'complete'
     ORDER BY t.due_date ASC LIMIT 10
-  `).all(today);
+  `).all(userId, today);
 
   const recentUpdates = db.prepare(`
     SELECT pu.*, j.job_number, j.client, u.full_name as submitted_by_name
@@ -112,6 +112,38 @@ function getMyWork(db, userId, today) {
   `).all(last7);
 
   return { myJobs, overdueTasksList, recentUpdates };
+}
+
+function getMyTasks(db, userId, today) {
+  return db.prepare(`
+    SELECT t.*, j.job_number, j.client, u.full_name as owner_name,
+      cb.full_name as created_by_name
+    FROM tasks t
+    LEFT JOIN jobs j ON t.job_id = j.id
+    LEFT JOIN users u ON t.owner_id = u.id
+    LEFT JOIN users cb ON t.created_by = cb.id
+    WHERE t.owner_id = ? AND t.status != 'complete'
+    ORDER BY
+      CASE WHEN t.due_date < ? THEN 0 ELSE 1 END,
+      t.due_date ASC,
+      CASE t.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END
+    LIMIT 15
+  `).all(userId, today);
+}
+
+function getTasksIAssigned(db, userId, today) {
+  return db.prepare(`
+    SELECT t.*, j.job_number, j.client, u.full_name as owner_name
+    FROM tasks t
+    LEFT JOIN jobs j ON t.job_id = j.id
+    LEFT JOIN users u ON t.owner_id = u.id
+    WHERE t.created_by = ? AND t.owner_id != ? AND t.status != 'complete'
+    ORDER BY
+      CASE WHEN t.due_date < ? THEN 0 ELSE 1 END,
+      t.due_date ASC,
+      CASE t.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END
+    LIMIT 20
+  `).all(userId, userId, today);
 }
 
 function getComplianceUrgent(db, today) {
@@ -162,6 +194,8 @@ module.exports = {
   getFinanceData,
   getChartData,
   getMyWork,
+  getMyTasks,
+  getTasksIAssigned,
   getComplianceUrgent,
   getRecentActivity,
 };

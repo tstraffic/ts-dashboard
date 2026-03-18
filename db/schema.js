@@ -2505,6 +2505,16 @@ function runMigrations(db) {
     console.log('Migration 41 complete.');
   }
 
+  // =============================================
+  // Migration 42: Add created_by to tasks
+  // =============================================
+  if (!isMigrationApplied.get(42)) {
+    console.log('Running migration 42: Add created_by to tasks');
+    try { db.exec('ALTER TABLE tasks ADD COLUMN created_by INTEGER REFERENCES users(id)'); } catch (e) { /* column may already exist */ }
+    recordMigration.run(42, 'Add created_by column to tasks table');
+    console.log('Migration 42 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
