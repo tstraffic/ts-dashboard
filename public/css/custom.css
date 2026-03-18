@@ -234,6 +234,11 @@ table {
   to { opacity: 1; }
 }
 
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes scale-in {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
@@ -244,21 +249,247 @@ table {
   100% { background-position: 200% 0; }
 }
 
+@keyframes glow-drift {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+  50% { transform: translate(15px, -10px) scale(1.1); opacity: 0.8; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+}
+
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes count-up-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes bell-ring {
+  0% { transform: rotate(0); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-14deg); }
+  30% { transform: rotate(10deg); }
+  40% { transform: rotate(-8deg); }
+  50% { transform: rotate(4deg); }
+  60% { transform: rotate(0); }
+  100% { transform: rotate(0); }
+}
+
+@keyframes progress-fill {
+  from { width: 0; }
+}
+
+@keyframes border-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(43, 127, 255, 0); }
+  50% { box-shadow: 0 0 12px 2px rgba(43, 127, 255, 0.12); }
+}
+
 /* Flash messages */
 .flash-msg {
   animation: slide-down 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Page content entrance */
+/* Page content entrance — staggered fade-in-up */
 main > div > * {
-  animation: fade-in 0.3s ease-out both;
+  animation: fade-in-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 main > div > *:nth-child(1) { animation-delay: 0ms; }
-main > div > *:nth-child(2) { animation-delay: 40ms; }
-main > div > *:nth-child(3) { animation-delay: 80ms; }
-main > div > *:nth-child(4) { animation-delay: 120ms; }
-main > div > *:nth-child(5) { animation-delay: 160ms; }
-main > div > *:nth-child(6) { animation-delay: 200ms; }
+main > div > *:nth-child(2) { animation-delay: 50ms; }
+main > div > *:nth-child(3) { animation-delay: 100ms; }
+main > div > *:nth-child(4) { animation-delay: 150ms; }
+main > div > *:nth-child(5) { animation-delay: 200ms; }
+main > div > *:nth-child(6) { animation-delay: 250ms; }
+main > div > *:nth-child(7) { animation-delay: 300ms; }
+main > div > *:nth-child(8) { animation-delay: 350ms; }
+
+/* ===== Tab Panel Transitions ===== */
+[data-tab-panel] {
+  animation: tab-panel-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+[data-tab-panel].hidden {
+  animation: none;
+}
+@keyframes tab-panel-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Tab button — animated underline indicator */
+[data-tab] {
+  position: relative;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+[data-tab]::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--brand-600);
+  border-radius: 2px;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+[data-tab].border-brand-600::after {
+  width: 100%;
+  left: 0;
+}
+
+/* ===== Hero Banner Animations ===== */
+.hero-banner {
+  position: relative;
+}
+.hero-banner .hero-orb {
+  animation: glow-drift 8s ease-in-out infinite;
+  will-change: transform;
+}
+.hero-banner .hero-orb:nth-child(2) { animation-delay: 2.5s; animation-duration: 10s; }
+.hero-banner .hero-orb:nth-child(3) { animation-delay: 5s; animation-duration: 12s; }
+.hero-greeting {
+  animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+.hero-kpi-card {
+  animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.hero-kpi-card:nth-child(1) { animation-delay: 0.2s; }
+.hero-kpi-card:nth-child(2) { animation-delay: 0.3s; }
+.hero-kpi-card:nth-child(3) { animation-delay: 0.4s; }
+
+/* KPI number animated countup style */
+.kpi-number {
+  display: inline-block;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.kpi-number.counted {
+  animation: count-up-pulse 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ===== Notification Bell Shake ===== */
+.bell-animate svg {
+  animation: bell-ring 1s ease-in-out;
+}
+
+/* ===== Card Hover Micro-Interactions ===== */
+.urgency-tile {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.urgency-tile:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 25px -5px rgba(0,0,0,0.1), 0 4px 10px -5px rgba(0,0,0,0.04);
+}
+
+/* Card content sections — stagger children on appear */
+.stagger-children > * {
+  animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 360ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 420ms; }
+
+/* ===== Table Row Hover Effects ===== */
+tbody tr {
+  transition: background-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+tbody tr:hover {
+  background-color: rgba(43, 127, 255, 0.02);
+}
+tbody tr:active {
+  background-color: rgba(43, 127, 255, 0.05);
+}
+
+/* ===== Progress Bars — Animated Fill ===== */
+.progress-fill-animated {
+  animation: progress-fill 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.3s;
+}
+
+/* ===== Sidebar Section Reveal ===== */
+.sidebar-section {
+  animation: fade-in-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.sidebar-section:nth-child(1) { animation-delay: 0ms; }
+.sidebar-section:nth-child(2) { animation-delay: 40ms; }
+.sidebar-section:nth-child(3) { animation-delay: 80ms; }
+.sidebar-section:nth-child(4) { animation-delay: 120ms; }
+.sidebar-section:nth-child(5) { animation-delay: 160ms; }
+.sidebar-section:nth-child(6) { animation-delay: 200ms; }
+.sidebar-section:nth-child(7) { animation-delay: 240ms; }
+
+/* Sidebar link hover — subtle slide right */
+.sidebar-link:hover {
+  transform: translateX(3px);
+}
+
+/* ===== Action Items — Attention Pulse ===== */
+.attention-dot {
+  position: relative;
+}
+.attention-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0;
+  animation: attention-ring 2s ease-out infinite;
+}
+@keyframes attention-ring {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+/* ===== Header Logo Hover ===== */
+.header-logo-wrap:hover img {
+  animation: float-gentle 2s ease-in-out infinite;
+}
+
+/* ===== Needs Attention Card — Subtle Border Glow ===== */
+.needs-attention-card {
+  animation: border-glow 3s ease-in-out infinite;
+}
+
+/* ===== Status Badge Entrance ===== */
+.status-badge-enter {
+  animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ===== Quick Create Menu Item Stagger ===== */
+#quickadd-dropdown .py-1\.5 > a {
+  opacity: 0;
+  animation: slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+#quickadd-dropdown:not(.hidden) .py-1\.5 > a:nth-child(1) { animation-delay: 30ms; }
+#quickadd-dropdown:not(.hidden) .py-1\.5 > a:nth-child(2) { animation-delay: 60ms; }
+#quickadd-dropdown:not(.hidden) .py-1\.5 > a:nth-child(3) { animation-delay: 90ms; }
+#quickadd-dropdown:not(.hidden) .py-1\.5 > a:nth-child(4) { animation-delay: 120ms; }
+#quickadd-dropdown:not(.hidden) .py-1\.5 > a:nth-child(5) { animation-delay: 150ms; }
+#quickadd-dropdown:not(.hidden) .py-1\.5 > a:nth-child(6) { animation-delay: 180ms; }
+#quickadd-dropdown:not(.hidden) .py-1\.5 > a:nth-child(7) { animation-delay: 210ms; }
+#quickadd-dropdown:not(.hidden) .py-1\.5 > a:nth-child(8) { animation-delay: 240ms; }
+#quickadd-dropdown:not(.hidden) .py-1\.5 > a:nth-child(9) { animation-delay: 270ms; }
+#quickadd-dropdown:not(.hidden) .py-1\.5 > a:nth-child(10) { animation-delay: 300ms; }
+
+/* ===== Onboarding Progress Bar ===== */
+.onboarding-progress {
+  transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
 /* ===== Responsive Tables ===== */
 @media (max-width: 768px) {
