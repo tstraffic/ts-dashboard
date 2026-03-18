@@ -191,16 +191,16 @@
       <div class="divide-y divide-gray-100">
         <% myTasks.slice(0, 8).forEach(t => {
           const isOverdue = t.due_date < new Date().toISOString().split('T')[0];
-          const priorityColor = t.priority === 'high' ? 'bg-red-100 text-red-700' : t.priority === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600';
-          const statusColor = t.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : t.status === 'blocked' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600';
+          const priorityTag = t.priority === 'high' ? 'task-tag-high' : t.priority === 'medium' ? 'task-tag-medium' : 'task-tag-low';
+          const statusTag = t.status === 'in_progress' ? 'task-tag-progress' : t.status === 'blocked' ? 'task-tag-blocked' : 'task-tag-default';
         %>
         <a href="/tasks/<%= t.id %>/edit" class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
           <div class="min-w-0 flex-1">
             <p class="text-sm font-medium text-gray-900 truncate"><%= t.title %></p>
-            <div class="flex items-center gap-2 mt-1">
-              <% if (t.job_number) { %><span class="text-[10px] text-gray-400"><%= t.job_number %></span><% } %>
-              <span class="text-[10px] font-medium px-1.5 py-0.5 rounded <%= priorityColor %>"><%= t.priority %></span>
-              <span class="text-[10px] font-medium px-1.5 py-0.5 rounded <%= statusColor %>"><%= t.status.replace(/_/g, ' ') %></span>
+            <div class="flex items-center gap-2 mt-1.5">
+              <% if (t.job_number) { %><span class="job-id-chip" style="font-size:10px;padding:1px 6px"><%= t.job_number %></span><% } %>
+              <span class="task-tag <%= priorityTag %>"><%= t.priority %></span>
+              <span class="task-tag <%= statusTag %>"><%= t.status.replace(/_/g, ' ') %></span>
             </div>
           </div>
           <div class="ml-3 text-right flex-shrink-0">
@@ -232,15 +232,15 @@
       <div class="divide-y divide-gray-100">
         <% tasksIAssigned.forEach(t => {
           const isOverdue = t.due_date < new Date().toISOString().split('T')[0];
-          const statusColor = t.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : t.status === 'blocked' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600';
+          const statusTag = t.status === 'in_progress' ? 'task-tag-progress' : t.status === 'blocked' ? 'task-tag-blocked' : 'task-tag-default';
         %>
         <div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
           <div class="min-w-0 flex-1">
             <a href="/tasks/<%= t.id %>/edit" class="text-sm font-medium text-gray-900 hover:text-brand-600 truncate block"><%= t.title %></a>
-            <div class="flex items-center gap-2 mt-1">
+            <div class="flex items-center gap-2 mt-1.5">
               <span class="text-[10px] text-gray-500">Assigned to <strong><%= t.owner_name %></strong></span>
-              <span class="text-[10px] font-medium px-1.5 py-0.5 rounded <%= statusColor %>"><%= t.status.replace(/_/g, ' ') %></span>
-              <% if (isOverdue) { %><span class="text-[10px] font-semibold text-red-600">OVERDUE</span><% } %>
+              <span class="task-tag <%= statusTag %>"><%= t.status.replace(/_/g, ' ') %></span>
+              <% if (isOverdue) { %><span class="task-tag task-tag-blocked">OVERDUE</span><% } %>
             </div>
           </div>
           <div class="ml-3 flex items-center gap-2 flex-shrink-0">
@@ -259,9 +259,12 @@
 
     <!-- My Jobs -->
     <div>
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-wider">My Jobs</h2>
-        <a href="/jobs/new" class="px-3 py-1 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition">+ New Job</a>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="dash-section-title">My Jobs</h2>
+        <a href="/jobs/new" class="btn-new-job">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          New Job
+        </a>
       </div>
       <% if (myJobs.length === 0) { %>
         <div class="bg-white border border-gray-200 rounded-2xl p-8 text-center">
@@ -283,22 +286,22 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <% myJobs.slice(0, 8).forEach(job => { %>
-            <tr class="hover:bg-gray-50 cursor-pointer transition" onclick="window.location='/projects/<%= job.id %>'">
-              <td class="px-3 sm:px-4 py-2 font-medium text-brand-600 text-sm"><%= job.job_number %></td>
-              <td class="px-3 sm:px-4 py-2 text-gray-600 text-sm"><%= job.client %></td>
-              <td class="px-3 sm:px-4 py-2">
-                <span class="inline-flex items-center gap-1.5">
-                  <span class="w-2 h-2 rounded-full <% if (job.health === 'green') { %>bg-emerald-500<% } else if (job.health === 'amber') { %>bg-amber-400<% } else { %>bg-red-500<% } %>"></span>
-                  <span class="text-xs text-gray-500 capitalize"><%= job.health %></span>
-                </span>
+            <% myJobs.slice(0, 8).forEach(job => {
+              const healthClass = job.health === 'green' ? 'health-pill-green' : job.health === 'amber' ? 'health-pill-amber' : 'health-pill-red';
+              const barClass = job.percent_complete >= 75 ? 'health-green' : job.percent_complete >= 40 ? 'health-blue' : 'health-amber';
+            %>
+            <tr class="cursor-pointer transition" onclick="window.location='/projects/<%= job.id %>'">
+              <td class="px-3 sm:px-4 py-2.5"><span class="job-id-chip"><%= job.job_number %></span></td>
+              <td class="px-3 sm:px-4 py-2.5 text-gray-600 text-sm"><%= job.client %></td>
+              <td class="px-3 sm:px-4 py-2.5">
+                <span class="health-pill <%= healthClass %>"><%= job.health %></span>
               </td>
-              <td class="px-3 sm:px-4 py-2">
+              <td class="px-3 sm:px-4 py-2.5">
                 <div class="flex items-center gap-2">
-                  <div class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div class="h-full rounded-full <%= job.percent_complete >= 75 ? 'bg-emerald-500' : job.percent_complete >= 40 ? 'bg-brand-500' : 'bg-amber-400' %>" style="width: <%= job.percent_complete %>%"></div>
+                  <div class="progress-track flex-1">
+                    <div class="progress-bar-fill <%= barClass %>" style="width: <%= job.percent_complete %>%"></div>
                   </div>
-                  <span class="text-xs text-gray-400 w-7 text-right"><%= job.percent_complete %>%</span>
+                  <span class="text-xs text-gray-400 w-7 text-right tabular-nums"><%= job.percent_complete %>%</span>
                 </div>
               </td>
             </tr>
@@ -317,8 +320,8 @@
     <!-- Recent Updates -->
     <% if (recentUpdates.length > 0) { %>
     <div>
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Recent Updates</h2>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="dash-section-title">Recent Updates</h2>
         <a href="/updates" class="text-xs text-brand-600 hover:text-brand-500 font-medium">All &rarr;</a>
       </div>
       <div class="bg-white border border-gray-200 rounded-2xl p-4">

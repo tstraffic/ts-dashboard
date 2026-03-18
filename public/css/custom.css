@@ -9,7 +9,7 @@
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
   --radius-xl: 1.25rem;
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
   --shadow-card-hover: 0 10px 25px -5px rgba(0,0,0,0.08), 0 4px 10px -5px rgba(0,0,0,0.04);
   --shadow-dropdown: 0 20px 50px -12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.03);
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -34,9 +34,9 @@ a, button, input, select, textarea {
   ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 }
 
-/* ===== Page Background Subtle Pattern ===== */
+/* ===== Page Background ===== */
 body {
-  background: #f8fafc;
+  background: #F7F8FA;
   background-image:
     radial-gradient(ellipse 80% 50% at 50% -20%, rgba(43,127,255,0.03), transparent);
 }
@@ -63,12 +63,17 @@ body {
   box-shadow: var(--shadow-card-hover);
 }
 
-/* All white cards get a subtle upgrade */
+/* All white cards get refined shadow + radius */
 .bg-white {
   box-shadow: var(--shadow-card);
 }
 .bg-white:not(nav):not(td):not(th):not(tr):not(.fab-menu a):not(#notif-dropdown):not(#quickadd-dropdown) {
   border-color: rgba(0,0,0,0.06) !important;
+}
+/* Dashboard cards — 12px radius */
+.bg-white[class*="rounded-2xl"],
+.bg-white[class*="rounded-xl"] {
+  border-radius: 12px;
 }
 
 /* ===== Tables — Refined ===== */
@@ -405,13 +410,15 @@ main > div > *:nth-child(8) { animation-delay: 350ms; }
 
 /* ===== Table Row Hover Effects ===== */
 tbody tr {
-  transition: background-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  border-left: 3px solid transparent;
 }
 tbody tr:hover {
-  background-color: rgba(43, 127, 255, 0.02);
+  background-color: #F5F8FF;
+  border-left-color: #3B82F6;
 }
 tbody tr:active {
-  background-color: rgba(43, 127, 255, 0.05);
+  background-color: rgba(59, 130, 246, 0.06);
 }
 
 /* ===== Progress Bars — Animated Fill ===== */
@@ -677,12 +684,15 @@ form.form-submitting input[type="submit"]::after {
 }
 
 /* ===== Section Titles ===== */
-.section-title {
-  font-size: 0.6875rem;
+.section-title,
+.dash-section-title {
+  font-size: 11px;
   font-weight: 700;
-  color: #1e293b;
-  letter-spacing: 0.05em;
+  color: #6B7280;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  border-left: 3px solid #3B82F6;
+  padding-left: 0.75rem;
 }
 .section-subtitle {
   font-size: 0.75rem;
@@ -696,6 +706,99 @@ form.form-submitting input[type="submit"]::after {
 .status-green { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
 .status-blue { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
 .status-grey { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
+
+/* ===== Health Pill Badges ===== */
+.health-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid;
+  text-transform: capitalize;
+  letter-spacing: 0.01em;
+}
+.health-pill-green { background: #F0FDF4; color: #16A34A; border-color: #BBF7D0; }
+.health-pill-amber { background: #FFFBEB; color: #D97706; border-color: #FDE68A; }
+.health-pill-red   { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
+
+/* ===== Job ID Chip ===== */
+.job-id-chip {
+  display: inline-flex;
+  align-items: center;
+  background: #EFF6FF;
+  color: #2563EB;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+.job-id-chip:hover {
+  background: #DBEAFE;
+  transform: translateY(-1px);
+}
+
+/* ===== Task Tag Pills ===== */
+.task-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid;
+}
+.task-tag-high     { background: #FFF1F2; color: #BE123C; border-color: #FECDD3; }
+.task-tag-medium   { background: #FFF7ED; color: #C2410C; border-color: #FED7AA; }
+.task-tag-low      { background: #F9FAFB; color: #6B7280; border-color: #E5E7EB; }
+.task-tag-progress { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
+.task-tag-blocked  { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
+.task-tag-default  { background: #F9FAFB; color: #6B7280; border-color: #E5E7EB; }
+
+/* ===== Progress Bar (Refined) ===== */
+.progress-track {
+  height: 6px;
+  border-radius: 99px;
+  background: #F1F5F9;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  animation: progress-fill 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.2s;
+}
+.progress-bar-fill.health-green { background: linear-gradient(90deg, #22C55E, rgba(34,197,94,0.85)); }
+.progress-bar-fill.health-blue  { background: linear-gradient(90deg, #3B82F6, rgba(59,130,246,0.85)); }
+.progress-bar-fill.health-amber { background: linear-gradient(90deg, #F59E0B, rgba(245,158,11,0.85)); }
+.progress-bar-fill.health-red   { background: linear-gradient(90deg, #EF4444, rgba(239,68,68,0.85)); }
+
+/* ===== + New Job Button ===== */
+.btn-new-job {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  background: linear-gradient(135deg, #3B82F6, #2563EB);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(59,130,246,0.35);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.btn-new-job:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(59,130,246,0.45);
+}
+.btn-new-job:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59,130,246,0.3);
+}
 
 /* ===== Buttons — Refined ===== */
 button, .btn, a[class*="bg-brand"], a[class*="bg-emerald"], a[class*="bg-red"] {
