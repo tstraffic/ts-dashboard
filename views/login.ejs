@@ -107,19 +107,19 @@
 
     /* ── Glass card (dark) ── */
     .glass-card {
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.07);
       backdrop-filter: blur(24px) saturate(180%);
       -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
       box-shadow:
         0 25px 60px -12px rgba(0, 0, 0, 0.5),
         0 0 0 1px rgba(255, 255, 255, 0.05),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
 
     /* ── Inputs ── */
     .login-input {
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.2);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 10px;
       color: #ffffff;
@@ -127,10 +127,10 @@
       position: relative;
     }
     .login-input::placeholder {
-      color: rgba(255, 255, 255, 0.35);
+      color: rgba(255, 255, 255, 0.25);
     }
     .login-input:focus {
-      background: rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.25);
       border-color: rgba(43, 127, 255, 0.5);
       box-shadow: 0 0 0 3px rgba(43, 127, 255, 0.15);
       outline: none;
@@ -219,7 +219,7 @@
 
     /* ── Logo ── */
     .login-logo {
-      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+      filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.5));
       will-change: transform;
     }
     @keyframes logo-float {
@@ -275,8 +275,8 @@
       <div class="inline-block mb-5">
         <img src="/images/logo-colour.jpg" alt="T&S Traffic Control" class="login-logo h-20 w-auto rounded-xl">
       </div>
-      <h1 class="text-2xl font-extrabold text-white tracking-tight">T&S Traffic Control</h1>
-      <p class="text-white/40 mt-1.5 text-sm font-medium">Operations Dashboard</p>
+      <h1 style="font-size:28px;font-weight:700;color:#FFFFFF;letter-spacing:-0.01em">T&S Traffic Control</h1>
+      <p style="color:rgba(255,255,255,0.5);font-size:13px;letter-spacing:0.06em;margin-top:6px;font-weight:500">T&S Dashboard</p>
     </div>
 
     <% if (typeof flash_error !== 'undefined' && flash_error && flash_error.length > 0) { %>
@@ -293,12 +293,12 @@
     <!-- Login form card -->
     <form method="POST" action="/login" class="glass-card rounded-2xl p-7 sm:p-8 space-y-5 animate-card-delay">
       <div class="text-center mb-1">
-        <h2 class="text-lg font-bold text-white">Welcome back</h2>
-        <p class="text-sm text-white/35 mt-0.5">Sign in to your account</p>
+        <h2 style="font-size:20px;font-weight:600;color:#FFFFFF">Welcome back</h2>
+        <p style="color:rgba(255,255,255,0.45);font-size:13px;margin-top:2px">Sign in to your account</p>
       </div>
 
       <div>
-        <label for="username" class="block text-xs font-semibold text-white/50 mb-1.5" style="letter-spacing:0.04em">Username</label>
+        <label for="username" class="block mb-1.5" style="font-size:11px;font-weight:600;letter-spacing:0.05em;color:rgba(255,255,255,0.55)">Username</label>
         <div class="input-wrap">
           <input type="text" id="username" name="username" required autofocus placeholder=" "
             class="login-input w-full px-4 pt-5 pb-2.5 text-[15px]">
@@ -307,7 +307,7 @@
       </div>
 
       <div>
-        <label for="password" class="block text-xs font-semibold text-white/50 mb-1.5" style="letter-spacing:0.04em">Password</label>
+        <label for="password" class="block mb-1.5" style="font-size:11px;font-weight:600;letter-spacing:0.05em;color:rgba(255,255,255,0.55)">Password</label>
         <div class="input-wrap">
           <input type="password" id="password" name="password" required placeholder=" "
             class="login-input w-full px-4 pt-5 pb-2.5 text-[15px]">
@@ -315,7 +315,7 @@
         </div>
       </div>
 
-      <button type="submit" class="login-btn w-full py-3.5 text-white font-bold text-[15px] shadow-lg">
+      <button type="submit" class="login-btn w-full py-3.5 text-white text-[15px] shadow-lg" style="font-weight:600">
         Sign in
       </button>
 
@@ -324,7 +324,7 @@
       </div>
     </form>
 
-    <p class="text-center text-white/25 text-xs mt-8 animate-card-delay-2 font-medium">&copy; <%= new Date().getFullYear() %> T&S Traffic Control Pty Ltd</p>
+    <p class="text-center mt-8 animate-card-delay-2" style="color:rgba(255,255,255,0.2);font-size:11px;font-weight:500">&copy; <%= new Date().getFullYear() %> T&S Traffic Control Pty Ltd</p>
   </div>
 
   <!-- Particle system -->
