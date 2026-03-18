@@ -48,6 +48,7 @@ router.get('/submissions', (req, res) => {
     submitted: getDb().prepare("SELECT COUNT(*) as c FROM induction_submissions WHERE status = 'submitted'").get().c,
     approved: getDb().prepare("SELECT COUNT(*) as c FROM induction_submissions WHERE status = 'approved'").get().c,
     rejected: getDb().prepare("SELECT COUNT(*) as c FROM induction_submissions WHERE status = 'rejected'").get().c,
+    converted: getDb().prepare("SELECT COUNT(*) as c FROM induction_submissions WHERE status = 'converted'").get().c,
   };
 
   res.render('induction/admin/submissions', {
@@ -86,11 +87,76 @@ router.post('/submissions/:id/status', (req, res) => {
     return res.status(400).send('Invalid status');
   }
 
-  getDb().prepare(`
+  const db = getDb();
+  const s = db.prepare('SELECT * FROM induction_submissions WHERE id = ?').get(req.params.id);
+  if (!s) return res.status(404).send('Submission not found');
+
+  // Update submission status
+  db.prepare(`
     UPDATE induction_submissions
     SET status = ?, reviewed_by_id = ?, reviewed_at = datetime('now'), review_notes = ?, updated_at = datetime('now')
     WHERE id = ?
   `).run(status, req.session.user.id, review_notes || '', req.params.id);
+
+  // If approved, auto-create Crew Member + Employee records
+  if (status === 'approved') {
+    try {
+      // Generate next employee ID (EMP-001, EMP-002, etc.)
+      const lastCrew = db.prepare("SELECT employee_id FROM crew_members WHERE employee_id LIKE 'EMP-%' ORDER BY employee_id DESC LIMIT 1").get();
+      let nextNum = 1;
+      if (lastCrew && lastCrew.employee_id) {
+        const num = parseInt(lastCrew.employee_id.replace('EMP-', ''), 10);
+        if (!isNaN(num)) nextNum = num + 1;
+      }
+      const employeeId = `EMP-${String(nextNum).padStart(3, '0')}`;
+
+      // Split full name into first/last
+      const nameParts = (s.full_name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      // Determine employment type from payment type
+      const employmentType = s.payment_type === 'abn' ? 'subcontractor' : 'casual';
+
+      // 1. Create Crew Member
+      const crewResult = db.prepare(`
+        INSERT INTO crew_members (full_name, employee_id, role, phone, email, company, employment_type,
+          white_card, licence_type, induction_date, induction_status, active, status)
+        VALUES (?, ?, 'TC', ?, ?, 'T&S Traffic Control', ?, ?, ?, date('now'), 'completed', 1, 'active')
+      `).run(
+        s.full_name, employeeId, s.phone || '', s.email || '', employmentType,
+        s.white_card_number || '', s.drivers_licence_number || ''
+      );
+      const crewMemberId = crewResult.lastInsertRowid;
+
+      // 2. Create Employee record linked to crew member
+      const empResult = db.prepare(`
+        INSERT INTO employees (employee_code, first_name, last_name, full_name, company,
+          employment_type, employment_status, start_date,
+          email, phone, address, suburb, state, postcode,
+          date_of_birth, induction_status, allocatable, active,
+          linked_crew_member_id, internal_notes)
+        VALUES (?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?)
+      `).run(
+        employeeId, firstName, lastName, s.full_name, employmentType,
+        s.email || '', s.phone || '', s.address || '', s.suburb || '', s.state || '', s.postcode || '',
+        s.date_of_birth || null, crewMemberId,
+        `Auto-created from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''} AccName: ${s.bank_account_name || ''}`
+      );
+
+      // 3. Update submission with link to crew member and mark as converted
+      db.prepare(`
+        UPDATE induction_submissions SET status = 'converted', linked_crew_member_id = ?, updated_at = datetime('now') WHERE id = ?
+      `).run(crewMemberId, s.id);
+
+      req.flash('success', `${s.full_name} approved and added as employee ${employeeId}. They now appear in Crew Roster and Employees.`);
+      return res.redirect(`/induction/admin/submissions/${req.params.id}`);
+    } catch (err) {
+      console.error('Auto-convert error:', err);
+      req.flash('error', `Approved but failed to create employee record: ${err.message}`);
+      return res.redirect(`/induction/admin/submissions/${req.params.id}`);
+    }
+  }
 
   req.flash('success', `Submission ${status} successfully.`);
   res.redirect(`/induction/admin/submissions/${req.params.id}`);
