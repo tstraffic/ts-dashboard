@@ -212,15 +212,21 @@
     </div>
 
     <!-- Tasks I Assigned -->
-    <% if (tasksIAssigned.length > 0) { %>
     <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <div class="flex items-center gap-2">
           <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           <h2 class="text-sm font-bold text-gray-900">Tasks I Assigned</h2>
-          <span class="text-[10px] font-semibold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full"><%= tasksIAssigned.length %></span>
+          <% if (tasksIAssigned.length > 0) { %><span class="text-[10px] font-semibold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full"><%= tasksIAssigned.length %></span><% } %>
         </div>
+        <a href="/tasks" class="text-xs text-purple-600 hover:text-purple-700 font-medium">View all &rarr;</a>
       </div>
+      <% if (tasksIAssigned.length === 0) { %>
+        <div class="p-6 text-center">
+          <p class="text-sm text-gray-500">No tasks assigned to others yet</p>
+          <p class="text-xs text-gray-400 mt-1">When you create a task and assign it to someone else, it will appear here.</p>
+        </div>
+      <% } else { %>
       <div class="divide-y divide-gray-100">
         <% tasksIAssigned.forEach(t => {
           const isOverdue = t.due_date < new Date().toISOString().split('T')[0];
@@ -246,8 +252,8 @@
         </div>
         <% }) %>
       </div>
+      <% } %>
     </div>
-    <% } %>
 
     <!-- My Jobs -->
     <div>
