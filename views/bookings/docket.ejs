@@ -1,0 +1,295 @@
+<% locals.currentPage = 'bookings' %>
+<%
+  const dk = docket;
+  const statusColors = { draft: 'bg-gray-100 text-gray-600', pending_signoff: 'bg-amber-50 text-amber-700', signed: 'bg-emerald-50 text-emerald-700', finalised: 'bg-purple-50 text-purple-700' };
+%>
+
+<!-- Breadcrumb -->
+<div class="flex items-center gap-2 text-sm text-gray-400 mb-4">
+  <a href="/bookings" class="hover:text-gray-900 transition">Bookings</a>
+  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <a href="/bookings/<%= booking.id %>" class="hover:text-gray-900 transition"><%= booking.booking_number %></a>
+  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <span class="text-gray-900"><%= dk.docket_number %></span>
+</div>
+
+<!-- Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
+    <div class="flex items-center gap-3">
+      <h1 class="text-2xl font-bold text-gray-900">Docket <%= dk.docket_number %></h1>
+      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= statusColors[dk.status] || statusColors.draft %>">
+        <%= (dk.status || 'draft').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) %>
+      </span>
+    </div>
+    <p class="text-sm text-gray-500 mt-0.5">Booking: <%= booking.booking_number %> &middot; <%= booking.site_address || booking.title || '' %></p>
+  </div>
+  <div class="flex items-center gap-2">
+    <form method="POST" action="/bookings/<%= booking.id %>/dockets/<%= dk.id %>/delete" onsubmit="return confirm('Delete this docket?')" class="inline">
+      <button type="submit" class="inline-flex items-center px-3 py-2 bg-red-50 border border-red-200 text-red-700 text-sm font-medium rounded-lg hover:bg-red-100 transition">Delete Docket</button>
+    </form>
+  </div>
+</div>
+
+<!-- Docket Details Form -->
+<form method="POST" action="/bookings/<%= booking.id %>/dockets/<%= dk.id %>" class="space-y-5">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Docket Details</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Physical Docket #</label>
+        <input type="text" name="physical_docket_number" value="<%= dk.physical_docket_number || '' %>" placeholder="Paper docket number"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client Billing Ref</label>
+        <input type="text" name="client_billing_ref" value="<%= dk.client_billing_ref || '' %>" placeholder="Client reference"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Bill From</label>
+        <input type="text" name="bill_from" value="<%= dk.bill_from || '' %>" placeholder="Billing entity"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Site Address</label>
+        <input type="text" name="site_address" value="<%= dk.site_address || '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client Feedback</label>
+        <input type="text" name="client_feedback" value="<%= dk.client_feedback || '' %>" placeholder="Any client feedback on site"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Notes</label>
+        <textarea name="notes" rows="2" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"><%= dk.notes || '' %></textarea>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Private Notes</label>
+        <textarea name="private_notes" rows="2" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"><%= dk.private_notes || '' %></textarea>
+      </div>
+    </div>
+    <div class="mt-4">
+      <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Save Details</button>
+    </div>
+  </div>
+</form>
+
+<!-- Time Entries Table -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+  <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Time Entries</h2>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead>
+        <tr class="border-b border-gray-200">
+          <th class="px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Crew</th>
+          <th class="px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Start on Site</th>
+          <th class="px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Finish on Site</th>
+          <th class="px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Break (hrs)</th>
+          <th class="px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Travel</th>
+          <th class="px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">LAFHA</th>
+          <th class="px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</th>
+          <th class="px-3 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-20"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        <% timeEntries.forEach(te => { %>
+        <tr>
+          <form method="POST" action="/bookings/<%= booking.id %>/dockets/<%= dk.id %>/time/<%= te.id %>">
+            <td class="px-3 py-3">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-[10px] font-bold">
+                  <%= te.full_name ? te.full_name.split(' ').map(n => n[0]).join('').substring(0,2) : '?' %>
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-900"><%= te.full_name || 'Unknown' %></p>
+                  <p class="text-[10px] text-gray-400"><%= (te.crew_role || '').replace(/_/g, ' ') %></p>
+                </div>
+              </div>
+            </td>
+            <td class="px-3 py-3">
+              <input type="datetime-local" name="start_on_site" value="<%= te.start_on_site ? te.start_on_site.replace(' ', 'T').substring(0, 16) : '' %>"
+                class="px-2 py-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-brand-500 w-44">
+            </td>
+            <td class="px-3 py-3">
+              <input type="datetime-local" name="finish_on_site" value="<%= te.finish_on_site ? te.finish_on_site.replace(' ', 'T').substring(0, 16) : '' %>"
+                class="px-2 py-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-brand-500 w-44">
+            </td>
+            <td class="px-3 py-3">
+              <input type="number" step="0.25" min="0" name="first_break" value="<%= te.first_break || 0 %>"
+                class="px-2 py-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 w-16 focus:outline-none focus:ring-1 focus:ring-brand-500">
+            </td>
+            <td class="px-3 py-3">
+              <input type="number" step="0.25" min="0" name="travel" value="<%= te.travel || 0 %>"
+                class="px-2 py-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 w-16 focus:outline-none focus:ring-1 focus:ring-brand-500">
+            </td>
+            <td class="px-3 py-3">
+              <input type="checkbox" name="lafha" value="1" <%= te.lafha ? 'checked' : '' %>
+                class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500">
+            </td>
+            <td class="px-3 py-3">
+              <span class="text-sm font-bold text-gray-900"><%= te.total_hours || '0.00' %></span>
+            </td>
+            <td class="px-3 py-3">
+              <div class="flex items-center gap-1">
+                <button type="submit" class="text-brand-500 hover:text-brand-700 transition" title="Save">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </button>
+              </div>
+            </td>
+          </form>
+          <td class="px-1 py-3">
+            <form method="POST" action="/bookings/<%= booking.id %>/dockets/<%= dk.id %>/time/<%= te.id %>/remove" class="inline">
+              <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="Remove">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </form>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Add crew to docket -->
+  <div class="px-5 py-4 border-t border-gray-100">
+    <form method="POST" action="/bookings/<%= booking.id %>/dockets/<%= dk.id %>/time" class="flex items-end gap-2">
+      <div class="flex-1">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Add Crew</label>
+        <select name="crew_member_id" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">-- Select --</option>
+          <% allCrew.forEach(c => { %>
+            <option value="<%= c.id %>"><%= c.full_name %> (<%= (c.role || '').replace(/_/g, ' ') %>)</option>
+          <% }); %>
+        </select>
+      </div>
+      <button type="submit" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Add</button>
+    </form>
+  </div>
+</div>
+
+<!-- Signatures -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-5">
+  <!-- Worker Signature -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Worker Signature</h2>
+    <% if (dk.worker_signature) { %>
+      <div class="border border-gray-200 rounded-lg p-3 bg-gray-50 mb-2">
+        <img src="<%= dk.worker_signature %>" alt="Worker signature" class="max-h-24 mx-auto">
+      </div>
+      <p class="text-xs text-gray-500"><strong>Worker:</strong> <%= dk.worker_signed_name %></p>
+      <p class="text-xs text-gray-400"><strong>Signed:</strong> <%= dk.worker_signed_at ? new Date(dk.worker_signed_at).toLocaleString('en-AU') : '' %></p>
+    <% } else { %>
+      <div class="border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 relative" style="height:150px">
+        <canvas id="worker-sig-canvas" class="w-full h-full rounded-lg cursor-crosshair" style="touch-action:none"></canvas>
+      </div>
+      <div class="flex items-center gap-2 mt-2">
+        <input type="text" id="worker-sig-name" placeholder="Signer name" class="flex-1 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <button onclick="clearSig('worker')" class="px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">Clear</button>
+        <button onclick="saveSig('worker')" class="px-3 py-1.5 text-xs bg-brand-600 text-white rounded-lg hover:bg-brand-500">Sign</button>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Client Signature -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Client Signature</h2>
+    <% if (dk.client_signature) { %>
+      <div class="border border-gray-200 rounded-lg p-3 bg-gray-50 mb-2">
+        <img src="<%= dk.client_signature %>" alt="Client signature" class="max-h-24 mx-auto">
+      </div>
+      <p class="text-xs text-gray-500"><strong>Client rep:</strong> <%= dk.client_signed_name %></p>
+      <p class="text-xs text-gray-400"><strong>Signed:</strong> <%= dk.client_signed_at ? new Date(dk.client_signed_at).toLocaleString('en-AU') : '' %></p>
+    <% } else { %>
+      <div class="border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 relative" style="height:150px">
+        <canvas id="client-sig-canvas" class="w-full h-full rounded-lg cursor-crosshair" style="touch-action:none"></canvas>
+      </div>
+      <div class="flex items-center gap-2 mt-2">
+        <input type="text" id="client-sig-name" placeholder="Client rep name" class="flex-1 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <button onclick="clearSig('client')" class="px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">Clear</button>
+        <button onclick="saveSig('client')" class="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-500">Sign</button>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<!-- Signature Capture JS -->
+<script>
+(function() {
+  function initCanvas(id) {
+    const canvas = document.getElementById(id);
+    if (!canvas) return null;
+    const ctx = canvas.getContext('2d');
+
+    // Set canvas size to match display
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * 2;
+      canvas.height = rect.height * 2;
+      ctx.scale(2, 2);
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#1a1a2e';
+    }
+    resize();
+
+    let drawing = false;
+    let lastX = 0, lastY = 0;
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches ? e.touches[0] : e;
+      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    }
+
+    canvas.addEventListener('mousedown', e => { drawing = true; const p = getPos(e); lastX = p.x; lastY = p.y; });
+    canvas.addEventListener('mousemove', e => { if (!drawing) return; const p = getPos(e); ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); lastX = p.x; lastY = p.y; });
+    canvas.addEventListener('mouseup', () => { drawing = false; });
+    canvas.addEventListener('mouseleave', () => { drawing = false; });
+
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; const p = getPos(e); lastX = p.x; lastY = p.y; }, { passive: false });
+    canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke(); lastX = p.x; lastY = p.y; }, { passive: false });
+    canvas.addEventListener('touchend', () => { drawing = false; });
+
+    return { canvas, ctx, resize };
+  }
+
+  const workerSig = initCanvas('worker-sig-canvas');
+  const clientSig = initCanvas('client-sig-canvas');
+
+  window.clearSig = function(type) {
+    const sig = type === 'worker' ? workerSig : clientSig;
+    if (sig) { sig.ctx.clearRect(0, 0, sig.canvas.width, sig.canvas.height); sig.resize(); }
+  };
+
+  window.saveSig = function(type) {
+    const sig = type === 'worker' ? workerSig : clientSig;
+    if (!sig) return;
+    const nameInput = document.getElementById(type + '-sig-name');
+    const dataUrl = sig.canvas.toDataURL('image/png');
+
+    // Check if canvas is blank
+    const blank = document.createElement('canvas');
+    blank.width = sig.canvas.width; blank.height = sig.canvas.height;
+    if (sig.canvas.toDataURL() === blank.toDataURL()) { alert('Please sign before saving.'); return; }
+
+    fetch('/bookings/<%= booking.id %>/dockets/<%= dk.id %>/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: type, signature: dataUrl, name: nameInput ? nameInput.value : '' })
+    }).then(r => r.json()).then(d => {
+      if (d.ok) window.location.reload();
+      else alert('Failed to save signature');
+    }).catch(() => alert('Error saving signature'));
+  };
+})();
+</script>

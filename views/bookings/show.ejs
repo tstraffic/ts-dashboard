@@ -179,6 +179,50 @@
       </form>
     </div>
 
+    <!-- Dockets -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Dockets (<%= b.dockets ? b.dockets.length : 0 %>)</h2>
+        <form method="POST" action="/bookings/<%= b.id %>/dockets" class="inline">
+          <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition">
+            <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+            New Docket
+          </button>
+        </form>
+      </div>
+
+      <% if (b.dockets && b.dockets.length > 0) { %>
+        <div class="space-y-2">
+          <% b.dockets.forEach(dk => {
+            const statusColors = { draft: 'bg-gray-100 text-gray-600', pending_signoff: 'bg-amber-50 text-amber-700', signed: 'bg-emerald-50 text-emerald-700', finalised: 'bg-purple-50 text-purple-700' };
+          %>
+            <a href="/bookings/<%= b.id %>/dockets/<%= dk.id %>" class="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition group">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-brand-500 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <div>
+                  <span class="text-sm font-medium text-gray-900"><%= dk.docket_number %></span>
+                  <% if (dk.physical_docket_number) { %><span class="text-xs text-gray-400 ml-2">(#<%= dk.physical_docket_number %>)</span><% } %>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <% if (dk.worker_signature) { %>
+                  <span class="text-[10px] text-emerald-500 font-medium">Worker signed</span>
+                <% } %>
+                <% if (dk.client_signature) { %>
+                  <span class="text-[10px] text-blue-500 font-medium">Client signed</span>
+                <% } %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= statusColors[dk.status] || statusColors.draft %>">
+                  <%= (dk.status || 'draft').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) %>
+                </span>
+              </div>
+            </a>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <p class="text-sm text-gray-400">No dockets yet. Create one to track crew time and get signatures.</p>
+      <% } %>
+    </div>
+
     <!-- Notes -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
       <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Notes</h2>

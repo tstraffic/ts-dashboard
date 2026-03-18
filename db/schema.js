@@ -2857,6 +2857,56 @@ function runMigrations(db) {
     console.log('Migration 50 complete.');
   }
 
+  // Migration 51: Booking dockets — time tracking + signatures
+  if (!isMigrationApplied.get(51)) {
+    console.log('Running migration 51: Booking dockets');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS booking_dockets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        docket_number TEXT UNIQUE,
+        status TEXT DEFAULT 'draft' CHECK(status IN ('draft','pending_signoff','signed','finalised')),
+        physical_docket_number TEXT DEFAULT '',
+        client_billing_ref TEXT DEFAULT '',
+        bill_from TEXT DEFAULT '',
+        site_address TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        private_notes TEXT DEFAULT '',
+        client_feedback TEXT DEFAULT '',
+        worker_signature TEXT DEFAULT '',
+        worker_signed_name TEXT DEFAULT '',
+        worker_signed_at DATETIME,
+        client_signature TEXT DEFAULT '',
+        client_signed_name TEXT DEFAULT '',
+        client_signed_at DATETIME,
+        created_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_dockets_booking ON booking_dockets(booking_id);
+      CREATE INDEX IF NOT EXISTS idx_dockets_status ON booking_dockets(status);
+
+      CREATE TABLE IF NOT EXISTS docket_time_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        docket_id INTEGER NOT NULL REFERENCES booking_dockets(id) ON DELETE CASCADE,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        start_on_site DATETIME,
+        finish_on_site DATETIME,
+        first_break REAL DEFAULT 0,
+        first_break_at TEXT DEFAULT '',
+        travel REAL DEFAULT 0,
+        lafha INTEGER DEFAULT 0,
+        total_hours REAL DEFAULT 0,
+        notes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_time_entries_docket ON docket_time_entries(docket_id);
+      CREATE INDEX IF NOT EXISTS idx_time_entries_crew ON docket_time_entries(crew_member_id);
+    `);
+    recordMigration.run(51, 'Booking dockets');
+    console.log('Migration 51 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

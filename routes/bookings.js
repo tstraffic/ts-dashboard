@@ -57,7 +57,9 @@ function transformBooking(db, row) {
     project: { name: projectName, client: clientName, address: projectAddress, orderNumber: row.order_number || '', billingCode: row.billing_code || '' },
     personnel: crew.map(c => ({ id: c.crew_member_id, name: c.full_name || 'Unknown', role: c.role_on_site || '', confirmed: c.status === 'confirmed' })),
     vehicles: vehicles.map(v => ({ id: v.id, registration: v.registration || '', name: v.vehicle_name || '' })),
-    scheduleWarning, dockets: 0, notes: noteCount, tasks: 0, docs: 0,
+    scheduleWarning,
+    dockets: db.prepare("SELECT COUNT(*) as c FROM booking_dockets WHERE booking_id = ?").get(row.id).c,
+    notes: noteCount, tasks: 0, docs: 0,
   };
 }
 
@@ -72,7 +74,8 @@ function loadBookingDetail(db, bookingId) {
   let jobInfo = row.job_id ? db.prepare("SELECT id, job_number, job_name, client, site_address, suburb, status FROM jobs WHERE id = ?").get(row.job_id) : null;
   let clientInfo = null;
   if (row.client_id) { try { clientInfo = db.prepare("SELECT id, company_name, primary_contact_name, primary_contact_phone, primary_contact_email FROM clients WHERE id = ?").get(row.client_id); } catch (e) {} }
-  return { ...row, supervisor_name: supervisorName, crew, notes, vehicles, job: jobInfo, client: clientInfo };
+  const dockets = db.prepare("SELECT * FROM booking_dockets WHERE booking_id = ? ORDER BY created_at DESC").all(bookingId);
+  return { ...row, supervisor_name: supervisorName, crew, notes, vehicles, dockets, job: jobInfo, client: clientInfo };
 }
 
 // GET / — Board view
@@ -166,7 +169,8 @@ router.get('/:id', (req, res) => {
     booking: { ...booking, supervisor: booking.supervisor_name, project: { name: booking.title || (booking.job ? booking.job.job_name : ''), client: booking.client ? booking.client.company_name : (booking.job ? booking.job.client : ''), address: booking.site_address || (booking.job ? booking.job.site_address : ''), orderNumber: booking.order_number, billingCode: booking.billing_code },
       startDateTime: booking.start_datetime, endDateTime: booking.end_datetime,
       personnel: booking.crew.map(c => ({ id: c.crew_member_id, name: c.full_name || 'Unknown', role: c.role_on_site || '', confirmed: c.status === 'confirmed', bcStatus: c.status })),
-      allVehicles: booking.vehicles },
+      allVehicles: booking.vehicles,
+      dockets: booking.dockets || [] },
     allCrew, user: req.session.user,
   });
 });
@@ -240,6 +244,146 @@ router.post('/:id/vehicles', (req, res) => {
   req.flash('success', 'Vehicle added.'); res.redirect('/bookings/' + req.params.id);
 });
 router.post('/:id/vehicles/:vehicleId/remove', (req, res) => { getDb().prepare("DELETE FROM booking_vehicles WHERE id=? AND booking_id=?").run(req.params.vehicleId, req.params.id); req.flash('success', 'Removed.'); res.redirect('/bookings/' + req.params.id); });
+
+// ===========================================================================
+// DOCKETS
+// ===========================================================================
+
+function generateDocketNumber(db) {
+  const last = db.prepare("SELECT docket_number FROM booking_dockets ORDER BY id DESC LIMIT 1").get();
+  let n = 1;
+  if (last && last.docket_number) { const num = parseInt(last.docket_number.replace('DK-', ''), 10); if (!isNaN(num)) n = num + 1; }
+  return 'DK-' + String(n).padStart(4, '0');
+}
+
+// POST /:id/dockets — Create new docket
+router.post('/:id/dockets', (req, res) => {
+  const db = getDb();
+  const booking = db.prepare("SELECT * FROM bookings WHERE id = ?").get(req.params.id);
+  if (!booking) { req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
+
+  const docketNumber = generateDocketNumber(db);
+  const result = db.prepare(`
+    INSERT INTO booking_dockets (booking_id, docket_number, status, site_address, created_by_id)
+    VALUES (?, ?, 'draft', ?, ?)
+  `).run(req.params.id, docketNumber, booking.site_address || '', req.session.user.id);
+
+  // Auto-add all booking crew as time entries
+  const crew = db.prepare("SELECT bc.crew_member_id FROM booking_crew bc WHERE bc.booking_id = ?").all(req.params.id);
+  const insertTime = db.prepare("INSERT INTO docket_time_entries (docket_id, crew_member_id, start_on_site, finish_on_site) VALUES (?, ?, ?, ?)");
+  crew.forEach(c => {
+    insertTime.run(result.lastInsertRowid, c.crew_member_id, booking.start_datetime, booking.end_datetime);
+  });
+
+  req.flash('success', `Docket ${docketNumber} created.`);
+  res.redirect('/bookings/' + req.params.id + '/dockets/' + result.lastInsertRowid);
+});
+
+// GET /:id/dockets/:docketId — View/edit docket
+router.get('/:id/dockets/:docketId', (req, res) => {
+  const db = getDb();
+  const booking = db.prepare("SELECT * FROM bookings WHERE id = ?").get(req.params.id);
+  if (!booking) { req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
+
+  const docket = db.prepare("SELECT * FROM booking_dockets WHERE id = ? AND booking_id = ?").get(req.params.docketId, req.params.id);
+  if (!docket) { req.flash('error', 'Docket not found.'); return res.redirect('/bookings/' + req.params.id); }
+
+  const timeEntries = db.prepare(`
+    SELECT te.*, cm.full_name, cm.role as crew_role, cm.employee_id
+    FROM docket_time_entries te
+    LEFT JOIN crew_members cm ON cm.id = te.crew_member_id
+    WHERE te.docket_id = ?
+    ORDER BY cm.full_name
+  `).all(docket.id);
+
+  // Compute totals
+  timeEntries.forEach(te => {
+    if (te.start_on_site && te.finish_on_site) {
+      const start = new Date(te.start_on_site);
+      const end = new Date(te.finish_on_site);
+      const diffHours = (end - start) / (1000 * 60 * 60);
+      te.total_hours = Math.max(0, diffHours - (te.first_break || 0)).toFixed(2);
+    }
+  });
+
+  const allCrew = db.prepare("SELECT id, full_name, role, employee_id FROM crew_members WHERE active = 1 ORDER BY full_name").all();
+
+  res.render('bookings/docket', {
+    title: 'Docket ' + docket.docket_number,
+    booking, docket, timeEntries, allCrew,
+    user: req.session.user,
+  });
+});
+
+// POST /:id/dockets/:docketId — Update docket details
+router.post('/:id/dockets/:docketId', (req, res) => {
+  const db = getDb();
+  const b = req.body;
+  db.prepare(`
+    UPDATE booking_dockets SET physical_docket_number=?, client_billing_ref=?, bill_from=?,
+      site_address=?, notes=?, private_notes=?, client_feedback=?, updated_at=CURRENT_TIMESTAMP
+    WHERE id=? AND booking_id=?
+  `).run(b.physical_docket_number || '', b.client_billing_ref || '', b.bill_from || '',
+    b.site_address || '', b.notes || '', b.private_notes || '', b.client_feedback || '',
+    req.params.docketId, req.params.id);
+  req.flash('success', 'Docket updated.');
+  res.redirect('/bookings/' + req.params.id + '/dockets/' + req.params.docketId);
+});
+
+// POST /:id/dockets/:docketId/time — Add time entry
+router.post('/:id/dockets/:docketId/time', (req, res) => {
+  const db = getDb();
+  const b = req.body;
+  if (!b.crew_member_id) { req.flash('error', 'Select a crew member.'); return res.redirect('/bookings/' + req.params.id + '/dockets/' + req.params.docketId); }
+  db.prepare("INSERT INTO docket_time_entries (docket_id, crew_member_id, start_on_site, finish_on_site) VALUES (?, ?, ?, ?)")
+    .run(req.params.docketId, b.crew_member_id, b.start_on_site || null, b.finish_on_site || null);
+  req.flash('success', 'Crew member added to docket.');
+  res.redirect('/bookings/' + req.params.id + '/dockets/' + req.params.docketId);
+});
+
+// POST /:id/dockets/:docketId/time/:timeId — Update time entry
+router.post('/:id/dockets/:docketId/time/:timeId', (req, res) => {
+  const db = getDb();
+  const b = req.body;
+  db.prepare(`
+    UPDATE docket_time_entries SET start_on_site=?, finish_on_site=?, first_break=?, first_break_at=?, travel=?, lafha=?, notes=?
+    WHERE id=? AND docket_id=?
+  `).run(b.start_on_site || null, b.finish_on_site || null, parseFloat(b.first_break) || 0,
+    b.first_break_at || '', parseFloat(b.travel) || 0, b.lafha ? 1 : 0, b.notes || '',
+    req.params.timeId, req.params.docketId);
+  req.flash('success', 'Time entry updated.');
+  res.redirect('/bookings/' + req.params.id + '/dockets/' + req.params.docketId);
+});
+
+// POST /:id/dockets/:docketId/time/:timeId/remove — Remove time entry
+router.post('/:id/dockets/:docketId/time/:timeId/remove', (req, res) => {
+  getDb().prepare("DELETE FROM docket_time_entries WHERE id=? AND docket_id=?").run(req.params.timeId, req.params.docketId);
+  req.flash('success', 'Removed.');
+  res.redirect('/bookings/' + req.params.id + '/dockets/' + req.params.docketId);
+});
+
+// POST /:id/dockets/:docketId/sign — Save signature
+router.post('/:id/dockets/:docketId/sign', (req, res) => {
+  const db = getDb();
+  const { type, signature, name } = req.body;
+  if (!signature) return res.status(400).json({ error: 'No signature data' });
+
+  if (type === 'worker') {
+    db.prepare("UPDATE booking_dockets SET worker_signature=?, worker_signed_name=?, worker_signed_at=CURRENT_TIMESTAMP, status='pending_signoff', updated_at=CURRENT_TIMESTAMP WHERE id=? AND booking_id=?")
+      .run(signature, name || '', req.params.docketId, req.params.id);
+  } else if (type === 'client') {
+    db.prepare("UPDATE booking_dockets SET client_signature=?, client_signed_name=?, client_signed_at=CURRENT_TIMESTAMP, status='signed', updated_at=CURRENT_TIMESTAMP WHERE id=? AND booking_id=?")
+      .run(signature, name || '', req.params.docketId, req.params.id);
+  }
+  res.json({ ok: true });
+});
+
+// POST /:id/dockets/:docketId/delete — Delete docket
+router.post('/:id/dockets/:docketId/delete', (req, res) => {
+  getDb().prepare("DELETE FROM booking_dockets WHERE id=? AND booking_id=?").run(req.params.docketId, req.params.id);
+  req.flash('success', 'Docket deleted.');
+  res.redirect('/bookings/' + req.params.id);
+});
 
 // Move booking to new date (drag-and-drop from calendar)
 router.post('/:id/move', (req, res) => {
