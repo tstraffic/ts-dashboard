@@ -82,8 +82,19 @@ router.get('/', (req, res) => {
   const dateStr = req.query.date || new Date().toISOString().split('T')[0];
   const depot = req.query.depot || '', status = req.query.status || '', search = req.query.search || '';
 
-  let where = "WHERE DATE(b.start_datetime) = ?";
-  const params = [dateStr];
+  // Calendar view: load whole month. Board/List: load single day.
+  let where;
+  const params = [];
+  if (view === 'calendar') {
+    const d = new Date(dateStr + 'T00:00:00');
+    const firstOfMonth = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+    const lastOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+    where = "WHERE DATE(b.start_datetime) BETWEEN ? AND ?";
+    params.push(firstOfMonth, lastOfMonth);
+  } else {
+    where = "WHERE DATE(b.start_datetime) = ?";
+    params.push(dateStr);
+  }
   if (depot) { where += " AND b.depot = ?"; params.push(depot); }
   if (status) { where += " AND b.status = ?"; params.push(status); }
   if (search) { where += " AND (b.title LIKE ? OR b.booking_number LIKE ? OR b.site_address LIKE ? OR b.suburb LIKE ?)"; const s = '%' + search + '%'; params.push(s, s, s, s); }
@@ -229,6 +240,26 @@ router.post('/:id/vehicles', (req, res) => {
   req.flash('success', 'Vehicle added.'); res.redirect('/bookings/' + req.params.id);
 });
 router.post('/:id/vehicles/:vehicleId/remove', (req, res) => { getDb().prepare("DELETE FROM booking_vehicles WHERE id=? AND booking_id=?").run(req.params.vehicleId, req.params.id); req.flash('success', 'Removed.'); res.redirect('/bookings/' + req.params.id); });
+
+// Move booking to new date (drag-and-drop from calendar)
+router.post('/:id/move', (req, res) => {
+  const db = getDb();
+  const booking = db.prepare("SELECT * FROM bookings WHERE id = ?").get(req.params.id);
+  if (!booking) return res.status(404).json({ error: 'Not found' });
+
+  const newDate = req.body.new_date;
+  if (!newDate) return res.status(400).json({ error: 'Missing new_date' });
+
+  // Keep the same times, just change the date
+  const oldStartTime = booking.start_datetime ? booking.start_datetime.split('T')[1] : '06:00:00';
+  const oldEndTime = booking.end_datetime ? booking.end_datetime.split('T')[1] : '14:30:00';
+
+  db.prepare("UPDATE bookings SET start_datetime = ?, end_datetime = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    .run(newDate + 'T' + oldStartTime, newDate + 'T' + oldEndTime, req.params.id);
+
+  logActivity({ user: req.session.user, action: 'update', entityType: 'booking', entityId: req.params.id, details: `Moved booking ${booking.booking_number} to ${newDate}`, req });
+  res.json({ ok: true });
+});
 
 // Clone
 router.post('/:id/clone', (req, res) => {

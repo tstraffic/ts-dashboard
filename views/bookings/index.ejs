@@ -357,41 +357,10 @@
       </div>
       <div class="resource-available-header">
         <span>Available resources</span>
-        <span class="text-xs text-gray-400">6:00am - 6:00pm</span>
+        <span class="text-xs text-gray-400" id="resource-count-label">Loading...</span>
       </div>
-      <div class="resource-list">
-        <div class="resource-item">
-          <div class="resource-avatar">JM</div>
-          <div class="resource-info">
-            <span class="resource-name">Jake Morrison</span>
-            <span class="resource-role">TC - Full-time</span>
-          </div>
-          <span class="resource-status available">Available</span>
-        </div>
-        <div class="resource-item">
-          <div class="resource-avatar">SC</div>
-          <div class="resource-info">
-            <span class="resource-name">Sophie Chen</span>
-            <span class="resource-role">TC - Casual</span>
-          </div>
-          <span class="resource-status available">Available</span>
-        </div>
-        <div class="resource-item">
-          <div class="resource-avatar">OF</div>
-          <div class="resource-info">
-            <span class="resource-name">Omar Fahmy</span>
-            <span class="resource-role">TL - Full-time</span>
-          </div>
-          <span class="resource-status available">Available</span>
-        </div>
-        <div class="resource-item">
-          <div class="resource-avatar">PP</div>
-          <div class="resource-info">
-            <span class="resource-name">Priya Patel</span>
-            <span class="resource-role">TC - Part-time</span>
-          </div>
-          <span class="resource-status busy">On shift</span>
-        </div>
+      <div class="resource-list" id="resource-list">
+        <div class="p-4 text-center text-gray-400 text-sm">Loading crew...</div>
       </div>
     </div>
   </div>
@@ -472,6 +441,114 @@
     </div>
   </div>
 </div>
+<% } else if (currentView === 'calendar') { %>
+<!-- ============ CALENDAR VIEW ============ -->
+<%
+  const calDate = new Date(currentDate + 'T00:00:00');
+  const calYear = calDate.getFullYear();
+  const calMonth = calDate.getMonth();
+  const firstDay = new Date(calYear, calMonth, 1);
+  const lastDay = new Date(calYear, calMonth + 1, 0);
+  const startPad = firstDay.getDay(); // 0=Sun
+  const totalDays = lastDay.getDate();
+  const monthName = calDate.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+  const prevMonth = new Date(calYear, calMonth - 1, 1).toISOString().split('T')[0];
+  const nextMonth = new Date(calYear, calMonth + 1, 1).toISOString().split('T')[0];
+
+  // Group bookings by date
+  const bookingsByDate = {};
+  bookings.forEach(bk => {
+    const d = bk.startDateTime ? bk.startDateTime.split('T')[0] : '';
+    if (d) { if (!bookingsByDate[d]) bookingsByDate[d] = []; bookingsByDate[d].push(bk); }
+  });
+%>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+  <!-- Calendar Header -->
+  <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+    <a href="/bookings?view=calendar&date=<%= prevMonth %>" class="p-2 hover:bg-gray-100 rounded-lg transition">
+      <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <h2 class="text-lg font-bold text-gray-900"><%= monthName %></h2>
+    <a href="/bookings?view=calendar&date=<%= nextMonth %>" class="p-2 hover:bg-gray-100 rounded-lg transition">
+      <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </a>
+  </div>
+
+  <!-- Day Headers -->
+  <div class="grid grid-cols-7 border-b border-gray-100">
+    <% ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => { %>
+      <div class="px-2 py-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest"><%= d %></div>
+    <% }); %>
+  </div>
+
+  <!-- Calendar Grid -->
+  <div class="grid grid-cols-7" id="calendar-grid">
+    <% for (let i = 0; i < startPad; i++) { %>
+      <div class="min-h-[100px] border-b border-r border-gray-50 bg-gray-50/50"></div>
+    <% } %>
+    <% for (let day = 1; day <= totalDays; day++) {
+      const dateStr = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+      const today = new Date().toISOString().split('T')[0];
+      const isToday = dateStr === today;
+      const dayBookings = bookingsByDate[dateStr] || [];
+      const statusColors = { unconfirmed: 'bg-red-400', confirmed: 'bg-blue-400', green_to_go: 'bg-emerald-400', in_progress: 'bg-amber-400', completed: 'bg-purple-400', cancelled: 'bg-gray-300', on_hold: 'bg-yellow-400' };
+    %>
+      <div class="min-h-[100px] border-b border-r border-gray-50 p-1 <%= isToday ? 'bg-brand-50/30' : '' %>"
+        data-date="<%= dateStr %>"
+        ondragover="event.preventDefault(); this.classList.add('bg-brand-50')"
+        ondragleave="this.classList.remove('bg-brand-50')"
+        ondrop="handleCalDrop(event, '<%= dateStr %>')">
+        <div class="flex items-center justify-between mb-1">
+          <a href="/bookings?view=board&date=<%= dateStr %>" class="text-xs font-semibold <%= isToday ? 'w-6 h-6 bg-brand-600 text-white rounded-full flex items-center justify-center' : 'text-gray-500 hover:text-brand-600' %>"><%= day %></a>
+          <% if (dayBookings.length > 0) { %>
+            <span class="text-[9px] font-bold text-gray-400"><%= dayBookings.length %></span>
+          <% } %>
+        </div>
+        <div class="space-y-0.5">
+          <% dayBookings.slice(0, 3).forEach(bk => {
+            const t = new Date(bk.startDateTime);
+            const timeStr = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+          %>
+            <div class="text-[10px] leading-tight px-1 py-0.5 rounded cursor-pointer truncate hover:opacity-80 transition
+              <%= statusColors[bk.status] || 'bg-gray-200' %> text-white font-medium"
+              draggable="true"
+              ondragstart="event.dataTransfer.setData('text/plain', '<%= bk.id %>')"
+              onclick="window.location='/bookings/<%= bk.id %>'"
+              title="<%= bk.project.name %> — <%= bk.supervisor || 'No supervisor' %>">
+              <%= timeStr %> <%= bk.project.name ? bk.project.name.substring(0, 20) : 'BK-' + bk.id %>
+            </div>
+          <% }); %>
+          <% if (dayBookings.length > 3) { %>
+            <a href="/bookings?view=board&date=<%= dateStr %>" class="text-[9px] text-brand-600 font-medium pl-1">+<%= dayBookings.length - 3 %> more</a>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+    <% const totalCells = startPad + totalDays; const remaining = 7 - (totalCells % 7); %>
+    <% if (remaining < 7) { for (let i = 0; i < remaining; i++) { %>
+      <div class="min-h-[100px] border-b border-r border-gray-50 bg-gray-50/50"></div>
+    <% } } %>
+  </div>
+</div>
+
+<script>
+function handleCalDrop(event, targetDate) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('bg-brand-50');
+  const bookingId = event.dataTransfer.getData('text/plain');
+  if (!bookingId) return;
+  // Move booking to new date via API
+  fetch('/bookings/' + bookingId + '/move', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'new_date=' + encodeURIComponent(targetDate)
+  }).then(r => {
+    if (r.ok) window.location.reload();
+    else alert('Failed to move booking');
+  });
+}
+</script>
+
 <% } else { %>
 <!-- Other views placeholder -->
 <div class="bookings-empty">
@@ -648,11 +725,34 @@
   const resBtn = document.getElementById('toggle-resource-panel');
   const resPanel = document.getElementById('resource-panel');
   const resClose = document.getElementById('close-resource-panel');
+  function loadResources() {
+    const list = document.getElementById('resource-list');
+    const label = document.getElementById('resource-count-label');
+    if (!list) return;
+    fetch('/bookings/resources?date=<%= currentDate %>')
+      .then(r => r.json())
+      .then(data => {
+        label.textContent = data.available.length + ' available, ' + data.assigned.length + ' assigned';
+        if (data.available.length === 0 && data.assigned.length === 0) {
+          list.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm">No crew members found</div>';
+          return;
+        }
+        list.innerHTML = '';
+        function renderItem(c, statusClass, statusLabel) {
+          const initials = c.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          list.innerHTML += '<div class="resource-item"><div class="resource-avatar">' + initials + '</div><div class="resource-info"><span class="resource-name">' + c.full_name + '</span><span class="resource-role">' + (c.role || '').replace(/_/g, ' ') + (c.employee_id ? ' · ' + c.employee_id : '') + '</span></div><span class="resource-status ' + statusClass + '">' + statusLabel + '</span></div>';
+        }
+        data.available.forEach(c => renderItem(c, 'available', 'Available'));
+        data.assigned.forEach(c => renderItem(c, 'busy', 'On shift'));
+      })
+      .catch(() => { list.innerHTML = '<div class="p-4 text-center text-red-400 text-sm">Failed to load</div>'; });
+  }
   if (resBtn && resPanel) {
     resBtn.addEventListener('click', function() {
       const isOpen = resPanel.style.display !== 'none';
       resPanel.style.display = isOpen ? 'none' : 'block';
       this.classList.toggle('active', !isOpen);
+      if (!isOpen) loadResources();
     });
   }
   if (resClose && resPanel) {
