@@ -263,14 +263,26 @@
           <h2 class="text-xl font-bold text-gray-900">Banking & Payment</h2>
 
           <% if (paymentType === 'cash') { %>
-            <div class="flex items-center gap-4 bg-green-50 border border-green-200 rounded-xl p-5">
-              <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-              </div>
-              <div>
-                <p class="font-semibold text-green-800">Cash Payment Selected</p>
-                <p class="text-sm text-green-700 mt-0.5">No banking details required. You'll be paid in cash.</p>
-              </div>
+            <p class="text-sm text-gray-500">Enter your banking details below for payments.</p>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Bank Name <span class="text-red-500">*</span></label>
+              <input type="text" name="bank_name" required placeholder="e.g. Commonwealth Bank"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">BSB <span class="text-red-500">*</span></label>
+              <input type="text" name="bank_bsb" required maxlength="7" placeholder="XXX-XXX"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Account Number <span class="text-red-500">*</span></label>
+              <input type="text" name="bank_account_number" required placeholder="Enter account number"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Account Name <span class="text-red-500">*</span></label>
+              <input type="text" name="bank_account_name" required placeholder="Name on bank account"
+                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" />
             </div>
           <% } else if (paymentType === 'tfn') { %>
             <p class="text-sm text-gray-500">Enter your tax and banking details below.</p>
@@ -341,55 +353,55 @@
 
               <!-- Card 1 -->
               <div class="min-w-full p-1">
-                <div class="bg-gradient-to-br from-brand-50 to-brand-100 rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
+                <div style="background:linear-gradient(135deg,#EBF3FF,#D6E7FF);" class="rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
                   <div>
-                    <div class="inline-flex items-center gap-2 bg-brand-500 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">1 / 4</div>
-                    <h3 class="text-lg font-bold text-brand-900 mb-2">Who We Are</h3>
-                    <p class="text-sm text-brand-800 leading-relaxed">T&S Traffic Control is a family-owned business established in 2021, raising the standards of safety in NSW traffic control. Founded by Taj and Saadat, we bring a personal touch to every project and treat our team like family.</p>
+                    <div style="background:#2B7FFF;" class="inline-flex items-center gap-2 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">1 / 4</div>
+                    <h3 class="text-lg font-bold mb-2" style="color:#052A99;">Who We Are</h3>
+                    <p class="text-sm leading-relaxed" style="color:#0D3FB2;">T&S Traffic Control is a family-owned business established in 2021, raising the standards of safety in NSW traffic control. Founded by Taj and Saadat, we bring a personal touch to every project and treat our team like family.</p>
                   </div>
                   <div class="flex justify-end mt-4">
-                    <button type="button" onclick="carouselNext()" class="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg px-5 py-2 transition">Next &rarr;</button>
+                    <button type="button" onclick="carouselNext()" style="background:#2B7FFF;color:#fff;" class="text-sm font-semibold rounded-lg px-5 py-2 transition hover:opacity-90">Next &rarr;</button>
                   </div>
                 </div>
               </div>
 
               <!-- Card 2 -->
               <div class="min-w-full p-1">
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
+                <div style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);" class="rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
                   <div>
-                    <div class="inline-flex items-center gap-2 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">2 / 4</div>
-                    <h3 class="text-lg font-bold text-emerald-900 mb-2">Our Mission</h3>
-                    <p class="text-sm text-emerald-800 leading-relaxed"><strong>"A Safe Way Home"</strong> &mdash; Our mission is to protect lives on every worksite we operate. We strive to create a workplace where every team member can grow, succeed, and return home safely at the end of each day.</p>
+                    <div style="background:#059669;" class="inline-flex items-center gap-2 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">2 / 4</div>
+                    <h3 class="text-lg font-bold mb-2" style="color:#064e3b;">Our Mission</h3>
+                    <p class="text-sm leading-relaxed" style="color:#065f46;"><strong>"A Safe Way Home"</strong> &mdash; Our mission is to protect lives on every worksite we operate. We strive to create a workplace where every team member can grow, succeed, and return home safely at the end of each day.</p>
                   </div>
                   <div class="flex justify-between mt-4">
-                    <button type="button" onclick="carouselPrev()" class="text-emerald-700 hover:text-emerald-900 text-sm font-medium transition">&larr; Back</button>
-                    <button type="button" onclick="carouselNext()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg px-5 py-2 transition">Next &rarr;</button>
+                    <button type="button" onclick="carouselPrev()" style="color:#047857;" class="text-sm font-medium transition hover:opacity-70">&larr; Back</button>
+                    <button type="button" onclick="carouselNext()" style="background:#059669;color:#fff;" class="text-sm font-semibold rounded-lg px-5 py-2 transition hover:opacity-90">Next &rarr;</button>
                   </div>
                 </div>
               </div>
 
               <!-- Card 3 -->
               <div class="min-w-full p-1">
-                <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
+                <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);" class="rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
                   <div>
-                    <div class="inline-flex items-center gap-2 bg-amber-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">3 / 4</div>
-                    <h3 class="text-lg font-bold text-amber-900 mb-2">What We've Accomplished</h3>
-                    <p class="text-sm text-amber-800 leading-relaxed">We've worked on major projects across NSW, including hospital roundabouts, road pavement upgrades, and hotel construction projects. Our reputation is built on delivering safe, reliable traffic management every time.</p>
+                    <div style="background:#d97706;" class="inline-flex items-center gap-2 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">3 / 4</div>
+                    <h3 class="text-lg font-bold mb-2" style="color:#78350f;">What We've Accomplished</h3>
+                    <p class="text-sm leading-relaxed" style="color:#92400e;">We've worked on major projects across NSW, including hospital roundabouts, road pavement upgrades, and hotel construction projects. Our reputation is built on delivering safe, reliable traffic management every time.</p>
                   </div>
                   <div class="flex justify-between mt-4">
-                    <button type="button" onclick="carouselPrev()" class="text-amber-700 hover:text-amber-900 text-sm font-medium transition">&larr; Back</button>
-                    <button type="button" onclick="carouselNext()" class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg px-5 py-2 transition">Next &rarr;</button>
+                    <button type="button" onclick="carouselPrev()" style="color:#b45309;" class="text-sm font-medium transition hover:opacity-70">&larr; Back</button>
+                    <button type="button" onclick="carouselNext()" style="background:#d97706;color:#fff;" class="text-sm font-semibold rounded-lg px-5 py-2 transition hover:opacity-90">Next &rarr;</button>
                   </div>
                 </div>
               </div>
 
               <!-- Card 4 -->
               <div class="min-w-full p-1">
-                <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
+                <div style="background:linear-gradient(135deg,#faf5ff,#ede9fe);" class="rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
                   <div>
-                    <div class="inline-flex items-center gap-2 bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">4 / 4</div>
-                    <h3 class="text-lg font-bold text-purple-900 mb-2">Our Values</h3>
-                    <ul class="text-sm text-purple-800 leading-relaxed space-y-1.5 mt-1">
+                    <div style="background:#7c3aed;" class="inline-flex items-center gap-2 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">4 / 4</div>
+                    <h3 class="text-lg font-bold mb-2" style="color:#3b0764;">Our Values</h3>
+                    <ul class="text-sm leading-relaxed space-y-1.5 mt-1" style="color:#581c87;">
                       <li class="flex items-start gap-2"><span class="mt-0.5">&#9679;</span> Respect everyone on and off site</li>
                       <li class="flex items-start gap-2"><span class="mt-0.5">&#9679;</span> Report unsafe actions immediately</li>
                       <li class="flex items-start gap-2"><span class="mt-0.5">&#9679;</span> Zero tolerance for harassment of any kind</li>
@@ -397,7 +409,7 @@
                     </ul>
                   </div>
                   <div class="flex justify-start mt-4">
-                    <button type="button" onclick="carouselPrev()" class="text-purple-700 hover:text-purple-900 text-sm font-medium transition">&larr; Back</button>
+                    <button type="button" onclick="carouselPrev()" style="color:#6d28d9;" class="text-sm font-medium transition hover:opacity-70">&larr; Back</button>
                   </div>
                 </div>
               </div>
@@ -407,15 +419,21 @@
 
           <!-- Carousel dots -->
           <div class="flex justify-center gap-2" id="carouselDots">
-            <span class="carousel-dot active w-2.5 h-2.5 rounded-full bg-brand-500 transition"></span>
+            <span class="carousel-dot active w-2.5 h-2.5 rounded-full transition" style="background:#2B7FFF;"></span>
             <span class="carousel-dot w-2.5 h-2.5 rounded-full bg-gray-300 transition"></span>
             <span class="carousel-dot w-2.5 h-2.5 rounded-full bg-gray-300 transition"></span>
             <span class="carousel-dot w-2.5 h-2.5 rounded-full bg-gray-300 transition"></span>
           </div>
 
-          <!-- Mark as read -->
-          <label class="flex items-center gap-3 bg-gray-50 rounded-xl p-4 cursor-pointer border border-gray-200 hover:border-brand-300 transition">
-            <input type="checkbox" id="markAsRead" name="company_intro_completed" value="on" class="w-5 h-5 rounded text-brand-500 focus:ring-brand-500" />
+          <!-- Mark as read (disabled until all cards viewed) -->
+          <div id="carouselLock" class="rounded-xl p-4 border border-gray-200 bg-gray-100 opacity-60">
+            <div class="flex items-center gap-2 text-sm text-gray-400 font-medium">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+              Swipe through all 4 cards above to unlock
+            </div>
+          </div>
+          <label id="carouselUnlock" class="hidden flex items-center gap-3 bg-gray-50 rounded-xl p-4 cursor-pointer border border-gray-200 hover:border-blue-300 transition">
+            <input type="checkbox" id="markAsRead" name="company_intro_completed" value="on" class="w-5 h-5 rounded" style="accent-color:#2B7FFF;" />
             <span class="text-sm font-medium text-gray-700">I have read and understood the information about T&S Traffic Control</span>
           </label>
 
@@ -437,13 +455,13 @@
           <p class="text-sm text-gray-500">Please read each rule carefully. These are non-negotiable.</p>
 
           <div class="space-y-3">
-            <div class="flex items-start gap-3 bg-brand-50 rounded-xl p-4 border border-brand-100">
-              <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+            <div class="flex items-start gap-3 rounded-xl p-4" style="background:#EBF3FF;border:1px solid #D6E7FF;">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style="background:#2B7FFF;">
                 <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
               </div>
               <div>
-                <p class="text-sm font-semibold text-brand-900">Correct PPE at All Times</p>
-                <p class="text-xs text-brand-700 mt-0.5">Hi-vis vest, hard hat, and steel-cap boots must be worn every time you're on site.</p>
+                <p class="text-sm font-semibold" style="color:#052A99;">Correct PPE at All Times</p>
+                <p class="text-xs mt-0.5" style="color:#1554CC;">Hi-vis vest, hard hat, and steel-cap boots must be worn every time you're on site.</p>
               </div>
             </div>
 
@@ -477,13 +495,13 @@
               </div>
             </div>
 
-            <div class="flex items-start gap-3 bg-brand-50 rounded-xl p-4 border border-brand-100">
-              <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+            <div class="flex items-start gap-3 rounded-xl p-4" style="background:#EBF3FF;border:1px solid #D6E7FF;">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style="background:#2B7FFF;">
                 <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
               </div>
               <div>
-                <p class="text-sm font-semibold text-brand-900">Follow All Supervisor Instructions</p>
-                <p class="text-xs text-brand-700 mt-0.5">Your supervisor's word is final on site. Always comply with their directions.</p>
+                <p class="text-sm font-semibold" style="color:#052A99;">Follow All Supervisor Instructions</p>
+                <p class="text-xs mt-0.5" style="color:#1554CC;">Your supervisor's word is final on site. Always comply with their directions.</p>
               </div>
             </div>
 
@@ -701,16 +719,23 @@
     }
 
     /* ───── Carousel ───── */
+    var carouselViewed = [true, false, false, false]; // track which cards have been seen
+
     function carouselTo(index) {
       const track = document.getElementById('carouselTrack');
       const dots = document.querySelectorAll('#carouselDots .carousel-dot');
       carouselIndex = index;
+      carouselViewed[index] = true;
       track.style.transform = 'translateX(-' + (index * 100) + '%)';
       dots.forEach((d, i) => {
         d.classList.toggle('active', i === index);
-        d.classList.toggle('bg-brand-500', i === index);
-        d.classList.toggle('bg-gray-300', i !== index);
+        d.style.background = i === index ? '#2B7FFF' : '#d1d5db';
       });
+      // Unlock checkbox when all 4 cards viewed
+      if (carouselViewed.every(Boolean)) {
+        document.getElementById('carouselLock').classList.add('hidden');
+        document.getElementById('carouselUnlock').classList.remove('hidden');
+      }
     }
 
     function carouselNext() { if (carouselIndex < 3) carouselTo(carouselIndex + 1); }

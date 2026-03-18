@@ -2529,6 +2529,14 @@ function runMigrations(db) {
     console.log('Migration 43 complete.');
   }
 
+  // Migration 44: Add bank_name column to induction_submissions
+  if (!isMigrationApplied.get(44)) {
+    console.log('Running migration 44: Add bank_name to induction_submissions');
+    db.exec(`ALTER TABLE induction_submissions ADD COLUMN bank_name TEXT DEFAULT ''`);
+    recordMigration.run(44, 'Add bank_name to induction_submissions');
+    console.log('Migration 44 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

@@ -260,6 +260,10 @@
         </div>
       <% } %>
       <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bank Name</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.bank_name || '—' %></p>
+      </div>
+      <div>
         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">BSB</p>
         <div class="flex items-center gap-2 mt-0.5">
           <p class="text-sm text-gray-900 font-medium sensitive-field" data-full="<%= s.bank_bsb || '' %>" data-masked="<%= maskField(s.bank_bsb, 4) %>"><%= maskField(s.bank_bsb, 4) %></p>

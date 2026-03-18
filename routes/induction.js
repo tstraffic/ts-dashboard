@@ -77,7 +77,7 @@ router.post('/:type/submit', (req, res, next) => {
         address, suburb, state, postcode,
         can_drive, can_drive_truck, has_injuries, injury_details, is_indigenous,
         white_card_number, tc_licence_number, drivers_licence_number,
-        tax_file_number, bank_bsb, bank_account_number, bank_account_name,
+        tax_file_number, bank_name, bank_bsb, bank_account_number, bank_account_name,
         abn_number,
         company_intro_completed, ppe_acknowledged
       } = req.body;
@@ -95,7 +95,7 @@ router.post('/:type/submit', (req, res, next) => {
           can_drive, can_drive_truck, has_injuries, injury_details, is_indigenous,
           white_card_number, tc_licence_number, drivers_licence_number,
           white_card_photo, tc_licence_photo, drivers_licence_photo,
-          tax_file_number, bank_bsb, bank_account_number, bank_account_name,
+          tax_file_number, bank_name, bank_bsb, bank_account_number, bank_account_name,
           abn_number,
           company_intro_completed, ppe_acknowledged,
           submitted_at
@@ -106,7 +106,7 @@ router.post('/:type/submit', (req, res, next) => {
           ?, ?, ?, ?, ?,
           ?, ?, ?,
           ?, ?, ?,
-          ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
           ?,
           ?, ?,
           datetime('now')
@@ -121,7 +121,7 @@ router.post('/:type/submit', (req, res, next) => {
         can_drive || '', can_drive_truck || '', has_injuries || '', injury_details || '', is_indigenous || '',
         white_card_number || '', tc_licence_number || '', drivers_licence_number || '',
         whiteCardPhoto, tcLicencePhoto, driversLicencePhoto,
-        tax_file_number || '', bank_bsb || '', bank_account_number || '', bank_account_name || '',
+        tax_file_number || '', bank_name || '', bank_bsb || '', bank_account_number || '', bank_account_name || '',
         abn_number || '',
         company_intro_completed === 'on' || company_intro_completed === '1' ? 1 : 0,
         ppe_acknowledged === 'on' || ppe_acknowledged === '1' ? 1 : 0
