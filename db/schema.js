@@ -2515,6 +2515,20 @@ function runMigrations(db) {
     console.log('Migration 42 complete.');
   }
 
+  // =============================================
+  // Migration 43: Backfill created_by on existing tasks
+  // =============================================
+  if (!isMigrationApplied.get(43)) {
+    console.log('Running migration 43: Backfill created_by on existing tasks');
+    // Set created_by to the first admin user for any tasks missing it
+    const firstAdmin = db.prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1").get();
+    if (firstAdmin) {
+      db.prepare('UPDATE tasks SET created_by = ? WHERE created_by IS NULL').run(firstAdmin.id);
+    }
+    recordMigration.run(43, 'Backfill created_by on existing tasks');
+    console.log('Migration 43 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
