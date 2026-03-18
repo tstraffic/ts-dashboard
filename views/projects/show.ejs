@@ -41,6 +41,7 @@
     <a href="/projects/<%= job.id %>/edit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Edit</a>
     <a href="/documents/job/<%= job.id %>" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Documents</a>
     <form method="POST" action="/projects/<%= job.id %>/delete" class="inline" onsubmit="return confirm('Delete project <%= job.job_number %>? All associated tasks, updates, allocations, timesheets, and other data will also be removed. This cannot be undone.')">
+      <%- include('../partials/csrf') %>
       <button type="submit" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg border border-red-200 transition-colors">Delete</button>
     </form>
   </div>

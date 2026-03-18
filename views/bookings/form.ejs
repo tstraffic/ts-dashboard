@@ -43,6 +43,7 @@
 </div>
 
 <form method="POST" action="<%= isEdit ? '/bookings/' + booking.id : '/bookings' %>" class="space-y-5">
+  <%- include('../partials/csrf') %>
 
   <!-- Section 1: Basic Info -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">

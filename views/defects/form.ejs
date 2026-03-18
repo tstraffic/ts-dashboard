@@ -13,6 +13,7 @@
 
   <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
     <form method="POST" action="<%= formAction %>" enctype="multipart/form-data">
+      <%- include('../partials/csrf') %>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Job -->
@@ -145,6 +146,7 @@
     <div class="flex gap-3">
       <button onclick="document.getElementById('delete-modal').classList.add('hidden')" class="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition font-medium">Cancel</button>
       <form method="POST" action="/defects/<%= defect.id %>/delete" class="flex-1">
+        <%- include('../partials/csrf') %>
         <button type="submit" class="w-full px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-semibold">Delete</button>
       </form>
     </div>

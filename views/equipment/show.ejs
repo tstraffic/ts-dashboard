@@ -37,6 +37,7 @@
     <div class="flex items-center gap-2">
       <a href="/equipment/<%= item.id %>/edit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Edit</a>
       <form method="POST" action="/equipment/<%= item.id %>/delete" onsubmit="return confirm('Are you sure you want to delete <%= item.asset_number %>? This cannot be undone.')">
+        <%- include('../partials/csrf') %>
         <button type="submit" class="inline-flex items-center px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg border border-red-200 transition">
           <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           Delete
@@ -152,6 +153,7 @@
           <td class="px-4 py-3 text-gray-500 text-xs"><%= a.assigned_by_name %></td>
           <td class="px-4 py-3">
             <form method="POST" action="/equipment/<%= item.id %>/assignments/<%= a.id %>/return" class="inline">
+              <%- include('../partials/csrf') %>
               <button type="submit" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-md transition-colors"
                 onclick="return confirm('Mark this equipment as returned?')">Return</button>
             </form>
@@ -171,6 +173,7 @@
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
     <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Assign to Job</h3>
     <form method="POST" action="/equipment/<%= item.id %>/assign" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <%- include('../partials/csrf') %>
       <!-- Job -->
       <div>
         <label class="block text-xs font-medium text-gray-500 mb-1">Job <span class="text-red-600">*</span></label>
@@ -265,6 +268,7 @@
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
     <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Add Maintenance Record</h3>
     <form method="POST" action="/equipment/<%= item.id %>/maintenance" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <%- include('../partials/csrf') %>
       <!-- Type -->
       <div>
         <label class="block text-xs font-medium text-gray-500 mb-1">Type <span class="text-red-600">*</span></label>

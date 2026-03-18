@@ -105,6 +105,7 @@
       <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Timesheet Weekly Summary</h3>
       <p class="text-xs text-gray-500 mb-3">Hours per crew member for a selected week</p>
       <form method="GET" action="/exports/timesheet-summary.csv" class="space-y-2">
+        <%- include('../partials/csrf') %>
         <input type="date" name="week_of" value="<%= new Date().toISOString().split('T')[0] %>"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <button type="submit" class="w-full px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Export CSV</button>
@@ -116,6 +117,7 @@
       <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Allocations by Date Range</h3>
       <p class="text-xs text-gray-500 mb-3">Crew allocations for a specific period</p>
       <form method="GET" action="/exports/allocations.csv" class="space-y-2">
+        <%- include('../partials/csrf') %>
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-[10px] text-gray-400 mb-0.5">From</label>
@@ -137,6 +139,7 @@
       <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Job Report (PDF)</h3>
       <p class="text-xs text-gray-500 mb-3">Full job summary including budget, timesheets & compliance</p>
       <form method="GET" action="/exports/job-report.pdf" class="space-y-2">
+        <%- include('../partials/csrf') %>
         <select name="job_id" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">Choose a job...</option>
           <% jobs.forEach(j => { %>

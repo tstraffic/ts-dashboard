@@ -1,6 +1,7 @@
 <div id="bulk-bar" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 text-sm">
   <span id="bulk-count" class="font-semibold">0 selected</span>
   <form method="POST" action="<%= formAction %>" id="bulk-form" class="flex items-center gap-2">
+    <%- include('csrf') %>
     <input type="hidden" name="ids" id="bulk-ids" value="">
     <select name="action" class="bg-gray-800 text-white text-sm rounded-lg px-3 py-1.5 border border-gray-700">
       <% actions.forEach(a => { %>

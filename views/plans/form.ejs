@@ -23,6 +23,7 @@
 </div>
 
 <form method="POST" action="<%= formAction %>" class="space-y-5" data-wizard>
+  <%- include('../partials/csrf') %>
   <input type="hidden" name="return_to" value="/plans">
 
   <!-- Step 1: Plan Details -->

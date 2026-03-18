@@ -1,0 +1,42 @@
+const crypto = require('crypto');
+
+// Paths that skip CSRF validation (service workers, webhooks, etc.)
+const SKIP_PATHS = [
+  '/admin-sw.js',
+  '/worker-sw.js',
+];
+
+function csrfProtection(req, res, next) {
+  // Skip for non-session requests (static assets handled by express.static before this)
+  if (SKIP_PATHS.some(p => req.path === p)) return next();
+
+  // Generate token if not in session
+  if (!req.session._csrf) {
+    req.session._csrf = crypto.randomBytes(32).toString('hex');
+  }
+
+  // Always expose token to templates
+  res.locals.csrfToken = req.session._csrf;
+
+  // Only validate on state-changing methods
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    return next();
+  }
+
+  // Get token from body or header
+  const token = req.body._csrf || req.headers['x-csrf-token'];
+
+  if (!token || token !== req.session._csrf) {
+    // AJAX request — return JSON error
+    if (req.xhr || (req.headers.accept && req.headers.accept.includes('application/json'))) {
+      return res.status(403).json({ error: 'Invalid or missing CSRF token. Please refresh the page and try again.' });
+    }
+    // Form submission — flash and redirect back
+    if (req.flash) req.flash('error', 'Form expired or invalid. Please try again.');
+    return res.redirect('back');
+  }
+
+  next();
+}
+
+module.exports = { csrfProtection };

@@ -87,6 +87,7 @@
   <!-- Filter Bar -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
     <form method="GET" action="/induction/admin/submissions" id="filterForm" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+      <%- include('../../partials/csrf') %>
 
       <!-- Search -->
       <div class="flex-1 min-w-0 sm:min-w-[200px]">

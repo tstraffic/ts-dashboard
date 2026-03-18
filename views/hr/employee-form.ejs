@@ -54,6 +54,7 @@
 </div>
 
 <form method="POST" action="<%= isEdit ? '/hr/employees/' + employee.id : '/hr/employees' %>" class="space-y-5">
+  <%- include('../partials/csrf') %>
 
   <!-- Section 1: Personal Details -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">

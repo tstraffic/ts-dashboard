@@ -39,6 +39,7 @@
       <% } %>
     </div>
     <form method="POST" action="/admin/integrations/traffio" class="p-5 space-y-4">
+      <%- include('../partials/csrf') %>
       <div>
         <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">API URL</label>
         <input type="url" name="api_url" value="<%= configs.traffio.config.api_url || '' %>" placeholder="https://api.traffio.com.au"
@@ -70,6 +71,7 @@
     <div class="px-5 pb-5 border-t border-gray-200 pt-4">
       <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Sync Now</p>
       <form method="POST" action="/admin/integrations/traffio/sync" class="flex flex-wrap gap-2">
+        <%- include('../partials/csrf') %>
         <button type="submit" name="sync_type" value="all" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-50 text-amber-700 ring-1 ring-amber-600/20 text-xs font-medium rounded-lg transition-colors">Sync All</button>
         <button type="submit" name="sync_type" value="jobs" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors">Jobs Only</button>
         <button type="submit" name="sync_type" value="crew" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors">Crew Only</button>
@@ -94,6 +96,7 @@
       <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 ring-1 ring-purple-600/20">Coming Soon</span>
     </div>
     <form method="POST" action="/admin/integrations/quickbooks" class="p-5 space-y-4">
+      <%- include('../partials/csrf') %>
       <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <p class="text-sm text-gray-500">QuickBooks Online integration is being prepared. Once connected, the dashboard will be able to:</p>
         <ul class="mt-2 space-y-1 text-xs text-gray-400">
@@ -142,6 +145,7 @@
       <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 ring-1 ring-purple-600/20">Coming Soon</span>
     </div>
     <form method="POST" action="/admin/integrations/employment_hero" class="p-5 space-y-4">
+      <%- include('../partials/csrf') %>
       <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <p class="text-sm text-gray-500">Employment Hero integration is being prepared. Once connected, the dashboard will be able to:</p>
         <ul class="mt-2 space-y-1 text-xs text-gray-400">
@@ -194,6 +198,7 @@
       <% } %>
     </div>
     <form method="POST" action="/admin/integrations/teams" class="p-5 space-y-4">
+      <%- include('../partials/csrf') %>
       <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <p class="text-sm text-gray-500">Send critical dashboard notifications to a Teams channel. The following alert types are forwarded:</p>
         <ul class="mt-2 space-y-1 text-xs text-gray-400">
@@ -241,6 +246,7 @@
       <% } %>
     </div>
     <form method="POST" action="/admin/integrations/sharepoint" class="p-5 space-y-4">
+      <%- include('../partials/csrf') %>
       <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <p class="text-sm text-gray-500">Link SharePoint document folders to jobs. Each job can have a SharePoint URL set on its detail page. The base site URL below is used for display purposes.</p>
       </div>

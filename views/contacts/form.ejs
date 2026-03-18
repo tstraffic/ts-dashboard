@@ -9,6 +9,7 @@
 
 <!-- Form -->
 <form method="POST" action="<%= isEdit ? '/contacts/' + contact.id : '/contacts' %>" class="space-y-6">
+  <%- include('../partials/csrf') %>
 
   <!-- Contact Details -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">

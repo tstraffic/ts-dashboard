@@ -12,6 +12,7 @@
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-6">
   <h3 class="text-sm font-semibold text-gray-600 mb-3">Add New Item</h3>
   <form method="POST" action="/settings/category/<%= category %>/add" class="flex flex-wrap items-end gap-3">
+    <%- include('../partials/csrf') %>
     <div class="flex-1 min-w-[150px]">
       <label class="block text-xs text-gray-500 mb-1">Key (system ID)</label>
       <input type="text" name="key" required placeholder="e.g. new_status" pattern="[a-zA-Z0-9_]+" title="Letters, numbers, underscores only"
@@ -100,10 +101,12 @@
             <button onclick="openEditModal(<%= item.id %>, '<%= item.key %>', `<%= item.label.replace(/`/g, '\\`') %>`, '<%= item.color %>', <%= item.is_active %>)" class="text-brand-600 hover:text-brand-700 text-xs font-medium">Edit</button>
             <% if (item.is_active) { %>
               <form method="POST" action="/settings/category/<%= category %>/<%= item.id %>/delete" class="inline" onsubmit="return confirm('Deactivate &quot;<%= item.label %>&quot;? It will no longer appear in dropdowns.')">
+                <%- include('../partials/csrf') %>
                 <button type="submit" class="text-red-600 hover:text-red-600 text-xs font-medium">Deactivate</button>
               </form>
             <% } else { %>
               <form method="POST" action="/settings/category/<%= category %>/<%= item.id %>" class="inline">
+                <%- include('../partials/csrf') %>
                 <input type="hidden" name="label" value="<%= item.label %>">
                 <input type="hidden" name="color" value="<%= item.color %>">
                 <input type="hidden" name="is_active" value="1">
@@ -129,6 +132,7 @@
   <div class="bg-white border border-gray-300 rounded-xl p-6 w-full max-w-md mx-4">
     <h3 class="text-lg font-semibold text-gray-900 mb-4">Edit Setting</h3>
     <form id="editForm" method="POST">
+      <%- include('../partials/csrf') %>
       <div class="space-y-3">
         <div>
           <label class="block text-xs text-gray-500 mb-1">Key</label>

@@ -32,6 +32,7 @@
     <a href="/defects/new?job_id=<%= incident.job_id %>" class="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-sm font-medium rounded-lg transition-colors border border-amber-200">Create Defect</a>
     <a href="/incidents/<%= incident.id %>/edit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Edit</a>
     <form method="POST" action="/incidents/<%= incident.id %>/delete" onsubmit="return confirm('Are you sure you want to delete this incident? This cannot be undone.')">
+      <%- include('../partials/csrf') %>
       <button type="submit" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg transition-colors border border-red-300">Delete</button>
     </form>
   </div>
@@ -225,6 +226,7 @@
     </span>
   </div>
   <form method="POST" action="/incidents/<%= incident.id %>/escalate" class="flex items-center gap-2">
+    <%- include('../partials/csrf') %>
     <select name="escalation_level" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
       <option value="standard" <%= (incident.escalation_level || 'standard') === 'standard' ? 'selected' : '' %>>Standard</option>
       <option value="elevated" <%= incident.escalation_level === 'elevated' ? 'selected' : '' %>>Elevated</option>
@@ -287,6 +289,7 @@
           <td class="px-4 py-3">
             <% if (ca.status !== 'completed') { %>
               <form method="POST" action="/incidents/<%= incident.id %>/corrective-actions/<%= ca.id %>/complete" class="inline">
+                <%- include('../partials/csrf') %>
                 <input type="hidden" name="completion_notes" value="">
                 <button type="submit" class="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-xs font-medium rounded-md transition-colors border border-emerald-200" onclick="const notes = prompt('Completion notes (optional):'); if(notes !== null) this.form.completion_notes.value = notes; else return false;">
                   Complete
@@ -310,6 +313,7 @@
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
     <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Add Corrective Action</h3>
     <form method="POST" action="/incidents/<%= incident.id %>/corrective-actions">
+      <%- include('../partials/csrf') %>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Description -->
         <div class="md:col-span-2">

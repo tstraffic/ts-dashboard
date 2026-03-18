@@ -34,6 +34,7 @@
 
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
     <form method="POST" action="<%= formAction %>" id="complianceForm" onsubmit="return validateAssignment()">
+      <%- include('../partials/csrf') %>
       <input type="hidden" name="return_to" value="<%= cancelHref %>">
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -327,6 +328,7 @@
       <div class="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
         <% if (isEdit) { %>
           <form method="POST" action="/compliance/<%= item.id %>/delete" onsubmit="return confirm('Delete this item?')" style="display:inline;">
+            <%- include('../partials/csrf') %>
             <input type="hidden" name="return_to" value="<%= cancelHref %>">
             <button type="submit" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition text-sm font-medium">Delete</button>
           </form>

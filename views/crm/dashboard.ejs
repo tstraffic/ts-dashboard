@@ -67,6 +67,7 @@
 <% const f = typeof filters !== 'undefined' ? filters : { view: 'my', period: 'month' }; %>
 <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-5">
   <form method="GET" action="/crm" class="flex flex-wrap items-center gap-3">
+    <%- include('../partials/csrf') %>
     <!-- My / Team Toggle -->
     <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden">
       <a href="/crm?view=my&period=<%= f.period %>" class="px-3 py-1.5 text-xs font-semibold transition-colors <%= f.view === 'my' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' %>">My View</a>

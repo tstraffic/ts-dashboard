@@ -1,5 +1,14 @@
 // T&S Dashboard - Client-side JavaScript
 
+// ===== CSRF Token Helper =====
+var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+function csrfHeaders(extra) {
+  var h = { 'x-csrf-token': csrfToken };
+  if (extra) { for (var k in extra) h[k] = extra[k]; }
+  return h;
+}
+
 // ===== Chart.js dark theme defaults =====
 if (typeof Chart !== 'undefined') {
   Chart.defaults.color = 'rgba(255,255,255,0.55)';
@@ -285,7 +294,7 @@ document.addEventListener('DOMContentLoaded', initCountUp);
       listEl.querySelectorAll('[data-delete-view]').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
           e.preventDefault();
-          fetch('/api/views/' + btn.dataset.deleteView, { method: 'DELETE' }).then(function() { loadViews(); });
+          fetch('/api/views/' + btn.dataset.deleteView, { method: 'DELETE', headers: csrfHeaders() }).then(function() { loadViews(); });
         });
       });
     });
@@ -297,7 +306,7 @@ document.addEventListener('DOMContentLoaded', initCountUp);
     var params = window.location.search.substring(1);
     fetch('/api/views', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: csrfHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ module: module, name: name, query_params: params })
     }).then(function(r) { return r.json(); }).then(function() { loadViews(); });
   });
@@ -474,7 +483,7 @@ document.addEventListener('DOMContentLoaded', initCountUp);
   function sendSubscriptionToServer(subscription) {
     fetch('/notifications/push/subscribe', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: csrfHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(subscription)
     })
     .then(function(res) {
@@ -502,7 +511,7 @@ document.addEventListener('DOMContentLoaded', initCountUp);
 
   // Expose for test button on profile page
   window.sendTestPush = function() {
-    fetch('/notifications/push/test', { method: 'POST' })
+    fetch('/notifications/push/test', { method: 'POST', headers: csrfHeaders() })
       .then(function(res) { return res.json(); })
       .then(function(data) {
         if (data.success) {

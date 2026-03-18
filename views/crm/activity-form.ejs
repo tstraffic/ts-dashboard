@@ -18,6 +18,7 @@
 
 <!-- Form -->
 <form method="POST" action="<%= isEdit ? '/crm/activities/' + activity.id : '/crm/activities' %>" class="space-y-5">
+  <%- include('../partials/csrf') %>
 
   <!-- 1. Activity Details -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">

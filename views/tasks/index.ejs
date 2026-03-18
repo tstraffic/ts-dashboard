@@ -189,6 +189,7 @@
 
   <!-- Compact Filter Bar -->
   <form method="GET" action="/tasks" data-module="tasks" class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-6">
+    <%- include('../partials/csrf') %>
     <% if (filters.tab) { %><input type="hidden" name="tab" value="<%= filters.tab %>"><% } %>
     <% if (filters.view) { %><input type="hidden" name="view" value="<%= filters.view %>"><% } %>
     <% if (filters.owner === 'me') { %><input type="hidden" name="owner" value="me"><% } %>
@@ -302,6 +303,7 @@
                       <span class="text-xs <%= isOverdue ? 'text-red-600 font-semibold' : 'text-gray-500' %>"><%= dueDisplay %></span>
                       <!-- Inline Status Select -->
                       <form method="POST" action="/tasks/<%= task.id %>/status" class="inline">
+                        <%- include('../partials/csrf') %>
                         <select name="status" onchange="this.form.submit()"
                           class="text-[11px] font-medium rounded-full pl-2 pr-6 py-0.5 border-0 cursor-pointer <%= statusColors[task.status] || 'bg-gray-100 text-gray-700' %> focus:ring-2 focus:ring-brand-500 focus:ring-offset-1">
                           <option value="not_started" <%= task.status === 'not_started' ? 'selected' : '' %>>Not Started</option>
@@ -376,6 +378,7 @@
                       <span class="text-xs <%= isOverdue ? 'text-red-600 font-semibold' : 'text-gray-500' %>"><%= dueDisplay %></span>
                       <!-- Inline Status Select -->
                       <form method="POST" action="/tasks/<%= task.id %>/status" class="inline">
+                        <%- include('../partials/csrf') %>
                         <select name="status" onchange="this.form.submit()"
                           class="text-[11px] font-medium rounded-full pl-2 pr-6 py-0.5 border-0 cursor-pointer <%= statusColors[task.status] || 'bg-gray-100 text-gray-700' %> focus:ring-2 focus:ring-brand-500 focus:ring-offset-1">
                           <option value="not_started" <%= task.status === 'not_started' ? 'selected' : '' %>>Not Started</option>

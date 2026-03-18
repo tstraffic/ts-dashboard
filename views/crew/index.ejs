@@ -70,6 +70,7 @@
   <!-- Filters -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
     <form method="GET" action="/crew" data-module="crew" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+      <%- include('../partials/csrf') %>
       <!-- Status Tabs -->
       <div class="flex rounded-lg overflow-hidden border border-gray-300 self-start">
         <a href="/crew?filter=all&search=<%= search %>&role=<%= roleFilter %>" class="px-3 py-2 text-xs font-medium <%= filter === 'all' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">All</a>

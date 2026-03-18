@@ -38,6 +38,7 @@
   <!-- Filters -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
     <form method="GET" action="/clients" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 sm:gap-3">
+      <%- include('../partials/csrf') %>
       <% if (filters.type) { %><input type="hidden" name="type" value="<%= filters.type %>"><% } %>
       <div class="flex-1 min-w-0 sm:min-w-[200px]">
         <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Search</label>
