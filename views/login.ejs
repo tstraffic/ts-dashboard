@@ -31,121 +31,258 @@
   <style>
     * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
-    @keyframes fade-up {
-      from { opacity: 0; transform: translateY(24px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes float {
-      0%, 100% { transform: translateY(0) rotate(0deg); }
-      50% { transform: translateY(-12px) rotate(1deg); }
-    }
-    @keyframes glow-pulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 0.7; }
-    }
-    .animate-fade-up {
-      animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .animate-fade-up-delay {
-      animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
-      opacity: 0;
-    }
-    .animate-fade-up-delay-2 {
-      animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
-      opacity: 0;
-    }
-
-    /* Background */
+    /* ── Background ── */
     .login-bg {
-      background: linear-gradient(145deg, #051B3F 0%, #0A2D66 30%, #1555C0 70%, #2B7FFF 100%);
+      background: linear-gradient(135deg, #020817 0%, #0A1628 20%, #0F2847 45%, #132E52 60%, #0A1628 85%, #020817 100%);
       position: relative;
       overflow: hidden;
     }
 
-    /* Floating orbs */
-    .orb {
+    /* Pulsing radial light source */
+    .login-bg::before {
+      content: '';
       position: absolute;
-      border-radius: 50%;
-      filter: blur(60px);
-      animation: glow-pulse 6s ease-in-out infinite;
-    }
-    .orb-1 {
-      top: -15%;
-      right: -10%;
-      width: 500px;
-      height: 500px;
-      background: radial-gradient(circle, rgba(43,127,255,0.25) 0%, transparent 70%);
-      animation-delay: 0s;
-    }
-    .orb-2 {
-      bottom: -20%;
-      left: -15%;
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, rgba(96,165,250,0.15) 0%, transparent 70%);
-      animation-delay: 3s;
-    }
-    .orb-3 {
-      top: 40%;
-      left: 50%;
-      width: 300px;
-      height: 300px;
-      background: radial-gradient(circle, rgba(147,197,253,0.1) 0%, transparent 70%);
-      animation-delay: 1.5s;
+      top: 25%;
+      left: 55%;
+      width: 900px;
+      height: 900px;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(43,127,255,0.12) 0%, rgba(29,106,229,0.06) 35%, transparent 70%);
+      animation: radial-pulse 8s ease-in-out infinite;
+      will-change: opacity, transform;
     }
 
-    /* Grid pattern overlay */
-    .grid-pattern {
+    @keyframes radial-pulse {
+      0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+      50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+    }
+
+    /* ── Road-marking lines ── */
+    .road-lines {
       position: absolute;
       inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-      background-size: 48px 48px;
-      mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, black 20%, transparent 100%);
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .road-line {
+      position: absolute;
+      width: 1px;
+      background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.04) 30%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.04) 70%, transparent 100%);
+      transform-origin: top;
+      will-change: transform;
+    }
+    .road-line:nth-child(1)  { left: 8%;  height: 120%; top: -10%; transform: rotate(25deg); animation: line-drift 18s ease-in-out infinite; }
+    .road-line:nth-child(2)  { left: 18%; height: 130%; top: -15%; transform: rotate(22deg); animation: line-drift 22s ease-in-out infinite 2s; }
+    .road-line:nth-child(3)  { left: 30%; height: 110%; top: -5%;  transform: rotate(28deg); animation: line-drift 20s ease-in-out infinite 4s; }
+    .road-line:nth-child(4)  { left: 42%; height: 125%; top: -12%; transform: rotate(24deg); animation: line-drift 24s ease-in-out infinite 1s; }
+    .road-line:nth-child(5)  { left: 55%; height: 115%; top: -8%;  transform: rotate(26deg); animation: line-drift 19s ease-in-out infinite 3s; }
+    .road-line:nth-child(6)  { left: 65%; height: 135%; top: -18%; transform: rotate(21deg); animation: line-drift 23s ease-in-out infinite 5s; }
+    .road-line:nth-child(7)  { left: 76%; height: 120%; top: -10%; transform: rotate(27deg); animation: line-drift 21s ease-in-out infinite 2.5s; }
+    .road-line:nth-child(8)  { left: 85%; height: 110%; top: -5%;  transform: rotate(23deg); animation: line-drift 25s ease-in-out infinite 1.5s; }
+    .road-line:nth-child(9)  { left: 93%; height: 125%; top: -12%; transform: rotate(20deg); animation: line-drift 17s ease-in-out infinite 4.5s; }
+    .road-line:nth-child(10) { left: 50%; height: 140%; top: -20%; transform: rotate(30deg); animation: line-drift 26s ease-in-out infinite 0.5s; }
+
+    @keyframes line-drift {
+      0%, 100% { transform: rotate(var(--r, 25deg)) translateX(0); opacity: 0.5; }
+      50% { transform: rotate(var(--r, 25deg)) translateX(12px); opacity: 1; }
     }
 
-    /* Glass card */
+    /* ── Card entrance ── */
+    @keyframes card-entrance {
+      from { opacity: 0; transform: translateY(32px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .animate-card {
+      animation: card-entrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      will-change: opacity, transform;
+    }
+    .animate-card-delay {
+      animation: card-entrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.12s forwards;
+      opacity: 0;
+    }
+    .animate-card-delay-2 {
+      animation: card-entrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.24s forwards;
+      opacity: 0;
+    }
+
+    /* ── Glass card (dark) ── */
     .glass-card {
-      background: rgba(255, 255, 255, 0.96);
+      background: rgba(255, 255, 255, 0.06);
       backdrop-filter: blur(24px) saturate(180%);
       -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       box-shadow:
-        0 25px 60px -12px rgba(0, 0, 0, 0.25),
-        0 0 0 1px rgba(255, 255, 255, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        0 25px 60px -12px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
 
-    input:focus {
+    /* ── Inputs ── */
+    .login-input {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      color: #ffffff;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+    .login-input::placeholder {
+      color: rgba(255, 255, 255, 0.35);
+    }
+    .login-input:focus {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(43, 127, 255, 0.5);
       box-shadow: 0 0 0 3px rgba(43, 127, 255, 0.15);
+      outline: none;
     }
-    button[type="submit"]:active {
-      transform: scale(0.98);
+
+    /* Input wrapper with border sweep */
+    .input-wrap {
+      position: relative;
+      overflow: hidden;
+      border-radius: 10px;
     }
+    .input-wrap::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #2B7FFF, transparent);
+      transition: all 0.4s ease;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+    .input-wrap:focus-within::after {
+      width: 100%;
+    }
+
+    /* Floating label */
+    .float-label {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 14px;
+      font-weight: 500;
+      pointer-events: none;
+      transition: all 0.25s ease;
+      will-change: transform;
+    }
+    .login-input:focus ~ .float-label,
+    .login-input:not(:placeholder-shown) ~ .float-label {
+      top: 6px;
+      transform: translateY(0);
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(43, 127, 255, 0.8);
+      letter-spacing: 0.05em;
+    }
+    .login-input:focus ~ .float-label {
+      color: #2B7FFF;
+    }
+
+    /* ── Submit button ── */
+    .login-btn {
+      border-radius: 10px;
+      background: linear-gradient(135deg, #1D6AE5 0%, #2B7FFF 100%);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      will-change: transform;
+    }
+    .login-btn:hover {
+      box-shadow: 0 8px 30px -4px rgba(43, 127, 255, 0.4);
+      transform: translateY(-1px);
+    }
+    .login-btn:active {
+      transform: scale(0.97);
+      box-shadow: 0 4px 12px rgba(43, 127, 255, 0.3);
+    }
+
+    /* Shimmer effect */
+    .login-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+      transition: left 0.5s ease;
+    }
+    .login-btn:hover::before {
+      left: 100%;
+    }
+
+    /* ── Logo ── */
+    .login-logo {
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+      will-change: transform;
+    }
+    @keyframes logo-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    .login-logo {
+      animation: logo-float 6s ease-in-out infinite;
+    }
+
+    /* ── Particles canvas ── */
+    #particles-canvas {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Reduced motion ── */
+    @media (prefers-reduced-motion: reduce) {
+      .road-line, .login-logo, .login-bg::before { animation: none !important; }
+      .animate-card, .animate-card-delay, .animate-card-delay-2 { animation: none !important; opacity: 1 !important; }
+      .login-btn::before { transition: none !important; }
+      #particles-canvas { display: none; }
+      .input-wrap::after { transition: none !important; }
+    }
+
     #__tailwind_indicator,div[style*="z-index: 2147483647"]{display:none!important}
   </style>
 </head>
 <body class="h-full login-bg flex items-center justify-center p-4 font-sans antialiased">
-  <!-- Background elements -->
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
-  <div class="grid-pattern"></div>
+
+  <!-- Road-marking lines -->
+  <div class="road-lines">
+    <div class="road-line"></div>
+    <div class="road-line"></div>
+    <div class="road-line"></div>
+    <div class="road-line"></div>
+    <div class="road-line"></div>
+    <div class="road-line"></div>
+    <div class="road-line"></div>
+    <div class="road-line"></div>
+    <div class="road-line"></div>
+    <div class="road-line"></div>
+  </div>
+
+  <!-- Particle system canvas -->
+  <canvas id="particles-canvas"></canvas>
 
   <div class="w-full max-w-[380px] relative z-10">
     <!-- Logo + branding -->
-    <div class="text-center mb-8 animate-fade-up">
-      <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white shadow-2xl mb-5 overflow-hidden ring-1 ring-white/20" style="animation: float 6s ease-in-out infinite">
-        <img src="/images/logo-colour.jpg" alt="T&S Traffic Control" class="h-16 w-auto">
+    <div class="text-center mb-8 animate-card">
+      <div class="inline-block mb-5">
+        <img src="/images/logo-colour.jpg" alt="T&S Traffic Control" class="login-logo h-20 w-auto rounded-xl">
       </div>
       <h1 class="text-2xl font-extrabold text-white tracking-tight">T&S Traffic Control</h1>
-      <p class="text-brand-300/80 mt-1.5 text-sm font-medium">Operations Dashboard</p>
+      <p class="text-white/40 mt-1.5 text-sm font-medium">Operations Dashboard</p>
     </div>
 
     <% if (typeof flash_error !== 'undefined' && flash_error && flash_error.length > 0) { %>
       <% flash_error.forEach(msg => { %>
-        <div class="mb-4 p-3.5 bg-red-500/90 backdrop-blur-sm border border-red-400/30 rounded-xl text-white text-sm font-medium flex items-center gap-2.5 animate-fade-up shadow-lg shadow-red-500/20">
-          <div class="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+        <div class="mb-4 p-3.5 bg-red-500/20 backdrop-blur-sm border border-red-400/20 rounded-xl text-red-300 text-sm font-medium flex items-center gap-2.5 animate-card shadow-lg">
+          <div class="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
           </div>
           <%= msg %>
@@ -154,30 +291,116 @@
     <% } %>
 
     <!-- Login form card -->
-    <form method="POST" action="/login" class="glass-card rounded-2xl p-7 sm:p-8 space-y-5 animate-fade-up-delay">
+    <form method="POST" action="/login" class="glass-card rounded-2xl p-7 sm:p-8 space-y-5 animate-card-delay">
       <div class="text-center mb-1">
-        <h2 class="text-lg font-bold text-gray-900">Welcome back</h2>
-        <p class="text-sm text-gray-400 mt-0.5">Sign in to your account</p>
+        <h2 class="text-lg font-bold text-white">Welcome back</h2>
+        <p class="text-sm text-white/35 mt-0.5">Sign in to your account</p>
       </div>
+
       <div>
-        <label for="username" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Username</label>
-        <input type="text" id="username" name="username" required autofocus placeholder="Enter your username"
-          class="w-full px-4 py-3 bg-gray-50/80 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 focus:bg-white transition-all text-[15px]">
+        <label for="username" class="block text-xs font-semibold text-white/50 mb-1.5" style="letter-spacing:0.04em">Username</label>
+        <div class="input-wrap">
+          <input type="text" id="username" name="username" required autofocus placeholder=" "
+            class="login-input w-full px-4 pt-5 pb-2.5 text-[15px]">
+          <span class="float-label">Enter your username</span>
+        </div>
       </div>
+
       <div>
-        <label for="password" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Password</label>
-        <input type="password" id="password" name="password" required placeholder="Enter your password"
-          class="w-full px-4 py-3 bg-gray-50/80 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 focus:bg-white transition-all text-[15px]">
+        <label for="password" class="block text-xs font-semibold text-white/50 mb-1.5" style="letter-spacing:0.04em">Password</label>
+        <div class="input-wrap">
+          <input type="password" id="password" name="password" required placeholder=" "
+            class="login-input w-full px-4 pt-5 pb-2.5 text-[15px]">
+          <span class="float-label">Enter your password</span>
+        </div>
       </div>
-      <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold rounded-xl transition-all shadow-lg shadow-brand-600/25 text-[15px] hover:shadow-xl hover:shadow-brand-600/30 active:shadow-md">
-        Sign In
+
+      <button type="submit" class="login-btn w-full py-3.5 text-white font-bold text-[15px] shadow-lg">
+        Sign in
       </button>
+
       <div class="text-center">
-        <a href="/forgot-password" class="text-sm text-gray-400 hover:text-brand-600 transition font-medium">Forgot password?</a>
+        <a href="/forgot-password" class="text-sm text-white/30 hover:text-white/60 transition font-medium">Forgot password?</a>
       </div>
     </form>
 
-    <p class="text-center text-brand-300/40 text-xs mt-8 animate-fade-up-delay-2 font-medium">&copy; <%= new Date().getFullYear() %> T&S Traffic Control Pty Ltd</p>
+    <p class="text-center text-white/25 text-xs mt-8 animate-card-delay-2 font-medium">&copy; <%= new Date().getFullYear() %> T&S Traffic Control Pty Ltd</p>
   </div>
+
+  <!-- Particle system -->
+  <script>
+    (function() {
+      const canvas = document.getElementById('particles-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let w, h, particles = [];
+      const PARTICLE_COUNT = 14;
+      const CONNECT_DIST = 180;
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reducedMotion) return;
+
+      function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      // Create particles
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        particles.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: (Math.random() - 0.5) * 0.4,
+          r: Math.random() * 2 + 1,
+          opacity: Math.random() * 0.3 + 0.15,
+        });
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, w, h);
+
+        // Update + draw particles
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+
+          // Wrap around edges
+          if (p.x < 0) p.x = w;
+          if (p.x > w) p.x = 0;
+          if (p.y < 0) p.y = h;
+          if (p.y > h) p.y = 0;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(147, 197, 253, ' + p.opacity + ')';
+          ctx.fill();
+        }
+
+        // Draw connections
+        for (let i = 0; i < particles.length; i++) {
+          for (let j = i + 1; j < particles.length; j++) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < CONNECT_DIST) {
+              const alpha = (1 - dist / CONNECT_DIST) * 0.12;
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.strokeStyle = 'rgba(147, 197, 253, ' + alpha + ')';
+              ctx.lineWidth = 0.5;
+              ctx.stroke();
+            }
+          }
+        }
+
+        requestAnimationFrame(animate);
+      }
+      animate();
+    })();
+  </script>
 </body>
 </html>
