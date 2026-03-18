@@ -59,10 +59,11 @@ router.get('/', (req, res) => {
 
   // Fetch tasks
   const tasks = db.prepare(`
-    SELECT t.*, j.job_number, j.client, u.full_name as owner_name
+    SELECT t.*, j.job_number, j.client, u.full_name as owner_name, cb.full_name as created_by_name
     FROM tasks t
     LEFT JOIN jobs j ON t.job_id = j.id
     LEFT JOIN users u ON t.owner_id = u.id
+    LEFT JOIN users cb ON t.created_by = cb.id
     WHERE ${baseWhere}
     ORDER BY
       CASE WHEN t.status != 'complete' AND t.due_date < '${today}' THEN 0 ELSE 1 END,
@@ -195,7 +196,11 @@ router.post('/bulk', (req, res) => {
 // GET /:id/edit — Edit form
 router.get('/:id/edit', (req, res) => {
   const db = getDb();
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  const task = db.prepare(`
+    SELECT t.*, cb.full_name as created_by_name
+    FROM tasks t LEFT JOIN users cb ON t.created_by = cb.id
+    WHERE t.id = ?
+  `).get(req.params.id);
   if (!task) { req.flash('error', 'Task not found.'); return res.redirect('/tasks'); }
 
   // Check ownership — non-owners can view but form will be read-only

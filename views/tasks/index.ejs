@@ -292,9 +292,12 @@
                   <div class="flex items-center justify-between pt-3 border-t border-gray-100">
                     <div class="flex items-center gap-2">
                       <% if (task.owner_name) { %>
-                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white <%= initialsColor(task.owner_name) %>" title="<%= task.owner_name %>"><%= getInitials(task.owner_name) %></div>
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white <%= initialsColor(task.owner_name) %>" title="Assigned to: <%= task.owner_name %>"><%= getInitials(task.owner_name) %></div>
                       <% } else { %>
                         <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-400 bg-gray-100">?</div>
+                      <% } %>
+                      <% if (task.created_by_name) { %>
+                        <span class="text-[10px] text-gray-400" title="Assigned by <%= task.created_by_name %>">by <%= task.created_by_name.split(' ')[0] %></span>
                       <% } %>
                       <span class="text-xs <%= isOverdue ? 'text-red-600 font-semibold' : 'text-gray-500' %>"><%= dueDisplay %></span>
                       <!-- Inline Status Select -->
@@ -363,9 +366,12 @@
                   <div class="flex items-center justify-between pt-3 border-t border-gray-100">
                     <div class="flex items-center gap-2">
                       <% if (task.owner_name) { %>
-                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white <%= initialsColor(task.owner_name) %>" title="<%= task.owner_name %>"><%= getInitials(task.owner_name) %></div>
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white <%= initialsColor(task.owner_name) %>" title="Assigned to: <%= task.owner_name %>"><%= getInitials(task.owner_name) %></div>
                       <% } else { %>
                         <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-400 bg-gray-100">?</div>
+                      <% } %>
+                      <% if (task.created_by_name) { %>
+                        <span class="text-[10px] text-gray-400" title="Assigned by <%= task.created_by_name %>">by <%= task.created_by_name.split(' ')[0] %></span>
                       <% } %>
                       <span class="text-xs <%= isOverdue ? 'text-red-600 font-semibold' : 'text-gray-500' %>"><%= dueDisplay %></span>
                       <!-- Inline Status Select -->

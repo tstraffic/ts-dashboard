@@ -83,6 +83,9 @@
               <option value="<%= u.id %>" <%= isEdit && task.owner_id == u.id ? 'selected' : '' %>><%= u.full_name || u.username %></option>
             <% }) %>
           </select>
+          <% if (isEdit && task.created_by_name) { %>
+            <p class="text-xs text-gray-400 mt-1">Assigned by <span class="font-medium text-gray-500"><%= task.created_by_name %></span></p>
+          <% } %>
         </div>
 
         <!-- Due Date -->
