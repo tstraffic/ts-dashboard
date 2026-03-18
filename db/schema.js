@@ -2681,6 +2681,21 @@ function runMigrations(db) {
     console.log('Migration 46 complete.');
   }
 
+  // Migration 47: Pay rate fields on employees
+  if (!isMigrationApplied.get(47)) {
+    console.log('Running migration 47: Employee pay rates');
+    const rateColumns = [
+      'rate_day', 'rate_ot', 'rate_dt',
+      'rate_night', 'rate_night_ot', 'rate_night_dt',
+      'rate_travel', 'rate_meal', 'rate_weekend'
+    ];
+    rateColumns.forEach(col => {
+      try { db.exec(`ALTER TABLE employees ADD COLUMN ${col} REAL DEFAULT 0`); } catch(e) {}
+    });
+    recordMigration.run(47, 'Employee pay rates');
+    console.log('Migration 47 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

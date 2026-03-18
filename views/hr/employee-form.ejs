@@ -361,6 +361,61 @@
     </div>
   </div>
 
+  <% if (typeof showRates !== 'undefined' && showRates) { %>
+  <!-- Pay Rates (Admin / Finance only) -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+    <h3 class="text-sm font-bold text-gray-900 mb-1">Pay Rates</h3>
+    <p class="text-xs text-gray-400 mb-4">Only visible to Admin and Finance roles. Rates are per hour ($).</p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Day Rate</label>
+        <input type="number" step="0.01" min="0" name="rate_day" value="<%= val('rate_day') || 0 %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">OT Rate</label>
+        <input type="number" step="0.01" min="0" name="rate_ot" value="<%= val('rate_ot') || 0 %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">DT Rate</label>
+        <input type="number" step="0.01" min="0" name="rate_dt" value="<%= val('rate_dt') || 0 %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Night Rate</label>
+        <input type="number" step="0.01" min="0" name="rate_night" value="<%= val('rate_night') || 0 %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Night OT</label>
+        <input type="number" step="0.01" min="0" name="rate_night_ot" value="<%= val('rate_night_ot') || 0 %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Night DT</label>
+        <input type="number" step="0.01" min="0" name="rate_night_dt" value="<%= val('rate_night_dt') || 0 %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Travel</label>
+        <input type="number" step="0.01" min="0" name="rate_travel" value="<%= val('rate_travel') || 0 %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Meal</label>
+        <input type="number" step="0.01" min="0" name="rate_meal" value="<%= val('rate_meal') || 0 %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Weekend</label>
+        <input type="number" step="0.01" min="0" name="rate_weekend" value="<%= val('rate_weekend') || 0 %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+    </div>
+  </div>
+  <% } %>
+
   <!-- Submit -->
   <div class="flex items-center gap-3">
     <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">

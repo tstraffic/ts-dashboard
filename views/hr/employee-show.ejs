@@ -200,6 +200,22 @@
           </div>
         </div>
 
+        <!-- Pay Rates (Admin / Finance only) -->
+        <% if (typeof showRates !== 'undefined' && showRates) { %>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+          <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Pay Rates</h2>
+          <div class="grid grid-cols-3 sm:grid-cols-5 gap-3">
+            <% const rateLabels = {rate_day:'Day',rate_ot:'OT',rate_dt:'DT',rate_night:'Night',rate_night_ot:'Night OT',rate_night_dt:'Night DT',rate_travel:'Travel',rate_meal:'Meal',rate_weekend:'Weekend'}; %>
+            <% Object.entries(rateLabels).forEach(([key, label]) => { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><%= label %></p>
+              <p class="text-lg font-bold text-gray-900 mt-0.5">$<%= (employee[key] || 0).toFixed(2) %></p>
+            </div>
+            <% }); %>
+          </div>
+        </div>
+        <% } %>
+
         <!-- Internal Notes -->
         <% if (employee.internal_notes) { %>
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">

@@ -6,6 +6,12 @@ const fs = require('fs');
 const { getDb } = require('../db/database');
 const { requirePermission, canViewSensitiveHR } = require('../middleware/auth');
 
+// Only admin and finance can see pay rates
+function canViewRates(user) {
+  const role = (user.role || '').toLowerCase();
+  return role === 'admin' || role === 'finance';
+}
+
 // --- Multer config for HR document uploads ---
 const UPLOAD_BASE = path.join(__dirname, '..', 'uploads', 'hr');
 
@@ -209,6 +215,7 @@ router.get('/employees', requirePermission('hr_employees'), (req, res) => {
     filters: { company, division, employment_type, status, manager_id, search, allocatable, sort, order, payment_type },
     filterOptions: { companies, divisions, managers },
     settingsOptions,
+    showRates: canViewRates(req.session.user),
     user: req.session.user
   });
 });
@@ -232,6 +239,7 @@ router.get('/employees/new', requirePermission('hr_employees'), (req, res) => {
     users,
     settingsOptions,
     canViewSensitive: canViewSensitiveHR(req.session.user),
+    showRates: canViewRates(req.session.user),
     user: req.session.user
   });
 });
@@ -245,6 +253,13 @@ router.post('/employees', requirePermission('hr_employees'), (req, res) => {
 
   const fullName = [(b.first_name || '').trim(), (b.middle_name || '').trim(), (b.last_name || '').trim()].filter(Boolean).join(' ');
 
+  // Only save rates if user has permission
+  const rateFields = canViewRates(req.session.user) ? {
+    rate_day: parseFloat(b.rate_day) || 0, rate_ot: parseFloat(b.rate_ot) || 0, rate_dt: parseFloat(b.rate_dt) || 0,
+    rate_night: parseFloat(b.rate_night) || 0, rate_night_ot: parseFloat(b.rate_night_ot) || 0, rate_night_dt: parseFloat(b.rate_night_dt) || 0,
+    rate_travel: parseFloat(b.rate_travel) || 0, rate_meal: parseFloat(b.rate_meal) || 0, rate_weekend: parseFloat(b.rate_weekend) || 0,
+  } : {};
+
   const result = db.prepare(`
     INSERT INTO employees (employee_code, first_name, middle_name, last_name, full_name, preferred_name, company, division, role_title,
       employment_type, employment_status, payment_type, start_date, end_date, probation_end_date, manager_id,
@@ -255,8 +270,9 @@ router.post('/employees', requirePermission('hr_employees'), (req, res) => {
       primary_work_region, base_location,
       emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
       date_of_birth, payroll_reference, internal_notes, active,
-      linked_crew_member_id, linked_user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+      linked_crew_member_id, linked_user_id,
+      rate_day, rate_ot, rate_dt, rate_night, rate_night_ot, rate_night_dt, rate_travel, rate_meal, rate_weekend)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     b.employee_code || null, b.first_name, b.middle_name || '', b.last_name, fullName, b.preferred_name || '',
     b.company || '', b.division || '', b.role_title || '',
@@ -272,7 +288,10 @@ router.post('/employees', requirePermission('hr_employees'), (req, res) => {
     b.primary_work_region || '', b.base_location || '',
     b.emergency_contact_name || '', b.emergency_contact_phone || '', b.emergency_contact_relationship || '',
     b.date_of_birth || null, b.payroll_reference || '', b.internal_notes || '',
-    b.linked_crew_member_id || null, b.linked_user_id || null
+    b.linked_crew_member_id || null, b.linked_user_id || null,
+    rateFields.rate_day || 0, rateFields.rate_ot || 0, rateFields.rate_dt || 0,
+    rateFields.rate_night || 0, rateFields.rate_night_ot || 0, rateFields.rate_night_dt || 0,
+    rateFields.rate_travel || 0, rateFields.rate_meal || 0, rateFields.rate_weekend || 0
   );
 
   req.flash('success', 'Employee created successfully.');
@@ -329,6 +348,7 @@ router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
     recentTimesheets,
     settingsOptions,
     canViewSensitive: canViewSensitiveHR(req.session.user),
+    showRates: canViewRates(req.session.user),
     user: req.session.user
   });
 });
@@ -355,6 +375,7 @@ router.get('/employees/:id/edit', requirePermission('hr_employees'), (req, res) 
     users,
     settingsOptions,
     canViewSensitive: canViewSensitiveHR(req.session.user),
+    showRates: canViewRates(req.session.user),
     user: req.session.user
   });
 });
@@ -366,6 +387,35 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
   const b = req.body;
   const fullName = [(b.first_name || '').trim(), (b.middle_name || '').trim(), (b.last_name || '').trim()].filter(Boolean).join(' ');
+
+  // Build rate SET clause only if user has permission
+  const rateSet = canViewRates(req.session.user)
+    ? ', rate_day = ?, rate_ot = ?, rate_dt = ?, rate_night = ?, rate_night_ot = ?, rate_night_dt = ?, rate_travel = ?, rate_meal = ?, rate_weekend = ?'
+    : '';
+
+  const baseParams = [
+    b.employee_code || null, b.first_name, b.middle_name || '', b.last_name, fullName, b.preferred_name || '',
+    b.company || '', b.division || '', b.role_title || '',
+    b.employment_type || 'full_time', b.employment_status || 'active', b.payment_type || '',
+    b.start_date || null, b.end_date || null, b.probation_end_date || null, b.manager_id || null,
+    b.email || '', b.phone || '', b.address || '', b.suburb || '', b.state || '', b.postcode || '',
+    b.traffic_role_level || '', b.ticket_classification || '',
+    b.white_card_required ? 1 : 0, b.medical_required ? 1 : 0,
+    b.allocatable ? 1 : 0, b.blocked_from_allocation ? 1 : 0, b.block_reason || '',
+    b.induction_status || 'pending',
+    b.ppe_issued_status || 'not_issued', b.uniform_issued_status || 'not_issued',
+    b.company_vehicle_assigned || '',
+    b.primary_work_region || '', b.base_location || '',
+    b.emergency_contact_name || '', b.emergency_contact_phone || '', b.emergency_contact_relationship || '',
+    b.date_of_birth || null, b.payroll_reference || '', b.internal_notes || '',
+    b.linked_crew_member_id || null, b.linked_user_id || null,
+  ];
+
+  const rateParams = canViewRates(req.session.user)
+    ? [parseFloat(b.rate_day) || 0, parseFloat(b.rate_ot) || 0, parseFloat(b.rate_dt) || 0,
+       parseFloat(b.rate_night) || 0, parseFloat(b.rate_night_ot) || 0, parseFloat(b.rate_night_dt) || 0,
+       parseFloat(b.rate_travel) || 0, parseFloat(b.rate_meal) || 0, parseFloat(b.rate_weekend) || 0]
+    : [];
 
   db.prepare(`
     UPDATE employees SET
@@ -382,25 +432,12 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
       primary_work_region = ?, base_location = ?,
       emergency_contact_name = ?, emergency_contact_phone = ?, emergency_contact_relationship = ?,
       date_of_birth = ?, payroll_reference = ?, internal_notes = ?,
-      linked_crew_member_id = ?, linked_user_id = ?,
+      linked_crew_member_id = ?, linked_user_id = ?
+      ${rateSet},
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
-    b.employee_code || null, b.first_name, b.middle_name || '', b.last_name, fullName, b.preferred_name || '',
-    b.company || '', b.division || '', b.role_title || '',
-    b.employment_type || 'full_time', b.employment_status || 'active', b.payment_type || '',
-    b.start_date || null, b.end_date || null, b.probation_end_date || null, b.manager_id || null,
-    b.email || '', b.phone || '', b.address || '', b.suburb || '', b.state || '', b.postcode || '',
-    b.traffic_role_level || '', b.ticket_classification || '',
-    b.white_card_required ? 1 : 0, b.medical_required ? 1 : 0,
-    b.allocatable ? 1 : 0, b.blocked_from_allocation ? 1 : 0, b.block_reason || '',
-    b.induction_status || 'pending',
-    b.ppe_issued_status || 'not_issued', b.uniform_issued_status || 'not_issued',
-    b.company_vehicle_assigned || '',
-    b.primary_work_region || '', b.base_location || '',
-    b.emergency_contact_name || '', b.emergency_contact_phone || '', b.emergency_contact_relationship || '',
-    b.date_of_birth || null, b.payroll_reference || '', b.internal_notes || '',
-    b.linked_crew_member_id || null, b.linked_user_id || null,
+    ...baseParams, ...rateParams,
     req.params.id
   );
 
