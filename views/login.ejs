@@ -219,7 +219,10 @@
 
     /* ── Logo ── */
     .login-logo {
-      filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.5));
+      filter: brightness(0) invert(1)
+              drop-shadow(0 0 18px rgba(43, 127, 255, 0.45))
+              drop-shadow(0 0 40px rgba(43, 127, 255, 0.20))
+              drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
       will-change: transform;
     }
     @keyframes logo-float {
@@ -273,7 +276,7 @@
     <!-- Logo + branding -->
     <div class="text-center mb-8 animate-card">
       <div class="inline-block mb-5">
-        <img src="/images/logo-colour.png" alt="T&S Traffic Control" class="login-logo" style="width:90px;height:auto;">
+        <img src="/images/logo-colour.png" alt="T&S Traffic Control" class="login-logo" style="width:100px;height:auto;">
       </div>
       <h1 style="font-size:28px;font-weight:700;color:#FFFFFF;letter-spacing:-0.01em">T&S Traffic Control</h1>
       <p style="color:rgba(255,255,255,0.5);font-size:13px;letter-spacing:0.06em;margin-top:6px;font-weight:500">T&S Dashboard</p>
