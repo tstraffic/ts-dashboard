@@ -3,7 +3,7 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const { getDb } = require('../db/database');
-const { employeeGuideSlides, tcTrainingSlides } = require('../data/induction-slides');
+const { employeeGuideSlides, tcTrainingSlides } = require('../induction-slides');
 
 // GET /induction/admin/submissions — list all submissions with filtering
 router.get('/submissions', (req, res) => {
