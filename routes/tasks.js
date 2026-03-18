@@ -48,10 +48,11 @@ router.get('/', (req, res) => {
     params.push(monday.toISOString().split('T')[0], sunday.toISOString().split('T')[0]);
   }
 
-  // Additional filters — default to showing only my tasks unless 'all' is explicitly selected
-  if (owner === 'all') { /* show all tasks */ }
-  else if (owner && owner !== 'me') { baseWhere += ' AND t.owner_id = ?'; params.push(owner); }
-  else { /* default: show my tasks */ baseWhere += ' AND t.owner_id = ?'; params.push(req.session.user.id); }
+  // Additional filters — admin/management defaults to all tasks, others default to their own
+  const isAdminRole = ['admin', 'management'].includes((req.session.user.role || '').toLowerCase());
+  if (owner === 'all' || (!owner && isAdminRole)) { /* show all tasks */ }
+  else if (owner === 'me' || (!owner && !isAdminRole)) { baseWhere += ' AND t.owner_id = ?'; params.push(req.session.user.id); }
+  else if (owner) { baseWhere += ' AND t.owner_id = ?'; params.push(owner); }
   if (priority && priority !== 'all') { baseWhere += ' AND t.priority = ?'; params.push(priority); }
   if (division && division !== 'all') { baseWhere += ' AND t.division = ?'; params.push(division); }
   if (job_id) { baseWhere += ' AND t.job_id = ?'; params.push(job_id); }
@@ -85,9 +86,9 @@ router.get('/', (req, res) => {
     countWhere += ' AND t.due_date BETWEEN ? AND ?';
     countParams.push(mon2.toISOString().split('T')[0], sun2.toISOString().split('T')[0]);
   }
-  if (owner === 'all') { /* count all */ }
-  else if (owner && owner !== 'me') { countWhere += ' AND t.owner_id = ?'; countParams.push(owner); }
-  else { countWhere += ' AND t.owner_id = ?'; countParams.push(req.session.user.id); }
+  if (owner === 'all' || (!owner && isAdminRole)) { /* count all */ }
+  else if (owner === 'me' || (!owner && !isAdminRole)) { countWhere += ' AND t.owner_id = ?'; countParams.push(req.session.user.id); }
+  else if (owner) { countWhere += ' AND t.owner_id = ?'; countParams.push(owner); }
   if (priority && priority !== 'all') { countWhere += ' AND t.priority = ?'; countParams.push(priority); }
   if (division && division !== 'all') { countWhere += ' AND t.division = ?'; countParams.push(division); }
   if (job_id) { countWhere += ' AND t.job_id = ?'; countParams.push(job_id); }
