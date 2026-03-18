@@ -36,7 +36,7 @@ a, button, input, select, textarea {
 
 /* ===== Page Background ===== */
 body {
-  background: #F7F8FA;
+  background: #F3F4F6;
   background-image:
     radial-gradient(ellipse 80% 50% at 50% -20%, rgba(43,127,255,0.03), transparent);
 }
@@ -67,7 +67,7 @@ body {
 .bg-white {
   box-shadow: var(--shadow-card);
 }
-.bg-white:not(nav):not(td):not(th):not(tr):not(.fab-menu a):not(#notif-dropdown):not(#quickadd-dropdown) {
+.bg-white:not(nav):not(td):not(th):not(tr):not(.fab-menu a):not(#notif-dropdown):not(#quickadd-dropdown):not(.urgency-tile) {
   border-color: rgba(0,0,0,0.06) !important;
 }
 /* Dashboard cards — 12px radius */
@@ -146,7 +146,7 @@ table {
   width: 3px;
   height: 60%;
   border-radius: 0 3px 3px 0;
-  background: #60a5fa;
+  background: #ffffff;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .sidebar-link.bg-white\/15::before,

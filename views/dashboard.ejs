@@ -98,7 +98,7 @@
 <% } %>
 
 <!-- Urgency Tiles -->
-<div class="grid grid-cols-4 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3 mb-5 stagger-children">
+<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3 mb-5 stagger-children">
   <a href="/tasks" class="urgency-tile group bg-white border rounded-xl p-3 <%= kpi.overdueTasks > 0 ? 'border-red-200' : 'border-gray-200' %>">
     <p class="text-2xl font-extrabold <%= kpi.overdueTasks > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.overdueTasks %>">0</span></p>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Overdue Tasks</p>
@@ -185,7 +185,11 @@
       </div>
       <% if (myTasks.length === 0) { %>
         <div class="p-6 text-center">
-          <p class="text-sm text-gray-500">No open tasks assigned to you</p>
+          <div class="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center mx-auto mb-2">
+            <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+          </div>
+          <p class="text-sm font-medium text-gray-700">No open tasks assigned to you</p>
+          <p class="text-xs text-gray-400 mt-1">Tasks assigned to you will appear here.</p>
         </div>
       <% } else { %>
       <div class="divide-y divide-gray-100">
@@ -359,7 +363,7 @@
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-gray-100">
+            <tr class="bg-gray-50 border-b border-gray-200">
               <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Crew</th>
               <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Role</th>
               <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Job</th>
