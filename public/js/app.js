@@ -1,5 +1,11 @@
 // T&S Dashboard - Client-side JavaScript
 
+// ===== Chart.js dark theme defaults =====
+if (typeof Chart !== 'undefined') {
+  Chart.defaults.color = 'rgba(255,255,255,0.55)';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
+}
+
 // ===== Auto-submit filter forms on change =====
 (function() {
   // Auto-submit GET forms when selects, checkboxes, or date inputs change
