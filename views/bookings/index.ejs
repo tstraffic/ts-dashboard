@@ -232,7 +232,10 @@
       const confirmedCount = booking.personnel.filter(p => p.confirmed).length;
       const totalPeople = booking.personnel.length;
     %>
-    <div class="booking-card" data-id="<%= booking.id %>" data-status="<%= booking.status %>" style="animation-delay: <%= idx * 40 %>ms">
+    <div class="booking-card" data-id="<%= booking.id %>" data-status="<%= booking.status %>" style="animation-delay: <%= idx * 40 %>ms"
+      ondragover="event.preventDefault(); this.style.outline='2px solid #2B7FFF'; this.style.outlineOffset='2px'"
+      ondragleave="this.style.outline=''; this.style.outlineOffset=''"
+      ondrop="handleCrewDrop(event, <%= booking.id %>)">
       <!-- Quick actions (hover) -->
       <div class="booking-card-actions">
         <button class="card-action-btn" title="Edit" onclick="event.stopPropagation(); openBookingDetail(<%= booking.id %>)">
@@ -740,7 +743,8 @@ function handleCalDrop(event, targetDate) {
         list.innerHTML = '';
         function renderItem(c, statusClass, statusLabel) {
           const initials = c.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-          list.innerHTML += '<div class="resource-item"><div class="resource-avatar">' + initials + '</div><div class="resource-info"><span class="resource-name">' + c.full_name + '</span><span class="resource-role">' + (c.role || '').replace(/_/g, ' ') + (c.employee_id ? ' · ' + c.employee_id : '') + '</span></div><span class="resource-status ' + statusClass + '">' + statusLabel + '</span></div>';
+          list.innerHTML += '<div class="resource-item" draggable="true" data-crew-id="' + c.id + '" data-crew-name="' + c.full_name + '" data-crew-role="' + (c.role||'') + '" style="cursor:grab" ondragstart="event.dataTransfer.setData(\'application/crew\', JSON.stringify({id:' + c.id + ',name:\'' + c.full_name.replace(/'/g, '') + '\',role:\'' + (c.role||'').replace(/'/g, '') + '\'}))">' +
+            '<div class="resource-avatar">' + initials + '</div><div class="resource-info"><span class="resource-name">' + c.full_name + '</span><span class="resource-role">' + (c.role || '').replace(/_/g, ' ') + (c.employee_id ? ' · ' + c.employee_id : '') + '</span></div><span class="resource-status ' + statusClass + '">' + statusLabel + '</span></div>';
         }
         data.available.forEach(c => renderItem(c, 'available', 'Available'));
         data.assigned.forEach(c => renderItem(c, 'busy', 'On shift'));
@@ -806,6 +810,34 @@ function handleCalDrop(event, targetDate) {
     });
   });
 })();
+
+// Drag-and-drop: assign crew from resource panel to booking card
+function handleCrewDrop(event, bookingId) {
+  event.preventDefault();
+  event.currentTarget.style.outline = '';
+  event.currentTarget.style.outlineOffset = '';
+
+  const crewData = event.dataTransfer.getData('application/crew');
+  if (!crewData) return;
+
+  try {
+    const crew = JSON.parse(crewData);
+    fetch('/bookings/' + bookingId + '/crew', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'crew_member_id=' + crew.id + '&role_on_site=' + encodeURIComponent(crew.role.replace(/_/g, ' '))
+    }).then(r => {
+      if (r.redirected || r.ok) {
+        // Show toast and reload
+        const toast = document.createElement('div');
+        toast.className = 'booking-toast show';
+        toast.innerHTML = '<svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> ' + crew.name + ' assigned';
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.remove(); window.location.reload(); }, 1200);
+      }
+    });
+  } catch(e) { console.error('Drop error:', e); }
+}
 
 function openBookingDetail(id) {
   const backdrop = document.getElementById('booking-modal-backdrop');
