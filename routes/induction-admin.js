@@ -97,7 +97,8 @@ router.post('/submissions/:id/status', (req, res) => {
 });
 
 // Serve uploaded induction files (authenticated)
-router.get('/uploads/:filename', (req, res) => {
+// View URLs: /induction/admin/uploads/:id/:filename — :id is for context only, files are stored flat
+router.get('/uploads/:id/:filename', (req, res) => {
   const filePath = path.join(__dirname, '..', 'uploads', 'inductions', req.params.filename);
   if (!fs.existsSync(filePath)) {
     return res.status(404).send('File not found');
