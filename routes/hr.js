@@ -635,6 +635,19 @@ router.get('/documents/:id/download', requirePermission('hr_documents'), (req, r
     req.flash('error', 'File not found on disk.');
     return res.redirect('back');
   }
+
+  // If ?inline=1 or the request is for an image, serve inline for preview
+  const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg|avif|heic|heif)$/i.test(doc.original_name || doc.filename);
+  if (req.query.inline || isImage) {
+    const ext = path.extname(doc.original_name || doc.filename).toLowerCase();
+    const mimeTypes = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp', '.svg': 'image/svg+xml', '.avif': 'image/avif', '.pdf': 'application/pdf' };
+    const mime = mimeTypes[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `inline; filename="${doc.original_name || doc.filename}"`);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    return res.sendFile(path.resolve(doc.file_path));
+  }
+
   res.download(doc.file_path, doc.original_name);
 });
 

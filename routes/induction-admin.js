@@ -151,12 +151,65 @@ router.post('/submissions/:id/status', (req, res) => {
         `Auto-created from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''} AccName: ${s.bank_account_name || ''}`
       );
 
-      // 3. Update submission with link to crew member (stay as 'approved' — conversion tracked by linked_crew_member_id)
+      // 3. Get the new employee record ID
+      const newEmployee = db.prepare("SELECT id FROM employees WHERE employee_code = ?").get(employeeId);
+      const newEmpId = newEmployee ? newEmployee.id : null;
+
+      // 4. Auto-create employee documents from induction uploads
+      if (newEmpId) {
+        const inductionUploadsDir = path.resolve(__dirname, '..', 'data', 'uploads', 'inductions');
+        const hrUploadsBase = path.resolve(__dirname, '..', 'data', 'uploads', 'hr');
+
+        const docMappings = [
+          { field: 'white_card_photo', type: 'white_card', name: 'White Card', mandatory: 1 },
+          { field: 'tc_licence_photo', type: 'tc_licence', name: 'TC Licence', mandatory: 1 },
+          { field: 'drivers_licence_photo', type: 'drivers_licence_front', name: "Driver's Licence (Front)", mandatory: 1 },
+          { field: 'drivers_licence_back_photo', type: 'drivers_licence_back', name: "Driver's Licence (Back)", mandatory: 1 },
+        ];
+
+        for (const mapping of docMappings) {
+          const srcFilename = s[mapping.field];
+          if (!srcFilename) continue;
+
+          try {
+            // Source path (induction uploads)
+            const srcPath = path.join(inductionUploadsDir, srcFilename);
+            if (!fs.existsSync(srcPath)) continue;
+
+            // Destination directory for this employee + doc type
+            const destDir = path.join(hrUploadsBase, `emp_${newEmpId}`, mapping.type);
+            fs.mkdirSync(destDir, { recursive: true });
+
+            // Copy file to HR uploads
+            const destFilename = `${Date.now()}-${srcFilename}`;
+            const destPath = path.join(destDir, destFilename);
+            fs.copyFileSync(srcPath, destPath);
+
+            // Get file size
+            const stats = fs.statSync(destPath);
+
+            // Insert document record
+            db.prepare(`
+              INSERT INTO employee_documents (employee_id, document_type, document_name, filename, original_name, file_path, file_size,
+                mandatory, verification_status, notes, uploaded_by_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+            `).run(
+              newEmpId, mapping.type, mapping.name, destFilename, srcFilename, destPath, stats.size,
+              mapping.mandatory, `Auto-imported from induction #${s.id}`, req.session.user.id
+            );
+          } catch (docErr) {
+            console.error(`Failed to copy induction doc ${mapping.field}:`, docErr);
+            // Continue with other docs even if one fails
+          }
+        }
+      }
+
+      // 5. Update submission with link to crew member (stay as 'approved' — conversion tracked by linked_crew_member_id)
       db.prepare(`
         UPDATE induction_submissions SET linked_crew_member_id = ?, updated_at = datetime('now') WHERE id = ?
       `).run(crewMemberId, s.id);
 
-      req.flash('success', `${fullName} approved and added as employee ${employeeId}. They now appear in Crew Roster and Employees.`);
+      req.flash('success', `${fullName} approved and added as employee ${employeeId}. Documents imported to their profile.`);
       return res.redirect(`/induction/admin/submissions/${req.params.id}`);
     } catch (err) {
       console.error('Auto-convert error:', err);
@@ -212,9 +265,40 @@ router.post('/submissions/:id/convert', (req, res) => {
       s.date_of_birth || null, crewMemberId,
       `Converted from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''}`);
 
+    // Auto-create employee documents from induction uploads
+    const newEmployee = db.prepare("SELECT id FROM employees WHERE employee_code = ?").get(employeeId);
+    const newEmpId = newEmployee ? newEmployee.id : null;
+    if (newEmpId) {
+      const inductionUploadsDir = path.resolve(__dirname, '..', 'data', 'uploads', 'inductions');
+      const hrUploadsBase = path.resolve(__dirname, '..', 'data', 'uploads', 'hr');
+      const docMappings = [
+        { field: 'white_card_photo', type: 'white_card', name: 'White Card', mandatory: 1 },
+        { field: 'tc_licence_photo', type: 'tc_licence', name: 'TC Licence', mandatory: 1 },
+        { field: 'drivers_licence_photo', type: 'drivers_licence_front', name: "Driver's Licence (Front)", mandatory: 1 },
+        { field: 'drivers_licence_back_photo', type: 'drivers_licence_back', name: "Driver's Licence (Back)", mandatory: 1 },
+      ];
+      for (const mapping of docMappings) {
+        const srcFilename = s[mapping.field];
+        if (!srcFilename) continue;
+        try {
+          const srcPath = path.join(inductionUploadsDir, srcFilename);
+          if (!fs.existsSync(srcPath)) continue;
+          const destDir = path.join(hrUploadsBase, `emp_${newEmpId}`, mapping.type);
+          fs.mkdirSync(destDir, { recursive: true });
+          const destFilename = `${Date.now()}-${srcFilename}`;
+          const destPath = path.join(destDir, destFilename);
+          fs.copyFileSync(srcPath, destPath);
+          const stats = fs.statSync(destPath);
+          db.prepare(`INSERT INTO employee_documents (employee_id, document_type, document_name, filename, original_name, file_path, file_size, mandatory, verification_status, notes, uploaded_by_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`).run(
+            newEmpId, mapping.type, mapping.name, destFilename, srcFilename, destPath, stats.size, mapping.mandatory, `Auto-imported from induction #${s.id}`, req.session.user.id
+          );
+        } catch (docErr) { console.error(`Failed to copy induction doc ${mapping.field}:`, docErr); }
+      }
+    }
+
     db.prepare("UPDATE induction_submissions SET linked_crew_member_id = ?, updated_at = datetime('now') WHERE id = ?").run(crewMemberId, s.id);
 
-    req.flash('success', `${fullName} converted to employee ${employeeId}.`);
+    req.flash('success', `${fullName} converted to employee ${employeeId}. Documents imported.`);
   } catch (err) {
     console.error('Convert error:', err);
     req.flash('error', `Failed to convert: ${err.message}`);
