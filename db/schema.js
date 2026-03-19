@@ -3146,6 +3146,20 @@ function runMigrations(db) {
     console.log('Migration 55 complete.');
   }
 
+  // Migration 56: Pinned messages + message editing support
+  if (!isMigrationApplied.get(56)) {
+    console.log('Running migration 56: Pinned messages');
+    const cols56 = [
+      "ALTER TABLE messages ADD COLUMN pinned_at DATETIME",
+      "ALTER TABLE messages ADD COLUMN pinned_by INTEGER REFERENCES users(id)",
+    ];
+    for (const sql of cols56) {
+      try { db.exec(sql); } catch (e) { /* column may already exist */ }
+    }
+    recordMigration.run(56, 'Pinned messages');
+    console.log('Migration 56 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

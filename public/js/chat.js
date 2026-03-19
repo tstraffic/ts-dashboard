@@ -92,9 +92,85 @@
         });
       }
 
+      // Camera input
+      const cameraInput = this.container.querySelector('.chat-camera-input');
+      if (cameraInput) {
+        cameraInput.addEventListener('change', (e) => {
+          if (e.target.files[0]) this.uploadImage(e.target.files[0]);
+        });
+      }
+
+      // Voice recording
+      const voiceBtn = this.container.querySelector('.chat-voice-btn');
+      const voiceRecording = this.container.querySelector('.chat-voice-recording');
+      const voiceStop = this.container.querySelector('.chat-voice-stop');
+      const voiceCancel = this.container.querySelector('.chat-voice-cancel');
+      const voiceTimer = this.container.querySelector('.chat-voice-timer');
+      this.mediaRecorder = null;
+      this.audioChunks = [];
+      this.voiceTimerInterval = null;
+
+      if (voiceBtn && navigator.mediaDevices) {
+        voiceBtn.addEventListener('click', async () => {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            this.mediaRecorder = new MediaRecorder(stream);
+            this.audioChunks = [];
+            let seconds = 0;
+
+            this.mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) this.audioChunks.push(e.data); };
+            this.mediaRecorder.onstop = () => {
+              stream.getTracks().forEach(t => t.stop());
+              clearInterval(this.voiceTimerInterval);
+              if (voiceRecording) voiceRecording.classList.add('hidden');
+              this.inputEl.classList.remove('hidden');
+              voiceBtn.classList.remove('hidden');
+            };
+
+            this.mediaRecorder.start();
+            if (voiceRecording) voiceRecording.classList.remove('hidden');
+            this.inputEl.classList.add('hidden');
+            voiceBtn.classList.add('hidden');
+            this.voiceTimerInterval = setInterval(() => {
+              seconds++;
+              if (voiceTimer) voiceTimer.textContent = `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
+            }, 1000);
+          } catch (e) { console.error('Mic access denied:', e); }
+        });
+
+        if (voiceStop) voiceStop.addEventListener('click', () => {
+          if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+            this.mediaRecorder.stop();
+            setTimeout(() => {
+              if (this.audioChunks.length > 0) {
+                const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                const file = new File([blob], 'voice-note.webm', { type: 'audio/webm' });
+                this.uploadImage(file);
+              }
+            }, 100);
+          }
+        });
+
+        if (voiceCancel) voiceCancel.addEventListener('click', () => {
+          if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+            this.audioChunks = [];
+            this.mediaRecorder.stop();
+          }
+        });
+      }
+
       if (this.replyCancel) {
         this.replyCancel.addEventListener('click', () => this.cancelReply());
       }
+
+      // Typing indicator: send on input
+      this.inputEl.addEventListener('input', () => {
+        this.sendTyping();
+      });
+      this.typingPollTimer = setInterval(() => this.pollTyping(), 3000);
+
+      // Load pinned messages
+      this.loadPinned();
 
       // Visibility tracking
       document.addEventListener('visibilitychange', () => {
@@ -167,6 +243,8 @@
           for (const att of msg.attachments) {
             if (att.mime_type && att.mime_type.startsWith('image/')) {
               attachmentHtml += `<img src="${this.escapeHtml(att.thumbnail_url || att.file_url)}" data-full="${this.escapeHtml(att.file_url)}" class="chat-msg-image" alt="${this.escapeHtml(att.original_name)}" onclick="window._chatLightbox(this.dataset.full)">`;
+            } else if (att.mime_type && att.mime_type.startsWith('audio/')) {
+              attachmentHtml += `<div class="chat-audio-player"><audio controls preload="metadata" src="${this.escapeHtml(att.file_url)}"></audio></div>`;
             } else {
               const sizeKb = att.file_size ? Math.round(att.file_size / 1024) : 0;
               const ext = att.original_name ? att.original_name.split('.').pop().toUpperCase() : 'FILE';
@@ -180,6 +258,7 @@
         }
 
         const timeStr = this.formatTime(msg.created_at);
+        const editedHtml = msg.edited_at ? '<span class="chat-msg-edited">(edited)</span>' : '';
 
         let actionsHtml = '';
         if (isOwn) {
@@ -191,7 +270,7 @@
           <div class="chat-msg-content">
             ${!isOwn ? `<div class="chat-msg-sender" style="color:${avatarColor}">${this.escapeHtml(msg.sender_name || 'Unknown')}</div>` : ''}
             ${replyHtml}
-            <div class="chat-msg-bubble">${bodyHtml}${attachmentHtml}</div>
+            <div class="chat-msg-bubble">${bodyHtml}${editedHtml}${attachmentHtml}</div>
             <div class="chat-msg-time">${timeStr}</div>
           </div>
           ${actionsHtml}
@@ -362,6 +441,52 @@
     }
 
     // ============================================
+    // Typing Indicators
+    // ============================================
+    async sendTyping() {
+      if (this._lastTypingSent && Date.now() - this._lastTypingSent < 3000) return;
+      this._lastTypingSent = Date.now();
+      try {
+        await fetch(`/chat/api/threads/${this.threadId}/typing`, { method: 'POST', headers: { 'x-csrf-token': getCsrfToken() } });
+      } catch (e) { /* ignore */ }
+    }
+
+    async pollTyping() {
+      try {
+        const resp = await fetch(`/chat/api/threads/${this.threadId}/typing`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const typingEl = this.container.querySelector('.chat-typing');
+        if (typingEl) {
+          if (data.typing && data.typing.length > 0) {
+            const names = data.typing.slice(0, 3).join(', ');
+            typingEl.textContent = `${names} ${data.typing.length === 1 ? 'is' : 'are'} typing...`;
+            typingEl.classList.remove('hidden');
+          } else {
+            typingEl.classList.add('hidden');
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    // ============================================
+    // Pinned Messages
+    // ============================================
+    async loadPinned() {
+      try {
+        const resp = await fetch(`/chat/api/threads/${this.threadId}/pinned`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const pinnedEl = this.container.querySelector('.chat-pinned');
+        if (pinnedEl && data.pinned && data.pinned.length > 0) {
+          const latest = data.pinned[0];
+          pinnedEl.innerHTML = `<span class="pin-icon">📌</span> <strong>${this.escapeHtml(latest.sender_name || '')}</strong>: ${this.escapeHtml(latest.body).substring(0, 80)}`;
+          pinnedEl.classList.remove('hidden');
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    // ============================================
     // @Mention Autocomplete
     // ============================================
     async loadMembers() {
@@ -405,7 +530,7 @@
       }
 
       this.mentionDropdown.innerHTML = filtered.map((m, i) =>
-        `<div class="chat-mention-item ${i === 0 ? 'active' : ''}" data-user-id="${m.id}" data-name="${this.escapeHtml(m.full_name)}">${this.escapeHtml(m.full_name)} <span class="text-slate-500 text-xs">${m.role}</span></div>`
+        `<div class="chat-mention-item ${i === 0 ? 'active' : ''}" data-user-id="${m.id}" data-name="${this.escapeHtml(m.full_name)}"><span>${this.escapeHtml(m.full_name)}</span><span class="mention-role">${m.role}</span></div>`
       ).join('');
 
       this.mentionDropdown.classList.remove('hidden');

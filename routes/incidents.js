@@ -258,6 +258,15 @@ router.post('/:id', upload.single('photo'), (req, res) => {
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'incident', entityId: parseInt(req.params.id), entityLabel: existing ? existing.incident_number : title, jobId: parseInt(job_id), jobNumber: job ? job.job_number : '', ip: req.ip });
 
+  // Archive chat thread when incident is closed
+  if (investigation_status === 'closed') {
+    const threadId = getThreadForEntity('incident', parseInt(req.params.id));
+    if (threadId) {
+      db.prepare("UPDATE chat_threads SET status = 'archived' WHERE id = ?").run(threadId);
+      postSystemMessage(threadId, 'Thread archived — incident closed');
+    }
+  }
+
   req.flash('success', 'Incident updated.');
   res.redirect(`/incidents/${req.params.id}`);
 });
