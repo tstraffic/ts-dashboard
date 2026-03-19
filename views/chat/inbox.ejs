@@ -1,0 +1,68 @@
+<% locals.currentPage = 'chat' %>
+
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Messages</h1>
+    <p class="text-gray-500 text-sm mt-1">Operational threads for jobs, incidents, and compliance items</p>
+  </div>
+</div>
+
+<% if (threads.length === 0) { %>
+  <div class="bg-white border border-gray-200 rounded-xl p-12 text-center shadow-sm">
+    <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+    <p class="text-gray-400 text-sm">No message threads yet. Threads are automatically created when jobs, incidents, or compliance items are created.</p>
+  </div>
+<% } else { %>
+  <div class="space-y-2">
+    <% threads.forEach(function(thread) { %>
+      <%
+        let link = '/chat';
+        if (thread.related_entity_type === 'job') link = '/jobs/' + thread.related_entity_id + '#chat';
+        else if (thread.related_entity_type === 'incident') link = '/incidents/' + thread.related_entity_id + '#chat';
+        else if (thread.related_entity_type === 'compliance') link = '/compliance/' + thread.related_entity_id;
+
+        let typeIcon = '';
+        let typeColor = '';
+        if (thread.thread_type === 'job') { typeIcon = 'J'; typeColor = 'bg-blue-100 text-blue-600'; }
+        else if (thread.thread_type === 'incident') { typeIcon = 'I'; typeColor = 'bg-red-100 text-red-600'; }
+        else if (thread.thread_type === 'compliance') { typeIcon = 'C'; typeColor = 'bg-emerald-100 text-emerald-600'; }
+        else { typeIcon = 'B'; typeColor = 'bg-purple-100 text-purple-600'; }
+
+        let preview = thread.last_message || 'No messages yet';
+        if (preview.length > 80) preview = preview.substring(0, 80) + '...';
+
+        function timeAgo(dateStr) {
+          if (!dateStr) return '';
+          const d = new Date(dateStr + (dateStr.endsWith('Z') ? '' : 'Z'));
+          const now = new Date();
+          const diff = Math.floor((now - d) / 60000);
+          if (diff < 1) return 'just now';
+          if (diff < 60) return diff + 'm';
+          if (diff < 1440) return Math.floor(diff / 60) + 'h';
+          return Math.floor(diff / 1440) + 'd';
+        }
+      %>
+      <a href="<%= link %>" class="block bg-white border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors shadow-sm">
+        <div class="flex items-start gap-3">
+          <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 <%= typeColor %>"><%= typeIcon %></div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-2">
+              <h3 class="text-sm font-semibold text-gray-900 truncate"><%= thread.title %></h3>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <% if (thread.last_message_at) { %>
+                  <span class="text-xs text-gray-400"><%= timeAgo(thread.last_message_at) %></span>
+                <% } %>
+                <% if (thread.unread_count > 0) { %>
+                  <span class="bg-brand-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center"><%= thread.unread_count > 99 ? '99+' : thread.unread_count %></span>
+                <% } %>
+              </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-0.5 truncate">
+              <% if (thread.last_message_sender) { %><span class="text-gray-700 font-medium"><%= thread.last_message_sender %>:</span> <% } %><%= preview %>
+            </p>
+          </div>
+        </div>
+      </a>
+    <% }) %>
+  </div>
+<% } %>

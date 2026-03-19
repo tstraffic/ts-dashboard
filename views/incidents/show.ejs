@@ -367,6 +367,21 @@
   </div>
 </div>
 
+<!-- Incident Thread Chat -->
+<div class="mt-6">
+  <div class="flex items-center gap-2 mb-4">
+    <h2 class="text-lg font-semibold text-gray-900">Incident Thread</h2>
+    <span class="text-xs text-gray-500">Operational discussion for this incident</span>
+  </div>
+  <% if (typeof chatThreadId !== 'undefined' && chatThreadId) { %>
+    <%- include('../partials/chat-panel') %>
+  <% } else { %>
+    <div class="bg-white border border-gray-200 rounded-xl p-6 text-center">
+      <p class="text-gray-400 text-sm">Chat thread not available.</p>
+    </div>
+  <% } %>
+</div>
+
 <!-- Back Link -->
 <div class="mt-6">
   <a href="/incidents" class="text-gray-500 hover:text-gray-600 text-sm">&larr; Back to all incidents</a>

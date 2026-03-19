@@ -12,6 +12,7 @@ const { requireWorker, blockWorkerFromAdmin, workerLocals } = require('./middlew
 const { notificationCountMiddleware, generateNotifications, sendDailyDigests } = require('./middleware/notifications');
 const { settingsMiddleware } = require('./middleware/settings');
 const { sidebarBadges } = require('./middleware/sidebarBadges');
+const { chatUnreadCountMiddleware } = require('./middleware/chat');
 const { initVapid } = require('./services/pushNotification');
 const { csrfProtection } = require('./middleware/csrf');
 
@@ -80,6 +81,9 @@ app.use(settingsMiddleware);
 // Sidebar badge counts (cached 60s)
 app.use(sidebarBadges);
 
+// Chat unread count available in all templates
+app.use(chatUnreadCountMiddleware);
+
 // Public invite/setup routes (no auth required, must be BEFORE blockWorkerFromAdmin)
 app.use('/invite', require('./routes/invite'));
 app.use('/w/setup', require('./routes/worker/setup'));
@@ -134,6 +138,7 @@ app.use('/defects', requireLogin, requirePermission('defects'), require('./route
 app.use('/hr', requireLogin, require('./routes/hr'));
 app.use('/crm', requireLogin, requirePermission('crm'), require('./routes/crm'));
 app.use('/opportunities', requireLogin, requirePermission('crm'), require('./routes/opportunities'));
+app.use('/chat', requireLogin, require('./routes/chat'));
 app.use('/notifications', requireLogin, requirePermission('notifications'), require('./routes/notifications'));
 app.use('/admin/integrations', requireLogin, requirePermission('admin'), require('./routes/integrations'));
 app.use('/admin', requireLogin, requirePermission('admin'), require('./routes/admin'));
