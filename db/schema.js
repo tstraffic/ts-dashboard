@@ -3286,6 +3286,49 @@ function runMigrations(db) {
     recordMigration.run(58, 'Induction form enhancements');
     console.log('Migration 58 complete.');
   }
+
+  // =============================================
+  // Migration 59: Clear all dummy/seed data
+  // =============================================
+  if (!isMigrationApplied.get(59)) {
+    console.log('Running migration 59: Clear dummy/seed data');
+    try {
+      // Clear tables that only contain seed data
+      const tablesToClear = [
+        'traffic_plans',
+        'crew_allocations',
+        'timesheets',
+        'cost_entries',
+        'job_budgets',
+        'incidents',
+        'defects',
+        'tasks',
+        'equipment',
+        'contacts',
+        'compliance_items',
+        'crew_members',
+        'employees',
+        'jobs',
+        'clients',
+      ];
+      for (const table of tablesToClear) {
+        try {
+          db.exec(`DELETE FROM ${table}`);
+          console.log(`  Cleared ${table}`);
+        } catch (e) {
+          // Table might not exist
+          console.log(`  Skipped ${table}: ${e.message}`);
+        }
+      }
+      // Reset auto-increment counters
+      try { db.exec("DELETE FROM sqlite_sequence WHERE name IN ('traffic_plans','crew_allocations','timesheets','cost_entries','job_budgets','incidents','defects','tasks','equipment','contacts','compliance_items','crew_members','employees','jobs','clients')"); } catch(e) {}
+    } catch (e) {
+      console.error('Migration 59 error:', e.message);
+    }
+    recordMigration.run(59, 'Clear dummy/seed data');
+    console.log('Migration 59 complete — all seed data cleared.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
