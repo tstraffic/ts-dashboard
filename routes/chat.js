@@ -440,8 +440,7 @@ router.post('/api/upload', chatUpload.single('file'), async (req, res) => {
     mime_type: req.file.mimetype,
     file_size: req.file.size,
     original_name: req.file.originalname
-    });
-  }
+  });
 });
 
 // ============================================
