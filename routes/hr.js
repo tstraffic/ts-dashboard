@@ -160,7 +160,98 @@ router.get('/', requirePermission('hr_dashboard'), (req, res) => {
 });
 
 // ============================================
-// EMPLOYEES LIST
+// ROSTER (new employees list — replaces /employees view)
+// ============================================
+router.get('/roster', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const { company, division, employment_type, status, manager_id, search, allocatable, sort, order, payment_type } = req.query;
+
+  let where = '1=1';
+  const params = [];
+  if (payment_type) { where += ' AND e.payment_type = ?'; params.push(payment_type); }
+  if (company) { where += ' AND e.company = ?'; params.push(company); }
+  if (division) { where += ' AND e.division = ?'; params.push(division); }
+  if (employment_type) { where += ' AND e.employment_type = ?'; params.push(employment_type); }
+  if (status) { where += ' AND e.employment_status = ?'; params.push(status); }
+  if (manager_id) { where += ' AND e.manager_id = ?'; params.push(manager_id); }
+  if (allocatable === '1') { where += ' AND e.allocatable = 1 AND e.blocked_from_allocation = 0'; }
+  if (allocatable === '0') { where += ' AND (e.allocatable = 0 OR e.blocked_from_allocation = 1)'; }
+  if (search) { where += ' AND (e.full_name LIKE ? OR e.employee_code LIKE ? OR e.email LIKE ? OR e.phone LIKE ?)'; const s = `%${search}%`; params.push(s, s, s, s); }
+
+  const sortCol = { full_name: 'e.full_name', employee_code: 'e.employee_code', company: 'e.company', start_date: 'e.start_date', status: 'e.employment_status' }[sort] || 'e.full_name';
+  const sortOrder = order === 'desc' ? 'DESC' : 'ASC';
+
+  const employees = db.prepare(`
+    SELECT e.*, m.full_name as manager_name,
+      (SELECT MIN(ec.expiry_date) FROM employee_competencies ec WHERE ec.employee_id = e.id AND ec.expiry_date IS NOT NULL AND ec.expiry_date >= DATE('now')) as next_expiry
+    FROM employees e
+    LEFT JOIN employees m ON e.manager_id = m.id
+    WHERE ${where}
+    ORDER BY ${sortCol} ${sortOrder}
+  `).all(...params);
+
+  employees.forEach(emp => {
+    const comps = db.prepare('SELECT * FROM employee_competencies WHERE employee_id = ?').all(emp.id);
+    const docs = db.prepare('SELECT * FROM employee_documents WHERE employee_id = ?').all(emp.id);
+    emp.readiness = computeReadiness(emp, comps, docs);
+  });
+
+  const totalActive = db.prepare("SELECT COUNT(*) as c FROM employees WHERE active = 1").get().c;
+  const totalOnboarding = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'onboarding'").get().c;
+  const totalBlocked = db.prepare("SELECT COUNT(*) as c FROM employees WHERE blocked_from_allocation = 1 AND active = 1").get().c;
+  const totalCash = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'cash' AND active = 1").get().c;
+  const totalTfn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'tfn' AND active = 1").get().c;
+  const totalAbn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'abn' AND active = 1").get().c;
+
+  const companies = db.prepare("SELECT DISTINCT company FROM employees WHERE company != '' ORDER BY company").all().map(r => r.company);
+  const divisions = db.prepare("SELECT DISTINCT division FROM employees WHERE division != '' ORDER BY division").all().map(r => r.division);
+  const managers = db.prepare('SELECT id, full_name FROM employees WHERE id IN (SELECT DISTINCT manager_id FROM employees WHERE manager_id IS NOT NULL) ORDER BY full_name').all();
+
+  res.render('hr/roster', {
+    title: 'Roster',
+    currentPage: 'hr-roster',
+    employees,
+    stats: { totalActive, totalOnboarding, totalBlocked, totalCash, totalTfn, totalAbn },
+    filters: { company, division, employment_type, status, manager_id, search, allocatable, sort, order, payment_type },
+    filterOptions: { companies, divisions, managers },
+    user: req.session.user
+  });
+});
+
+// ============================================
+// ROSTER BULK DELETE
+// ============================================
+router.post('/roster/delete', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  let ids = req.body.ids;
+  if (!ids) { req.flash('error', 'No employees selected.'); return res.redirect('/hr/roster'); }
+  if (!Array.isArray(ids)) ids = [ids];
+  ids = ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+  if (ids.length === 0) { req.flash('error', 'No valid employees selected.'); return res.redirect('/hr/roster'); }
+
+  const placeholders = ids.map(() => '?').join(',');
+  try {
+    const docs = db.prepare(`SELECT file_path FROM employee_documents WHERE employee_id IN (${placeholders})`).all(...ids);
+    for (const doc of docs) { if (doc.file_path) { try { fs.unlinkSync(doc.file_path); } catch (e) { /* ignore */ } } }
+    db.prepare(`DELETE FROM employee_competencies WHERE employee_id IN (${placeholders})`).run(...ids);
+    db.prepare(`DELETE FROM employee_documents WHERE employee_id IN (${placeholders})`).run(...ids);
+    db.prepare(`DELETE FROM employee_leave WHERE employee_id IN (${placeholders})`).run(...ids);
+    db.prepare(`UPDATE employees SET manager_id = NULL WHERE manager_id IN (${placeholders})`).run(...ids);
+    db.prepare(`DELETE FROM employees WHERE id IN (${placeholders})`).run(...ids);
+    for (const id of ids) {
+      const dir = path.join(UPLOAD_BASE, `emp_${id}`);
+      if (fs.existsSync(dir)) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* ignore */ } }
+    }
+    req.flash('success', `${ids.length} employee(s) deleted.`);
+  } catch (err) {
+    console.error('Roster bulk delete error:', err);
+    req.flash('error', 'Error deleting employees: ' + err.message);
+  }
+  res.redirect('/hr/roster');
+});
+
+// ============================================
+// EMPLOYEES LIST (legacy — kept for backward compat)
 // ============================================
 router.get('/employees', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
