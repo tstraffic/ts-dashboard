@@ -324,11 +324,14 @@ router.post('/employees/delete', requirePermission('hr_employees'), (req, res) =
     }
   } catch (e) { /* ignore */ }
 
-  // Delete related records
-  const relatedTables = ['employee_competencies', 'employee_documents'];
+  // Delete related records from all tables that reference employees
+  const relatedTables = ['employee_competencies', 'employee_documents', 'employee_leave'];
   for (const table of relatedTables) {
     try { db.prepare(`DELETE FROM ${table} WHERE employee_id IN (${placeholders})`).run(...ids); } catch (e) { /* table may not exist */ }
   }
+
+  // Null out manager_id self-references so other employees aren't blocked
+  try { db.prepare(`UPDATE employees SET manager_id = NULL WHERE manager_id IN (${placeholders})`).run(...ids); } catch (e) { /* ignore */ }
 
   // Delete uploaded HR folders
   for (const id of ids) {
@@ -336,10 +339,14 @@ router.post('/employees/delete', requirePermission('hr_employees'), (req, res) =
     try { fs.rmSync(empDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
   }
 
-  const result = db.prepare(`DELETE FROM employees WHERE id IN (${placeholders})`).run(...ids);
-  const count = result.changes;
-
-  req.flash('success', `Deleted ${count} employee${count !== 1 ? 's' : ''}.`);
+  try {
+    const result = db.prepare(`DELETE FROM employees WHERE id IN (${placeholders})`).run(...ids);
+    const count = result.changes;
+    req.flash('success', `Deleted ${count} employee${count !== 1 ? 's' : ''}.`);
+  } catch (e) {
+    console.error('Employee delete error:', e.message);
+    req.flash('error', 'Could not delete employee(s): ' + e.message);
+  }
   res.redirect('/hr/employees');
 });
 
