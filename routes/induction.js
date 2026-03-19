@@ -9,7 +9,7 @@ const { getDb } = require('../db/database');
 // Multer config for induction document uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '..', 'uploads', 'inductions');
+    const dir = path.join(__dirname, '..', 'data', 'uploads', 'inductions');
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },

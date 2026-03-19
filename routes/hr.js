@@ -13,7 +13,7 @@ function canViewRates(user) {
 }
 
 // --- Multer config for HR document uploads ---
-const UPLOAD_BASE = path.join(__dirname, '..', 'uploads', 'hr');
+const UPLOAD_BASE = path.join(__dirname, '..', 'data', 'uploads', 'hr');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

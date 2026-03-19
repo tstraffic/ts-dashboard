@@ -3,12 +3,8 @@ data/*.db
 data/*.db-shm
 data/*.db-wal
 data/sessions.db
-uploads/delivery/*
-uploads/accounts/*
-uploads/defects/*
-!uploads/delivery/.gitkeep
-!uploads/accounts/.gitkeep
-!uploads/defects/.gitkeep
+uploads/
+data/uploads/
 .env
 *.log
 .claude/

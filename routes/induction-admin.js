@@ -245,13 +245,14 @@ router.post('/submissions/delete', (req, res) => {
   const placeholders = ids.map(() => '?').join(',');
   const submissions = db.prepare(`SELECT id, white_card_photo, tc_licence_photo, drivers_licence_photo, drivers_licence_back_photo FROM induction_submissions WHERE id IN (${placeholders})`).all(...ids);
 
-  // Delete uploaded files from disk
-  const uploadsDir = path.resolve(__dirname, '..', 'uploads', 'inductions');
+  // Delete uploaded files from disk (check both new and legacy paths)
+  const newUploadsDir = path.resolve(__dirname, '..', 'data', 'uploads', 'inductions');
+  const legacyUploadsDir = path.resolve(__dirname, '..', 'uploads', 'inductions');
   for (const s of submissions) {
     for (const field of ['white_card_photo', 'tc_licence_photo', 'drivers_licence_photo', 'drivers_licence_back_photo']) {
       if (s[field]) {
-        const filePath = path.join(uploadsDir, s[field]);
-        try { fs.unlinkSync(filePath); } catch (e) { /* file may not exist */ }
+        try { fs.unlinkSync(path.join(newUploadsDir, s[field])); } catch (e) { /* ignore */ }
+        try { fs.unlinkSync(path.join(legacyUploadsDir, s[field])); } catch (e) { /* ignore */ }
       }
     }
   }
@@ -269,10 +270,16 @@ router.post('/submissions/delete', (req, res) => {
 router.get('/uploads/:id/:filename', (req, res) => {
   // Sanitize filename — prevent path traversal attacks
   const filename = path.basename(req.params.filename);
-  const uploadsDir = path.resolve(__dirname, '..', 'uploads', 'inductions');
-  const filePath = path.resolve(uploadsDir, filename);
-  if (!filePath.startsWith(uploadsDir) || !fs.existsSync(filePath)) {
-    return res.status(404).send('File not found');
+  // Check both new (data/uploads) and legacy (uploads) paths for backwards compat
+  const newUploadsDir = path.resolve(__dirname, '..', 'data', 'uploads', 'inductions');
+  const legacyUploadsDir = path.resolve(__dirname, '..', 'uploads', 'inductions');
+  let filePath = path.resolve(newUploadsDir, filename);
+  if (!filePath.startsWith(newUploadsDir) || !fs.existsSync(filePath)) {
+    // Fallback to legacy path
+    filePath = path.resolve(legacyUploadsDir, filename);
+    if (!filePath.startsWith(legacyUploadsDir) || !fs.existsSync(filePath)) {
+      return res.status(404).send('File not found');
+    }
   }
   res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
   res.sendFile(filePath);
