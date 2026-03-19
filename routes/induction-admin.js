@@ -222,6 +222,48 @@ router.post('/submissions/:id/convert', (req, res) => {
   res.redirect(`/induction/admin/submissions/${req.params.id}`);
 });
 
+// POST /induction/admin/submissions/delete — bulk delete submissions
+router.post('/submissions/delete', (req, res) => {
+  const db = getDb();
+  let ids = req.body.ids;
+
+  // Support both single id and array of ids
+  if (!ids) {
+    req.flash('error', 'No submissions selected.');
+    return res.redirect('/induction/admin/submissions');
+  }
+  if (!Array.isArray(ids)) ids = [ids];
+
+  // Sanitize to integers
+  ids = ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+  if (ids.length === 0) {
+    req.flash('error', 'No valid submissions selected.');
+    return res.redirect('/induction/admin/submissions');
+  }
+
+  // Fetch submissions to clean up uploaded files
+  const placeholders = ids.map(() => '?').join(',');
+  const submissions = db.prepare(`SELECT id, white_card_photo, tc_licence_photo, drivers_licence_photo, drivers_licence_back_photo FROM induction_submissions WHERE id IN (${placeholders})`).all(...ids);
+
+  // Delete uploaded files from disk
+  const uploadsDir = path.resolve(__dirname, '..', 'uploads', 'inductions');
+  for (const s of submissions) {
+    for (const field of ['white_card_photo', 'tc_licence_photo', 'drivers_licence_photo', 'drivers_licence_back_photo']) {
+      if (s[field]) {
+        const filePath = path.join(uploadsDir, s[field]);
+        try { fs.unlinkSync(filePath); } catch (e) { /* file may not exist */ }
+      }
+    }
+  }
+
+  // Delete from database
+  db.prepare(`DELETE FROM induction_submissions WHERE id IN (${placeholders})`).run(...ids);
+
+  const count = submissions.length;
+  req.flash('success', `Deleted ${count} submission${count !== 1 ? 's' : ''}.`);
+  res.redirect('/induction/admin/submissions');
+});
+
 // Serve uploaded induction files (authenticated)
 // View URLs: /induction/admin/uploads/:id/:filename — :id is for context only, files are stored flat
 router.get('/uploads/:id/:filename', (req, res) => {
