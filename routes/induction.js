@@ -218,21 +218,19 @@ function handleSubmission(req, res) {
         submitted_at: new Date().toISOString(),
       };
 
-      // Only include columns that actually exist in the table
-      const cols = [];
-      const placeholders = [];
-      const values = [];
+      // Build named params — only for columns that exist in the table
+      const colNames = [];
+      const params = {};
       for (const [col, val] of Object.entries(allFields)) {
         if (existingCols.includes(col)) {
-          cols.push(col);
-          placeholders.push('?');
-          values.push(val);
+          colNames.push(col);
+          params['$' + col] = val;
         }
       }
 
-      const sql = `INSERT INTO induction_submissions (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`;
-      console.log('Running INSERT with', cols.length, 'columns for:', computedFullName);
-      db.prepare(sql).run(...values);
+      const sql = `INSERT INTO induction_submissions (${colNames.join(', ')}) VALUES (${colNames.map(c => '$' + c).join(', ')})`;
+      console.log('Running INSERT with', colNames.length, 'named params for:', computedFullName);
+      db.prepare(sql).run(params);
 
       console.log('Induction submitted successfully:', computedFullName, paymentType);
 
