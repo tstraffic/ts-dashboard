@@ -1,12 +1,12 @@
 {
-  "name": "T&S Worker Portal",
-  "short_name": "T&S Worker",
-  "description": "T&S Traffic Control Worker Operations Portal",
+  "name": "T&S Employee Portal",
+  "short_name": "T&S Employee",
+  "description": "T&S Traffic Control Employee Operations Portal",
   "start_url": "/w/home",
   "scope": "/w/",
   "display": "standalone",
-  "background_color": "#F9FAFB",
-  "theme_color": "#1D6AE5",
+  "background_color": "#020817",
+  "theme_color": "#020817",
   "orientation": "portrait-primary",
   "icons": [
     {
