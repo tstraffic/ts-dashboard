@@ -32,6 +32,33 @@ if (typeof Chart !== 'undefined') {
   });
 })();
 
+// ===== Sidebar Scroll Persistence =====
+// Saves sidebar scroll position so it doesn't jump to top on page navigation
+(function() {
+  var nav = document.querySelector('.sidebar-nav');
+  if (!nav) return;
+
+  // Restore scroll position on page load
+  var saved = sessionStorage.getItem('sidebar-scroll');
+  if (saved) {
+    nav.scrollTop = parseInt(saved, 10);
+  }
+
+  // Save scroll position before navigating away
+  window.addEventListener('beforeunload', function() {
+    sessionStorage.setItem('sidebar-scroll', nav.scrollTop);
+  });
+
+  // Also save on every scroll (debounced) for instant accuracy
+  var scrollTimer;
+  nav.addEventListener('scroll', function() {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function() {
+      sessionStorage.setItem('sidebar-scroll', nav.scrollTop);
+    }, 100);
+  }, { passive: true });
+})();
+
 // ===== Mobile Sidebar Toggle =====
 (function() {
   const toggle = document.getElementById('sidebar-toggle');
