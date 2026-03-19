@@ -120,8 +120,8 @@
     </form>
   </div>
 
-  <!-- Bulk Action Bar (hidden until checkboxes selected) -->
-  <div id="bulkBar" class="hidden sticky top-0 z-30 bg-red-50 border border-red-200 rounded-xl shadow-sm p-3 items-center justify-between gap-3">
+  <!-- Bulk Action Bar -->
+  <div id="bulkBar" style="display:none;" class="sticky top-0 z-30 bg-red-50 border border-red-200 rounded-xl shadow-sm p-3 flex items-center justify-between gap-3">
     <div class="flex items-center gap-2">
       <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
       <span id="bulkCount" class="text-sm font-semibold text-red-700">0 selected</span>
@@ -132,105 +132,105 @@
   </div>
 
   <!-- Employees Table -->
+  <% if (employees && employees.length > 0) { %>
   <form id="deleteForm" method="POST" action="/hr/employees/delete">
     <%- include('../partials/csrf') %>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-    <% if (employees && employees.length > 0) { %>
-    <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead>
-          <tr class="border-b border-gray-200">
-            <th class="px-2 sm:px-3 py-3 text-center w-10">
-              <input type="checkbox" id="selectAll" onchange="toggleAll(this)" class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
-            </th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Code</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Full Name</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Company</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Division</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Role</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Type</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Readiness</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Manager</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Start Date</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Next Expiry</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <% employees.forEach(emp => { %>
-          <tr class="hover:bg-gray-50 transition">
-            <td class="px-2 sm:px-3 py-3 text-center">
-              <input type="checkbox" name="ids" value="<%= emp.id %>" onchange="updateBulkBar()" class="emp-check w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
-            </td>
-            <td class="px-3 sm:px-4 py-3 text-gray-500 font-mono text-xs"><%= emp.employee_code || '-' %></td>
-            <td class="px-3 sm:px-4 py-3">
-              <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %><% if (emp.middle_name) { %> <%= emp.middle_name %><% } %> <%= emp.last_name %></a>
-              <div class="flex items-center gap-1.5 mt-0.5">
-                <% if (emp.payment_type) { %>
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase
-                    <%= emp.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600' : emp.payment_type === 'tfn' ? 'bg-blue-50 text-blue-600' : emp.payment_type === 'abn' ? 'bg-purple-50 text-purple-600' : 'bg-gray-50 text-gray-500' %>"><%= emp.payment_type %></span>
-                <% } %>
-                <span class="sm:hidden text-[10px] text-gray-400"><%= emp.company || '' %><% if (emp.role_title) { %> &middot; <%= emp.role_title %><% } %></span>
-              </div>
-            </td>
-            <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden sm:table-cell"><%= emp.company || '-' %></td>
-            <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden md:table-cell"><%= emp.division || '-' %></td>
-            <td class="px-3 sm:px-4 py-3 text-gray-600 text-xs hidden md:table-cell"><%= emp.role_title || '-' %></td>
-            <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden lg:table-cell"><%= emp.employment_type ? emp.employment_type.replace(/_/g, ' ') : '-' %></td>
-            <td class="px-3 sm:px-4 py-3">
-              <% const sBadge = statusBadge[emp.employment_status] || statusBadge.inactive; %>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= sBadge %>">
-                <%= (emp.employment_status || 'unknown').replace(/_/g, ' ') %>
-              </span>
-            </td>
-            <td class="px-3 sm:px-4 py-3">
-              <% if (emp.readiness) { %>
-                <% const rBadge = readinessBadge[emp.readiness.status] || 'bg-gray-100 text-gray-500'; %>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= rBadge %>">
-                  <%= readinessLabel[emp.readiness.status] || emp.readiness.status %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th class="px-2 sm:px-3 py-3 text-center w-10">
+                <input type="checkbox" id="selectAll" onchange="toggleAll(this)" class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+              </th>
+              <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Code</th>
+              <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Full Name</th>
+              <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Company</th>
+              <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Division</th>
+              <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Role</th>
+              <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Type</th>
+              <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+              <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Readiness</th>
+              <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Manager</th>
+              <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Start Date</th>
+              <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Next Expiry</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% employees.forEach(function(emp) { %>
+            <tr class="hover:bg-gray-50 transition">
+              <td class="px-2 sm:px-3 py-3 text-center">
+                <input type="checkbox" name="ids" value="<%= emp.id %>" onchange="updateBulkBar()" class="emp-check w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+              </td>
+              <td class="px-3 sm:px-4 py-3 text-gray-500 font-mono text-xs"><%= emp.employee_code || '-' %></td>
+              <td class="px-3 sm:px-4 py-3">
+                <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %><% if (emp.middle_name) { %> <%= emp.middle_name %><% } %> <%= emp.last_name %></a>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <% if (emp.payment_type) { %>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase
+                      <%= emp.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600' : emp.payment_type === 'tfn' ? 'bg-blue-50 text-blue-600' : emp.payment_type === 'abn' ? 'bg-purple-50 text-purple-600' : 'bg-gray-50 text-gray-500' %>"><%= emp.payment_type %></span>
+                  <% } %>
+                  <span class="sm:hidden text-[10px] text-gray-400"><%= emp.company || '' %><% if (emp.role_title) { %> &middot; <%= emp.role_title %><% } %></span>
+                </div>
+              </td>
+              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden sm:table-cell"><%= emp.company || '-' %></td>
+              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden md:table-cell"><%= emp.division || '-' %></td>
+              <td class="px-3 sm:px-4 py-3 text-gray-600 text-xs hidden md:table-cell"><%= emp.role_title || '-' %></td>
+              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden lg:table-cell"><%= emp.employment_type ? emp.employment_type.replace(/_/g, ' ') : '-' %></td>
+              <td class="px-3 sm:px-4 py-3">
+                <% var sBadge = statusBadge[emp.employment_status] || statusBadge.inactive; %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= sBadge %>">
+                  <%= (emp.employment_status || 'unknown').replace(/_/g, ' ') %>
                 </span>
-              <% } else { %>
-                <span class="text-gray-300 text-xs">-</span>
-              <% } %>
-            </td>
-            <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden lg:table-cell"><%= emp.manager_name || '-' %></td>
-            <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs tabular-nums hidden xl:table-cell"><%= formatDate(emp.start_date) %></td>
-            <td class="px-3 sm:px-4 py-3 hidden xl:table-cell">
-              <% if (emp.next_expiry) { %>
-                <span class="text-xs text-amber-600"><%= formatDate(emp.next_expiry) %></span>
-              <% } else { %>
-                <span class="text-gray-300 text-xs">-</span>
-              <% } %>
-            </td>
-          </tr>
-          <% }); %>
-        </tbody>
-      </table>
-    </div>
-    <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
-      Showing <%= employees.length %> employee<%= employees.length !== 1 ? 's' : '' %>
-    </div>
-    <% } else { %>
-    <div class="p-10 text-center">
-      <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
-        <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </td>
+              <td class="px-3 sm:px-4 py-3">
+                <% if (emp.readiness) { %>
+                  <% var rBadge = readinessBadge[emp.readiness.status] || 'bg-gray-100 text-gray-500'; %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= rBadge %>">
+                    <%= readinessLabel[emp.readiness.status] || emp.readiness.status %>
+                  </span>
+                <% } else { %>
+                  <span class="text-gray-300 text-xs">-</span>
+                <% } %>
+              </td>
+              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden lg:table-cell"><%= emp.manager_name || '-' %></td>
+              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs tabular-nums hidden xl:table-cell"><%= formatDate(emp.start_date) %></td>
+              <td class="px-3 sm:px-4 py-3 hidden xl:table-cell">
+                <% if (emp.next_expiry) { %>
+                  <span class="text-xs text-amber-600"><%= formatDate(emp.next_expiry) %></span>
+                <% } else { %>
+                  <span class="text-gray-300 text-xs">-</span>
+                <% } %>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
       </div>
-      <h3 class="text-gray-900 font-semibold text-base mb-1">No employees found</h3>
-      <p class="text-gray-500 text-sm mb-1">No employees match the current filters.</p>
-      <p class="text-gray-400 text-xs mb-4">Try adjusting your search criteria or add a new employee.</p>
-      <a href="/hr/employees/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-        Add Employee
-      </a>
+      <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
+        Showing <%= employees.length %> employee<%= employees.length !== 1 ? 's' : '' %>
+      </div>
     </div>
-    <% } %>
-  </div>
   </form>
+  <% } else { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+    <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    </div>
+    <h3 class="text-gray-900 font-semibold text-base mb-1">No employees found</h3>
+    <p class="text-gray-500 text-sm mb-1">No employees match the current filters.</p>
+    <p class="text-gray-400 text-xs mb-4">Try adjusting your search criteria or add a new employee.</p>
+    <a href="/hr/employees/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      Add Employee
+    </a>
+  </div>
+  <% } %>
 
 </div>
 
 <!-- Delete Confirmation Modal -->
-<div id="deleteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+<div id="deleteModal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-4">
   <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeDeleteModal()"></div>
   <div class="relative bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
     <div class="flex items-center gap-3">
@@ -250,43 +250,56 @@
 </div>
 
 <script>
-function toggleAll(master) {
-  document.querySelectorAll('.emp-check').forEach(cb => { cb.checked = master.checked; });
-  updateBulkBar();
-}
-
-function updateBulkBar() {
-  var checked = document.querySelectorAll('.emp-check:checked');
-  var bar = document.getElementById('bulkBar');
-  var count = document.getElementById('bulkCount');
-  if (checked.length > 0) {
-    bar.classList.remove('hidden');
-    bar.classList.add('flex');
-    count.textContent = checked.length + ' selected';
-  } else {
-    bar.classList.add('hidden');
-    bar.classList.remove('flex');
+(function() {
+  function toggleAll(master) {
+    var boxes = document.querySelectorAll('.emp-check');
+    for (var i = 0; i < boxes.length; i++) {
+      boxes[i].checked = master.checked;
+    }
+    updateBulkBar();
   }
-  // Update select-all state
-  var all = document.querySelectorAll('.emp-check');
-  var selectAll = document.getElementById('selectAll');
-  if (selectAll) {
-    selectAll.checked = all.length > 0 && checked.length === all.length;
-    selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
+
+  function updateBulkBar() {
+    var checked = document.querySelectorAll('.emp-check:checked');
+    var bar = document.getElementById('bulkBar');
+    var count = document.getElementById('bulkCount');
+    if (!bar || !count) return;
+
+    if (checked.length > 0) {
+      bar.style.display = 'flex';
+      count.textContent = checked.length + ' selected';
+    } else {
+      bar.style.display = 'none';
+    }
+
+    var all = document.querySelectorAll('.emp-check');
+    var selectAll = document.getElementById('selectAll');
+    if (selectAll) {
+      selectAll.checked = all.length > 0 && checked.length === all.length;
+      selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
+    }
   }
-}
 
-function confirmDelete() {
-  var count = document.querySelectorAll('.emp-check:checked').length;
-  document.getElementById('modalCount').textContent = count;
-  document.getElementById('deleteModal').classList.remove('hidden');
-}
+  function confirmDelete() {
+    var count = document.querySelectorAll('.emp-check:checked').length;
+    if (count === 0) return;
+    document.getElementById('modalCount').textContent = count;
+    document.getElementById('deleteModal').style.display = 'flex';
+  }
 
-function closeDeleteModal() {
-  document.getElementById('deleteModal').classList.add('hidden');
-}
+  function closeDeleteModal() {
+    document.getElementById('deleteModal').style.display = 'none';
+  }
 
-function submitDelete() {
-  document.getElementById('deleteForm').submit();
-}
+  function submitDelete() {
+    document.getElementById('deleteForm').submit();
+  }
+
+  // Expose to global scope for inline handlers
+  window.toggleAll = toggleAll;
+  window.updateBulkBar = updateBulkBar;
+  window.confirmDelete = confirmDelete;
+  window.closeDeleteModal = closeDeleteModal;
+  window.submitDelete = submitDelete;
+})();
 </script>
