@@ -7,18 +7,53 @@
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
     </a>
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">New Thread</h1>
-      <p class="text-gray-500 text-sm mt-0.5">Start an operational discussion tied to a job or incident</p>
+      <h1 class="text-2xl font-bold text-gray-900">New Message</h1>
+      <p class="text-gray-500 text-sm mt-0.5">Start a direct message or operational thread</p>
     </div>
   </div>
 
-  <!-- Form -->
+  <!-- Direct Message Section -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-4">
+    <h2 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700">DM</span>
+      Direct Message
+    </h2>
+    <form method="POST" action="/chat/new">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="thread_type" value="dm">
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">Send to</label>
+        <select name="dm_user_id" class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" required>
+          <option value="">Select person...</option>
+          <% users.forEach(u => { %>
+            <option value="<%= u.id %>"><%= u.full_name %> (<%= u.role %>)</option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">Message <span class="text-gray-400 font-normal">(optional)</span></label>
+        <textarea name="initial_message" rows="2" class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none" placeholder="Write your first message..."></textarea>
+      </div>
+
+      <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+        Start Conversation
+      </button>
+    </form>
+  </div>
+
+  <% if (canCreateOpsThread) { %>
+  <!-- Operational Thread Section -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+    <h2 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700">OPS</span>
+      Operational Thread
+    </h2>
     <form method="POST" action="/chat/new">
       <%- include('../partials/csrf') %>
 
-      <!-- Thread Type -->
-      <div class="mb-5">
+      <div class="mb-4">
         <label class="block text-sm font-medium text-gray-700 mb-1.5">Thread Type</label>
         <select name="thread_type" id="thread_type" class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" required onchange="toggleEntitySelect()">
           <option value="">Select type...</option>
@@ -27,10 +62,9 @@
         </select>
       </div>
 
-      <!-- Job Select -->
-      <div id="job_select_group" class="mb-5 hidden">
+      <div id="job_select_group" class="mb-4 hidden">
         <label class="block text-sm font-medium text-gray-700 mb-1.5">Job</label>
-        <select name="entity_id" id="job_entity_id" class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <select name="entity_id" id="job_entity_id" class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" disabled>
           <option value="">Select job...</option>
           <% jobs.forEach(j => { %>
             <option value="<%= j.id %>"><%= j.job_number %> — <%= j.client %></option>
@@ -38,10 +72,9 @@
         </select>
       </div>
 
-      <!-- Incident Select -->
-      <div id="incident_select_group" class="mb-5 hidden">
+      <div id="incident_select_group" class="mb-4 hidden">
         <label class="block text-sm font-medium text-gray-700 mb-1.5">Incident</label>
-        <select name="entity_id" id="incident_entity_id" class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <select name="entity_id" id="incident_entity_id" class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" disabled>
           <option value="">Select incident...</option>
           <% incidents.forEach(i => { %>
             <option value="<%= i.id %>"><%= i.incident_number %> — <%= i.title %> (<%= i.job_number %>)</option>
@@ -49,21 +82,17 @@
         </select>
       </div>
 
-      <!-- Initial Message -->
-      <div class="mb-6">
+      <div class="mb-4">
         <label class="block text-sm font-medium text-gray-700 mb-1.5">Initial Message <span class="text-gray-400 font-normal">(optional)</span></label>
-        <textarea name="initial_message" rows="3" class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none" placeholder="Add an initial message to start the conversation..."></textarea>
+        <textarea name="initial_message" rows="2" class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none" placeholder="Add a message to start the conversation..."></textarea>
       </div>
 
-      <!-- Submit -->
-      <div class="flex items-center justify-between">
-        <a href="/chat" class="px-4 py-2 text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors">Cancel</a>
-        <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
-          Create Thread
-        </button>
-      </div>
+      <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+        Create Thread
+      </button>
     </form>
   </div>
+  <% } %>
 </div>
 
 <script>
@@ -73,20 +102,10 @@
     const incidentGroup = document.getElementById('incident_select_group');
     const jobSelect = document.getElementById('job_entity_id');
     const incidentSelect = document.getElementById('incident_entity_id');
-
-    jobGroup.classList.add('hidden');
-    incidentGroup.classList.add('hidden');
-    jobSelect.disabled = true;
-    incidentSelect.disabled = true;
-
-    if (type === 'job') {
-      jobGroup.classList.remove('hidden');
-      jobSelect.disabled = false;
-    } else if (type === 'incident') {
-      incidentGroup.classList.remove('hidden');
-      incidentSelect.disabled = false;
-    }
+    jobGroup.classList.add('hidden'); incidentGroup.classList.add('hidden');
+    jobSelect.disabled = true; incidentSelect.disabled = true;
+    if (type === 'job') { jobGroup.classList.remove('hidden'); jobSelect.disabled = false; }
+    else if (type === 'incident') { incidentGroup.classList.remove('hidden'); incidentSelect.disabled = false; }
   }
-  // Init
   toggleEntitySelect();
 </script>

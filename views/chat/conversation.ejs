@@ -1,0 +1,37 @@
+<% locals.currentPage = 'chat' %>
+
+<!-- Header -->
+<div class="flex items-center gap-3 mb-5">
+  <a href="<%= backUrl || '/chat' %>" class="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+  </a>
+  <div class="flex-1 min-w-0">
+    <h1 class="text-xl font-bold text-gray-900 truncate"><%= threadTitle %></h1>
+    <p class="text-gray-500 text-xs"><%= threadSubtitle %></p>
+  </div>
+  <% if (threadType === 'announcement') { %>
+    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700">Announcement</span>
+  <% } else if (threadType === 'channel') { %>
+    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700">Channel</span>
+  <% } else if (threadType === 'dm') { %>
+    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700">Direct</span>
+  <% } %>
+</div>
+
+<!-- Chat Panel -->
+<% if (canPost) { %>
+  <%- include('../partials/chat-panel') %>
+<% } else { %>
+  <!-- Read-only view for announcement channels -->
+  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+       data-chat-thread="<%= chatThreadId %>"
+       data-current-user-id="<%= user.id %>"
+       data-current-user-name="<%= user.full_name %>">
+    <div class="chat-messages overflow-y-auto p-4 space-y-1" style="max-height: 600px;">
+      <div class="text-center text-gray-400 text-sm py-4">Loading messages...</div>
+    </div>
+    <div class="border-t border-gray-200 p-3 text-center">
+      <p class="text-xs text-gray-400">This is an announcement channel. Only admin and operations can post.</p>
+    </div>
+  </div>
+<% } %>

@@ -44,6 +44,7 @@ router.get('/', (req, res) => {
   const canStartThread = ['admin', 'operations'].includes(userRole);
 
   // Filters
+  const tab = req.query.tab || 'all';
   const filterType = req.query.type || '';
   const filterStatus = req.query.status || '';
   const filterSearch = req.query.search || '';
@@ -77,6 +78,15 @@ router.get('/', (req, res) => {
       JOIN chat_threads ct ON ct.id = ctm.thread_id
       WHERE ctm.user_id = ? AND ct.status = 'active'`;
     baseParams = [userId];
+  }
+
+  // Apply tab filter
+  if (tab === 'direct') {
+    baseQuery += ` AND ct.thread_type = 'dm'`;
+  } else if (tab === 'threads') {
+    baseQuery += ` AND ct.thread_type IN ('job','incident','compliance')`;
+  } else if (tab === 'channels') {
+    baseQuery += ` AND ct.thread_type IN ('channel','announcement')`;
   }
 
   // Apply filters
@@ -115,17 +125,31 @@ router.get('/', (req, res) => {
 
   const stats = {
     unread: allThreads.filter(t => t.unread_count > 0).length,
-    jobs: allThreads.filter(t => t.thread_type === 'job').length,
-    incidents: allThreads.filter(t => t.thread_type === 'incident').length,
-    plans: allThreads.filter(t => t.thread_type === 'compliance').length,
+    dms: allThreads.filter(t => t.thread_type === 'dm').length,
+    threads: allThreads.filter(t => ['job','incident','compliance'].includes(t.thread_type)).length,
+    channels: allThreads.filter(t => ['channel','announcement'].includes(t.thread_type)).length,
     total: allThreads.length,
   };
+
+  // For DM threads, resolve the "other user" name for display
+  for (const t of filteredThreads) {
+    if (t.thread_type === 'dm') {
+      const otherUser = db.prepare(`
+        SELECT u.id, u.full_name, u.role FROM chat_thread_members ctm
+        JOIN users u ON ctm.user_id = u.id
+        WHERE ctm.thread_id = ? AND ctm.user_id != ?
+        LIMIT 1
+      `).get(t.id, userId);
+      t.dm_user = otherUser || null;
+    }
+  }
 
   res.render('chat/inbox', {
     title: 'Operational Communications',
     currentPage: 'chat',
     threads: filteredThreads,
     stats,
+    tab,
     filters: { type: filterType, status: filterStatus, search: filterSearch },
     canStartThread,
     user: req.session.user
@@ -424,50 +448,124 @@ router.get('/api/unread-count', (req, res) => {
 });
 
 // ============================================
+// HTML: DM Conversation View
+// ============================================
+router.get('/dm/:userId', (req, res) => {
+  const db = getDb();
+  const { findOrCreateDM } = require('../lib/chat');
+  const otherUserId = parseInt(req.params.userId);
+  const currentUserId = req.session.user.id;
+
+  if (otherUserId === currentUserId) {
+    req.flash('error', 'Cannot message yourself.');
+    return res.redirect('/chat');
+  }
+
+  const otherUser = db.prepare('SELECT id, full_name, role FROM users WHERE id = ? AND active = 1').get(otherUserId);
+  if (!otherUser) {
+    req.flash('error', 'User not found.');
+    return res.redirect('/chat');
+  }
+
+  const chatThreadId = findOrCreateDM(currentUserId, otherUserId);
+
+  res.render('chat/conversation', {
+    title: `Chat with ${otherUser.full_name}`,
+    currentPage: 'chat',
+    chatThreadId,
+    threadTitle: otherUser.full_name,
+    threadSubtitle: otherUser.role,
+    threadType: 'dm',
+    canPost: true,
+    backUrl: '/chat?tab=direct',
+    user: req.session.user
+  });
+});
+
+// ============================================
+// HTML: Channel Conversation View
+// ============================================
+router.get('/channel/:id', requireThreadMember, (req, res) => {
+  const db = getDb();
+  const thread = db.prepare('SELECT * FROM chat_threads WHERE id = ? AND thread_type IN (?, ?)').get(req.params.id, 'channel', 'announcement');
+  if (!thread) {
+    req.flash('error', 'Channel not found.');
+    return res.redirect('/chat');
+  }
+
+  const memberCount = db.prepare('SELECT COUNT(*) as c FROM chat_thread_members WHERE thread_id = ?').get(thread.id).c;
+  const canPost = thread.thread_type === 'channel' || ['admin', 'operations'].includes(req.session.user.role);
+
+  res.render('chat/conversation', {
+    title: thread.title,
+    currentPage: 'chat',
+    chatThreadId: thread.id,
+    threadTitle: thread.title,
+    threadSubtitle: `${memberCount} members · ${thread.thread_type === 'announcement' ? 'Announcements' : 'Team Channel'}`,
+    threadType: thread.thread_type,
+    canPost,
+    backUrl: '/chat?tab=channels',
+    user: req.session.user
+  });
+});
+
+// ============================================
 // HTML: New Thread Form (admin/operations only)
 // ============================================
 router.get('/new', (req, res) => {
-  if (!['admin', 'operations'].includes(req.session.user.role)) {
-    req.flash('error', 'You do not have permission to start threads.');
-    return res.redirect('/chat');
-  }
   const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won','prestart') ORDER BY job_number").all();
-  const incidents = db.prepare(`
+  const canCreateOpsThread = ['admin', 'operations'].includes(req.session.user.role);
+  const jobs = canCreateOpsThread ? db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won','prestart') ORDER BY job_number").all() : [];
+  const incidents = canCreateOpsThread ? db.prepare(`
     SELECT i.id, i.incident_number, i.title, j.job_number
     FROM incidents i JOIN jobs j ON i.job_id = j.id
     WHERE i.investigation_status IN ('reported','investigating')
     ORDER BY i.incident_date DESC
-  `).all();
+  `).all() : [];
+  const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 AND id != ? ORDER BY full_name').all(req.session.user.id);
   res.render('chat/new', {
-    title: 'New Thread',
+    title: 'New Message',
     currentPage: 'chat',
     jobs,
     incidents,
+    users,
+    canCreateOpsThread,
     user: req.session.user
   });
 });
 
 router.post('/new', (req, res) => {
+  const db = getDb();
+  const { thread_type, entity_id, dm_user_id, initial_message } = req.body;
+  const { ensureThreadForEntity, addMembersToThread, postSystemMessage, findOrCreateDM } = require('../lib/chat');
+
+  // DM creation — any user can do this
+  if (thread_type === 'dm') {
+    if (!dm_user_id) { req.flash('error', 'Please select a user.'); return res.redirect('/chat/new'); }
+    const threadId = findOrCreateDM(req.session.user.id, parseInt(dm_user_id));
+    if (initial_message && initial_message.trim()) {
+      db.prepare('INSERT INTO messages (thread_id, sender_id, body, message_type) VALUES (?, ?, ?, ?)').run(threadId, req.session.user.id, initial_message.trim(), 'text');
+      db.prepare('UPDATE chat_threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(threadId);
+    }
+    return res.redirect(`/chat/dm/${dm_user_id}`);
+  }
+
+  // Operational threads — admin/operations only
   if (!['admin', 'operations'].includes(req.session.user.role)) {
-    req.flash('error', 'You do not have permission to start threads.');
+    req.flash('error', 'You do not have permission to start operational threads.');
     return res.redirect('/chat');
   }
-  const db = getDb();
-  const { thread_type, entity_id, initial_message } = req.body;
-  const { ensureThreadForEntity, addMembersToThread, postSystemMessage } = require('../lib/chat');
 
   if (!entity_id || !thread_type) {
     req.flash('error', 'Please select a thread type and item.');
     return res.redirect('/chat/new');
   }
 
-  let title, entityType, redirectUrl;
+  let title, redirectUrl;
   if (thread_type === 'job') {
     const job = db.prepare('SELECT id, job_number, project_manager_id, ops_supervisor_id, planning_owner_id, marketing_owner_id, accounts_owner_id FROM jobs WHERE id = ?').get(entity_id);
     if (!job) { req.flash('error', 'Job not found.'); return res.redirect('/chat/new'); }
     title = `Job ${job.job_number}`;
-    entityType = 'job';
     redirectUrl = `/jobs/${job.id}#chat`;
     const threadId = ensureThreadForEntity('job', job.id, title, req.session.user.id);
     const memberIds = [...new Set([req.session.user.id, job.project_manager_id, job.ops_supervisor_id, job.planning_owner_id, job.marketing_owner_id, job.accounts_owner_id].filter(Boolean))];
@@ -481,7 +579,6 @@ router.post('/new', (req, res) => {
     const incident = db.prepare('SELECT i.id, i.incident_number, i.reported_by_id, i.job_id, j.project_manager_id, j.ops_supervisor_id FROM incidents i JOIN jobs j ON i.job_id = j.id WHERE i.id = ?').get(entity_id);
     if (!incident) { req.flash('error', 'Incident not found.'); return res.redirect('/chat/new'); }
     title = `Incident ${incident.incident_number}`;
-    entityType = 'incident';
     redirectUrl = `/incidents/${incident.id}#chat`;
     const threadId = ensureThreadForEntity('incident', incident.id, title, req.session.user.id);
     const memberIds = [...new Set([req.session.user.id, incident.reported_by_id, incident.project_manager_id, incident.ops_supervisor_id].filter(Boolean))];
