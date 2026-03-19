@@ -835,6 +835,25 @@ router.get('/compliance', requirePermission('hr_compliance_view'), (req, res) =>
 });
 
 // ============================================
+// DEACTIVATE / REACTIVATE EMPLOYEE
+// ============================================
+router.post('/employees/:id/toggle-active', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const employee = db.prepare('SELECT id, employment_status, active FROM employees WHERE id = ?').get(req.params.id);
+  if (!employee) { req.flash('error', 'Employee not found.'); return res.redirect('/hr/employees'); }
+
+  const action = req.body.action; // 'deactivate' or 'reactivate'
+  if (action === 'deactivate') {
+    db.prepare('UPDATE employees SET employment_status = ?, active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('inactive', employee.id);
+    req.flash('success', 'Employee deactivated.');
+  } else if (action === 'reactivate') {
+    db.prepare('UPDATE employees SET employment_status = ?, active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('active', employee.id);
+    req.flash('success', 'Employee reactivated.');
+  }
+  res.redirect(`/hr/employees/${employee.id}`);
+});
+
+// ============================================
 // BLOCK / UNBLOCK EMPLOYEE
 // ============================================
 router.post('/employees/:id/block', requirePermission('hr_employees'), (req, res) => {
