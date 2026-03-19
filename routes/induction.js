@@ -44,7 +44,9 @@ const uploadFields = upload.fields([
 // Valid payment types
 const VALID_TYPES = ['cash', 'tfn', 'abn'];
 
-// GET /induction — unified form (user selects employment type inside)
+// ─── LITERAL ROUTES FIRST (before /:type catches them) ───
+
+// GET /induction — unified form
 router.get('/', (req, res) => {
   const accessToken = crypto.randomBytes(24).toString('hex');
   res.render('induction/form', {
@@ -55,7 +57,23 @@ router.get('/', (req, res) => {
   });
 });
 
-// GET /induction/:type — legacy URLs still work
+// GET /induction/complete — confirmation page
+router.get('/complete', (req, res) => {
+  res.render('induction/complete', {
+    layout: false,
+    paymentType: 'unified',
+    title: 'Application Submitted'
+  });
+});
+
+// POST /induction/submit — unified submit
+router.post('/submit', (req, res) => {
+  handleSubmission(req, res);
+});
+
+// ─── PARAMETRIC ROUTES (legacy URLs) ───
+
+// GET /induction/:type — legacy URLs (cash, tfn, abn)
 router.get('/:type', (req, res, next) => {
   const { type } = req.params;
   if (!VALID_TYPES.includes(type)) return next();
@@ -69,9 +87,16 @@ router.get('/:type', (req, res, next) => {
   });
 });
 
-// POST /induction/submit — unified submit
-router.post('/submit', (req, res) => {
-  handleSubmission(req, res);
+// GET /induction/:type/complete — legacy complete URLs
+router.get('/:type/complete', (req, res, next) => {
+  const { type } = req.params;
+  if (!VALID_TYPES.includes(type)) return next();
+
+  res.render('induction/complete', {
+    layout: false,
+    paymentType: type,
+    title: 'Application Submitted'
+  });
 });
 
 // POST /induction/:type/submit — legacy submit URLs
@@ -110,6 +135,13 @@ function handleSubmission(req, res) {
         b.bank_bsb = b.abn_bank_bsb || b.bank_bsb || '';
         b.bank_account_number = b.abn_bank_account_number || b.bank_account_number || '';
         b.bank_account_name = b.abn_bank_account_name || b.bank_account_name || '';
+      }
+      // For cash workers, bank fields have cash_ prefix
+      if (paymentType === 'cash') {
+        b.bank_name = b.cash_bank_name || b.bank_name || '';
+        b.bank_bsb = b.cash_bank_bsb || b.bank_bsb || '';
+        b.bank_account_number = b.cash_bank_account_number || b.bank_account_number || '';
+        b.bank_account_name = b.cash_bank_account_name || b.bank_account_name || '';
       }
 
       const stmt = getDb().prepare(`
@@ -171,26 +203,5 @@ function handleSubmission(req, res) {
     }
   });
 }
-
-// GET /induction/complete — confirmation page
-router.get('/complete', (req, res) => {
-  res.render('induction/complete', {
-    layout: false,
-    paymentType: 'unified',
-    title: 'Application Submitted'
-  });
-});
-
-// GET /induction/:type/complete — legacy complete URLs
-router.get('/:type/complete', (req, res, next) => {
-  const { type } = req.params;
-  if (!VALID_TYPES.includes(type)) return next();
-
-  res.render('induction/complete', {
-    layout: false,
-    paymentType: type,
-    title: 'Application Submitted'
-  });
-});
 
 module.exports = router;

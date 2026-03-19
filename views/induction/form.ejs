@@ -406,6 +406,32 @@
           <p class="text-sm text-gray-500">Select your employment type and enter your details.</p>
 
           <!-- Employment type selector -->
+          <% if (paymentType === 'cash') { %>
+          <!-- Cash workers: just bank details -->
+          <div class="border border-emerald-100 rounded-xl p-4 space-y-3 bg-emerald-50/30">
+            <h3 class="text-sm font-semibold text-emerald-800">Bank Account Details</h3>
+            <p class="text-xs text-gray-500">Enter your bank details for payment.</p>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Bank Name <span class="text-red-500">*</span></label>
+              <input type="text" name="bank_name" required placeholder="e.g. Commonwealth Bank" class="input-base" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">BSB <span class="text-red-500">*</span></label>
+                <input type="text" name="bank_bsb" required maxlength="7" placeholder="XXX-XXX" class="input-base" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Account Number <span class="text-red-500">*</span></label>
+                <input type="text" name="bank_account_number" required placeholder="Account number" class="input-base" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Account Name <span class="text-red-500">*</span></label>
+              <input type="text" name="bank_account_name" required placeholder="Name on bank account" class="input-base" />
+            </div>
+          </div>
+          <% } else { %>
+          <!-- TFN / ABN selector -->
           <div class="grid grid-cols-2 gap-3" id="typeSelector">
             <div class="type-card rounded-xl border-2 border-gray-200 p-4 text-center" onclick="selectType('tfn')" id="typeTfn">
               <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mx-auto mb-2">
@@ -422,6 +448,7 @@
               <p class="text-xs text-gray-500 mt-1">Australian Business Number</p>
             </div>
           </div>
+          <% } %>
 
           <!-- TFN Section -->
           <div id="tfnSection" class="hidden space-y-4">
