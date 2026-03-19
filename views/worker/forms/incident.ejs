@@ -1,0 +1,74 @@
+<div class="space-y-5">
+  <a href="/w/forms" class="inline-flex items-center text-sm text-brand-600 font-medium">
+    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back
+  </a>
+  <h1 class="text-xl font-bold text-gray-900">Report Incident</h1>
+
+  <form method="POST" action="/w/forms/incident" class="space-y-4">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <input type="hidden" name="latitude" id="lat">
+    <input type="hidden" name="longitude" id="lng">
+
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Incident Type</label>
+        <select name="incident_type" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm">
+          <option value="near_miss">Near Miss</option>
+          <option value="injury">Injury</option>
+          <option value="property_damage">Property Damage</option>
+          <option value="vehicle">Vehicle</option>
+          <option value="hazard">Hazard</option>
+          <option value="environmental">Environmental</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Severity</label>
+        <div class="grid grid-cols-4 gap-2">
+          <label class="flex flex-col items-center p-2 border rounded-lg cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
+            <input type="radio" name="severity" value="low" class="hidden" checked>
+            <span class="text-xs font-medium text-emerald-700">Low</span>
+          </label>
+          <label class="flex flex-col items-center p-2 border rounded-lg cursor-pointer has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+            <input type="radio" name="severity" value="medium" class="hidden">
+            <span class="text-xs font-medium text-amber-700">Medium</span>
+          </label>
+          <label class="flex flex-col items-center p-2 border rounded-lg cursor-pointer has-[:checked]:border-red-500 has-[:checked]:bg-red-50">
+            <input type="radio" name="severity" value="high" class="hidden">
+            <span class="text-xs font-medium text-red-700">High</span>
+          </label>
+          <label class="flex flex-col items-center p-2 border rounded-lg cursor-pointer has-[:checked]:border-red-700 has-[:checked]:bg-red-100">
+            <input type="radio" name="severity" value="critical" class="hidden">
+            <span class="text-xs font-bold text-red-800">Critical</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Title</label>
+        <input type="text" name="title" required placeholder="Brief description of the incident" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Description</label>
+        <textarea name="description" rows="4" required placeholder="What happened? Include as much detail as possible..." class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500"></textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Location</label>
+        <input type="text" name="location" placeholder="Where did this happen?" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+
+    <button type="submit" class="w-full py-3 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition">Submit Incident Report</button>
+  </form>
+</div>
+<script>
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(p => {
+    document.getElementById('lat').value = p.coords.latitude;
+    document.getElementById('lng').value = p.coords.longitude;
+  }, () => {}, { enableHighAccuracy: true, timeout: 10000 });
+}
+</script>

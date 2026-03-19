@@ -1,0 +1,49 @@
+<div class="space-y-5">
+  <div>
+    <h1 class="text-xl font-bold text-gray-900">Dockets</h1>
+    <p class="text-sm text-gray-500 mt-0.5">Sign-off records</p>
+  </div>
+
+  <!-- Today's Shifts Needing Dockets -->
+  <% if (todaysShifts.length > 0) { %>
+    <div>
+      <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Today's Shifts</h2>
+      <div class="space-y-2">
+        <% todaysShifts.forEach(s => { %>
+          <a href="/w/dockets/sign/<%= s.id %>" class="block bg-brand-50 border border-brand-200 rounded-xl p-4 active:bg-brand-100 transition">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-gray-900"><%= s.client %></p>
+                <p class="text-xs text-gray-500"><%= s.job_number %></p>
+              </div>
+              <span class="text-xs font-medium text-brand-600">Sign Docket &rarr;</span>
+            </div>
+          </a>
+        <% }) %>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Signed Dockets History -->
+  <div>
+    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Signed Dockets</h2>
+    <% if (dockets.length === 0) { %>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
+        <p class="text-gray-500 text-sm">No signed dockets yet</p>
+      </div>
+    <% } else { %>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm divide-y divide-gray-100">
+        <% dockets.forEach(d => { %>
+          <div class="p-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs text-gray-500"><%= d.signed_at ? new Date(d.signed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '' %></span>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700">Signed</span>
+            </div>
+            <p class="text-sm font-medium text-gray-900"><%= d.client || d.job_number || 'Docket' %></p>
+            <p class="text-xs text-gray-500"><%= d.docket_type.replace(/_/g, ' ') %><%= d.client_name ? ' · ' + d.client_name : '' %></p>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</div>

@@ -1,0 +1,65 @@
+<div class="space-y-5">
+  <a href="/w/hr" class="inline-flex items-center text-sm text-brand-600 font-medium">
+    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back to HR
+  </a>
+
+  <h1 class="text-xl font-bold text-gray-900">Certifications & Licences</h1>
+
+  <!-- Crew Member Licence -->
+  <% if (member && member.licence_type) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Traffic Control Licence</h3>
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-medium text-gray-900"><%= member.licence_type %></span>
+        <% if (member.licence_expiry) { %>
+          <% const exp = new Date(member.licence_expiry); const now = new Date(); const isExpired = exp < now; const isExpiring = !isExpired && exp < new Date(Date.now() + 30*24*60*60*1000); %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold
+            <%= isExpired ? 'bg-red-50 text-red-700' : isExpiring ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700' %>">
+            <%= isExpired ? 'Expired' : isExpiring ? 'Expiring Soon' : 'Valid' %> · <%= exp.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+          </span>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Competencies -->
+  <% if (certs.length === 0) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
+      <p class="text-gray-500 text-sm">No certifications on record</p>
+      <p class="text-xs text-gray-400 mt-1">Contact admin to add your qualifications</p>
+    </div>
+  <% } else { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm divide-y divide-gray-100">
+      <% certs.forEach(c => { %>
+        <div class="p-4">
+          <div class="flex items-center justify-between mb-1">
+            <p class="text-sm font-medium text-gray-900"><%= c.competency_name || c.comp_type %></p>
+            <% if (c.expiry_date) { %>
+              <% const exp = new Date(c.expiry_date); const now = new Date(); const isExpired = exp < now; const isExpiring = !isExpired && exp < new Date(Date.now() + 30*24*60*60*1000); %>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold
+                <%= isExpired ? 'bg-red-50 text-red-700' : isExpiring ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700' %>">
+                <%= isExpired ? 'Expired' : isExpiring ? 'Expiring' : 'Valid' %>
+              </span>
+            <% } else { %>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-600">No Expiry</span>
+            <% } %>
+          </div>
+          <div class="text-xs text-gray-500 space-y-0.5">
+            <% if (c.cert_number) { %><p>Cert #: <%= c.cert_number %></p><% } %>
+            <% if (c.issuing_authority) { %><p>Issued by: <%= c.issuing_authority %></p><% } %>
+            <% if (c.expiry_date) { %><p>Expires: <%= new Date(c.expiry_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) %></p><% } %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <!-- Induction -->
+  <% if (member && member.induction_date) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Induction</h3>
+      <p class="text-sm text-gray-700">Completed <%= new Date(member.induction_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }) %></p>
+    </div>
+  <% } %>
+</div>

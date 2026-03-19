@@ -45,7 +45,7 @@
           </svg>
         </div>
         <p class="text-gray-500 text-sm">No shift scheduled for today</p>
-        <a href="/w/jobs" class="inline-block mt-3 text-brand-600 text-sm font-medium">View upcoming jobs &rarr;</a>
+        <a href="/w/shifts" class="inline-block mt-3 text-brand-600 text-sm font-medium">View upcoming shifts &rarr;</a>
       </div>
     <% } else { %>
       <% todaysShifts.forEach(shift => { %>
@@ -108,8 +108,8 @@
 
           <!-- Actions -->
           <div class="px-4 py-3 bg-gray-50 border-t border-gray-100">
-            <a href="/w/jobs/<%= shift.id %>" class="block text-center text-sm font-medium text-brand-600">
-              View Job Details &rarr;
+            <a href="/w/shifts/<%= shift.id %>" class="block text-center text-sm font-medium text-brand-600">
+              View Shift Details &rarr;
             </a>
           </div>
         </div>
@@ -121,31 +121,29 @@
   <div>
     <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Quick Actions</h2>
     <div class="grid grid-cols-3 gap-3">
-      <a href="/w/clock" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center hover:bg-gray-50 transition">
-        <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mx-auto mb-2">
-          <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-        </div>
-        <p class="text-xs font-medium text-gray-700">Clock In</p>
-      </a>
-      <a href="#" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center hover:bg-gray-50 transition opacity-50 pointer-events-none">
+      <a href="/w/forms/prestart" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center hover:bg-gray-50 active:bg-gray-50 transition">
         <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-2">
           <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
         </div>
-        <p class="text-xs font-medium text-gray-700">Prestart</p>
-        <p class="text-[10px] text-gray-400">Coming soon</p>
+        <p class="text-xs font-medium text-gray-700">Pre-Start</p>
       </a>
-      <a href="#" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center hover:bg-gray-50 transition opacity-50 pointer-events-none">
+      <a href="/w/forms/incident" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center hover:bg-gray-50 active:bg-gray-50 transition">
         <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-2">
           <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
           </svg>
         </div>
         <p class="text-xs font-medium text-gray-700">Incident</p>
-        <p class="text-[10px] text-gray-400">Coming soon</p>
+      </a>
+      <a href="/w/dockets" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center hover:bg-gray-50 active:bg-gray-50 transition">
+        <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mx-auto mb-2">
+          <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+          </svg>
+        </div>
+        <p class="text-xs font-medium text-gray-700">Dockets</p>
       </a>
     </div>
   </div>

@@ -110,7 +110,17 @@ app.post('/w/login', loginLimiter);
 app.use('/w', require('./routes/worker/auth'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/home'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/jobs'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/shifts'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/chat'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/timesheets'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/availability'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/dockets'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/hr'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/profile'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/forms'));
+app.get('/w/more', requireWorker, workerLocals, (req, res) => {
+  res.render('worker/more', { title: 'More', currentPage: 'more' });
+});
 
 // Block worker-only sessions from admin routes
 app.use(blockWorkerFromAdmin);
