@@ -121,6 +121,25 @@
     </div>
   </div>
 
+  <!-- Emergency Contact -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Emergency Contact</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-3">
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.emergency_contact_name || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.emergency_contact_phone || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Relationship</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.emergency_contact_relationship ? s.emergency_contact_relationship.charAt(0).toUpperCase() + s.emergency_contact_relationship.slice(1) : '—' %></p>
+      </div>
+    </div>
+  </div>
+
   <!-- Fitness & Suitability -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
     <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Fitness & Suitability</h2>

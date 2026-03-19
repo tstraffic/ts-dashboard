@@ -3329,6 +3329,21 @@ function runMigrations(db) {
     console.log('Migration 59 complete — all seed data cleared.');
   }
 
+  // Migration 60: Add emergency contact fields to induction_submissions
+  if (!isMigrationApplied.get(60)) {
+    console.log('Running migration 60: Add emergency contact to induction_submissions');
+    const newCols60 = [
+      "ALTER TABLE induction_submissions ADD COLUMN emergency_contact_name TEXT DEFAULT ''",
+      "ALTER TABLE induction_submissions ADD COLUMN emergency_contact_phone TEXT DEFAULT ''",
+      "ALTER TABLE induction_submissions ADD COLUMN emergency_contact_relationship TEXT DEFAULT ''",
+    ];
+    for (const sql of newCols60) {
+      try { db.exec(sql); } catch (e) { /* column likely exists */ }
+    }
+    recordMigration.run(60, 'Add emergency contact to induction_submissions');
+    console.log('Migration 60 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
