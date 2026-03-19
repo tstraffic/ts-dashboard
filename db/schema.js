@@ -3035,6 +3035,117 @@ function runMigrations(db) {
     console.log('Migration 54 complete.');
   }
 
+  // Migration 55: Extend chat_threads for DMs, channels, announcements
+  if (!isMigrationApplied.get(55)) {
+    console.log('Running migration 55: DMs, channels, announcements');
+
+    // Rebuild chat_threads with extended CHECK + nullable entity columns + new columns
+    // Save existing data first
+    const existingThreads = db.prepare('SELECT * FROM chat_threads').all();
+    const existingMembers = db.prepare('SELECT * FROM chat_thread_members').all();
+
+    // Disable FK temporarily for the rebuild
+    db.pragma('foreign_keys = OFF');
+
+    // Drop old tables (messages FK references chat_threads but we keep messages intact)
+    db.exec('DROP TABLE IF EXISTS chat_thread_members');
+    db.exec('DROP TABLE IF EXISTS chat_threads');
+
+    // Create new tables with extended schema
+    db.exec(`
+      CREATE TABLE chat_threads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_type TEXT NOT NULL CHECK(thread_type IN ('job','incident','compliance','broadcast','dm','channel','announcement')),
+        related_entity_id INTEGER,
+        related_entity_type TEXT,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived','locked')),
+        is_default INTEGER NOT NULL DEFAULT 0,
+        channel_slug TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE chat_thread_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id INTEGER NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role_in_thread TEXT NOT NULL DEFAULT 'member' CHECK(role_in_thread IN ('owner','member','readonly')),
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        muted_at DATETIME,
+        last_read_message_id INTEGER DEFAULT 0,
+        UNIQUE(thread_id, user_id)
+      );
+    `);
+
+    // Restore data
+    if (existingThreads.length > 0) {
+      const insertThread = db.prepare('INSERT INTO chat_threads (id, thread_type, related_entity_id, related_entity_type, title, status, is_default, channel_slug, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)');
+      for (const t of existingThreads) {
+        insertThread.run(t.id, t.thread_type, t.related_entity_id, t.related_entity_type, t.title, t.status, t.created_by, t.created_at, t.updated_at);
+      }
+    }
+    if (existingMembers.length > 0) {
+      const insertMember = db.prepare('INSERT OR IGNORE INTO chat_thread_members (id, thread_id, user_id, role_in_thread, joined_at, muted_at, last_read_message_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
+      for (const m of existingMembers) {
+        insertMember.run(m.id, m.thread_id, m.user_id, m.role_in_thread, m.joined_at, m.muted_at, m.last_read_message_id);
+      }
+    }
+
+    // Re-enable FK
+    db.pragma('foreign_keys = ON');
+
+    // Recreate indexes
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_type ON chat_threads(thread_type);
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_entity ON chat_threads(related_entity_type, related_entity_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_status ON chat_threads(status);
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_slug ON chat_threads(channel_slug);
+      CREATE INDEX IF NOT EXISTS idx_chat_thread_members_thread ON chat_thread_members(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_thread_members_user ON chat_thread_members(user_id);
+    `);
+
+    // Seed default channels
+    const channels = [
+      { slug: 'all-team', title: 'All Team', type: 'announcement', isDefault: 1 },
+      { slug: 'operations', title: 'Operations', type: 'channel', isDefault: 1 },
+      { slug: 'field-workers', title: 'Field Workers', type: 'channel', isDefault: 1 },
+      { slug: 'supervisors', title: 'Supervisors', type: 'channel', isDefault: 1 },
+      { slug: 'planning', title: 'Planning', type: 'channel', isDefault: 1 },
+    ];
+    const insertChannel = db.prepare('INSERT OR IGNORE INTO chat_threads (thread_type, title, status, is_default, channel_slug) VALUES (?, ?, \'active\', ?, ?)');
+    for (const ch of channels) {
+      const exists = db.prepare('SELECT id FROM chat_threads WHERE channel_slug = ?').get(ch.slug);
+      if (!exists) {
+        insertChannel.run(ch.type, ch.title, ch.isDefault, ch.slug);
+      }
+    }
+
+    // Auto-add all existing active users to All Team channel
+    const allTeam = db.prepare("SELECT id FROM chat_threads WHERE channel_slug = 'all-team'").get();
+    if (allTeam) {
+      const users = db.prepare('SELECT id FROM users WHERE active = 1').all();
+      const addMember = db.prepare('INSERT OR IGNORE INTO chat_thread_members (thread_id, user_id, role_in_thread) VALUES (?, ?, ?)');
+      for (const u of users) {
+        addMember.run(allTeam.id, u.id, 'member');
+      }
+    }
+
+    // Post welcome system messages in default channels
+    const welcomeStmt = db.prepare("INSERT INTO messages (thread_id, sender_id, body, message_type) VALUES (?, NULL, ?, 'system')");
+    const allChannels = db.prepare("SELECT id, title, channel_slug FROM chat_threads WHERE is_default = 1").all();
+    for (const ch of allChannels) {
+      const hasMessages = db.prepare('SELECT id FROM messages WHERE thread_id = ? LIMIT 1').get(ch.id);
+      if (!hasMessages) {
+        welcomeStmt.run(ch.id, `Welcome to ${ch.title}. This channel was created automatically.`);
+      }
+    }
+
+    recordMigration.run(55, 'DMs, channels, announcements');
+    console.log('Migration 55 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

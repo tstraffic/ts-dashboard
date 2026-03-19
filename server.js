@@ -19,6 +19,10 @@ const { csrfProtection } = require('./middleware/csrf');
 // Initialize database and seed data
 initializeDatabase();
 
+// Ensure default chat channels exist
+const { ensureDefaultChannels } = require('./lib/chat');
+ensureDefaultChannels();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 

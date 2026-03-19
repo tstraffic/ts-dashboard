@@ -7,11 +7,11 @@ const { getTotalUnreadCount } = require('../lib/chat');
  */
 function requireThreadMember(req, res, next) {
   const db = getDb();
-  const threadId = req.params.threadId;
+  const threadId = req.params.threadId || req.params.id;
   const userId = req.session.user.id;
 
-  // Management can access all threads
-  if (req.session.user.role === 'management') return next();
+  // Admin and management can access all threads
+  if (['admin', 'management'].includes(req.session.user.role)) return next();
 
   const member = db.prepare(
     'SELECT id FROM chat_thread_members WHERE thread_id = ? AND user_id = ?'
