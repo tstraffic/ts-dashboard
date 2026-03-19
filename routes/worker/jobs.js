@@ -82,6 +82,7 @@ router.get('/jobs', (req, res) => {
 router.get('/jobs/:id', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
+  const tab = req.query.tab || 'info';
 
   // Get this allocation (must belong to this worker)
   const allocation = db.prepare(`
@@ -118,12 +119,50 @@ router.get('/jobs/:id', (req, res) => {
     if (supCrew) supervisorPhone = supCrew.phone;
   }
 
+  // Get safety forms for this allocation
+  const forms = db.prepare(`
+    SELECT id, form_type, status, submitted_at, created_at
+    FROM safety_forms
+    WHERE crew_member_id = ? AND allocation_id = ?
+    ORDER BY created_at DESC
+  `).all(worker.id, allocation.id);
+
+  // Also check for forms linked by job_id on same date (some may not have allocation_id)
+  const formsByJob = db.prepare(`
+    SELECT id, form_type, status, submitted_at, created_at
+    FROM safety_forms
+    WHERE crew_member_id = ? AND job_id = ? AND allocation_id IS NULL
+      AND date(created_at) = ?
+    ORDER BY created_at DESC
+  `).all(worker.id, allocation.job_id, allocation.allocation_date);
+
+  const allForms = [...forms, ...formsByJob];
+
+  // Build form completion status
+  const formStatus = {
+    prestart: allForms.find(f => f.form_type === 'prestart') || null,
+    take5: allForms.find(f => f.form_type === 'take5') || null,
+    hazard: allForms.filter(f => f.form_type === 'hazard'),
+    incident: allForms.filter(f => f.form_type === 'incident'),
+    equipment: allForms.find(f => f.form_type === 'equipment') || null,
+  };
+
+  // Get docket for this allocation
+  const docket = db.prepare(`
+    SELECT * FROM docket_signatures
+    WHERE crew_member_id = ? AND allocation_id = ?
+    ORDER BY signed_at DESC LIMIT 1
+  `).get(worker.id, allocation.id);
+
   res.render('worker/job-detail', {
     title: allocation.job_name || allocation.job_number,
     currentPage: 'shifts',
+    tab,
     allocation,
     otherCrew,
     supervisorPhone,
+    formStatus,
+    docket,
   });
 });
 

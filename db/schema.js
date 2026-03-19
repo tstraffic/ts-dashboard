@@ -3361,6 +3361,26 @@ function runMigrations(db) {
     console.log('Migration 61 complete.');
   }
 
+  // Migration 62: Enhanced docket_signatures with time entries + client signature
+  if (!isMigrationApplied.get(62)) {
+    console.log('Running migration 62: Enhanced docket signatures');
+    const newCols62 = [
+      "ALTER TABLE docket_signatures ADD COLUMN start_on_site TEXT DEFAULT ''",
+      "ALTER TABLE docket_signatures ADD COLUMN finish_on_site TEXT DEFAULT ''",
+      "ALTER TABLE docket_signatures ADD COLUMN break_minutes INTEGER DEFAULT 0",
+      "ALTER TABLE docket_signatures ADD COLUMN travel_hours REAL DEFAULT 0",
+      "ALTER TABLE docket_signatures ADD COLUMN total_hours REAL DEFAULT 0",
+      "ALTER TABLE docket_signatures ADD COLUMN client_signature TEXT DEFAULT ''",
+      "ALTER TABLE docket_signatures ADD COLUMN client_signed_name TEXT DEFAULT ''",
+      "ALTER TABLE docket_signatures ADD COLUMN client_signed_at DATETIME",
+    ];
+    for (const sql of newCols62) {
+      try { db.exec(sql); } catch (e) { /* column likely exists */ }
+    }
+    recordMigration.run(62, 'Enhanced docket signatures');
+    console.log('Migration 62 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

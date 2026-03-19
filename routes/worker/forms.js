@@ -2,18 +2,57 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../../db/database');
 
-// GET /w/forms — Form type selector
+// GET /w/forms — Form type selector with today's status
 router.get('/forms', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
+  const today = new Date().toISOString().split('T')[0];
 
   // Count recent submissions
   const recentCount = db.prepare('SELECT COUNT(*) as c FROM safety_forms WHERE crew_member_id = ? AND submitted_at >= datetime(\'now\', \'-7 days\')').get(worker.id).c;
 
+  // Get today's shifts
+  const todaysShifts = db.prepare(`
+    SELECT ca.id, ca.allocation_date, ca.start_time, ca.end_time, ca.job_id,
+      j.job_number, j.client, j.suburb
+    FROM crew_allocations ca
+    JOIN jobs j ON ca.job_id = j.id
+    WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
+  `).all(worker.id, today);
+
+  // Get today's completed forms
+  const todaysForms = db.prepare(`
+    SELECT form_type, allocation_id, created_at
+    FROM safety_forms
+    WHERE crew_member_id = ? AND date(created_at) = ?
+  `).all(worker.id, today);
+
+  // Get today's dockets
+  const todaysDockets = db.prepare(`
+    SELECT allocation_id
+    FROM docket_signatures
+    WHERE crew_member_id = ? AND date(signed_at) = ?
+  `).all(worker.id, today);
+
+  // Build status per shift
+  const shiftStatus = todaysShifts.map(s => {
+    const hasPrestart = todaysForms.some(f => f.form_type === 'prestart' && (f.allocation_id === s.id || f.allocation_id === null));
+    const hasTake5 = todaysForms.some(f => f.form_type === 'take5' && (f.allocation_id === s.id || f.allocation_id === null));
+    const hasDocket = todaysDockets.some(d => d.allocation_id === s.id);
+    return { ...s, hasPrestart, hasTake5, hasDocket };
+  });
+
+  const hasTodaysPrestart = todaysForms.some(f => f.form_type === 'prestart');
+  const hasTodaysTake5 = todaysForms.some(f => f.form_type === 'take5');
+
   res.render('worker/forms/index', {
-    title: 'Safety Forms',
-    currentPage: 'more',
+    title: 'Forms',
+    currentPage: 'forms',
     recentCount,
+    todaysShifts,
+    shiftStatus,
+    hasTodaysPrestart,
+    hasTodaysTake5,
   });
 });
 
@@ -29,10 +68,14 @@ router.get('/forms/prestart', (req, res) => {
     WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
   `).all(worker.id, today);
 
+  // Pre-select allocation if passed via query
+  const selectedAllocation = req.query.allocation_id || '';
+
   res.render('worker/forms/prestart', {
     title: 'Pre-Start Checklist',
-    currentPage: 'more',
+    currentPage: 'forms',
     todaysShifts,
+    selectedAllocation,
   });
 });
 
@@ -53,6 +96,11 @@ router.post('/forms/prestart', (req, res) => {
   `).run(worker.id, allocation ? allocation.job_id : null, allocation_id || null, JSON.stringify(checklistData), req.body.latitude || null, req.body.longitude || null);
 
   req.flash('success', 'Pre-start checklist submitted.');
+
+  // Redirect back to job detail if came from there
+  if (allocation_id) {
+    return res.redirect('/w/jobs/' + allocation_id + '?tab=forms');
+  }
   res.redirect('/w/forms');
 });
 
@@ -68,10 +116,13 @@ router.get('/forms/take5', (req, res) => {
     WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
   `).all(worker.id, today);
 
+  const selectedAllocation = req.query.allocation_id || '';
+
   res.render('worker/forms/take5', {
     title: 'Take 5 Safety Check',
-    currentPage: 'more',
+    currentPage: 'forms',
     todaysShifts,
+    selectedAllocation,
   });
 });
 
@@ -90,6 +141,9 @@ router.post('/forms/take5', (req, res) => {
   `).run(worker.id, allocation ? allocation.job_id : null, allocation_id || null, JSON.stringify(formData));
 
   req.flash('success', 'Take 5 submitted.');
+  if (allocation_id) {
+    return res.redirect('/w/jobs/' + allocation_id + '?tab=forms');
+  }
   res.redirect('/w/forms');
 });
 
@@ -97,7 +151,7 @@ router.post('/forms/take5', (req, res) => {
 router.get('/forms/incident', (req, res) => {
   res.render('worker/forms/incident', {
     title: 'Report Incident',
-    currentPage: 'more',
+    currentPage: 'forms',
   });
 });
 
@@ -144,7 +198,7 @@ router.post('/forms/incident', (req, res) => {
 router.get('/forms/hazard', (req, res) => {
   res.render('worker/forms/hazard', {
     title: 'Report Hazard',
-    currentPage: 'more',
+    currentPage: 'forms',
   });
 });
 
@@ -168,7 +222,8 @@ router.post('/forms/hazard', (req, res) => {
 router.get('/forms/equipment', (req, res) => {
   res.render('worker/forms/equipment', {
     title: 'Equipment Check',
-    currentPage: 'more',
+    currentPage: 'forms',
+    allocation_id: req.query.allocation_id || '',
   });
 });
 
@@ -176,7 +231,7 @@ router.get('/forms/equipment', (req, res) => {
 router.post('/forms/equipment', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const { ...formData } = req.body;
+  const { allocation_id, ...formData } = req.body;
   delete formData._csrf;
 
   db.prepare(`
@@ -185,6 +240,9 @@ router.post('/forms/equipment', (req, res) => {
   `).run(worker.id, JSON.stringify(formData));
 
   req.flash('success', 'Equipment check submitted.');
+  if (allocation_id) {
+    return res.redirect('/w/jobs/' + allocation_id + '?tab=forms');
+  }
   res.redirect('/w/forms');
 });
 
@@ -203,7 +261,7 @@ router.get('/forms/history', (req, res) => {
 
   res.render('worker/forms/history', {
     title: 'Form History',
-    currentPage: 'more',
+    currentPage: 'forms',
     forms,
   });
 });

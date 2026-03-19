@@ -1,81 +1,212 @@
-<div class="space-y-5">
-  <a href="/w/dockets" class="inline-flex items-center text-sm text-brand-600 font-medium">
+<div class="space-y-4">
+  <a href="/w/jobs/<%= allocation.id %>?tab=docket" class="inline-flex items-center text-sm text-brand-600 font-medium">
     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
     Back
   </a>
 
   <h1 class="text-xl font-bold text-gray-900">Sign Docket</h1>
 
+  <!-- Job Summary -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-    <p class="text-sm font-medium text-gray-900"><%= allocation.client %></p>
-    <p class="text-xs text-gray-500"><%= allocation.job_number %> · <%= allocation.site_address %></p>
-    <p class="text-xs text-gray-500"><%= new Date(allocation.allocation_date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' }) %></p>
+    <div class="flex items-start justify-between">
+      <div>
+        <p class="text-sm font-bold text-gray-900"><%= allocation.client %></p>
+        <p class="text-xs text-gray-500"><%= allocation.job_number %> &middot; <%= allocation.site_address || allocation.suburb %></p>
+      </div>
+      <span class="text-xs font-medium text-gray-400"><%= new Date(allocation.allocation_date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) %></span>
+    </div>
   </div>
 
-  <form method="POST" action="/w/dockets/sign/<%= allocation.id %>">
+  <form method="POST" action="/w/dockets/sign/<%= allocation.id %>" id="docket-form">
     <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
 
     <div class="space-y-4">
+
+      <!-- Docket Type -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Docket Type</label>
+        <select name="docket_type" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <option value="daily_docket">Daily Docket</option>
+          <option value="completion">Completion</option>
+          <option value="delivery">Delivery</option>
+        </select>
+      </div>
+
+      <!-- Time Entries -->
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
-        <div>
-          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Docket Type</label>
-          <select name="docket_type" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
-            <option value="daily_docket">Daily Docket</option>
-            <option value="completion">Completion</option>
-            <option value="delivery">Delivery</option>
-          </select>
+        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Time & Hours</h3>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Start on site</label>
+            <input type="time" name="start_on_site" value="<%= allocation.start_time || '' %>"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              id="time-start">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Finish on site</label>
+            <input type="time" name="finish_on_site" value="<%= allocation.end_time || '' %>"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              id="time-finish">
+          </div>
         </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Client Name (optional)</label>
-          <input type="text" name="client_name" placeholder="Client representative name" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Break (minutes)</label>
+            <input type="number" name="break_minutes" value="30" min="0" max="120" step="5"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              id="time-break">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Travel (hours)</label>
+            <input type="number" name="travel_hours" value="0" min="0" max="8" step="0.25"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              id="time-travel">
+          </div>
+        </div>
+
+        <!-- Calculated Total -->
+        <div class="bg-brand-50 rounded-lg px-4 py-3 flex items-center justify-between">
+          <span class="text-sm font-medium text-brand-800">Total Hours</span>
+          <span class="text-lg font-bold text-brand-700" id="total-hours">0.00</span>
         </div>
       </div>
 
-      <!-- Signature Pad -->
+      <!-- Client Info -->
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-        <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Signature</label>
-        <div class="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 relative" style="height: 200px;">
-          <canvas id="sig-canvas" class="w-full h-full rounded-lg" style="touch-action: none;"></canvas>
-          <button type="button" onclick="clearSig()" class="absolute top-2 right-2 text-xs text-gray-400 hover:text-gray-600 bg-white px-2 py-1 rounded shadow-sm">Clear</button>
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Client Representative</label>
+        <input type="text" name="client_name" placeholder="Name of person signing off"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+      </div>
+
+      <!-- Worker Signature -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs font-semibold text-gray-500 uppercase">Worker Signature</label>
+          <button type="button" onclick="clearSig('worker')" class="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 px-2 py-1 rounded">Clear</button>
         </div>
-        <input type="hidden" name="signature_data" id="sig-data">
+        <div class="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 relative" style="height: 160px;">
+          <canvas id="worker-sig-canvas" class="w-full h-full rounded-lg" style="touch-action: none;"></canvas>
+        </div>
+        <input type="hidden" name="signature_data" id="worker-sig-data">
+        <p class="text-[10px] text-gray-400 mt-1 text-center">Sign above with your finger</p>
+      </div>
+
+      <!-- Client Signature -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs font-semibold text-gray-500 uppercase">Client Signature</label>
+          <button type="button" onclick="clearSig('client')" class="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 px-2 py-1 rounded">Clear</button>
+        </div>
+        <input type="text" name="client_signed_name" placeholder="Client printed name"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-2 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        <div class="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 relative" style="height: 160px;">
+          <canvas id="client-sig-canvas" class="w-full h-full rounded-lg" style="touch-action: none;"></canvas>
+        </div>
+        <input type="hidden" name="client_signature" id="client-sig-data">
+        <p class="text-[10px] text-gray-400 mt-1 text-center">Client signs above</p>
       </div>
 
       <!-- Notes -->
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
         <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Notes (optional)</label>
-        <textarea name="notes" rows="2" placeholder="Any notes..." class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 resize-none"></textarea>
+        <textarea name="notes" rows="2" placeholder="Any additional notes..."
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
       </div>
 
-      <button type="submit" onclick="saveSig()" class="w-full py-3 bg-brand-600 text-white rounded-xl font-semibold text-sm hover:bg-brand-700 active:bg-brand-800 transition">
-        Sign & Submit
+      <!-- Submit -->
+      <button type="submit" onclick="saveSigs()" class="w-full py-3.5 bg-brand-600 text-white rounded-xl font-semibold text-sm hover:bg-brand-700 active:bg-brand-800 transition" style="min-height:48px;">
+        Sign & Submit Docket
       </button>
     </div>
   </form>
 </div>
 
 <script>
-// Simple signature pad
-const canvas = document.getElementById('sig-canvas');
-const ctx = canvas.getContext('2d');
-let drawing = false;
+// Signature pad setup for both canvases
+function setupSigPad(canvasId) {
+  var canvas = document.getElementById(canvasId);
+  var ctx = canvas.getContext('2d');
+  var drawing = false;
+  var hasDrawn = false;
 
-function resizeCanvas() {
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width;
-  canvas.height = rect.height;
-  ctx.strokeStyle = '#1D6AE5';
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
+  function resize() {
+    var rect = canvas.parentElement.getBoundingClientRect();
+    var data = hasDrawn ? canvas.toDataURL() : null;
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    ctx.strokeStyle = '#1D6AE5';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (data && hasDrawn) {
+      var img = new Image();
+      img.onload = function() { ctx.drawImage(img, 0, 0); };
+      img.src = data;
+    }
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  canvas.addEventListener('pointerdown', function(e) {
+    drawing = true;
+    hasDrawn = true;
+    ctx.beginPath();
+    ctx.moveTo(e.offsetX, e.offsetY);
+    e.preventDefault();
+  });
+  canvas.addEventListener('pointermove', function(e) {
+    if (drawing) {
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.stroke();
+      e.preventDefault();
+    }
+  });
+  canvas.addEventListener('pointerup', function() { drawing = false; });
+  canvas.addEventListener('pointerleave', function() { drawing = false; });
+
+  return {
+    clear: function() { ctx.clearRect(0, 0, canvas.width, canvas.height); hasDrawn = false; },
+    getData: function() { return hasDrawn ? canvas.toDataURL('image/png') : ''; },
+    hasDrawn: function() { return hasDrawn; }
+  };
 }
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
 
-canvas.addEventListener('pointerdown', e => { drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); });
-canvas.addEventListener('pointermove', e => { if (drawing) { ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); } });
-canvas.addEventListener('pointerup', () => drawing = false);
-canvas.addEventListener('pointerleave', () => drawing = false);
+var workerPad = setupSigPad('worker-sig-canvas');
+var clientPad = setupSigPad('client-sig-canvas');
 
-function clearSig() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
-function saveSig() { document.getElementById('sig-data').value = canvas.toDataURL('image/png'); }
+function clearSig(which) {
+  if (which === 'worker') workerPad.clear();
+  else clientPad.clear();
+}
+
+function saveSigs() {
+  document.getElementById('worker-sig-data').value = workerPad.getData();
+  document.getElementById('client-sig-data').value = clientPad.getData();
+}
+
+// Time calculation
+function calcTotal() {
+  var start = document.getElementById('time-start').value;
+  var finish = document.getElementById('time-finish').value;
+  var breakMin = parseInt(document.getElementById('time-break').value) || 0;
+  var travel = parseFloat(document.getElementById('time-travel').value) || 0;
+  var el = document.getElementById('total-hours');
+
+  if (!start || !finish) { el.textContent = '0.00'; return; }
+  var sp = start.split(':').map(Number);
+  var fp = finish.split(':').map(Number);
+  var startMin = sp[0] * 60 + sp[1];
+  var finishMin = fp[0] * 60 + fp[1];
+  var worked = finishMin > startMin ? finishMin - startMin : (1440 - startMin) + finishMin;
+  var total = Math.max(0, (worked - breakMin) / 60) + travel;
+  el.textContent = total.toFixed(2);
+}
+
+document.getElementById('time-start').addEventListener('change', calcTotal);
+document.getElementById('time-finish').addEventListener('change', calcTotal);
+document.getElementById('time-break').addEventListener('input', calcTotal);
+document.getElementById('time-travel').addEventListener('input', calcTotal);
+calcTotal();
 </script>

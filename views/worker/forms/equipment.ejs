@@ -7,6 +7,9 @@
 
   <form method="POST" action="/w/forms/equipment" class="space-y-4">
     <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <% if (typeof allocation_id !== 'undefined' && allocation_id) { %>
+      <input type="hidden" name="allocation_id" value="<%= allocation_id %>">
+    <% } %>
 
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
       <div>
