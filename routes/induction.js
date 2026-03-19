@@ -159,7 +159,14 @@ function handleSubmission(req, res) {
         b.bank_account_name = b.cash_bank_account_name || b.bank_account_name || '';
       }
 
-      const accessToken = b.access_token || crypto.randomBytes(24).toString('hex');
+      // Always generate a fresh token to avoid UNIQUE constraint on re-submit
+      const accessToken = crypto.randomBytes(24).toString('hex');
+
+      // Validate payment_type against DB CHECK constraint
+      const validPaymentTypes = ['cash', 'tfn', 'abn'];
+      if (!validPaymentTypes.includes(paymentType)) {
+        throw new Error('Invalid payment type: "' + paymentType + '". Please go back and select Employee (TFN) or Contractor (ABN).');
+      }
 
       // Dynamically build INSERT based on columns that actually exist in the DB
       const existingCols = db.prepare("PRAGMA table_info(induction_submissions)").all().map(c => c.name);
@@ -181,7 +188,7 @@ function handleSubmission(req, res) {
         last_name: ln,
         email: b.email || '',
         phone: b.phone || '',
-        date_of_birth: b.date_of_birth || null,
+        date_of_birth: b.date_of_birth || '',
         address: b.address || '',
         suburb: b.suburb || '',
         state: b.state || '',
