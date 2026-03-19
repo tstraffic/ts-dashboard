@@ -39,40 +39,95 @@ const chatUpload = multer({
 router.get('/', (req, res) => {
   const db = getDb();
   const userId = req.session.user.id;
-  const isManagement = req.session.user.role === 'management';
+  const userRole = req.session.user.role;
+  const isAdmin = ['admin', 'management'].includes(userRole);
+  const canStartThread = ['admin', 'operations'].includes(userRole);
 
-  let threads;
-  if (isManagement) {
-    threads = db.prepare(`
+  // Filters
+  const filterType = req.query.type || '';
+  const filterStatus = req.query.status || '';
+  const filterSearch = req.query.search || '';
+
+  // Base query for threads
+  let baseQuery, baseParams;
+  if (isAdmin) {
+    baseQuery = `
       SELECT ct.*,
         (SELECT COUNT(*) FROM messages m WHERE m.thread_id = ct.id AND m.deleted_at IS NULL) as message_count,
         (SELECT m.body FROM messages m WHERE m.thread_id = ct.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) as last_message,
         (SELECT m.created_at FROM messages m WHERE m.thread_id = ct.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) as last_message_at,
         (SELECT u.full_name FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.thread_id = ct.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) as last_message_sender,
-        (SELECT COUNT(m.id) FROM chat_thread_members ctm2 JOIN messages m ON m.thread_id = ctm2.thread_id AND m.id > COALESCE(ctm2.last_read_message_id, 0) AND m.deleted_at IS NULL AND (m.sender_id != ctm2.user_id OR m.sender_id IS NULL) WHERE ctm2.thread_id = ct.id AND ctm2.user_id = ?) as unread_count
+        (SELECT m.message_type FROM messages m WHERE m.thread_id = ct.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) as last_message_type,
+        (SELECT COUNT(m.id) FROM chat_thread_members ctm2 JOIN messages m ON m.thread_id = ctm2.thread_id AND m.id > COALESCE(ctm2.last_read_message_id, 0) AND m.deleted_at IS NULL AND (m.sender_id != ctm2.user_id OR m.sender_id IS NULL) WHERE ctm2.thread_id = ct.id AND ctm2.user_id = ?) as unread_count,
+        (SELECT COUNT(*) FROM chat_thread_members WHERE thread_id = ct.id) as member_count
       FROM chat_threads ct
-      WHERE ct.status = 'active'
-      ORDER BY last_message_at DESC NULLS LAST, ct.created_at DESC
+      WHERE ct.status = 'active'`;
+    baseParams = [userId];
+  } else {
+    baseQuery = `
+      SELECT ct.*,
+        (SELECT COUNT(*) FROM messages m WHERE m.thread_id = ct.id AND m.deleted_at IS NULL) as message_count,
+        (SELECT m.body FROM messages m WHERE m.thread_id = ct.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) as last_message,
+        (SELECT m.created_at FROM messages m WHERE m.thread_id = ct.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) as last_message_at,
+        (SELECT u.full_name FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.thread_id = ct.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) as last_message_sender,
+        (SELECT m.message_type FROM messages m WHERE m.thread_id = ct.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) as last_message_type,
+        (SELECT COUNT(m.id) FROM messages m WHERE m.thread_id = ct.id AND m.id > COALESCE(ctm.last_read_message_id, 0) AND m.deleted_at IS NULL AND (m.sender_id != ctm.user_id OR m.sender_id IS NULL)) as unread_count,
+        (SELECT COUNT(*) FROM chat_thread_members WHERE thread_id = ct.id) as member_count
+      FROM chat_thread_members ctm
+      JOIN chat_threads ct ON ct.id = ctm.thread_id
+      WHERE ctm.user_id = ? AND ct.status = 'active'`;
+    baseParams = [userId];
+  }
+
+  // Apply filters
+  if (filterType) {
+    baseQuery += ` AND ct.thread_type = ?`;
+    baseParams.push(filterType);
+  }
+  if (filterSearch) {
+    baseQuery += ` AND ct.title LIKE ?`;
+    baseParams.push(`%${filterSearch}%`);
+  }
+
+  baseQuery += ` ORDER BY last_message_at DESC NULLS LAST, ct.created_at DESC`;
+  const threads = db.prepare(baseQuery).all(...baseParams);
+
+  // Filter unread client-side (SQLite HAVING on subquery is complex)
+  const filteredThreads = filterStatus === 'unread' ? threads.filter(t => t.unread_count > 0) : threads;
+
+  // Compute stats from all threads (unfiltered)
+  let allThreads;
+  if (isAdmin) {
+    allThreads = db.prepare(`
+      SELECT ct.thread_type,
+        (SELECT COUNT(m.id) FROM chat_thread_members ctm2 JOIN messages m ON m.thread_id = ctm2.thread_id AND m.id > COALESCE(ctm2.last_read_message_id, 0) AND m.deleted_at IS NULL AND (m.sender_id != ctm2.user_id OR m.sender_id IS NULL) WHERE ctm2.thread_id = ct.id AND ctm2.user_id = ?) as unread_count
+      FROM chat_threads ct WHERE ct.status = 'active'
     `).all(userId);
   } else {
-    threads = db.prepare(`
-      SELECT ct.*,
-        (SELECT COUNT(*) FROM messages m WHERE m.thread_id = ct.id AND m.deleted_at IS NULL) as message_count,
-        (SELECT m.body FROM messages m WHERE m.thread_id = ct.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) as last_message,
-        (SELECT m.created_at FROM messages m WHERE m.thread_id = ct.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) as last_message_at,
-        (SELECT u.full_name FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.thread_id = ct.id AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 1) as last_message_sender,
+    allThreads = db.prepare(`
+      SELECT ct.thread_type,
         (SELECT COUNT(m.id) FROM messages m WHERE m.thread_id = ct.id AND m.id > COALESCE(ctm.last_read_message_id, 0) AND m.deleted_at IS NULL AND (m.sender_id != ctm.user_id OR m.sender_id IS NULL)) as unread_count
       FROM chat_thread_members ctm
       JOIN chat_threads ct ON ct.id = ctm.thread_id
       WHERE ctm.user_id = ? AND ct.status = 'active'
-      ORDER BY last_message_at DESC NULLS LAST, ct.created_at DESC
     `).all(userId);
   }
 
+  const stats = {
+    unread: allThreads.filter(t => t.unread_count > 0).length,
+    jobs: allThreads.filter(t => t.thread_type === 'job').length,
+    incidents: allThreads.filter(t => t.thread_type === 'incident').length,
+    plans: allThreads.filter(t => t.thread_type === 'compliance').length,
+    total: allThreads.length,
+  };
+
   res.render('chat/inbox', {
-    title: 'Messages',
+    title: 'Operational Communications',
     currentPage: 'chat',
-    threads,
+    threads: filteredThreads,
+    stats,
+    filters: { type: filterType, status: filterStatus, search: filterSearch },
+    canStartThread,
     user: req.session.user
   });
 });
@@ -366,6 +421,83 @@ router.get('/api/unread-count', (req, res) => {
   const { getTotalUnreadCount } = require('../lib/chat');
   const count = getTotalUnreadCount(req.session.user.id);
   res.json({ count });
+});
+
+// ============================================
+// HTML: New Thread Form (admin/operations only)
+// ============================================
+router.get('/new', (req, res) => {
+  if (!['admin', 'operations'].includes(req.session.user.role)) {
+    req.flash('error', 'You do not have permission to start threads.');
+    return res.redirect('/chat');
+  }
+  const db = getDb();
+  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won','prestart') ORDER BY job_number").all();
+  const incidents = db.prepare(`
+    SELECT i.id, i.incident_number, i.title, j.job_number
+    FROM incidents i JOIN jobs j ON i.job_id = j.id
+    WHERE i.investigation_status IN ('reported','investigating')
+    ORDER BY i.incident_date DESC
+  `).all();
+  res.render('chat/new', {
+    title: 'New Thread',
+    currentPage: 'chat',
+    jobs,
+    incidents,
+    user: req.session.user
+  });
+});
+
+router.post('/new', (req, res) => {
+  if (!['admin', 'operations'].includes(req.session.user.role)) {
+    req.flash('error', 'You do not have permission to start threads.');
+    return res.redirect('/chat');
+  }
+  const db = getDb();
+  const { thread_type, entity_id, initial_message } = req.body;
+  const { ensureThreadForEntity, addMembersToThread, postSystemMessage } = require('../lib/chat');
+
+  if (!entity_id || !thread_type) {
+    req.flash('error', 'Please select a thread type and item.');
+    return res.redirect('/chat/new');
+  }
+
+  let title, entityType, redirectUrl;
+  if (thread_type === 'job') {
+    const job = db.prepare('SELECT id, job_number, project_manager_id, ops_supervisor_id, planning_owner_id, marketing_owner_id, accounts_owner_id FROM jobs WHERE id = ?').get(entity_id);
+    if (!job) { req.flash('error', 'Job not found.'); return res.redirect('/chat/new'); }
+    title = `Job ${job.job_number}`;
+    entityType = 'job';
+    redirectUrl = `/jobs/${job.id}#chat`;
+    const threadId = ensureThreadForEntity('job', job.id, title, req.session.user.id);
+    const memberIds = [...new Set([req.session.user.id, job.project_manager_id, job.ops_supervisor_id, job.planning_owner_id, job.marketing_owner_id, job.accounts_owner_id].filter(Boolean))];
+    addMembersToThread(threadId, memberIds, 'member', true);
+    if (initial_message && initial_message.trim()) {
+      db.prepare('INSERT INTO messages (thread_id, sender_id, body, message_type) VALUES (?, ?, ?, ?)').run(threadId, req.session.user.id, initial_message.trim(), 'text');
+    } else {
+      postSystemMessage(threadId, `Thread started by ${req.session.user.full_name}`);
+    }
+  } else if (thread_type === 'incident') {
+    const incident = db.prepare('SELECT i.id, i.incident_number, i.reported_by_id, i.job_id, j.project_manager_id, j.ops_supervisor_id FROM incidents i JOIN jobs j ON i.job_id = j.id WHERE i.id = ?').get(entity_id);
+    if (!incident) { req.flash('error', 'Incident not found.'); return res.redirect('/chat/new'); }
+    title = `Incident ${incident.incident_number}`;
+    entityType = 'incident';
+    redirectUrl = `/incidents/${incident.id}#chat`;
+    const threadId = ensureThreadForEntity('incident', incident.id, title, req.session.user.id);
+    const memberIds = [...new Set([req.session.user.id, incident.reported_by_id, incident.project_manager_id, incident.ops_supervisor_id].filter(Boolean))];
+    addMembersToThread(threadId, memberIds, 'member', true);
+    if (initial_message && initial_message.trim()) {
+      db.prepare('INSERT INTO messages (thread_id, sender_id, body, message_type) VALUES (?, ?, ?, ?)').run(threadId, req.session.user.id, initial_message.trim(), 'text');
+    } else {
+      postSystemMessage(threadId, `Thread started by ${req.session.user.full_name}`);
+    }
+  } else {
+    req.flash('error', 'Invalid thread type.');
+    return res.redirect('/chat/new');
+  }
+
+  req.flash('success', `Thread created for ${title}.`);
+  res.redirect(redirectUrl);
 });
 
 module.exports = router;
