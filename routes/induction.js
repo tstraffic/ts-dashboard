@@ -107,37 +107,16 @@ router.post('/:type/submit', (req, res, next) => {
 });
 
 function handleSubmission(req, res) {
+  // Check if client wants JSON (fetch-based submission)
+  const wantsJSON = req.headers['x-requested-with'] === 'fetch';
+
   uploadFields(req, res, (err) => {
     if (err) {
       console.error('Upload error:', err);
-      // Show a friendly error page instead of raw JSON
-      return res.status(400).send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Upload Error | T&S Traffic Control</title>
-          <script src="https://cdn.tailwindcss.com"><\/script>
-          <script>tailwindcss.config={theme:{extend:{colors:{brand:{50:'#EBF3FF',100:'#D6E7FF',200:'#ADC9FF',500:'#2B7FFF',600:'#1D6AE5',700:'#1554CC',900:'#052A99'}}}}}<\/script>
-        </head>
-        <body class="min-h-screen bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 flex items-center justify-center p-4">
-          <div class="bg-white rounded-2xl shadow-2xl p-8 md:p-10 max-w-md w-full text-center">
-            <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5">
-              <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-              </svg>
-            </div>
-            <h1 class="text-xl font-bold text-gray-900 mb-2">Upload Error</h1>
-            <p class="text-gray-600 mb-2">${err.message}</p>
-            <p class="text-sm text-gray-400 mb-6">Accepted formats: JPG, PNG, HEIC, PDF, WebP</p>
-            <button onclick="history.back()" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition shadow-md">
-              Go Back & Try Again
-            </button>
-          </div>
-        </body>
-        </html>
-      `);
+      if (wantsJSON) {
+        return res.status(400).json({ ok: false, error: 'Upload error: ' + err.message });
+      }
+      return res.status(400).send('Upload error: ' + err.message);
     }
 
     try {
@@ -176,6 +155,12 @@ function handleSubmission(req, res) {
 
       // Dynamically build INSERT based on columns that actually exist in the DB
       const existingCols = db.prepare("PRAGMA table_info(induction_submissions)").all().map(c => c.name);
+
+      console.log('DB columns found:', existingCols.length, 'Payment type:', paymentType);
+
+      if (existingCols.length === 0) {
+        throw new Error('induction_submissions table not found — migrations may not have run');
+      }
 
       // All possible column→value mappings
       const allFields = {
@@ -238,40 +223,22 @@ function handleSubmission(req, res) {
       }
 
       const sql = `INSERT INTO induction_submissions (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`;
+      console.log('Running INSERT with', cols.length, 'columns for:', computedFullName);
       db.prepare(sql).run(...values);
 
-      console.log('Induction submitted:', computedFullName, paymentType);
+      console.log('Induction submitted successfully:', computedFullName, paymentType);
+
+      if (wantsJSON) {
+        return res.json({ ok: true });
+      }
       res.redirect('/induction/complete');
     } catch (error) {
       console.error('Induction submission error:', error);
       console.error('Error stack:', error.stack);
-      res.status(500).send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Error | T&S Traffic Control</title>
-          <script src="https://cdn.tailwindcss.com"><\/script>
-          <script>tailwindcss.config={theme:{extend:{colors:{brand:{50:'#EBF3FF',100:'#D6E7FF',200:'#ADC9FF',500:'#2B7FFF',600:'#1D6AE5',700:'#1554CC',900:'#052A99'}}}}}<\/script>
-        </head>
-        <body class="min-h-screen bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 flex items-center justify-center p-4">
-          <div class="bg-white rounded-2xl shadow-2xl p-8 md:p-10 max-w-md w-full text-center">
-            <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5">
-              <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-              </svg>
-            </div>
-            <h1 class="text-xl font-bold text-gray-900 mb-2">Something Went Wrong</h1>
-            <p class="text-gray-600 mb-4">We couldn't process your submission. Please try again.</p>
-            <p class="text-xs text-gray-400 mb-6 bg-gray-50 rounded-lg p-3 text-left font-mono break-all">${error.message}</p>
-            <button onclick="history.back()" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition shadow-md">
-              Go Back & Try Again
-            </button>
-          </div>
-        </body>
-        </html>
-      `);
+      if (wantsJSON) {
+        return res.status(500).json({ ok: false, error: error.message });
+      }
+      res.status(500).send('Submission error: ' + error.message);
     }
   });
 }
