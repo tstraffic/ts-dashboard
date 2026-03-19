@@ -58,7 +58,8 @@
 
 /* Content wrapper next to avatar */
 .chat-msg-content {
-  max-width: 75%;
+  flex: 1;
+  min-width: 0;
 }
 
 .chat-msg-own .chat-msg-content {
@@ -69,7 +70,7 @@
 .chat-msg-bubble {
   display: inline-block;
   text-align: left;
-  max-width: 100%;
+  max-width: 75%;
   padding: 0.5rem 0.75rem;
   border-radius: 0.75rem;
   font-size: 0.8125rem;
