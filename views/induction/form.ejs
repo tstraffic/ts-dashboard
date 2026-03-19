@@ -304,8 +304,8 @@
               <input type="text" name="white_card_number" required placeholder="Enter your White Card number" class="input-base" />
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1">Upload White Card Photo <span class="text-gray-400 font-normal">(optional)</span></label>
-              <input type="file" name="white_card_photo" accept="image/*,.pdf" onchange="previewFile(this,'previewWhiteCard')" class="w-full text-sm text-gray-500 file:mr-3" />
+              <label class="block text-xs font-medium text-gray-600 mb-1">Upload White Card Photo <span class="text-red-500">*</span></label>
+              <input type="file" name="white_card_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewWhiteCard')" class="w-full text-sm text-gray-500 file:mr-3" />
               <div id="previewWhiteCard" class="mt-2"></div>
             </div>
           </div>
@@ -335,8 +335,8 @@
               </div>
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1">Upload TC Licence Photo <span class="text-gray-400 font-normal">(optional)</span></label>
-              <input type="file" name="tc_licence_photo" accept="image/*,.pdf" onchange="previewFile(this,'previewTCLicence')" class="w-full text-sm text-gray-500 file:mr-3" />
+              <label class="block text-xs font-medium text-gray-600 mb-1">Upload TC Licence Photo <span class="text-red-500">*</span></label>
+              <input type="file" name="tc_licence_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewTCLicence')" class="w-full text-sm text-gray-500 file:mr-3" />
               <div id="previewTCLicence" class="mt-2"></div>
             </div>
           </div>
@@ -353,13 +353,13 @@
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Front of Licence <span class="text-gray-400 font-normal">(optional)</span></label>
-                <input type="file" name="drivers_licence_photo" accept="image/*,.pdf" onchange="previewFile(this,'previewDLFront')" class="w-full text-sm text-gray-500 file:mr-3" />
+                <label class="block text-xs font-medium text-gray-600 mb-1">Front of Licence <span class="text-red-500">*</span></label>
+                <input type="file" name="drivers_licence_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewDLFront')" class="w-full text-sm text-gray-500 file:mr-3" />
                 <div id="previewDLFront" class="mt-2"></div>
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Back of Licence <span class="text-gray-400 font-normal">(optional)</span></label>
-                <input type="file" name="drivers_licence_back_photo" accept="image/*,.pdf" onchange="previewFile(this,'previewDLBack')" class="w-full text-sm text-gray-500 file:mr-3" />
+                <label class="block text-xs font-medium text-gray-600 mb-1">Back of Licence <span class="text-red-500">*</span></label>
+                <input type="file" name="drivers_licence_back_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewDLBack')" class="w-full text-sm text-gray-500 file:mr-3" />
                 <div id="previewDLBack" class="mt-2"></div>
               </div>
             </div>
@@ -864,12 +864,59 @@
       return valid;
     }
 
-    /* ───── Form submit via fetch (avoids redirect/caching issues) ───── */
-    document.getElementById('inductionForm').addEventListener('submit', function(e) {
-      e.preventDefault(); // Always prevent native form submit
+    /* ───── Image compression utility ───── */
+    function compressImage(file, maxWidth, quality) {
+      maxWidth = maxWidth || 1200;
+      quality = quality || 0.7;
+      return new Promise(function(resolve) {
+        // Skip PDFs — send as-is
+        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+          return resolve(file);
+        }
+        // Skip if already small (under 500KB)
+        if (file.size < 500 * 1024) {
+          return resolve(file);
+        }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var img = new Image();
+          img.onload = function() {
+            var canvas = document.createElement('canvas');
+            var w = img.width;
+            var h = img.height;
+            if (w > maxWidth) {
+              h = Math.round(h * maxWidth / w);
+              w = maxWidth;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            canvas.toBlob(function(blob) {
+              if (blob) {
+                var compressed = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+                console.log('Compressed ' + file.name + ': ' + (file.size/1024).toFixed(0) + 'KB → ' + (compressed.size/1024).toFixed(0) + 'KB');
+                resolve(compressed);
+              } else {
+                resolve(file); // fallback to original
+              }
+            }, 'image/jpeg', quality);
+          };
+          img.onerror = function() { resolve(file); };
+          img.src = e.target.result;
+        };
+        reader.onerror = function() { resolve(file); };
+        reader.readAsDataURL(file);
+      });
+    }
 
-      const ppe = document.getElementById('ppeAcknowledge');
-      const ppeErr = document.getElementById('ppeError');
+    /* ───── Form submit via fetch with image compression ───── */
+    document.getElementById('inductionForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      var form = this;
+      var ppe = document.getElementById('ppeAcknowledge');
+      var ppeErr = document.getElementById('ppeError');
       if (!ppe.checked) {
         ppeErr.classList.remove('hidden');
         ppe.closest('label')?.classList.add('ring-2', 'ring-red-300');
@@ -878,19 +925,43 @@
       }
       ppeErr.classList.add('hidden');
 
-      // Disable submit button
-      const btn = document.getElementById('submitBtn');
+      var btn = document.getElementById('submitBtn');
       btn.disabled = true;
-      btn.innerHTML = '<svg class="animate-spin inline -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Submitting...';
+      btn.innerHTML = '<svg class="animate-spin inline -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Compressing photos...';
 
-      // Submit via fetch
-      var formData = new FormData(this);
-      fetch(this.action, {
-        method: 'POST',
-        body: formData
+      // Collect file inputs to compress
+      var fileFields = ['white_card_photo', 'tc_licence_photo', 'drivers_licence_photo', 'drivers_licence_back_photo'];
+      var compressionJobs = [];
+
+      fileFields.forEach(function(fieldName) {
+        var input = form.querySelector('input[name="' + fieldName + '"]');
+        if (input && input.files && input.files[0]) {
+          compressionJobs.push(
+            compressImage(input.files[0], 1200, 0.7).then(function(compressed) {
+              return { name: fieldName, file: compressed };
+            })
+          );
+        }
+      });
+
+      Promise.all(compressionJobs).then(function(compressedFiles) {
+        btn.innerHTML = '<svg class="animate-spin inline -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Submitting...';
+
+        // Build FormData with compressed files
+        var formData = new FormData(form);
+
+        // Replace original files with compressed versions
+        compressedFiles.forEach(function(item) {
+          formData.delete(item.name);
+          formData.append(item.name, item.file, item.file.name);
+        });
+
+        return fetch(form.action, {
+          method: 'POST',
+          body: formData
+        });
       }).then(function(response) {
         if (response.ok || response.redirected) {
-          // Success — go to thank you page
           window.location.href = '/induction/complete';
         } else {
           return response.text().then(function(text) { throw new Error(text || 'Submission failed'); });
