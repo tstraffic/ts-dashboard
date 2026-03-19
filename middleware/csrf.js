@@ -4,6 +4,10 @@ const crypto = require('crypto');
 const SKIP_PATHS = [
   '/admin-sw.js',
   '/worker-sw.js',
+  '/induction/submit',
+  '/induction/cash/submit',
+  '/induction/tfn/submit',
+  '/induction/abn/submit',
 ];
 
 function csrfProtection(req, res, next) {
