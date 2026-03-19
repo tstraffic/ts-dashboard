@@ -188,7 +188,7 @@
 
         div.innerHTML = `
           <div class="chat-msg-avatar" style="background:${avatarColor}">${initials}</div>
-          <div style="max-width:75%">
+          <div class="chat-msg-content">
             ${!isOwn ? `<div class="chat-msg-sender" style="color:${avatarColor}">${this.escapeHtml(msg.sender_name || 'Unknown')}</div>` : ''}
             ${replyHtml}
             <div class="chat-msg-bubble">${bodyHtml}${attachmentHtml}</div>

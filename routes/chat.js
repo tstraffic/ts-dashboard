@@ -305,6 +305,46 @@ router.post('/api/threads/:threadId/messages', requireThreadMember, (req, res) =
     ip: req.ip
   });
 
+  // Push notifications to thread members (async, non-blocking)
+  try {
+    const { sendPushToUser } = require('../services/pushNotification');
+    const thread = db.prepare('SELECT title, thread_type, related_entity_type, related_entity_id, channel_slug FROM chat_threads WHERE id = ?').get(threadId);
+    const members = db.prepare('SELECT user_id FROM chat_thread_members WHERE thread_id = ? AND user_id != ?').all(threadId, userId);
+    const senderName = req.session.user.full_name;
+    const preview = body ? (body.length > 60 ? body.substring(0, 60) + '...' : body) : (type === 'image' ? 'Sent an image' : 'Sent a file');
+
+    // Build deep link URL based on thread type
+    let pushUrl = '/chat';
+    if (thread.thread_type === 'dm') {
+      pushUrl = `/chat/dm/${userId}`;
+    } else if (thread.thread_type === 'channel' || thread.thread_type === 'announcement') {
+      pushUrl = `/chat/channel/${threadId}`;
+    } else if (thread.related_entity_type === 'job') {
+      pushUrl = `/jobs/${thread.related_entity_id}#chat`;
+    } else if (thread.related_entity_type === 'incident') {
+      pushUrl = `/incidents/${thread.related_entity_id}#chat`;
+    }
+
+    // Build push title based on thread type
+    let pushTitle;
+    if (thread.thread_type === 'dm') {
+      pushTitle = senderName;
+    } else {
+      pushTitle = thread.title;
+    }
+
+    for (const member of members) {
+      sendPushToUser(member.user_id, {
+        title: pushTitle,
+        body: thread.thread_type === 'dm' ? preview : `${senderName}: ${preview}`,
+        url: pushUrl,
+        type: 'chat'
+      }).catch(() => {}); // Silently ignore push errors
+    }
+  } catch (e) {
+    // Push is best-effort, don't fail the message send
+  }
+
   // Return the created message with sender info
   const message = db.prepare(`
     SELECT m.id, m.thread_id, m.sender_id, m.body, m.message_type,
