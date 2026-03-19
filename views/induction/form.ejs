@@ -305,7 +305,7 @@
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Upload White Card Photo <span class="text-red-500">*</span></label>
-              <input type="file" name="white_card_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewWhiteCard')" class="w-full text-sm text-gray-500 file:mr-3" />
+              <input type="file" name="white_card_photo" accept=".jpg,.jpeg,.png,.heic,.heif,.webp,.pdf,.gif,.bmp" required onchange="previewFile(this,'previewWhiteCard')" class="w-full text-sm text-gray-500 file:mr-3" />
               <div id="previewWhiteCard" class="mt-2"></div>
             </div>
           </div>
@@ -336,7 +336,7 @@
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Upload TC Licence Photo <span class="text-red-500">*</span></label>
-              <input type="file" name="tc_licence_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewTCLicence')" class="w-full text-sm text-gray-500 file:mr-3" />
+              <input type="file" name="tc_licence_photo" accept=".jpg,.jpeg,.png,.heic,.heif,.webp,.pdf,.gif,.bmp" required onchange="previewFile(this,'previewTCLicence')" class="w-full text-sm text-gray-500 file:mr-3" />
               <div id="previewTCLicence" class="mt-2"></div>
             </div>
           </div>
@@ -354,12 +354,12 @@
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Front of Licence <span class="text-red-500">*</span></label>
-                <input type="file" name="drivers_licence_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewDLFront')" class="w-full text-sm text-gray-500 file:mr-3" />
+                <input type="file" name="drivers_licence_photo" accept=".jpg,.jpeg,.png,.heic,.heif,.webp,.pdf,.gif,.bmp" required onchange="previewFile(this,'previewDLFront')" class="w-full text-sm text-gray-500 file:mr-3" />
                 <div id="previewDLFront" class="mt-2"></div>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Back of Licence <span class="text-red-500">*</span></label>
-                <input type="file" name="drivers_licence_back_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewDLBack')" class="w-full text-sm text-gray-500 file:mr-3" />
+                <input type="file" name="drivers_licence_back_photo" accept=".jpg,.jpeg,.png,.heic,.heif,.webp,.pdf,.gif,.bmp" required onchange="previewFile(this,'previewDLBack')" class="w-full text-sm text-gray-500 file:mr-3" />
                 <div id="previewDLBack" class="mt-2"></div>
               </div>
             </div>
@@ -403,7 +403,11 @@
       <div class="step-panel hidden" id="step5">
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
           <h2 class="text-xl font-bold text-gray-900">Employment & Payment</h2>
+          <% if (paymentType === 'cash') { %>
+          <p class="text-sm text-gray-500">Enter your bank details for payment.</p>
+          <% } else { %>
           <p class="text-sm text-gray-500">Select your employment type and enter your details.</p>
+          <% } %>
 
           <!-- Employment type selector -->
           <% if (paymentType === 'cash') { %>
@@ -546,8 +550,8 @@
             </div>
           </div>
 
-          <!-- Prompt to select type -->
-          <div id="typePrompt" class="text-center py-4">
+          <!-- Prompt to select type (hidden for cash workers who don't need to choose) -->
+          <div id="typePrompt" class="text-center py-4 <%= paymentType === 'cash' ? 'hidden' : '' %>">
             <p class="text-sm text-gray-400">Select your employment type above to continue.</p>
           </div>
 
@@ -680,6 +684,10 @@
     if (selectedType === 'tfn' || selectedType === 'abn') {
       document.addEventListener('DOMContentLoaded', () => selectType(selectedType));
     }
+    // Cash workers: payment type is pre-set, skip type selection
+    if (selectedType === 'cash') {
+      document.getElementById('paymentTypeField').value = 'cash';
+    }
 
     /* ───── Employment type selection ───── */
     function selectType(type) {
@@ -741,29 +749,31 @@
         const label = document.getElementById('stepLabel' + i);
 
         if (i < step) {
-          circle.className = 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-brand-500 text-white border-brand-500';
+          // Completed steps → green
+          circle.className = 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-emerald-500 text-white border-emerald-500';
           num.classList.add('hidden');
           check.classList.remove('hidden');
-          label.classList.remove('text-gray-400');
-          label.classList.add('text-brand-600');
+          label.classList.remove('text-gray-400', 'text-brand-600');
+          label.classList.add('text-emerald-600');
         } else if (i === step) {
+          // Active step → blue
           circle.className = 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-brand-500 text-white border-brand-500';
           num.classList.remove('hidden');
           check.classList.add('hidden');
-          label.classList.remove('text-gray-400');
+          label.classList.remove('text-gray-400', 'text-emerald-600');
           label.classList.add('text-brand-600');
         } else {
           circle.className = 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-white text-gray-400 border-gray-300';
           num.classList.remove('hidden');
           check.classList.add('hidden');
-          label.classList.remove('text-brand-600');
+          label.classList.remove('text-brand-600', 'text-emerald-600');
           label.classList.add('text-gray-400');
         }
 
         if (i < 6) {
           const line = document.getElementById('stepLine' + i);
           line.className = i < step
-            ? 'flex-1 h-0.5 mx-1 mt-[-12px] transition-all duration-300 bg-brand-500'
+            ? 'flex-1 h-0.5 mx-1 mt-[-12px] transition-all duration-300 bg-emerald-500'
             : 'flex-1 h-0.5 mx-1 mt-[-12px] transition-all duration-300 bg-gray-200';
         }
       }
