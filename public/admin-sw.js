@@ -1,5 +1,5 @@
 // T&S Admin Dashboard Service Worker — Network-first with offline fallback
-const CACHE_NAME = 'ts-admin-v17';
+const CACHE_NAME = 'ts-admin-v18';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to pre-cache

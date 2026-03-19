@@ -864,12 +864,13 @@
       return valid;
     }
 
-    /* ───── Form submit validation ───── */
+    /* ───── Form submit via fetch (avoids redirect/caching issues) ───── */
     document.getElementById('inductionForm').addEventListener('submit', function(e) {
+      e.preventDefault(); // Always prevent native form submit
+
       const ppe = document.getElementById('ppeAcknowledge');
       const ppeErr = document.getElementById('ppeError');
       if (!ppe.checked) {
-        e.preventDefault();
         ppeErr.classList.remove('hidden');
         ppe.closest('label')?.classList.add('ring-2', 'ring-red-300');
         ppe.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -882,13 +883,24 @@
       btn.disabled = true;
       btn.innerHTML = '<svg class="animate-spin inline -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Submitting...';
 
-      // Safety: re-enable button after 30s in case something goes wrong
-      setTimeout(function() {
-        if (btn.disabled) {
-          btn.disabled = false;
-          btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Submit Application';
+      // Submit via fetch
+      var formData = new FormData(this);
+      fetch(this.action, {
+        method: 'POST',
+        body: formData
+      }).then(function(response) {
+        if (response.ok || response.redirected) {
+          // Success — go to thank you page
+          window.location.href = '/induction/complete';
+        } else {
+          return response.text().then(function(text) { throw new Error(text || 'Submission failed'); });
         }
-      }, 30000);
+      }).catch(function(err) {
+        console.error('Submit error:', err);
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Submit Application';
+        alert('Something went wrong submitting. Please check your internet connection and try again.');
+      });
     });
 
     /* ───── File preview ───── */
