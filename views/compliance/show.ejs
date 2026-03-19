@@ -1,0 +1,79 @@
+<% locals.currentPage = 'compliance' %>
+
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  <div class="flex items-center gap-3 flex-wrap">
+    <h1 class="text-2xl font-bold text-white"><%= item.title %></h1>
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+      <% if (item.status === 'approved') { %>bg-emerald-900/60 text-emerald-300
+      <% } else if (item.status === 'rejected') { %>bg-red-900/60 text-red-300
+      <% } else if (item.status === 'expired') { %>bg-orange-900/60 text-brand-300
+      <% } else if (item.status === 'submitted') { %>bg-blue-900/60 text-blue-300
+      <% } else { %>bg-slate-700 text-slate-300<% } %>">
+      <%= item.status ? item.status.replace(/_/g, ' ') : 'not started' %>
+    </span>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/compliance/<%= item.id %>/edit" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Edit</a>
+    <a href="/compliance" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors">Back</a>
+  </div>
+</div>
+
+<!-- Info Grid -->
+<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6">
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Job</p>
+      <p class="text-sm text-white mt-1"><a href="/jobs/<%= item.job_id %>" class="text-blue-400 hover:text-blue-300 hover:underline"><%= item.job_number %></a> &mdash; <%= item.client %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Item Type</p>
+      <p class="text-sm text-slate-300 mt-1"><%= item.item_type ? item.item_type.replace(/_/g, ' ') : '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Authority / Approver</p>
+      <p class="text-sm text-slate-300 mt-1"><%= item.authority_approver || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Internal Approver</p>
+      <p class="text-sm text-slate-300 mt-1"><%= item.approver_name || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Due Date</p>
+      <p class="text-sm text-slate-300 mt-1"><%= item.due_date || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Submitted Date</p>
+      <p class="text-sm text-slate-300 mt-1"><%= item.submitted_date || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Approved Date</p>
+      <p class="text-sm text-slate-300 mt-1"><%= item.approved_date || '-' %></p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Expiry Date</p>
+      <p class="text-sm text-slate-300 mt-1"><%= item.expiry_date || '-' %></p>
+    </div>
+  </div>
+  <% if (item.notes) { %>
+    <div class="mt-4 pt-4 border-t border-slate-700">
+      <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Notes</p>
+      <p class="text-sm text-slate-300 whitespace-pre-wrap"><%= item.notes %></p>
+    </div>
+  <% } %>
+</div>
+
+<!-- Compliance Thread Chat -->
+<div class="mb-6">
+  <div class="flex items-center gap-2 mb-4">
+    <h2 class="text-lg font-semibold text-white">Planning / Approval Comments</h2>
+    <span class="text-xs text-slate-500">Discussion for this compliance item</span>
+  </div>
+  <% if (typeof chatThreadId !== 'undefined' && chatThreadId) { %>
+    <%- include('../partials/chat-panel') %>
+  <% } else { %>
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-center">
+      <p class="text-slate-500 text-sm">Chat thread not available.</p>
+    </div>
+  <% } %>
+</div>

@@ -211,6 +211,9 @@
     <a href="#defects" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Defects</a>
+    <a href="#chat" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
+      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Chat</a>
     <% if (canViewAccounts) { %>
     <a href="#budget" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
@@ -754,6 +757,21 @@
         </tbody>
       </table>
     </div>
+    <% } %>
+  </div>
+
+  <!-- Chat Tab -->
+  <div id="chat" class="tab-content">
+    <div class="mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Job Chat</h2>
+      <p class="text-sm text-gray-500 mt-1">Operational messages for this job</p>
+    </div>
+    <% if (typeof chatThreadId !== 'undefined' && chatThreadId) { %>
+      <%- include('../partials/chat-panel') %>
+    <% } else { %>
+      <div class="bg-white border border-gray-200 rounded-xl p-6 text-center">
+        <p class="text-gray-400 text-sm">Chat thread not available.</p>
+      </div>
     <% } %>
   </div>
 

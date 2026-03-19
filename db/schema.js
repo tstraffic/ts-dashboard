@@ -2961,6 +2961,80 @@ function runMigrations(db) {
     console.log('Migration 53 complete.');
   }
 
+  // Migration 54: Operational Chat / Messaging Tables
+  if (!isMigrationApplied.get(54)) {
+    console.log('Running migration 54: Operational Chat / Messaging Tables');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS chat_threads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_type TEXT NOT NULL CHECK(thread_type IN ('job','incident','compliance','broadcast')),
+        related_entity_id INTEGER NOT NULL,
+        related_entity_type TEXT NOT NULL CHECK(related_entity_type IN ('job','incident','compliance')),
+        title TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived','locked')),
+        created_by INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS chat_thread_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id INTEGER NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role_in_thread TEXT NOT NULL DEFAULT 'member' CHECK(role_in_thread IN ('owner','member','readonly')),
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        muted_at DATETIME,
+        last_read_message_id INTEGER DEFAULT 0,
+        UNIQUE(thread_id, user_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id INTEGER NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+        sender_id INTEGER REFERENCES users(id),
+        body TEXT NOT NULL DEFAULT '',
+        message_type TEXT NOT NULL DEFAULT 'text' CHECK(message_type IN ('text','image','file','system')),
+        reply_to_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        edited_at DATETIME,
+        deleted_at DATETIME
+      );
+
+      CREATE TABLE IF NOT EXISTS message_attachments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        file_url TEXT NOT NULL,
+        thumbnail_url TEXT DEFAULT '',
+        mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+        file_size INTEGER NOT NULL DEFAULT 0,
+        original_name TEXT NOT NULL,
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS message_mentions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        mentioned_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(message_id, mentioned_user_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_type ON chat_threads(thread_type);
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_entity ON chat_threads(related_entity_type, related_entity_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_status ON chat_threads(status);
+      CREATE INDEX IF NOT EXISTS idx_chat_thread_members_thread ON chat_thread_members(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_thread_members_user ON chat_thread_members(user_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_thread_created ON messages(thread_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_deleted ON messages(deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_message_attachments_message ON message_attachments(message_id);
+      CREATE INDEX IF NOT EXISTS idx_message_mentions_user ON message_mentions(mentioned_user_id);
+      CREATE INDEX IF NOT EXISTS idx_message_mentions_message ON message_mentions(message_id);
+    `);
+    recordMigration.run(54, 'Operational Chat / Messaging Tables');
+    console.log('Migration 54 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

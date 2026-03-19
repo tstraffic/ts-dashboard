@@ -1,0 +1,41 @@
+<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+     data-chat-thread="<%= typeof chatThreadId !== 'undefined' ? chatThreadId : '' %>"
+     data-current-user-id="<%= user.id %>"
+     data-current-user-name="<%= user.full_name %>">
+
+  <!-- Messages container (scrollable) -->
+  <div class="chat-messages overflow-y-auto p-4 space-y-1" style="max-height: 500px;">
+    <div class="text-center text-gray-400 text-sm py-4">Loading messages...</div>
+  </div>
+
+  <!-- Input area -->
+  <div class="border-t border-gray-200 p-3 relative">
+    <!-- Reply indicator (hidden by default) -->
+    <div class="chat-reply-indicator hidden mb-2 text-xs text-gray-500 bg-gray-50 rounded px-2 py-1 flex items-center justify-between">
+      <span class="chat-reply-text truncate"></span>
+      <button class="chat-reply-cancel text-gray-400 hover:text-gray-700 ml-2 font-bold">&times;</button>
+    </div>
+
+    <div class="flex items-end gap-2">
+      <!-- Image upload button -->
+      <label class="cursor-pointer text-gray-400 hover:text-gray-600 p-2 flex-shrink-0 transition-colors" title="Upload image">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        <input type="file" accept="image/*" class="hidden chat-image-input">
+      </label>
+
+      <!-- Message textarea -->
+      <textarea class="chat-input flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+        rows="1" placeholder="Type a message... Use @ to mention"></textarea>
+
+      <!-- Send button -->
+      <button class="chat-send px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors flex-shrink-0">
+        Send
+      </button>
+    </div>
+
+    <!-- Mention autocomplete dropdown (hidden by default) -->
+    <div class="chat-mention-dropdown hidden bg-white border border-gray-200 rounded-lg shadow-xl overflow-y-auto"></div>
+  </div>
+</div>

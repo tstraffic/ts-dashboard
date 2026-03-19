@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { canViewAccounts } = require('../middleware/auth');
+const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadForEntity } = require('../lib/chat');
 
 // List all jobs
 router.get('/', (req, res) => {
@@ -87,6 +88,21 @@ router.post('/', (req, res) => {
       b.rol_required ? 1 : 0, b.tmp_required ? 1 : 0, b.sharepoint_url || '', b.state || '',
       b.required_tcp_level || ''
     );
+    // Auto-create chat thread for this job
+    const newJobId = db.prepare('SELECT id FROM jobs WHERE job_number = ?').get(b.job_number);
+    if (newJobId) {
+      const threadId = ensureThreadForEntity('job', newJobId.id, `Job ${b.job_number}`, req.session.user.id);
+      const memberIds = [...new Set([req.session.user.id,
+        b.project_manager_id ? parseInt(b.project_manager_id) : null,
+        b.ops_supervisor_id ? parseInt(b.ops_supervisor_id) : null,
+        b.planning_owner_id ? parseInt(b.planning_owner_id) : null,
+        b.marketing_owner_id ? parseInt(b.marketing_owner_id) : null,
+        b.accounts_owner_id ? parseInt(b.accounts_owner_id) : null
+      ].filter(Boolean))];
+      addMembersToThread(threadId, memberIds, 'member', true);
+      postSystemMessage(threadId, `Thread created for job ${b.job_number}`);
+    }
+
     req.flash('success', `Job ${b.job_number} created successfully.`);
     res.redirect('/jobs');
   } catch (err) {
@@ -201,11 +217,23 @@ router.get('/:id', (req, res) => {
     WHERE tp.job_id = ? ORDER BY tp.created_at DESC
   `).all(job.id);
 
+  // Lazy-create chat thread for pre-existing jobs
+  let chatThreadId = getThreadForEntity('job', job.id);
+  if (!chatThreadId) {
+    chatThreadId = ensureThreadForEntity('job', job.id, `Job ${job.job_number}`, req.session.user.id);
+    const memberIds = [...new Set([req.session.user.id,
+      job.project_manager_id, job.ops_supervisor_id,
+      job.planning_owner_id, job.marketing_owner_id, job.accounts_owner_id
+    ].filter(Boolean))];
+    addMembersToThread(chatThreadId, memberIds, 'member', true);
+    postSystemMessage(chatThreadId, `Thread created for job ${job.job_number}`);
+  }
+
   res.render('jobs/show', {
     title: job.job_number,
     job, tasks, updates, complianceItems, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
-    equipmentAssignments, defects, trafficPlans,
+    equipmentAssignments, defects, trafficPlans, chatThreadId,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });
