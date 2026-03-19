@@ -224,7 +224,7 @@ function handleSubmission(req, res) {
       for (const [col, val] of Object.entries(allFields)) {
         if (existingCols.includes(col)) {
           colNames.push(col);
-          params['$' + col] = val;
+          params[col] = val;
         }
       }
 
