@@ -196,10 +196,10 @@
   <!-- Tabs -->
   <div class="border-b border-gray-200">
     <nav class="flex gap-6 -mb-px overflow-x-auto" id="empTabs">
-      <button data-tab="overview" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-brand-600 text-brand-600 text-sm font-medium transition cursor-pointer">Overview</button>
-      <button data-tab="documents" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition cursor-pointer">Documents <span class="ml-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full"><%= documents.length %></span></button>
-      <button data-tab="competencies" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition cursor-pointer">Competencies <span class="ml-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full"><%= competencies.length %></span></button>
-      <button data-tab="workforce" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition cursor-pointer">Linked Workforce <% if (crewMember) { %><span class="ml-1 w-2 h-2 bg-emerald-500 rounded-full inline-block"></span><% } %></button>
+      <button onclick="switchEmpTab('overview')" data-tab="overview" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-brand-600 text-brand-600 text-sm font-medium transition cursor-pointer">Overview</button>
+      <button onclick="switchEmpTab('documents')" data-tab="documents" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition cursor-pointer">Documents <span class="ml-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full"><%= documents.length %></span></button>
+      <button onclick="switchEmpTab('competencies')" data-tab="competencies" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition cursor-pointer">Competencies <span class="ml-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full"><%= competencies.length %></span></button>
+      <button onclick="switchEmpTab('workforce')" data-tab="workforce" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition cursor-pointer">Linked Workforce <% if (crewMember) { %><span class="ml-1 w-2 h-2 bg-emerald-500 rounded-full inline-block"></span><% } %></button>
     </nav>
   </div>
 
@@ -928,64 +928,49 @@
 
 <%- contentFor('script') %>
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  // ── Tab switching ──
-  const tabs = document.querySelectorAll('.emp-tab');
-  const contents = document.querySelectorAll('.emp-tab-content');
-
-  function switchTab(target) {
-    tabs.forEach(t => {
-      t.classList.remove('border-brand-600', 'text-brand-600');
-      t.classList.add('border-transparent', 'text-gray-500');
-    });
-    contents.forEach(c => {
-      c.style.display = 'none';
-      c.classList.add('hidden');
-    });
-
-    const activeTab = document.querySelector('[data-tab="' + target + '"]');
-    const activeContent = document.getElementById('tab-' + target);
-    if (activeTab) {
-      activeTab.classList.add('border-brand-600', 'text-brand-600');
-      activeTab.classList.remove('border-transparent', 'text-gray-500');
-    }
-    if (activeContent) {
-      activeContent.style.display = '';
-      activeContent.classList.remove('hidden');
-    }
-  }
-
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      const target = tab.dataset.tab;
-      switchTab(target);
-      history.replaceState(null, '', '#' + target);
-    });
+// ── Tab switching (global so onclick works) ──
+function switchEmpTab(target) {
+  document.querySelectorAll('.emp-tab').forEach(function(t) {
+    t.classList.remove('border-brand-600', 'text-brand-600');
+    t.classList.add('border-transparent', 'text-gray-500');
+  });
+  document.querySelectorAll('.emp-tab-content').forEach(function(c) {
+    c.style.display = 'none';
   });
 
-  // Check hash for direct tab link
-  const hash = window.location.hash.replace('#', '');
-  if (hash && document.getElementById('tab-' + hash)) {
-    switchTab(hash);
+  var activeTab = document.querySelector('[data-tab="' + target + '"]');
+  var activeContent = document.getElementById('tab-' + target);
+  if (activeTab) {
+    activeTab.classList.add('border-brand-600', 'text-brand-600');
+    activeTab.classList.remove('border-transparent', 'text-gray-500');
   }
-});
+  if (activeContent) {
+    activeContent.style.display = '';
+  }
+  try { history.replaceState(null, '', '#' + target); } catch(e) {}
+}
+
+// ── Check hash on load ──
+(function() {
+  var hash = window.location.hash.replace('#', '');
+  if (hash && document.getElementById('tab-' + hash)) {
+    switchEmpTab(hash);
+  }
+})();
 
 // ── Upload modal helper ──
 function openUploadModal(docType) {
-  const modal = document.getElementById('uploadDocModal');
-  const select = document.getElementById('uploadDocType');
-  if (select && docType) {
-    select.value = docType;
-  }
+  var modal = document.getElementById('uploadDocModal');
+  var select = document.getElementById('uploadDocType');
+  if (select && docType) select.value = docType;
   modal.classList.remove('hidden');
 }
 
 // ── Edit competency modal ──
 function openEditComp(comp) {
-  const modal = document.getElementById('editCompModal');
-  const form = document.getElementById('editCompForm');
+  var modal = document.getElementById('editCompModal');
+  var form = document.getElementById('editCompForm');
   form.action = '/hr/competencies/' + comp.id;
-
   document.getElementById('edit_comp_type').value = comp.competency_type || '';
   document.getElementById('edit_comp_name').value = comp.competency_name || '';
   document.getElementById('edit_comp_level').value = comp.competency_level || '';
@@ -995,7 +980,6 @@ function openEditComp(comp) {
   document.getElementById('edit_comp_doc').value = comp.linked_document_id || '';
   document.getElementById('edit_comp_mandatory').checked = !!comp.mandatory_for_role;
   document.getElementById('edit_comp_notes').value = comp.notes || '';
-
   modal.classList.remove('hidden');
 }
 </script>
