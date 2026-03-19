@@ -141,14 +141,20 @@ router.post('/submissions/:id/status', (req, res) => {
           employment_type, employment_status, payment_type, start_date,
           email, phone, address, suburb, state, postcode,
           date_of_birth, induction_status, allocatable, active,
-          linked_crew_member_id, internal_notes)
-        VALUES (?, ?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', ?, date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?)
+          linked_crew_member_id, internal_notes,
+          white_card_number, tc_licence_number, tc_licence_state, tc_licence_date_of_issue, drivers_licence_number,
+          emergency_contact_name, emergency_contact_phone, emergency_contact_relationship)
+        VALUES (?, ?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', ?, date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?)
       `).run(
         employeeId, firstName, middleName, lastName, fullName, employmentType,
         s.payment_type || '',
         s.email || '', s.phone || '', s.address || '', s.suburb || '', s.state || '', s.postcode || '',
         s.date_of_birth || null, crewMemberId,
-        `Auto-created from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''} AccName: ${s.bank_account_name || ''}`
+        `Auto-created from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''} AccName: ${s.bank_account_name || ''}`,
+        s.white_card_number || '', s.tc_licence_number || '', s.tc_licence_state || '', s.tc_licence_date_of_issue || '', s.drivers_licence_number || '',
+        s.emergency_contact_name || '', s.emergency_contact_phone || '', s.emergency_contact_relationship || ''
       );
 
       // 3. Get the new employee record ID
@@ -258,12 +264,18 @@ router.post('/submissions/:id/convert', (req, res) => {
         employment_type, employment_status, payment_type, start_date,
         email, phone, address, suburb, state, postcode,
         date_of_birth, induction_status, allocatable, active,
-        linked_crew_member_id, internal_notes)
-      VALUES (?, ?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', ?, date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?)
+        linked_crew_member_id, internal_notes,
+        white_card_number, tc_licence_number, tc_licence_state, tc_licence_date_of_issue, drivers_licence_number,
+        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship)
+      VALUES (?, ?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', ?, date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?)
     `).run(employeeId, firstName, middleName, lastName, fullName, employmentType, s.payment_type || '',
       s.email || '', s.phone || '', s.address || '', s.suburb || '', s.state || '', s.postcode || '',
       s.date_of_birth || null, crewMemberId,
-      `Converted from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''}`);
+      `Converted from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''}`,
+      s.white_card_number || '', s.tc_licence_number || '', s.tc_licence_state || '', s.tc_licence_date_of_issue || '', s.drivers_licence_number || '',
+      s.emergency_contact_name || '', s.emergency_contact_phone || '', s.emergency_contact_relationship || '');
 
     // Auto-create employee documents from induction uploads
     const newEmployee = db.prepare("SELECT id FROM employees WHERE employee_code = ?").get(employeeId);

@@ -239,11 +239,23 @@
           </div>
         </div>
 
+        <!-- Licences & Cards -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+          <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Licences & Cards</h2>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6">
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">White Card Number</p><p class="text-sm text-gray-900 mt-0.5 font-mono"><%= employee.white_card_number || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">TC Licence Number</p><p class="text-sm text-gray-900 mt-0.5 font-mono"><%= employee.tc_licence_number || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">TC Licence State</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.tc_licence_state || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">TC Date of Issue</p><p class="text-sm text-gray-900 mt-0.5"><%= formatDate(employee.tc_licence_date_of_issue) %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Driver's Licence Number</p><p class="text-sm text-gray-900 mt-0.5 font-mono"><%= employee.drivers_licence_number || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Ticket Classification</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.ticket_classification || '-' %></p></div>
+          </div>
+        </div>
+
         <!-- Operational -->
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
           <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Operational</h2>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6">
-            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Ticket Classification</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.ticket_classification || '-' %></p></div>
             <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Primary Region</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.primary_work_region || '-' %></p></div>
             <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Base Location</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.base_location || '-' %></p></div>
             <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Induction</p><p class="text-sm text-gray-900 mt-0.5"><%= formatType(employee.induction_status) %></p></div>
@@ -926,7 +938,6 @@
   </div>
 </div>
 
-<%- contentFor('script') %>
 <script>
 // ── Tab switching (global so onclick works) ──
 function switchEmpTab(target) {

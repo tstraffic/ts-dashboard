@@ -3344,6 +3344,23 @@ function runMigrations(db) {
     console.log('Migration 60 complete.');
   }
 
+  // Migration 61: Add licence/card number fields to employees table
+  if (!isMigrationApplied.get(61)) {
+    console.log('Running migration 61: Add licence number fields to employees');
+    const newCols61 = [
+      "ALTER TABLE employees ADD COLUMN white_card_number TEXT DEFAULT ''",
+      "ALTER TABLE employees ADD COLUMN tc_licence_number TEXT DEFAULT ''",
+      "ALTER TABLE employees ADD COLUMN tc_licence_state TEXT DEFAULT ''",
+      "ALTER TABLE employees ADD COLUMN tc_licence_date_of_issue TEXT DEFAULT ''",
+      "ALTER TABLE employees ADD COLUMN drivers_licence_number TEXT DEFAULT ''",
+    ];
+    for (const sql of newCols61) {
+      try { db.exec(sql); } catch (e) { /* column likely exists */ }
+    }
+    recordMigration.run(61, 'Add licence number fields to employees');
+    console.log('Migration 61 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

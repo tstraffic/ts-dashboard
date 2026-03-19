@@ -545,6 +545,7 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
     b.emergency_contact_name || '', b.emergency_contact_phone || '', b.emergency_contact_relationship || '',
     b.date_of_birth || null, b.payroll_reference || '', b.internal_notes || '',
     b.linked_crew_member_id || null, b.linked_user_id || null,
+    b.white_card_number || '', b.tc_licence_number || '', b.tc_licence_state || '', b.tc_licence_date_of_issue || '', b.drivers_licence_number || '',
   ];
 
   const rateParams = canViewRates(req.session.user)
@@ -568,7 +569,8 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
       primary_work_region = ?, base_location = ?,
       emergency_contact_name = ?, emergency_contact_phone = ?, emergency_contact_relationship = ?,
       date_of_birth = ?, payroll_reference = ?, internal_notes = ?,
-      linked_crew_member_id = ?, linked_user_id = ?
+      linked_crew_member_id = ?, linked_user_id = ?,
+      white_card_number = ?, tc_licence_number = ?, tc_licence_state = ?, tc_licence_date_of_issue = ?, drivers_licence_number = ?
       ${rateSet},
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?

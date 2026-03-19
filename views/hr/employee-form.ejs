@@ -296,7 +296,47 @@
     </div>
   </div>
 
-  <!-- Section 4: Emergency Contact -->
+  <!-- Section 4: Licences & Cards -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Licences & Cards</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">White Card Number</label>
+        <input type="text" name="white_card_number" value="<%= val('white_card_number') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. WC-12345678">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TC Licence Number</label>
+        <input type="text" name="tc_licence_number" value="<%= val('tc_licence_number') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. TC-123456">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TC Licence State</label>
+        <select name="tc_licence_state"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">Select...</option>
+          <% ['NSW','VIC','QLD','SA','WA','TAS','NT','ACT'].forEach(s => { %>
+            <option value="<%= s %>" <%= val('tc_licence_state') === s ? 'selected' : '' %>><%= s %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TC Date of Issue</label>
+        <input type="date" name="tc_licence_date_of_issue" value="<%= val('tc_licence_date_of_issue') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Driver's Licence Number</label>
+        <input type="text" name="drivers_licence_number" value="<%= val('drivers_licence_number') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. 12345678">
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 5: Emergency Contact -->
   <% if (canViewSensitive) { %>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
     <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Emergency Contact</h2>
