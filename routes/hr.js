@@ -164,21 +164,17 @@ router.get('/', requirePermission('hr_dashboard'), (req, res) => {
 // ============================================
 router.get('/roster', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
-  const { company, division, employment_type, status, manager_id, search, allocatable, sort, order, payment_type } = req.query;
+  const { employment_type, status, level, search, sort, order, payment_type } = req.query;
 
   let where = '1=1';
   const params = [];
   if (payment_type) { where += ' AND e.payment_type = ?'; params.push(payment_type); }
-  if (company) { where += ' AND e.company = ?'; params.push(company); }
-  if (division) { where += ' AND e.division = ?'; params.push(division); }
   if (employment_type) { where += ' AND e.employment_type = ?'; params.push(employment_type); }
   if (status) { where += ' AND e.employment_status = ?'; params.push(status); }
-  if (manager_id) { where += ' AND e.manager_id = ?'; params.push(manager_id); }
-  if (allocatable === '1') { where += ' AND e.allocatable = 1 AND e.blocked_from_allocation = 0'; }
-  if (allocatable === '0') { where += ' AND (e.allocatable = 0 OR e.blocked_from_allocation = 1)'; }
+  if (level) { where += ' AND (e.traffic_role_level = ? OR e.role_title = ?)'; params.push(level, level); }
   if (search) { where += ' AND (e.full_name LIKE ? OR e.employee_code LIKE ? OR e.email LIKE ? OR e.phone LIKE ?)'; const s = `%${search}%`; params.push(s, s, s, s); }
 
-  const sortCol = { full_name: 'e.full_name', employee_code: 'e.employee_code', company: 'e.company', start_date: 'e.start_date', status: 'e.employment_status' }[sort] || 'e.full_name';
+  const sortCol = { full_name: 'e.full_name', employee_code: 'e.employee_code', start_date: 'e.start_date', status: 'e.employment_status' }[sort] || 'e.full_name';
   const sortOrder = order === 'desc' ? 'DESC' : 'ASC';
 
   const employees = db.prepare(`
@@ -196,24 +192,21 @@ router.get('/roster', requirePermission('hr_employees'), (req, res) => {
     emp.readiness = computeReadiness(emp, comps, docs);
   });
 
-  const totalActive = db.prepare("SELECT COUNT(*) as c FROM employees WHERE active = 1").get().c;
-  const totalOnboarding = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'onboarding'").get().c;
-  const totalBlocked = db.prepare("SELECT COUNT(*) as c FROM employees WHERE blocked_from_allocation = 1 AND active = 1").get().c;
+  // Stats
+  const totalActive = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'active'").get().c;
+  const totalDeactivated = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status IN ('inactive', 'deactivated')").get().c;
+  const totalOnLeave = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'on_leave'").get().c;
+  const totalTerminated = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status IN ('terminated', 'offboarded')").get().c;
   const totalCash = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'cash' AND active = 1").get().c;
   const totalTfn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'tfn' AND active = 1").get().c;
   const totalAbn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'abn' AND active = 1").get().c;
-
-  const companies = db.prepare("SELECT DISTINCT company FROM employees WHERE company != '' ORDER BY company").all().map(r => r.company);
-  const divisions = db.prepare("SELECT DISTINCT division FROM employees WHERE division != '' ORDER BY division").all().map(r => r.division);
-  const managers = db.prepare('SELECT id, full_name FROM employees WHERE id IN (SELECT DISTINCT manager_id FROM employees WHERE manager_id IS NOT NULL) ORDER BY full_name').all();
 
   res.render('hr/roster', {
     title: 'Roster',
     currentPage: 'hr-roster',
     employees,
-    stats: { totalActive, totalOnboarding, totalBlocked, totalCash, totalTfn, totalAbn },
-    filters: { company, division, employment_type, status, manager_id, search, allocatable, sort, order, payment_type },
-    filterOptions: { companies, divisions, managers },
+    stats: { totalActive, totalDeactivated, totalOnLeave, totalTerminated, totalCash, totalTfn, totalAbn },
+    filters: { employment_type, status, level, search, sort, order, payment_type },
     user: req.session.user
   });
 });

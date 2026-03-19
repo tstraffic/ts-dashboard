@@ -5,12 +5,15 @@
     return new Date(d).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
   }
   var sBadges = {
-    active:     'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
-    onboarding: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
-    on_leave:   'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
-    suspended:  'bg-red-50 text-red-700 ring-1 ring-red-600/20',
-    inactive:   'bg-gray-100 text-gray-500',
-    offboarded: 'bg-gray-100 text-gray-500',
+    active:      'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+    reserved:    'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    on_leave:    'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    deactivated: 'bg-gray-100 text-gray-500',
+    inactive:    'bg-gray-100 text-gray-500',
+    terminated:  'bg-red-50 text-red-700 ring-1 ring-red-600/20',
+    suspended:   'bg-red-50 text-red-700 ring-1 ring-red-600/20',
+    onboarding:  'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
+    offboarded:  'bg-gray-100 text-gray-500',
   };
   var rBadges = {
     ready:                'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
@@ -41,18 +44,22 @@
   </div>
 
   <!-- Stats -->
-  <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
       <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Active</p>
       <p class="text-2xl font-bold text-emerald-600 mt-1"><%= stats.totalActive %></p>
     </div>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-      <p class="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Onboarding</p>
-      <p class="text-2xl font-bold text-purple-600 mt-1"><%= stats.totalOnboarding %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Deactivated</p>
+      <p class="text-2xl font-bold text-gray-500 mt-1"><%= stats.totalDeactivated %></p>
     </div>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-      <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Blocked</p>
-      <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.totalBlocked %></p>
+      <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">On Leave</p>
+      <p class="text-2xl font-bold text-blue-600 mt-1"><%= stats.totalOnLeave %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Terminated</p>
+      <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.totalTerminated %></p>
     </div>
   </div>
 
@@ -76,17 +83,20 @@
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
     <form method="GET" action="/hr/roster" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
       <% if (filters.payment_type) { %><input type="hidden" name="payment_type" value="<%= filters.payment_type %>"><% } %>
-      <select name="company" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <option value="">All Companies</option>
-        <% if (filterOptions && filterOptions.companies) { filterOptions.companies.forEach(function(c) { %>
-          <option value="<%= c %>" <%= filters.company === c ? 'selected' : '' %>><%= c %></option>
-        <% }); } %>
+      <select name="status" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Statuses</option>
+        <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Active</option>
+        <option value="reserved" <%= filters.status === 'reserved' ? 'selected' : '' %>>Reserved</option>
+        <option value="on_leave" <%= filters.status === 'on_leave' ? 'selected' : '' %>>On Leave</option>
+        <option value="deactivated" <%= filters.status === 'deactivated' ? 'selected' : '' %>>Deactivated</option>
+        <option value="inactive" <%= filters.status === 'inactive' ? 'selected' : '' %>>Deactivated</option>
+        <option value="terminated" <%= filters.status === 'terminated' ? 'selected' : '' %>>Terminated</option>
       </select>
-      <select name="division" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <option value="">All Divisions</option>
-        <% if (filterOptions && filterOptions.divisions) { filterOptions.divisions.forEach(function(d) { %>
-          <option value="<%= d %>" <%= filters.division === d ? 'selected' : '' %>><%= d %></option>
-        <% }); } %>
+      <select name="level" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Levels</option>
+        <option value="Traffic Controller" <%= filters.level === 'Traffic Controller' ? 'selected' : '' %>>Traffic Controller</option>
+        <option value="Team Leader" <%= filters.level === 'Team Leader' ? 'selected' : '' %>>Team Leader</option>
+        <option value="Project Supervisor" <%= filters.level === 'Project Supervisor' ? 'selected' : '' %>>Project Supervisor</option>
       </select>
       <select name="employment_type" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
         <option value="">All Types</option>
@@ -96,17 +106,8 @@
         <option value="contractor" <%= filters.employment_type === 'contractor' ? 'selected' : '' %>>Contractor</option>
         <option value="subcontractor" <%= filters.employment_type === 'subcontractor' ? 'selected' : '' %>>Subcontractor</option>
       </select>
-      <select name="status" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <option value="">All Statuses</option>
-        <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Active</option>
-        <option value="onboarding" <%= filters.status === 'onboarding' ? 'selected' : '' %>>Onboarding</option>
-        <option value="on_leave" <%= filters.status === 'on_leave' ? 'selected' : '' %>>On Leave</option>
-        <option value="suspended" <%= filters.status === 'suspended' ? 'selected' : '' %>>Suspended</option>
-        <option value="inactive" <%= filters.status === 'inactive' ? 'selected' : '' %>>Inactive</option>
-        <option value="offboarded" <%= filters.status === 'offboarded' ? 'selected' : '' %>>Offboarded</option>
-      </select>
       <div class="flex-1 min-w-0 sm:min-w-[200px]">
-        <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Search name, code, role..."
+        <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Search name, code, phone..."
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
       </div>
       <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition">Filter</button>
@@ -115,7 +116,7 @@
 
   <% if (employees && employees.length > 0) { %>
 
-  <!-- Bulk Bar — uses inline style, no Tailwind hidden class -->
+  <!-- Bulk Bar -->
   <div id="rosterBulk" style="display:none" class="sticky top-0 z-30 bg-red-50 border border-red-200 rounded-xl shadow-sm p-3 flex items-center justify-between gap-3">
     <div class="flex items-center gap-2">
       <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
@@ -126,7 +127,7 @@
     </button>
   </div>
 
-  <!-- Table wrapped in form for bulk delete -->
+  <!-- Table -->
   <form id="rosterDeleteForm" method="POST" action="/hr/roster/delete">
     <%- include('../partials/csrf') %>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -137,17 +138,13 @@
               <th scope="col" class="px-2 sm:px-3 py-3 text-center w-10">
                 <input type="checkbox" id="rosterAll" aria-label="Select all employees" class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
               </th>
-              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Code</th>
-              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Full Name</th>
-              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Company</th>
-              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Division</th>
-              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Role</th>
-              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Type</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Phone</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Level</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Type</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Readiness</th>
-              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Manager</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Readiness</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Start Date</th>
-              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Next Expiry</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -156,27 +153,29 @@
               <td class="px-2 sm:px-3 py-3 text-center">
                 <input type="checkbox" name="ids" value="<%= emp.id %>" aria-label="Select <%= emp.full_name || emp.first_name + ' ' + emp.last_name %>" class="roster-chk w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
               </td>
-              <td class="px-3 sm:px-4 py-3 text-gray-500 font-mono text-xs"><%= emp.employee_code || '-' %></td>
               <td class="px-3 sm:px-4 py-3">
                 <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %><% if (emp.middle_name) { %> <%= emp.middle_name %><% } %> <%= emp.last_name %></a>
                 <div class="flex items-center gap-1.5 mt-0.5">
+                  <% if (emp.employee_code) { %><span class="text-[10px] text-gray-400 font-mono"><%= emp.employee_code %></span><% } %>
                   <% if (emp.payment_type) { %>
                     <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase
                       <%= emp.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600' : emp.payment_type === 'tfn' ? 'bg-blue-50 text-blue-600' : emp.payment_type === 'abn' ? 'bg-purple-50 text-purple-600' : 'bg-gray-50 text-gray-500' %>"><%= emp.payment_type %></span>
                   <% } %>
-                  <span class="sm:hidden text-[10px] text-gray-400"><%= emp.company || '' %><% if (emp.role_title) { %> &middot; <%= emp.role_title %><% } %></span>
                 </div>
               </td>
-              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden sm:table-cell"><%= emp.company || '-' %></td>
-              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden md:table-cell"><%= emp.division || '-' %></td>
-              <td class="px-3 sm:px-4 py-3 text-gray-600 text-xs hidden md:table-cell"><%= emp.role_title || '-' %></td>
-              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden lg:table-cell"><%= emp.employment_type ? emp.employment_type.replace(/_/g, ' ') : '-' %></td>
+              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden sm:table-cell">
+                <% if (emp.phone) { %>
+                  <a href="tel:<%= emp.phone %>" class="hover:text-brand-600"><%= emp.phone %></a>
+                <% } else { %>-<% } %>
+              </td>
+              <td class="px-3 sm:px-4 py-3 text-gray-600 text-xs hidden md:table-cell"><%= emp.traffic_role_level || emp.role_title || '-' %></td>
+              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden md:table-cell capitalize"><%= emp.employment_type ? emp.employment_type.replace(/_/g, ' ') : '-' %></td>
               <td class="px-3 sm:px-4 py-3">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= sBadges[emp.employment_status] || sBadges.inactive %>">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize <%= sBadges[emp.employment_status] || sBadges.inactive %>">
                   <%= (emp.employment_status || 'unknown').replace(/_/g, ' ') %>
                 </span>
               </td>
-              <td class="px-3 sm:px-4 py-3">
+              <td class="px-3 sm:px-4 py-3 hidden lg:table-cell">
                 <% if (emp.readiness) { %>
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= rBadges[emp.readiness.status] || 'bg-gray-100 text-gray-500' %>">
                     <%= rLabels[emp.readiness.status] || emp.readiness.status %>
@@ -185,15 +184,7 @@
                   <span class="text-gray-300 text-xs">-</span>
                 <% } %>
               </td>
-              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden lg:table-cell"><%= emp.manager_name || '-' %></td>
               <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs tabular-nums hidden xl:table-cell"><%= fmtDate(emp.start_date) %></td>
-              <td class="px-3 sm:px-4 py-3 hidden xl:table-cell">
-                <% if (emp.next_expiry) { %>
-                  <span class="text-xs text-amber-600"><%= fmtDate(emp.next_expiry) %></span>
-                <% } else { %>
-                  <span class="text-gray-300 text-xs">-</span>
-                <% } %>
-              </td>
             </tr>
             <% }); %>
           </tbody>
@@ -206,7 +197,6 @@
   </form>
 
   <% } else { %>
-  <!-- Empty state -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
     <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
       <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
