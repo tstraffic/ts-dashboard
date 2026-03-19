@@ -44,6 +44,14 @@ const uploadFields = upload.fields([
 // Valid payment types
 const VALID_TYPES = ['cash', 'tfn', 'abn'];
 
+// ─── No-cache middleware for all induction routes ───
+router.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 // ─── LITERAL ROUTES FIRST (before /:type catches them) ───
 
 // GET /induction — unified form
