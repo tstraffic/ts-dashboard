@@ -142,6 +142,7 @@ function handleSubmission(req, res) {
 
     try {
       const b = req.body;
+      const db = getDb();
       const paymentType = b.payment_type || req.params?.type || 'tfn';
 
       // Compute full_name from split fields (or use legacy field)
@@ -171,62 +172,106 @@ function handleSubmission(req, res) {
         b.bank_account_name = b.cash_bank_account_name || b.bank_account_name || '';
       }
 
-      const stmt = getDb().prepare(`
-        INSERT INTO induction_submissions (
-          access_token, payment_type, status,
-          full_name, first_name, middle_name, last_name,
-          email, phone, date_of_birth,
-          address, suburb, state, postcode,
-          can_drive, can_drive_truck, has_injuries, injury_details, is_indigenous,
-          white_card_number, tc_licence_number, tc_licence_date_of_issue, tc_licence_state,
-          drivers_licence_number,
-          white_card_photo, tc_licence_photo, drivers_licence_photo, drivers_licence_back_photo,
-          experience_years, experience_description,
-          tax_file_number, bank_name, bank_bsb, bank_account_number, bank_account_name,
-          abn_number, has_insurance,
-          super_fund_name, super_fund_abn, super_usi, super_member_number,
-          company_intro_completed, ppe_acknowledged,
-          submitted_at
-        ) VALUES (
-          ?, ?, 'submitted',
-          ?, ?, ?, ?,
-          ?, ?, ?,
-          ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
-          ?, ?, ?, ?,
-          ?,
-          ?, ?, ?, ?,
-          ?, ?,
-          ?, ?, ?, ?, ?,
-          ?, ?,
-          ?, ?, ?, ?,
-          ?, ?,
-          datetime('now')
-        )
-      `);
+      const accessToken = b.access_token || crypto.randomBytes(24).toString('hex');
 
-      stmt.run(
-        b.access_token || crypto.randomBytes(24).toString('hex'),
-        paymentType,
-        computedFullName, fn, mn, ln,
-        b.email || '', b.phone || '', b.date_of_birth || null,
-        b.address || '', b.suburb || '', b.state || '', b.postcode || '',
-        b.can_drive || '', b.can_drive_truck || '', b.has_injuries || '', b.injury_details || '', b.is_indigenous || '',
-        b.white_card_number || '', b.tc_licence_number || '', b.tc_licence_date_of_issue || '', b.tc_licence_state || '',
-        b.drivers_licence_number || '',
-        whiteCardPhoto, tcLicencePhoto, driversLicencePhoto, driversLicenceBackPhoto,
-        b.experience_years || '', b.experience_description || '',
-        b.tax_file_number || '', b.bank_name || '', b.bank_bsb || '', b.bank_account_number || '', b.bank_account_name || '',
-        b.abn_number || '', b.has_insurance || '',
-        b.super_fund_name || '', b.super_fund_abn || '', b.super_usi || '', b.super_member_number || '',
-        (b.company_intro_completed === 'on' || b.company_intro_completed === '1') ? 1 : 0,
-        (b.ppe_acknowledged === 'on' || b.ppe_acknowledged === '1') ? 1 : 0
-      );
+      // Dynamically build INSERT based on columns that actually exist in the DB
+      const existingCols = db.prepare("PRAGMA table_info(induction_submissions)").all().map(c => c.name);
 
+      // All possible column→value mappings
+      const allFields = {
+        access_token: accessToken,
+        payment_type: paymentType,
+        status: 'submitted',
+        full_name: computedFullName,
+        first_name: fn,
+        middle_name: mn,
+        last_name: ln,
+        email: b.email || '',
+        phone: b.phone || '',
+        date_of_birth: b.date_of_birth || null,
+        address: b.address || '',
+        suburb: b.suburb || '',
+        state: b.state || '',
+        postcode: b.postcode || '',
+        can_drive: b.can_drive || '',
+        can_drive_truck: b.can_drive_truck || '',
+        has_injuries: b.has_injuries || '',
+        injury_details: b.injury_details || '',
+        is_indigenous: b.is_indigenous || '',
+        white_card_number: b.white_card_number || '',
+        tc_licence_number: b.tc_licence_number || '',
+        tc_licence_date_of_issue: b.tc_licence_date_of_issue || '',
+        tc_licence_state: b.tc_licence_state || '',
+        drivers_licence_number: b.drivers_licence_number || '',
+        white_card_photo: whiteCardPhoto,
+        tc_licence_photo: tcLicencePhoto,
+        drivers_licence_photo: driversLicencePhoto,
+        drivers_licence_back_photo: driversLicenceBackPhoto,
+        experience_years: b.experience_years || '',
+        experience_description: b.experience_description || '',
+        tax_file_number: b.tax_file_number || '',
+        bank_name: b.bank_name || '',
+        bank_bsb: b.bank_bsb || '',
+        bank_account_number: b.bank_account_number || '',
+        bank_account_name: b.bank_account_name || '',
+        abn_number: b.abn_number || '',
+        has_insurance: b.has_insurance || '',
+        super_fund_name: b.super_fund_name || '',
+        super_fund_abn: b.super_fund_abn || '',
+        super_usi: b.super_usi || '',
+        super_member_number: b.super_member_number || '',
+        company_intro_completed: (b.company_intro_completed === 'on' || b.company_intro_completed === '1') ? 1 : 0,
+        ppe_acknowledged: (b.ppe_acknowledged === 'on' || b.ppe_acknowledged === '1') ? 1 : 0,
+        submitted_at: new Date().toISOString(),
+      };
+
+      // Only include columns that actually exist in the table
+      const cols = [];
+      const placeholders = [];
+      const values = [];
+      for (const [col, val] of Object.entries(allFields)) {
+        if (existingCols.includes(col)) {
+          cols.push(col);
+          placeholders.push('?');
+          values.push(val);
+        }
+      }
+
+      const sql = `INSERT INTO induction_submissions (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`;
+      db.prepare(sql).run(...values);
+
+      console.log('Induction submitted:', computedFullName, paymentType);
       res.redirect('/induction/complete');
     } catch (error) {
       console.error('Induction submission error:', error);
-      res.status(500).send('Something went wrong. Please try again.');
+      console.error('Error stack:', error.stack);
+      res.status(500).send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Error | T&S Traffic Control</title>
+          <script src="https://cdn.tailwindcss.com"><\/script>
+          <script>tailwindcss.config={theme:{extend:{colors:{brand:{50:'#EBF3FF',100:'#D6E7FF',200:'#ADC9FF',500:'#2B7FFF',600:'#1D6AE5',700:'#1554CC',900:'#052A99'}}}}}<\/script>
+        </head>
+        <body class="min-h-screen bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 flex items-center justify-center p-4">
+          <div class="bg-white rounded-2xl shadow-2xl p-8 md:p-10 max-w-md w-full text-center">
+            <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-5">
+              <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+              </svg>
+            </div>
+            <h1 class="text-xl font-bold text-gray-900 mb-2">Something Went Wrong</h1>
+            <p class="text-gray-600 mb-4">We couldn't process your submission. Please try again.</p>
+            <p class="text-xs text-gray-400 mb-6 bg-gray-50 rounded-lg p-3 text-left font-mono break-all">${error.message}</p>
+            <button onclick="history.back()" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition shadow-md">
+              Go Back & Try Again
+            </button>
+          </div>
+        </body>
+        </html>
+      `);
     }
   });
 }
