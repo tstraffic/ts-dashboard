@@ -3,8 +3,13 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
 const { getDb } = require('../db/database');
 const { requirePermission, canViewSensitiveHR } = require('../middleware/auth');
+const { logActivity } = require('../middleware/audit');
+const { createInvitation, TOKEN_EXPIRY_HOURS } = require('../services/invitations');
+const { sendEmail } = require('../services/email');
+const { workerInviteEmail } = require('../services/emailTemplates');
 
 // Only admin and finance can see pay rates
 function canViewRates(user) {
@@ -581,6 +586,81 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
 
   req.flash('success', 'Employee updated successfully.');
   res.redirect(`/hr/employees/${req.params.id}`);
+});
+
+// ============================================
+// WORKER PORTAL PIN MANAGEMENT
+// ============================================
+
+// Helper: load employee + linked crew member, or flash error
+function loadEmployeeWithCrew(req, res) {
+  const db = getDb();
+  const employee = db.prepare('SELECT * FROM employees WHERE id = ?').get(req.params.id);
+  if (!employee) { req.flash('error', 'Employee not found.'); return null; }
+  if (!employee.linked_crew_member_id) { req.flash('error', 'Employee is not linked to a crew member.'); return null; }
+  const crewMember = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(employee.linked_crew_member_id);
+  if (!crewMember) { req.flash('error', 'Linked crew member not found.'); return null; }
+  return { employee, crewMember };
+}
+
+// POST /employees/:id/set-pin — Set or reset worker portal PIN
+router.post('/employees/:id/set-pin', requirePermission('hr_employees'), (req, res) => {
+  const data = loadEmployeeWithCrew(req, res);
+  if (!data) return res.redirect(`/hr/employees/${req.params.id}#workforce`);
+  const { employee, crewMember } = data;
+
+  const { pin } = req.body;
+  if (!pin || !/^\d{4,6}$/.test(pin)) {
+    req.flash('error', 'PIN must be 4-6 digits.');
+    return res.redirect(`/hr/employees/${employee.id}#workforce`);
+  }
+
+  const pinHash = bcrypt.hashSync(pin, 12);
+  getDb().prepare('UPDATE crew_members SET pin_hash = ?, pin_set_at = CURRENT_TIMESTAMP, pin_set_by_id = ? WHERE id = ?')
+    .run(pinHash, req.session.user.id, crewMember.id);
+
+  logActivity({ user: req.session.user, action: 'update', entityType: 'crew_member', entityId: crewMember.id, entityLabel: crewMember.full_name, details: 'Set worker portal PIN (from HR)', ip: req.ip });
+  req.flash('success', 'Portal PIN set for ' + crewMember.full_name);
+  res.redirect(`/hr/employees/${employee.id}#workforce`);
+});
+
+// POST /employees/:id/clear-pin — Remove worker portal PIN
+router.post('/employees/:id/clear-pin', requirePermission('hr_employees'), (req, res) => {
+  const data = loadEmployeeWithCrew(req, res);
+  if (!data) return res.redirect(`/hr/employees/${req.params.id}#workforce`);
+  const { employee, crewMember } = data;
+
+  getDb().prepare('UPDATE crew_members SET pin_hash = NULL, pin_set_at = NULL, pin_set_by_id = NULL WHERE id = ?')
+    .run(crewMember.id);
+
+  logActivity({ user: req.session.user, action: 'update', entityType: 'crew_member', entityId: crewMember.id, entityLabel: crewMember.full_name, details: 'Cleared worker portal PIN (from HR)', ip: req.ip });
+  req.flash('success', 'Portal PIN cleared for ' + crewMember.full_name);
+  res.redirect(`/hr/employees/${employee.id}#workforce`);
+});
+
+// POST /employees/:id/send-invite — Send email invitation for worker portal
+router.post('/employees/:id/send-invite', requirePermission('hr_employees'), async (req, res) => {
+  const data = loadEmployeeWithCrew(req, res);
+  if (!data) return res.redirect(`/hr/employees/${req.params.id}#workforce`);
+  const { employee, crewMember } = data;
+
+  if (!crewMember.email || !crewMember.employee_id) {
+    req.flash('error', 'Crew member needs both an email and Employee ID to receive an invite.');
+    return res.redirect(`/hr/employees/${employee.id}#workforce`);
+  }
+
+  try {
+    const { token } = createInvitation({ type: 'crew_member', targetId: crewMember.id, email: crewMember.email, createdById: req.session.user.id });
+    const setupUrl = (process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`) + '/w/setup/' + token;
+    await sendEmail(crewMember.email, 'Set up your T&S Worker Portal PIN', workerInviteEmail(crewMember.full_name, setupUrl, TOKEN_EXPIRY_HOURS));
+
+    logActivity({ user: req.session.user, action: 'update', entityType: 'crew_member', entityId: crewMember.id, entityLabel: crewMember.full_name, details: 'Sent worker portal email invitation (from HR)', ip: req.ip });
+    req.flash('success', `Invitation email sent to ${crewMember.email}`);
+  } catch (err) {
+    console.error('Send invite error:', err);
+    req.flash('error', 'Failed to send invitation email.');
+  }
+  res.redirect(`/hr/employees/${employee.id}#workforce`);
 });
 
 // ============================================
