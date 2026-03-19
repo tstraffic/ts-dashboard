@@ -110,6 +110,7 @@ app.post('/w/login', loginLimiter);
 app.use('/w', require('./routes/worker/auth'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/home'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/jobs'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/chat'));
 
 // Block worker-only sessions from admin routes
 app.use(blockWorkerFromAdmin);

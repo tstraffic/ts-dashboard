@@ -7,6 +7,9 @@ const { getDb } = require('../db/database');
 const { requireThreadMember } = require('../middleware/chat');
 const { logActivity } = require('../middleware/audit');
 
+// In-memory typing indicator store (resets on restart, intentionally ephemeral)
+const typingUsers = new Map(); // threadId -> Map(userId -> { name, timestamp })
+
 // ============================================
 // Multer config for chat image uploads
 // ============================================
@@ -32,7 +35,8 @@ const chatUpload = multer({
     const docTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'text/plain', 'text/csv'];
-    cb(null, imageTypes.includes(file.mimetype) || docTypes.includes(file.mimetype));
+    const audioTypes = ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav'];
+    cb(null, imageTypes.includes(file.mimetype) || docTypes.includes(file.mimetype) || audioTypes.includes(file.mimetype));
   }
 });
 
@@ -309,8 +313,8 @@ router.post('/api/threads/:threadId/messages', requireThreadMember, (req, res) =
   try {
     const { sendPushToUser } = require('../services/pushNotification');
     const thread = db.prepare('SELECT title, thread_type, related_entity_type, related_entity_id, channel_slug FROM chat_threads WHERE id = ?').get(threadId);
-    const members = db.prepare('SELECT user_id FROM chat_thread_members WHERE thread_id = ? AND user_id != ?').all(threadId, userId);
-    const senderName = req.session.user.full_name;
+    const members = db.prepare('SELECT user_id FROM chat_thread_members WHERE thread_id = ? AND user_id != ? AND muted_at IS NULL').all(threadId, userId);
+    const senderName = req.session.user ? req.session.user.full_name : (req.session.worker ? req.session.worker.full_name : 'Someone');
     const preview = body ? (body.length > 60 ? body.substring(0, 60) + '...' : body) : (type === 'image' ? 'Sent an image' : 'Sent a file');
 
     // Build deep link URL based on thread type
@@ -640,6 +644,157 @@ router.post('/new', (req, res) => {
 
   req.flash('success', `Thread created for ${title}.`);
   res.redirect(redirectUrl);
+});
+
+// ============================================
+// API: Search within a thread
+// ============================================
+router.get('/api/threads/:threadId/search', requireThreadMember, (req, res) => {
+  const db = getDb();
+  const q = req.query.q || '';
+  if (!q || q.length < 2) return res.json({ messages: [] });
+
+  const messages = db.prepare(`
+    SELECT m.id, m.body, m.created_at, m.sender_id, u.full_name as sender_name
+    FROM messages m LEFT JOIN users u ON m.sender_id = u.id
+    WHERE m.thread_id = ? AND m.deleted_at IS NULL AND m.body LIKE ?
+    ORDER BY m.created_at DESC LIMIT 20
+  `).all(req.params.threadId, `%${q}%`);
+  res.json({ messages });
+});
+
+// ============================================
+// API: Mute / unmute a thread
+// ============================================
+router.post('/api/threads/:threadId/mute', requireThreadMember, (req, res) => {
+  const db = getDb();
+  const userId = req.session.user ? req.session.user.id : (req.session.worker ? req.session.worker.id : null);
+  if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+
+  const member = db.prepare('SELECT muted_at FROM chat_thread_members WHERE thread_id = ? AND user_id = ?').get(req.params.threadId, userId);
+  if (!member) return res.status(404).json({ error: 'Not a member' });
+
+  if (member.muted_at) {
+    db.prepare('UPDATE chat_thread_members SET muted_at = NULL WHERE thread_id = ? AND user_id = ?').run(req.params.threadId, userId);
+    res.json({ muted: false });
+  } else {
+    db.prepare('UPDATE chat_thread_members SET muted_at = CURRENT_TIMESTAMP WHERE thread_id = ? AND user_id = ?').run(req.params.threadId, userId);
+    res.json({ muted: true });
+  }
+});
+
+// ============================================
+// API: Pin / unpin a message (admin/operations only)
+// ============================================
+router.post('/api/threads/:threadId/messages/:msgId/pin', requireThreadMember, (req, res) => {
+  const db = getDb();
+  const userRole = req.session.user ? req.session.user.role : '';
+  if (!['admin', 'operations'].includes(userRole)) {
+    return res.status(403).json({ error: 'Only admin and operations can pin messages.' });
+  }
+
+  const msg = db.prepare('SELECT id, pinned_at FROM messages WHERE id = ? AND thread_id = ?').get(req.params.msgId, req.params.threadId);
+  if (!msg) return res.status(404).json({ error: 'Message not found' });
+
+  if (msg.pinned_at) {
+    db.prepare('UPDATE messages SET pinned_at = NULL, pinned_by = NULL WHERE id = ?').run(msg.id);
+    res.json({ pinned: false });
+  } else {
+    const userId = req.session.user.id;
+    db.prepare('UPDATE messages SET pinned_at = CURRENT_TIMESTAMP, pinned_by = ? WHERE id = ?').run(userId, msg.id);
+    res.json({ pinned: true });
+  }
+});
+
+// ============================================
+// API: Edit own message (5-minute window)
+// ============================================
+router.post('/api/threads/:threadId/messages/:msgId/edit', requireThreadMember, (req, res) => {
+  const db = getDb();
+  const userId = req.session.user ? req.session.user.id : (req.session.worker ? req.session.worker.id : null);
+  const { body } = req.body;
+  if (!body || !body.trim()) return res.status(400).json({ error: 'Message body required' });
+
+  const msg = db.prepare('SELECT id, sender_id, created_at FROM messages WHERE id = ? AND thread_id = ? AND deleted_at IS NULL').get(req.params.msgId, req.params.threadId);
+  if (!msg) return res.status(404).json({ error: 'Message not found' });
+  if (msg.sender_id !== userId) return res.status(403).json({ error: 'Can only edit your own messages' });
+
+  // Check 5-minute window
+  const created = new Date(msg.created_at + 'Z');
+  const now = new Date();
+  if (now - created > 5 * 60 * 1000) {
+    return res.status(403).json({ error: 'Can only edit messages within 5 minutes of sending' });
+  }
+
+  db.prepare('UPDATE messages SET body = ?, edited_at = CURRENT_TIMESTAMP WHERE id = ?').run(body.trim(), msg.id);
+  res.json({ success: true, body: body.trim() });
+});
+
+// ============================================
+// API: Typing indicator (set)
+// ============================================
+router.post('/api/threads/:threadId/typing', requireThreadMember, (req, res) => {
+  const threadId = req.params.threadId;
+  const userId = req.session.user ? req.session.user.id : (req.session.worker ? req.session.worker.id : null);
+  const userName = req.session.user ? req.session.user.full_name : (req.session.worker ? req.session.worker.full_name : 'Someone');
+
+  if (!typingUsers.has(threadId)) typingUsers.set(threadId, new Map());
+  typingUsers.get(threadId).set(String(userId), { name: userName, ts: Date.now() });
+  res.json({ ok: true });
+});
+
+// ============================================
+// API: Typing indicator (get who's typing)
+// ============================================
+router.get('/api/threads/:threadId/typing', requireThreadMember, (req, res) => {
+  const threadId = req.params.threadId;
+  const userId = req.session.user ? req.session.user.id : (req.session.worker ? req.session.worker.id : null);
+  const now = Date.now();
+  const typing = [];
+
+  if (typingUsers.has(threadId)) {
+    for (const [uid, data] of typingUsers.get(threadId)) {
+      if (uid !== String(userId) && now - data.ts < 5000) {
+        typing.push(data.name);
+      }
+    }
+    // Clean up stale entries
+    for (const [uid, data] of typingUsers.get(threadId)) {
+      if (now - data.ts > 10000) typingUsers.get(threadId).delete(uid);
+    }
+  }
+
+  res.json({ typing });
+});
+
+// ============================================
+// API: Get read receipts for a thread (DMs)
+// ============================================
+router.get('/api/threads/:threadId/read-receipts', requireThreadMember, (req, res) => {
+  const db = getDb();
+  const receipts = db.prepare(`
+    SELECT ctm.user_id, ctm.last_read_message_id, u.full_name
+    FROM chat_thread_members ctm
+    JOIN users u ON ctm.user_id = u.id
+    WHERE ctm.thread_id = ?
+  `).all(req.params.threadId);
+  res.json({ receipts });
+});
+
+// ============================================
+// API: Get pinned messages for a thread
+// ============================================
+router.get('/api/threads/:threadId/pinned', requireThreadMember, (req, res) => {
+  const db = getDb();
+  const pinned = db.prepare(`
+    SELECT m.id, m.body, m.created_at, m.pinned_at, u.full_name as sender_name, pu.full_name as pinned_by_name
+    FROM messages m
+    LEFT JOIN users u ON m.sender_id = u.id
+    LEFT JOIN users pu ON m.pinned_by = pu.id
+    WHERE m.thread_id = ? AND m.pinned_at IS NOT NULL AND m.deleted_at IS NULL
+    ORDER BY m.pinned_at DESC
+  `).all(req.params.threadId);
+  res.json({ pinned });
 });
 
 module.exports = router;

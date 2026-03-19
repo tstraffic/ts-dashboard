@@ -278,6 +278,15 @@ router.post('/:id', (req, res) => {
       b.required_tcp_level || '',
       req.params.id
     );
+    // Archive chat thread when job is completed/closed
+    if (['completed', 'closed'].includes(b.status)) {
+      const threadId = getThreadForEntity('job', parseInt(req.params.id));
+      if (threadId) {
+        db.prepare("UPDATE chat_threads SET status = 'archived' WHERE id = ?").run(threadId);
+        postSystemMessage(threadId, `Thread archived — job ${b.status}`);
+      }
+    }
+
     req.flash('success', 'Job updated successfully.');
     res.redirect(`/jobs/${req.params.id}`);
   } catch (err) {
