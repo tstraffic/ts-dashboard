@@ -1,0 +1,90 @@
+<div class="space-y-5">
+  <div>
+    <h1 class="text-xl font-bold text-gray-900">HR & My Info</h1>
+    <p class="text-sm text-gray-500 mt-0.5">Personal records & self-service</p>
+  </div>
+
+  <!-- Quick Stats -->
+  <div class="grid grid-cols-2 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center">
+      <p class="text-2xl font-bold <%= expiringSoon > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><%= certs.length %></p>
+      <p class="text-[10px] text-gray-500 uppercase mt-1">Certifications</p>
+      <% if (expiringSoon > 0) { %>
+        <p class="text-[10px] text-amber-600 font-medium"><%= expiringSoon %> expiring soon</p>
+      <% } %>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center">
+      <p class="text-2xl font-bold <%= pendingLeave > 0 ? 'text-amber-600' : 'text-gray-400' %>"><%= pendingLeave %></p>
+      <p class="text-[10px] text-gray-500 uppercase mt-1">Pending Leave</p>
+    </div>
+  </div>
+
+  <!-- Menu Items -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm divide-y divide-gray-100">
+    <a href="/w/hr/certs" class="flex items-center justify-between p-4 active:bg-gray-50 transition">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center">
+          <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+        </div>
+        <div>
+          <p class="text-sm font-medium text-gray-900">Certifications & Licences</p>
+          <p class="text-xs text-gray-500"><%= certs.length %> on record</p>
+        </div>
+      </div>
+      <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </a>
+    <a href="/w/hr/leave" class="flex items-center justify-between p-4 active:bg-gray-50 transition">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+          <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        </div>
+        <div>
+          <p class="text-sm font-medium text-gray-900">Leave Requests</p>
+          <p class="text-xs text-gray-500"><%= pendingLeave > 0 ? pendingLeave + ' pending' : 'No pending requests' %></p>
+        </div>
+      </div>
+      <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </a>
+  </div>
+
+  <!-- Employment Info -->
+  <% if (employee) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Employment Details</h3>
+      <div class="space-y-2 text-sm">
+        <% if (employee.employee_number) { %>
+          <div class="flex justify-between"><span class="text-gray-500">Employee #</span><span class="font-medium text-gray-900"><%= employee.employee_number %></span></div>
+        <% } %>
+        <% if (employee.position_title) { %>
+          <div class="flex justify-between"><span class="text-gray-500">Position</span><span class="font-medium text-gray-900"><%= employee.position_title %></span></div>
+        <% } %>
+        <% if (employee.employment_type) { %>
+          <div class="flex justify-between"><span class="text-gray-500">Type</span><span class="font-medium text-gray-900"><%= employee.employment_type.replace(/_/g, ' ') %></span></div>
+        <% } %>
+        <% if (employee.employment_start_date) { %>
+          <div class="flex justify-between"><span class="text-gray-500">Start Date</span><span class="font-medium text-gray-900"><%= new Date(employee.employment_start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) %></span></div>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Basic Info from crew_members -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Your Details</h3>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between"><span class="text-gray-500">Name</span><span class="font-medium text-gray-900"><%= member.full_name %></span></div>
+      <% if (member.employee_id) { %>
+        <div class="flex justify-between"><span class="text-gray-500">Employee ID</span><span class="font-medium text-gray-900"><%= member.employee_id %></span></div>
+      <% } %>
+      <% if (member.phone) { %>
+        <div class="flex justify-between"><span class="text-gray-500">Phone</span><span class="font-medium text-gray-900"><%= member.phone %></span></div>
+      <% } %>
+      <% if (member.email) { %>
+        <div class="flex justify-between"><span class="text-gray-500">Email</span><span class="font-medium text-gray-900"><%= member.email %></span></div>
+      <% } %>
+      <% if (member.role) { %>
+        <div class="flex justify-between"><span class="text-gray-500">Role</span><span class="font-medium text-gray-900"><%= member.role.replace(/_/g, ' ') %></span></div>
+      <% } %>
+    </div>
+  </div>
+</div>

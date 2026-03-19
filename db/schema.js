@@ -3160,6 +3160,105 @@ function runMigrations(db) {
     console.log('Migration 56 complete.');
   }
 
+  // Migration 57: Clock events, crew availability, docket signatures, safety forms, employee leave
+  if (!isMigrationApplied.get(57)) {
+    console.log('Running migration 57: Sprint 2 tables — clock events, availability, dockets, safety forms, leave');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS clock_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        allocation_id INTEGER REFERENCES crew_allocations(id),
+        event_type TEXT NOT NULL CHECK(event_type IN ('clock_in', 'clock_out')),
+        event_time DATETIME NOT NULL DEFAULT (datetime('now')),
+        latitude REAL,
+        longitude REAL,
+        accuracy REAL,
+        address TEXT,
+        notes TEXT,
+        photo_path TEXT,
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_clock_events_crew ON clock_events(crew_member_id, event_time);
+
+      CREATE TABLE IF NOT EXISTS crew_availability (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        date DATE NOT NULL,
+        status TEXT NOT NULL DEFAULT 'available' CHECK(status IN ('available', 'unavailable', 'preferred_off', 'leave')),
+        shift_preference TEXT DEFAULT 'any' CHECK(shift_preference IN ('day', 'night', 'any')),
+        notes TEXT,
+        created_at DATETIME DEFAULT (datetime('now')),
+        UNIQUE(crew_member_id, date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_crew_availability_crew ON crew_availability(crew_member_id, date);
+
+      CREATE TABLE IF NOT EXISTS docket_signatures (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        allocation_id INTEGER REFERENCES crew_allocations(id),
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        docket_type TEXT DEFAULT 'daily_docket' CHECK(docket_type IN ('daily_docket', 'delivery', 'completion')),
+        docket_number TEXT,
+        client_name TEXT,
+        signature_data TEXT,
+        signed_at DATETIME DEFAULT (datetime('now')),
+        notes TEXT,
+        photo_path TEXT,
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_docket_signatures_crew ON docket_signatures(crew_member_id);
+
+      CREATE TABLE IF NOT EXISTS safety_forms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        form_type TEXT NOT NULL CHECK(form_type IN ('prestart', 'take5', 'incident', 'hazard', 'equipment')),
+        job_id INTEGER REFERENCES jobs(id),
+        allocation_id INTEGER REFERENCES crew_allocations(id),
+        data TEXT,
+        status TEXT DEFAULT 'submitted' CHECK(status IN ('draft', 'submitted', 'reviewed')),
+        submitted_at DATETIME DEFAULT (datetime('now')),
+        reviewed_by_id INTEGER REFERENCES users(id),
+        reviewed_at DATETIME,
+        latitude REAL,
+        longitude REAL,
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_safety_forms_crew ON safety_forms(crew_member_id, form_type);
+
+      CREATE TABLE IF NOT EXISTS employee_leave (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER REFERENCES employees(id),
+        crew_member_id INTEGER REFERENCES crew_members(id),
+        leave_type TEXT NOT NULL DEFAULT 'annual' CHECK(leave_type IN ('annual', 'sick', 'personal', 'unpaid', 'other')),
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        total_days REAL,
+        status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected', 'cancelled')),
+        reason TEXT,
+        approved_by_id INTEGER REFERENCES users(id),
+        approved_at DATETIME,
+        notes TEXT,
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_employee_leave_crew ON employee_leave(crew_member_id, status);
+    `);
+
+    // Add columns to crew_members
+    const cols57cm = [
+      "ALTER TABLE crew_members ADD COLUMN last_clock_event TEXT",
+      "ALTER TABLE crew_members ADD COLUMN last_clock_time DATETIME",
+      "ALTER TABLE crew_members ADD COLUMN onboarding_completed INTEGER DEFAULT 0",
+    ];
+    for (const sql of cols57cm) {
+      try { db.exec(sql); } catch (e) { /* column may already exist */ }
+    }
+
+    // Add column to incidents
+    try { db.exec("ALTER TABLE incidents ADD COLUMN reported_by_crew_id INTEGER REFERENCES crew_members(id)"); } catch (e) { /* column may already exist */ }
+
+    recordMigration.run(57, 'Sprint 2 tables — clock events, availability, dockets, safety forms, leave');
+    console.log('Migration 57 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

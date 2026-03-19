@@ -1,0 +1,83 @@
+<div class="space-y-5">
+  <div>
+    <h1 class="text-xl font-bold text-gray-900">My Availability</h1>
+    <p class="text-sm text-gray-500 mt-0.5">Next 4 weeks</p>
+  </div>
+
+  <form method="POST" action="/w/availability">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+
+    <!-- Legend -->
+    <div class="flex items-center gap-3 mb-4 text-[10px] font-medium">
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-500 inline-block"></span> Available</span>
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-500 inline-block"></span> Unavailable</span>
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-500 inline-block"></span> Prefer Off</span>
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-500 inline-block"></span> Leave</span>
+    </div>
+
+    <% weeks.forEach((week, wi) => { %>
+      <div class="mb-4">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          Week <%= wi + 1 %> · <%= new Date(week[0] + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) %> — <%= new Date(week[6] + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) %>
+        </p>
+        <div class="grid grid-cols-7 gap-1">
+          <% week.forEach(date => { %>
+            <%
+              const d = new Date(date + 'T00:00:00');
+              const dayName = d.toLocaleDateString('en-AU', { weekday: 'short' }).slice(0, 2);
+              const dayNum = d.getDate();
+              const avail = availMap[date];
+              const status = avail ? avail.status : 'available';
+              const isPast = date < today;
+              let bgClass = 'bg-emerald-100 border-emerald-300 text-emerald-800';
+              if (status === 'unavailable') bgClass = 'bg-red-100 border-red-300 text-red-800';
+              else if (status === 'preferred_off') bgClass = 'bg-amber-100 border-amber-300 text-amber-800';
+              else if (status === 'leave') bgClass = 'bg-blue-100 border-blue-300 text-blue-800';
+            %>
+            <div class="text-center">
+              <p class="text-[9px] text-gray-400 mb-0.5"><%= dayName %></p>
+              <button type="button"
+                data-date="<%= date %>"
+                data-status="<%= status %>"
+                onclick="cycleStatus(this)"
+                class="avail-btn w-full aspect-square rounded-lg border text-xs font-bold flex items-center justify-center transition <%= isPast ? 'opacity-40 pointer-events-none' : '' %> <%= bgClass %>"
+                <%= isPast ? 'disabled' : '' %>>
+                <%= dayNum %>
+              </button>
+              <input type="hidden" name="dates" value="<%= date %>">
+              <input type="hidden" name="statuses" value="<%= status %>" class="status-input" data-date="<%= date %>">
+              <input type="hidden" name="preferences" value="<%= avail ? avail.shift_preference : 'any' %>">
+              <input type="hidden" name="notes" value="">
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    <% }) %>
+
+    <button type="submit" class="w-full py-3 bg-brand-600 text-white rounded-xl font-semibold text-sm hover:bg-brand-700 active:bg-brand-800 transition">
+      Save Availability
+    </button>
+  </form>
+</div>
+
+<script>
+function cycleStatus(btn) {
+  const states = ['available', 'unavailable', 'preferred_off', 'leave'];
+  const styles = {
+    available: 'bg-emerald-100 border-emerald-300 text-emerald-800',
+    unavailable: 'bg-red-100 border-red-300 text-red-800',
+    preferred_off: 'bg-amber-100 border-amber-300 text-amber-800',
+    leave: 'bg-blue-100 border-blue-300 text-blue-800'
+  };
+  let current = btn.dataset.status;
+  let idx = states.indexOf(current);
+  let next = states[(idx + 1) % states.length];
+
+  btn.dataset.status = next;
+  btn.className = 'avail-btn w-full aspect-square rounded-lg border text-xs font-bold flex items-center justify-center transition ' + styles[next];
+
+  // Update hidden input
+  const input = document.querySelector('.status-input[data-date="' + btn.dataset.date + '"]');
+  if (input) input.value = next;
+}
+</script>

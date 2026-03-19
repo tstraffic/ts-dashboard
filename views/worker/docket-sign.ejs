@@ -1,0 +1,81 @@
+<div class="space-y-5">
+  <a href="/w/dockets" class="inline-flex items-center text-sm text-brand-600 font-medium">
+    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back
+  </a>
+
+  <h1 class="text-xl font-bold text-gray-900">Sign Docket</h1>
+
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-sm font-medium text-gray-900"><%= allocation.client %></p>
+    <p class="text-xs text-gray-500"><%= allocation.job_number %> · <%= allocation.site_address %></p>
+    <p class="text-xs text-gray-500"><%= new Date(allocation.allocation_date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' }) %></p>
+  </div>
+
+  <form method="POST" action="/w/dockets/sign/<%= allocation.id %>">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+
+    <div class="space-y-4">
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Docket Type</label>
+          <select name="docket_type" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
+            <option value="daily_docket">Daily Docket</option>
+            <option value="completion">Completion</option>
+            <option value="delivery">Delivery</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Client Name (optional)</label>
+          <input type="text" name="client_name" placeholder="Client representative name" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
+        </div>
+      </div>
+
+      <!-- Signature Pad -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Signature</label>
+        <div class="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 relative" style="height: 200px;">
+          <canvas id="sig-canvas" class="w-full h-full rounded-lg" style="touch-action: none;"></canvas>
+          <button type="button" onclick="clearSig()" class="absolute top-2 right-2 text-xs text-gray-400 hover:text-gray-600 bg-white px-2 py-1 rounded shadow-sm">Clear</button>
+        </div>
+        <input type="hidden" name="signature_data" id="sig-data">
+      </div>
+
+      <!-- Notes -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Notes (optional)</label>
+        <textarea name="notes" rows="2" placeholder="Any notes..." class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 resize-none"></textarea>
+      </div>
+
+      <button type="submit" onclick="saveSig()" class="w-full py-3 bg-brand-600 text-white rounded-xl font-semibold text-sm hover:bg-brand-700 active:bg-brand-800 transition">
+        Sign & Submit
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+// Simple signature pad
+const canvas = document.getElementById('sig-canvas');
+const ctx = canvas.getContext('2d');
+let drawing = false;
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  ctx.strokeStyle = '#1D6AE5';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+canvas.addEventListener('pointerdown', e => { drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); });
+canvas.addEventListener('pointermove', e => { if (drawing) { ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); } });
+canvas.addEventListener('pointerup', () => drawing = false);
+canvas.addEventListener('pointerleave', () => drawing = false);
+
+function clearSig() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+function saveSig() { document.getElementById('sig-data').value = canvas.toDataURL('image/png'); }
+</script>

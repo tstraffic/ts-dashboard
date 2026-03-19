@@ -1,0 +1,47 @@
+<div class="space-y-5">
+  <a href="/w/forms" class="inline-flex items-center text-sm text-brand-600 font-medium">
+    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back
+  </a>
+  <h1 class="text-xl font-bold text-gray-900">Report Hazard</h1>
+
+  <form method="POST" action="/w/forms/hazard" class="space-y-4">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <input type="hidden" name="latitude" id="lat">
+    <input type="hidden" name="longitude" id="lng">
+
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Hazard Description</label>
+        <textarea name="description" rows="3" required placeholder="Describe the hazard..." class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500"></textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Location</label>
+        <input type="text" name="location" required placeholder="Where is the hazard?" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Risk Level</label>
+        <select name="risk_level" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Suggested Action</label>
+        <textarea name="suggested_action" rows="2" placeholder="What should be done?" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500"></textarea>
+      </div>
+    </div>
+
+    <button type="submit" class="w-full py-3 bg-amber-600 text-white rounded-xl font-semibold text-sm hover:bg-amber-700 transition">Submit Hazard Report</button>
+  </form>
+</div>
+<script>
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(p => {
+    document.getElementById('lat').value = p.coords.latitude;
+    document.getElementById('lng').value = p.coords.longitude;
+  }, () => {}, { enableHighAccuracy: true, timeout: 10000 });
+}
+</script>
