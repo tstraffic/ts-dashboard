@@ -304,6 +304,46 @@ router.post('/employees', requirePermission('hr_employees'), (req, res) => {
 });
 
 // ============================================
+// BULK DELETE EMPLOYEES
+// ============================================
+router.post('/employees/delete', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  let ids = req.body.ids;
+  if (!ids) { req.flash('error', 'No employees selected.'); return res.redirect('/hr/employees'); }
+  if (!Array.isArray(ids)) ids = [ids];
+  ids = ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+  if (ids.length === 0) { req.flash('error', 'No valid employees selected.'); return res.redirect('/hr/employees'); }
+
+  const placeholders = ids.map(() => '?').join(',');
+
+  // Delete uploaded document files from disk first (before deleting DB records)
+  try {
+    const docs = db.prepare(`SELECT file_path FROM employee_documents WHERE employee_id IN (${placeholders})`).all(...ids);
+    for (const doc of docs) {
+      if (doc.file_path) { try { fs.unlinkSync(doc.file_path); } catch (e) { /* ignore */ } }
+    }
+  } catch (e) { /* ignore */ }
+
+  // Delete related records
+  const relatedTables = ['employee_competencies', 'employee_documents'];
+  for (const table of relatedTables) {
+    try { db.prepare(`DELETE FROM ${table} WHERE employee_id IN (${placeholders})`).run(...ids); } catch (e) { /* table may not exist */ }
+  }
+
+  // Delete uploaded HR folders
+  for (const id of ids) {
+    const empDir = path.join(UPLOAD_BASE, `emp_${id}`);
+    try { fs.rmSync(empDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+  }
+
+  const result = db.prepare(`DELETE FROM employees WHERE id IN (${placeholders})`).run(...ids);
+  const count = result.changes;
+
+  req.flash('success', `Deleted ${count} employee${count !== 1 ? 's' : ''}.`);
+  res.redirect('/hr/employees');
+});
+
+// ============================================
 // EMPLOYEE DETAIL
 // ============================================
 router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
