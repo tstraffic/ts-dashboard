@@ -26,10 +26,13 @@ const chatStorage = multer.diskStorage({
 
 const chatUpload = multer({
   storage: chatStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
   fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    cb(null, allowed.includes(file.mimetype));
+    const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const docTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain', 'text/csv'];
+    cb(null, imageTypes.includes(file.mimetype) || docTypes.includes(file.mimetype));
   }
 });
 
@@ -395,45 +398,48 @@ router.get('/api/threads/:threadId/members', requireThreadMember, (req, res) => 
 });
 
 // ============================================
-// API: Upload image (JSON)
+// API: Upload file (image or document) (JSON)
 // ============================================
-router.post('/api/upload', chatUpload.single('image'), async (req, res) => {
+router.post('/api/upload', chatUpload.single('file'), async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'No image uploaded or invalid file type.' });
+    return res.status(400).json({ error: 'No file uploaded or invalid file type. Allowed: images, PDF, Word, Excel, CSV, TXT.' });
   }
 
-  try {
-    const sharp = require('sharp');
-    const thumbFilename = 'thumb_' + req.file.filename;
-    const thumbPath = path.join(req.file.destination, thumbFilename);
+  const threadDir = path.basename(req.file.destination);
+  const fileUrl = `/uploads/chat/${threadDir}/${req.file.filename}`;
+  const isImage = req.file.mimetype.startsWith('image/');
 
-    await sharp(req.file.path)
-      .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 80 })
-      .toFile(thumbPath);
+  // Generate thumbnail only for images
+  if (isImage) {
+    try {
+      const sharp = require('sharp');
+      const thumbFilename = 'thumb_' + req.file.filename;
+      const thumbPath = path.join(req.file.destination, thumbFilename);
+      await sharp(req.file.path)
+        .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80 })
+        .toFile(thumbPath);
 
-    const threadDir = path.basename(req.file.destination);
-    const fileUrl = `/uploads/chat/${threadDir}/${req.file.filename}`;
-    const thumbnailUrl = `/uploads/chat/${threadDir}/${thumbFilename}`;
+      return res.json({
+        file_url: fileUrl,
+        thumbnail_url: `/uploads/chat/${threadDir}/${thumbFilename}`,
+        mime_type: req.file.mimetype,
+        file_size: req.file.size,
+        original_name: req.file.originalname
+      });
+    } catch (err) {
+      console.error('Image processing error:', err);
+      // Fall through to generic response
+    }
+  }
 
-    res.json({
-      file_url: fileUrl,
-      thumbnail_url: thumbnailUrl,
-      mime_type: req.file.mimetype,
-      file_size: req.file.size,
-      original_name: req.file.originalname
-    });
-  } catch (err) {
-    console.error('Image processing error:', err);
-    // Fall back to serving the original without thumbnail
-    const threadDir = path.basename(req.file.destination);
-    const fileUrl = `/uploads/chat/${threadDir}/${req.file.filename}`;
-    res.json({
-      file_url: fileUrl,
-      thumbnail_url: fileUrl,
-      mime_type: req.file.mimetype,
-      file_size: req.file.size,
-      original_name: req.file.originalname
+  // Non-image files or image thumbnail failure
+  res.json({
+    file_url: fileUrl,
+    thumbnail_url: '',
+    mime_type: req.file.mimetype,
+    file_size: req.file.size,
+    original_name: req.file.originalname
     });
   }
 });
