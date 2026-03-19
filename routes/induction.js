@@ -226,12 +226,20 @@ function handleSubmission(req, res) {
       };
 
       // Build named params — only for columns that exist in the table
+      // Sanitize every value to a type SQLite can bind (string, number, null, buffer)
       const colNames = [];
       const params = {};
       for (const [col, val] of Object.entries(allFields)) {
         if (existingCols.includes(col)) {
           colNames.push(col);
-          params[col] = val;
+          if (val === null || val === undefined) {
+            params[col] = null;
+          } else if (typeof val === 'number' || typeof val === 'bigint' || Buffer.isBuffer(val)) {
+            params[col] = val;
+          } else {
+            // Convert arrays, objects, booleans, etc. to string
+            params[col] = String(val);
+          }
         }
       }
 
