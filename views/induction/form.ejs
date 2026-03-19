@@ -16,6 +16,11 @@
     }
     input[type="file"]::file-selector-button:hover { background: #1D6AE5; }
     .carousel-dot.active { background: #2B7FFF; }
+    .type-card { transition: all 0.2s; cursor: pointer; }
+    .type-card:hover { border-color: #2B7FFF; }
+    .type-card.selected { border-color: #2B7FFF; background: #EBF3FF; box-shadow: 0 0 0 2px #2B7FFF; }
+    .input-base { width: 100%; border-radius: 0.75rem; border: 1px solid #d1d5db; padding: 0.65rem 1rem; font-size: 0.875rem; outline: none; transition: all 0.15s; }
+    .input-base:focus { box-shadow: 0 0 0 2px rgba(43,127,255,0.25); border-color: #2B7FFF; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen text-gray-800 font-sans">
@@ -30,7 +35,7 @@
   <!-- Progress Stepper -->
   <div class="max-w-2xl mx-auto px-4 pt-6 pb-2">
     <div class="flex items-center justify-between" id="stepper">
-      <% const stepLabels = ['Details','Fitness','Documents','Payment','About T&S','PPE']; %>
+      <% const stepLabels = ['About T&S','Details','Fitness','Licences','Employment','PPE']; %>
       <% for (let i = 0; i < 6; i++) { %>
         <div class="flex flex-col items-center flex-1 step-indicator" data-step="<%= i + 1 %>">
           <div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300
@@ -49,322 +54,25 @@
   </div>
 
   <!-- Form -->
-  <form id="inductionForm" action="/induction/<%= paymentType %>/submit" method="POST" enctype="multipart/form-data" novalidate>
-    <%- include('../partials/csrf') %>
+  <form id="inductionForm" action="/induction/submit" method="POST" enctype="multipart/form-data" novalidate>
     <input type="hidden" name="access_token" value="<%= accessToken %>" />
+    <input type="hidden" name="payment_type" id="paymentTypeField" value="<%= paymentType !== 'unified' ? paymentType : '' %>" />
 
     <div class="max-w-2xl mx-auto px-4 pb-12 pt-2">
 
-      <!-- ===================== STEP 1: Personal Details ===================== -->
+      <!-- ===================== STEP 1: About T&S (Company Values) ===================== -->
       <div class="step-panel step-fade-enter" id="step1">
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
-          <h2 class="text-xl font-bold text-gray-900">Personal Details</h2>
-          <p class="text-sm text-gray-500">Let's start with your basic information.</p>
-
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
-              <input type="text" name="first_name" required placeholder="e.g. John"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
-              <input type="text" name="middle_name" placeholder="Optional"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
-              <input type="text" name="last_name" required placeholder="e.g. Smith"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
+          <div class="text-center mb-2">
+            <h2 class="text-xl font-bold text-gray-900">Welcome to T&S Traffic Control</h2>
+            <p class="text-sm text-gray-500 mt-1">Get to know us before you start. Swipe through each card.</p>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
-            <input type="email" name="email" required placeholder="you@example.com"
-              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
-            <input type="tel" name="phone" required placeholder="04XX XXX XXX" inputmode="tel"
-              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-            <input type="date" name="date_of_birth"
-              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
-            <input type="text" name="address" placeholder="Street address"
-              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Suburb</label>
-              <input type="text" name="suburb" placeholder="Suburb"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">State</label>
-              <select name="state"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition bg-white">
-                <option value="">Select</option>
-                <option>NSW</option><option>VIC</option><option>QLD</option><option>SA</option>
-                <option>WA</option><option>TAS</option><option>NT</option><option>ACT</option>
-              </select>
-            </div>
-          </div>
-          <div class="w-1/2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Postcode</label>
-            <input type="text" name="postcode" maxlength="4" placeholder="2000"
-              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-          </div>
-
-          <div class="pt-4 flex justify-between">
-            <div></div>
-            <button type="button" onclick="goToStep(2)" style="background:#2B7FFF;color:#fff;border:1px solid #1D6AE5;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:opacity-90">
-              Next <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===================== STEP 2: Fitness & Suitability ===================== -->
-      <div class="step-panel hidden" id="step2">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
-          <h2 class="text-xl font-bold text-gray-900">Fitness & Suitability</h2>
-          <p class="text-sm text-gray-500">A few quick questions to make sure you're ready to work safely.</p>
-
-          <!-- Q1 -->
-          <fieldset class="space-y-2">
-            <legend class="text-sm font-medium text-gray-700">Can you legally drive in Australia? <span class="text-red-500">*</span></legend>
-            <div class="flex gap-4">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="can_drive" value="yes" required class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
-                <span class="text-sm">Yes</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="can_drive" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
-                <span class="text-sm">No</span>
-              </label>
-            </div>
-          </fieldset>
-
-          <!-- Q2 -->
-          <fieldset class="space-y-2">
-            <legend class="text-sm font-medium text-gray-700">Can you drive a truck (MR/HR licence)? <span class="text-red-500">*</span></legend>
-            <div class="flex gap-4">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="can_drive_truck" value="yes" required class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
-                <span class="text-sm">Yes</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="can_drive_truck" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
-                <span class="text-sm">No</span>
-              </label>
-            </div>
-          </fieldset>
-
-          <!-- Q3 -->
-          <fieldset class="space-y-2">
-            <legend class="text-sm font-medium text-gray-700">Do you have any injuries or medical conditions that may affect your ability to work as a traffic controller? <span class="text-red-500">*</span></legend>
-            <div class="flex gap-4">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="has_injuries" value="yes" required class="w-4 h-4 text-brand-500 focus:ring-brand-500" onchange="document.getElementById('injuryDetails').classList.remove('hidden')" />
-                <span class="text-sm">Yes</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="has_injuries" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" onchange="document.getElementById('injuryDetails').classList.add('hidden')" />
-                <span class="text-sm">No</span>
-              </label>
-            </div>
-            <div id="injuryDetails" class="hidden mt-2">
-              <textarea name="injury_details" rows="3" placeholder="Please describe your condition..."
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition"></textarea>
-            </div>
-          </fieldset>
-
-          <!-- Q4 -->
-          <fieldset class="space-y-2">
-            <legend class="text-sm font-medium text-gray-700">Do you identify as Aboriginal or Torres Strait Islander?</legend>
-            <div class="flex flex-wrap gap-4">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="is_indigenous" value="yes" class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
-                <span class="text-sm">Yes</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="is_indigenous" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
-                <span class="text-sm">No</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="is_indigenous" value="prefer_not" class="w-4 h-4 text-brand-500 focus:ring-brand-500" />
-                <span class="text-sm">Prefer not to say</span>
-              </label>
-            </div>
-          </fieldset>
-
-          <div class="pt-4 flex justify-between">
-            <button type="button" onclick="goToStep(1)" style="background:#fff;color:#374151;border:1px solid #d1d5db;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:bg-gray-50">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Previous
-            </button>
-            <button type="button" onclick="goToStep(3)" style="background:#2B7FFF;color:#fff;border:1px solid #1D6AE5;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:opacity-90">
-              Next <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===================== STEP 3: Documents & Licences ===================== -->
-      <div class="step-panel hidden" id="step3">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
-          <h2 class="text-xl font-bold text-gray-900">Documents & Licences</h2>
-          <p class="text-sm text-gray-500">Enter your licence numbers and upload photos of each document.</p>
-
-          <!-- White Card -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">White Card Number <span class="text-red-500">*</span></label>
-            <input type="text" name="white_card_number" required placeholder="Enter your White Card number"
-              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Upload White Card Photo <span class="text-red-500">*</span></label>
-            <input type="file" name="white_card_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewWhiteCard')"
-              class="w-full text-sm text-gray-500 file:mr-3" />
-            <div id="previewWhiteCard" class="mt-2"></div>
-          </div>
-
-          <!-- TC Licence -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">TC Licence Number <span class="text-red-500">*</span></label>
-            <input type="text" name="tc_licence_number" required placeholder="Enter your TC Licence number"
-              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Upload TC Licence Photo <span class="text-red-500">*</span></label>
-            <input type="file" name="tc_licence_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewTCLicence')"
-              class="w-full text-sm text-gray-500 file:mr-3" />
-            <div id="previewTCLicence" class="mt-2"></div>
-          </div>
-
-          <!-- Driver's Licence -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Driver's Licence Number <span class="text-red-500">*</span></label>
-            <input type="text" name="drivers_licence_number" required placeholder="Enter your Driver's Licence number"
-              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Upload Driver's Licence Photo <span class="text-red-500">*</span></label>
-            <input type="file" name="drivers_licence_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewDriversLicence')"
-              class="w-full text-sm text-gray-500 file:mr-3" />
-            <div id="previewDriversLicence" class="mt-2"></div>
-          </div>
-
-          <div class="pt-4 flex justify-between">
-            <button type="button" onclick="goToStep(2)" style="background:#fff;color:#374151;border:1px solid #d1d5db;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:bg-gray-50">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Previous
-            </button>
-            <button type="button" onclick="goToStep(4)" style="background:#2B7FFF;color:#fff;border:1px solid #1D6AE5;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:opacity-90">
-              Next <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===================== STEP 4: Banking & Payment ===================== -->
-      <div class="step-panel hidden" id="step4">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
-          <h2 class="text-xl font-bold text-gray-900">Banking & Payment</h2>
-
-          <% if (paymentType === 'cash') { %>
-            <p class="text-sm text-gray-500">Enter your banking details below for payments.</p>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Bank Name <span class="text-red-500">*</span></label>
-              <input type="text" name="bank_name" required placeholder="e.g. Commonwealth Bank"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">BSB <span class="text-red-500">*</span></label>
-              <input type="text" name="bank_bsb" required maxlength="7" placeholder="XXX-XXX"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Account Number <span class="text-red-500">*</span></label>
-              <input type="text" name="bank_account_number" required placeholder="Enter account number"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Account Name <span class="text-red-500">*</span></label>
-              <input type="text" name="bank_account_name" required placeholder="Name on bank account"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" />
-            </div>
-          <% } else if (paymentType === 'tfn') { %>
-            <p class="text-sm text-gray-500">Enter your tax and banking details below.</p>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Tax File Number (TFN) <span class="text-red-500">*</span></label>
-              <input type="text" name="tax_file_number" required placeholder="XXX XXX XXX"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">BSB <span class="text-red-500">*</span></label>
-              <input type="text" name="bank_bsb" required maxlength="7" placeholder="XXX-XXX"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Account Number <span class="text-red-500">*</span></label>
-              <input type="text" name="bank_account_number" required placeholder="Enter account number"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Account Name <span class="text-red-500">*</span></label>
-              <input type="text" name="bank_account_name" required placeholder="Name on bank account"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
-          <% } else if (paymentType === 'abn') { %>
-            <p class="text-sm text-gray-500">Enter your ABN and banking details below.</p>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">ABN Number <span class="text-red-500">*</span></label>
-              <input type="text" name="abn_number" required placeholder="XX XXX XXX XXX"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">BSB <span class="text-red-500">*</span></label>
-              <input type="text" name="bank_bsb" required maxlength="7" placeholder="XXX-XXX"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Account Number <span class="text-red-500">*</span></label>
-              <input type="text" name="bank_account_number" required placeholder="Enter account number"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Account Name <span class="text-red-500">*</span></label>
-              <input type="text" name="bank_account_name" required placeholder="Name on bank account"
-                class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition" />
-            </div>
-          <% } %>
-
-          <div class="pt-4 flex justify-between">
-            <button type="button" onclick="goToStep(3)" style="background:#fff;color:#374151;border:1px solid #d1d5db;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:bg-gray-50">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Previous
-            </button>
-            <button type="button" onclick="goToStep(5)" style="background:#2B7FFF;color:#fff;border:1px solid #1D6AE5;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:opacity-90">
-              Next <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===================== STEP 5: About T&S ===================== -->
-      <div class="step-panel hidden" id="step5">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
-          <h2 class="text-xl font-bold text-gray-900">About T&S Traffic Control</h2>
-          <p class="text-sm text-gray-500">Get to know us before you start. Swipe through each card.</p>
 
           <!-- Carousel -->
           <div class="relative overflow-hidden rounded-xl">
             <div id="carouselTrack" class="flex transition-transform duration-400 ease-in-out">
 
-              <!-- Card 1 -->
+              <!-- Card 1: Who We Are -->
               <div class="min-w-full p-1">
                 <div style="background:linear-gradient(135deg,#EBF3FF,#D6E7FF);" class="rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
                   <div>
@@ -378,7 +86,7 @@
                 </div>
               </div>
 
-              <!-- Card 2 -->
+              <!-- Card 2: Our Mission -->
               <div class="min-w-full p-1">
                 <div style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);" class="rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
                   <div>
@@ -393,13 +101,13 @@
                 </div>
               </div>
 
-              <!-- Card 3 -->
+              <!-- Card 3: What We've Accomplished -->
               <div class="min-w-full p-1">
                 <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);" class="rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
                   <div>
                     <div style="background:#d97706;" class="inline-flex items-center gap-2 text-white text-xs font-bold px-3 py-1 rounded-full mb-3">3 / 4</div>
                     <h3 class="text-lg font-bold mb-2" style="color:#78350f;">What We've Accomplished</h3>
-                    <p class="text-sm leading-relaxed" style="color:#92400e;">We've done it all — major road closures, lane shutdowns, detour management, event traffic control, residential and commercial developments, utility works, council projects, and regional jobs across NSW. From Sydney CBD to country towns, T&S delivers safe, reliable traffic management no matter the scale or complexity.</p>
+                    <p class="text-sm leading-relaxed" style="color:#92400e;">We've done it all &mdash; major road closures, lane shutdowns, detour management, event traffic control, residential and commercial developments, utility works, council projects, and regional jobs across NSW. From Sydney CBD to country towns, T&S delivers safe, reliable traffic management no matter the scale or complexity.</p>
                   </div>
                   <div class="flex justify-between mt-4">
                     <button type="button" onclick="carouselPrev()" style="color:#b45309;" class="text-sm font-medium transition hover:opacity-70">&larr; Back</button>
@@ -408,7 +116,7 @@
                 </div>
               </div>
 
-              <!-- Card 4 -->
+              <!-- Card 4: Our Values -->
               <div class="min-w-full p-1">
                 <div style="background:linear-gradient(135deg,#faf5ff,#ede9fe);" class="rounded-xl p-6 min-h-[220px] flex flex-col justify-between">
                   <div>
@@ -438,7 +146,7 @@
             <span class="carousel-dot w-2.5 h-2.5 rounded-full bg-gray-300 transition"></span>
           </div>
 
-          <!-- Mark as read (disabled until all cards viewed) -->
+          <!-- Unlock checkbox -->
           <div id="carouselLock" class="rounded-xl p-4 border border-gray-200 bg-gray-100 opacity-60">
             <div class="flex items-center gap-2 text-sm text-gray-400 font-medium">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
@@ -449,6 +157,372 @@
             <input type="checkbox" id="markAsRead" name="company_intro_completed" value="on" class="w-5 h-5 rounded" style="accent-color:#2B7FFF;" />
             <span class="text-sm font-medium text-gray-700">I have read and understood the information about T&S Traffic Control</span>
           </label>
+
+          <div class="pt-4 flex justify-end">
+            <button type="button" onclick="goToStep(2)" style="background:#2B7FFF;color:#fff;border:1px solid #1D6AE5;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:opacity-90">
+              Next <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 2: Personal Details ===================== -->
+      <div class="step-panel hidden" id="step2">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+          <h2 class="text-xl font-bold text-gray-900">Personal Details</h2>
+          <p class="text-sm text-gray-500">Let's start with your basic information.</p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">First Name <span class="text-red-500">*</span></label>
+              <input type="text" name="first_name" required placeholder="e.g. John" class="input-base" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
+              <input type="text" name="middle_name" placeholder="Optional" class="input-base" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Last Name <span class="text-red-500">*</span></label>
+              <input type="text" name="last_name" required placeholder="e.g. Smith" class="input-base" />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
+              <input type="email" name="email" required placeholder="you@example.com" class="input-base" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
+              <input type="tel" name="phone" required placeholder="04XX XXX XXX" inputmode="tel" class="input-base" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+            <input type="date" name="date_of_birth" class="input-base" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+            <input type="text" name="address" placeholder="Street address" class="input-base" />
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Suburb</label>
+              <input type="text" name="suburb" placeholder="Suburb" class="input-base" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">State</label>
+              <select name="state" class="input-base bg-white">
+                <option value="">Select</option>
+                <option>NSW</option><option>VIC</option><option>QLD</option><option>SA</option>
+                <option>WA</option><option>TAS</option><option>NT</option><option>ACT</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Postcode</label>
+              <input type="text" name="postcode" maxlength="4" placeholder="2000" class="input-base" />
+            </div>
+          </div>
+
+          <div class="pt-4 flex justify-between">
+            <button type="button" onclick="goToStep(1)" style="background:#fff;color:#374151;border:1px solid #d1d5db;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:bg-gray-50">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Previous
+            </button>
+            <button type="button" onclick="goToStep(3)" style="background:#2B7FFF;color:#fff;border:1px solid #1D6AE5;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:opacity-90">
+              Next <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 3: Fitness & Suitability ===================== -->
+      <div class="step-panel hidden" id="step3">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+          <h2 class="text-xl font-bold text-gray-900">Fitness & Suitability</h2>
+          <p class="text-sm text-gray-500">A few quick questions to make sure you're ready to work safely.</p>
+
+          <fieldset class="space-y-2">
+            <legend class="text-sm font-medium text-gray-700">Can you legally drive in Australia? <span class="text-red-500">*</span></legend>
+            <div class="flex gap-4">
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="can_drive" value="yes" required class="w-4 h-4 text-brand-500 focus:ring-brand-500" /><span class="text-sm">Yes</span></label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="can_drive" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" /><span class="text-sm">No</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="space-y-2">
+            <legend class="text-sm font-medium text-gray-700">Can you drive a truck (MR/HR licence)? <span class="text-red-500">*</span></legend>
+            <div class="flex gap-4">
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="can_drive_truck" value="yes" required class="w-4 h-4 text-brand-500 focus:ring-brand-500" /><span class="text-sm">Yes</span></label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="can_drive_truck" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" /><span class="text-sm">No</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="space-y-2">
+            <legend class="text-sm font-medium text-gray-700">Do you have any injuries or medical conditions that may affect your ability to work as a traffic controller? <span class="text-red-500">*</span></legend>
+            <div class="flex gap-4">
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="has_injuries" value="yes" required class="w-4 h-4 text-brand-500 focus:ring-brand-500" onchange="document.getElementById('injuryDetails').classList.remove('hidden')" /><span class="text-sm">Yes</span></label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="has_injuries" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" onchange="document.getElementById('injuryDetails').classList.add('hidden')" /><span class="text-sm">No</span></label>
+            </div>
+            <div id="injuryDetails" class="hidden mt-2">
+              <textarea name="injury_details" rows="3" placeholder="Please describe your condition..." class="input-base"></textarea>
+            </div>
+          </fieldset>
+
+          <fieldset class="space-y-2">
+            <legend class="text-sm font-medium text-gray-700">Do you identify as Aboriginal or Torres Strait Islander?</legend>
+            <div class="flex flex-wrap gap-4">
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="is_indigenous" value="yes" class="w-4 h-4 text-brand-500 focus:ring-brand-500" /><span class="text-sm">Yes</span></label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="is_indigenous" value="no" class="w-4 h-4 text-brand-500 focus:ring-brand-500" /><span class="text-sm">No</span></label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="is_indigenous" value="prefer_not" class="w-4 h-4 text-brand-500 focus:ring-brand-500" /><span class="text-sm">Prefer not to say</span></label>
+            </div>
+          </fieldset>
+
+          <div class="pt-4 flex justify-between">
+            <button type="button" onclick="goToStep(2)" style="background:#fff;color:#374151;border:1px solid #d1d5db;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:bg-gray-50">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Previous
+            </button>
+            <button type="button" onclick="goToStep(4)" style="background:#2B7FFF;color:#fff;border:1px solid #1D6AE5;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:opacity-90">
+              Next <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 4: Licences & Experience ===================== -->
+      <div class="step-panel hidden" id="step4">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+          <h2 class="text-xl font-bold text-gray-900">Licences & Experience</h2>
+          <p class="text-sm text-gray-500">Enter your licence details, upload photos, and tell us about your experience.</p>
+
+          <!-- White Card -->
+          <div class="border border-gray-100 rounded-xl p-4 space-y-3 bg-gray-50/50">
+            <h3 class="text-sm font-semibold text-gray-800 flex items-center gap-2">
+              <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              White Card (Construction Induction)
+            </h3>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">White Card Number <span class="text-red-500">*</span></label>
+              <input type="text" name="white_card_number" required placeholder="Enter your White Card number" class="input-base" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Upload White Card Photo <span class="text-red-500">*</span></label>
+              <input type="file" name="white_card_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewWhiteCard')" class="w-full text-sm text-gray-500 file:mr-3" />
+              <div id="previewWhiteCard" class="mt-2"></div>
+            </div>
+          </div>
+
+          <!-- TC Licence -->
+          <div class="border border-gray-100 rounded-xl p-4 space-y-3 bg-gray-50/50">
+            <h3 class="text-sm font-semibold text-gray-800 flex items-center gap-2">
+              <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z"/></svg>
+              Traffic Control Ticket
+            </h3>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">TC Licence Number <span class="text-red-500">*</span></label>
+              <input type="text" name="tc_licence_number" required placeholder="Enter your TC Licence number" class="input-base" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Date of Issue <span class="text-red-500">*</span></label>
+                <input type="date" name="tc_licence_date_of_issue" required class="input-base" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">State of Issue <span class="text-red-500">*</span></label>
+                <select name="tc_licence_state" required class="input-base bg-white">
+                  <option value="">Select</option>
+                  <option>NSW</option><option>VIC</option><option>QLD</option><option>SA</option>
+                  <option>WA</option><option>TAS</option><option>NT</option><option>ACT</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Upload TC Licence Photo <span class="text-red-500">*</span></label>
+              <input type="file" name="tc_licence_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewTCLicence')" class="w-full text-sm text-gray-500 file:mr-3" />
+              <div id="previewTCLicence" class="mt-2"></div>
+            </div>
+          </div>
+
+          <!-- Driver's Licence -->
+          <div class="border border-gray-100 rounded-xl p-4 space-y-3 bg-gray-50/50">
+            <h3 class="text-sm font-semibold text-gray-800 flex items-center gap-2">
+              <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5z"/></svg>
+              Driver's Licence
+            </h3>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Driver's Licence Number <span class="text-red-500">*</span></label>
+              <input type="text" name="drivers_licence_number" required placeholder="Enter your Driver's Licence number" class="input-base" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Front of Licence <span class="text-red-500">*</span></label>
+                <input type="file" name="drivers_licence_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewDLFront')" class="w-full text-sm text-gray-500 file:mr-3" />
+                <div id="previewDLFront" class="mt-2"></div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Back of Licence <span class="text-red-500">*</span></label>
+                <input type="file" name="drivers_licence_back_photo" accept="image/*,.pdf" required onchange="previewFile(this,'previewDLBack')" class="w-full text-sm text-gray-500 file:mr-3" />
+                <div id="previewDLBack" class="mt-2"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Experience -->
+          <div class="border border-gray-100 rounded-xl p-4 space-y-3 bg-gray-50/50">
+            <h3 class="text-sm font-semibold text-gray-800 flex items-center gap-2">
+              <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0M12 12.75h.008v.008H12v-.008z"/></svg>
+              Experience in Traffic Control
+            </h3>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">How long have you been working in traffic control? <span class="text-red-500">*</span></label>
+              <select name="experience_years" required class="input-base bg-white" onchange="toggleExpDesc(this.value)">
+                <option value="">Select</option>
+                <option value="new">I'm new / no experience yet</option>
+                <option value="less_than_1">Less than 1 year</option>
+                <option value="1_to_2">1 - 2 years</option>
+                <option value="2_to_5">2 - 5 years</option>
+                <option value="5_plus">5+ years</option>
+              </select>
+            </div>
+            <div id="expDescBlock">
+              <label class="block text-xs font-medium text-gray-600 mb-1" id="expDescLabel">Tell us a bit about your experience, or what you're looking to gain from working in traffic control <span class="text-red-500">*</span></label>
+              <textarea name="experience_description" rows="3" required placeholder="e.g. I've worked on road closures, lane shutdowns, and event traffic management..." class="input-base" id="expDescField"></textarea>
+            </div>
+          </div>
+
+          <div class="pt-4 flex justify-between">
+            <button type="button" onclick="goToStep(3)" style="background:#fff;color:#374151;border:1px solid #d1d5db;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:bg-gray-50">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Previous
+            </button>
+            <button type="button" onclick="goToStep(5)" style="background:#2B7FFF;color:#fff;border:1px solid #1D6AE5;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:opacity-90">
+              Next <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 5: Employment & Payment ===================== -->
+      <div class="step-panel hidden" id="step5">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+          <h2 class="text-xl font-bold text-gray-900">Employment & Payment</h2>
+          <p class="text-sm text-gray-500">Select your employment type and enter your details.</p>
+
+          <!-- Employment type selector -->
+          <div class="grid grid-cols-2 gap-3" id="typeSelector">
+            <div class="type-card rounded-xl border-2 border-gray-200 p-4 text-center" onclick="selectType('tfn')" id="typeTfn">
+              <div class="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mx-auto mb-2">
+                <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+              </div>
+              <p class="text-sm font-bold text-gray-800">TFN Employee</p>
+              <p class="text-xs text-gray-500 mt-1">Tax File Number &amp; super</p>
+            </div>
+            <div class="type-card rounded-xl border-2 border-gray-200 p-4 text-center" onclick="selectType('abn')" id="typeAbn">
+              <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-2">
+                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0M12 12.75h.008v.008H12v-.008z"/></svg>
+              </div>
+              <p class="text-sm font-bold text-gray-800">ABN Contractor</p>
+              <p class="text-xs text-gray-500 mt-1">Australian Business Number</p>
+            </div>
+          </div>
+
+          <!-- TFN Section -->
+          <div id="tfnSection" class="hidden space-y-4">
+            <div class="border border-blue-100 rounded-xl p-4 space-y-3 bg-blue-50/30">
+              <h3 class="text-sm font-semibold text-brand-800">Tax Details</h3>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Tax File Number (TFN) <span class="text-red-500">*</span></label>
+                <input type="text" name="tax_file_number" placeholder="XXX XXX XXX" class="input-base" id="tfnInput" />
+              </div>
+            </div>
+
+            <div class="border border-blue-100 rounded-xl p-4 space-y-3 bg-blue-50/30">
+              <h3 class="text-sm font-semibold text-brand-800">Superannuation Details</h3>
+              <p class="text-xs text-gray-500 mb-1">Provide your super fund details, or leave blank to use the company default fund.</p>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Super Fund Name</label>
+                <input type="text" name="super_fund_name" placeholder="e.g. AustralianSuper, REST, Sunsuper" class="input-base" />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Fund ABN</label>
+                  <input type="text" name="super_fund_abn" placeholder="XX XXX XXX XXX" class="input-base" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">USI</label>
+                  <input type="text" name="super_usi" placeholder="Unique Superannuation Identifier" class="input-base" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Member Number</label>
+                <input type="text" name="super_member_number" placeholder="Your super member number" class="input-base" />
+              </div>
+            </div>
+
+            <div class="border border-blue-100 rounded-xl p-4 space-y-3 bg-blue-50/30">
+              <h3 class="text-sm font-semibold text-brand-800">Bank Account Details</h3>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Bank Name <span class="text-red-500">*</span></label>
+                <input type="text" name="bank_name" placeholder="e.g. Commonwealth Bank" class="input-base" id="tfnBankName" />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">BSB <span class="text-red-500">*</span></label>
+                  <input type="text" name="bank_bsb" maxlength="7" placeholder="XXX-XXX" class="input-base" id="tfnBsb" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Account Number <span class="text-red-500">*</span></label>
+                  <input type="text" name="bank_account_number" placeholder="Account number" class="input-base" id="tfnAccNum" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Account Name <span class="text-red-500">*</span></label>
+                <input type="text" name="bank_account_name" placeholder="Name on bank account" class="input-base" id="tfnAccName" />
+              </div>
+            </div>
+          </div>
+
+          <!-- ABN Section -->
+          <div id="abnSection" class="hidden space-y-4">
+            <div class="border border-amber-100 rounded-xl p-4 space-y-3 bg-amber-50/30">
+              <h3 class="text-sm font-semibold text-amber-800">Business Details</h3>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">ABN Number <span class="text-red-500">*</span></label>
+                <input type="text" name="abn_number" placeholder="XX XXX XXX XXX" class="input-base" id="abnInput" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Do you have public liability insurance? <span class="text-red-500">*</span></label>
+                <div class="flex gap-4 mt-1">
+                  <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="has_insurance" value="yes" class="w-4 h-4 text-amber-500 focus:ring-amber-500" /><span class="text-sm">Yes</span></label>
+                  <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="has_insurance" value="no" class="w-4 h-4 text-amber-500 focus:ring-amber-500" /><span class="text-sm">No</span></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="border border-amber-100 rounded-xl p-4 space-y-3 bg-amber-50/30">
+              <h3 class="text-sm font-semibold text-amber-800">Bank Account Details</h3>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Bank Name <span class="text-red-500">*</span></label>
+                <input type="text" name="abn_bank_name" placeholder="e.g. Commonwealth Bank" class="input-base" id="abnBankName" />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">BSB <span class="text-red-500">*</span></label>
+                  <input type="text" name="abn_bank_bsb" maxlength="7" placeholder="XXX-XXX" class="input-base" id="abnBsb" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Account Number <span class="text-red-500">*</span></label>
+                  <input type="text" name="abn_bank_account_number" placeholder="Account number" class="input-base" id="abnAccNum" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Account Name <span class="text-red-500">*</span></label>
+                <input type="text" name="abn_bank_account_name" placeholder="Name on bank account" class="input-base" id="abnAccName" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Prompt to select type -->
+          <div id="typePrompt" class="text-center py-4">
+            <p class="text-sm text-gray-400">Select your employment type above to continue.</p>
+          </div>
 
           <div class="pt-4 flex justify-between">
             <button type="button" onclick="goToStep(4)" style="background:#fff;color:#374151;border:1px solid #d1d5db;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:bg-gray-50">
@@ -498,13 +572,23 @@
               </div>
             </div>
 
+            <div class="flex items-start gap-3 bg-red-50 rounded-xl p-4 border border-red-100">
+              <div class="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-red-900">Zero Tolerance: Drugs & Alcohol</p>
+                <p class="text-xs text-red-700 mt-0.5">Attending work under the influence of drugs or alcohol is strictly prohibited. You may be subject to random testing. Any positive result or refusal to test will result in immediate removal from site.</p>
+              </div>
+            </div>
+
             <div class="flex items-start gap-3 bg-amber-50 rounded-xl p-4 border border-amber-100">
               <div class="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
                 <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
               </div>
               <div>
-                <p class="text-sm font-semibold text-amber-900">No Slacking Off</p>
-                <p class="text-xs text-amber-700 mt-0.5">Maintain full focus at all times. Complacency puts lives at risk.</p>
+                <p class="text-sm font-semibold text-amber-900">Stay Alert & Focused at All Times</p>
+                <p class="text-xs text-amber-700 mt-0.5">Maintain full situational awareness on site. Complacency puts lives at risk &mdash; yours and others.</p>
               </div>
             </div>
 
@@ -563,6 +647,56 @@
   <script>
     let currentStep = 1;
     let carouselIndex = 0;
+    let selectedType = '<%= paymentType !== "unified" ? paymentType : "" %>';
+
+    // Auto-select type if coming from legacy URL
+    if (selectedType === 'tfn' || selectedType === 'abn') {
+      document.addEventListener('DOMContentLoaded', () => selectType(selectedType));
+    }
+
+    /* ───── Employment type selection ───── */
+    function selectType(type) {
+      selectedType = type;
+      document.getElementById('paymentTypeField').value = type;
+
+      // Visual
+      document.getElementById('typeTfn').classList.toggle('selected', type === 'tfn');
+      document.getElementById('typeAbn').classList.toggle('selected', type === 'abn');
+      document.getElementById('tfnSection').classList.toggle('hidden', type !== 'tfn');
+      document.getElementById('abnSection').classList.toggle('hidden', type !== 'abn');
+      document.getElementById('typePrompt').classList.add('hidden');
+
+      // Toggle required attributes
+      toggleRequired('tfnInput', type === 'tfn');
+      toggleRequired('tfnBankName', type === 'tfn');
+      toggleRequired('tfnBsb', type === 'tfn');
+      toggleRequired('tfnAccNum', type === 'tfn');
+      toggleRequired('tfnAccName', type === 'tfn');
+
+      toggleRequired('abnInput', type === 'abn');
+      toggleRequired('abnBankName', type === 'abn');
+      toggleRequired('abnBsb', type === 'abn');
+      toggleRequired('abnAccNum', type === 'abn');
+      toggleRequired('abnAccName', type === 'abn');
+    }
+
+    function toggleRequired(id, required) {
+      const el = document.getElementById(id);
+      if (el) { if (required) el.setAttribute('required',''); else el.removeAttribute('required'); }
+    }
+
+    /* ───── Experience description toggle ───── */
+    function toggleExpDesc(val) {
+      const label = document.getElementById('expDescLabel');
+      const field = document.getElementById('expDescField');
+      if (val === 'new') {
+        label.innerHTML = 'What are you looking to gain from working in traffic control? <span class="text-red-500">*</span>';
+        field.placeholder = 'e.g. I want to develop my skills in traffic management and work towards becoming a team leader...';
+      } else {
+        label.innerHTML = 'Tell us a bit about your experience in traffic control <span class="text-red-500">*</span>';
+        field.placeholder = 'e.g. I\'ve worked on road closures, lane shutdowns, and event traffic management...';
+      }
+    }
 
     /* ───── Step navigation ───── */
     function goToStep(step) {
@@ -580,21 +714,18 @@
         const label = document.getElementById('stepLabel' + i);
 
         if (i < step) {
-          // completed
           circle.className = 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-brand-500 text-white border-brand-500';
           num.classList.add('hidden');
           check.classList.remove('hidden');
           label.classList.remove('text-gray-400');
           label.classList.add('text-brand-600');
         } else if (i === step) {
-          // current
           circle.className = 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-brand-500 text-white border-brand-500';
           num.classList.remove('hidden');
           check.classList.add('hidden');
           label.classList.remove('text-gray-400');
           label.classList.add('text-brand-600');
         } else {
-          // upcoming
           circle.className = 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-white text-gray-400 border-gray-300';
           num.classList.remove('hidden');
           check.classList.add('hidden');
@@ -602,7 +733,6 @@
           label.classList.add('text-gray-400');
         }
 
-        // lines
         if (i < 6) {
           const line = document.getElementById('stepLine' + i);
           line.className = i < step
@@ -613,22 +743,51 @@
 
       currentStep = step;
 
-      // show new step
       const newPanel = document.getElementById('step' + step);
       newPanel.classList.remove('hidden');
       newPanel.classList.add('step-fade-enter');
 
-      // scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     /* ───── Validation ───── */
     function validateStep(step) {
       const panel = document.getElementById('step' + step);
-      const requiredInputs = panel.querySelectorAll('[required]');
       let valid = true;
 
+      // Step 1 special: markAsRead
+      if (step === 1) {
+        const mr = document.getElementById('markAsRead');
+        if (!mr.checked) {
+          valid = false;
+          mr.closest('label')?.classList.add('ring-2', 'ring-red-300');
+        } else {
+          mr.closest('label')?.classList.remove('ring-2', 'ring-red-300');
+        }
+        if (!valid) {
+          const firstError = panel.querySelector('.ring-red-300');
+          if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        return valid;
+      }
+
+      // Step 5 special: must select employment type
+      if (step === 5) {
+        if (!selectedType) {
+          valid = false;
+          document.getElementById('typePrompt').innerHTML = '<p class="text-sm text-red-500 font-medium">Please select your employment type to continue.</p>';
+          document.getElementById('typePrompt').classList.remove('hidden');
+          document.getElementById('typePrompt').scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return false;
+        }
+      }
+
+      // Standard required field validation
+      const requiredInputs = panel.querySelectorAll('[required]');
       requiredInputs.forEach(input => {
+        // Skip hidden fields (wrong employment type section)
+        if (input.closest('.hidden')) return;
+
         if (input.type === 'radio') {
           const name = input.name;
           const group = panel.querySelectorAll('input[name="' + name + '"]');
@@ -653,6 +812,13 @@
           } else {
             input.classList.remove('ring-2', 'ring-red-300', 'rounded-xl');
           }
+        } else if (input.tagName === 'SELECT') {
+          if (!input.value) {
+            valid = false;
+            input.classList.add('ring-2', 'ring-red-300');
+          } else {
+            input.classList.remove('ring-2', 'ring-red-300');
+          }
         } else {
           if (!input.value.trim()) {
             valid = false;
@@ -663,19 +829,7 @@
         }
       });
 
-      // Step 5 special: markAsRead
-      if (step === 5) {
-        const mr = document.getElementById('markAsRead');
-        if (!mr.checked) {
-          valid = false;
-          mr.closest('label')?.classList.add('ring-2', 'ring-red-300');
-        } else {
-          mr.closest('label')?.classList.remove('ring-2', 'ring-red-300');
-        }
-      }
-
       if (!valid) {
-        // scroll to first error
         const firstError = panel.querySelector('.ring-red-300');
         if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
@@ -727,12 +881,11 @@
         container.appendChild(badge);
       }
 
-      // clear validation ring
       input.classList.remove('ring-2', 'ring-red-300', 'rounded-xl');
     }
 
     /* ───── Carousel ───── */
-    var carouselViewed = [true, false, false, false]; // track which cards have been seen
+    var carouselViewed = [true, false, false, false];
 
     function carouselTo(index) {
       const track = document.getElementById('carouselTrack');
@@ -744,7 +897,6 @@
         d.classList.toggle('active', i === index);
         d.style.background = i === index ? '#2B7FFF' : '#d1d5db';
       });
-      // Unlock checkbox when all 4 cards viewed
       if (carouselViewed.every(Boolean)) {
         document.getElementById('carouselLock').classList.add('hidden');
         document.getElementById('carouselUnlock').classList.remove('hidden');
@@ -754,7 +906,7 @@
     function carouselNext() { if (carouselIndex < 3) carouselTo(carouselIndex + 1); }
     function carouselPrev() { if (carouselIndex > 0) carouselTo(carouselIndex - 1); }
 
-    /* ───── Touch swipe support for carousel ───── */
+    /* ───── Touch swipe for carousel ───── */
     (function() {
       const track = document.getElementById('carouselTrack');
       let startX = 0;

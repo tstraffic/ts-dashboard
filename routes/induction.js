@@ -15,7 +15,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    const prefix = file.fieldname; // white_card_photo, tc_licence_photo, drivers_licence_photo
+    const prefix = file.fieldname;
     cb(null, `${prefix}_${Date.now()}${ext}`);
   }
 });
@@ -38,20 +38,29 @@ const uploadFields = upload.fields([
   { name: 'white_card_photo', maxCount: 1 },
   { name: 'tc_licence_photo', maxCount: 1 },
   { name: 'drivers_licence_photo', maxCount: 1 },
+  { name: 'drivers_licence_back_photo', maxCount: 1 },
 ]);
 
 // Valid payment types
 const VALID_TYPES = ['cash', 'tfn', 'abn'];
 
-// GET /induction/:type — render the soft induction form
+// GET /induction — unified form (user selects employment type inside)
+router.get('/', (req, res) => {
+  const accessToken = crypto.randomBytes(24).toString('hex');
+  res.render('induction/form', {
+    layout: false,
+    paymentType: 'unified',
+    accessToken,
+    title: 'T&S Induction'
+  });
+});
+
+// GET /induction/:type — legacy URLs still work
 router.get('/:type', (req, res, next) => {
   const { type } = req.params;
-  if (!VALID_TYPES.includes(type)) {
-    return next();
-  }
+  if (!VALID_TYPES.includes(type)) return next();
 
   const accessToken = crypto.randomBytes(24).toString('hex');
-
   res.render('induction/form', {
     layout: false,
     paymentType: type,
@@ -60,10 +69,19 @@ router.get('/:type', (req, res, next) => {
   });
 });
 
-// POST /induction/:type/submit — process the soft induction form
+// POST /induction/submit — unified submit
+router.post('/submit', (req, res) => {
+  handleSubmission(req, res);
+});
+
+// POST /induction/:type/submit — legacy submit URLs
 router.post('/:type/submit', (req, res, next) => {
   const { type } = req.params;
   if (!VALID_TYPES.includes(type)) return next();
+  handleSubmission(req, res);
+});
+
+function handleSubmission(req, res) {
   uploadFields(req, res, (err) => {
     if (err) {
       console.error('Upload error:', err);
@@ -71,29 +89,28 @@ router.post('/:type/submit', (req, res, next) => {
     }
 
     try {
-      const {
-        access_token,
-        first_name, middle_name, last_name,
-        full_name: legacyFullName,
-        email, phone, date_of_birth,
-        address, suburb, state, postcode,
-        can_drive, can_drive_truck, has_injuries, injury_details, is_indigenous,
-        white_card_number, tc_licence_number, drivers_licence_number,
-        tax_file_number, bank_name, bank_bsb, bank_account_number, bank_account_name,
-        abn_number,
-        company_intro_completed, ppe_acknowledged
-      } = req.body;
+      const b = req.body;
+      const paymentType = b.payment_type || req.params?.type || 'tfn';
 
       // Compute full_name from split fields (or use legacy field)
-      const fn = (first_name || '').trim();
-      const mn = (middle_name || '').trim();
-      const ln = (last_name || '').trim();
-      const computedFullName = [fn, mn, ln].filter(Boolean).join(' ') || (legacyFullName || '').trim();
+      const fn = (b.first_name || '').trim();
+      const mn = (b.middle_name || '').trim();
+      const ln = (b.last_name || '').trim();
+      const computedFullName = [fn, mn, ln].filter(Boolean).join(' ') || (b.full_name || '').trim();
 
       // Get uploaded file paths
       const whiteCardPhoto = req.files?.white_card_photo?.[0]?.filename || '';
       const tcLicencePhoto = req.files?.tc_licence_photo?.[0]?.filename || '';
       const driversLicencePhoto = req.files?.drivers_licence_photo?.[0]?.filename || '';
+      const driversLicenceBackPhoto = req.files?.drivers_licence_back_photo?.[0]?.filename || '';
+
+      // For ABN contractors, bank fields have abn_ prefix to avoid form name conflicts
+      if (paymentType === 'abn') {
+        b.bank_name = b.abn_bank_name || b.bank_name || '';
+        b.bank_bsb = b.abn_bank_bsb || b.bank_bsb || '';
+        b.bank_account_number = b.abn_bank_account_number || b.bank_account_number || '';
+        b.bank_account_name = b.abn_bank_account_name || b.bank_account_name || '';
+      }
 
       const stmt = getDb().prepare(`
         INSERT INTO induction_submissions (
@@ -102,10 +119,13 @@ router.post('/:type/submit', (req, res, next) => {
           email, phone, date_of_birth,
           address, suburb, state, postcode,
           can_drive, can_drive_truck, has_injuries, injury_details, is_indigenous,
-          white_card_number, tc_licence_number, drivers_licence_number,
-          white_card_photo, tc_licence_photo, drivers_licence_photo,
+          white_card_number, tc_licence_number, tc_licence_date_of_issue, tc_licence_state,
+          drivers_licence_number,
+          white_card_photo, tc_licence_photo, drivers_licence_photo, drivers_licence_back_photo,
+          experience_years, experience_description,
           tax_file_number, bank_name, bank_bsb, bank_account_number, bank_account_name,
-          abn_number,
+          abn_number, has_insurance,
+          super_fund_name, super_fund_abn, super_usi, super_member_number,
           company_intro_completed, ppe_acknowledged,
           submitted_at
         ) VALUES (
@@ -114,44 +134,57 @@ router.post('/:type/submit', (req, res, next) => {
           ?, ?, ?,
           ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
-          ?, ?, ?,
-          ?, ?, ?,
-          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
           ?,
+          ?, ?, ?, ?,
+          ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?,
+          ?, ?, ?, ?,
           ?, ?,
           datetime('now')
         )
       `);
 
       stmt.run(
-        access_token || crypto.randomBytes(24).toString('hex'),
-        type,
+        b.access_token || crypto.randomBytes(24).toString('hex'),
+        paymentType,
         computedFullName, fn, mn, ln,
-        email || '', phone || '', date_of_birth || null,
-        address || '', suburb || '', state || '', postcode || '',
-        can_drive || '', can_drive_truck || '', has_injuries || '', injury_details || '', is_indigenous || '',
-        white_card_number || '', tc_licence_number || '', drivers_licence_number || '',
-        whiteCardPhoto, tcLicencePhoto, driversLicencePhoto,
-        tax_file_number || '', bank_name || '', bank_bsb || '', bank_account_number || '', bank_account_name || '',
-        abn_number || '',
-        company_intro_completed === 'on' || company_intro_completed === '1' ? 1 : 0,
-        ppe_acknowledged === 'on' || ppe_acknowledged === '1' ? 1 : 0
+        b.email || '', b.phone || '', b.date_of_birth || null,
+        b.address || '', b.suburb || '', b.state || '', b.postcode || '',
+        b.can_drive || '', b.can_drive_truck || '', b.has_injuries || '', b.injury_details || '', b.is_indigenous || '',
+        b.white_card_number || '', b.tc_licence_number || '', b.tc_licence_date_of_issue || '', b.tc_licence_state || '',
+        b.drivers_licence_number || '',
+        whiteCardPhoto, tcLicencePhoto, driversLicencePhoto, driversLicenceBackPhoto,
+        b.experience_years || '', b.experience_description || '',
+        b.tax_file_number || '', b.bank_name || '', b.bank_bsb || '', b.bank_account_number || '', b.bank_account_name || '',
+        b.abn_number || '', b.has_insurance || '',
+        b.super_fund_name || '', b.super_fund_abn || '', b.super_usi || '', b.super_member_number || '',
+        (b.company_intro_completed === 'on' || b.company_intro_completed === '1') ? 1 : 0,
+        (b.ppe_acknowledged === 'on' || b.ppe_acknowledged === '1') ? 1 : 0
       );
 
-      res.redirect(`/induction/${type}/complete`);
+      res.redirect('/induction/complete');
     } catch (error) {
       console.error('Induction submission error:', error);
       res.status(500).send('Something went wrong. Please try again.');
     }
   });
+}
+
+// GET /induction/complete — confirmation page
+router.get('/complete', (req, res) => {
+  res.render('induction/complete', {
+    layout: false,
+    paymentType: 'unified',
+    title: 'Application Submitted'
+  });
 });
 
-// GET /induction/:type/complete — confirmation page
+// GET /induction/:type/complete — legacy complete URLs
 router.get('/:type/complete', (req, res, next) => {
   const { type } = req.params;
-  if (!VALID_TYPES.includes(type)) {
-    return next();
-  }
+  if (!VALID_TYPES.includes(type)) return next();
 
   res.render('induction/complete', {
     layout: false,

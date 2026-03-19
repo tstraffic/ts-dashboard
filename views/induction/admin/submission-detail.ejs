@@ -207,6 +207,9 @@
       <div class="border border-gray-100 rounded-lg p-3">
         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TC Licence</p>
         <p class="text-sm text-gray-900 font-medium"><%= s.tc_licence_number || '—' %></p>
+        <% if (s.tc_licence_date_of_issue || s.tc_licence_state) { %>
+          <p class="text-xs text-gray-500 mt-1">Issued: <%= s.tc_licence_date_of_issue ? new Date(s.tc_licence_date_of_issue).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—' %> &bull; State: <%= s.tc_licence_state || '—' %></p>
+        <% } %>
         <% if (s.tc_licence_photo) { %>
           <div class="mt-2">
             <img src="/induction/admin/uploads/<%= s.id %>/<%= s.tc_licence_photo %>" alt="TC Licence" class="w-full h-24 object-cover rounded border border-gray-200 cursor-pointer" onclick="window.open(this.src, '_blank')">
@@ -235,8 +238,29 @@
         <% } else { %>
           <p class="text-xs text-gray-400 mt-2">Not uploaded</p>
         <% } %>
+        <% if (s.drivers_licence_back_photo) { %>
+          <div class="mt-2">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Back of Licence</p>
+            <img src="/induction/admin/uploads/<%= s.id %>/<%= s.drivers_licence_back_photo %>" alt="Driver's Licence Back" class="w-full h-24 object-cover rounded border border-gray-200 cursor-pointer" onclick="window.open(this.src, '_blank')">
+            <a href="/induction/admin/uploads/<%= s.id %>/<%= s.drivers_licence_back_photo %>" target="_blank" class="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium mt-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              View Full Size
+            </a>
+          </div>
+        <% } %>
       </div>
     </div>
+
+    <!-- Experience -->
+    <% if (s.experience_years || s.experience_description) { %>
+    <div class="mt-4 border border-gray-100 rounded-lg p-3">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Experience</p>
+      <p class="text-sm text-gray-900 font-medium"><%= s.experience_years === 'new' ? 'New / No experience' : s.experience_years === 'less_than_1' ? 'Less than 1 year' : s.experience_years === '1_to_2' ? '1-2 years' : s.experience_years === '2_to_5' ? '2-5 years' : s.experience_years === '5_plus' ? '5+ years' : s.experience_years || '—' %></p>
+      <% if (s.experience_description) { %>
+        <p class="text-sm text-gray-600 mt-1 whitespace-pre-line"><%= s.experience_description %></p>
+      <% } %>
+    </div>
+    <% } %>
   </div>
 
   <!-- Banking Details -->
@@ -291,7 +315,38 @@
         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Name</p>
         <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.bank_account_name || '—' %></p>
       </div>
+
+      <% if (s.payment_type === 'abn' && typeof s.has_insurance !== 'undefined') { %>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Public Liability Insurance</p>
+        <p class="text-sm font-medium mt-0.5 <%= s.has_insurance === 'yes' ? 'text-emerald-700' : 'text-red-600' %>"><%= s.has_insurance === 'yes' ? 'Yes' : s.has_insurance === 'no' ? 'No' : '—' %></p>
+      </div>
+      <% } %>
     </div>
+
+    <% if (s.payment_type === 'tfn' && (s.super_fund_name || s.super_member_number)) { %>
+    <div class="mt-4 pt-4 border-t border-gray-100">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Superannuation</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fund Name</p>
+          <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.super_fund_name || '—' %></p>
+        </div>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fund ABN</p>
+          <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.super_fund_abn || '—' %></p>
+        </div>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">USI</p>
+          <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.super_usi || '—' %></p>
+        </div>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Member Number</p>
+          <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.super_member_number || '—' %></p>
+        </div>
+      </div>
+    </div>
+    <% } %>
   </div>
   <% } %>
 

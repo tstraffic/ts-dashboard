@@ -3259,6 +3259,33 @@ function runMigrations(db) {
     console.log('Migration 57 complete.');
   }
 
+  // =============================================
+  // Migration 58: Induction form enhancements — new fields
+  // =============================================
+  if (!isMigrationApplied.get(58)) {
+    console.log('Running migration 58: Induction form enhancements');
+    try {
+      const newCols58 = [
+        "ALTER TABLE induction_submissions ADD COLUMN tc_licence_date_of_issue TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN tc_licence_state TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN experience_years TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN experience_description TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN drivers_licence_back_photo TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN super_fund_name TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN super_fund_abn TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN super_usi TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN super_member_number TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN has_insurance TEXT DEFAULT ''",
+      ];
+      for (const sql of newCols58) {
+        try { db.exec(sql); } catch (e) { /* column likely exists */ }
+      }
+    } catch (e) {
+      console.error('Migration 58 error:', e.message);
+    }
+    recordMigration.run(58, 'Induction form enhancements');
+    console.log('Migration 58 complete.');
+  }
   console.log('All migrations checked/applied.');
 }
 
