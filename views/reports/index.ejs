@@ -1,153 +1,848 @@
 <% locals.currentPage = 'reports' %>
 
-<!-- Page Header -->
-<div class="mb-4">
-  <h1 class="text-2xl font-bold text-gray-900">Reports & Exports</h1>
-  <p class="text-gray-500 text-xs mt-0.5">Download data extracts and generate reports</p>
+<!-- Page Header + Date Range Filter -->
+<div class="mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
+    <p class="text-gray-500 text-xs mt-0.5">Operational insights for <%= fromDate %> to <%= toDate %></p>
+  </div>
+  <form method="GET" action="/reports" class="flex items-end gap-2 flex-shrink-0">
+    <input type="hidden" name="tab" id="activeTabInput" value="<%= activeTab %>">
+    <div>
+      <label class="block text-[10px] text-gray-400 mb-0.5">From</label>
+      <input type="date" name="from" value="<%= fromDate %>" class="px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+    </div>
+    <div>
+      <label class="block text-[10px] text-gray-400 mb-0.5">To</label>
+      <input type="date" name="to" value="<%= toDate %>" class="px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+    </div>
+    <button type="submit" class="px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Apply</button>
+  </form>
 </div>
 
-<!-- Two-column layout: Quick Exports left, Tools right -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+<!-- Tab Bar -->
+<div class="border-b border-gray-200 mb-4">
+  <nav class="flex gap-6 -mb-px overflow-x-auto" id="reportTabs">
+    <button data-tab="crew" class="tab-btn whitespace-nowrap pb-2.5 px-1 text-sm font-medium border-b-2 transition-colors">Crew Utilisation</button>
+    <button data-tab="jobs" class="tab-btn whitespace-nowrap pb-2.5 px-1 text-sm font-medium border-b-2 transition-colors">Job Health</button>
+    <% if (canViewFinance) { %>
+    <button data-tab="finance" class="tab-btn whitespace-nowrap pb-2.5 px-1 text-sm font-medium border-b-2 transition-colors">Financial</button>
+    <% } %>
+    <button data-tab="safety" class="tab-btn whitespace-nowrap pb-2.5 px-1 text-sm font-medium border-b-2 transition-colors">Safety & Compliance</button>
+    <button data-tab="timesheets" class="tab-btn whitespace-nowrap pb-2.5 px-1 text-sm font-medium border-b-2 transition-colors">Timesheets</button>
+    <button data-tab="exports" class="tab-btn whitespace-nowrap pb-2.5 px-1 text-sm font-medium border-b-2 transition-colors">Quick Exports</button>
+  </nav>
+</div>
 
-  <!-- Quick Exports — compact list, not cards -->
-  <div class="lg:col-span-2">
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
-      <div class="px-4 py-3 border-b border-gray-100">
-        <h2 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Quick Exports</h2>
-      </div>
-      <div class="divide-y divide-gray-50">
-        <a href="/exports/jobs.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
-          <div class="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Jobs Register</p>
-            <p class="text-xs text-gray-400">All jobs with status, dates & budget</p>
-          </div>
-          <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
-        </a>
-
-        <a href="/exports/timesheets.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
-          <div class="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Timesheets</p>
-            <p class="text-xs text-gray-400">All entries with hours, crew & approval status</p>
-          </div>
-          <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
-        </a>
-
-        <a href="/exports/incidents.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
-          <div class="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Incidents</p>
-            <p class="text-xs text-gray-400">Safety incidents, severity & actions</p>
-          </div>
-          <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
-        </a>
-
-        <a href="/exports/compliance.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
-          <div class="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Compliance</p>
-            <p class="text-xs text-gray-400">Permits, approvals & certifications</p>
-          </div>
-          <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
-        </a>
-
-        <a href="/exports/equipment.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
-          <div class="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Equipment</p>
-            <p class="text-xs text-gray-400">Assets, conditions & assignments</p>
-          </div>
-          <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
-        </a>
-
-        <a href="/exports/allocations.csv?from_date=<%= new Date().toISOString().split('T')[0] %>&to_date=<%= (() => { const d = new Date(); d.setDate(d.getDate() + 6); return d.toISOString().split('T')[0]; })() %>" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
-          <div class="w-8 h-8 bg-teal-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Allocations</p>
-            <p class="text-xs text-gray-400">This week's crew bookings</p>
-          </div>
-          <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
-        </a>
-
-        <% if (user && (user.role === 'admin' || user.role === 'finance')) { %>
-        <a href="/exports/budgets.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
-          <div class="w-8 h-8 bg-yellow-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Budgets</p>
-            <p class="text-xs text-gray-400">Budget & cost summary per job</p>
-          </div>
-          <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
-        </a>
-        <% } %>
-      </div>
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB 1: Crew Utilisation                            -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-crew" class="tab-panel hidden">
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold text-gray-900"><%= activeCrew %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Active Crew</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold text-gray-900"><%= avgDaysAllocated %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Avg Days Allocated</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold text-gray-900"><%= Math.round(totalCrewHours * 10) / 10 %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Total Hours</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold <%= fatigueCount > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= fatigueCount %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Fatigue Alerts</p>
     </div>
   </div>
 
-  <!-- Right column: Report tools -->
-  <div class="space-y-4">
-    <!-- Timesheet Summary -->
+  <!-- Charts Row -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Timesheet Weekly Summary</h3>
-      <p class="text-xs text-gray-500 mb-3">Hours per crew member for a selected week</p>
-      <form method="GET" action="/exports/timesheet-summary.csv" class="space-y-2">
-        <%- include('../partials/csrf') %>
-        <input type="date" name="week_of" value="<%= new Date().toISOString().split('T')[0] %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-        <button type="submit" class="w-full px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Export CSV</button>
-      </form>
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Hours by Crew Member</h3>
+      <% if (crewData.filter(c => c.total_hours > 0).length > 0) { %>
+      <div style="height: 300px"><canvas id="crewHoursBar"></canvas></div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-12 text-center">No timesheet data for this period</p>
+      <% } %>
     </div>
-
-    <!-- Allocations Date Range -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Allocations by Date Range</h3>
-      <p class="text-xs text-gray-500 mb-3">Crew allocations for a specific period</p>
-      <form method="GET" action="/exports/allocations.csv" class="space-y-2">
-        <%- include('../partials/csrf') %>
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-[10px] text-gray-400 mb-0.5">From</label>
-            <input type="date" name="from_date" value="<%= new Date().toISOString().split('T')[0] %>"
-              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-          <div>
-            <label class="block text-[10px] text-gray-400 mb-0.5">To</label>
-            <input type="date" name="to_date" value="<%= (() => { const d = new Date(); d.setDate(d.getDate() + 6); return d.toISOString().split('T')[0]; })() %>"
-              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-        </div>
-        <button type="submit" class="w-full px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Export CSV</button>
-      </form>
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Daily Allocations</h3>
+      <% if (dailyAllocations.length > 0) { %>
+      <div style="height: 300px"><canvas id="dailyAllocLine"></canvas></div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-12 text-center">No allocations for this period</p>
+      <% } %>
     </div>
+  </div>
 
-    <!-- Job PDF Report -->
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Job Report (PDF)</h3>
-      <p class="text-xs text-gray-500 mb-3">Full job summary including budget, timesheets & compliance</p>
-      <form method="GET" action="/exports/job-report.pdf" class="space-y-2">
-        <%- include('../partials/csrf') %>
-        <select name="job_id" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          <option value="">Choose a job...</option>
-          <% jobs.forEach(j => { %>
-            <option value="<%= j.id %>"><%= j.job_number %> - <%= j.client %></option>
+  <!-- Crew Table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Crew Breakdown</h3>
+    </div>
+    <% if (crewData.filter(c => c.days_allocated > 0 || c.total_hours > 0).length > 0) { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-100 bg-gray-50/50">
+            <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Role</th>
+            <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Days</th>
+            <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hours</th>
+            <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Overtime</th>
+            <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          <% crewData.filter(c => c.days_allocated > 0 || c.total_hours > 0).forEach(c => { %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-2.5 font-medium text-gray-900"><%= c.full_name %></td>
+            <td class="px-3 py-2.5 text-gray-500 hidden sm:table-cell"><%= (c.role || '').replace(/_/g, ' ') %></td>
+            <td class="px-3 py-2.5 text-right text-gray-700"><%= c.days_allocated %></td>
+            <td class="px-3 py-2.5 text-right text-gray-700"><%= Math.round(c.total_hours * 10) / 10 %></td>
+            <td class="px-3 py-2.5 text-right text-gray-700 hidden sm:table-cell"><%= Math.round(c.overtime_hours * 10) / 10 %></td>
+            <td class="px-3 py-2.5 text-center">
+              <% if (c.fatigue) { %>
+              <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-red-50 text-red-700">Fatigue Risk</span>
+              <% } else { %>
+              <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700">OK</span>
+              <% } %>
+            </td>
+          </tr>
           <% }) %>
-        </select>
-        <button type="submit" class="w-full px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Generate PDF</button>
-      </form>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <p class="text-sm text-gray-400 py-8 text-center">No crew activity for this period</p>
+    <% } %>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB 2: Job Health                                  -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-jobs" class="tab-panel hidden">
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold text-gray-900"><%= activeJobCount %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Active Jobs</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold <%= redHealth > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= redHealth %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Red Health</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold <%= overdueJobs.length > 0 ? 'text-amber-600' : 'text-gray-900' %>"><%= overdueJobs.length %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Overdue</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold text-gray-900"><%= staleJobs.length %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Stale (7d+)</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Active Jobs by Health</h3>
+      <% if (jobsByHealth.length > 0) { %>
+      <div style="height: 250px" class="flex items-center justify-center"><canvas id="jobHealthDoughnut"></canvas></div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-12 text-center">No active jobs</p>
+      <% } %>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Jobs by Status</h3>
+      <% if (jobsByStatus.length > 0) { %>
+      <div style="height: 250px"><canvas id="jobStatusBar"></canvas></div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-12 text-center">No jobs</p>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Needs Attention Table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Needs Attention</h3>
+    </div>
+    <% var attentionItems = [];
+       overdueJobs.forEach(j => attentionItems.push({ job_number: j.job_number, client: j.client, reason: 'Overdue (end: ' + j.end_date + ')', severity: 'red', id: j.id }));
+       overBudgetJobs.forEach(j => attentionItems.push({ job_number: j.job_number, client: j.client, reason: 'Over budget ($' + Math.round(j.total_spent - j.contract_value).toLocaleString() + ')', severity: 'amber', id: j.id }));
+       staleJobs.forEach(j => attentionItems.push({ job_number: j.job_number, client: j.client, reason: 'No update since ' + (j.last_update_date || 'never'), severity: 'gray', id: j.id }));
+    %>
+    <% if (attentionItems.length > 0) { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-100 bg-gray-50/50">
+            <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Job</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Client</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Issue</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          <% attentionItems.forEach(item => { %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-2.5"><a href="/jobs/<%= item.id %>" class="font-medium text-brand-600 hover:underline"><%= item.job_number %></a></td>
+            <td class="px-3 py-2.5 text-gray-500 hidden sm:table-cell"><%= item.client %></td>
+            <td class="px-3 py-2.5">
+              <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-<%= item.severity %>-50 text-<%= item.severity %>-700"><%= item.reason %></span>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <p class="text-sm text-gray-400 py-8 text-center">All jobs healthy</p>
+    <% } %>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB 3: Financial (admin/finance only)              -->
+<!-- ═══════════════════════════════════════════════════ -->
+<% if (canViewFinance) { %>
+<div id="tab-finance" class="tab-panel hidden">
+  <% var fd = financeData; var margin = fd.portfolio.total_contract > 0 ? Math.round((1 - fd.portfolio.total_spent / fd.portfolio.total_contract) * 1000) / 10 : 0; %>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold text-gray-900">$<%= Math.round(fd.portfolio.total_contract).toLocaleString() %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Contract Value</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold text-gray-900">$<%= Math.round(fd.portfolio.total_spent).toLocaleString() %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Total Spend</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold <%= margin < 10 ? 'text-red-600' : margin < 25 ? 'text-amber-600' : 'text-emerald-600' %>"><%= margin %>%</p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Portfolio Margin</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold <%= fd.overBudgetCount > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= fd.overBudgetCount %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Over Budget</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Monthly Spend Trend</h3>
+      <% if (fd.monthlySpend.length > 0) { %>
+      <div style="height: 280px"><canvas id="monthlySpendChart"></canvas></div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-12 text-center">No cost entries recorded</p>
+      <% } %>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Spend by Category</h3>
+      <% if (fd.spendByCategory.length > 0) { %>
+      <div style="height: 280px" class="flex items-center justify-center"><canvas id="spendCatChart"></canvas></div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-12 text-center">No cost entries for this period</p>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Job Financials Table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Job Financial Summary</h3>
+    </div>
+    <% if (fd.jobFinancials.length > 0) { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-100 bg-gray-50/50">
+            <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Job</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Client</th>
+            <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contract</th>
+            <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Spent</th>
+            <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Margin</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-32 hidden md:table-cell">Usage</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          <% fd.jobFinancials.forEach(j => {
+            var total = j.contract_value + j.variations;
+            var pct = total > 0 ? Math.round(j.total_spent / total * 100) : 0;
+            var marginPct = total > 0 ? Math.round((1 - j.total_spent / total) * 100) : 0;
+            var barColor = pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-emerald-500';
+          %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-2.5"><a href="/jobs/<%= j.id %>" class="font-medium text-brand-600 hover:underline"><%= j.job_number %></a></td>
+            <td class="px-3 py-2.5 text-gray-500 hidden sm:table-cell"><%= j.client %></td>
+            <td class="px-3 py-2.5 text-right text-gray-700">$<%= Math.round(total).toLocaleString() %></td>
+            <td class="px-3 py-2.5 text-right text-gray-700">$<%= Math.round(j.total_spent).toLocaleString() %></td>
+            <td class="px-3 py-2.5 text-right hidden sm:table-cell">
+              <span class="<%= marginPct < 10 ? 'text-red-600' : marginPct < 25 ? 'text-amber-600' : 'text-emerald-600' %> font-medium"><%= marginPct %>%</span>
+            </td>
+            <td class="px-3 py-2.5 hidden md:table-cell">
+              <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="<%= barColor %> h-2 rounded-full" style="width: <%= Math.min(pct, 100) %>%"></div>
+              </div>
+              <span class="text-[10px] text-gray-400"><%= pct %>%</span>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <p class="text-sm text-gray-400 py-8 text-center">No budgets configured</p>
+    <% } %>
+  </div>
+</div>
+<% } %>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB 4: Safety & Compliance                         -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-safety" class="tab-panel hidden">
+  <% var caRate = correctiveStats.total > 0 ? Math.round(correctiveStats.completed / correctiveStats.total * 100) : 100; %>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold <%= openIncidents.length > 0 ? 'text-amber-600' : 'text-gray-900' %>"><%= openIncidents.length %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Open Incidents</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold <%= correctiveStats.overdue > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= correctiveStats.overdue %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Overdue Actions</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold <%= caRate < 70 ? 'text-red-600' : caRate < 90 ? 'text-amber-600' : 'text-emerald-600' %>"><%= caRate %>%</p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Action Completion</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold <%= notifiableCount > 0 ? 'text-red-600' : 'text-gray-900' %>"><%= notifiableCount %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Notifiable</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Incidents by Month</h3>
+      <% if (incidentsByMonth.length > 0) { %>
+      <div style="height: 280px"><canvas id="incidentMonthChart"></canvas></div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-12 text-center">No incidents for this period</p>
+      <% } %>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Incidents by Type</h3>
+      <% if (incidentsByType.length > 0) { %>
+      <div style="height: 280px" class="flex items-center justify-center"><canvas id="incidentTypeChart"></canvas></div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-12 text-center">No incidents for this period</p>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Open Incidents Table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-4">
+    <div class="px-4 py-3 border-b border-gray-100">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Open Incidents</h3>
+    </div>
+    <% if (openIncidents.length > 0) { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-100 bg-gray-50/50">
+            <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Incident</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Job</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Severity</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Date</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          <% openIncidents.forEach(i => {
+            var sevColor = { low: 'emerald', medium: 'amber', high: 'red', critical: 'red' }[i.severity] || 'gray';
+          %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-2.5">
+              <a href="/incidents/<%= i.id %>" class="font-medium text-brand-600 hover:underline"><%= i.incident_number %></a>
+              <p class="text-xs text-gray-400 truncate max-w-xs"><%= i.title %></p>
+            </td>
+            <td class="px-3 py-2.5 text-gray-500 hidden sm:table-cell"><%= i.job_number %></td>
+            <td class="px-3 py-2.5"><span class="px-2 py-0.5 text-xs font-medium rounded-full bg-<%= sevColor %>-50 text-<%= sevColor %>-700"><%= i.severity %></span></td>
+            <td class="px-3 py-2.5 text-gray-500 hidden sm:table-cell"><%= i.incident_date %></td>
+            <td class="px-3 py-2.5"><span class="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700"><%= (i.investigation_status || '').replace(/_/g, ' ') %></span></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <p class="text-sm text-gray-400 py-8 text-center">No open incidents</p>
+    <% } %>
+  </div>
+
+  <!-- Overdue Compliance -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Overdue Compliance Items</h3>
+    </div>
+    <% if (overdueCompliance.length > 0) { %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-100 bg-gray-50/50">
+            <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Item</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Job</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type</th>
+            <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Due</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          <% overdueCompliance.forEach(c => { %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-2.5 font-medium text-gray-900"><%= c.title %></td>
+            <td class="px-3 py-2.5 text-gray-500 hidden sm:table-cell"><%= c.job_number %></td>
+            <td class="px-3 py-2.5"><span class="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-50 text-purple-700"><%= (c.item_type || '').replace(/_/g, ' ') %></span></td>
+            <td class="px-3 py-2.5 text-red-600 font-medium"><%= c.due_date %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } else { %>
+    <p class="text-sm text-gray-400 py-8 text-center">No overdue compliance items</p>
+    <% } %>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB 5: Timesheets                                  -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-timesheets" class="tab-panel hidden">
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold text-gray-900"><%= Math.round(tsOverall.total_hours * 10) / 10 %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Total Hours</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold <%= tsOverall.pending_hours > 0 ? 'text-amber-600' : 'text-gray-900' %>"><%= Math.round(tsOverall.pending_hours * 10) / 10 %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Pending Approval</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold text-gray-900"><%= Math.round(tsOverall.overtime_hours * 10) / 10 %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Overtime Hours</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-2xl font-extrabold text-gray-900"><%= tsOverall.unique_crew %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Unique Crew</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Weekly Hours</h3>
+      <% if (tsWeekly.length > 0) { %>
+      <div style="height: 280px"><canvas id="weeklyHoursChart"></canvas></div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-12 text-center">No timesheet data for this period</p>
+      <% } %>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Approval Status</h3>
+      <% if (tsOverall.total_hours > 0) { %>
+      <div style="height: 280px" class="flex items-center justify-center"><canvas id="approvalPie"></canvas></div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-12 text-center">No timesheet data</p>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Hours by Job -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100">
+        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hours by Job</h3>
+      </div>
+      <% if (tsByJob.length > 0) { %>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100 bg-gray-50/50">
+              <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Job</th>
+              <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hours</th>
+              <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">OT</th>
+              <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Crew</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            <% tsByJob.forEach(j => { %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-2.5">
+                <a href="/jobs/<%= j.id %>" class="font-medium text-brand-600 hover:underline"><%= j.job_number %></a>
+                <p class="text-xs text-gray-400 truncate max-w-[150px]"><%= j.client %></p>
+              </td>
+              <td class="px-3 py-2.5 text-right font-medium text-gray-700"><%= Math.round(j.total_hours * 10) / 10 %></td>
+              <td class="px-3 py-2.5 text-right text-gray-500 hidden sm:table-cell"><%= Math.round(j.overtime * 10) / 10 %></td>
+              <td class="px-3 py-2.5 text-right text-gray-500 hidden sm:table-cell"><%= j.crew_count %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-8 text-center">No timesheet data</p>
+      <% } %>
+    </div>
+
+    <!-- Hours by Crew -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100">
+        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hours by Crew Member</h3>
+      </div>
+      <% if (tsByCrew.length > 0) { %>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100 bg-gray-50/50">
+              <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
+              <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hours</th>
+              <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">OT</th>
+              <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Days</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            <% tsByCrew.forEach(c => { %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-2.5">
+                <p class="font-medium text-gray-900"><%= c.full_name %></p>
+                <p class="text-xs text-gray-400"><%= (c.role || '').replace(/_/g, ' ') %></p>
+              </td>
+              <td class="px-3 py-2.5 text-right font-medium text-gray-700"><%= Math.round(c.total_hours * 10) / 10 %></td>
+              <td class="px-3 py-2.5 text-right text-gray-500 hidden sm:table-cell"><%= Math.round(c.overtime * 10) / 10 %></td>
+              <td class="px-3 py-2.5 text-right text-gray-500 hidden sm:table-cell"><%= c.days_worked %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 py-8 text-center">No timesheet data</p>
+      <% } %>
     </div>
   </div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TAB 6: Quick Exports (preserved from original)     -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="tab-exports" class="tab-panel hidden">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="lg:col-span-2">
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div class="px-4 py-3 border-b border-gray-100">
+          <h2 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Quick Exports</h2>
+        </div>
+        <div class="divide-y divide-gray-50">
+          <a href="/exports/jobs.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+            <div class="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Jobs Register</p>
+              <p class="text-xs text-gray-400">All jobs with status, dates & budget</p>
+            </div>
+            <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
+          </a>
+          <a href="/exports/timesheets.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+            <div class="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Timesheets</p>
+              <p class="text-xs text-gray-400">All entries with hours, crew & approval status</p>
+            </div>
+            <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
+          </a>
+          <a href="/exports/incidents.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+            <div class="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Incidents</p>
+              <p class="text-xs text-gray-400">Safety incidents, severity & actions</p>
+            </div>
+            <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
+          </a>
+          <a href="/exports/compliance.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+            <div class="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Compliance</p>
+              <p class="text-xs text-gray-400">Permits, approvals & certifications</p>
+            </div>
+            <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
+          </a>
+          <a href="/exports/equipment.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+            <div class="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Equipment</p>
+              <p class="text-xs text-gray-400">Assets, conditions & assignments</p>
+            </div>
+            <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
+          </a>
+          <a href="/exports/allocations.csv?from_date=<%= new Date().toISOString().split('T')[0] %>&to_date=<%= (() => { const d = new Date(); d.setDate(d.getDate() + 6); return d.toISOString().split('T')[0]; })() %>" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+            <div class="w-8 h-8 bg-teal-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Allocations</p>
+              <p class="text-xs text-gray-400">This week's crew bookings</p>
+            </div>
+            <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
+          </a>
+          <% if (user && (user.role === 'admin' || user.role === 'finance')) { %>
+          <a href="/exports/budgets.csv" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+            <div class="w-8 h-8 bg-yellow-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 group-hover:text-brand-600 transition-colors">Budgets</p>
+              <p class="text-xs text-gray-400">Budget & cost summary per job</p>
+            </div>
+            <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/></svg>
+          </a>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Timesheet Weekly Summary</h3>
+        <p class="text-xs text-gray-500 mb-3">Hours per crew member for a selected week</p>
+        <form method="GET" action="/exports/timesheet-summary.csv" class="space-y-2">
+          <%- include('../partials/csrf') %>
+          <input type="date" name="week_of" value="<%= new Date().toISOString().split('T')[0] %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <button type="submit" class="w-full px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Export CSV</button>
+        </form>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Allocations by Date Range</h3>
+        <p class="text-xs text-gray-500 mb-3">Crew allocations for a specific period</p>
+        <form method="GET" action="/exports/allocations.csv" class="space-y-2">
+          <%- include('../partials/csrf') %>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-gray-400 mb-0.5">From</label>
+              <input type="date" name="from_date" value="<%= new Date().toISOString().split('T')[0] %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            </div>
+            <div>
+              <label class="block text-[10px] text-gray-400 mb-0.5">To</label>
+              <input type="date" name="to_date" value="<%= (() => { const d = new Date(); d.setDate(d.getDate() + 6); return d.toISOString().split('T')[0]; })() %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            </div>
+          </div>
+          <button type="submit" class="w-full px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Export CSV</button>
+        </form>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Job Report (PDF)</h3>
+        <p class="text-xs text-gray-500 mb-3">Full job summary including budget, timesheets & compliance</p>
+        <form method="GET" action="/exports/job-report.pdf" class="space-y-2">
+          <%- include('../partials/csrf') %>
+          <select name="job_id" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="">Choose a job...</option>
+            <% jobs.forEach(j => { %>
+              <option value="<%= j.id %>"><%= j.job_number %> - <%= j.client %></option>
+            <% }) %>
+          </select>
+          <button type="submit" class="w-full px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Generate PDF</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- Chart.js + Tab Switching Script                     -->
+<!-- ═══════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  // Tab switching
+  var tabs = document.querySelectorAll('.tab-btn');
+  var panels = document.querySelectorAll('.tab-panel');
+  var tabInput = document.getElementById('activeTabInput');
+
+  function activateTab(name) {
+    tabs.forEach(function(t) {
+      var active = t.getAttribute('data-tab') === name;
+      t.className = 'tab-btn whitespace-nowrap pb-2.5 px-1 text-sm font-medium border-b-2 transition-colors ' +
+        (active ? 'border-brand-500 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300');
+    });
+    panels.forEach(function(p) {
+      p.classList.toggle('hidden', p.id !== 'tab-' + name);
+    });
+    tabInput.value = name;
+  }
+
+  tabs.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      activateTab(this.getAttribute('data-tab'));
+    });
+  });
+
+  activateTab('<%= activeTab %>');
+
+  // ── Chart Helpers ──
+  var brandBlue = '#2B7FFF';
+  var chartDefaults = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
+
+  // ── Crew Utilisation Charts ──
+  <% var crewChartData = crewData.filter(c => c.total_hours > 0).slice(0, 15); %>
+  <% if (crewChartData.length > 0) { %>
+  var crewBarData = <%- JSON.stringify(crewChartData) %>;
+  new Chart(document.getElementById('crewHoursBar'), {
+    type: 'bar',
+    data: {
+      labels: crewBarData.map(function(d) { return d.full_name; }),
+      datasets: [{
+        data: crewBarData.map(function(d) { return Math.round(d.total_hours * 10) / 10; }),
+        backgroundColor: crewBarData.map(function(d) { return d.fatigue ? '#f87171' : brandBlue; }),
+        borderRadius: 4, barThickness: 16
+      }]
+    },
+    options: Object.assign({}, chartDefaults, { indexAxis: 'y', scales: { x: { grid: { display: false }, beginAtZero: true }, y: { grid: { display: false } } } })
+  });
+  <% } %>
+
+  <% if (dailyAllocations.length > 0) { %>
+  var allocData = <%- JSON.stringify(dailyAllocations) %>;
+  new Chart(document.getElementById('dailyAllocLine'), {
+    type: 'line',
+    data: {
+      labels: allocData.map(function(d) { return new Date(d.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }); }),
+      datasets: [{ data: allocData.map(function(d) { return d.count; }), borderColor: brandBlue, backgroundColor: 'rgba(43,127,255,0.08)', fill: true, tension: 0.4, pointRadius: 2, borderWidth: 2 }]
+    },
+    options: Object.assign({}, chartDefaults, { scales: { x: { grid: { display: false } }, y: { grid: { color: '#f3f4f6' }, beginAtZero: true, ticks: { stepSize: 1 } } } })
+  });
+  <% } %>
+
+  // ── Job Health Charts ──
+  <% if (jobsByHealth.length > 0) { %>
+  var healthData = <%- JSON.stringify(jobsByHealth) %>;
+  var hColors = { green: '#34d399', amber: '#fb923c', red: '#f87171' };
+  new Chart(document.getElementById('jobHealthDoughnut'), {
+    type: 'doughnut',
+    data: {
+      labels: healthData.map(function(d) { return d.health.charAt(0).toUpperCase() + d.health.slice(1); }),
+      datasets: [{ data: healthData.map(function(d) { return d.count; }), backgroundColor: healthData.map(function(d) { return hColors[d.health] || '#94a3b8'; }), borderWidth: 0, cutout: '70%' }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 16 } } } }
+  });
+  <% } %>
+
+  <% if (jobsByStatus.length > 0) { %>
+  var statusData = <%- JSON.stringify(jobsByStatus) %>;
+  var sLabels = { lead: 'Lead', won: 'Won', active: 'Active', on_hold: 'On Hold', completed: 'Completed', lost: 'Lost' };
+  var sColors = { lead: '#94a3b8', won: '#34d399', active: '#2B7FFF', on_hold: '#fb923c', completed: '#6ee7b7', lost: '#fca5a5' };
+  new Chart(document.getElementById('jobStatusBar'), {
+    type: 'bar',
+    data: {
+      labels: statusData.map(function(d) { return sLabels[d.status] || d.status; }),
+      datasets: [{ data: statusData.map(function(d) { return d.count; }), backgroundColor: statusData.map(function(d) { return sColors[d.status] || '#94a3b8'; }), borderRadius: 6, barThickness: 24 }]
+    },
+    options: Object.assign({}, chartDefaults, { indexAxis: 'y', scales: { x: { grid: { display: false }, ticks: { stepSize: 1 } }, y: { grid: { display: false } } } })
+  });
+  <% } %>
+
+  // ── Financial Charts ──
+  <% if (canViewFinance && financeData.monthlySpend && financeData.monthlySpend.length > 0) { %>
+  var spendData = <%- JSON.stringify(financeData.monthlySpend) %>;
+  new Chart(document.getElementById('monthlySpendChart'), {
+    type: 'bar',
+    data: {
+      labels: spendData.map(function(d) { var p = d.month.split('-'); return new Date(p[0], p[1]-1).toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }); }),
+      datasets: [{ data: spendData.map(function(d) { return Math.round(d.total); }), backgroundColor: brandBlue, borderRadius: 6, barThickness: 32 }]
+    },
+    options: Object.assign({}, chartDefaults, { scales: { x: { grid: { display: false } }, y: { grid: { color: '#f3f4f6' }, beginAtZero: true, ticks: { callback: function(v) { return '$' + v.toLocaleString(); } } } } })
+  });
+  <% } %>
+
+  <% if (canViewFinance && financeData.spendByCategory && financeData.spendByCategory.length > 0) { %>
+  var catData = <%- JSON.stringify(financeData.spendByCategory) %>;
+  var catColors = { labour: '#2B7FFF', materials: '#34d399', subcontractors: '#fb923c', equipment: '#a78bfa', other: '#94a3b8' };
+  new Chart(document.getElementById('spendCatChart'), {
+    type: 'doughnut',
+    data: {
+      labels: catData.map(function(d) { return d.category.charAt(0).toUpperCase() + d.category.slice(1); }),
+      datasets: [{ data: catData.map(function(d) { return Math.round(d.total); }), backgroundColor: catData.map(function(d) { return catColors[d.category] || '#94a3b8'; }), borderWidth: 0, cutout: '65%' }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 16 } }, tooltip: { callbacks: { label: function(ctx) { return ctx.label + ': $' + ctx.parsed.toLocaleString(); } } } } }
+  });
+  <% } %>
+
+  // ── Safety Charts ──
+  <% if (incidentsByMonth.length > 0) { %>
+  var incMonthRaw = <%- JSON.stringify(incidentsByMonth) %>;
+  // Group by month, stack by severity
+  var months = []; var sevSets = {};
+  incMonthRaw.forEach(function(d) {
+    if (months.indexOf(d.month) === -1) months.push(d.month);
+    if (!sevSets[d.severity]) sevSets[d.severity] = {};
+    sevSets[d.severity][d.month] = d.count;
+  });
+  var sevColors = { low: '#94a3b8', medium: '#fbbf24', high: '#fb923c', critical: '#f87171' };
+  var sevDatasets = Object.keys(sevSets).map(function(sev) {
+    return { label: sev.charAt(0).toUpperCase() + sev.slice(1), data: months.map(function(m) { return sevSets[sev][m] || 0; }), backgroundColor: sevColors[sev] || '#94a3b8', borderRadius: 4 };
+  });
+  new Chart(document.getElementById('incidentMonthChart'), {
+    type: 'bar',
+    data: { labels: months.map(function(m) { var p = m.split('-'); return new Date(p[0], p[1]-1).toLocaleDateString('en-AU', { month: 'short' }); }), datasets: sevDatasets },
+    options: Object.assign({}, chartDefaults, { plugins: { legend: { display: true, position: 'bottom' } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: '#f3f4f6' }, beginAtZero: true, ticks: { stepSize: 1 } } } })
+  });
+  <% } %>
+
+  <% if (incidentsByType.length > 0) { %>
+  var typeData = <%- JSON.stringify(incidentsByType) %>;
+  var typeColors = ['#2B7FFF','#34d399','#fb923c','#f87171','#a78bfa','#fbbf24','#94a3b8','#ec4899','#14b8a6','#6366f1','#78716c'];
+  new Chart(document.getElementById('incidentTypeChart'), {
+    type: 'doughnut',
+    data: {
+      labels: typeData.map(function(d) { return d.incident_type.replace(/_/g, ' '); }),
+      datasets: [{ data: typeData.map(function(d) { return d.count; }), backgroundColor: typeColors.slice(0, typeData.length), borderWidth: 0, cutout: '65%' }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } } } }
+  });
+  <% } %>
+
+  // ── Timesheet Charts ──
+  <% if (tsWeekly.length > 0) { %>
+  var weekData = <%- JSON.stringify(tsWeekly) %>;
+  new Chart(document.getElementById('weeklyHoursChart'), {
+    type: 'bar',
+    data: {
+      labels: weekData.map(function(d) { return d.week; }),
+      datasets: [
+        { label: 'Ordinary', data: weekData.map(function(d) { return Math.round((d.ordinary || d.total_hours - d.overtime) * 10) / 10; }), backgroundColor: brandBlue, borderRadius: 4 },
+        { label: 'Overtime', data: weekData.map(function(d) { return Math.round(d.overtime * 10) / 10; }), backgroundColor: '#fb923c', borderRadius: 4 }
+      ]
+    },
+    options: Object.assign({}, chartDefaults, { plugins: { legend: { display: true, position: 'bottom' } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: '#f3f4f6' }, beginAtZero: true } } })
+  });
+  <% } %>
+
+  <% if (tsOverall.total_hours > 0) { %>
+  new Chart(document.getElementById('approvalPie'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Approved', 'Pending'],
+      datasets: [{ data: [<%= tsOverall.approved_hours %>, <%= tsOverall.pending_hours %>], backgroundColor: ['#34d399', '#fbbf24'], borderWidth: 0, cutout: '65%' }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 16 } } } }
+  });
+  <% } %>
+})();
+</script>
