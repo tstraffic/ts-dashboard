@@ -3381,6 +3381,55 @@ function runMigrations(db) {
     console.log('Migration 62 complete.');
   }
 
+  // Migration 63: Nuke ALL data for clean production launch (keep only users)
+  if (!isMigrationApplied.get(63)) {
+    console.log('Running migration 63: Wipe all data for clean production launch');
+    try {
+      // Order matters: children before parents to respect foreign keys
+      const tablesToWipe = [
+        'activity_log', 'notifications', 'push_subscriptions',
+        'messages', 'message_attachments', 'message_mentions',
+        'chat_thread_members', 'chat_threads',
+        'docket_signatures', 'docket_time_entries',
+        'booking_crew', 'booking_dockets', 'booking_documents',
+        'booking_equipment', 'booking_notes', 'booking_requirements', 'booking_vehicles',
+        'bookings',
+        'clock_events', 'crew_allocations', 'crew_availability',
+        'task_comments', 'task_dependencies', 'subtasks', 'tasks',
+        'cost_entries', 'job_budgets',
+        'corrective_actions', 'incident_crew_members', 'incidents',
+        'safety_forms',
+        'equipment_maintenance', 'equipment_assignments', 'equipment',
+        'employee_competencies', 'employee_documents', 'employee_leave',
+        'timesheets', 'crew_members', 'employees',
+        'documents', 'compliance', 'defects',
+        'project_updates', 'traffic_plans',
+        'communication_log', 'client_contacts',
+        'crm_activities', 'crm_meetings', 'opportunities',
+        'saved_views', 'invitations',
+        'external_refs', 'sync_log',
+        'clients', 'jobs',
+      ];
+      for (const table of tablesToWipe) {
+        try {
+          db.exec(`DELETE FROM ${table}`);
+          console.log(`  Cleared ${table}`);
+        } catch (e) {
+          console.log(`  Skipped ${table}: ${e.message}`);
+        }
+      }
+      // Reset auto-increment counters
+      try {
+        const names = tablesToWipe.map(t => `'${t}'`).join(',');
+        db.exec(`DELETE FROM sqlite_sequence WHERE name IN (${names})`);
+      } catch (e) { /* ok */ }
+    } catch (e) {
+      console.error('Migration 63 error:', e.message);
+    }
+    recordMigration.run(63, 'Wipe all data for clean production launch');
+    console.log('Migration 63 complete — database is clean.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
