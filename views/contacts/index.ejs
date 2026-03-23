@@ -66,9 +66,9 @@
 
 <!-- Contacts Table -->
 <% if (contacts.length === 0) { %>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
-    <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
-      <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
+    <div class="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
     </div>
     <h3 class="text-gray-900 font-semibold text-base mb-1">No contacts found</h3>
     <p class="text-gray-500 text-sm mb-1">Manage client reps, council officers, subcontractors, and key stakeholders for your jobs.</p>
@@ -90,7 +90,7 @@
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Email</th>
         <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Job</th>
         <th class="px-3 py-2.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Comms</th>
-        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Last Contact</th>
+        <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Last Activity</th>
         <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actions</th>
       </tr>
     </thead>
@@ -98,12 +98,23 @@
       <% contacts.forEach(c => { %>
       <tr class="hover:bg-gray-50">
         <td class="px-3 py-2.5">
-          <a href="/contacts/<%= c.id %>" class="font-medium text-gray-900 hover:text-brand-600 transition"><%= c.full_name %></a>
-          <% if (c.position) { %><span class="block text-[10px] text-gray-400"><%= c.position %></span><% } %>
-          <span class="sm:hidden text-[10px] text-gray-400"><%= c.company %></span>
-          <% if (c.is_primary) { %>
-            <span class="inline-flex items-center ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-brand-50 text-brand-600 ring-1 ring-brand-600/20">PRIMARY</span>
-          <% } %>
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0
+              <% if (c.contact_type === 'client') { %>bg-blue-100 text-blue-700
+              <% } else if (c.contact_type === 'council') { %>bg-purple-100 text-purple-700
+              <% } else if (c.contact_type === 'subcontractor') { %>bg-emerald-100 text-emerald-700
+              <% } else { %>bg-gray-100 text-gray-600<% } %>">
+              <%= c.full_name ? c.full_name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase() : '?' %>
+            </div>
+            <div class="min-w-0">
+              <a href="/contacts/<%= c.id %>" class="font-medium text-gray-900 hover:text-brand-600 transition"><%= c.full_name %></a>
+              <% if (c.position) { %><span class="block text-[10px] text-gray-400"><%= c.position %></span><% } %>
+              <span class="sm:hidden text-[10px] text-gray-400"><%= c.company %></span>
+              <% if (c.is_primary) { %>
+                <span class="inline-flex items-center ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-brand-50 text-brand-600 ring-1 ring-brand-600/20">PRIMARY</span>
+              <% } %>
+            </div>
+          </div>
         </td>
         <td class="px-3 py-2.5 text-xs hidden sm:table-cell">
           <% if (c.company_id) { %>
@@ -146,7 +157,19 @@
             <span class="text-gray-300">-</span>
           <% } %>
         </td>
-        <td class="px-3 py-2.5 text-xs text-gray-500 hidden xl:table-cell"><%= formatShortDate(c.last_contact_date) %></td>
+        <td class="px-3 py-2.5 text-xs hidden lg:table-cell">
+          <% if (c.last_contact_date) { %>
+            <%
+              const lastDate = new Date(c.last_contact_date);
+              const daysSince = Math.floor((Date.now() - lastDate.getTime()) / (1000*60*60*24));
+              const activityColor = daysSince <= 7 ? 'text-emerald-600' : daysSince <= 30 ? 'text-gray-600' : daysSince <= 90 ? 'text-amber-600' : 'text-red-500';
+            %>
+            <span class="<%= activityColor %> font-medium"><%= formatShortDate(c.last_contact_date) %></span>
+            <span class="block text-[10px] text-gray-400"><%= daysSince === 0 ? 'Today' : daysSince === 1 ? '1 day ago' : daysSince + ' days ago' %></span>
+          <% } else { %>
+            <span class="text-gray-300">No activity</span>
+          <% } %>
+        </td>
         <td class="px-3 py-2.5 text-right">
           <div class="flex items-center justify-end gap-1">
             <a href="/contacts/<%= c.id %>/edit" class="px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg">Edit</a>

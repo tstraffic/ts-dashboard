@@ -1,0 +1,312 @@
+<div class="space-y-5">
+  <!-- Status Banner -->
+  <div class="bg-gradient-to-br <%= clockStatus.status === 'clocked_in' ? 'from-emerald-800/90 to-emerald-950/90' : clockStatus.status === 'on_break' ? 'from-amber-800/90 to-amber-950/90' : 'from-brand-800/90 to-brand-950/90' %> backdrop-blur-md rounded-2xl p-5 border border-white/10 shadow-lg text-center">
+    <div class="flex items-center justify-center gap-2 mb-2">
+      <div class="w-3 h-3 rounded-full <%= clockStatus.status === 'clocked_in' ? 'bg-emerald-400 animate-pulse' : clockStatus.status === 'on_break' ? 'bg-amber-400 animate-pulse' : 'bg-gray-400' %>"></div>
+      <span class="text-sm font-medium <%= clockStatus.status === 'clocked_in' ? 'text-emerald-200' : clockStatus.status === 'on_break' ? 'text-amber-200' : 'text-gray-300' %>">
+        <%= clockStatus.status === 'clocked_in' ? 'Clocked In' : clockStatus.status === 'on_break' ? 'On Break' : 'Clocked Out' %>
+      </span>
+    </div>
+
+    <!-- Current Time -->
+    <div class="text-4xl font-bold text-white mb-1" id="currentTime">--:--</div>
+    <p class="text-sm text-white/60"><%= new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' }) %></p>
+
+    <% if (clockStatus.status === 'clocked_in' || clockStatus.status === 'on_break') { %>
+      <!-- Elapsed Timer -->
+      <div class="mt-4 pt-4 border-t border-white/10">
+        <p class="text-xs text-white/50 uppercase tracking-wide mb-1">Time Elapsed</p>
+        <div class="text-2xl font-mono font-bold text-white" id="elapsedTime"
+          data-clock-in="<%= clockStatus.clockInTime %>"
+          data-total-ms="<%= totalMs %>">
+          <%= String(totalHours).padStart(2, '0') %>:<%= String(totalMinutes).padStart(2, '0') %>:00
+        </div>
+      </div>
+    <% } else if (totalMs > 0) { %>
+      <!-- Today's total (when clocked out but worked today) -->
+      <div class="mt-4 pt-4 border-t border-white/10">
+        <p class="text-xs text-white/50 uppercase tracking-wide mb-1">Today's Total</p>
+        <div class="text-2xl font-mono font-bold text-white">
+          <%= String(totalHours).padStart(2, '0') %>h <%= String(totalMinutes).padStart(2, '0') %>m
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Clock In/Out Button -->
+  <div class="flex flex-col items-center gap-3">
+    <% if (clockStatus.status === 'clocked_out') { %>
+      <!-- Clock In Button -->
+      <button id="clockInBtn" onclick="handleClockIn()" class="w-32 h-32 rounded-full bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white shadow-lg shadow-emerald-500/30 flex flex-col items-center justify-center transition-all active:scale-95">
+        <svg class="w-10 h-10 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+        </svg>
+        <span class="text-sm font-bold">CLOCK IN</span>
+      </button>
+    <% } else { %>
+      <!-- Clock Out Button -->
+      <button id="clockOutBtn" onclick="handleClockOut()" class="w-32 h-32 rounded-full bg-red-500 hover:bg-red-600 active:bg-red-700 text-white shadow-lg shadow-red-500/30 flex flex-col items-center justify-center transition-all active:scale-95">
+        <svg class="w-10 h-10 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+        <span class="text-sm font-bold">CLOCK OUT</span>
+      </button>
+    <% } %>
+
+    <!-- Break Button (only when clocked in or on break) -->
+    <% if (clockStatus.status === 'clocked_in' || clockStatus.status === 'on_break') { %>
+      <button id="breakBtn" onclick="handleBreak()" class="px-6 py-3 rounded-full <%= clockStatus.status === 'on_break' ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-white border-2 border-gray-200 text-gray-700 hover:bg-gray-50' %> font-medium text-sm transition-all active:scale-95 shadow-sm">
+        <% if (clockStatus.status === 'on_break') { %>
+          <span class="flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
+            End Break
+          </span>
+        <% } else { %>
+          <span class="flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Start Break
+          </span>
+        <% } %>
+      </button>
+    <% } %>
+  </div>
+
+  <!-- Shift Selection (for clock in) -->
+  <% if (clockStatus.status === 'clocked_out' && todaysShifts.length > 0) { %>
+    <div>
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Select Shift</h2>
+      <div class="space-y-2" id="shiftSelector">
+        <% todaysShifts.forEach((shift, i) => { %>
+          <label class="block bg-white border-2 rounded-xl p-4 cursor-pointer transition hover:border-brand-300 <%= i === 0 ? 'border-brand-500 ring-1 ring-brand-200' : 'border-gray-200' %>" data-shift-card>
+            <div class="flex items-start gap-3">
+              <input type="radio" name="allocation_id" value="<%= shift.id %>" class="mt-1 text-brand-600" <%= i === 0 ? 'checked' : '' %>>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs text-gray-500"><%= shift.job_number %></p>
+                <p class="font-semibold text-gray-900 text-sm"><%= shift.client %></p>
+                <div class="flex items-center gap-1 mt-1">
+                  <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span class="text-xs text-gray-600"><%= shift.start_time %> - <%= shift.end_time %></span>
+                </div>
+                <% if (shift.site_address) { %>
+                  <div class="flex items-center gap-1 mt-0.5">
+                    <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                    <span class="text-xs text-gray-500 truncate"><%= shift.site_address %></span>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+          </label>
+        <% }) %>
+      </div>
+    </div>
+  <% } else if (clockStatus.status === 'clocked_out' && todaysShifts.length === 0) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 text-center">
+      <p class="text-sm text-gray-500">No shifts scheduled for today</p>
+      <p class="text-xs text-gray-400 mt-1">You can still clock in without a shift</p>
+    </div>
+  <% } %>
+
+  <!-- Currently On Shift -->
+  <% if ((clockStatus.status === 'clocked_in' || clockStatus.status === 'on_break') && clockStatus.currentAllocationId) { %>
+    <%
+      const currentShift = todaysShifts.find(s => s.id === clockStatus.currentAllocationId);
+    %>
+    <% if (currentShift) { %>
+      <div>
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Current Shift</h2>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+          <p class="text-xs text-gray-500"><%= currentShift.job_number %></p>
+          <p class="font-semibold text-gray-900"><%= currentShift.client %></p>
+          <div class="flex items-center gap-4 mt-2 text-xs text-gray-600">
+            <span><%= currentShift.start_time %> - <%= currentShift.end_time %></span>
+            <% if (currentShift.supervisor_name) { %>
+              <span>Sup: <%= currentShift.supervisor_name %></span>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  <% } %>
+
+  <!-- Today's Timeline -->
+  <% if (todayEvents.length > 0) { %>
+    <div>
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Today's Activity</h2>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <% todayEvents.forEach((evt, i) => { %>
+          <div class="flex items-center gap-3 px-4 py-3 <%= i < todayEvents.length - 1 ? 'border-b border-gray-100' : '' %>">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 <%=
+              evt.event_type === 'clock_in' ? 'bg-emerald-100 text-emerald-600' :
+              evt.event_type === 'clock_out' ? 'bg-red-100 text-red-600' :
+              evt.event_type === 'break_start' ? 'bg-amber-100 text-amber-600' :
+              'bg-blue-100 text-blue-600' %>">
+              <% if (evt.event_type === 'clock_in') { %>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14"/></svg>
+              <% } else if (evt.event_type === 'clock_out') { %>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7"/></svg>
+              <% } else if (evt.event_type === 'break_start') { %>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <% } else { %>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
+              <% } %>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900">
+                <%= evt.event_type === 'clock_in' ? 'Clock In' : evt.event_type === 'clock_out' ? 'Clock Out' : evt.event_type === 'break_start' ? 'Break Start' : 'Break End' %>
+              </p>
+              <% if (evt.notes) { %>
+                <p class="text-xs text-gray-500 truncate"><%= evt.notes %></p>
+              <% } %>
+            </div>
+            <div class="text-right shrink-0">
+              <p class="text-sm font-medium text-gray-900">
+                <%= new Date(evt.timestamp + (evt.timestamp.includes('Z') ? '' : 'Z')).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true }) %>
+              </p>
+              <% if (evt.latitude && evt.longitude) { %>
+                <p class="text-[10px] text-gray-400">GPS recorded</p>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- History Link -->
+  <div class="text-center pb-2">
+    <a href="/w/clock/history" class="text-sm text-brand-600 font-medium hover:underline">View Clock History &rarr;</a>
+  </div>
+
+  <!-- Hidden forms for CSRF -->
+  <form id="clockInForm" method="POST" action="/w/clock/in" style="display:none;">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="latitude" id="clockInLat">
+    <input type="hidden" name="longitude" id="clockInLng">
+    <input type="hidden" name="accuracy" id="clockInAcc">
+    <input type="hidden" name="allocation_id" id="clockInAllocation">
+    <input type="hidden" name="notes" id="clockInNotes">
+  </form>
+  <form id="clockOutForm" method="POST" action="/w/clock/out" style="display:none;">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="latitude" id="clockOutLat">
+    <input type="hidden" name="longitude" id="clockOutLng">
+    <input type="hidden" name="accuracy" id="clockOutAcc">
+    <input type="hidden" name="notes" id="clockOutNotes">
+  </form>
+  <form id="breakForm" method="POST" action="/w/clock/break" style="display:none;">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="latitude" id="breakLat">
+    <input type="hidden" name="longitude" id="breakLng">
+    <input type="hidden" name="accuracy" id="breakAcc">
+  </form>
+</div>
+
+<%- contentFor('script') %>
+<script>
+(function() {
+  // Update current time
+  function updateClock() {
+    const el = document.getElementById('currentTime');
+    if (!el) return;
+    const now = new Date();
+    el.textContent = now.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // Elapsed time counter
+  const elapsedEl = document.getElementById('elapsedTime');
+  if (elapsedEl) {
+    const startMs = parseInt(elapsedEl.dataset.totalMs) || 0;
+    const startedAt = Date.now();
+
+    function updateElapsed() {
+      const currentMs = startMs + (Date.now() - startedAt);
+      const hours = Math.floor(currentMs / 3600000);
+      const mins = Math.floor((currentMs % 3600000) / 60000);
+      const secs = Math.floor((currentMs % 60000) / 1000);
+      elapsedEl.textContent = String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    }
+    updateElapsed();
+    setInterval(updateElapsed, 1000);
+  }
+
+  // Shift card selection styling
+  document.querySelectorAll('[data-shift-card]').forEach(function(card) {
+    card.querySelector('input[type=radio]').addEventListener('change', function() {
+      document.querySelectorAll('[data-shift-card]').forEach(function(c) {
+        c.classList.remove('border-brand-500', 'ring-1', 'ring-brand-200');
+        c.classList.add('border-gray-200');
+      });
+      card.classList.remove('border-gray-200');
+      card.classList.add('border-brand-500', 'ring-1', 'ring-brand-200');
+    });
+  });
+
+  // Get GPS location
+  function getLocation() {
+    return new Promise(function(resolve) {
+      if (!navigator.geolocation) {
+        resolve({ latitude: null, longitude: null, accuracy: null });
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+          resolve({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy
+          });
+        },
+        function() {
+          resolve({ latitude: null, longitude: null, accuracy: null });
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    });
+  }
+
+  // Clock In handler
+  window.handleClockIn = async function() {
+    var btn = document.getElementById('clockInBtn');
+    if (btn) btn.disabled = true;
+
+    var loc = await getLocation();
+    document.getElementById('clockInLat').value = loc.latitude || '';
+    document.getElementById('clockInLng').value = loc.longitude || '';
+    document.getElementById('clockInAcc').value = loc.accuracy || '';
+
+    // Get selected allocation
+    var radio = document.querySelector('input[name="allocation_id"]:checked');
+    document.getElementById('clockInAllocation').value = radio ? radio.value : '';
+
+    document.getElementById('clockInForm').submit();
+  };
+
+  // Clock Out handler
+  window.handleClockOut = async function() {
+    var btn = document.getElementById('clockOutBtn');
+    if (btn) btn.disabled = true;
+
+    var loc = await getLocation();
+    document.getElementById('clockOutLat').value = loc.latitude || '';
+    document.getElementById('clockOutLng').value = loc.longitude || '';
+    document.getElementById('clockOutAcc').value = loc.accuracy || '';
+
+    document.getElementById('clockOutForm').submit();
+  };
+
+  // Break handler
+  window.handleBreak = async function() {
+    var btn = document.getElementById('breakBtn');
+    if (btn) btn.disabled = true;
+
+    var loc = await getLocation();
+    document.getElementById('breakLat').value = loc.latitude || '';
+    document.getElementById('breakLng').value = loc.longitude || '';
+    document.getElementById('breakAcc').value = loc.accuracy || '';
+
+    document.getElementById('breakForm').submit();
+  };
+})();
+</script>

@@ -1,0 +1,255 @@
+<div class="space-y-5">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">My Availability</h1>
+      <p class="text-sm text-gray-500">Next 14 days</p>
+    </div>
+    <a href="/w/clock" class="inline-flex items-center gap-1 text-sm text-brand-600 font-medium">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      Back
+    </a>
+  </div>
+
+  <!-- Legend -->
+  <div class="flex items-center gap-4 text-xs text-gray-500">
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Available</span>
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span> Unavailable</span>
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Partial</span>
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-gray-300 inline-block"></span> Not set</span>
+  </div>
+
+  <!-- Day Cards -->
+  <div class="space-y-2">
+    <% days.forEach(function(day) { %>
+      <%
+        const avail = availabilityMap[day.date];
+        const shifts = allocationMap[day.date] || [];
+        const statusColor = avail
+          ? (avail.status === 'available' ? 'emerald' : avail.status === 'unavailable' ? 'red' : 'amber')
+          : 'gray';
+        const isPast = day.date < new Date().toISOString().split('T')[0];
+      %>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden <%= isPast ? 'opacity-60' : '' %>">
+        <div class="flex items-stretch">
+          <!-- Date Column -->
+          <div class="w-16 shrink-0 flex flex-col items-center justify-center py-3 border-r border-gray-100 <%= day.isToday ? 'bg-brand-50' : day.isWeekend ? 'bg-gray-50' : '' %>">
+            <span class="text-xs font-medium <%= day.isToday ? 'text-brand-600' : 'text-gray-500' %>"><%= day.dayName %></span>
+            <span class="text-lg font-bold <%= day.isToday ? 'text-brand-700' : 'text-gray-900' %>"><%= day.dayNum %></span>
+            <span class="text-[10px] text-gray-400"><%= day.monthName %></span>
+          </div>
+
+          <!-- Content -->
+          <div class="flex-1 p-3">
+            <!-- Current Status -->
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <div class="w-2.5 h-2.5 rounded-full bg-<%= statusColor %>-500"></div>
+                <span class="text-sm font-medium text-gray-700">
+                  <% if (avail) { %>
+                    <%= avail.status.charAt(0).toUpperCase() + avail.status.slice(1) %>
+                    <% if (avail.status === 'partial' && avail.start_time && avail.end_time) { %>
+                      <span class="text-xs text-gray-500 font-normal">(<%= avail.start_time %> - <%= avail.end_time %>)</span>
+                    <% } %>
+                  <% } else { %>
+                    <span class="text-gray-400">Not set</span>
+                  <% } %>
+                </span>
+              </div>
+              <% if (!isPast) { %>
+                <button onclick="openAvailForm('<%= day.date %>', '<%= day.dayName %> <%= day.dayNum %> <%= day.monthName %>', '<%= avail ? avail.status : '' %>', '<%= avail ? (avail.start_time || '') : '' %>', '<%= avail ? (avail.end_time || '') : '' %>', '<%= avail ? (avail.notes || '') : '' %>', '<%= avail ? avail.id : '' %>')"
+                  class="text-xs text-brand-600 font-medium px-2 py-1 rounded hover:bg-brand-50 transition">
+                  <%= avail ? 'Edit' : 'Set' %>
+                </button>
+              <% } %>
+            </div>
+
+            <!-- Shifts (if any) -->
+            <% if (shifts.length > 0) { %>
+              <% shifts.forEach(function(s) { %>
+                <div class="flex items-center gap-1.5 text-xs text-gray-500">
+                  <svg class="w-3 h-3 text-brand-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m8 0H8"/></svg>
+                  <span><%= s.client %> (<%= s.start_time %> - <%= s.end_time %>)</span>
+                </div>
+              <% }) %>
+            <% } %>
+
+            <!-- Notes -->
+            <% if (avail && avail.notes) { %>
+              <p class="text-xs text-gray-400 mt-1 truncate"><%= avail.notes %></p>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+</div>
+
+<!-- Availability Modal -->
+<div id="availModal" class="fixed inset-0 z-[60] hidden">
+  <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeAvailModal()"></div>
+  <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl p-5 pb-8 safe-area-bottom transform transition-transform duration-300 translate-y-0">
+    <div class="w-10 h-1 rounded-full bg-gray-300 mx-auto mb-4"></div>
+    <h3 class="text-lg font-bold text-gray-900 mb-1" id="modalTitle">Set Availability</h3>
+    <p class="text-sm text-gray-500 mb-4" id="modalDate"></p>
+
+    <form id="availForm" method="POST" action="/w/availability">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="date" id="modalDateInput">
+
+      <!-- Status Options -->
+      <div class="space-y-2 mb-4">
+        <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition hover:border-emerald-300 border-gray-200" data-status-option="available">
+          <input type="radio" name="status" value="available" class="text-emerald-600">
+          <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-gray-900">Available</p>
+            <p class="text-xs text-gray-500">Full day availability</p>
+          </div>
+        </label>
+
+        <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition hover:border-red-300 border-gray-200" data-status-option="unavailable">
+          <input type="radio" name="status" value="unavailable" class="text-red-600">
+          <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-gray-900">Unavailable</p>
+            <p class="text-xs text-gray-500">Not available for shifts</p>
+          </div>
+        </label>
+
+        <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition hover:border-amber-300 border-gray-200" data-status-option="partial">
+          <input type="radio" name="status" value="partial" class="text-amber-600">
+          <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-gray-900">Partial</p>
+            <p class="text-xs text-gray-500">Available for specific hours</p>
+          </div>
+        </label>
+      </div>
+
+      <!-- Time Range (visible only for partial) -->
+      <div id="timeRange" class="hidden mb-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">From</label>
+            <input type="time" name="start_time" id="modalStartTime" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">To</label>
+            <input type="time" name="end_time" id="modalEndTime" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="mb-4">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Notes (optional)</label>
+        <input type="text" name="notes" id="modalNotes" placeholder="e.g. Doctor appointment, early finish..."
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+      </div>
+
+      <!-- Actions -->
+      <div class="flex gap-3">
+        <button type="submit" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-medium py-3 rounded-xl text-sm transition active:scale-[0.98]">
+          Save
+        </button>
+        <button type="button" onclick="closeAvailModal()" class="px-6 py-3 rounded-xl text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+          Cancel
+        </button>
+      </div>
+    </form>
+
+    <!-- Clear Button (visible when editing existing) -->
+    <form id="clearForm" method="POST" action="/w/availability/delete" class="hidden mt-3">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="id" id="clearAvailId">
+      <button type="submit" class="w-full text-center text-sm text-red-600 font-medium py-2 hover:underline">
+        Clear availability for this day
+      </button>
+    </form>
+  </div>
+</div>
+
+<%- contentFor('script') %>
+<script>
+(function() {
+  var modal = document.getElementById('availModal');
+  var statusOptions = document.querySelectorAll('[data-status-option]');
+  var timeRange = document.getElementById('timeRange');
+
+  // Style radio selections
+  statusOptions.forEach(function(opt) {
+    var radio = opt.querySelector('input[type=radio]');
+    radio.addEventListener('change', function() {
+      statusOptions.forEach(function(o) {
+        o.classList.remove('border-emerald-500', 'border-red-500', 'border-amber-500', 'bg-emerald-50', 'bg-red-50', 'bg-amber-50');
+        o.classList.add('border-gray-200');
+      });
+      var color = radio.value === 'available' ? 'emerald' : radio.value === 'unavailable' ? 'red' : 'amber';
+      opt.classList.remove('border-gray-200');
+      opt.classList.add('border-' + color + '-500', 'bg-' + color + '-50');
+
+      // Show/hide time range
+      if (radio.value === 'partial') {
+        timeRange.classList.remove('hidden');
+      } else {
+        timeRange.classList.add('hidden');
+      }
+    });
+  });
+
+  window.openAvailForm = function(date, label, status, startTime, endTime, notes, existingId) {
+    document.getElementById('modalDate').textContent = label;
+    document.getElementById('modalDateInput').value = date;
+    document.getElementById('modalNotes').value = notes || '';
+    document.getElementById('modalStartTime').value = startTime || '06:00';
+    document.getElementById('modalEndTime').value = endTime || '14:00';
+
+    // Reset styling
+    statusOptions.forEach(function(o) {
+      o.classList.remove('border-emerald-500', 'border-red-500', 'border-amber-500', 'bg-emerald-50', 'bg-red-50', 'bg-amber-50');
+      o.classList.add('border-gray-200');
+      o.querySelector('input[type=radio]').checked = false;
+    });
+    timeRange.classList.add('hidden');
+
+    // Set existing status
+    if (status) {
+      var radio = document.querySelector('input[name="status"][value="' + status + '"]');
+      if (radio) {
+        radio.checked = true;
+        radio.dispatchEvent(new Event('change'));
+      }
+      document.getElementById('modalTitle').textContent = 'Edit Availability';
+    } else {
+      document.getElementById('modalTitle').textContent = 'Set Availability';
+    }
+
+    // Show/hide clear button
+    var clearForm = document.getElementById('clearForm');
+    if (existingId) {
+      document.getElementById('clearAvailId').value = existingId;
+      clearForm.classList.remove('hidden');
+    } else {
+      clearForm.classList.add('hidden');
+    }
+
+    modal.classList.remove('hidden');
+  };
+
+  window.closeAvailModal = function() {
+    modal.classList.add('hidden');
+  };
+
+  // Close on escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeAvailModal();
+  });
+})();
+</script>

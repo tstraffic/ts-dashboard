@@ -84,6 +84,14 @@ router.post('/:type/submit', (req, res, next) => {
         company_intro_completed, ppe_acknowledged
       } = req.body;
 
+      // Check for existing submission with same access_token (prevent duplicates)
+      if (access_token) {
+        const existing = getDb().prepare('SELECT id FROM induction_submissions WHERE access_token = ?').get(access_token);
+        if (existing) {
+          return res.redirect(`/induction/${type}/complete`);
+        }
+      }
+
       // Compute full_name from split fields (or use legacy field)
       const fn = (first_name || '').trim();
       const mn = (middle_name || '').trim();

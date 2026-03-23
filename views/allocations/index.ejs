@@ -52,7 +52,7 @@
 </div>
 
 <!-- Date Navigation -->
-<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-6">
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-6">
   <div class="flex items-center justify-between">
     <a href="/allocations?view=<%= view %>&date=<%= prevStr %>" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors">&larr; Prev</a>
     <div class="flex items-center gap-3">
@@ -83,11 +83,11 @@
     <p class="text-xs text-gray-500 uppercase tracking-wide">Crew Allocated</p>
     <p class="text-3xl font-bold text-brand-600 mt-1"><%= stats.crewAllocated %></p>
   </div>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 <%= stats.unconfirmed > 0 ? 'border-orange-300' : '' %>">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 <%= stats.unconfirmed > 0 ? 'border-orange-300' : '' %>">
     <p class="text-xs text-gray-500 uppercase tracking-wide">Unconfirmed</p>
     <p class="text-3xl font-bold <%= stats.unconfirmed > 0 ? 'text-orange-600' : 'text-emerald-600' %> mt-1"><%= stats.unconfirmed %></p>
   </div>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 <%= stats.gaps > 0 ? 'border-red-700' : '' %>">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 <%= stats.gaps > 0 ? 'border-red-700' : '' %>">
     <p class="text-xs text-gray-500 uppercase tracking-wide">Jobs with Gaps</p>
     <p class="text-3xl font-bold <%= stats.gaps > 0 ? 'text-red-600' : 'text-emerald-600' %> mt-1"><%= stats.gaps %></p>
   </div>
@@ -359,7 +359,7 @@
         </tbody>
       </table>
       <% if (jobs.length === 0) { %>
-        <div class="p-10 text-center">
+        <div class="p-6 text-center">
           <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
           <p class="text-gray-500 text-sm font-medium">No active jobs to allocate</p>
           <p class="text-gray-400 text-xs mt-1">Create a job first, then allocate crew and equipment to shifts here</p>
@@ -508,7 +508,7 @@
     </tbody>
   </table>
   <% if (jobs.length === 0) { %>
-    <div class="p-10 text-center">
+    <div class="p-6 text-center">
       <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
       <p class="text-gray-500 text-sm font-medium">No active jobs to allocate</p>
       <p class="text-gray-400 text-xs mt-1">Create a job first, then allocate crew and equipment to shifts here</p>

@@ -1,0 +1,157 @@
+<%
+  const severityColors = {
+    low: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    medium: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
+    high: 'bg-orange-50 text-orange-700 ring-1 ring-orange-600/20',
+    critical: 'bg-red-50 text-red-700 ring-1 ring-red-600/20'
+  };
+  const statusColors = {
+    reported: 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-600/20',
+    investigating: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    resolved: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+    closed: 'bg-gray-100 text-gray-600 ring-1 ring-gray-400/20'
+  };
+  function formatDate(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+%>
+
+<div class="space-y-4">
+  <!-- Header -->
+  <div class="flex items-center gap-3">
+    <a href="/w/incidents" class="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 transition">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <div class="min-w-0">
+      <p class="text-xs text-gray-400 font-mono"><%= incident.incident_number %></p>
+      <h1 class="text-lg font-bold text-gray-900 truncate"><%= (incident.incident_type || '').replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); }) %></h1>
+    </div>
+  </div>
+
+  <!-- Status & Severity Badges -->
+  <div class="flex items-center gap-2">
+    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold <%= severityColors[incident.severity] || severityColors.low %>">
+      <%= (incident.severity || '').toUpperCase() %> SEVERITY
+    </span>
+    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium <%= statusColors[incident.investigation_status] || statusColors.reported %>">
+      <%= (incident.investigation_status || '').replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); }) %>
+    </span>
+  </div>
+
+  <!-- Job Info Card -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Job Details</p>
+    <div class="space-y-2">
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m8 0H8m8 0h2a2 2 0 012 2v6.255M8 6H6a2 2 0 00-2 2v6.255"/></svg>
+        <p class="text-sm text-gray-900 font-medium"><%= incident.job_number %> &mdash; <%= incident.client %></p>
+      </div>
+      <% if (incident.site_address) { %>
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <p class="text-sm text-gray-600"><%= incident.site_address %><% if (incident.suburb) { %>, <%= incident.suburb %><% } %></p>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Incident Details Card -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-4">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Incident Details</p>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <p class="text-[10px] text-gray-400 font-medium uppercase">Date</p>
+        <p class="text-sm text-gray-900 font-medium"><%= formatDate(incident.incident_date) %></p>
+      </div>
+      <div>
+        <p class="text-[10px] text-gray-400 font-medium uppercase">Time</p>
+        <p class="text-sm text-gray-900 font-medium"><%= incident.incident_time || '-' %></p>
+      </div>
+    </div>
+
+    <% if (incident.location) { %>
+    <div>
+      <p class="text-[10px] text-gray-400 font-medium uppercase">Location</p>
+      <p class="text-sm text-gray-700"><%= incident.location %></p>
+    </div>
+    <% } %>
+
+    <div>
+      <p class="text-[10px] text-gray-400 font-medium uppercase mb-1">Description</p>
+      <p class="text-sm text-gray-700 whitespace-pre-line"><%= incident.description %></p>
+    </div>
+
+    <% if (incident.persons_involved) { %>
+    <div>
+      <p class="text-[10px] text-gray-400 font-medium uppercase">Conditions / Notes</p>
+      <p class="text-sm text-gray-700"><%= incident.persons_involved %></p>
+    </div>
+    <% } %>
+
+    <% if (incident.immediate_actions) { %>
+    <div>
+      <p class="text-[10px] text-gray-400 font-medium uppercase">Immediate Actions</p>
+      <p class="text-sm text-gray-700"><%= incident.immediate_actions %></p>
+    </div>
+    <% } %>
+
+    <% if (incident.root_cause) { %>
+    <div>
+      <p class="text-[10px] text-gray-400 font-medium uppercase">Root Cause</p>
+      <p class="text-sm text-gray-700"><%= incident.root_cause %></p>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Photos -->
+  <% if (incident.photo_path) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Photos</p>
+    <div class="grid grid-cols-3 gap-2">
+      <% incident.photo_path.split(',').filter(function(p) { return p.trim(); }).forEach(function(photo) { %>
+        <a href="<%= photo.trim() %>" target="_blank" class="block aspect-square rounded-lg overflow-hidden border border-gray-200">
+          <img src="<%= photo.trim() %>" alt="Incident photo" class="w-full h-full object-cover">
+        </a>
+      <% }) %>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Corrective Actions -->
+  <% if (correctiveActions && correctiveActions.length > 0) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Corrective Actions</p>
+    <div class="space-y-3">
+      <% correctiveActions.forEach(function(ca) {
+        const caStatusColors = {
+          open: 'bg-yellow-50 text-yellow-700',
+          in_progress: 'bg-blue-50 text-blue-700',
+          completed: 'bg-emerald-50 text-emerald-700',
+          overdue: 'bg-red-50 text-red-700',
+          cancelled: 'bg-gray-100 text-gray-500'
+        };
+      %>
+      <div class="border border-gray-100 rounded-lg p-3">
+        <div class="flex items-start justify-between gap-2 mb-1">
+          <p class="text-sm text-gray-900 font-medium"><%= ca.description %></p>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 <%= caStatusColors[ca.status] || caStatusColors.open %>">
+            <%= (ca.status || '').replace(/_/g, ' ') %>
+          </span>
+        </div>
+        <div class="flex items-center gap-3 text-[10px] text-gray-400 mt-1">
+          <% if (ca.assigned_to_name) { %><span>Assigned: <%= ca.assigned_to_name %></span><% } %>
+          <% if (ca.due_date) { %><span>Due: <%= formatDate(ca.due_date) %></span><% } %>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Timestamp -->
+  <div class="text-center pb-4">
+    <p class="text-[10px] text-gray-400">Reported on <%= formatDate(incident.created_at) %></p>
+  </div>
+</div>

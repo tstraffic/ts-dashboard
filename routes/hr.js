@@ -737,6 +737,29 @@ router.get('/reports', requirePermission('hr_reports'), (req, res) => {
     ORDER BY full_name
   `).all();
 
+  // Headcount by employment status
+  const headcountByStatus = db.prepare(`
+    SELECT employment_status, COUNT(*) as count
+    FROM employees
+    GROUP BY employment_status
+    ORDER BY count DESC
+  `).all();
+
+  // Expiring competencies in next 90 days (for timeline chart)
+  const expiringCompetencies90 = db.prepare(`
+    SELECT ec.*, e.full_name, e.employee_code,
+      CAST(julianday(ec.expiry_date) - julianday('now') AS INTEGER) as days_left
+    FROM employee_competencies ec
+    JOIN employees e ON ec.employee_id = e.id
+    WHERE ec.expiry_date BETWEEN DATE('now') AND DATE('now', '+90 days') AND e.active = 1
+    ORDER BY ec.expiry_date ASC
+  `).all();
+
+  // Compliance rate calculation
+  const totalActive = db.prepare("SELECT COUNT(*) as count FROM employees WHERE active = 1").get().count;
+  const blockedCount = blockedWorkers.length;
+  const complianceRate = totalActive > 0 ? Math.round(((totalActive - blockedCount) / totalActive) * 100) : 100;
+
   res.render('hr/reports', {
     title: 'HR Reports',
     currentPage: 'hr-reports',
@@ -746,6 +769,11 @@ router.get('/reports', requirePermission('hr_reports'), (req, res) => {
     expiringCompetencies,
     missingDocs,
     blockedWorkers,
+    headcountByStatus,
+    expiringCompetencies90,
+    complianceRate,
+    totalActive,
+    blockedCount,
     user: req.session.user
   });
 });

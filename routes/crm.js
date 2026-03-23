@@ -726,7 +726,7 @@ router.get('/reports', (req, res, next) => {
     const dormantAccounts = db.prepare(`
       SELECT c.id, c.company_name, c.company_type, c.last_contacted_date as last_contact_date,
         u.full_name as owner_name,
-        CAST(julianday('now') - julianday(COALESCE(c.last_contacted_date, '2000-01-01')) AS INTEGER) as days_since_contact
+        CASE WHEN c.last_contacted_date IS NULL THEN NULL ELSE CAST(julianday('now') - julianday(c.last_contacted_date) AS INTEGER) END as days_since_contact
       FROM clients c
       LEFT JOIN users u ON c.account_owner_id = u.id
       WHERE c.active = 1 AND (c.last_contacted_date < ? OR c.last_contacted_date IS NULL)
@@ -791,6 +791,19 @@ router.get('/reports', (req, res, next) => {
       ORDER BY count DESC
     `).all();
 
+    // Activity trends — last 8 weeks
+    const activityTrends = db.prepare(`
+      SELECT
+        CAST(strftime('%W', activity_date) AS INTEGER) as week_num,
+        MIN(activity_date) as week_start,
+        COUNT(*) as count
+      FROM crm_activities
+      WHERE activity_date >= DATE('now', '-56 days')
+      GROUP BY strftime('%W', activity_date)
+      ORDER BY week_num ASC
+      LIMIT 8
+    `).all();
+
     res.render('crm/reports', {
       title: 'CRM Reports',
       currentPage: 'crm-reports',
@@ -804,6 +817,7 @@ router.get('/reports', (req, res, next) => {
       overdueFollowUps,
       oppsNoNextStep,
       meetingsByOwner,
+      activityTrends,
     });
   } catch (err) {
     console.error('CRM Reports error:', err);

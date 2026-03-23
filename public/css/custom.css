@@ -91,6 +91,17 @@ body.dark-glass {
   border-radius: 12px;
 }
 
+/* ===== Density — Compact Operations UI ===== */
+/* Tighter table rows for data-dense views */
+tbody td { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+thead th { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+
+/* Cap empty-state containers so they never dominate the viewport */
+.empty-state,
+[class*="text-center"][class*="p-6"] {
+  max-height: 220px;
+}
+
 /* ===== Tables — Refined ===== */
 tbody tr {
   transition: background-color var(--transition-fast);

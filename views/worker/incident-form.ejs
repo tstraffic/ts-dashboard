@@ -1,0 +1,219 @@
+<div class="space-y-4">
+  <!-- Header -->
+  <div class="flex items-center gap-3">
+    <a href="/w/incidents" class="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 transition">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">Report Incident</h1>
+      <p class="text-xs text-gray-500 mt-0.5">Submit a safety incident report</p>
+    </div>
+  </div>
+
+  <form method="POST" action="/w/incidents" enctype="multipart/form-data" class="space-y-4">
+    <%- include('../partials/csrf') %>
+
+    <!-- Job Selector -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Job / Site <span class="text-red-500">*</span></label>
+      <% if (allocations && allocations.length > 0) { %>
+        <select name="job_id" required class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <option value="">Select a job...</option>
+          <% allocations.forEach(function(a) { %>
+            <option value="<%= a.job_id %>"><%= a.job_number %> &mdash; <%= a.client %> (<%= a.suburb %>)</option>
+          <% }) %>
+        </select>
+      <% } else { %>
+        <p class="text-sm text-gray-500 mb-2">No recent job allocations found.</p>
+        <input type="number" name="job_id" placeholder="Enter Job ID" required class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+      <% } %>
+    </div>
+
+    <!-- Incident Type & Severity -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Incident Type <span class="text-red-500">*</span></label>
+        <select name="incident_type" required class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <option value="">Select type...</option>
+          <option value="near_miss">Near Miss</option>
+          <option value="worker_injury">Minor Injury</option>
+          <option value="injury">Major Injury</option>
+          <option value="property_damage">Property Damage</option>
+          <option value="vehicle_damage">Vehicle Damage</option>
+          <option value="traffic_incident">Traffic Incident</option>
+          <option value="environmental">Environmental</option>
+          <option value="public_complaint">Public Complaint</option>
+          <option value="hazard">Hazard</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Severity <span class="text-red-500">*</span></label>
+        <div class="grid grid-cols-4 gap-2">
+          <label class="relative">
+            <input type="radio" name="severity" value="low" required class="peer sr-only" checked>
+            <div class="cursor-pointer text-center px-2 py-2.5 rounded-lg border-2 border-gray-200 bg-white peer-checked:border-blue-500 peer-checked:bg-blue-50 transition">
+              <div class="w-3 h-3 rounded-full bg-blue-500 mx-auto mb-1"></div>
+              <span class="text-xs font-medium text-gray-700 peer-checked:text-blue-700">Low</span>
+            </div>
+          </label>
+          <label class="relative">
+            <input type="radio" name="severity" value="medium" class="peer sr-only">
+            <div class="cursor-pointer text-center px-2 py-2.5 rounded-lg border-2 border-gray-200 bg-white peer-checked:border-amber-500 peer-checked:bg-amber-50 transition">
+              <div class="w-3 h-3 rounded-full bg-amber-500 mx-auto mb-1"></div>
+              <span class="text-xs font-medium text-gray-700 peer-checked:text-amber-700">Medium</span>
+            </div>
+          </label>
+          <label class="relative">
+            <input type="radio" name="severity" value="high" class="peer sr-only">
+            <div class="cursor-pointer text-center px-2 py-2.5 rounded-lg border-2 border-gray-200 bg-white peer-checked:border-orange-500 peer-checked:bg-orange-50 transition">
+              <div class="w-3 h-3 rounded-full bg-orange-500 mx-auto mb-1"></div>
+              <span class="text-xs font-medium text-gray-700 peer-checked:text-orange-700">High</span>
+            </div>
+          </label>
+          <label class="relative">
+            <input type="radio" name="severity" value="critical" class="peer sr-only">
+            <div class="cursor-pointer text-center px-2 py-2.5 rounded-lg border-2 border-gray-200 bg-white peer-checked:border-red-500 peer-checked:bg-red-50 transition">
+              <div class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-1"></div>
+              <span class="text-xs font-medium text-gray-700 peer-checked:text-red-700">Critical</span>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Date & Time -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Date <span class="text-red-500">*</span></label>
+          <input type="date" name="incident_date" value="<%= today %>" required class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Time</label>
+          <input type="time" name="incident_time" value="<%= now %>" class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+      </div>
+    </div>
+
+    <!-- Location -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Location</label>
+      <div class="flex gap-2">
+        <input type="text" name="location" id="locationInput" placeholder="e.g. Corner of Main St & George St" class="flex-1 px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        <button type="button" id="gpsBtn" class="px-3 py-2.5 bg-brand-50 border border-brand-200 rounded-lg text-brand-600 hover:bg-brand-100 transition" title="Use GPS">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </button>
+      </div>
+      <input type="hidden" name="gps_lat" id="gpsLat">
+      <input type="hidden" name="gps_lng" id="gpsLng">
+      <p id="gpsStatus" class="text-[10px] text-gray-400 mt-1 hidden"></p>
+    </div>
+
+    <!-- Description -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Description <span class="text-red-500">*</span></label>
+      <textarea name="description" rows="4" required placeholder="Describe what happened, including any immediate actions taken..." class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 resize-none"></textarea>
+    </div>
+
+    <!-- Weather Conditions -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Weather Conditions</label>
+      <select name="weather_conditions" class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        <option value="">Select conditions...</option>
+        <option value="Clear / Fine">Clear / Fine</option>
+        <option value="Overcast">Overcast</option>
+        <option value="Light Rain">Light Rain</option>
+        <option value="Heavy Rain">Heavy Rain</option>
+        <option value="Windy">Windy</option>
+        <option value="Fog / Low Visibility">Fog / Low Visibility</option>
+        <option value="Extreme Heat">Extreme Heat</option>
+        <option value="Storm">Storm</option>
+        <option value="Night / Dark">Night / Dark</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <!-- Photo Upload -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Photos</label>
+      <div class="flex items-center justify-center w-full">
+        <label class="flex flex-col items-center justify-center w-full h-28 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition">
+          <div class="flex flex-col items-center justify-center py-4">
+            <svg class="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            <p class="text-xs text-gray-500 font-medium">Tap to take photo or choose file</p>
+            <p class="text-[10px] text-gray-400 mt-0.5">Up to 5 photos, 10MB each</p>
+          </div>
+          <input type="file" name="photos" multiple accept="image/*" capture="environment" class="hidden" id="photoInput">
+        </label>
+      </div>
+      <div id="photoPreview" class="flex gap-2 mt-3 overflow-x-auto hidden"></div>
+    </div>
+
+    <!-- Submit -->
+    <div class="pt-2 pb-4">
+      <button type="submit" class="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition shadow-sm text-sm">
+        Submit Incident Report
+      </button>
+      <p class="text-[10px] text-gray-400 text-center mt-2">This report will be sent to your site supervisor and safety team.</p>
+    </div>
+  </form>
+</div>
+
+<script>
+  // GPS auto-fill
+  document.getElementById('gpsBtn').addEventListener('click', function() {
+    const statusEl = document.getElementById('gpsStatus');
+    statusEl.classList.remove('hidden');
+    statusEl.textContent = 'Getting location...';
+    statusEl.className = 'text-[10px] text-brand-600 mt-1';
+
+    if (!navigator.geolocation) {
+      statusEl.textContent = 'Geolocation not supported by your browser.';
+      statusEl.className = 'text-[10px] text-red-500 mt-1';
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        document.getElementById('gpsLat').value = lat;
+        document.getElementById('gpsLng').value = lng;
+        statusEl.textContent = 'GPS: ' + lat + ', ' + lng;
+        statusEl.className = 'text-[10px] text-emerald-600 mt-1';
+      },
+      function(err) {
+        statusEl.textContent = 'Could not get location: ' + err.message;
+        statusEl.className = 'text-[10px] text-red-500 mt-1';
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+
+  // Photo preview
+  document.getElementById('photoInput').addEventListener('change', function(e) {
+    const preview = document.getElementById('photoPreview');
+    preview.innerHTML = '';
+    if (e.target.files.length > 0) {
+      preview.classList.remove('hidden');
+      Array.from(e.target.files).forEach(function(file, idx) {
+        if (idx >= 5) return;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+          const img = document.createElement('img');
+          img.src = ev.target.result;
+          img.className = 'w-16 h-16 rounded-lg object-cover border border-gray-200 shrink-0';
+          preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
+    } else {
+      preview.classList.add('hidden');
+    }
+  });
+</script>

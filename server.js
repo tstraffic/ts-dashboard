@@ -102,6 +102,9 @@ app.post('/w/login', loginLimiter);
 app.use('/w', require('./routes/worker/auth'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/home'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/jobs'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/clock'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/availability'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/incidents'));
 
 // Block worker-only sessions from admin routes
 app.use(blockWorkerFromAdmin);
@@ -139,6 +142,9 @@ app.use('/admin/integrations', requireLogin, requirePermission('admin'), require
 app.use('/admin', requireLogin, requirePermission('admin'), require('./routes/admin'));
 app.use('/settings', requireLogin, requirePermission('settings'), require('./routes/settings'));
 app.use('/api/views', requireLogin, require('./routes/saved-views'));
+
+// Roster redirects to crew page
+app.get('/roster', requireLogin, (req, res) => res.redirect('/crew'));
 
 // Home redirects to dashboard or worker portal
 app.get('/', (req, res) => {

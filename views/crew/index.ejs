@@ -45,30 +45,30 @@
 
   <!-- Stat Cards -->
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
       <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Active</p>
-      <p class="text-2xl font-bold text-gray-900 mt-1"><%= stats.totalActive %></p>
+      <p class="text-xl font-bold text-gray-900 mt-0.5"><%= stats.totalActive %></p>
     </div>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
       <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Allocatable</p>
-      <p class="text-2xl font-bold text-emerald-600 mt-1"><%= stats.allocatable %></p>
+      <p class="text-xl font-bold text-emerald-600 mt-0.5"><%= stats.allocatable %></p>
     </div>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
       <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Compliance Issues</p>
-      <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.complianceIssues %></p>
+      <p class="text-xl font-bold text-red-600 mt-0.5"><%= stats.complianceIssues %></p>
     </div>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
       <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Fatigue Blocked</p>
-      <p class="text-2xl font-bold text-orange-600 mt-1"><%= stats.fatigueBlocked %></p>
+      <p class="text-xl font-bold text-orange-600 mt-0.5"><%= stats.fatigueBlocked %></p>
     </div>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
       <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Expiring &lt;30d</p>
-      <p class="text-2xl font-bold text-amber-600 mt-1"><%= stats.expiringSoon %></p>
+      <p class="text-xl font-bold text-amber-600 mt-0.5"><%= stats.expiringSoon %></p>
     </div>
   </div>
 
   <!-- Filters -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
     <form method="GET" action="/crew" data-module="crew" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
       <%- include('../partials/csrf') %>
       <!-- Status Tabs -->
@@ -101,9 +101,9 @@
   <!-- Crew Table -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
     <% if (crew.length === 0) { %>
-      <div class="p-10 text-center">
-        <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <div class="p-6 text-center">
+        <div class="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
         </div>
         <h3 class="text-gray-900 font-semibold text-base mb-1">No crew members found</h3>
         <p class="text-gray-500 text-sm mb-1">Your crew roster tracks traffic controllers, leading hands, supervisors, and other field staff.</p>
@@ -119,37 +119,37 @@
         <thead>
           <% const crewSortParams = '&filter=' + encodeURIComponent(filter) + '&search=' + encodeURIComponent(search) + '&role=' + encodeURIComponent(roleFilter); %>
           <tr class="border-b border-gray-200">
-            <th class="px-2 py-3 text-left w-8">
+            <th class="px-2 py-2 text-left w-8">
               <input type="checkbox" id="select-all" class="rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500" title="Select all">
             </th>
-            <th class="px-3 sm:px-4 py-3 text-left"><%- include('../partials/sort-header', { label: 'Name', field: 'full_name', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
-            <th class="px-3 sm:px-4 py-3 text-left hidden sm:table-cell"><%- include('../partials/sort-header', { label: 'Employee ID', field: 'employee_id', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
-            <th class="px-3 sm:px-4 py-3 text-left hidden md:table-cell"><%- include('../partials/sort-header', { label: 'Role', field: 'role', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-            <th class="px-3 sm:px-4 py-3 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Jobs</th>
-            <th class="px-3 sm:px-4 py-3 text-left hidden lg:table-cell"><%- include('../partials/sort-header', { label: 'Next Expiry', field: 'licence_expiry', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Last Worked</th>
-            <th class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Company</th>
-            <th class="px-3 sm:px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actions</th>
+            <th class="px-3 sm:px-4 py-2 text-left"><%- include('../partials/sort-header', { label: 'Name', field: 'full_name', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
+            <th class="px-3 sm:px-4 py-2 text-left hidden sm:table-cell"><%- include('../partials/sort-header', { label: 'Employee ID', field: 'employee_id', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
+            <th class="px-3 sm:px-4 py-2 text-left hidden md:table-cell"><%- include('../partials/sort-header', { label: 'Role', field: 'role', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
+            <th class="px-3 sm:px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+            <th class="px-3 sm:px-4 py-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Jobs</th>
+            <th class="px-3 sm:px-4 py-2 text-left hidden lg:table-cell"><%- include('../partials/sort-header', { label: 'Next Expiry', field: 'licence_expiry', currentSort: sort, currentOrder: order, baseUrl: '/crew', extraParams: crewSortParams }) %></th>
+            <th class="px-3 sm:px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Last Worked</th>
+            <th class="px-3 sm:px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Company</th>
+            <th class="px-3 sm:px-4 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
           <% for (const c of crew) { %>
           <tr class="hover:bg-gray-50 transition <%= !c.active ? 'opacity-50' : '' %>">
-            <td class="px-2 py-3">
+            <td class="px-2 py-2">
               <input type="checkbox" class="bulk-checkbox rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500" value="<%= c.id %>">
             </td>
             <!-- Name + mobile subtitle -->
-            <td class="px-3 sm:px-4 py-3">
+            <td class="px-3 sm:px-4 py-2">
               <a href="/crew/<%= c.id %>" class="text-brand-600 hover:text-brand-700 font-medium"><%= c.full_name %></a>
               <div class="sm:hidden text-[10px] text-gray-400 mt-0.5"><%= c.employee_id || '' %><% if (c.role) { %> &middot; <%= roleLabels[c.role] || c.role %><% } %></div>
             </td>
 
             <!-- Employee ID -->
-            <td class="px-3 sm:px-4 py-3 text-gray-500 hidden sm:table-cell font-mono text-xs"><%= c.employee_id || '-' %></td>
+            <td class="px-3 sm:px-4 py-2 text-gray-500 hidden sm:table-cell font-mono text-xs"><%= c.employee_id || '-' %></td>
 
             <!-- Role -->
-            <td class="px-3 sm:px-4 py-3 hidden md:table-cell">
+            <td class="px-3 sm:px-4 py-2 hidden md:table-cell">
               <span class="text-xs text-gray-600"><%= roleLabels[c.role] || c.role || '-' %></span>
               <% if (c.tcp_level) { %>
                 <span class="ml-1 text-[10px] text-gray-400">L<%= c.tcp_level %></span>
@@ -157,7 +157,7 @@
             </td>
 
             <!-- Compliance Status Badges -->
-            <td class="px-3 sm:px-4 py-3">
+            <td class="px-3 sm:px-4 py-2">
               <div class="flex flex-wrap gap-1">
                 <% if (c.compliance.canAllocate) { %>
                   <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">CLEAR</span>
@@ -185,7 +185,7 @@
             </td>
 
             <!-- Active Jobs Count -->
-            <td class="px-3 sm:px-4 py-3 text-center hidden lg:table-cell">
+            <td class="px-3 sm:px-4 py-2 text-center hidden lg:table-cell">
               <% if (c.activeJobs > 0) { %>
                 <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold bg-brand-50 text-brand-700 ring-1 ring-brand-600/20"><%= c.activeJobs %></span>
               <% } else { %>
@@ -194,7 +194,7 @@
             </td>
 
             <!-- Next Expiry -->
-            <td class="px-3 sm:px-4 py-3 hidden lg:table-cell">
+            <td class="px-3 sm:px-4 py-2 hidden lg:table-cell">
               <% if (c.nearestExpiry) { %>
                 <%
                   const days = daysUntil(c.nearestExpiry.date);
@@ -213,7 +213,7 @@
             </td>
 
             <!-- Last Worked -->
-            <td class="px-3 sm:px-4 py-3 hidden xl:table-cell">
+            <td class="px-3 sm:px-4 py-2 hidden xl:table-cell">
               <% if (c.lastWorked) { %>
                 <span class="text-xs text-gray-500"><%= formatShortDate(c.lastWorked) %></span>
               <% } else { %>
@@ -222,10 +222,10 @@
             </td>
 
             <!-- Company -->
-            <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden xl:table-cell"><%= c.company || '-' %></td>
+            <td class="px-3 sm:px-4 py-2 text-gray-500 text-xs hidden xl:table-cell"><%= c.company || '-' %></td>
 
             <!-- Actions -->
-            <td class="px-3 sm:px-4 py-3 text-right">
+            <td class="px-3 sm:px-4 py-2 text-right">
               <div class="flex items-center justify-end gap-1">
                 <a href="/crew/<%= c.id %>" class="px-2.5 py-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50 rounded-lg">View</a>
                 <a href="/crew/<%= c.id %>/edit" class="px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg">Edit</a>

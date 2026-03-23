@@ -43,7 +43,7 @@ const PERMISSIONS = {
   exports:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
   notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'marketing', 'accounts'],
   bookings:      ['admin', 'operations', 'planning'],
-  crm:           ['admin', 'operations', 'planning', 'sales'],
+  crm:           ['admin', 'operations', 'planning', 'sales', 'bdm', 'business_development'],
   admin:         ['admin'],
   activity:      ['admin'],
   settings:      ['admin'],

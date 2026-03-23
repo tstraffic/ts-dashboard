@@ -49,15 +49,15 @@
 
   <!-- Stat Cards -->
   <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
       <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Active Employees</p>
       <p class="text-2xl font-bold text-emerald-600 mt-1"><%= stats.totalActive %></p>
     </div>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
       <p class="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Onboarding</p>
       <p class="text-2xl font-bold text-purple-600 mt-1"><%= stats.totalOnboarding %></p>
     </div>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
       <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Blocked</p>
       <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.totalBlocked %></p>
     </div>
@@ -80,7 +80,7 @@
   </div>
 
   <!-- Filters -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
     <form method="GET" action="/hr/employees" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
       <% if (filters.payment_type) { %><input type="hidden" name="payment_type" value="<%= filters.payment_type %>"><% } %>
       <select name="company" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -192,9 +192,9 @@
       Showing <%= employees.length %> employee<%= employees.length !== 1 ? 's' : '' %>
     </div>
     <% } else { %>
-    <div class="p-10 text-center">
-      <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
-        <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    <div class="p-6 text-center">
+      <div class="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
       </div>
       <h3 class="text-gray-900 font-semibold text-base mb-1">No employees found</h3>
       <p class="text-gray-500 text-sm mb-1">No employees match the current filters.</p>

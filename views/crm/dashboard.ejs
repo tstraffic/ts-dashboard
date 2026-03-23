@@ -125,9 +125,9 @@
 </div>
 
 <!-- Row 2: My Actions + Recent Activity -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
   <!-- Left: My Actions -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 sm:p-4">
     <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">My Actions</h2>
 
     <!-- Overdue Follow-ups -->
@@ -198,7 +198,7 @@
     <% } %>
 
     <% if ((!myActions.overdue_followups || myActions.overdue_followups.length === 0) && (!myActions.today_activities || myActions.today_activities.length === 0) && (!myActions.no_next_step || myActions.no_next_step.length === 0)) { %>
-    <div class="text-center py-6">
+    <div class="text-center py-4">
       <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
         <svg class="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       </div>
@@ -208,7 +208,7 @@
   </div>
 
   <!-- Right: Recent Activity Feed -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 sm:p-4">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Recent Activity</h2>
       <a href="/crm/activities" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all</a>
@@ -236,7 +236,7 @@
       <% }) %>
     </div>
     <% } else { %>
-    <div class="text-center py-8">
+    <div class="text-center py-5">
       <p class="text-sm text-gray-400">No recent activities</p>
     </div>
     <% } %>
@@ -244,9 +244,9 @@
 </div>
 
 <!-- Row 3: Activity Summary -->
-<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 mb-5">
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 sm:p-4 mb-5">
   <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Activity Summary</h2>
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
     <div class="text-center p-3 rounded-lg bg-green-50">
       <div class="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<%= activityTypeIcons.call %>"/></svg>
@@ -293,9 +293,9 @@
 </div>
 
 <!-- Row 4: Conversion Tracking -->
-<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 sm:p-4">
   <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Conversion Tracking (This Month)</h2>
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
     <div class="text-center">
       <p class="text-2xl font-bold text-gray-900"><%= conversion.leads_this_month || 0 %></p>
       <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Leads</p>

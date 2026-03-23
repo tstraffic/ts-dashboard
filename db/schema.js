@@ -2961,6 +2961,60 @@ function runMigrations(db) {
     console.log('Migration 53 complete.');
   }
 
+  // =============================================
+  // Migration 54: Clock Events table (Sprint 2)
+  // =============================================
+  if (!isMigrationApplied.get(54)) {
+    console.log('Running migration 54: Clock Events table');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS clock_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL,
+        allocation_id INTEGER,
+        event_type TEXT NOT NULL CHECK(event_type IN ('clock_in', 'clock_out', 'break_start', 'break_end')),
+        timestamp DATETIME DEFAULT (datetime('now')),
+        latitude REAL,
+        longitude REAL,
+        accuracy REAL,
+        notes TEXT,
+        created_at DATETIME DEFAULT (datetime('now')),
+        FOREIGN KEY (crew_member_id) REFERENCES crew_members(id),
+        FOREIGN KEY (allocation_id) REFERENCES crew_allocations(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_clock_events_crew ON clock_events(crew_member_id);
+      CREATE INDEX IF NOT EXISTS idx_clock_events_timestamp ON clock_events(crew_member_id, timestamp);
+      CREATE INDEX IF NOT EXISTS idx_clock_events_allocation ON clock_events(allocation_id);
+    `);
+    recordMigration.run(54, 'Clock Events table');
+    console.log('Migration 54 complete.');
+  }
+
+  // =============================================
+  // Migration 55: Worker Availability table (Sprint 2)
+  // =============================================
+  if (!isMigrationApplied.get(55)) {
+    console.log('Running migration 55: Worker Availability table');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS worker_availability (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('available', 'unavailable', 'partial')),
+        start_time TEXT,
+        end_time TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT (datetime('now')),
+        updated_at DATETIME DEFAULT (datetime('now')),
+        FOREIGN KEY (crew_member_id) REFERENCES crew_members(id),
+        UNIQUE(crew_member_id, date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_worker_availability_crew ON worker_availability(crew_member_id);
+      CREATE INDEX IF NOT EXISTS idx_worker_availability_date ON worker_availability(crew_member_id, date);
+    `);
+    recordMigration.run(55, 'Worker Availability table');
+    console.log('Migration 55 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
