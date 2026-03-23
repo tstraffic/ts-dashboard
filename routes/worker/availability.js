@@ -181,4 +181,5 @@ router.get('/availability/api', (req, res) => {
   res.json({ success: true, data: records });
 });
 
+
 module.exports = router;

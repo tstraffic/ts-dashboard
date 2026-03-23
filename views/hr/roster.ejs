@@ -1,0 +1,285 @@
+<% locals.currentPage = 'hr-roster' %>
+<%
+  function fmtDate(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  var sBadges = {
+    active:      'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+    reserved:    'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    on_leave:    'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    deactivated: 'bg-gray-100 text-gray-500',
+    inactive:    'bg-gray-100 text-gray-500',
+    terminated:  'bg-red-50 text-red-700 ring-1 ring-red-600/20',
+    suspended:   'bg-red-50 text-red-700 ring-1 ring-red-600/20',
+    onboarding:  'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
+    offboarded:  'bg-gray-100 text-gray-500',
+  };
+  var rBadges = {
+    ready:                'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+    ready_with_warnings:  'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
+    non_compliant:        'bg-red-50 text-red-700 ring-1 ring-red-600/20',
+    blocked:              'bg-red-50 text-red-700 ring-1 ring-red-600/20',
+    onboarding:           'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
+    on_leave:             'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+  };
+  var rLabels = {
+    ready: 'Ready', ready_with_warnings: 'Warnings', non_compliant: 'Non-Compliant',
+    blocked: 'Blocked', onboarding: 'Onboarding', on_leave: 'On Leave',
+  };
+%>
+
+<div class="space-y-5">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Roster</h1>
+      <p class="text-sm text-gray-500 mt-1">Full workforce list &mdash; manage, filter and bulk-action employees</p>
+    </div>
+    <a href="/hr/employees/new" class="inline-flex items-center justify-center px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      Add Employee
+    </a>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Active</p>
+      <p class="text-2xl font-bold text-emerald-600 mt-1"><%= stats.totalActive %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Deactivated</p>
+      <p class="text-2xl font-bold text-gray-500 mt-1"><%= stats.totalDeactivated %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">On Leave</p>
+      <p class="text-2xl font-bold text-blue-600 mt-1"><%= stats.totalOnLeave %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Terminated</p>
+      <p class="text-2xl font-bold text-red-600 mt-1"><%= stats.totalTerminated %></p>
+    </div>
+  </div>
+
+  <!-- Payment Tabs -->
+  <div class="flex gap-2 overflow-x-auto pb-1">
+    <a href="/hr/roster" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all <%= !filters.payment_type ? 'bg-brand-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' %>">
+      All <span class="text-xs font-bold opacity-70"><%= stats.totalActive %></span>
+    </a>
+    <a href="/hr/roster?payment_type=cash" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all <%= filters.payment_type === 'cash' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' %>">
+      Cash <span class="text-xs font-bold opacity-70"><%= stats.totalCash %></span>
+    </a>
+    <a href="/hr/roster?payment_type=tfn" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all <%= filters.payment_type === 'tfn' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' %>">
+      TFN <span class="text-xs font-bold opacity-70"><%= stats.totalTfn %></span>
+    </a>
+    <a href="/hr/roster?payment_type=abn" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all <%= filters.payment_type === 'abn' ? 'bg-purple-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' %>">
+      ABN <span class="text-xs font-bold opacity-70"><%= stats.totalAbn %></span>
+    </a>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <form method="GET" action="/hr/roster" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+      <% if (filters.payment_type) { %><input type="hidden" name="payment_type" value="<%= filters.payment_type %>"><% } %>
+      <select name="status" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Statuses</option>
+        <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Active</option>
+        <option value="reserved" <%= filters.status === 'reserved' ? 'selected' : '' %>>Reserved</option>
+        <option value="on_leave" <%= filters.status === 'on_leave' ? 'selected' : '' %>>On Leave</option>
+        <option value="deactivated" <%= filters.status === 'deactivated' ? 'selected' : '' %>>Deactivated</option>
+        <option value="inactive" <%= filters.status === 'inactive' ? 'selected' : '' %>>Deactivated</option>
+        <option value="terminated" <%= filters.status === 'terminated' ? 'selected' : '' %>>Terminated</option>
+      </select>
+      <select name="level" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Levels</option>
+        <option value="Traffic Controller" <%= filters.level === 'Traffic Controller' ? 'selected' : '' %>>Traffic Controller</option>
+        <option value="Team Leader" <%= filters.level === 'Team Leader' ? 'selected' : '' %>>Team Leader</option>
+        <option value="Project Supervisor" <%= filters.level === 'Project Supervisor' ? 'selected' : '' %>>Project Supervisor</option>
+      </select>
+      <select name="employment_type" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <option value="">All Types</option>
+        <option value="full_time" <%= filters.employment_type === 'full_time' ? 'selected' : '' %>>Full Time</option>
+        <option value="part_time" <%= filters.employment_type === 'part_time' ? 'selected' : '' %>>Part Time</option>
+        <option value="casual" <%= filters.employment_type === 'casual' ? 'selected' : '' %>>Casual</option>
+        <option value="contractor" <%= filters.employment_type === 'contractor' ? 'selected' : '' %>>Contractor</option>
+        <option value="subcontractor" <%= filters.employment_type === 'subcontractor' ? 'selected' : '' %>>Subcontractor</option>
+      </select>
+      <div class="flex-1 min-w-0 sm:min-w-[200px]">
+        <input type="text" name="search" value="<%= filters.search || '' %>" placeholder="Search name, code, phone..."
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition">Filter</button>
+    </form>
+  </div>
+
+  <% if (employees && employees.length > 0) { %>
+
+  <!-- Bulk Bar -->
+  <div id="rosterBulk" style="display:none" class="sticky top-0 z-30 bg-red-50 border border-red-200 rounded-xl shadow-sm p-3 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-2">
+      <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      <span id="rosterBulkCount" class="text-sm font-semibold text-red-700">0 selected</span>
+    </div>
+    <button type="button" id="rosterDeleteBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition">
+      Delete Selected
+    </button>
+  </div>
+
+  <!-- Table -->
+  <form id="rosterDeleteForm" method="POST" action="/hr/roster/delete">
+    <%- include('../partials/csrf') %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200" role="grid" aria-label="Employee roster">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th scope="col" class="px-2 sm:px-3 py-3 text-center w-10">
+                <input type="checkbox" id="rosterAll" aria-label="Select all employees" class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+              </th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Phone</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Level</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Type</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Readiness</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Start Date</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% employees.forEach(function(emp) { %>
+            <tr class="hover:bg-gray-50 transition">
+              <td class="px-2 sm:px-3 py-3 text-center">
+                <input type="checkbox" name="ids" value="<%= emp.id %>" aria-label="Select <%= emp.full_name || emp.first_name + ' ' + emp.last_name %>" class="roster-chk w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+              </td>
+              <td class="px-3 sm:px-4 py-3">
+                <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %><% if (emp.middle_name) { %> <%= emp.middle_name %><% } %> <%= emp.last_name %></a>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <% if (emp.employee_code) { %><span class="text-[10px] text-gray-400 font-mono"><%= emp.employee_code %></span><% } %>
+                  <% if (emp.payment_type) { %>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase
+                      <%= emp.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600' : emp.payment_type === 'tfn' ? 'bg-blue-50 text-blue-600' : emp.payment_type === 'abn' ? 'bg-purple-50 text-purple-600' : 'bg-gray-50 text-gray-500' %>"><%= emp.payment_type %></span>
+                  <% } %>
+                </div>
+              </td>
+              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden sm:table-cell">
+                <% if (emp.phone) { %>
+                  <a href="tel:<%= emp.phone %>" class="hover:text-brand-600"><%= emp.phone %></a>
+                <% } else { %>-<% } %>
+              </td>
+              <td class="px-3 sm:px-4 py-3 text-gray-600 text-xs hidden md:table-cell"><%= emp.traffic_role_level || emp.role_title || '-' %></td>
+              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden md:table-cell capitalize"><%= emp.employment_type ? emp.employment_type.replace(/_/g, ' ') : '-' %></td>
+              <td class="px-3 sm:px-4 py-3">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize <%= sBadges[emp.employment_status] || sBadges.inactive %>">
+                  <%= (emp.employment_status || 'unknown').replace(/_/g, ' ') %>
+                </span>
+              </td>
+              <td class="px-3 sm:px-4 py-3 hidden lg:table-cell">
+                <% if (emp.readiness) { %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= rBadges[emp.readiness.status] || 'bg-gray-100 text-gray-500' %>">
+                    <%= rLabels[emp.readiness.status] || emp.readiness.status %>
+                  </span>
+                <% } else { %>
+                  <span class="text-gray-300 text-xs">-</span>
+                <% } %>
+              </td>
+              <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs tabular-nums hidden xl:table-cell"><%= fmtDate(emp.start_date) %></td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
+        Showing <%= employees.length %> employee<%= employees.length !== 1 ? 's' : '' %>
+      </div>
+    </div>
+  </form>
+
+  <% } else { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+    <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    </div>
+    <h3 class="text-gray-900 font-semibold text-base mb-1">No employees found</h3>
+    <p class="text-gray-500 text-sm mb-4">Try adjusting your filters or add a new employee.</p>
+    <a href="/hr/employees/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      Add Employee
+    </a>
+  </div>
+  <% } %>
+</div>
+
+<!-- Delete modal -->
+<div id="rosterModal" style="display:none" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" id="rosterModalBg"></div>
+  <div class="relative bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-gray-900">Delete Employees</h3>
+        <p class="text-sm text-gray-500">Permanently delete <span id="rosterModalN" class="font-semibold text-red-600">0</span> employee(s) and all their data.</p>
+      </div>
+    </div>
+    <div class="flex gap-3 pt-2">
+      <button type="button" id="rosterModalCancel" class="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</button>
+      <button type="button" id="rosterModalConfirm" class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var allBox    = document.getElementById('rosterAll');
+  var checks    = function() { return document.querySelectorAll('.roster-chk'); };
+  var checked   = function() { return document.querySelectorAll('.roster-chk:checked'); };
+  var bar       = document.getElementById('rosterBulk');
+  var countEl   = document.getElementById('rosterBulkCount');
+  var delBtn    = document.getElementById('rosterDeleteBtn');
+  var modal     = document.getElementById('rosterModal');
+  var modalN    = document.getElementById('rosterModalN');
+  var modalBg   = document.getElementById('rosterModalBg');
+  var modalNo   = document.getElementById('rosterModalCancel');
+  var modalYes  = document.getElementById('rosterModalConfirm');
+  var form      = document.getElementById('rosterDeleteForm');
+
+  function refresh() {
+    var c = checked().length;
+    var a = checks().length;
+    if (bar) bar.style.display = c > 0 ? 'flex' : 'none';
+    if (countEl) countEl.textContent = c + ' selected';
+    if (allBox) {
+      allBox.checked = a > 0 && c === a;
+      allBox.indeterminate = c > 0 && c < a;
+    }
+  }
+
+  if (allBox) {
+    allBox.addEventListener('change', function() {
+      var val = allBox.checked;
+      checks().forEach(function(cb) { cb.checked = val; });
+      refresh();
+    });
+  }
+
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.classList.contains('roster-chk')) refresh();
+  });
+
+  if (delBtn) {
+    delBtn.addEventListener('click', function() {
+      var n = checked().length;
+      if (n === 0) return;
+      if (modalN) modalN.textContent = n;
+      if (modal) modal.style.display = 'flex';
+    });
+  }
+
+  if (modalBg) modalBg.addEventListener('click', function() { modal.style.display = 'none'; });
+  if (modalNo) modalNo.addEventListener('click', function() { modal.style.display = 'none'; });
+  if (modalYes) modalYes.addEventListener('click', function() { if (form) form.submit(); });
+});
+</script>

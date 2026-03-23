@@ -49,17 +49,13 @@
       <p class="text-sm text-gray-500 mt-1">Manage soft induction submissions</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
-      <button onclick="copyLink('cash')" class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg border border-gray-200 transition" title="Copy Cash induction link">
+      <button onclick="copyLink('')" class="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-semibold rounded-lg border border-brand-200 transition" title="Copy induction link (TFN/ABN)">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+        Copy Induction Link
+      </button>
+      <button onclick="copyLink('cash')" class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg border border-gray-200 transition" title="Copy cash induction link">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
         Copy Cash Link
-      </button>
-      <button onclick="copyLink('tfn')" class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg border border-gray-200 transition" title="Copy TFN induction link">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-        Copy TFN Link
-      </button>
-      <button onclick="copyLink('abn')" class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg border border-gray-200 transition" title="Copy ABN induction link">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-        Copy ABN Link
       </button>
     </div>
   </div>
@@ -132,6 +128,20 @@
   </div>
 
   <!-- Results Table -->
+  <form id="deleteForm" method="POST" action="/induction/admin/submissions/delete">
+    <%- include('../../partials/csrf') %>
+
+    <!-- Bulk Actions Bar (hidden until checkboxes selected) -->
+    <div id="bulkBar" class="hidden bg-red-50 border border-red-200 rounded-xl shadow-sm px-4 py-3 mb-3 flex items-center justify-between">
+      <span class="text-sm text-red-700 font-medium">
+        <span id="selectedCount">0</span> selected
+      </span>
+      <button type="button" onclick="confirmDelete()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        Delete Selected
+      </button>
+    </div>
+
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
     <% if (submissions.length === 0) { %>
       <div class="p-6 text-center">
@@ -149,6 +159,9 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-gray-200">
+              <th class="px-3 py-3 w-10">
+                <input type="checkbox" id="selectAll" onchange="toggleAll(this)" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+              </th>
               <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
               <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone</th>
               <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Payment</th>
@@ -166,6 +179,10 @@
               const docs = docCount(s);
             %>
               <tr class="hover:bg-gray-50 transition-colors">
+                <!-- Checkbox -->
+                <td class="px-3 py-3">
+                  <input type="checkbox" name="ids" value="<%= s.id %>" onchange="updateBulkBar()" class="row-check rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+                </td>
                 <!-- Name -->
                 <td class="px-4 py-3">
                   <span class="font-medium text-gray-900"><%= s.full_name %></span>
@@ -182,8 +199,8 @@
 
                 <!-- Can Drive -->
                 <td class="px-4 py-3 text-center">
-                  <% if (s.can_drive) { %>
-                    <span class="inline-flex items-center text-emerald-600" title="Can drive<%= s.can_drive_truck ? ' (incl. truck)' : '' %>">
+                  <% if (s.can_drive === 'yes') { %>
+                    <span class="inline-flex items-center text-emerald-600" title="Can drive<%= s.can_drive_truck === 'yes' ? ' (incl. truck)' : '' %>">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     </span>
                   <% } else { %>
@@ -228,7 +245,9 @@
           const pb = PAYMENT_BADGES[s.payment_type] || { label: s.payment_type, color: 'bg-gray-100 text-gray-600' };
           const docs = docCount(s);
         %>
-          <a href="/induction/admin/submissions/<%= s.id %>" class="block p-4 hover:bg-gray-50 transition-colors">
+          <div class="flex items-start p-4 hover:bg-gray-50 transition-colors gap-3">
+            <input type="checkbox" name="ids" value="<%= s.id %>" onchange="updateBulkBar()" class="row-check mt-1 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer flex-shrink-0">
+            <a href="/induction/admin/submissions/<%= s.id %>" class="block min-w-0 flex-1">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0 flex-1">
                 <p class="font-medium text-gray-900 truncate"><%= s.full_name %></p>
@@ -244,10 +263,11 @@
               <span class="ml-auto text-gray-400"><%= timeAgo(s.submitted_at) %></span>
             </div>
             <div class="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
-              <span>Drive: <% if (s.can_drive) { %><span class="text-emerald-600 font-medium">Yes</span><% } else { %><span class="text-red-500 font-medium">No</span><% } %></span>
+              <span>Drive: <% if (s.can_drive === 'yes') { %><span class="text-emerald-600 font-medium">Yes</span><% } else { %><span class="text-red-500 font-medium">No</span><% } %></span>
               <span>Docs: <span class="<%= docs.filled === docs.total ? 'text-emerald-600' : 'text-amber-600' %> font-medium"><%= docs.filled %>/<%= docs.total %></span></span>
             </div>
-          </a>
+            </a>
+          </div>
         <% }) %>
       </div>
 
@@ -257,7 +277,26 @@
       </div>
     <% } %>
   </div>
+  </form>
 
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="fixed inset-0 bg-black/40 backdrop-blur-sm" onclick="closeDeleteModal()"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+    <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    </div>
+    <h3 class="text-lg font-bold text-gray-900 text-center">Delete Submissions?</h3>
+    <p class="text-sm text-gray-500 text-center mt-2">
+      This will permanently delete <span id="deleteCount" class="font-semibold text-red-600">0</span> submission(s) and their uploaded documents. This cannot be undone.
+    </p>
+    <div class="flex gap-3 mt-6">
+      <button type="button" onclick="closeDeleteModal()" class="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</button>
+      <button type="button" onclick="submitDelete()" class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition">Delete</button>
+    </div>
+  </div>
 </div>
 
 <!-- Copy Link Toast -->
@@ -266,8 +305,51 @@
 </div>
 
 <script>
+  function toggleAll(master) {
+    var checks = document.querySelectorAll('.row-check');
+    checks.forEach(function(cb) { cb.checked = master.checked; });
+    updateBulkBar();
+  }
+
+  function updateBulkBar() {
+    var checks = document.querySelectorAll('.row-check:checked');
+    var bar = document.getElementById('bulkBar');
+    var countEl = document.getElementById('selectedCount');
+    var selectAll = document.getElementById('selectAll');
+    var allChecks = document.querySelectorAll('.row-check');
+
+    countEl.textContent = checks.length;
+
+    if (checks.length > 0) {
+      bar.classList.remove('hidden');
+    } else {
+      bar.classList.add('hidden');
+    }
+
+    // Update select-all checkbox state
+    if (selectAll) {
+      selectAll.checked = allChecks.length > 0 && checks.length === allChecks.length;
+      selectAll.indeterminate = checks.length > 0 && checks.length < allChecks.length;
+    }
+  }
+
+  function confirmDelete() {
+    var count = document.querySelectorAll('.row-check:checked').length;
+    if (count === 0) return;
+    document.getElementById('deleteCount').textContent = count;
+    document.getElementById('deleteModal').classList.remove('hidden');
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.add('hidden');
+  }
+
+  function submitDelete() {
+    document.getElementById('deleteForm').submit();
+  }
+
   function copyLink(type) {
-    var url = window.location.origin + '/induction/' + type;
+    var url = window.location.origin + '/induction' + (type ? '/' + type : '');
     navigator.clipboard.writeText(url).then(function() {
       var toast = document.getElementById('copyToast');
       toast.style.opacity = '1';

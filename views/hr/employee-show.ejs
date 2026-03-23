@@ -12,6 +12,9 @@
     suspended:  'bg-red-50 text-red-700 ring-1 ring-red-600/20',
     inactive:   'bg-gray-100 text-gray-500',
     offboarded: 'bg-gray-100 text-gray-500',
+    reserved:   'bg-orange-50 text-orange-700 ring-1 ring-orange-600/20',
+    deactivated:'bg-gray-100 text-gray-500',
+    terminated: 'bg-red-50 text-red-600 ring-1 ring-red-500/20',
   };
 
   const readinessBadge = {
@@ -49,34 +52,75 @@
     suspended:     'bg-gray-100 text-gray-600',
   };
 
-  const defaultDocTypes = [
-    'contract', 'licence', 'white_card', 'induction_record',
-    'training_certificate', 'VOC', 'medical', 'ID',
-    'policy_acknowledgement', 'other'
+  // Key document types that map to induction uploads
+  const keyDocTypes = [
+    { type: 'white_card', label: 'White Card', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', mandatory: true },
+    { type: 'tc_licence', label: 'TC Licence', icon: 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2', mandatory: true },
+    { type: 'drivers_licence_front', label: "Driver's Licence (Front)", icon: 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2', mandatory: true },
+    { type: 'drivers_licence_back', label: "Driver's Licence (Back)", icon: 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2', mandatory: true },
   ];
-  const rawDocTypes = (settingsOptions && settingsOptions.hr_document_types) || defaultDocTypes;
-  const docTypes = rawDocTypes.map(t => typeof t === 'string' ? { val: t, label: t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) } : { val: t.key || t.val || t, label: t.label || t.key || t });
 
-  const defaultCompTypes = [
-    'white_card', 'traffic_controller_licence', 'first_aid',
-    'working_at_heights', 'confined_space', 'EWP',
-    'forklift', 'drivers_licence', 'other'
+  // Build lookup for key docs
+  const keyDocMap = {};
+  keyDocTypes.forEach(kd => { keyDocMap[kd.type] = null; });
+  const otherDocs = [];
+  (documents || []).forEach(doc => {
+    if (keyDocMap.hasOwnProperty(doc.document_type) && !keyDocMap[doc.document_type]) {
+      keyDocMap[doc.document_type] = doc;
+    } else {
+      otherDocs.push(doc);
+    }
+  });
+
+  // Document types for upload modal
+  const allDocTypes = [
+    { val: 'white_card', label: 'White Card' },
+    { val: 'tc_licence', label: 'TC Licence' },
+    { val: 'drivers_licence_front', label: "Driver's Licence (Front)" },
+    { val: 'drivers_licence_back', label: "Driver's Licence (Back)" },
+    { val: 'contract', label: 'Contract' },
+    { val: 'training_certificate', label: 'Training Certificate' },
+    { val: 'VOC', label: 'VOC (Verification of Competency)' },
+    { val: 'medical', label: 'Medical Certificate' },
+    { val: 'ID', label: 'Photo ID' },
+    { val: 'induction_record', label: 'Induction Record' },
+    { val: 'policy_acknowledgement', label: 'Policy Acknowledgement' },
+    { val: 'other', label: 'Other' },
   ];
-  const rawCompTypes = (settingsOptions && settingsOptions.hr_competency_types) || defaultCompTypes;
-  const compTypes = rawCompTypes.map(t => typeof t === 'string' ? { val: t, label: t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) } : { val: t.key || t.val || t, label: t.label || t.key || t });
+
+  // Competency types
+  const defaultCompTypes = [
+    { val: 'traffic_controller_licence', label: 'Traffic Controller Licence' },
+    { val: 'white_card', label: 'White Card' },
+    { val: 'first_aid', label: 'First Aid' },
+    { val: 'drivers_licence', label: "Driver's Licence" },
+    { val: 'truck_licence', label: 'Truck Licence (HR/HC/MC)' },
+    { val: 'working_at_heights', label: 'Working at Heights' },
+    { val: 'confined_space', label: 'Confined Space' },
+    { val: 'EWP', label: 'EWP (Elevated Work Platform)' },
+    { val: 'forklift', label: 'Forklift Licence' },
+    { val: 'rsa', label: 'RSA' },
+    { val: 'other', label: 'Other' },
+  ];
+  const compTypes = defaultCompTypes;
 
   function formatType(type) {
     if (!type) return '-';
     if (typeof type !== 'string') return String(type);
     return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
+
+  function isImageFile(filename) {
+    if (!filename) return false;
+    return /\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|svg|avif)$/i.test(filename);
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
 %>
 
 <!-- Breadcrumb -->
 <div class="flex items-center gap-2 text-sm text-gray-400 mb-4">
-  <a href="/hr" class="hover:text-gray-900 transition">HR</a>
-  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-  <a href="/hr/employees" class="hover:text-gray-900 transition">Employees</a>
+  <a href="/hr/roster" class="hover:text-gray-900 transition">Roster</a>
   <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
   <span class="text-gray-900"><%= employee.full_name %></span>
 </div>
@@ -90,31 +134,44 @@
         <%= (employee.first_name || '?')[0] %><%= (employee.last_name || '?')[0] %>
       </div>
       <div>
-        <h1 class="text-2xl font-bold text-gray-900"><%= employee.full_name %><% if (employee.preferred_name) { %> <span class="text-gray-400 text-lg font-normal">(<%= employee.preferred_name %>)</span><% } %></h1>
+        <h1 class="text-xl font-bold text-gray-900"><%= employee.full_name %></h1>
         <div class="flex flex-wrap items-center gap-2 mt-1">
-          <% if (employee.employee_code) { %><span class="text-xs font-mono text-gray-500"><%= employee.employee_code %></span><% } %>
-          <% if (employee.role_title) { %><span class="text-xs text-gray-500">&middot; <%= employee.role_title %></span><% } %>
-          <% if (employee.company) { %><span class="text-xs text-gray-500">&middot; <%= employee.company %></span><% } %>
-          <% if (employee.payment_type) { %><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase <%= employee.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600' : employee.payment_type === 'tfn' ? 'bg-blue-50 text-blue-600' : employee.payment_type === 'abn' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500' %>"><%= employee.payment_type %></span><% } %>
-          <% const sBadge = statusBadge[employee.employment_status] || statusBadge.inactive; %>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= sBadge %>"><%= (employee.employment_status || 'unknown').replace(/_/g, ' ') %></span>
-          <% if (readiness) { %>
-            <% const rBadge = readinessBadge[readiness.status] || 'bg-gray-100 text-gray-500'; %>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= rBadge %>"><%= readinessLabel[readiness.status] || readiness.status %></span>
-          <% } %>
+          <% if (employee.employee_code) { %><span class="text-xs font-mono text-gray-400"><%= employee.employee_code %></span><% } %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= statusBadge[employee.employment_status] || statusBadge.inactive %>"><%= (employee.employment_status || 'unknown').replace(/_/g, ' ') %></span>
+          <% if (employee.payment_type) { %><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600"><%= employee.payment_type.toUpperCase() %></span><% } %>
+          <% if (readiness) { %><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= readinessBadge[readiness.status] || 'bg-gray-100 text-gray-500' %>"><%= readinessLabel[readiness.status] || readiness.status %></span><% } %>
         </div>
       </div>
     </div>
-    <div class="flex items-center gap-2">
-      <a href="/hr/employees/<%= employee.id %>/edit" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition">
+    <div class="flex flex-wrap gap-2">
+      <a href="/hr/employees/<%= employee.id %>/edit" class="inline-flex items-center px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
         <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
         Edit
       </a>
+      <% if (employee.employment_status === 'inactive' || employee.employment_status === 'deactivated') { %>
+        <form method="POST" action="/hr/employees/<%= employee.id %>/toggle-active" class="inline">
+          <%- include('../partials/csrf') %>
+          <input type="hidden" name="action" value="reactivate">
+          <button class="inline-flex items-center px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium rounded-lg hover:bg-emerald-100 transition">
+            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Reactivate
+          </button>
+        </form>
+      <% } else if (employee.employment_status === 'active') { %>
+        <form method="POST" action="/hr/employees/<%= employee.id %>/toggle-active" class="inline">
+          <%- include('../partials/csrf') %>
+          <input type="hidden" name="action" value="deactivate">
+          <button class="inline-flex items-center px-3 py-2 bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-100 transition">
+            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+            Deactivate
+          </button>
+        </form>
+      <% } %>
       <% if (employee.blocked_from_allocation) { %>
         <form method="POST" action="/hr/employees/<%= employee.id %>/block" class="inline">
           <%- include('../partials/csrf') %>
           <input type="hidden" name="action" value="unblock">
-          <button type="submit" class="inline-flex items-center px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium rounded-lg hover:bg-emerald-100 transition">
+          <button class="inline-flex items-center px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium rounded-lg hover:bg-emerald-100 transition">
             <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
             Unblock
           </button>
@@ -139,16 +196,16 @@
   <!-- Tabs -->
   <div class="border-b border-gray-200">
     <nav class="flex gap-6 -mb-px overflow-x-auto" id="empTabs">
-      <button data-tab="overview" class="emp-tab active whitespace-nowrap pb-3 px-1 border-b-2 border-brand-600 text-brand-600 text-sm font-medium transition">Overview</button>
-      <button data-tab="documents" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition">Documents <span class="ml-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full"><%= documents.length %></span></button>
-      <button data-tab="competencies" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition">Competencies <span class="ml-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full"><%= competencies.length %></span></button>
-      <% if (crewMember) { %>
-        <button data-tab="workforce" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition">Linked Workforce</button>
-      <% } %>
+      <button onclick="switchEmpTab('overview')" data-tab="overview" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-brand-600 text-brand-600 text-sm font-medium transition cursor-pointer">Overview</button>
+      <button onclick="switchEmpTab('documents')" data-tab="documents" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition cursor-pointer">Documents <span class="ml-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full"><%= documents.length %></span></button>
+      <button onclick="switchEmpTab('competencies')" data-tab="competencies" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition cursor-pointer">Competencies <span class="ml-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full"><%= competencies.length %></span></button>
+      <button onclick="switchEmpTab('workforce')" data-tab="workforce" class="emp-tab whitespace-nowrap pb-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium transition cursor-pointer">Linked Workforce <% if (crewMember) { %><span class="ml-1 w-2 h-2 bg-emerald-500 rounded-full inline-block"></span><% } %></button>
     </nav>
   </div>
 
-  <!-- TAB: Overview -->
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- TAB: Overview                               -->
+  <!-- ═══════════════════════════════════════════ -->
   <div id="tab-overview" class="emp-tab-content">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
@@ -159,10 +216,9 @@
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
           <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Employment</h2>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6">
-            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Company</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.company || '-' %></p></div>
-            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Division</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.division || '-' %></p></div>
-            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Role Title</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.role_title || '-' %></p></div>
-            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Employment Type</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.employment_type ? employee.employment_type.replace(/_/g, ' ') : '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Role / Level</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.traffic_role_level || employee.role_title || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Employment Type</p><p class="text-sm text-gray-900 mt-0.5 capitalize"><%= employee.employment_type ? employee.employment_type.replace(/_/g, ' ') : '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Payment Type</p><p class="text-sm text-gray-900 mt-0.5 uppercase"><%= employee.payment_type || '-' %></p></div>
             <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Start Date</p><p class="text-sm text-gray-900 mt-0.5"><%= formatDate(employee.start_date) %></p></div>
             <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">End Date</p><p class="text-sm text-gray-900 mt-0.5"><%= formatDate(employee.end_date) %></p></div>
             <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Probation Ends</p><p class="text-sm text-gray-900 mt-0.5"><%= formatDate(employee.probation_end_date) %></p></div>
@@ -183,21 +239,28 @@
           </div>
         </div>
 
+        <!-- Licences & Cards -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+          <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Licences & Cards</h2>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6">
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">White Card Number</p><p class="text-sm text-gray-900 mt-0.5 font-mono"><%= employee.white_card_number || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">TC Licence Number</p><p class="text-sm text-gray-900 mt-0.5 font-mono"><%= employee.tc_licence_number || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">TC Licence State</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.tc_licence_state || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">TC Date of Issue</p><p class="text-sm text-gray-900 mt-0.5"><%= formatDate(employee.tc_licence_date_of_issue) %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Driver's Licence Number</p><p class="text-sm text-gray-900 mt-0.5 font-mono"><%= employee.drivers_licence_number || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Ticket Classification</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.ticket_classification || '-' %></p></div>
+          </div>
+        </div>
+
         <!-- Operational -->
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
           <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Operational</h2>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6">
-            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Traffic Role Level</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.traffic_role_level || '-' %></p></div>
-            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Ticket Classification</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.ticket_classification || '-' %></p></div>
             <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Primary Region</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.primary_work_region || '-' %></p></div>
             <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Base Location</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.base_location || '-' %></p></div>
-            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Vehicle Assigned</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.company_vehicle_assigned || '-' %></p></div>
             <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Induction</p><p class="text-sm text-gray-900 mt-0.5"><%= formatType(employee.induction_status) %></p></div>
             <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">PPE Status</p><p class="text-sm text-gray-900 mt-0.5"><%= formatType(employee.ppe_issued_status) %></p></div>
-            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Uniform Status</p><p class="text-sm text-gray-900 mt-0.5"><%= formatType(employee.uniform_issued_status) %></p></div>
             <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Allocatable</p><p class="text-sm mt-0.5 <%= employee.allocatable ? 'text-emerald-600' : 'text-red-600' %>"><%= employee.allocatable ? 'Yes' : 'No' %></p></div>
-            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">White Card Required</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.white_card_required ? 'Yes' : 'No' %></p></div>
-            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Medical Required</p><p class="text-sm text-gray-900 mt-0.5"><%= employee.medical_required ? 'Yes' : 'No' %></p></div>
           </div>
         </div>
 
@@ -280,74 +343,142 @@
     </div>
   </div>
 
-  <!-- TAB: Documents -->
-  <div id="tab-documents" class="emp-tab-content hidden">
-    <!-- Upload Button -->
-    <div class="flex justify-end mb-4">
-      <button onclick="document.getElementById('uploadDocModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
-        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-        Upload Document
-      </button>
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- TAB: Documents                              -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="tab-documents" class="emp-tab-content" style="display:none;">
+
+    <!-- Key Documents Grid -->
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-bold text-gray-800">Key Documents</h2>
+        <button onclick="document.getElementById('uploadDocModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+          <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          Upload Document
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <% keyDocTypes.forEach(kd => {
+          const doc = keyDocMap[kd.type];
+          const hasDoc = !!doc;
+          const isExpired = doc && doc.expiry_date && doc.expiry_date < todayStr;
+          const vStatus = doc ? (doc.verification_status || 'pending') : null;
+          const vBadge = vStatus ? (verificationBadge[vStatus] || 'bg-gray-100 text-gray-600') : '';
+        %>
+        <div class="bg-white border <%= hasDoc ? (isExpired ? 'border-red-200' : 'border-gray-200') : 'border-dashed border-gray-300' %> rounded-xl shadow-sm overflow-hidden">
+          <!-- Card Header -->
+          <div class="px-4 py-3 border-b <%= hasDoc ? 'border-gray-100 bg-gray-50/50' : 'border-gray-200 bg-gray-50' %>">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 <%= hasDoc ? 'text-brand-500' : 'text-gray-400' %>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<%= kd.icon %>"/></svg>
+                <span class="text-xs font-bold text-gray-700 uppercase tracking-wider"><%= kd.label %></span>
+              </div>
+              <% if (kd.mandatory) { %><span class="text-[9px] font-bold text-red-600 uppercase">Required</span><% } %>
+            </div>
+          </div>
+
+          <!-- Card Body -->
+          <div class="p-4">
+            <% if (hasDoc) { %>
+              <!-- Document exists -->
+              <% if (isImageFile(doc.original_name || doc.filename)) { %>
+                <div class="w-full h-28 bg-gray-100 rounded-lg mb-3 overflow-hidden flex items-center justify-center">
+                  <a href="/hr/documents/<%= doc.id %>/download" class="block w-full h-full">
+                    <img src="/hr/documents/<%= doc.id %>/download" alt="<%= kd.label %>" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\'flex items-center justify-center h-full text-gray-400 text-xs\'>Preview unavailable</div>'">
+                  </a>
+                </div>
+              <% } else { %>
+                <div class="w-full h-28 bg-gray-50 rounded-lg mb-3 flex flex-col items-center justify-center">
+                  <svg class="w-8 h-8 text-gray-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                  <span class="text-[10px] text-gray-400 font-medium">PDF / Document</span>
+                </div>
+              <% } %>
+
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= vBadge %>"><%= (vStatus || 'pending').replace(/_/g, ' ') %></span>
+                  <% if (isExpired) { %><span class="text-[10px] font-bold text-red-600">EXPIRED</span><% } %>
+                </div>
+                <% if (doc.expiry_date) { %>
+                  <p class="text-[10px] text-gray-400">Expires: <span class="<%= isExpired ? 'text-red-600 font-medium' : 'text-gray-600' %>"><%= formatDate(doc.expiry_date) %></span></p>
+                <% } %>
+                <div class="flex gap-1.5 pt-1">
+                  <a href="/hr/documents/<%= doc.id %>/download" class="flex-1 text-center px-2 py-1.5 text-[10px] font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition">Download</a>
+                  <% if (vStatus === 'pending') { %>
+                    <form method="POST" action="/hr/documents/<%= doc.id %>/verify" class="flex-1"><%- include('../partials/csrf') %><input type="hidden" name="action" value="verify"><button type="submit" class="w-full px-2 py-1.5 text-[10px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition">Verify</button></form>
+                  <% } %>
+                  <form method="POST" action="/hr/documents/<%= doc.id %>/delete" class="inline" onsubmit="return confirm('Delete this document?')"><%- include('../partials/csrf') %><button type="submit" class="px-2 py-1.5 text-[10px] font-medium text-red-600 hover:bg-red-50 rounded-lg transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button></form>
+                </div>
+              </div>
+            <% } else { %>
+              <!-- No document — upload prompt -->
+              <div class="flex flex-col items-center justify-center py-4">
+                <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                  <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                </div>
+                <p class="text-xs text-gray-500 mb-2">Not uploaded</p>
+                <button onclick="openUploadModal('<%= kd.type %>')" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition">Upload</button>
+              </div>
+            <% } %>
+          </div>
+        </div>
+        <% }); %>
+      </div>
     </div>
 
-    <% if (documents.length > 0) { %>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead>
-            <tr class="bg-gray-50 border-b border-gray-200">
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Issue Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Expiry</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Mandatory</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <% documents.forEach(doc => {
-              const todayStr = new Date().toISOString().split('T')[0];
-              const isExpired = doc.expiry_date && doc.expiry_date < todayStr;
-              const vBadge = verificationBadge[doc.verification_status] || 'bg-gray-100 text-gray-600';
-            %>
-            <tr class="hover:bg-gray-50 transition">
-              <td class="px-4 py-3 text-sm text-gray-700"><%= formatType(doc.document_type) %></td>
-              <td class="px-4 py-3">
-                <p class="text-sm font-medium text-gray-900"><%= doc.document_name || doc.original_name %></p>
-                <p class="text-[10px] text-gray-400 mt-0.5"><%= doc.original_name %></p>
-              </td>
-              <td class="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell"><%= formatDate(doc.issue_date) %></td>
-              <td class="px-4 py-3">
-                <% if (doc.expiry_date) { %>
-                  <span class="text-sm <%= isExpired ? 'text-red-600 font-semibold' : 'text-gray-600' %>"><%= formatDate(doc.expiry_date) %></span>
-                  <% if (isExpired) { %><span class="block text-[10px] text-red-500 font-medium">EXPIRED</span><% } %>
-                <% } else { %>
-                  <span class="text-gray-300 text-sm">-</span>
-                <% } %>
-              </td>
-              <td class="px-4 py-3">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= vBadge %>"><%= (doc.verification_status || 'pending').replace(/_/g, ' ') %></span>
-              </td>
-              <td class="px-4 py-3 hidden md:table-cell">
-                <% if (doc.mandatory) { %>
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20">Required</span>
-                <% } else { %><span class="text-gray-300 text-xs">-</span><% } %>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <div class="flex items-center justify-end gap-1">
-                  <a href="/hr/documents/<%= doc.id %>/download" class="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-brand-50 hover:text-brand-700 rounded-lg transition" title="Download">Download</a>
-                  <% if (doc.verification_status === 'pending') { %>
-                    <form method="POST" action="/hr/documents/<%= doc.id %>/verify" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="verify"><button type="submit" class="px-2 py-1 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition">Verify</button></form>
-                    <form method="POST" action="/hr/documents/<%= doc.id %>/verify" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="reject"><button type="submit" class="px-2 py-1 text-xs text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition">Reject</button></form>
-                  <% } %>
-                  <form method="POST" action="/hr/documents/<%= doc.id %>/delete" class="inline" onsubmit="return confirm('Delete this document?')"><%- include('../partials/csrf') %><button type="submit" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-lg transition">Delete</button></form>
-                </div>
-              </td>
-            </tr>
-            <% }); %>
-          </tbody>
-        </table>
+    <!-- Other Documents -->
+    <% if (otherDocs.length > 0) { %>
+    <div>
+      <h2 class="text-sm font-bold text-gray-800 mb-3">Other Documents</h2>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-200">
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Expiry</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <% otherDocs.forEach(doc => {
+                const isExpired = doc.expiry_date && doc.expiry_date < todayStr;
+                const vBadge = verificationBadge[doc.verification_status] || 'bg-gray-100 text-gray-600';
+              %>
+              <tr class="hover:bg-gray-50 transition">
+                <td class="px-4 py-3 text-sm text-gray-700"><%= formatType(doc.document_type) %></td>
+                <td class="px-4 py-3">
+                  <p class="text-sm font-medium text-gray-900"><%= doc.document_name || doc.original_name %></p>
+                  <p class="text-[10px] text-gray-400 mt-0.5"><%= doc.original_name %></p>
+                </td>
+                <td class="px-4 py-3 hidden sm:table-cell">
+                  <% if (doc.expiry_date) { %>
+                    <span class="text-sm <%= isExpired ? 'text-red-600 font-semibold' : 'text-gray-600' %>"><%= formatDate(doc.expiry_date) %></span>
+                    <% if (isExpired) { %><span class="block text-[10px] text-red-500 font-medium">EXPIRED</span><% } %>
+                  <% } else { %><span class="text-gray-300 text-sm">-</span><% } %>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= vBadge %>"><%= (doc.verification_status || 'pending').replace(/_/g, ' ') %></span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <div class="flex items-center justify-end gap-1">
+                    <a href="/hr/documents/<%= doc.id %>/download" class="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-brand-50 hover:text-brand-700 rounded-lg transition">Download</a>
+                    <% if (doc.verification_status === 'pending') { %>
+                      <form method="POST" action="/hr/documents/<%= doc.id %>/verify" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="verify"><button type="submit" class="px-2 py-1 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition">Verify</button></form>
+                    <% } %>
+                    <form method="POST" action="/hr/documents/<%= doc.id %>/delete" class="inline" onsubmit="return confirm('Delete this document?')"><%- include('../partials/csrf') %><button type="submit" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-lg transition">Delete</button></form>
+                  </div>
+                </td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
     <% } else { %>
@@ -362,9 +493,12 @@
     <% } %>
   </div>
 
-  <!-- TAB: Competencies -->
-  <div id="tab-competencies" class="emp-tab-content hidden">
-    <div class="flex justify-end mb-4">
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- TAB: Competencies                           -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="tab-competencies" class="emp-tab-content" style="display:none;">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-bold text-gray-800">Licences & Competencies</h2>
       <button onclick="document.getElementById('addCompModal').classList.remove('hidden')" class="inline-flex items-center px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
         <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
         Add Competency
@@ -372,137 +506,285 @@
     </div>
 
     <% if (competencies.length > 0) { %>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead>
-            <tr class="bg-gray-50 border-b border-gray-200">
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Level</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Issue Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Expiry</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Mandatory</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <% competencies.forEach(comp => {
-              const todayStr = new Date().toISOString().split('T')[0];
-              const isExpired = comp.expiry_date && comp.expiry_date < todayStr;
-              const cBadge = compStatusBadge[comp.status] || 'bg-gray-100 text-gray-600';
-            %>
-            <tr class="hover:bg-gray-50 transition">
-              <td class="px-4 py-3 text-sm text-gray-700"><%= formatType(comp.competency_type) %></td>
-              <td class="px-4 py-3 text-sm font-medium text-gray-900"><%= comp.competency_name || '-' %></td>
-              <td class="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell"><%= comp.competency_level || '-' %></td>
-              <td class="px-4 py-3 text-sm text-gray-600 hidden md:table-cell"><%= formatDate(comp.issue_date) %></td>
-              <td class="px-4 py-3">
-                <% if (comp.expiry_date) { %>
-                  <span class="text-sm <%= isExpired ? 'text-red-600 font-semibold' : 'text-gray-600' %>"><%= formatDate(comp.expiry_date) %></span>
-                  <% if (isExpired) { %><span class="block text-[10px] text-red-500 font-medium">EXPIRED</span><% } %>
-                <% } else { %><span class="text-gray-300 text-sm">-</span><% } %>
-              </td>
-              <td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= cBadge %>"><%= formatType(comp.status) %></span></td>
-              <td class="px-4 py-3 hidden md:table-cell">
-                <% if (comp.mandatory_for_role) { %><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20">Required</span><% } else { %><span class="text-gray-300 text-xs">-</span><% } %>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <form method="POST" action="/hr/competencies/<%= comp.id %>/delete" class="inline" onsubmit="return confirm('Remove this competency?')"><%- include('../partials/csrf') %><button type="submit" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-lg transition">Remove</button></form>
-              </td>
-            </tr>
-            <% }); %>
-          </tbody>
-        </table>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <% competencies.forEach(comp => {
+          const isExpired = comp.expiry_date && comp.expiry_date < todayStr;
+          const isExpiring = comp.status === 'expiring_soon';
+          const cBadge = compStatusBadge[comp.status] || 'bg-gray-100 text-gray-600';
+          const borderColor = isExpired ? 'border-red-200' : (isExpiring ? 'border-amber-200' : 'border-gray-200');
+
+          // Find linked document
+          const linkedDoc = comp.linked_document_id ? documents.find(d => d.id === comp.linked_document_id) : null;
+
+          // Icon based on type
+          const compIcons = {
+            traffic_controller_licence: 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0',
+            white_card: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+            first_aid: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z',
+            drivers_licence: 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0',
+            truck_licence: 'M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10 M13 6h4l3 5v5h-2',
+            working_at_heights: 'M13 10V3L4 14h7v7l9-11h-7z',
+            confined_space: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+            EWP: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+            forklift: 'M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10 M13 6h4l3 5v5h-2',
+          };
+          const compIcon = compIcons[comp.competency_type] || 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z';
+        %>
+        <div class="bg-white border <%= borderColor %> rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+          <!-- Card Header -->
+          <div class="px-4 py-3 bg-gray-50/50 border-b border-gray-100">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg <%= isExpired ? 'bg-red-100' : (isExpiring ? 'bg-amber-100' : 'bg-brand-100') %> flex items-center justify-center">
+                  <svg class="w-4 h-4 <%= isExpired ? 'text-red-600' : (isExpiring ? 'text-amber-600' : 'text-brand-600') %>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<%= compIcon %>"/></svg>
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-gray-900"><%= formatType(comp.competency_type) %></p>
+                  <% if (comp.competency_name && comp.competency_name !== formatType(comp.competency_type)) { %>
+                    <p class="text-[10px] text-gray-500"><%= comp.competency_name %></p>
+                  <% } %>
+                </div>
+              </div>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= cBadge %>"><%= formatType(comp.status) %></span>
+            </div>
+          </div>
+
+          <!-- Card Body -->
+          <div class="px-4 py-3 space-y-2.5">
+            <% if (comp.competency_level) { %>
+              <div class="flex justify-between">
+                <span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Level</span>
+                <span class="text-xs font-medium text-gray-900"><%= comp.competency_level %></span>
+              </div>
+            <% } %>
+            <% if (comp.issue_date) { %>
+              <div class="flex justify-between">
+                <span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Issued</span>
+                <span class="text-xs text-gray-600"><%= formatDate(comp.issue_date) %></span>
+              </div>
+            <% } %>
+            <% if (comp.expiry_date) { %>
+              <div class="flex justify-between">
+                <span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Expires</span>
+                <span class="text-xs <%= isExpired ? 'text-red-600 font-bold' : (isExpiring ? 'text-amber-600 font-medium' : 'text-gray-600') %>"><%= formatDate(comp.expiry_date) %>
+                  <% if (isExpired) { %> <span class="text-red-500">(EXPIRED)</span><% } %>
+                  <% if (isExpiring && !isExpired) { %> <span class="text-amber-500">(EXPIRING)</span><% } %>
+                </span>
+              </div>
+            <% } %>
+            <% if (comp.mandatory_for_role) { %>
+              <div class="flex justify-between">
+                <span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Required</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20">Mandatory</span>
+              </div>
+            <% } %>
+
+            <!-- Linked Document -->
+            <% if (linkedDoc) { %>
+              <div class="pt-2 mt-2 border-t border-gray-100">
+                <div class="flex items-center gap-2">
+                  <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                  <a href="/hr/documents/<%= linkedDoc.id %>/download" class="text-[10px] text-brand-600 hover:text-brand-700 font-medium truncate"><%= linkedDoc.document_name || linkedDoc.original_name %></a>
+                </div>
+              </div>
+            <% } %>
+
+            <% if (comp.notes) { %>
+              <p class="text-[10px] text-gray-500 italic pt-1"><%= comp.notes %></p>
+            <% } %>
+          </div>
+
+          <!-- Card Footer -->
+          <div class="px-4 py-2.5 bg-gray-50/50 border-t border-gray-100 flex justify-end gap-1.5">
+            <button onclick="openEditComp(<%= JSON.stringify({id: comp.id, competency_type: comp.competency_type, competency_name: comp.competency_name || '', competency_level: comp.competency_level || '', issue_date: comp.issue_date || '', expiry_date: comp.expiry_date || '', status: comp.status, mandatory_for_role: comp.mandatory_for_role, linked_document_id: comp.linked_document_id || '', notes: comp.notes || ''}) %>)" class="px-2.5 py-1.5 text-[10px] font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition">Edit</button>
+            <form method="POST" action="/hr/competencies/<%= comp.id %>/delete" class="inline" onsubmit="return confirm('Remove this competency?')"><%- include('../partials/csrf') %><button type="submit" class="px-2.5 py-1.5 text-[10px] font-medium text-red-600 hover:bg-red-50 rounded-lg transition">Remove</button></form>
+          </div>
+        </div>
+        <% }); %>
       </div>
-    </div>
     <% } else { %>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
-      <div class="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
-        <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+        <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </div>
+        <h3 class="text-gray-900 font-semibold text-base mb-1">No competencies recorded</h3>
+        <p class="text-gray-500 text-sm mb-4">Add licences and competencies to track compliance for this employee.</p>
+        <button onclick="document.getElementById('addCompModal').classList.remove('hidden')" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Add Competency</button>
       </div>
-      <h3 class="text-gray-900 font-semibold text-base mb-1">No competencies</h3>
-      <p class="text-gray-500 text-sm mb-4">Add the first licence or competency for this employee.</p>
-      <button onclick="document.getElementById('addCompModal').classList.remove('hidden')" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Add Competency</button>
-    </div>
     <% } %>
   </div>
 
-  <!-- TAB: Linked Workforce -->
-  <% if (crewMember) { %>
-  <div id="tab-workforce" class="emp-tab-content hidden">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- TAB: Linked Workforce                       -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="tab-workforce" class="emp-tab-content" style="display:none;">
+    <% if (crewMember) { %>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-      <!-- Crew Member Info -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Crew Profile</h2>
-          <a href="/crew/<%= crewMember.id %>" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View Full Profile &rarr;</a>
-        </div>
-        <div class="grid grid-cols-2 gap-y-3 gap-x-6">
-          <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Name</p><p class="text-sm text-gray-900 mt-0.5"><%= crewMember.full_name %></p></div>
-          <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Employee ID</p><p class="text-sm font-mono text-gray-900 mt-0.5"><%= crewMember.employee_id || '-' %></p></div>
-          <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Phone</p><p class="text-sm text-gray-900 mt-0.5"><%= crewMember.phone || '-' %></p></div>
-          <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Company</p><p class="text-sm text-gray-900 mt-0.5"><%= crewMember.company || '-' %></p></div>
-        </div>
-      </div>
-
-      <!-- Upcoming Shifts -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Upcoming Shifts</h2>
-        <% if (upcomingShifts.length > 0) { %>
-          <div class="space-y-2">
-            <% upcomingShifts.forEach(shift => { %>
-            <div class="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-              <div>
-                <p class="text-sm font-medium text-gray-900"><%= shift.job_number %></p>
-                <p class="text-[10px] text-gray-400"><%= shift.client || '' %></p>
-              </div>
-              <span class="text-xs text-gray-500 tabular-nums"><%= formatDate(shift.allocation_date) %></span>
+        <!-- Crew Member Info -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Crew Profile</h2>
+            <a href="/crew/<%= crewMember.id %>" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View Full Profile &rarr;</a>
+          </div>
+          <div class="flex items-center gap-4 mb-4">
+            <div class="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center text-brand-700 font-bold text-lg">
+              <%= (crewMember.full_name || '?')[0] %>
             </div>
-            <% }); %>
+            <div>
+              <p class="text-sm font-semibold text-gray-900"><%= crewMember.full_name %></p>
+              <p class="text-xs text-gray-500"><%= crewMember.employee_id || '' %> &middot; <%= crewMember.role ? crewMember.role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '' %></p>
+            </div>
           </div>
-        <% } else { %>
-          <p class="text-sm text-gray-400">No upcoming shifts.</p>
-        <% } %>
-      </div>
+          <div class="grid grid-cols-2 gap-y-3 gap-x-6">
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Phone</p><p class="text-sm text-gray-900 mt-0.5"><%= crewMember.phone || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Email</p><p class="text-sm text-gray-900 mt-0.5"><%= crewMember.email || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Status</p><p class="text-sm text-gray-900 mt-0.5 capitalize"><%= crewMember.status || '-' %></p></div>
+            <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Employment</p><p class="text-sm text-gray-900 mt-0.5 capitalize"><%= (crewMember.employment_type || '-').replace(/_/g, ' ') %></p></div>
+            <% if (crewMember.white_card) { %>
+              <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">White Card</p><p class="text-sm text-gray-900 mt-0.5 font-mono"><%= crewMember.white_card %></p></div>
+            <% } %>
+            <% if (crewMember.licence_type) { %>
+              <div><p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Licence</p><p class="text-sm text-gray-900 mt-0.5"><%= crewMember.licence_type %></p></div>
+            <% } %>
+          </div>
+        </div>
 
-      <!-- Recent Timesheets -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 lg:col-span-2">
-        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Recent Timesheets</h2>
-        <% if (recentTimesheets.length > 0) { %>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr class="border-b border-gray-200">
-                  <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date</th>
-                  <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Job</th>
-                  <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Client</th>
-                  <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hours</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-50">
-                <% recentTimesheets.forEach(ts => { %>
-                <tr class="hover:bg-gray-50">
-                  <td class="px-3 py-2 text-xs text-gray-600 tabular-nums"><%= formatDate(ts.work_date) %></td>
-                  <td class="px-3 py-2 text-xs font-medium text-gray-900"><%= ts.job_number %></td>
-                  <td class="px-3 py-2 text-xs text-gray-500 hidden sm:table-cell"><%= ts.client || '-' %></td>
-                  <td class="px-3 py-2 text-xs text-gray-900 tabular-nums"><%= ts.hours_worked || '-' %></td>
-                </tr>
-                <% }); %>
-              </tbody>
-            </table>
+        <!-- Upcoming Shifts -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+          <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Upcoming Shifts</h2>
+          <% if (upcomingShifts && upcomingShifts.length > 0) { %>
+            <div class="space-y-2">
+              <% upcomingShifts.forEach(shift => { %>
+              <div class="flex items-center justify-between py-2.5 px-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p class="text-sm font-medium text-gray-900"><%= shift.job_number %></p>
+                  <p class="text-[10px] text-gray-400"><%= shift.client || '' %></p>
+                </div>
+                <div class="text-right">
+                  <span class="text-xs text-gray-600 tabular-nums"><%= formatDate(shift.allocation_date) %></span>
+                  <% if (shift.start_time) { %><p class="text-[10px] text-gray-400"><%= shift.start_time %></p><% } %>
+                </div>
+              </div>
+              <% }); %>
+            </div>
+          <% } else { %>
+            <div class="text-center py-6">
+              <svg class="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              <p class="text-sm text-gray-400">No upcoming shifts.</p>
+            </div>
+          <% } %>
+        </div>
+
+        <!-- Worker Portal Access -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Portal Access</h2>
+            <% if (crewMember.pin_hash) { %>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">PIN Set</span>
+            <% } else { %>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-500">No Access</span>
+            <% } %>
           </div>
-        <% } else { %>
-          <p class="text-sm text-gray-400">No timesheets found.</p>
-        <% } %>
+
+          <% if (!crewMember.employee_id) { %>
+            <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-xs">
+              Worker needs an Employee ID before portal access. <a href="/hr/employees/<%= employee.id %>/edit" class="font-medium underline">Edit profile</a>
+            </div>
+          <% } else { %>
+            <% if (crewMember.pin_hash && crewMember.last_worker_login) { %>
+            <div class="text-xs text-gray-500 mb-2">
+              Last login: <span class="text-gray-700 font-medium"><%= new Date(crewMember.last_worker_login).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></span>
+              <% if (crewMember.worker_login_count) { %> (<%= crewMember.worker_login_count %> total)<% } %>
+            </div>
+            <% } else if (crewMember.pin_hash) { %>
+            <p class="text-xs text-gray-400 mb-2">Never logged in</p>
+            <% } %>
+
+            <div class="space-y-2">
+              <form method="POST" action="/hr/employees/<%= employee.id %>/set-pin" class="flex items-end gap-2">
+                <%- include('../partials/csrf') %>
+                <div class="flex-1">
+                  <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5"><%= crewMember.pin_hash ? 'Reset PIN' : 'Set PIN' %></label>
+                  <input type="text" name="pin" inputmode="numeric" pattern="[0-9]{4,6}" maxlength="6" required placeholder="4-6 digits"
+                    class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                </div>
+                <button type="submit" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition"><%= crewMember.pin_hash ? 'Reset' : 'Set' %></button>
+              </form>
+              <div class="flex gap-2">
+                <% if (crewMember.pin_hash) { %>
+                  <form method="POST" action="/hr/employees/<%= employee.id %>/clear-pin" onsubmit="return confirm('Remove portal access?')" class="flex-1">
+                    <%- include('../partials/csrf') %>
+                    <button type="submit" class="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition">Clear PIN</button>
+                  </form>
+                <% } %>
+                <% if (crewMember.email && crewMember.employee_id) { %>
+                  <form method="POST" action="/hr/employees/<%= employee.id %>/send-invite" class="flex-1">
+                    <%- include('../partials/csrf') %>
+                    <button type="submit" class="w-full px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium rounded-lg border border-blue-200 transition">Email Invite</button>
+                  </form>
+                <% } %>
+              </div>
+            </div>
+          <% } %>
+        </div>
+
+        <!-- Recent Timesheets -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 lg:col-span-2">
+          <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Recent Timesheets</h2>
+          <% if (recentTimesheets && recentTimesheets.length > 0) { %>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr class="border-b border-gray-200">
+                    <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date</th>
+                    <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Job</th>
+                    <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Client</th>
+                    <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hours</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                  <% recentTimesheets.forEach(ts => { %>
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2 text-xs text-gray-600 tabular-nums"><%= formatDate(ts.work_date) %></td>
+                    <td class="px-3 py-2 text-xs font-medium text-gray-900"><%= ts.job_number %></td>
+                    <td class="px-3 py-2 text-xs text-gray-500 hidden sm:table-cell"><%= ts.client || '-' %></td>
+                    <td class="px-3 py-2 text-xs text-gray-900 tabular-nums"><%= ts.hours_worked || '-' %></td>
+                  </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } else { %>
+            <div class="text-center py-6">
+              <svg class="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <p class="text-sm text-gray-400">No timesheets found.</p>
+            </div>
+          <% } %>
+        </div>
       </div>
-    </div>
+    <% } else { %>
+      <!-- No linked crew member -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+        <div class="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        </div>
+        <h3 class="text-gray-900 font-semibold text-base mb-2">Not linked to Crew Roster</h3>
+        <p class="text-gray-500 text-sm mb-4 max-w-md mx-auto">This employee isn't linked to a crew member record yet. Link them to see their shifts, timesheets, and operational data.</p>
+        <a href="/hr/employees/<%= employee.id %>/edit" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+          Link Crew Member
+        </a>
+        <p class="text-[10px] text-gray-400 mt-3">Go to Edit &rarr; set "Linked Crew Member" field</p>
+      </div>
+    <% } %>
   </div>
-  <% } %>
 
 </div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- MODALS                                          -->
+<!-- ═══════════════════════════════════════════════ -->
 
 <!-- Upload Document Modal -->
 <div id="uploadDocModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -516,8 +798,8 @@
       <%- include('../partials/csrf') %>
       <div>
         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Document Type <span class="text-red-500">*</span></label>
-        <select name="document_type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          <% docTypes.forEach(dt => { %><option value="<%= dt.val %>"><%= dt.label %></option><% }); %>
+        <select name="document_type" id="uploadDocType" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <% allDocTypes.forEach(dt => { %><option value="<%= dt.val %>"><%= dt.label %></option><% }); %>
         </select>
       </div>
       <div>
@@ -526,7 +808,12 @@
       </div>
       <div>
         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">File <span class="text-red-500">*</span></label>
-        <input type="file" name="file" required class="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-brand-400 transition" id="dropZone">
+          <svg class="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          <p class="text-sm text-gray-500 mb-1">Click or drag to upload</p>
+          <p class="text-[10px] text-gray-400">PDF, images, documents up to 50MB</p>
+          <input type="file" name="file" required class="absolute inset-0 opacity-0 cursor-pointer" style="position:relative; margin-top:8px;">
+        </div>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
@@ -571,12 +858,12 @@
         </select>
       </div>
       <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Name</label>
-        <input type="text" name="competency_name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. White Card - General Construction">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Name / Description</label>
+        <input type="text" name="competency_name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. HLTAID011 Provide First Aid">
       </div>
       <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Level</label>
-        <input type="text" name="competency_level" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. TC1, Gold, Advanced">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Level / Class</label>
+        <input type="text" name="competency_level" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="e.g. TC1, Gold, HR, HC, MC">
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
@@ -598,6 +885,16 @@
           <option value="suspended">Suspended</option>
         </select>
       </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Link to Document</label>
+        <select name="linked_document_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">— No linked document —</option>
+          <% (documents || []).forEach(doc => { %>
+            <option value="<%= doc.id %>"><%= formatType(doc.document_type) %> — <%= doc.document_name || doc.original_name %></option>
+          <% }); %>
+        </select>
+        <p class="text-[10px] text-gray-400 mt-1">Attach the certificate or licence file for this competency</p>
+      </div>
       <div class="flex items-center gap-2">
         <input type="checkbox" name="mandatory_for_role" value="1" id="comp_mandatory" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
         <label for="comp_mandatory" class="text-sm text-gray-700">Mandatory for role</label>
@@ -609,6 +906,75 @@
       <div class="flex items-center gap-3 pt-2">
         <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Add Competency</button>
         <button type="button" onclick="document.getElementById('addCompModal').classList.add('hidden')" class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Competency Modal -->
+<div id="editCompModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/40" onclick="document.getElementById('editCompModal').classList.add('hidden')"></div>
+  <div class="relative bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-900">Edit Competency</h3>
+      <button onclick="document.getElementById('editCompModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <form id="editCompForm" method="POST" class="space-y-4">
+      <%- include('../partials/csrf') %>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Competency Type</label>
+        <select name="competency_type" id="edit_comp_type" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <% compTypes.forEach(ct => { %><option value="<%= ct.val %>"><%= ct.label %></option><% }); %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Name / Description</label>
+        <input type="text" name="competency_name" id="edit_comp_name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Level / Class</label>
+        <input type="text" name="competency_level" id="edit_comp_level" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Issue Date</label>
+          <input type="date" name="issue_date" id="edit_comp_issue" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Expiry Date</label>
+          <input type="date" name="expiry_date" id="edit_comp_expiry" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Status</label>
+        <select name="status" id="edit_comp_status" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="valid">Valid</option>
+          <option value="expiring_soon">Expiring Soon</option>
+          <option value="expired">Expired</option>
+          <option value="missing">Missing</option>
+          <option value="suspended">Suspended</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Link to Document</label>
+        <select name="linked_document_id" id="edit_comp_doc" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">— No linked document —</option>
+          <% (documents || []).forEach(doc => { %>
+            <option value="<%= doc.id %>"><%= formatType(doc.document_type) %> — <%= doc.document_name || doc.original_name %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" name="mandatory_for_role" value="1" id="edit_comp_mandatory" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+        <label for="edit_comp_mandatory" class="text-sm text-gray-700">Mandatory for role</label>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Notes</label>
+        <textarea name="notes" id="edit_comp_notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+      </div>
+      <div class="flex items-center gap-3 pt-2">
+        <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Save Changes</button>
+        <button type="button" onclick="document.getElementById('editCompModal').classList.add('hidden')" class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
       </div>
     </form>
   </div>
@@ -634,41 +1000,59 @@
   </div>
 </div>
 
-<%- contentFor('script') %>
 <script>
-  // Tab switching
-  document.addEventListener('DOMContentLoaded', () => {
-    const tabs = document.querySelectorAll('.emp-tab');
-    const contents = document.querySelectorAll('.emp-tab-content');
-
-    // Check hash for direct tab link
-    const hash = window.location.hash.replace('#', '');
-    if (hash && document.getElementById('tab-' + hash)) {
-      switchTab(hash);
-    }
-
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        const target = tab.dataset.tab;
-        switchTab(target);
-        window.location.hash = target;
-      });
-    });
-
-    function switchTab(target) {
-      tabs.forEach(t => {
-        t.classList.remove('border-brand-600', 'text-brand-600');
-        t.classList.add('border-transparent', 'text-gray-500');
-      });
-      contents.forEach(c => c.classList.add('hidden'));
-
-      const activeTab = document.querySelector(`[data-tab="${target}"]`);
-      const activeContent = document.getElementById('tab-' + target);
-      if (activeTab) {
-        activeTab.classList.add('border-brand-600', 'text-brand-600');
-        activeTab.classList.remove('border-transparent', 'text-gray-500');
-      }
-      if (activeContent) activeContent.classList.remove('hidden');
-    }
+// ── Tab switching (global so onclick works) ──
+function switchEmpTab(target) {
+  document.querySelectorAll('.emp-tab').forEach(function(t) {
+    t.classList.remove('border-brand-600', 'text-brand-600');
+    t.classList.add('border-transparent', 'text-gray-500');
   });
+  document.querySelectorAll('.emp-tab-content').forEach(function(c) {
+    c.style.display = 'none';
+  });
+
+  var activeTab = document.querySelector('[data-tab="' + target + '"]');
+  var activeContent = document.getElementById('tab-' + target);
+  if (activeTab) {
+    activeTab.classList.add('border-brand-600', 'text-brand-600');
+    activeTab.classList.remove('border-transparent', 'text-gray-500');
+  }
+  if (activeContent) {
+    activeContent.style.display = '';
+  }
+  try { history.replaceState(null, '', '#' + target); } catch(e) {}
+}
+
+// ── Check hash on load ──
+(function() {
+  var hash = window.location.hash.replace('#', '');
+  if (hash && document.getElementById('tab-' + hash)) {
+    switchEmpTab(hash);
+  }
+})();
+
+// ── Upload modal helper ──
+function openUploadModal(docType) {
+  var modal = document.getElementById('uploadDocModal');
+  var select = document.getElementById('uploadDocType');
+  if (select && docType) select.value = docType;
+  modal.classList.remove('hidden');
+}
+
+// ── Edit competency modal ──
+function openEditComp(comp) {
+  var modal = document.getElementById('editCompModal');
+  var form = document.getElementById('editCompForm');
+  form.action = '/hr/competencies/' + comp.id;
+  document.getElementById('edit_comp_type').value = comp.competency_type || '';
+  document.getElementById('edit_comp_name').value = comp.competency_name || '';
+  document.getElementById('edit_comp_level').value = comp.competency_level || '';
+  document.getElementById('edit_comp_issue').value = comp.issue_date || '';
+  document.getElementById('edit_comp_expiry').value = comp.expiry_date || '';
+  document.getElementById('edit_comp_status').value = comp.status || 'valid';
+  document.getElementById('edit_comp_doc').value = comp.linked_document_id || '';
+  document.getElementById('edit_comp_mandatory').checked = !!comp.mandatory_for_role;
+  document.getElementById('edit_comp_notes').value = comp.notes || '';
+  modal.classList.remove('hidden');
+}
 </script>

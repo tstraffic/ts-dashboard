@@ -387,11 +387,254 @@
     </div>
   </div>
 
-  <!-- Step 5: Payroll & Links (Optional) -->
-  <div class="wizard-panel hidden" data-wizard-panel="4">
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Payroll & Links <span class="text-gray-400 font-normal normal-case text-[10px] ml-1">Optional</span></h2>
+  <!-- Section 2: Employment -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Employment</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Employee Code</label>
+        <input type="text" name="employee_code" value="<%= val('employee_code') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. EMP-001">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Company</label>
+        <input type="text" name="company" value="<%= val('company') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. T&S Traffic Control">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Division</label>
+        <input type="text" name="division" value="<%= val('division') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. Operations">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Role Title</label>
+        <input type="text" name="role_title" value="<%= val('role_title') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. Traffic Controller">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Employment Type</label>
+        <select name="employment_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select --</option>
+          <% employmentTypes.forEach(t => { %>
+            <% const typeVal = t.val || t.value || t; const typeLabel = t.label || t; %>
+            <option value="<%= typeVal %>" <%= selected('employment_type', typeVal) %>><%= typeLabel %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Employment Status</label>
+        <select name="employment_status" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <% defaultStatuses.forEach(s => { %>
+            <option value="<%= s.val %>" <%= selected('employment_status', s.val) %>><%= s.label %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Payment Type</label>
+        <select name="payment_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- None --</option>
+          <option value="cash" <%= val('payment_type') === 'cash' ? 'selected' : '' %>>Cash</option>
+          <option value="tfn" <%= val('payment_type') === 'tfn' ? 'selected' : '' %>>TFN</option>
+          <option value="abn" <%= val('payment_type') === 'abn' ? 'selected' : '' %>>ABN</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Start Date</label>
+        <input type="date" name="start_date" value="<%= val('start_date') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">End Date</label>
+        <input type="date" name="end_date" value="<%= val('end_date') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Probation End Date</label>
+        <input type="date" name="probation_end_date" value="<%= val('probation_end_date') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Manager</label>
+        <select name="manager_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- No Manager --</option>
+          <% if (allEmployees) { allEmployees.forEach(e => { %>
+            <% if (!isEdit || e.id !== employee.id) { %>
+              <option value="<%= e.id %>" <%= isEdit && employee.manager_id == e.id ? 'selected' : '' %>><%= e.first_name %> <%= e.last_name %></option>
+            <% } %>
+          <% }); } %>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Operational -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Operational</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Traffic Role Level</label>
+        <input type="text" name="traffic_role_level" value="<%= val('traffic_role_level') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. TC1, TC2, Supervisor">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Ticket Classification</label>
+        <input type="text" name="ticket_classification" value="<%= val('ticket_classification') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Primary Work Region</label>
+        <input type="text" name="primary_work_region" value="<%= val('primary_work_region') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. Sydney Metro">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Base Location</label>
+        <input type="text" name="base_location" value="<%= val('base_location') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Company Vehicle Assigned</label>
+        <input type="text" name="company_vehicle_assigned" value="<%= val('company_vehicle_assigned') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. Vehicle rego or ID">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Induction Status</label>
+        <select name="induction_status" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select --</option>
+          <option value="not_started" <%= selected('induction_status', 'not_started') %>>Not Started</option>
+          <option value="in_progress" <%= selected('induction_status', 'in_progress') %>>In Progress</option>
+          <option value="completed" <%= selected('induction_status', 'completed') %>>Completed</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">PPE Issued Status</label>
+        <select name="ppe_issued_status" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select --</option>
+          <option value="not_issued" <%= selected('ppe_issued_status', 'not_issued') %>>Not Issued</option>
+          <option value="partial" <%= selected('ppe_issued_status', 'partial') %>>Partial</option>
+          <option value="fully_issued" <%= selected('ppe_issued_status', 'fully_issued') %>>Fully Issued</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Uniform Issued Status</label>
+        <select name="uniform_issued_status" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select --</option>
+          <option value="not_issued" <%= selected('uniform_issued_status', 'not_issued') %>>Not Issued</option>
+          <option value="partial" <%= selected('uniform_issued_status', 'partial') %>>Partial</option>
+          <option value="fully_issued" <%= selected('uniform_issued_status', 'fully_issued') %>>Fully Issued</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-100">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" name="allocatable" id="allocatable" value="1" <%= checked('allocatable') %>
+          class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+        <label for="allocatable" class="text-sm text-gray-700">Allocatable to Jobs</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" name="blocked_from_allocation" id="blocked_from_allocation" value="1" <%= checked('blocked_from_allocation') %>
+          class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+        <label for="blocked_from_allocation" class="text-sm text-gray-700">Blocked from Allocation</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" name="white_card_required" id="white_card_required" value="1" <%= checked('white_card_required') %>
+          class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+        <label for="white_card_required" class="text-sm text-gray-700">White Card Required</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" name="medical_required" id="medical_required" value="1" <%= checked('medical_required') %>
+          class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+        <label for="medical_required" class="text-sm text-gray-700">Medical Required</label>
+      </div>
+    </div>
+    <div class="mt-4">
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Block Reason</label>
+      <input type="text" name="block_reason" value="<%= val('block_reason') %>"
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+        placeholder="Reason for blocking from allocation (if applicable)">
+    </div>
+  </div>
+
+  <!-- Section 4: Licences & Cards -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Licences & Cards</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">White Card Number</label>
+        <input type="text" name="white_card_number" value="<%= val('white_card_number') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. WC-12345678">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TC Licence Number</label>
+        <input type="text" name="tc_licence_number" value="<%= val('tc_licence_number') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. TC-123456">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TC Licence State</label>
+        <select name="tc_licence_state"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">Select...</option>
+          <% ['NSW','VIC','QLD','SA','WA','TAS','NT','ACT'].forEach(s => { %>
+            <option value="<%= s %>" <%= val('tc_licence_state') === s ? 'selected' : '' %>><%= s %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TC Date of Issue</label>
+        <input type="date" name="tc_licence_date_of_issue" value="<%= val('tc_licence_date_of_issue') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Driver's Licence Number</label>
+        <input type="text" name="drivers_licence_number" value="<%= val('drivers_licence_number') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. 12345678">
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 5: Emergency Contact -->
+  <% if (canViewSensitive) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Emergency Contact</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Contact Name</label>
+        <input type="text" name="emergency_contact_name" value="<%= val('emergency_contact_name') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Contact Phone</label>
+        <input type="tel" name="emergency_contact_phone" value="<%= val('emergency_contact_phone') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Relationship</label>
+        <input type="text" name="emergency_contact_relationship" value="<%= val('emergency_contact_relationship') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. Spouse, Parent, Sibling">
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Section 5: Notes & Links -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Notes & Links</h2>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Internal Notes</label>
+        <textarea name="internal_notes" rows="4"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="Private notes about this employee..."><%= val('internal_notes') %></textarea>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>

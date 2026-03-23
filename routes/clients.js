@@ -144,6 +144,43 @@ router.post('/', (req, res) => {
   }
 });
 
+// Bulk delete companies
+router.post('/delete', (req, res) => {
+  const db = getDb();
+  let ids = req.body.ids;
+  if (!ids) { req.flash('error', 'No companies selected.'); return res.redirect('/clients'); }
+  if (!Array.isArray(ids)) ids = [ids];
+  ids = ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+  if (ids.length === 0) { req.flash('error', 'No valid companies selected.'); return res.redirect('/clients'); }
+
+  const placeholders = ids.map(() => '?').join(',');
+
+  // Check for linked jobs
+  const linkedJobs = db.prepare(`SELECT client_id, COUNT(*) as c FROM jobs WHERE client_id IN (${placeholders}) GROUP BY client_id`).all(...ids);
+  const blockedIds = linkedJobs.filter(j => j.c > 0).map(j => j.client_id);
+  const deletableIds = ids.filter(id => !blockedIds.includes(id));
+
+  if (deletableIds.length === 0) {
+    req.flash('error', 'Cannot delete — all selected companies have linked projects. Deactivate instead.');
+    return res.redirect('/clients');
+  }
+
+  const delPlaceholders = deletableIds.map(() => '?').join(',');
+
+  // Delete related records
+  try { db.prepare(`DELETE FROM client_contacts WHERE company_id IN (${delPlaceholders})`).run(...deletableIds); } catch (e) { /* ignore */ }
+
+  const result = db.prepare(`DELETE FROM clients WHERE id IN (${delPlaceholders})`).run(...deletableIds);
+  const count = result.changes;
+
+  if (blockedIds.length > 0) {
+    req.flash('success', `Deleted ${count} company${count !== 1 ? 'ies' : 'y'}. ${blockedIds.length} skipped (have linked projects).`);
+  } else {
+    req.flash('success', `Deleted ${count} company${count !== 1 ? 'ies' : 'y'}.`);
+  }
+  res.redirect('/clients');
+});
+
 // Company detail page
 router.get('/:id', (req, res, next) => {
   try {

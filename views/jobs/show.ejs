@@ -211,6 +211,9 @@
     <a href="#defects" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Defects</a>
+    <a href="#chat" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
+      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Chat</a>
     <% if (canViewAccounts) { %>
     <a href="#budget" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
@@ -426,14 +429,21 @@
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Due Date</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Cost</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Charged</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Approver</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
+          <% let compTotalCost = 0, compTotalCharged = 0; %>
           <% complianceItems.forEach(item => { %>
+          <% const itemCost = (item.costs || 0) + (item.council_fee_amount || 0); compTotalCost += itemCost; compTotalCharged += (item.charge_amount || 0); %>
           <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3 text-gray-600 font-medium"><%= item.title %></td>
-            <td class="px-4 py-3 text-gray-500"><%= item.item_type || '-' %></td>
+            <td class="px-4 py-3 font-medium">
+              <a href="/compliance/<%= item.id %>/edit?return_to=/jobs/<%= job.id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= item.title %></a>
+              <% if (item.reference_number) { %><span class="text-xs text-gray-400 ml-1">(<%= item.reference_number %>)</span><% } %>
+            </td>
+            <td class="px-4 py-3 text-gray-500"><%= item.item_type ? item.item_type.replace(/_/g, ' ') : '-' %></td>
             <td class="px-4 py-3">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
                 <% if (item.status === 'approved') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
@@ -445,10 +455,27 @@
               </span>
             </td>
             <td class="px-4 py-3 text-gray-500 text-xs"><%= item.due_date || '-' %></td>
+            <td class="px-4 py-3 text-right text-gray-900 font-medium"><%= itemCost > 0 ? '$' + itemCost.toLocaleString() : '-' %></td>
+            <td class="px-4 py-3 text-right">
+              <% if (item.charge_amount > 0) { %>
+                <span class="text-gray-900 font-medium">$<%= item.charge_amount.toLocaleString() %></span>
+                <% if (item.invoiced) { %><span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700">Invoiced</span><% } %>
+              <% } else { %>-<% } %>
+            </td>
             <td class="px-4 py-3 text-gray-600"><%= item.approver_name || '-' %></td>
           </tr>
           <% }) %>
         </tbody>
+        <% if (compTotalCost > 0 || compTotalCharged > 0) { %>
+        <tfoot>
+          <tr class="border-t-2 border-gray-300 bg-gray-50">
+            <td class="px-4 py-3 text-sm font-semibold text-gray-900" colspan="4">Total</td>
+            <td class="px-4 py-3 text-right text-sm font-bold text-gray-900">$<%= compTotalCost.toLocaleString() %></td>
+            <td class="px-4 py-3 text-right text-sm font-bold text-gray-900"><%= compTotalCharged > 0 ? '$' + compTotalCharged.toLocaleString() : '-' %></td>
+            <td></td>
+          </tr>
+        </tfoot>
+        <% } %>
       </table>
     </div>
     <% } %>
@@ -686,8 +713,8 @@
         <tbody class="divide-y divide-gray-200">
           <% equipmentAssignments.forEach(ea => { %>
           <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3 text-brand-600 font-medium"><%= ea.asset_number || '-' %></td>
-            <td class="px-4 py-3 text-gray-600"><%= ea.equipment_name || '-' %></td>
+            <td class="px-4 py-3 font-medium"><a href="/equipment/<%= ea.equipment_id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= ea.asset_number || '-' %></a></td>
+            <td class="px-4 py-3"><a href="/equipment/<%= ea.equipment_id %>" class="text-gray-700 hover:text-brand-600 hover:underline"><%= ea.equipment_name || '-' %></a></td>
             <td class="px-4 py-3 text-gray-500"><%= ea.category ? ea.category.replace(/_/g, ' ') : '-' %></td>
             <td class="px-4 py-3">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
@@ -757,6 +784,21 @@
     <% } %>
   </div>
 
+  <!-- Chat Tab -->
+  <div id="chat" class="tab-content">
+    <div class="mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Job Chat</h2>
+      <p class="text-sm text-gray-500 mt-1">Operational messages for this job</p>
+    </div>
+    <% if (typeof chatThreadId !== 'undefined' && chatThreadId) { %>
+      <%- include('../partials/chat-panel') %>
+    <% } else { %>
+      <div class="bg-white border border-gray-200 rounded-xl p-6 text-center">
+        <p class="text-gray-400 text-sm">Chat thread not available.</p>
+      </div>
+    <% } %>
+  </div>
+
   <!-- Budget Tab (conditional) -->
   <% if (canViewAccounts) { %>
   <div id="budget" class="tab-content">
@@ -789,6 +831,39 @@
       <a href="/budgets/job/<%= job.id %>" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Set up budget</a>
     </div>
     <% } %>
+    <!-- Cost Breakdown by Source -->
+    <% const allSourcesTotal = totalSpend + (complianceCosts || 0) + (equipmentCosts || 0); %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mb-6">
+      <h3 class="text-sm font-semibold text-gray-900 mb-4">Cost Breakdown by Source</h3>
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
+            <span class="text-sm text-gray-700">Manual Cost Entries</span>
+          </div>
+          <span class="text-sm font-semibold text-gray-900">$<%= totalSpend.toLocaleString() %></span>
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+            <a href="#compliance" onclick="activateTab(document.querySelector('a[href=\'#compliance\']'))" class="text-sm text-purple-700 hover:underline">Plans & Approvals (Council fees, TGS costs)</a>
+          </div>
+          <span class="text-sm font-semibold text-gray-900">$<%= (complianceCosts || 0).toLocaleString() %></span>
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            <a href="#equipment" onclick="activateTab(document.querySelector('a[href=\'#equipment\']'))" class="text-sm text-amber-700 hover:underline">Equipment Maintenance</a>
+          </div>
+          <span class="text-sm font-semibold text-gray-900">$<%= (equipmentCosts || 0).toLocaleString() %></span>
+        </div>
+        <div class="border-t border-gray-200 pt-3 flex items-center justify-between">
+          <span class="text-sm font-bold text-gray-900">Total All Sources</span>
+          <span class="text-base font-bold text-gray-900">$<%= allSourcesTotal.toLocaleString() %></span>
+        </div>
+      </div>
+    </div>
+
     <% if (costEntries.length > 0) { %>
     <h3 class="text-sm font-semibold text-gray-900 mb-3">Recent Cost Entries</h3>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">

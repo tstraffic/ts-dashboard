@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDb } = require('../db/database');
 const { logActivity } = require('../middleware/audit');
 const upload = require('../middleware/upload');
+const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadForEntity } = require('../lib/chat');
 
 // Helper to generate next incident number
 function nextIncidentNumber(db) {
@@ -123,6 +124,16 @@ router.post('/', upload.single('photo'), (req, res) => {
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'incident', entityId: incidentId, entityLabel: `${incident_number} - ${title}`, jobId: parseInt(job_id), jobNumber: job ? job.job_number : '', details: `Severity: ${severity}, Type: ${incident_type}`, ip: req.ip });
 
+  // Auto-create chat thread for this incident
+  const threadId = ensureThreadForEntity('incident', incidentId, `Incident ${incident_number}`, req.session.user.id);
+  const jobDetails = db.prepare('SELECT project_manager_id, ops_supervisor_id FROM jobs WHERE id = ?').get(job_id);
+  const memberIds = [...new Set([req.session.user.id,
+    jobDetails ? jobDetails.project_manager_id : null,
+    jobDetails ? jobDetails.ops_supervisor_id : null
+  ].filter(Boolean))];
+  addMembersToThread(threadId, memberIds, 'member', true);
+  postSystemMessage(threadId, `Incident ${incident_number} reported — ${severity} severity`);
+
   req.flash('success', `Incident ${incident_number} reported successfully.`);
   res.redirect(`/incidents/${incidentId}`);
 });
@@ -168,6 +179,19 @@ router.get('/:id', (req, res) => {
     ORDER BY al.created_at DESC LIMIT 20
   `).all(req.params.id);
 
+  // Lazy-create chat thread for pre-existing incidents
+  let chatThreadId = getThreadForEntity('incident', incident.id);
+  if (!chatThreadId) {
+    chatThreadId = ensureThreadForEntity('incident', incident.id, `Incident ${incident.incident_number}`, req.session.user.id);
+    const jobDetails = db.prepare('SELECT project_manager_id, ops_supervisor_id FROM jobs WHERE id = ?').get(incident.job_id);
+    const memberIds = [...new Set([req.session.user.id, incident.reported_by_id,
+      jobDetails ? jobDetails.project_manager_id : null,
+      jobDetails ? jobDetails.ops_supervisor_id : null
+    ].filter(Boolean))];
+    addMembersToThread(chatThreadId, memberIds, 'member', true);
+    postSystemMessage(chatThreadId, `Thread created for incident ${incident.incident_number}`);
+  }
+
   res.render('incidents/show', {
     title: `Incident ${incident.incident_number}`,
     currentPage: 'incidents',
@@ -175,7 +199,8 @@ router.get('/:id', (req, res) => {
     correctiveActions,
     linkedCrew,
     activities,
-    users
+    users,
+    chatThreadId
   });
 });
 
@@ -232,6 +257,15 @@ router.post('/:id', upload.single('photo'), (req, res) => {
   }
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'incident', entityId: parseInt(req.params.id), entityLabel: existing ? existing.incident_number : title, jobId: parseInt(job_id), jobNumber: job ? job.job_number : '', ip: req.ip });
+
+  // Archive chat thread when incident is closed
+  if (investigation_status === 'closed') {
+    const threadId = getThreadForEntity('incident', parseInt(req.params.id));
+    if (threadId) {
+      db.prepare("UPDATE chat_threads SET status = 'archived' WHERE id = ?").run(threadId);
+      postSystemMessage(threadId, 'Thread archived — incident closed');
+    }
+  }
 
   req.flash('success', 'Incident updated.');
   res.redirect(`/incidents/${req.params.id}`);

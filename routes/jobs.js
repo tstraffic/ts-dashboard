@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { canViewAccounts } = require('../middleware/auth');
+const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadForEntity } = require('../lib/chat');
 
 // List all jobs
 router.get('/', (req, res) => {
@@ -87,6 +88,21 @@ router.post('/', (req, res) => {
       b.rol_required ? 1 : 0, b.tmp_required ? 1 : 0, b.sharepoint_url || '', b.state || '',
       b.required_tcp_level || ''
     );
+    // Auto-create chat thread for this job
+    const newJobId = db.prepare('SELECT id FROM jobs WHERE job_number = ?').get(b.job_number);
+    if (newJobId) {
+      const threadId = ensureThreadForEntity('job', newJobId.id, `Job ${b.job_number}`, req.session.user.id);
+      const memberIds = [...new Set([req.session.user.id,
+        b.project_manager_id ? parseInt(b.project_manager_id) : null,
+        b.ops_supervisor_id ? parseInt(b.ops_supervisor_id) : null,
+        b.planning_owner_id ? parseInt(b.planning_owner_id) : null,
+        b.marketing_owner_id ? parseInt(b.marketing_owner_id) : null,
+        b.accounts_owner_id ? parseInt(b.accounts_owner_id) : null
+      ].filter(Boolean))];
+      addMembersToThread(threadId, memberIds, 'member', true);
+      postSystemMessage(threadId, `Thread created for job ${b.job_number}`);
+    }
+
     req.flash('success', `Job ${b.job_number} created successfully.`);
     res.redirect('/jobs');
   } catch (err) {
@@ -175,6 +191,16 @@ router.get('/:id', (req, res) => {
   `).all(job.id);
   const totalSpend = db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM cost_entries WHERE job_id = ?`).get(job.id).total;
 
+  // Compliance costs for this job (council fees + plan costs)
+  const complianceCosts = db.prepare(`SELECT COALESCE(SUM(costs), 0) + COALESCE(SUM(council_fee_amount), 0) as total FROM compliance WHERE job_id = ?`).get(job.id).total;
+
+  // Equipment maintenance costs for equipment assigned to this job
+  const equipmentCosts = db.prepare(`
+    SELECT COALESCE(SUM(em.cost), 0) as total FROM equipment_maintenance em
+    INNER JOIN equipment_assignments ea ON em.equipment_id = ea.equipment_id
+    WHERE ea.job_id = ?
+  `).get(job.id).total;
+
   // Equipment assigned to this job
   const equipmentAssignments = db.prepare(`
     SELECT ea.*, e.name as equipment_name, e.asset_number, e.category, e.current_condition as equipment_condition,
@@ -201,11 +227,24 @@ router.get('/:id', (req, res) => {
     WHERE tp.job_id = ? ORDER BY tp.created_at DESC
   `).all(job.id);
 
+  // Lazy-create chat thread for pre-existing jobs
+  let chatThreadId = getThreadForEntity('job', job.id);
+  if (!chatThreadId) {
+    chatThreadId = ensureThreadForEntity('job', job.id, `Job ${job.job_number}`, req.session.user.id);
+    const memberIds = [...new Set([req.session.user.id,
+      job.project_manager_id, job.ops_supervisor_id,
+      job.planning_owner_id, job.marketing_owner_id, job.accounts_owner_id
+    ].filter(Boolean))];
+    addMembersToThread(chatThreadId, memberIds, 'member', true);
+    postSystemMessage(chatThreadId, `Thread created for job ${job.job_number}`);
+  }
+
   res.render('jobs/show', {
     title: job.job_number,
     job, tasks, updates, complianceItems, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
-    equipmentAssignments, defects, trafficPlans,
+    complianceCosts, equipmentCosts,
+    equipmentAssignments, defects, trafficPlans, chatThreadId,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });
@@ -250,6 +289,15 @@ router.post('/:id', (req, res) => {
       b.required_tcp_level || '',
       req.params.id
     );
+    // Archive chat thread when job is completed/closed
+    if (['completed', 'closed'].includes(b.status)) {
+      const threadId = getThreadForEntity('job', parseInt(req.params.id));
+      if (threadId) {
+        db.prepare("UPDATE chat_threads SET status = 'archived' WHERE id = ?").run(threadId);
+        postSystemMessage(threadId, `Thread archived — job ${b.status}`);
+      }
+    }
+
     req.flash('success', 'Job updated successfully.');
     res.redirect(`/jobs/${req.params.id}`);
   } catch (err) {

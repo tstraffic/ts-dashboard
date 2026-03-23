@@ -1,6 +1,30 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { getDb } = require('../db/database');
+
+// Multer config for compliance document uploads
+const complianceStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'data', 'uploads', 'compliance', req.params.id || 'new');
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const complianceUpload = multer({
+  storage: complianceStorage,
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /\.(pdf|doc|docx|xls|xlsx|csv|txt|jpg|jpeg|png|gif|webp|dwg|dxf)$/i;
+    cb(null, allowed.test(path.extname(file.originalname)));
+  }
+});
 
 function weekStart(date) {
   const d = new Date(date);
@@ -87,6 +111,43 @@ router.get('/', (req, res) => {
   });
 });
 
+// API: Generate next reference number for a given item_type
+router.get('/api/next-ref', (req, res) => {
+  const db = getDb();
+  const type = req.query.item_type || '';
+
+  const prefixMap = {
+    traffic_guidance: 'TSTGS',
+    road_occupancy: 'TSROL',
+    rol: 'TSROL',
+    council_permit: 'TSCA',
+    tmp_approval: 'TSTMP',
+    swms_review: 'TSSWMS',
+    insurance: 'TSINS',
+    induction: 'TSIND',
+    environmental: 'TSENV',
+    utility_clearance: 'TSUC',
+    spa: 'TSSPA',
+    police_notification: 'TSPN',
+    letter_drop: 'TSLD',
+    other: 'TSOTH',
+  };
+  const prefix = prefixMap[type] || 'TSREF';
+
+  // Find highest existing number with this prefix
+  const rows = db.prepare("SELECT reference_number FROM compliance WHERE reference_number LIKE ? || '%'").all(prefix);
+  let maxNum = 3000; // Start from 3001 to continue after existing TSTGS3xxx series
+  rows.forEach(r => {
+    const match = r.reference_number.match(new RegExp(prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\d+)'));
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  });
+
+  res.json({ reference_number: prefix + (maxNum + 1) });
+});
+
 router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
@@ -120,7 +181,9 @@ router.get('/:id/edit', (req, res) => {
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   const returnTo = req.query.return_to || '/compliance';
-  res.render('compliance/form', { title: 'Edit Plan / Approval', item, jobs, clients, users, user: req.session.user, prefillJobId: '', prefillClientId: '', returnTo });
+  let documents = [];
+  try { documents = db.prepare('SELECT cd.*, u.full_name as uploaded_by_name FROM compliance_documents cd LEFT JOIN users u ON cd.uploaded_by_id = u.id WHERE cd.compliance_id = ? ORDER BY cd.created_at DESC').all(item.id); } catch (e) { /* table may not exist yet */ }
+  res.render('compliance/form', { title: 'Edit Plan / Approval', item, jobs, clients, users, user: req.session.user, prefillJobId: '', prefillClientId: '', returnTo, documents });
 });
 
 router.post('/:id', (req, res) => {
@@ -143,6 +206,51 @@ router.post('/:id/delete', (req, res) => {
   db.prepare('DELETE FROM compliance WHERE id = ?').run(req.params.id);
   req.flash('success', 'Item deleted.');
   res.redirect(req.body.return_to || '/compliance');
+});
+
+// Upload documents to a compliance item
+router.post('/:id/upload', complianceUpload.array('documents', 10), (req, res) => {
+  const db = getDb();
+  const complianceId = req.params.id;
+  const item = db.prepare('SELECT id FROM compliance WHERE id = ?').get(complianceId);
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+
+  const ins = db.prepare('INSERT INTO compliance_documents (compliance_id, filename, original_name, file_path, file_size, mime_type, uploaded_by_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
+  const files = req.files || [];
+  files.forEach(f => {
+    const relPath = '/uploads/compliance/' + complianceId + '/' + f.filename;
+    ins.run(complianceId, f.filename, f.originalname, relPath, f.size, f.mimetype || '', req.session.user.id);
+  });
+
+  if (req.headers['accept'] && req.headers['accept'].includes('json')) {
+    const docs = db.prepare('SELECT * FROM compliance_documents WHERE compliance_id = ? ORDER BY created_at DESC').all(complianceId);
+    return res.json({ success: true, count: files.length, documents: docs });
+  }
+  req.flash('success', `${files.length} file(s) uploaded.`);
+  res.redirect(req.body.return_to || '/compliance/' + complianceId + '/edit');
+});
+
+// Delete a compliance document
+router.post('/:id/documents/:docId/delete', (req, res) => {
+  const db = getDb();
+  const doc = db.prepare('SELECT * FROM compliance_documents WHERE id = ? AND compliance_id = ?').get(req.params.docId, req.params.id);
+  if (doc) {
+    const fullPath = path.join(__dirname, '..', 'data', doc.file_path);
+    try { fs.unlinkSync(fullPath); } catch (e) { /* file may not exist */ }
+    db.prepare('DELETE FROM compliance_documents WHERE id = ?').run(doc.id);
+  }
+  if (req.headers['accept'] && req.headers['accept'].includes('json')) {
+    return res.json({ success: true });
+  }
+  req.flash('success', 'Document deleted.');
+  res.redirect(req.body.return_to || '/compliance/' + req.params.id + '/edit');
+});
+
+// Serve compliance uploads
+router.get('/:id/documents/:filename', (req, res) => {
+  const filePath = path.join(__dirname, '..', 'data', 'uploads', 'compliance', req.params.id, req.params.filename);
+  if (fs.existsSync(filePath)) return res.sendFile(filePath);
+  res.status(404).send('File not found');
 });
 
 module.exports = router;

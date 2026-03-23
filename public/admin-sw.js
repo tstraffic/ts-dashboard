@@ -1,5 +1,5 @@
 // T&S Admin Dashboard Service Worker — Network-first with offline fallback
-const CACHE_NAME = 'ts-admin-v17';
+const CACHE_NAME = 'ts-admin-v21';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to pre-cache
@@ -34,6 +34,9 @@ self.addEventListener('fetch', event => {
 
   // Skip non-GET requests
   if (request.method !== 'GET') return;
+
+  // Never cache induction pages — always go to network
+  if (request.url.includes('/induction')) return;
 
   // Static assets (CSS, JS, images) — cache-first
   if (request.url.match(/\.(css|js|jpg|jpeg|png|svg|ico|woff2?)(\?.*)?$/)) {

@@ -1,0 +1,156 @@
+<% locals.currentPage = 'chat' %>
+
+<%
+  function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + (dateStr.endsWith('Z') ? '' : 'Z'));
+    const now = new Date();
+    const diff = Math.floor((now - d) / 60000);
+    if (diff < 1) return 'just now';
+    if (diff < 60) return diff + 'm ago';
+    if (diff < 1440) return Math.floor(diff / 60) + 'h ago';
+    const days = Math.floor(diff / 1440);
+    if (days < 7) return days + 'd ago';
+    return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
+  }
+%>
+
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Operational Communications</h1>
+    <p class="text-gray-500 text-sm mt-0.5">Messages, threads, and channels</p>
+  </div>
+  <a href="/chat/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+    New Message
+  </a>
+</div>
+
+<!-- Stat Cards -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-brand-500 uppercase tracking-widest">Unread</p>
+    <p class="text-xl font-bold <%= stats.unread > 0 ? 'text-brand-600' : 'text-gray-300' %> mt-0.5"><%= stats.unread %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Direct Messages</p>
+    <p class="text-xl font-bold <%= stats.dms > 0 ? 'text-blue-600' : 'text-gray-300' %> mt-0.5"><%= stats.dms %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Threads</p>
+    <p class="text-xl font-bold <%= stats.threads > 0 ? 'text-emerald-600' : 'text-gray-300' %> mt-0.5"><%= stats.threads %></p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <p class="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Channels</p>
+    <p class="text-xl font-bold <%= stats.channels > 0 ? 'text-purple-600' : 'text-gray-300' %> mt-0.5"><%= stats.channels %></p>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl">
+  <a href="/chat?tab=all" class="flex-1 text-center px-3 py-2 text-sm font-medium rounded-lg transition-colors <%= tab === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700' %>">All</a>
+  <a href="/chat?tab=direct" class="flex-1 text-center px-3 py-2 text-sm font-medium rounded-lg transition-colors <%= tab === 'direct' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700' %>">Direct</a>
+  <a href="/chat?tab=threads" class="flex-1 text-center px-3 py-2 text-sm font-medium rounded-lg transition-colors <%= tab === 'threads' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700' %>">Threads</a>
+  <a href="/chat?tab=channels" class="flex-1 text-center px-3 py-2 text-sm font-medium rounded-lg transition-colors <%= tab === 'channels' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700' %>">Channels</a>
+</div>
+
+<!-- Thread List -->
+<% if (threads.length === 0) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center">
+    <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+      <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+    </div>
+    <% if (tab === 'direct') { %>
+      <h3 class="text-sm font-semibold text-gray-900 mb-1">No direct messages yet</h3>
+      <p class="text-gray-400 text-sm">Start a conversation with a team member using the New Message button.</p>
+    <% } else if (tab === 'threads') { %>
+      <h3 class="text-sm font-semibold text-gray-900 mb-1">No operational threads yet</h3>
+      <p class="text-gray-400 text-sm">Threads are created automatically when you open a job or incident. Admin and ops can also create threads manually.</p>
+    <% } else if (tab === 'channels') { %>
+      <h3 class="text-sm font-semibold text-gray-900 mb-1">No channels available</h3>
+      <p class="text-gray-400 text-sm">You'll be added to team channels based on your role.</p>
+    <% } else { %>
+      <h3 class="text-sm font-semibold text-gray-900 mb-1">No conversations yet</h3>
+      <p class="text-gray-400 text-sm">Start a direct message, open a job to create a thread, or join a team channel.</p>
+      <div class="flex flex-wrap items-center justify-center gap-2 mt-4">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>Direct Messages</span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Job / Incident Threads</span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 text-xs font-medium rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>Team Channels</span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Announcements</span>
+      </div>
+    <% } %>
+  </div>
+<% } else { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="divide-y divide-gray-100">
+      <% threads.forEach(function(thread) { %>
+        <%
+          let link = '/chat';
+          if (thread.thread_type === 'dm' && thread.dm_user) {
+            link = '/chat/dm/' + thread.dm_user.id;
+          } else if (thread.thread_type === 'channel' || thread.thread_type === 'announcement') {
+            link = '/chat/channel/' + thread.id;
+          } else if (thread.related_entity_type === 'job') {
+            link = '/jobs/' + thread.related_entity_id + '#chat';
+          } else if (thread.related_entity_type === 'incident') {
+            link = '/incidents/' + thread.related_entity_id + '#chat';
+          } else if (thread.related_entity_type === 'compliance') {
+            link = '/compliance/' + thread.related_entity_id;
+          }
+
+          let typeLabel = '', typeColor = '', typeBg = '';
+          if (thread.thread_type === 'dm') { typeLabel = 'DM'; typeColor = 'text-blue-700'; typeBg = 'bg-blue-50'; }
+          else if (thread.thread_type === 'job') { typeLabel = 'Job'; typeColor = 'text-emerald-700'; typeBg = 'bg-emerald-50'; }
+          else if (thread.thread_type === 'incident') { typeLabel = 'Incident'; typeColor = 'text-red-700'; typeBg = 'bg-red-50'; }
+          else if (thread.thread_type === 'compliance') { typeLabel = 'Plan'; typeColor = 'text-teal-700'; typeBg = 'bg-teal-50'; }
+          else if (thread.thread_type === 'channel') { typeLabel = 'Channel'; typeColor = 'text-purple-700'; typeBg = 'bg-purple-50'; }
+          else if (thread.thread_type === 'announcement') { typeLabel = 'Notice'; typeColor = 'text-amber-700'; typeBg = 'bg-amber-50'; }
+          else { typeLabel = thread.thread_type; typeColor = 'text-gray-700'; typeBg = 'bg-gray-50'; }
+
+          let displayTitle = thread.thread_type === 'dm' && thread.dm_user ? thread.dm_user.full_name : thread.title;
+
+          let preview = thread.last_message || 'No messages yet';
+          if (thread.last_message_type === 'system') preview = thread.last_message || '';
+          if (thread.last_message_type === 'image') preview = 'Sent an image';
+          if (preview.length > 90) preview = preview.substring(0, 90) + '...';
+
+          const hasUnread = thread.unread_count > 0;
+        %>
+        <a href="<%= link %>" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors <%= hasUnread ? 'border-l-3 border-l-brand-500 bg-brand-50/30' : '' %>">
+          <% if (thread.thread_type === 'dm' && thread.dm_user) { %>
+            <!-- DM avatar -->
+            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+              <%= thread.dm_user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() %>
+            </div>
+          <% } else { %>
+            <!-- Type chip -->
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider flex-shrink-0 <%= typeBg %> <%= typeColor %>"><%= typeLabel %></span>
+          <% } %>
+
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm <%= hasUnread ? 'font-semibold' : 'font-medium' %> text-gray-900 truncate"><%= displayTitle %></h3>
+              <% if (thread.member_count && thread.thread_type !== 'dm') { %>
+                <span class="text-[10px] text-gray-400 flex-shrink-0"><%= thread.member_count %></span>
+              <% } %>
+            </div>
+            <p class="text-xs text-gray-500 mt-0.5 truncate">
+              <% if (thread.last_message_sender && thread.last_message_type !== 'system') { %><span class="text-gray-700 font-medium"><%= thread.last_message_sender %>:</span> <% } %><%= preview %>
+            </p>
+          </div>
+
+          <div class="flex flex-col items-end gap-1 flex-shrink-0">
+            <% if (thread.last_message_at) { %>
+              <span class="text-[10px] text-gray-400 whitespace-nowrap"><%= timeAgo(thread.last_message_at) %></span>
+            <% } %>
+            <% if (hasUnread) { %>
+              <span class="bg-brand-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center"><%= thread.unread_count > 99 ? '99+' : thread.unread_count %></span>
+            <% } %>
+          </div>
+        </a>
+      <% }) %>
+    </div>
+  </div>
+  <p class="text-xs text-gray-400 mt-3 text-center"><%= threads.length %> conversation<%= threads.length !== 1 ? 's' : '' %></p>
+<% } %>

@@ -1,0 +1,120 @@
+<% locals.currentPage = 'chat' %>
+
+<!-- Header -->
+<div class="flex items-center gap-3 mb-5">
+  <a href="<%= backUrl || '/chat' %>" class="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+  </a>
+  <div class="flex-1 min-w-0">
+    <h1 class="text-xl font-bold text-gray-900 truncate"><%= threadTitle %></h1>
+    <p class="text-gray-500 text-xs"><%= threadSubtitle %></p>
+  </div>
+  <% if (threadType !== 'dm') { %>
+    <button id="toggleMembersBtn" onclick="toggleMembersPanel()" class="p-2 text-gray-400 hover:text-brand-600 rounded-lg hover:bg-gray-100 transition-colors" title="View Members">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+    </button>
+  <% } %>
+  <% if (threadType === 'announcement') { %>
+    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700">Announcement</span>
+  <% } else if (threadType === 'channel') { %>
+    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700">Channel</span>
+  <% } else if (threadType === 'dm') { %>
+    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700">Direct</span>
+  <% } %>
+</div>
+
+<!-- Chat Panel -->
+<% if (canPost) { %>
+  <%- include('../partials/chat-panel') %>
+<% } else { %>
+  <!-- Read-only view for announcement channels -->
+  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+       data-chat-thread="<%= chatThreadId %>"
+       data-current-user-id="<%= user.id %>"
+       data-current-user-name="<%= user.full_name %>">
+    <div class="chat-messages overflow-y-auto p-4 space-y-1" style="max-height: 600px;">
+      <div class="text-center text-gray-400 text-sm py-4">Loading messages...</div>
+    </div>
+    <div class="border-t border-gray-200 p-3 text-center">
+      <p class="text-xs text-gray-400">This is an announcement channel. Only admin and operations can post.</p>
+    </div>
+  </div>
+<% } %>
+
+<% if (threadType !== 'dm') { %>
+<!-- Members Panel (hidden by default) -->
+<div id="membersPanel" class="hidden mt-4 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+    <h3 class="text-sm font-bold text-gray-900">Members</h3>
+    <span id="memberCount" class="text-xs text-gray-400"></span>
+  </div>
+  <div id="membersList" class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+    <div class="p-4 text-center text-gray-400 text-sm">Loading...</div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var threadId = '<%= chatThreadId %>';
+  var membersLoaded = false;
+  var panelOpen = false;
+
+  window.toggleMembersPanel = function() {
+    var panel = document.getElementById('membersPanel');
+    var btn = document.getElementById('toggleMembersBtn');
+    panelOpen = !panelOpen;
+    panel.classList.toggle('hidden', !panelOpen);
+    btn.classList.toggle('text-brand-600', panelOpen);
+    btn.classList.toggle('bg-gray-100', panelOpen);
+    btn.classList.toggle('text-gray-400', !panelOpen);
+    if (panelOpen && !membersLoaded) loadMembers();
+  };
+
+  function loadMembers() {
+    fetch('/chat/api/threads/' + threadId + '/members')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        membersLoaded = true;
+        var list = document.getElementById('membersList');
+        var count = document.getElementById('memberCount');
+        var members = data.members || [];
+        count.textContent = members.length + ' member' + (members.length !== 1 ? 's' : '');
+        if (!members.length) {
+          list.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm">No members</div>';
+          return;
+        }
+        var roleColors = {
+          admin: 'bg-purple-50 text-purple-700',
+          operations: 'bg-blue-50 text-blue-700',
+          planning: 'bg-teal-50 text-teal-700',
+          finance: 'bg-amber-50 text-amber-700',
+          management: 'bg-purple-50 text-purple-700',
+          accounts: 'bg-amber-50 text-amber-700'
+        };
+        var roleAliases = { management: 'admin', accounts: 'finance', marketing: 'operations' };
+        list.innerHTML = members.map(function(m) {
+          var initials = m.full_name ? m.full_name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2).toUpperCase() : '?';
+          var displayRole = roleAliases[m.role] || m.role || '';
+          var roleBadge = m.role_in_thread === 'owner'
+            ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-50 text-brand-700">Owner</span>'
+            : (m.role_in_thread === 'readonly'
+              ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">Read-only</span>'
+              : '');
+          var rc = roleColors[m.role] || 'bg-gray-50 text-gray-600';
+          return '<div class="flex items-center gap-3 px-4 py-2.5">'
+            + '<div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 text-xs font-bold flex-shrink-0">' + initials + '</div>'
+            + '<div class="flex-1 min-w-0">'
+            + '<p class="text-sm font-medium text-gray-900 truncate">' + m.full_name + '</p>'
+            + '<div class="flex items-center gap-1.5 mt-0.5">'
+            + '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ' + rc + '">' + (displayRole.charAt(0).toUpperCase() + displayRole.slice(1)) + '</span>'
+            + roleBadge
+            + '</div></div></div>';
+        }).join('');
+      })
+      .catch(function() {
+        document.getElementById('membersList').innerHTML = '<div class="p-4 text-center text-red-400 text-sm">Failed to load members</div>';
+      });
+  }
+})();
+</script>
+<% } %>

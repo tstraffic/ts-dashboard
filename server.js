@@ -12,11 +12,16 @@ const { requireWorker, blockWorkerFromAdmin, workerLocals } = require('./middlew
 const { notificationCountMiddleware, generateNotifications, sendDailyDigests } = require('./middleware/notifications');
 const { settingsMiddleware } = require('./middleware/settings');
 const { sidebarBadges } = require('./middleware/sidebarBadges');
+const { chatUnreadCountMiddleware } = require('./middleware/chat');
 const { initVapid } = require('./services/pushNotification');
 const { csrfProtection } = require('./middleware/csrf');
 
 // Initialize database and seed data
 initializeDatabase();
+
+// Ensure default chat channels exist
+const { ensureDefaultChannels } = require('./lib/chat');
+ensureDefaultChannels();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -80,6 +85,9 @@ app.use(settingsMiddleware);
 // Sidebar badge counts (cached 60s)
 app.use(sidebarBadges);
 
+// Chat unread count available in all templates
+app.use(chatUnreadCountMiddleware);
+
 // Public invite/setup routes (no auth required, must be BEFORE blockWorkerFromAdmin)
 app.use('/invite', require('./routes/invite'));
 app.use('/w/setup', require('./routes/worker/setup'));
@@ -103,8 +111,18 @@ app.use('/w', require('./routes/worker/auth'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/home'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/jobs'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/clock'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/shifts'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/chat'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/timesheets'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/availability'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/incidents'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/dockets'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/hr'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/profile'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/forms'));
+app.get('/w/more', requireWorker, workerLocals, (req, res) => {
+  res.render('worker/more', { title: 'More', currentPage: 'more' });
+});
 
 // Block worker-only sessions from admin routes
 app.use(blockWorkerFromAdmin);
@@ -137,6 +155,7 @@ app.use('/defects', requireLogin, requirePermission('defects'), require('./route
 app.use('/hr', requireLogin, require('./routes/hr'));
 app.use('/crm', requireLogin, requirePermission('crm'), require('./routes/crm'));
 app.use('/opportunities', requireLogin, requirePermission('crm'), require('./routes/opportunities'));
+app.use('/chat', requireLogin, require('./routes/chat'));
 app.use('/notifications', requireLogin, requirePermission('notifications'), require('./routes/notifications'));
 app.use('/admin/integrations', requireLogin, requirePermission('admin'), require('./routes/integrations'));
 app.use('/admin', requireLogin, requirePermission('admin'), require('./routes/admin'));

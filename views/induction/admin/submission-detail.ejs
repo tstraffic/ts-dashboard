@@ -121,12 +121,31 @@
     </div>
   </div>
 
+  <!-- Emergency Contact -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Emergency Contact</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-3">
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.emergency_contact_name || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.emergency_contact_phone || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Relationship</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.emergency_contact_relationship ? s.emergency_contact_relationship.charAt(0).toUpperCase() + s.emergency_contact_relationship.slice(1) : '—' %></p>
+      </div>
+    </div>
+  </div>
+
   <!-- Fitness & Suitability -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
     <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Fitness & Suitability</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
       <div class="flex items-center gap-2">
-        <% if (s.can_drive) { %>
+        <% if (s.can_drive === 'yes') { %>
           <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
           </span>
@@ -137,11 +156,11 @@
         <% } %>
         <div>
           <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Can Drive</p>
-          <p class="text-sm text-gray-900 font-medium"><%= s.can_drive ? 'Yes' : 'No' %></p>
+          <p class="text-sm text-gray-900 font-medium"><%= s.can_drive === 'yes' ? 'Yes' : 'No' %></p>
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <% if (s.can_drive_truck) { %>
+        <% if (s.can_drive_truck === 'yes') { %>
           <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
           </span>
@@ -152,11 +171,11 @@
         <% } %>
         <div>
           <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Can Drive Truck</p>
-          <p class="text-sm text-gray-900 font-medium"><%= s.can_drive_truck ? 'Yes' : 'No' %></p>
+          <p class="text-sm text-gray-900 font-medium"><%= s.can_drive_truck === 'yes' ? 'Yes' : 'No' %></p>
         </div>
       </div>
       <div class="flex items-start gap-2 sm:col-span-2">
-        <% if (s.has_injuries) { %>
+        <% if (s.has_injuries === 'yes') { %>
           <span class="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0 mt-0.5">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
           </span>
@@ -167,8 +186,8 @@
         <% } %>
         <div class="flex-1">
           <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Has Injuries / Medical Conditions</p>
-          <p class="text-sm text-gray-900 font-medium"><%= s.has_injuries ? 'Yes' : 'No' %></p>
-          <% if (s.has_injuries && s.injury_details) { %>
+          <p class="text-sm text-gray-900 font-medium"><%= s.has_injuries === 'yes' ? 'Yes' : 'No' %></p>
+          <% if (s.has_injuries === 'yes' && s.injury_details) { %>
             <div class="mt-1.5 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
               <%= s.injury_details %>
             </div>
@@ -177,7 +196,7 @@
       </div>
       <div>
         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Aboriginal / Torres Strait Islander</p>
-        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.is_indigenous ? 'Yes' : 'No' %></p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.is_indigenous === 'yes' ? 'Yes' : s.is_indigenous === 'prefer_not' ? 'Prefer not to say' : 'No' %></p>
       </div>
     </div>
   </div>
@@ -207,6 +226,9 @@
       <div class="border border-gray-100 rounded-lg p-3">
         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TC Licence</p>
         <p class="text-sm text-gray-900 font-medium"><%= s.tc_licence_number || '—' %></p>
+        <% if (s.tc_licence_date_of_issue || s.tc_licence_state) { %>
+          <p class="text-xs text-gray-500 mt-1">Issued: <%= s.tc_licence_date_of_issue ? new Date(s.tc_licence_date_of_issue).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—' %> &bull; State: <%= s.tc_licence_state || '—' %></p>
+        <% } %>
         <% if (s.tc_licence_photo) { %>
           <div class="mt-2">
             <img src="/induction/admin/uploads/<%= s.id %>/<%= s.tc_licence_photo %>" alt="TC Licence" class="w-full h-24 object-cover rounded border border-gray-200 cursor-pointer" onclick="window.open(this.src, '_blank')">
@@ -235,8 +257,29 @@
         <% } else { %>
           <p class="text-xs text-gray-400 mt-2">Not uploaded</p>
         <% } %>
+        <% if (s.drivers_licence_back_photo) { %>
+          <div class="mt-2">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Back of Licence</p>
+            <img src="/induction/admin/uploads/<%= s.id %>/<%= s.drivers_licence_back_photo %>" alt="Driver's Licence Back" class="w-full h-24 object-cover rounded border border-gray-200 cursor-pointer" onclick="window.open(this.src, '_blank')">
+            <a href="/induction/admin/uploads/<%= s.id %>/<%= s.drivers_licence_back_photo %>" target="_blank" class="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium mt-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              View Full Size
+            </a>
+          </div>
+        <% } %>
       </div>
     </div>
+
+    <!-- Experience -->
+    <% if (s.experience_years || s.experience_description) { %>
+    <div class="mt-4 border border-gray-100 rounded-lg p-3">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Experience</p>
+      <p class="text-sm text-gray-900 font-medium"><%= s.experience_years === 'new' ? 'New / No experience' : s.experience_years === 'less_than_1' ? 'Less than 1 year' : s.experience_years === '1_to_2' ? '1-2 years' : s.experience_years === '2_to_5' ? '2-5 years' : s.experience_years === '5_plus' ? '5+ years' : s.experience_years || '—' %></p>
+      <% if (s.experience_description) { %>
+        <p class="text-sm text-gray-600 mt-1 whitespace-pre-line"><%= s.experience_description %></p>
+      <% } %>
+    </div>
+    <% } %>
   </div>
 
   <!-- Banking Details -->
@@ -291,7 +334,38 @@
         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Name</p>
         <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.bank_account_name || '—' %></p>
       </div>
+
+      <% if (s.payment_type === 'abn' && typeof s.has_insurance !== 'undefined') { %>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Public Liability Insurance</p>
+        <p class="text-sm font-medium mt-0.5 <%= s.has_insurance === 'yes' ? 'text-emerald-700' : 'text-red-600' %>"><%= s.has_insurance === 'yes' ? 'Yes' : s.has_insurance === 'no' ? 'No' : '—' %></p>
+      </div>
+      <% } %>
     </div>
+
+    <% if (s.payment_type === 'tfn' && (s.super_fund_name || s.super_member_number)) { %>
+    <div class="mt-4 pt-4 border-t border-gray-100">
+      <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Superannuation</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fund Name</p>
+          <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.super_fund_name || '—' %></p>
+        </div>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fund ABN</p>
+          <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.super_fund_abn || '—' %></p>
+        </div>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">USI</p>
+          <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.super_usi || '—' %></p>
+        </div>
+        <div>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Member Number</p>
+          <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.super_member_number || '—' %></p>
+        </div>
+      </div>
+    </div>
+    <% } %>
   </div>
   <% } %>
 

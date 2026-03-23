@@ -2961,39 +2961,652 @@ function runMigrations(db) {
     console.log('Migration 53 complete.');
   }
 
-  // =============================================
-  // Migration 54: Clock Events table (Sprint 2)
-  // =============================================
+  // Migration 54: Operational Chat / Messaging Tables
   if (!isMigrationApplied.get(54)) {
-    console.log('Running migration 54: Clock Events table');
+    console.log('Running migration 54: Operational Chat / Messaging Tables');
     db.exec(`
-      CREATE TABLE IF NOT EXISTS clock_events (
+      CREATE TABLE IF NOT EXISTS chat_threads (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        crew_member_id INTEGER NOT NULL,
-        allocation_id INTEGER,
-        event_type TEXT NOT NULL CHECK(event_type IN ('clock_in', 'clock_out', 'break_start', 'break_end')),
-        timestamp DATETIME DEFAULT (datetime('now')),
-        latitude REAL,
-        longitude REAL,
-        accuracy REAL,
-        notes TEXT,
-        created_at DATETIME DEFAULT (datetime('now')),
-        FOREIGN KEY (crew_member_id) REFERENCES crew_members(id),
-        FOREIGN KEY (allocation_id) REFERENCES crew_allocations(id)
+        thread_type TEXT NOT NULL CHECK(thread_type IN ('job','incident','compliance','broadcast')),
+        related_entity_id INTEGER NOT NULL,
+        related_entity_type TEXT NOT NULL CHECK(related_entity_type IN ('job','incident','compliance')),
+        title TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived','locked')),
+        created_by INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
-      CREATE INDEX IF NOT EXISTS idx_clock_events_crew ON clock_events(crew_member_id);
-      CREATE INDEX IF NOT EXISTS idx_clock_events_timestamp ON clock_events(crew_member_id, timestamp);
-      CREATE INDEX IF NOT EXISTS idx_clock_events_allocation ON clock_events(allocation_id);
+
+      CREATE TABLE IF NOT EXISTS chat_thread_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id INTEGER NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role_in_thread TEXT NOT NULL DEFAULT 'member' CHECK(role_in_thread IN ('owner','member','readonly')),
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        muted_at DATETIME,
+        last_read_message_id INTEGER DEFAULT 0,
+        UNIQUE(thread_id, user_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id INTEGER NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+        sender_id INTEGER REFERENCES users(id),
+        body TEXT NOT NULL DEFAULT '',
+        message_type TEXT NOT NULL DEFAULT 'text' CHECK(message_type IN ('text','image','file','system')),
+        reply_to_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        edited_at DATETIME,
+        deleted_at DATETIME
+      );
+
+      CREATE TABLE IF NOT EXISTS message_attachments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        file_url TEXT NOT NULL,
+        thumbnail_url TEXT DEFAULT '',
+        mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+        file_size INTEGER NOT NULL DEFAULT 0,
+        original_name TEXT NOT NULL,
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS message_mentions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        mentioned_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(message_id, mentioned_user_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_type ON chat_threads(thread_type);
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_entity ON chat_threads(related_entity_type, related_entity_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_status ON chat_threads(status);
+      CREATE INDEX IF NOT EXISTS idx_chat_thread_members_thread ON chat_thread_members(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_thread_members_user ON chat_thread_members(user_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_thread_created ON messages(thread_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_deleted ON messages(deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_message_attachments_message ON message_attachments(message_id);
+      CREATE INDEX IF NOT EXISTS idx_message_mentions_user ON message_mentions(mentioned_user_id);
+      CREATE INDEX IF NOT EXISTS idx_message_mentions_message ON message_mentions(message_id);
     `);
-    recordMigration.run(54, 'Clock Events table');
+    recordMigration.run(54, 'Operational Chat / Messaging Tables');
     console.log('Migration 54 complete.');
   }
 
-  // =============================================
-  // Migration 55: Worker Availability table (Sprint 2)
-  // =============================================
+  // Migration 55: Extend chat_threads for DMs, channels, announcements
   if (!isMigrationApplied.get(55)) {
-    console.log('Running migration 55: Worker Availability table');
+    console.log('Running migration 55: DMs, channels, announcements');
+
+    // Rebuild chat_threads with extended CHECK + nullable entity columns + new columns
+    // Save existing data first
+    const existingThreads = db.prepare('SELECT * FROM chat_threads').all();
+    const existingMembers = db.prepare('SELECT * FROM chat_thread_members').all();
+
+    // Disable FK temporarily for the rebuild
+    db.pragma('foreign_keys = OFF');
+
+    // Drop old tables (messages FK references chat_threads but we keep messages intact)
+    db.exec('DROP TABLE IF EXISTS chat_thread_members');
+    db.exec('DROP TABLE IF EXISTS chat_threads');
+
+    // Create new tables with extended schema
+    db.exec(`
+      CREATE TABLE chat_threads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_type TEXT NOT NULL CHECK(thread_type IN ('job','incident','compliance','broadcast','dm','channel','announcement')),
+        related_entity_id INTEGER,
+        related_entity_type TEXT,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived','locked')),
+        is_default INTEGER NOT NULL DEFAULT 0,
+        channel_slug TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE chat_thread_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        thread_id INTEGER NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role_in_thread TEXT NOT NULL DEFAULT 'member' CHECK(role_in_thread IN ('owner','member','readonly')),
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        muted_at DATETIME,
+        last_read_message_id INTEGER DEFAULT 0,
+        UNIQUE(thread_id, user_id)
+      );
+    `);
+
+    // Restore data
+    if (existingThreads.length > 0) {
+      const insertThread = db.prepare('INSERT INTO chat_threads (id, thread_type, related_entity_id, related_entity_type, title, status, is_default, channel_slug, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)');
+      for (const t of existingThreads) {
+        insertThread.run(t.id, t.thread_type, t.related_entity_id, t.related_entity_type, t.title, t.status, t.created_by, t.created_at, t.updated_at);
+      }
+    }
+    if (existingMembers.length > 0) {
+      const insertMember = db.prepare('INSERT OR IGNORE INTO chat_thread_members (id, thread_id, user_id, role_in_thread, joined_at, muted_at, last_read_message_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
+      for (const m of existingMembers) {
+        insertMember.run(m.id, m.thread_id, m.user_id, m.role_in_thread, m.joined_at, m.muted_at, m.last_read_message_id);
+      }
+    }
+
+    // Re-enable FK
+    db.pragma('foreign_keys = ON');
+
+    // Recreate indexes
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_type ON chat_threads(thread_type);
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_entity ON chat_threads(related_entity_type, related_entity_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_status ON chat_threads(status);
+      CREATE INDEX IF NOT EXISTS idx_chat_threads_slug ON chat_threads(channel_slug);
+      CREATE INDEX IF NOT EXISTS idx_chat_thread_members_thread ON chat_thread_members(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_thread_members_user ON chat_thread_members(user_id);
+    `);
+
+    // Seed default channels
+    const channels = [
+      { slug: 'all-team', title: 'All Team', type: 'announcement', isDefault: 1 },
+      { slug: 'operations', title: 'Operations', type: 'channel', isDefault: 1 },
+      { slug: 'field-workers', title: 'Field Workers', type: 'channel', isDefault: 1 },
+      { slug: 'supervisors', title: 'Supervisors', type: 'channel', isDefault: 1 },
+      { slug: 'planning', title: 'Planning', type: 'channel', isDefault: 1 },
+    ];
+    const insertChannel = db.prepare('INSERT OR IGNORE INTO chat_threads (thread_type, title, status, is_default, channel_slug) VALUES (?, ?, \'active\', ?, ?)');
+    for (const ch of channels) {
+      const exists = db.prepare('SELECT id FROM chat_threads WHERE channel_slug = ?').get(ch.slug);
+      if (!exists) {
+        insertChannel.run(ch.type, ch.title, ch.isDefault, ch.slug);
+      }
+    }
+
+    // Auto-add all existing active users to All Team channel
+    const allTeam = db.prepare("SELECT id FROM chat_threads WHERE channel_slug = 'all-team'").get();
+    if (allTeam) {
+      const users = db.prepare('SELECT id FROM users WHERE active = 1').all();
+      const addMember = db.prepare('INSERT OR IGNORE INTO chat_thread_members (thread_id, user_id, role_in_thread) VALUES (?, ?, ?)');
+      for (const u of users) {
+        addMember.run(allTeam.id, u.id, 'member');
+      }
+    }
+
+    // Post welcome system messages in default channels
+    const welcomeStmt = db.prepare("INSERT INTO messages (thread_id, sender_id, body, message_type) VALUES (?, NULL, ?, 'system')");
+    const allChannels = db.prepare("SELECT id, title, channel_slug FROM chat_threads WHERE is_default = 1").all();
+    for (const ch of allChannels) {
+      const hasMessages = db.prepare('SELECT id FROM messages WHERE thread_id = ? LIMIT 1').get(ch.id);
+      if (!hasMessages) {
+        welcomeStmt.run(ch.id, `Welcome to ${ch.title}. This channel was created automatically.`);
+      }
+    }
+
+    recordMigration.run(55, 'DMs, channels, announcements');
+    console.log('Migration 55 complete.');
+  }
+
+  // Migration 56: Pinned messages + message editing support
+  if (!isMigrationApplied.get(56)) {
+    console.log('Running migration 56: Pinned messages');
+    const cols56 = [
+      "ALTER TABLE messages ADD COLUMN pinned_at DATETIME",
+      "ALTER TABLE messages ADD COLUMN pinned_by INTEGER REFERENCES users(id)",
+    ];
+    for (const sql of cols56) {
+      try { db.exec(sql); } catch (e) { /* column may already exist */ }
+    }
+    recordMigration.run(56, 'Pinned messages');
+    console.log('Migration 56 complete.');
+  }
+
+  // Migration 57: Clock events, crew availability, docket signatures, safety forms, employee leave
+  if (!isMigrationApplied.get(57)) {
+    console.log('Running migration 57: Sprint 2 tables — clock events, availability, dockets, safety forms, leave');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS clock_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        allocation_id INTEGER REFERENCES crew_allocations(id),
+        event_type TEXT NOT NULL CHECK(event_type IN ('clock_in', 'clock_out')),
+        event_time DATETIME NOT NULL DEFAULT (datetime('now')),
+        latitude REAL,
+        longitude REAL,
+        accuracy REAL,
+        address TEXT,
+        notes TEXT,
+        photo_path TEXT,
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_clock_events_crew ON clock_events(crew_member_id, event_time);
+
+      CREATE TABLE IF NOT EXISTS crew_availability (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        date DATE NOT NULL,
+        status TEXT NOT NULL DEFAULT 'available' CHECK(status IN ('available', 'unavailable', 'preferred_off', 'leave')),
+        shift_preference TEXT DEFAULT 'any' CHECK(shift_preference IN ('day', 'night', 'any')),
+        notes TEXT,
+        created_at DATETIME DEFAULT (datetime('now')),
+        UNIQUE(crew_member_id, date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_crew_availability_crew ON crew_availability(crew_member_id, date);
+
+      CREATE TABLE IF NOT EXISTS docket_signatures (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        allocation_id INTEGER REFERENCES crew_allocations(id),
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        docket_type TEXT DEFAULT 'daily_docket' CHECK(docket_type IN ('daily_docket', 'delivery', 'completion')),
+        docket_number TEXT,
+        client_name TEXT,
+        signature_data TEXT,
+        signed_at DATETIME DEFAULT (datetime('now')),
+        notes TEXT,
+        photo_path TEXT,
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_docket_signatures_crew ON docket_signatures(crew_member_id);
+
+      CREATE TABLE IF NOT EXISTS safety_forms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        form_type TEXT NOT NULL CHECK(form_type IN ('prestart', 'take5', 'incident', 'hazard', 'equipment')),
+        job_id INTEGER REFERENCES jobs(id),
+        allocation_id INTEGER REFERENCES crew_allocations(id),
+        data TEXT,
+        status TEXT DEFAULT 'submitted' CHECK(status IN ('draft', 'submitted', 'reviewed')),
+        submitted_at DATETIME DEFAULT (datetime('now')),
+        reviewed_by_id INTEGER REFERENCES users(id),
+        reviewed_at DATETIME,
+        latitude REAL,
+        longitude REAL,
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_safety_forms_crew ON safety_forms(crew_member_id, form_type);
+
+      CREATE TABLE IF NOT EXISTS employee_leave (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER REFERENCES employees(id),
+        crew_member_id INTEGER REFERENCES crew_members(id),
+        leave_type TEXT NOT NULL DEFAULT 'annual' CHECK(leave_type IN ('annual', 'sick', 'personal', 'unpaid', 'other')),
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        total_days REAL,
+        status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected', 'cancelled')),
+        reason TEXT,
+        approved_by_id INTEGER REFERENCES users(id),
+        approved_at DATETIME,
+        notes TEXT,
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_employee_leave_crew ON employee_leave(crew_member_id, status);
+    `);
+
+    // Add columns to crew_members
+    const cols57cm = [
+      "ALTER TABLE crew_members ADD COLUMN last_clock_event TEXT",
+      "ALTER TABLE crew_members ADD COLUMN last_clock_time DATETIME",
+      "ALTER TABLE crew_members ADD COLUMN onboarding_completed INTEGER DEFAULT 0",
+    ];
+    for (const sql of cols57cm) {
+      try { db.exec(sql); } catch (e) { /* column may already exist */ }
+    }
+
+    // Add column to incidents
+    try { db.exec("ALTER TABLE incidents ADD COLUMN reported_by_crew_id INTEGER REFERENCES crew_members(id)"); } catch (e) { /* column may already exist */ }
+
+    recordMigration.run(57, 'Sprint 2 tables — clock events, availability, dockets, safety forms, leave');
+    console.log('Migration 57 complete.');
+  }
+
+  // =============================================
+  // Migration 58: Induction form enhancements — new fields
+  // =============================================
+  if (!isMigrationApplied.get(58)) {
+    console.log('Running migration 58: Induction form enhancements');
+    try {
+      const newCols58 = [
+        "ALTER TABLE induction_submissions ADD COLUMN tc_licence_date_of_issue TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN tc_licence_state TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN experience_years TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN experience_description TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN drivers_licence_back_photo TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN super_fund_name TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN super_fund_abn TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN super_usi TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN super_member_number TEXT DEFAULT ''",
+        "ALTER TABLE induction_submissions ADD COLUMN has_insurance TEXT DEFAULT ''",
+      ];
+      for (const sql of newCols58) {
+        try { db.exec(sql); } catch (e) { /* column likely exists */ }
+      }
+    } catch (e) {
+      console.error('Migration 58 error:', e.message);
+    }
+    recordMigration.run(58, 'Induction form enhancements');
+    console.log('Migration 58 complete.');
+  }
+
+  // =============================================
+  // Migration 59: Clear all dummy/seed data
+  // =============================================
+  if (!isMigrationApplied.get(59)) {
+    console.log('Running migration 59: Clear dummy/seed data');
+    try {
+      // Clear tables that only contain seed data
+      const tablesToClear = [
+        'traffic_plans',
+        'crew_allocations',
+        'timesheets',
+        'cost_entries',
+        'job_budgets',
+        'incidents',
+        'defects',
+        'tasks',
+        'equipment',
+        'contacts',
+        'compliance_items',
+        'crew_members',
+        'employees',
+        'jobs',
+        'clients',
+      ];
+      for (const table of tablesToClear) {
+        try {
+          db.exec(`DELETE FROM ${table}`);
+          console.log(`  Cleared ${table}`);
+        } catch (e) {
+          // Table might not exist
+          console.log(`  Skipped ${table}: ${e.message}`);
+        }
+      }
+      // Reset auto-increment counters
+      try { db.exec("DELETE FROM sqlite_sequence WHERE name IN ('traffic_plans','crew_allocations','timesheets','cost_entries','job_budgets','incidents','defects','tasks','equipment','contacts','compliance_items','crew_members','employees','jobs','clients')"); } catch(e) {}
+    } catch (e) {
+      console.error('Migration 59 error:', e.message);
+    }
+    recordMigration.run(59, 'Clear dummy/seed data');
+    console.log('Migration 59 complete — all seed data cleared.');
+  }
+
+  // Migration 60: Add emergency contact fields to induction_submissions
+  if (!isMigrationApplied.get(60)) {
+    console.log('Running migration 60: Add emergency contact to induction_submissions');
+    const newCols60 = [
+      "ALTER TABLE induction_submissions ADD COLUMN emergency_contact_name TEXT DEFAULT ''",
+      "ALTER TABLE induction_submissions ADD COLUMN emergency_contact_phone TEXT DEFAULT ''",
+      "ALTER TABLE induction_submissions ADD COLUMN emergency_contact_relationship TEXT DEFAULT ''",
+    ];
+    for (const sql of newCols60) {
+      try { db.exec(sql); } catch (e) { /* column likely exists */ }
+    }
+    recordMigration.run(60, 'Add emergency contact to induction_submissions');
+    console.log('Migration 60 complete.');
+  }
+
+  // Migration 61: Add licence/card number fields to employees table
+  if (!isMigrationApplied.get(61)) {
+    console.log('Running migration 61: Add licence number fields to employees');
+    const newCols61 = [
+      "ALTER TABLE employees ADD COLUMN white_card_number TEXT DEFAULT ''",
+      "ALTER TABLE employees ADD COLUMN tc_licence_number TEXT DEFAULT ''",
+      "ALTER TABLE employees ADD COLUMN tc_licence_state TEXT DEFAULT ''",
+      "ALTER TABLE employees ADD COLUMN tc_licence_date_of_issue TEXT DEFAULT ''",
+      "ALTER TABLE employees ADD COLUMN drivers_licence_number TEXT DEFAULT ''",
+    ];
+    for (const sql of newCols61) {
+      try { db.exec(sql); } catch (e) { /* column likely exists */ }
+    }
+    recordMigration.run(61, 'Add licence number fields to employees');
+    console.log('Migration 61 complete.');
+  }
+
+  // Migration 62: Enhanced docket_signatures with time entries + client signature
+  if (!isMigrationApplied.get(62)) {
+    console.log('Running migration 62: Enhanced docket signatures');
+    const newCols62 = [
+      "ALTER TABLE docket_signatures ADD COLUMN start_on_site TEXT DEFAULT ''",
+      "ALTER TABLE docket_signatures ADD COLUMN finish_on_site TEXT DEFAULT ''",
+      "ALTER TABLE docket_signatures ADD COLUMN break_minutes INTEGER DEFAULT 0",
+      "ALTER TABLE docket_signatures ADD COLUMN travel_hours REAL DEFAULT 0",
+      "ALTER TABLE docket_signatures ADD COLUMN total_hours REAL DEFAULT 0",
+      "ALTER TABLE docket_signatures ADD COLUMN client_signature TEXT DEFAULT ''",
+      "ALTER TABLE docket_signatures ADD COLUMN client_signed_name TEXT DEFAULT ''",
+      "ALTER TABLE docket_signatures ADD COLUMN client_signed_at DATETIME",
+    ];
+    for (const sql of newCols62) {
+      try { db.exec(sql); } catch (e) { /* column likely exists */ }
+    }
+    recordMigration.run(62, 'Enhanced docket signatures');
+    console.log('Migration 62 complete.');
+  }
+
+  // Migration 63: Nuke ALL data for clean production launch (keep only users)
+  if (!isMigrationApplied.get(63)) {
+    console.log('Running migration 63: Wipe all data for clean production launch');
+    try {
+      // Order matters: children before parents to respect foreign keys
+      const tablesToWipe = [
+        'activity_log', 'notifications', 'push_subscriptions',
+        'messages', 'message_attachments', 'message_mentions',
+        'chat_thread_members', 'chat_threads',
+        'docket_signatures', 'docket_time_entries',
+        'booking_crew', 'booking_dockets', 'booking_documents',
+        'booking_equipment', 'booking_notes', 'booking_requirements', 'booking_vehicles',
+        'bookings',
+        'clock_events', 'crew_allocations', 'crew_availability',
+        'task_comments', 'task_dependencies', 'subtasks', 'tasks',
+        'cost_entries', 'job_budgets',
+        'corrective_actions', 'incident_crew_members', 'incidents',
+        'safety_forms',
+        'equipment_maintenance', 'equipment_assignments', 'equipment',
+        'employee_competencies', 'employee_documents', 'employee_leave',
+        'timesheets', 'crew_members', 'employees',
+        'documents', 'compliance', 'defects',
+        'project_updates', 'traffic_plans',
+        'communication_log', 'client_contacts',
+        'crm_activities', 'crm_meetings', 'opportunities',
+        'saved_views', 'invitations',
+        'external_refs', 'sync_log',
+        'clients', 'jobs',
+      ];
+      for (const table of tablesToWipe) {
+        try {
+          db.exec(`DELETE FROM ${table}`);
+          console.log(`  Cleared ${table}`);
+        } catch (e) {
+          console.log(`  Skipped ${table}: ${e.message}`);
+        }
+      }
+      // Reset auto-increment counters
+      try {
+        const names = tablesToWipe.map(t => `'${t}'`).join(',');
+        db.exec(`DELETE FROM sqlite_sequence WHERE name IN (${names})`);
+      } catch (e) { /* ok */ }
+    } catch (e) {
+      console.error('Migration 63 error:', e.message);
+    }
+    recordMigration.run(63, 'Wipe all data for clean production launch');
+    console.log('Migration 63 complete — database is clean.');
+  }
+
+  // Migration 64: Import 2026 TGS Register into Plans & Approvals
+  if (!isMigrationApplied.get(64)) {
+    console.log('Running migration 64: Import 2026 TGS Register (92 entries)');
+    try {
+      // Map PM short names to user IDs
+      const pmUsers = db.prepare("SELECT id, username, full_name FROM users").all();
+      const pmMap = {};
+      pmUsers.forEach(u => {
+        pmMap[u.username.toLowerCase()] = u.id;
+        if (u.full_name) pmMap[u.full_name.split(' ')[0].toLowerCase()] = u.id;
+      });
+
+      const ins64 = db.prepare(`INSERT INTO compliance (job_id, client_id, item_type, title, authority_approver, internal_approver_id, assigned_to_id, due_date, submitted_date, approved_date, expiry_date, status, notes, designer, file_link, council_fee_paid, council_fee_amount, reference_number, rol_required, rol_response, bus_approvals_required, bus_approvals_response, client_pm, costs, action_required, charge_client, charge_amount, invoiced, invoice_number, police_notification, letter_drop) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+      ins64.run(null, null, 'traffic_guidance', 'TGS | Impact Cranes | 16 Mountain St, Ultimo', '', pmMap['taj'] || null, pmMap['taj'] || null, '2026-01-12', null, null, null, 'not_started', 'ROL, Police,Letter Drop - New Date Update 20.02.2026', '', '', 0, 0, '', 1, '', 1, 'Yes', 'Paul', 0, 'All Updates', 0, 0, 0, '', 1, 1);
+      ins64.run(null, null, 'traffic_guidance', 'Deferred Date Application | Impact Cranes', '', pmMap['taj'] || null, pmMap['taj'] || null, null, null, null, null, 'not_started', 'Deferred Date Application', '', '', 0, 0, 'Deferred Date Application', 0, '', 0, '', 'Paul', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'other', 'Police Notif | TQM | Wentworth  Hotel', '', pmMap['taj'] || null, pmMap['taj'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Police Notif', 0, '', 0, '', 'Greg', 0, '', 0, 0, 0, '', 1, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3001 | Labourconnect | Simpson St, Dundas Valley', '', pmMap['taj'] || null, pmMap['taj'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3001', 0, '', 0, '', 'Alex', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'Parking Fee | Impact Cranes | York St', '', pmMap['taj'] || null, pmMap['taj'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Parking Fee', 0, '', 0, '', 'Paul', 1050.0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3002 | QMC Group | Highview Ave, Manly', '', pmMap['taj'] || null, pmMap['taj'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3002', 0, '', 0, '', 'Jayden', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'road_occupancy', 'ROL ext. | SIFU | Darlinghurst Rd', '', pmMap['taj'] || null, pmMap['taj'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'ROL ext.', 1, '', 0, '', 'Frank', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'other', 'Police Notif | TQM | Wentworth Hotel', '', pmMap['taj'] || null, pmMap['taj'] || null, null, null, null, null, 'not_started', 'New Dates received', '', '', 0, 0, 'Police Notif', 1, '', 0, '', 'Greg', 0, '', 0, 0, 0, '', 1, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3003 | Ace Demo & Civil | 2-4 URANGA PDE MIRANDA', '', pmMap['taj'] || null, pmMap['taj'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3003', 0, '', 0, '', 'Osama', 0, '', 1, 150.0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3010 | Cubic CM | Pappa Flock Parramatta', '', pmMap['taj'] || null, pmMap['taj'] || null, '2026-01-19', null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3010', 0, '', 0, '', 'Zain', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3011 | Cubic CM', '', pmMap['taj'] || null, pmMap['taj'] || null, '2026-01-19', null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3011', 0, '', 0, '', 'Zain', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'tmp_approval', 'TMP | Cubic CM | Pappa Flock Parramatta', '', pmMap['suhail'] || null, pmMap['suhail'] || null, '2026-01-19', null, null, null, 'not_started', '', '', '', 0, 0, 'TMP', 0, '', 0, '', 'Zain', 0, '', 1, 2500.0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3004 | LBC | 30 Botany Rd, Alexandria', '', pmMap['taj'] || null, pmMap['taj'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3004', 0, '', 0, '', 'Antony', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3005 | AICC', '', pmMap['taj'] || null, pmMap['taj'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3005', 0, '', 0, '', 'Munzir', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3006 | TQM | 47-51 Wentowrth St Port Kembla Project ', '', pmMap['taj'] || null, pmMap['taj'] || null, '2026-01-22', null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3006', 0, '', 0, '', 'Youseff', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TGS | TQM | Wentworth Hotel', '', pmMap['taj'] || null, pmMap['taj'] || null, '2026-01-27', null, null, null, 'not_started', '', '', '', 0, 0, '', 1, '', 0, '', 'Greg', 0, 'ROL ext', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3008 | Compass Dev', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3008', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3009 | CIP', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3009', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3012 | AICC | Wollongong Mosque', '', pmMap['noah'] || null, pmMap['noah'] || null, null, null, null, null, 'not_started', 'to be invoiced once works complete', '', '', 0, 0, 'TSTGS3012', 0, '', 0, '', 'Munzir', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3013 | AICC | Wollongong Mosque', '', pmMap['noah'] || null, pmMap['noah'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3013', 0, '', 0, '', 'Munzir', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3014 | AICC | Wollongong Mosque', '', pmMap['noah'] || null, pmMap['noah'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3014', 0, '', 0, '', 'Munzir', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'other', 'Police notif | TQM | Wentworth  Hotel', '', pmMap['taj'] || null, pmMap['taj'] || null, '2026-01-30', null, '2026-02-02', null, 'approved', 'Crane works delayed again to 04-06/02', '', '', 0, 0, 'Police notif', 1, 'Approved', 1, 'Approved', 'Greg', 0, 'ROL + Police', 0, 0, 1, '', 1, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3016 | Just Flow | Darlinghurst Public School', '', pmMap['taj'] || null, pmMap['taj'] || null, '2026-02-02', null, null, null, 'approved', '', '', '', 0, 0, 'TSTGS3016', 0, 'Approved', 1, 'Pending', 'Monzir', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'other', 'Police notif | Just Flow', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Police notif', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 1, 0);
+      ins64.run(null, null, 'traffic_guidance', 'ROP | Just Flow | Darlinghurst Public School', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'ROP', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TGS Revision | Axial Constructions', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TGS Revision', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3015 | LBC | Botany Rd, Alexandria', '', pmMap['taj'] || null, pmMap['taj'] || null, '2026-02-02', null, '2026-02-02', null, 'approved', '', '', '', 0, 0, 'TSTGS3015', 0, '', 0, '', 'Anthony', 0.0, 'TGS', 1, 120.0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TGS3021 | LBC | 79 - 101 Heath Rd, Leppington (Roads 1 & 2 Tie-in)', '', pmMap['taj'] || null, pmMap['taj'] || null, '2026-02-02', null, null, null, 'not_started', '', '', '', 0, 0, 'TGS3021', 0, '', 0, '', 'Chad', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'council_permit', 'Council Approval | Axial Constructions | Holindsworth Rd, Marsden Park', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Council Approval', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTG3017 | Tamaki Constructions | 16 Fremont Ave Ermington', '', pmMap['sav'] || null, pmMap['sav'] || null, '2026-02-03', null, '2026-02-03', null, 'approved', 'tamakiconstructiongroup@gmail.com', '', '', 0, 0, 'TSTG3017', 0, '', 0, '', '', 0, '', 1, 200.0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'Extend Date of application | Icon Build', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Extend Date of application', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3018 | LBC', '', pmMap['taj'] || null, pmMap['taj'] || null, '2026-02-03', null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3018', 1, '', 0, '', 'Antony', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3019 | LBC | Vicar St, Coogee', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3019', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3020 | LBC | 3 Homebush road Strathfield', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3020', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'tmp_approval', 'LC CTMP105 | LBC', '', pmMap['suhail'] || null, pmMap['suhail'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'LC CTMP105', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3027 | LBC | 21 McGill street lewisham', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, '2026-02-16', null, 'approved', '', '', '', 0, 0, 'TSTGS3027', 0, '', 0, '', 'Anthony', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'tmp_approval', 'LC CTMP104 | LBC', '', pmMap['suhail'] || null, pmMap['suhail'] || null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'LC CTMP104', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'council_permit', 'Council Appliation | Skyscraper Tower Cranes', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Council Appliation', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3021 | LBC | Bronte SLSC', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3021', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'council_permit', 'Council Approval | AICC', '', null, null, null, null, null, null, 'not_started', 'Laylatul Qadr 16.03.2026', '', '', 0, 0, 'Council Approval', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TGS3023 | Impact Cranes | 39 York St', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TGS3023', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'council_permit', 'Council Approval | Impact Cranes | 39 York St', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Council Approval', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'other', 'Police Approval | Impact Cranes', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Police Approval', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 1, 0);
+      ins64.run(null, null, 'council_permit', 'Council Application | LBC | Chapel Ln, Alexandria', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Council Application', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'other', 'Police Notification | LBC | Chapel Ln, Alexandria', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Police Notification', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 1, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3022 | LBC | Chapel Ln, Alexandria', '', pmMap['sav'] || null, pmMap['sav'] || null, '2026-02-11', null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3022', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3023 | Taha | 310 Marsden Rd, Carlingford', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3023', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS 3027 | ACG | 1450 Pittwater Rd, North Narrabeen', '', pmMap['taj'] || null, pmMap['taj'] || null, '2025-02-15', null, '2025-02-16', null, 'approved', '', '', '', 0, 0, 'TSTGS 3027', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS 3028 | ACG | 1450 Pittwater Rd, North Narrabeen', '', pmMap['taj'] || null, pmMap['taj'] || null, '2025-02-16', null, '2025-02-17', null, 'approved', '', '', '', 0, 0, 'TSTGS 3028', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3024 | ACG | 70 Mame Rd, St Marys', '', pmMap['sav'] || null, pmMap['sav'] || null, '2025-02-16', null, '2026-02-17', null, 'approved', '', '', '', 0, 0, 'TSTGS3024', 0, 'Pending', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3025 | ACG | 603 George St, Windsor', '', pmMap['sav'] || null, pmMap['sav'] || null, '2025-02-16', null, '2026-02-17', null, 'approved', '', '', '', 0, 0, 'TSTGS3025', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3032 | ACG', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3032', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3026 | ManWorx | 94 Epping Rd, North Ryde', '', pmMap['taj'] || null, pmMap['taj'] || null, '2026-02-15', null, '2026-02-17', null, 'approved', '', '', '', 0, 0, 'TSTGS3026', 0, '', 1, 'Pending', 'Hammad', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TGS3029 | Greenbrook | 103 Moore St, Liverpool', '', null, null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TGS3029', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TGS3030 | LBC | Bronte SLSC', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TGS3030', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3031 | AM2PM Group | 98 Audley St, Petersham', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3031', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3034 | AM2PM Group | Northwood Rd, Longueville', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3034', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3035 | AM2PM Group', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3035', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'council_permit', 'Council Application | AM2PM Group | Northwood Rd, Longueville', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Council Application', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3033 | UMA', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3033', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3032 | LBC | Botany Rd, Alexandria', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3032', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'tmp_approval', 'LC CTMP106 | LBC | Glossop St, St Marys', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'LC CTMP106', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3036 | LBC | Glossop St, St Marys', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3036', 0, '', 0, '', '', 0, '', 0, 0, 1, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3037 | ACG | Barcom Ave Marrylands', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3037', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3038 | AM2PM Group | 94 Beami9sh St, Camspie', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'TSTGS3038', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'council_permit', 'Council Application | Axial Constructions | Heddon Gretta', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, 'Council Application', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3030 | ACG | Marion St, Auburn', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3030', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3031 | ACG | Milton St, Lidcombe', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3031', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3032 | ACG | Myall St, Merrylands', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3032', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3033 | ACG | Neil St, Merrylands', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3033', 0, 'Pending', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3034 | ACG | Nottinghill Rd, Berala', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3034', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3035 | ACG | Vaughan St, Lidcombe', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3035', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3036 | ACG | Hill Rd, Olyimpic Park', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3036', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3037 | ACG | Dawn Fraser Ave, Olympic Park', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3037', 0, 'Pending', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3038 | ACG | 603 George St, Windsor', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3038', 0, 'Pending', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3039 | Atlantis | 178 Corrimal St', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3039', 0, 'Pending', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3040 | AM2PM Group | Doyle St, Narrabri', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3040', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TGS | March - 2026', '', null, null, null, null, null, null, 'not_started', '', '', '', 0, 0, '', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3050 | Ace Demo | 365 CLYDE ST SOUTH GRANVILLE', '', null, null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3050', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3051 | Ace Demo | 10 Ian St Rose Bay', '', null, null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3051', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3052 | Ace Demo | 10 Ian St Rose Bay', '', null, null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3052', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3041 | ACG | Bridge st, Lidcombe', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3041', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3042 | ACG | Grace Ave, Lidcombe', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3042', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3043 | ACG | Loftus Rd, Yennora', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3043', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3044 | ACG | 2 Hawksbury Rd, Westmead', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3044', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3045 | ACG | 26 Junia Ave, Toongabbie', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3045', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3046 | ACG | Fox St, Holroyd', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3046', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3047 | ACG | Gallpoli st, Lidcombe', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3047', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3048 | ACG | Blaxcell st, Guildford', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3048', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3049 | ACG | Locksley Sve, Merrylands', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3049', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3050 | ACG | Amy St, Regents Park', '', pmMap['sav'] || null, pmMap['sav'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3050', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+      ins64.run(null, null, 'traffic_guidance', 'TSTGS3053 | LBC | 9 Bourke Rd, Alexandria', '', pmMap['taj'] || null, pmMap['taj'] || null, null, null, null, null, 'submitted', '', '', '', 0, 0, 'TSTGS3053', 0, '', 0, '', '', 0, '', 0, 0, 0, '', 0, 0);
+
+    } catch (e) {
+      console.error('Migration 64 error:', e.message);
+    }
+    recordMigration.run(64, 'Import 2026 TGS Register');
+    console.log('Migration 64 complete — 92 TGS entries imported.');
+  }
+
+  // Migration 65: Add police_notification and letter_drop to compliance item_type CHECK
+  if (!isMigrationApplied.get(65)) {
+    console.log('Running migration 65: Expand compliance item_type CHECK constraint');
+    try {
+      const oldDDL = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'compliance'").get().sql;
+      if (!oldDDL.includes('police_notification')) {
+        const cols = db.prepare("PRAGMA table_info(compliance)").all();
+        const colDefs = cols.map(c => {
+          let def = `${c.name} ${c.type}`;
+          if (c.name === 'item_type') {
+            def = "item_type TEXT NOT NULL CHECK(item_type IN ('tmp_approval','council_permit','traffic_guidance','insurance','swms_review','induction','road_occupancy','utility_clearance','environmental','rol','insurance_certificate','public_liability','vehicle_registration','plant_inspection','staff_certification','spa','police_notification','letter_drop','other'))";
+          } else {
+            if (c.notnull) def += ' NOT NULL';
+            if (c.dflt_value !== null) def += ` DEFAULT ${c.dflt_value}`;
+          }
+          if (c.pk) def += ' PRIMARY KEY AUTOINCREMENT';
+          return def;
+        }).join(', ');
+
+        db.exec('PRAGMA foreign_keys = OFF');
+        db.exec('BEGIN');
+        db.exec(`CREATE TABLE compliance_new (${colDefs})`);
+        db.exec('INSERT INTO compliance_new SELECT * FROM compliance');
+        db.exec('DROP TABLE compliance');
+        db.exec('ALTER TABLE compliance_new RENAME TO compliance');
+        db.exec('COMMIT');
+        db.exec('PRAGMA foreign_keys = ON');
+        console.log('  Rebuilt compliance table with expanded item_type CHECK.');
+      }
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch (_) {}
+      console.error('Migration 65 error:', e.message);
+    }
+    recordMigration.run(65, 'Add police_notification and letter_drop to compliance item_type');
+    console.log('Migration 65 complete.');
+  }
+
+  // Migration 66: Compliance documents table
+  if (!isMigrationApplied.get(66)) {
+    console.log('Running migration 66: Compliance documents table');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS compliance_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        compliance_id INTEGER NOT NULL REFERENCES compliance(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_size INTEGER NOT NULL DEFAULT 0,
+        mime_type TEXT DEFAULT '',
+        uploaded_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_compliance_docs_compliance ON compliance_documents(compliance_id);
+    `);
+    recordMigration.run(66, 'Compliance documents table');
+    console.log('Migration 66 complete.');
+  }
+
+  // =============================================
+  // Migration 67: Worker Availability table (Sprint 2 — detailed per-day availability)
+  // =============================================
+  if (!isMigrationApplied.get(67)) {
+    console.log('Running migration 67: Worker Availability table');
     db.exec(`
       CREATE TABLE IF NOT EXISTS worker_availability (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3011,23 +3624,17 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_worker_availability_crew ON worker_availability(crew_member_id);
       CREATE INDEX IF NOT EXISTS idx_worker_availability_date ON worker_availability(crew_member_id, date);
     `);
-    recordMigration.run(55, 'Worker Availability table');
-    console.log('Migration 55 complete.');
+    recordMigration.run(67, 'Worker Availability table');
+    console.log('Migration 67 complete.');
   }
 
   console.log('All migrations checked/applied.');
 }
 
-// Separate function to seed demo data (called AFTER initial user/job seed)
+// seedDemoData — DISABLED (all demo data removed)
 function seedDemoData(db) {
-  // Only run if migration 40 was applied and seed data hasn't been done yet
-  const existingAllocs = db.prepare('SELECT COUNT(*) as c FROM crew_allocations').get().c;
-  if (existingAllocs > 0) return; // Already seeded
-
-  const jobCount = db.prepare('SELECT COUNT(*) as c FROM jobs').get().c;
-  if (jobCount === 0) return; // No base seed data yet
-
-  console.log('Seeding comprehensive demo data...');
+  return; // No-op: demo data seeding permanently disabled
+  /* eslint-disable no-unreachable */
   try {
       const today40 = new Date().toISOString().split('T')[0];
       const daysAgo40 = (n) => new Date(Date.now() - n * 86400000).toISOString().split('T')[0];
@@ -3693,203 +4300,42 @@ function initializeDatabase() {
     insertUser.run('finance_user', bcrypt.hashSync('password', 12), 'Pat Finance', 'pat@tstraffic.com.au', 'finance');
     insertUser.run('accounts_user', bcrypt.hashSync('password', 12), 'Jordan Accounts', 'jordan@tstraffic.com.au', 'finance');
 
-    // Seed sample jobs (use statuses valid under the new CHECK after migration 1 runs)
-    const insertJob = db.prepare(`
-      INSERT INTO jobs (job_number, job_name, client, site_address, suburb, status, stage, percent_complete, start_date, end_date, project_manager_id, ops_supervisor_id, planning_owner_id, marketing_owner_id, accounts_owner_id, health, accounts_status, last_update_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    console.log('Database seeded with admin users only (no demo data).');
+  }
 
-    insertJob.run('J-02451', 'J-02451 | ABC Civil | Bankstown | 2026-02-15', 'ABC Civil', '12 Canterbury Rd', 'Bankstown', 'active', 'delivery', 45, '2026-02-15', '2026-06-30', 1, 2, 3, 4, 5, 'green', 'on_track', '2026-02-25');
-    insertJob.run('J-02452', 'J-02452 | RMS NSW | Parramatta | 2026-03-01', 'RMS NSW', '88 Church St', 'Parramatta', 'active', 'prestart', 10, '2026-03-01', '2026-09-15', 1, 2, 3, 4, 5, 'amber', 'na', null);
-    insertJob.run('J-02453', 'J-02453 | Lendlease | Chatswood | 2026-03-10', 'Lendlease', '1 Help St', 'Chatswood', 'won', 'tender', 0, '2026-03-10', '2026-12-01', 1, 2, 3, 4, 5, 'green', 'na', null);
-    insertJob.run('J-02454', 'J-02454 | Sydney Water | Liverpool | 2026-01-10', 'Sydney Water', '45 Macquarie St', 'Liverpool', 'active', 'delivery', 80, '2026-01-10', '2026-04-15', 1, 2, 3, 4, 5, 'red', 'overdue', '2026-02-10');
-    insertJob.run('J-02455', 'J-02455 | Ausgrid | Penrith | 2026-02-01', 'Ausgrid', '22 Henry St', 'Penrith', 'on_hold', 'delivery', 35, '2026-02-01', '2026-07-30', 1, 2, 3, 4, 5, 'amber', 'disputed', '2026-02-20');
-
-    // Seed sample tasks
-    const insertTask = db.prepare(`
-      INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertTask.run(1, 'ops', 'Install traffic barriers Section A', 'Complete barrier installation on Canterbury Rd northbound', 2, '2026-02-28', 'in_progress', 'high');
-    insertTask.run(1, 'planning', 'Submit TMP revision to council', 'Updated TMP with night works clause', 3, '2026-02-20', 'not_started', 'high');
-    insertTask.run(2, 'planning', 'Complete traffic guidance scheme', 'Full TGS for Church St closure', 3, '2026-03-05', 'in_progress', 'medium');
-    insertTask.run(4, 'ops', 'Final inspection walkthrough', 'Arrange RMS site inspection', 2, '2026-02-25', 'not_started', 'high');
-    insertTask.run(4, 'accounts', 'Chase overdue invoice #INV-4421', 'Invoice 60 days overdue', 5, '2026-02-15', 'not_started', 'high');
-
-    // Seed sample compliance
-    const insertCompliance = db.prepare(`
-      INSERT INTO compliance (job_id, item_type, title, authority_approver, internal_approver_id, due_date, status) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertCompliance.run(1, 'tmp_approval', 'TMP Approval - Canterbury Rd', 'Canterbury-Bankstown Council', 3, '2026-02-20', 'approved');
-    insertCompliance.run(1, 'swms_review', 'SWMS Review - Barrier Install', '', 2, '2026-02-27', 'submitted');
-    insertCompliance.run(2, 'council_permit', 'Road Closure Permit - Church St', 'City of Parramatta Council', 3, '2026-03-08', 'not_started');
-    insertCompliance.run(2, 'insurance', 'Public Liability Certificate', 'Insurer', 5, '2026-03-01', 'submitted');
-    insertCompliance.run(4, 'road_occupancy', 'ROL Extension - Macquarie St', 'Transport for NSW', 3, '2026-02-18', 'not_started');
-
-    // Seed sample updates
-    const insertUpdate = db.prepare(`
-      INSERT INTO project_updates (job_id, week_ending, summary, milestones, issues_risks, blockers, submitted_by_id) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertUpdate.run(1, '2026-02-28', 'Good progress on barrier installation. Section A 80% complete. Night works approved by council.', 'Section A barriers 80% installed. Council night works approval received.', 'Minor delay due to weather on Tuesday. Subcontractor availability next week uncertain.', '', 1);
-    insertUpdate.run(4, '2026-02-14', 'Project nearing completion but facing payment issues. Final inspection scheduled for next week.', 'Pavement marking completed. Signage installed.', 'Client disputing variation claim. Invoice 60 days overdue.', 'Cannot proceed with demobilisation until payment received.', 1);
-
-    // ── Additional jobs (7 more to reach 12 total) ──
-    insertJob.run('J-02456', 'J-02456 | Fulton Hogan | Blacktown | 2026-03-15', 'Fulton Hogan', '5 Main St', 'Blacktown', 'active', 'delivery', 60, '2026-03-15', '2026-08-20', 1, 2, 3, 4, 5, 'green', 'on_track', '2026-03-10');
-    insertJob.run('J-02457', 'J-02457 | CPB Contractors | Mascot | 2026-01-20', 'CPB Contractors', '200 Coward St', 'Mascot', 'active', 'delivery', 90, '2026-01-20', '2026-03-30', 1, 2, 3, 4, 5, 'green', 'on_track', '2026-03-15');
-    insertJob.run('J-02458', 'J-02458 | John Holland | Norwest | 2026-04-01', 'John Holland', '10 Lexington Dr', 'Norwest', 'won', 'prestart', 5, '2026-04-01', '2026-10-15', 1, 2, 3, 4, 5, 'green', 'na', null);
-    insertJob.run('J-02459', 'J-02459 | Transport for NSW | Homebush | 2026-02-10', 'Transport for NSW', '1 Olympic Blvd', 'Homebush', 'active', 'delivery', 55, '2026-02-10', '2026-07-15', 1, 2, 3, 4, 5, 'amber', 'on_track', '2026-03-12');
-    insertJob.run('J-02460', 'J-02460 | Downer EDI | Ryde | 2026-03-01', 'Downer EDI', '45 Victoria Rd', 'Ryde', 'active', 'delivery', 25, '2026-03-01', '2026-09-30', 1, 2, 3, 4, 5, 'green', 'on_track', '2026-03-14');
-    insertJob.run('J-02461', 'J-02461 | Georgiou Group | Campbelltown | 2026-02-20', 'Georgiou Group', '80 Queen St', 'Campbelltown', 'active', 'delivery', 70, '2026-02-20', '2026-06-15', 1, 2, 3, 4, 5, 'red', 'overdue', '2026-03-01');
-    insertJob.run('J-02462', 'J-02462 | Acciona | Wolli Creek | 2026-03-20', 'Acciona', '15 Arncliffe St', 'Wolli Creek', 'lead', 'tender', 0, '2026-03-20', '2026-12-31', 1, 2, 3, 4, 5, 'green', 'na', null);
-
-    // ── Crew members (25 people) ──
-    const insertCrew = db.prepare(`
-      INSERT INTO crew_members (full_name, employee_id, role, phone, email, licence_type, licence_expiry, induction_date, active, hourly_rate)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertCrew.run('John Smith', 'EMP-001', 'supervisor', '0412 345 678', 'john.smith@tstraffic.com.au', 'C', '2027-06-15', '2024-01-10', 1, 65);
-    insertCrew.run('Sarah Johnson', 'EMP-002', 'leading_hand', '0413 456 789', 'sarah.j@tstraffic.com.au', 'C', '2026-11-20', '2024-02-15', 1, 55);
-    insertCrew.run('Mike Chen', 'EMP-003', 'traffic_controller', '0414 567 890', 'mike.c@tstraffic.com.au', 'C', '2026-08-30', '2024-03-01', 1, 45);
-    insertCrew.run('Emma Wilson', 'EMP-004', 'traffic_controller', '0415 678 901', 'emma.w@tstraffic.com.au', 'C', '2027-01-15', '2024-01-20', 1, 45);
-    insertCrew.run('David Brown', 'EMP-005', 'supervisor', '0416 789 012', 'david.b@tstraffic.com.au', 'HR', '2027-03-10', '2023-11-05', 1, 65);
-    insertCrew.run('Lisa Nguyen', 'EMP-006', 'leading_hand', '0417 890 123', 'lisa.n@tstraffic.com.au', 'C', '2026-05-20', '2024-04-10', 1, 55);
-    insertCrew.run('James Taylor', 'EMP-007', 'traffic_controller', '0418 901 234', 'james.t@tstraffic.com.au', 'C', '2026-09-15', '2024-05-01', 1, 45);
-    insertCrew.run('Amy Patel', 'EMP-008', 'traffic_controller', '0419 012 345', 'amy.p@tstraffic.com.au', 'C', '2027-02-28', '2024-06-15', 1, 45);
-    insertCrew.run('Ryan O\'Brien', 'EMP-009', 'pilot_vehicle', '0420 123 456', 'ryan.o@tstraffic.com.au', 'HR', '2026-12-01', '2024-02-20', 1, 50);
-    insertCrew.run('Jessica Martinez', 'EMP-010', 'traffic_controller', '0421 234 567', 'jess.m@tstraffic.com.au', 'C', '2026-04-10', '2024-07-01', 1, 45);
-    insertCrew.run('Tom Anderson', 'EMP-011', 'supervisor', '0422 345 678', 'tom.a@tstraffic.com.au', 'HR', '2027-05-20', '2023-09-15', 1, 65);
-    insertCrew.run('Rachel Kim', 'EMP-012', 'leading_hand', '0423 456 789', 'rachel.k@tstraffic.com.au', 'C', '2026-07-15', '2024-01-05', 1, 55);
-    insertCrew.run('Steve Murray', 'EMP-013', 'traffic_controller', '0424 567 890', 'steve.m@tstraffic.com.au', 'C', '2026-10-30', '2024-08-01', 1, 45);
-    insertCrew.run('Karen White', 'EMP-014', 'spotter', '0425 678 901', 'karen.w@tstraffic.com.au', 'C', '2027-04-15', '2024-03-20', 1, 48);
-    insertCrew.run('Daniel Lee', 'EMP-015', 'traffic_controller', '0426 789 012', 'daniel.l@tstraffic.com.au', 'C', '2026-06-25', '2024-09-01', 1, 45);
-    insertCrew.run('Michelle Harris', 'EMP-016', 'traffic_controller', '0427 890 123', 'michelle.h@tstraffic.com.au', 'C', '2026-03-25', '2024-04-15', 1, 45);
-    insertCrew.run('Chris Thompson', 'EMP-017', 'leading_hand', '0428 901 234', 'chris.t@tstraffic.com.au', 'C', '2027-01-30', '2024-05-10', 1, 55);
-    insertCrew.run('Natalie Cooper', 'EMP-018', 'traffic_controller', '0429 012 345', 'nat.c@tstraffic.com.au', 'C', '2026-08-10', '2024-10-01', 1, 45);
-    insertCrew.run('Ben Walker', 'EMP-019', 'pilot_vehicle', '0430 123 456', 'ben.w@tstraffic.com.au', 'HR', '2026-11-05', '2024-06-20', 1, 50);
-    insertCrew.run('Sophie Young', 'EMP-020', 'traffic_controller', '0431 234 567', 'sophie.y@tstraffic.com.au', 'C', '2027-03-15', '2024-07-15', 1, 45);
-    insertCrew.run('Mark Phillips', 'EMP-021', 'labourer', '0432 345 678', 'mark.p@tstraffic.com.au', 'C', '2026-09-20', '2024-08-10', 1, 40);
-    insertCrew.run('Laura Scott', 'EMP-022', 'traffic_controller', '0433 456 789', 'laura.s@tstraffic.com.au', 'C', '2026-04-30', '2024-11-01', 1, 45);
-    insertCrew.run('Peter Hall', 'EMP-023', 'supervisor', '0434 567 890', 'peter.h@tstraffic.com.au', 'HR', '2027-02-10', '2023-12-01', 1, 65);
-    insertCrew.run('Angela Davis', 'EMP-024', 'traffic_controller', '0435 678 901', 'angela.d@tstraffic.com.au', 'C', '2026-05-15', '2024-09-15', 1, 45);
-    insertCrew.run('Tony Romano', 'EMP-025', 'leading_hand', '0436 789 012', 'tony.r@tstraffic.com.au', 'C', '2026-12-20', '2024-02-01', 1, 55);
-
-    // ── Equipment (15 items) ──
-    const insertEquipment = db.prepare(`
-      INSERT INTO equipment (asset_number, name, category, description, serial_number, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertEquipment.run('EQ-001', 'Arrow Board Trailer #1', 'arrow_board', '15-lamp LED arrow board on single-axle trailer', 'AB-2023-001', '2023-06-15', 8500, 'good', 'Bankstown Depot', '2026-06-15', 90, 'Annual rego due July', 1);
-    insertEquipment.run('EQ-002', 'Arrow Board Trailer #2', 'arrow_board', '15-lamp LED arrow board on single-axle trailer', 'AB-2023-002', '2023-06-15', 8500, 'good', 'Bankstown Depot', '2026-04-20', 90, '', 1);
-    insertEquipment.run('EQ-003', 'VMS Board - Large', 'vms', 'Solar-powered variable message sign 2400x1200', 'VMS-2024-001', '2024-02-01', 22000, 'good', 'Parramatta Yard', '2026-05-01', 90, 'New battery installed Feb 2026', 1);
-    insertEquipment.run('EQ-004', 'VMS Board - Small', 'vms', 'Trailer-mounted VMS 1200x600', 'VMS-2024-002', '2024-03-10', 15000, 'fair', 'Bankstown Depot', '2026-03-30', 90, 'Screen flickering - monitor', 1);
-    insertEquipment.run('EQ-005', 'Traffic Ute #1', 'vehicle', '2024 Toyota Hilux SR5 dual cab, white', 'VEH-HIL-001', '2024-01-20', 58000, 'good', 'Bankstown Depot', '2026-07-20', 180, 'Fleet #T&S-U01', 1);
-    insertEquipment.run('EQ-006', 'Traffic Ute #2', 'vehicle', '2024 Toyota Hilux SR dual cab, white', 'VEH-HIL-002', '2024-04-15', 52000, 'good', 'Parramatta Yard', '2026-10-15', 180, 'Fleet #T&S-U02', 1);
-    insertEquipment.run('EQ-007', 'Barrier Trailer #1', 'barrier', 'Water-filled barrier set (40 units) on flat-top trailer', 'BAR-2023-001', '2023-09-01', 12000, 'good', 'Bankstown Depot', '2026-09-01', 180, '', 1);
-    insertEquipment.run('EQ-008', 'Barrier Trailer #2', 'barrier', 'Water-filled barrier set (40 units) on flat-top trailer', 'BAR-2023-002', '2023-09-01', 12000, 'fair', 'Liverpool Yard', '2026-04-10', 180, '3 barriers cracked, replacement ordered', 1);
-    insertEquipment.run('EQ-009', 'Lighting Tower #1', 'lighting', 'Diesel lighting tower 4-head LED', 'LT-2024-001', '2024-05-20', 18000, 'good', 'Bankstown Depot', '2026-05-20', 90, '', 1);
-    insertEquipment.run('EQ-010', 'Lighting Tower #2', 'lighting', 'Diesel lighting tower 4-head LED', 'LT-2024-002', '2024-05-20', 18000, 'poor', 'Bankstown Depot', '2026-03-20', 90, 'Generator needs service', 1);
-    insertEquipment.run('EQ-011', 'Cone Set A (200)', 'cone', '200x 700mm reflective traffic cones', 'CONE-2024-A', '2024-01-10', 3000, 'good', 'Bankstown Depot', '2026-07-10', 180, '', 1);
-    insertEquipment.run('EQ-012', 'Cone Set B (200)', 'cone', '200x 700mm reflective traffic cones', 'CONE-2024-B', '2024-01-10', 3000, 'fair', 'Parramatta Yard', '2026-07-10', 180, '~30 cones damaged', 1);
-    insertEquipment.run('EQ-013', 'Delineator Set (100)', 'delineator', '100x T-top delineators with bases', 'DEL-2024-001', '2024-06-01', 2500, 'good', 'Bankstown Depot', '2026-12-01', 180, '', 1);
-    insertEquipment.run('EQ-014', 'Sign Kit - Complete', 'sign', 'Full TC sign kit - 120 signs, stands, sandbags', 'SIGN-2023-001', '2023-08-15', 6000, 'good', 'Bankstown Depot', '2026-08-15', 180, '', 1);
-    insertEquipment.run('EQ-015', 'Speed Radar Trailer', 'other', 'Solar-powered speed advisory display trailer', 'SPD-2025-001', '2025-11-01', 14000, 'new', 'Parramatta Yard', '2026-11-01', 90, 'Purchased for TfNSW project', 1);
-
-    // ── Additional tasks (5 more to reach 10 total) ──
-    insertTask.run(6, 'ops', 'Set up night works lane closure', 'Establish contra-flow on Main St between 8pm-5am', 2, '2026-03-20', 'not_started', 'medium');
-    insertTask.run(7, 'ops', 'Complete site demobilisation', 'Remove all barriers, signs, and equipment from Coward St', 2, '2026-03-25', 'in_progress', 'high');
-    insertTask.run(9, 'planning', 'Submit ROL application to TfNSW', 'Road Occupancy Licence for Olympic Blvd night works', 3, '2026-03-18', 'in_progress', 'high');
-    insertTask.run(10, 'ops', 'Conduct crew toolbox talk', 'Weekly safety briefing for Victoria Rd crew', 2, '2026-03-17', 'not_started', 'medium');
-    insertTask.run(11, 'accounts', 'Process progress claim #3', 'Georgiou Group progress claim for February works', 5, '2026-03-15', 'not_started', 'high');
-
-    // ── Clients / Subcontractors / Suppliers ──
-    const insertClient = db.prepare(`
-      INSERT INTO clients (company_name, abn, primary_contact_name, primary_contact_phone, primary_contact_email, address, billing_address, payment_terms, notes, active, company_type, trade_specialty, insurance_expiry, insurance_policy, product_categories, account_number, website, approved, rating)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    // Clients
-    insertClient.run('ABC Civil', '51 234 567 890', 'Greg Thompson', '0400 111 222', 'greg.t@abccivil.com.au', '100 George St, Sydney NSW 2000', 'PO Box 100, Sydney NSW 2001', '30 days', 'Major civil contractor, long-term client', 1, 'client', '', null, '', '', '', 'www.abccivil.com.au', 1, 4);
-    insertClient.run('RMS NSW', '20 345 678 901', 'Linda Park', '0400 222 333', 'linda.park@transport.nsw.gov.au', '20 Lee St, Chippendale NSW 2008', '', 'EOM+30', 'Government - Transport for NSW', 1, 'client', '', null, '', '', '', 'www.transport.nsw.gov.au', 1, 5);
-    insertClient.run('Lendlease', '40 456 789 012', 'Rebecca Walsh', '0400 888 999', 'r.walsh@lendlease.com', '30 The Bond, Millers Point NSW 2000', 'Level 14, 30 The Bond, Millers Point NSW 2000', '45 days', 'Tier 1 builder', 1, 'client', '', null, '', '', '', 'www.lendlease.com', 1, 4);
-    insertClient.run('Sydney Water', '49 776 225 038', 'Fiona Clarke', '0400 444 555', 'fiona.c@sydneywater.com.au', '1 Smith St, Parramatta NSW 2150', '', '30 days', '', 1, 'client', '', null, '', '', '', 'www.sydneywater.com.au', 1, 3);
-    // Subcontractors
-    insertClient.run('Sydney Line Marking', '33 111 222 333', 'Dave Russo', '0411 222 333', 'dave@sydneylinemarking.com.au', '18 Industrial Ave, Bankstown NSW 2200', '', '14 days', 'Reliable line marking subbie. Available most nights.', 1, 'subcontractor', 'line_marking', '2026-09-30', 'QBE-PL-445566', '', '', 'www.sydneylinemarking.com.au', 1, 4);
-    insertClient.run('PowerGrid Electrical', '44 222 333 444', 'Maria Santos', '0422 333 444', 'maria@powergridelectrical.com.au', '7 Sparks Rd, Penrith NSW 2750', '', '14 days', 'Licensed electrician for street lighting and signal work', 1, 'subcontractor', 'electrical', '2027-01-15', 'AIG-PL-778899', '', '', 'www.powergridelectrical.com.au', 1, 5);
-    insertClient.run('Metro Fencing Solutions', '55 333 444 555', 'Trent O\'Neill', '0433 444 555', 'trent@metrofencing.com.au', '22 Boundary St, Granville NSW 2142', '', '7 days', 'Temp fencing and hoarding. Quick turnaround.', 1, 'subcontractor', 'fencing', '2026-06-15', 'ZURICH-PL-112233', '', '', '', 1, 3);
-    // Suppliers
-    insertClient.run('Barrier Systems Australia', '66 444 555 666', 'Kim Tran', '0444 555 666', 'kim@barriersystems.com.au', '5 Factory Rd, Wetherill Park NSW 2164', 'PO Box 55, Wetherill Park NSW 2164', '30 days', 'Plastic and concrete barriers. Water-fill available.', 1, 'supplier', '', null, '', 'barriers,delineators', 'BSA-2200', 'www.barriersystems.com.au', 1, 4);
-    insertClient.run('Kennards Hire', '22 555 666 777', 'Account Team', '13 15 64', 'hire@kennards.com.au', '126 Silverwater Rd, Silverwater NSW 2128', '', 'EOM', 'General equipment hire. Use national account rate.', 1, 'supplier', '', null, '', 'lighting,vehicles,other', 'KH-NAT-5540', 'www.kennards.com.au', 1, 4);
-    insertClient.run('SignPac', '77 666 777 888', 'Ross Brennan', '0455 666 777', 'ross@signpac.com.au', '40 Industry Rd, Padstow NSW 2211', '', '14 days', 'Custom and standard traffic signs. 48hr turnaround on stock items.', 1, 'supplier', '', null, '', 'signs,cones,delineators', 'SP-1180', 'www.signpac.com.au', 1, 5);
-
-    // Link jobs to clients
-    try {
-      db.exec("UPDATE jobs SET client_id = 1 WHERE client = 'ABC Civil'");
-      db.exec("UPDATE jobs SET client_id = 2 WHERE client = 'RMS NSW'");
-      db.exec("UPDATE jobs SET client_id = 3 WHERE client = 'Lendlease'");
-      db.exec("UPDATE jobs SET client_id = 4 WHERE client = 'Sydney Water'");
-    } catch (e) { /* client_id column may not exist yet */ }
-
-    // ── Contacts (5) ──
-    const insertContact = db.prepare(`
-      INSERT INTO client_contacts (job_id, contact_type, company, full_name, position, phone, email, notes, is_primary)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertContact.run(1, 'client', 'ABC Civil', 'Greg Thompson', 'Project Manager', '0400 111 222', 'greg.t@abccivil.com.au', 'Primary contact for Bankstown project', 1);
-    insertContact.run(2, 'rms', 'Transport for NSW', 'Linda Park', 'Network Coordinator', '0400 222 333', 'linda.park@transport.nsw.gov.au', 'Handles ROL approvals for Parramatta area', 1);
-    insertContact.run(1, 'council', 'Canterbury-Bankstown Council', 'Ahmed Hassan', 'Traffic Engineer', '0400 333 444', 'ahmed.h@cbcity.nsw.gov.au', 'Approves TMPs for Canterbury Rd precinct', 0);
-    insertContact.run(4, 'client', 'Sydney Water', 'Fiona Clarke', 'Site Supervisor', '0400 444 555', 'fiona.c@sydneywater.com.au', 'Day-to-day site contact for Liverpool', 1);
-    insertContact.run(6, 'subcontractor', 'Fulton Hogan', 'Brett Williams', 'Foreman', '0400 555 666', 'brett.w@fultonhogan.com.au', 'Night works coordination', 0);
-
-    // ── Timesheets (10 entries) ──
-    const insertTimesheet = db.prepare(`
-      INSERT INTO timesheets (job_id, crew_member_id, work_date, start_time, end_time, break_minutes, total_hours, shift_type, role_on_site, approved, approved_by_id, notes, submitted_by_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertTimesheet.run(1, 1, '2026-03-14', '06:00', '14:30', 30, 8.0, 'day', 'Supervisor', 1, 1, 'Barrier install Section A', 1);
-    insertTimesheet.run(1, 3, '2026-03-14', '06:00', '14:30', 30, 8.0, 'day', 'Traffic Controller', 1, 1, 'Barrier install Section A', 1);
-    insertTimesheet.run(1, 4, '2026-03-14', '06:00', '14:30', 30, 8.0, 'day', 'Traffic Controller', 1, 1, 'Barrier install Section A', 1);
-    insertTimesheet.run(1, 2, '2026-03-15', '06:00', '16:00', 30, 9.5, 'day', 'Leading Hand', 0, null, 'Extended shift - barrier completion', 1);
-    insertTimesheet.run(1, 3, '2026-03-15', '06:00', '16:00', 30, 9.5, 'day', 'Traffic Controller', 0, null, 'Extended shift', 1);
-    insertTimesheet.run(6, 5, '2026-03-14', '19:00', '05:00', 30, 9.5, 'night', 'Supervisor', 1, 1, 'Night works - lane closure Main St', 1);
-    insertTimesheet.run(6, 7, '2026-03-14', '19:00', '05:00', 30, 9.5, 'night', 'Traffic Controller', 1, 1, 'Night works', 1);
-    insertTimesheet.run(6, 8, '2026-03-14', '19:00', '05:00', 30, 9.5, 'night', 'Traffic Controller', 0, null, 'Night works - pending approval', 1);
-    insertTimesheet.run(4, 11, '2026-03-13', '06:30', '15:00', 30, 8.0, 'day', 'Supervisor', 1, 1, 'Final inspection prep', 1);
-    insertTimesheet.run(4, 13, '2026-03-13', '06:30', '15:00', 30, 8.0, 'day', 'Traffic Controller', 0, null, 'Final inspection prep - pending', 1);
-
-    // ── Incidents (3) ──
-    const insertIncident = db.prepare(`
-      INSERT INTO incidents (job_id, incident_number, incident_type, severity, title, description, location, incident_date, incident_time, reported_by_id, persons_involved, immediate_actions, root_cause, investigation_status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertIncident.run(1, 'INC-0001', 'near_miss', 'medium', 'Vehicle entered work zone', 'Private vehicle ignored signage and entered active work zone on Canterbury Rd. No injuries. Crew members had to move quickly to avoid contact.', '12 Canterbury Rd, Bankstown', '2026-03-10', '10:30', 1, 'Mike Chen (EMP-003), Emma Wilson (EMP-004)', 'Work stopped immediately. Additional signage deployed. RMS notified.', 'Inadequate advance warning signage during peak hour', 'resolved');
-    insertIncident.run(4, 'INC-0002', 'injury', 'high', 'Crew member twisted ankle', 'Steve Murray stepped in pothole while repositioning barriers at Liverpool site. Ankle swelling observed. First aid administered on site.', '45 Macquarie St, Liverpool', '2026-03-12', '14:15', 1, 'Steve Murray (EMP-013)', 'First aid applied. Worker sent home. Incident area cordoned. Site hazard assessment completed.', 'Uneven ground surface not identified in pre-start', 'investigating');
-    insertIncident.run(6, 'INC-0003', 'hazard', 'low', 'Damaged road surface near barrier line', 'Pothole developing at edge of barrier line on Main St near work zone entry point. Could worsen with heavy vehicle traffic.', '5 Main St, Blacktown', '2026-03-15', '08:00', 2, '', 'Area marked with cones. Council notified for repair.', '', 'reported');
-
-    // ── Defects (5) ──
-    const insertDefect = db.prepare(`
-      INSERT INTO defects (job_id, defect_number, title, description, location, severity, status, reported_by_id, assigned_to_id, reported_date, target_close_date, rectification_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertDefect.run(1, 'DEF-0001', 'Cracked barrier section B12', 'Water-filled barrier unit B12 has visible crack along top edge. Leaking slowly.', 'Canterbury Rd northbound, Section B', 'moderate', 'rectification', 1, 2, '2026-03-08', '2026-03-20', 'Replacement barrier ordered. ETA 18 March.');
-    insertDefect.run(1, 'DEF-0002', 'Faded road marking at detour entry', 'Temporary road marking at detour entry point is worn and hard to see at night.', 'Canterbury Rd / Side St intersection', 'minor', 'open', 2, 3, '2026-03-12', '2026-03-22', '');
-    insertDefect.run(4, 'DEF-0003', 'Missing delineator posts - westbound', '4 delineator posts missing from westbound approach. Likely knocked over by trucks.', 'Macquarie St, Liverpool - westbound', 'major', 'investigating', 1, 2, '2026-03-11', '2026-03-15', 'Replacement delineators sourced. Install scheduled for 15 March.');
-    insertDefect.run(6, 'DEF-0004', 'Arrow board lamp failure', 'Arrow board trailer EQ-002 has 3 lamps not functioning. Reduces visibility.', 'Main St, Blacktown - night works zone', 'moderate', 'open', 2, 2, '2026-03-14', '2026-03-18', '');
-    insertDefect.run(9, 'DEF-0005', 'Damaged VMS screen', 'VMS board showing display artifacts on lower-right quadrant. Intermittent issue.', 'Olympic Blvd approach, Homebush', 'minor', 'deferred', 1, 3, '2026-03-05', '2026-04-05', 'Deferred to next scheduled maintenance window. Not impacting readability.');
-
-    // ── Additional compliance items (5 more) ──
-    insertCompliance.run(6, 'road_occupancy', 'ROL - Main St Night Works', 'Transport for NSW', 2, '2026-03-18', 'submitted');
-    insertCompliance.run(9, 'tmp_approval', 'TMP - Olympic Blvd Detour', 'City of Parramatta Council', 3, '2026-03-25', 'not_started');
-    insertCompliance.run(10, 'swms_review', 'SWMS - Victoria Rd Median Works', '', 2, '2026-03-20', 'approved');
-    insertCompliance.run(11, 'council_permit', 'Road Opening Permit - Queen St', 'Campbelltown City Council', 3, '2026-03-10', 'submitted');
-    insertCompliance.run(7, 'insurance', 'PI Certificate - CPB Project', 'QBE Insurance', 5, '2026-04-01', 'approved');
-
-    // ── Additional project updates (3 more) ──
-    insertUpdate.run(6, '2026-03-14', 'Night works progressing well. Lane closure setup completed ahead of schedule. Minor issue with arrow board lamps resolved.', 'Lane closure established. First 200m of asphalt resurfacing complete.', 'Arrow board EQ-002 had lamp failures. Backup deployed.', '', 1);
-    insertUpdate.run(9, '2026-03-14', 'TfNSW project on track. ROL application submitted, awaiting approval. Crew briefed on traffic staging.', 'ROL application submitted to TfNSW. Crew inductions completed.', 'ROL approval taking longer than expected. Escalated to regional coordinator.', 'Cannot commence night works until ROL is approved.', 1);
-    insertUpdate.run(11, '2026-03-07', 'Campbelltown project facing payment delays. Road opening permit submitted to council. Crew allocated for next 2 weeks.', 'Excavation 70% complete. Permit application lodged.', 'Client progress claim #2 still unpaid (45 days). Escalated to accounts.', 'Cannot order materials for final stage until payment received.', 1);
-
-    console.log('Database seeded with sample data.');
-
-    // Seed comprehensive demo data (allocations, equipment assignments, activity log, CRM, etc.)
-    seedDemoData(db);
+  // ── One-time cleanup: ensure all demo/seed data is gone ──
+  // Uses system_config flag so it only runs once (won't wipe real data added later)
+  try {
+    const cleanupDone = db.prepare("SELECT value FROM system_config WHERE key = 'demo_data_cleaned'").get();
+    if (!cleanupDone) {
+      console.log('Cleaning up demo/seed data...');
+      const demoTables = [
+        'traffic_plans', 'crew_allocations', 'timesheets', 'cost_entries',
+        'job_budgets', 'incidents', 'defects', 'tasks', 'equipment',
+        'contacts', 'compliance_items', 'crew_members', 'employees',
+        'jobs', 'clients', 'equipment_assignments', 'equipment_maintenance',
+        'activity_log', 'opportunities', 'crm_activities', 'communication_log',
+        'project_updates', 'compliance',
+      ];
+      for (const table of demoTables) {
+        try {
+          const count = db.prepare(`SELECT COUNT(*) as c FROM ${table}`).get().c;
+          if (count > 0) {
+            db.exec(`DELETE FROM ${table}`);
+            console.log(`  Cleared ${count} rows from ${table}`);
+          }
+        } catch (e) { /* table may not exist */ }
+      }
+      // Reset auto-increment counters
+      try {
+        db.exec(`DELETE FROM sqlite_sequence WHERE name IN (${demoTables.map(t => "'" + t + "'").join(',')})`);
+      } catch (e) { /* ignore */ }
+      // Mark cleanup as done so it never runs again
+      db.prepare("INSERT OR REPLACE INTO system_config (key, value) VALUES ('demo_data_cleaned', '1')").run();
+      console.log('Demo data cleanup complete.');
+    }
+  } catch (e) {
+    console.error('Demo cleanup error (non-fatal):', e.message);
   }
 
   // Ensure key users always exist (survives DB resets)

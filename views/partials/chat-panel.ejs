@@ -1,0 +1,75 @@
+<%
+  // Support both admin (user) and worker sessions
+  const chatUser = typeof user !== 'undefined' && user ? user : (typeof worker !== 'undefined' && worker ? worker : { id: 0, full_name: 'Unknown' });
+%>
+<div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+     data-chat-thread="<%= typeof chatThreadId !== 'undefined' ? chatThreadId : '' %>"
+     data-current-user-id="<%= chatUser.id %>"
+     data-current-user-name="<%= chatUser.full_name %>">
+
+  <!-- Pinned messages bar (populated by JS) -->
+  <div class="chat-pinned hidden border-b border-gray-200 bg-amber-50 px-3 py-2 text-xs"></div>
+
+  <!-- Typing indicator (populated by JS) -->
+  <div class="chat-typing hidden px-4 py-1 text-xs text-gray-400 italic"></div>
+
+  <!-- Messages container (scrollable) -->
+  <div class="chat-messages overflow-y-auto p-4 space-y-1" style="max-height: 500px;">
+    <div class="text-center text-gray-400 text-sm py-4">Loading messages...</div>
+  </div>
+
+  <!-- Input area -->
+  <div class="border-t border-gray-200 p-3 relative">
+    <!-- Reply indicator (hidden by default) -->
+    <div class="chat-reply-indicator hidden mb-2 text-xs text-gray-500 bg-gray-50 rounded px-2 py-1 flex items-center justify-between">
+      <span class="chat-reply-text truncate"></span>
+      <button class="chat-reply-cancel text-gray-400 hover:text-gray-700 ml-2 font-bold">&times;</button>
+    </div>
+
+    <div class="flex items-end gap-1.5">
+      <!-- File upload button (paperclip) -->
+      <label class="cursor-pointer text-gray-400 hover:text-gray-600 p-1.5 flex-shrink-0 transition-colors" title="Attach file">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+        </svg>
+        <input type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,audio/*" class="hidden chat-image-input">
+      </label>
+
+      <!-- Camera button (mobile) -->
+      <label class="cursor-pointer text-gray-400 hover:text-gray-600 p-1.5 flex-shrink-0 transition-colors" title="Take photo">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <input type="file" accept="image/*" capture="environment" class="hidden chat-camera-input">
+      </label>
+
+      <!-- Voice note button -->
+      <button class="chat-voice-btn text-gray-400 hover:text-gray-600 p-1.5 flex-shrink-0 transition-colors" title="Record voice note">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+        </svg>
+      </button>
+
+      <!-- Voice recording indicator (hidden) -->
+      <div class="chat-voice-recording hidden items-center gap-2 flex-1">
+        <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+        <span class="text-xs text-red-500 font-medium chat-voice-timer">0:00</span>
+        <button class="chat-voice-stop text-red-500 hover:text-red-700 text-xs font-medium ml-auto">Stop & Send</button>
+        <button class="chat-voice-cancel text-gray-400 hover:text-gray-600 text-xs ml-2">Cancel</button>
+      </div>
+
+      <!-- Message textarea -->
+      <textarea class="chat-input flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+        rows="1" placeholder="Type a message... Use @ to mention"></textarea>
+
+      <!-- Send button -->
+      <button class="chat-send px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors flex-shrink-0">
+        Send
+      </button>
+    </div>
+
+    <!-- Mention autocomplete dropdown (hidden by default) -->
+    <div class="chat-mention-dropdown hidden"></div>
+  </div>
+</div>

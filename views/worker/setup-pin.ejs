@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#1D6AE5">
-  <title><%= title %> | T&S Worker Portal</title>
+  <title><%= title %> | T&S Employee Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -28,7 +28,7 @@
   <div class="w-full max-w-sm px-6">
     <div class="text-center mb-8">
       <img src="/images/logo-colour.jpg" alt="T&S Traffic Control" class="h-20 w-auto mx-auto mb-4 rounded-xl shadow-sm">
-      <h1 class="text-xl font-bold text-gray-900">Worker Portal</h1>
+      <h1 class="text-xl font-bold text-gray-900">Employee Portal</h1>
       <p class="text-gray-500 text-sm mt-1">Set up your sign-in PIN</p>
     </div>
 
@@ -47,7 +47,7 @@
 
       <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-1">Welcome, <%= fullName %>!</h2>
-        <p class="text-gray-500 text-sm mb-6">Create a 4-6 digit PIN to sign in to the Worker Portal.</p>
+        <p class="text-gray-500 text-sm mb-6">Create a 4-6 digit PIN to sign in to the Employee Portal.</p>
 
         <form method="POST" action="/w/setup/<%= token %>" class="space-y-5">
           <%- include('../partials/csrf') %>

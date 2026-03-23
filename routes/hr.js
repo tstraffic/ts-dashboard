@@ -3,8 +3,13 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
 const { getDb } = require('../db/database');
 const { requirePermission, canViewSensitiveHR } = require('../middleware/auth');
+const { logActivity } = require('../middleware/audit');
+const { createInvitation, TOKEN_EXPIRY_HOURS } = require('../services/invitations');
+const { sendEmail } = require('../services/email');
+const { workerInviteEmail } = require('../services/emailTemplates');
 
 // Only admin and finance can see pay rates
 function canViewRates(user) {
@@ -13,7 +18,7 @@ function canViewRates(user) {
 }
 
 // --- Multer config for HR document uploads ---
-const UPLOAD_BASE = path.join(__dirname, '..', 'uploads', 'hr');
+const UPLOAD_BASE = path.join(__dirname, '..', 'data', 'uploads', 'hr');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -160,7 +165,91 @@ router.get('/', requirePermission('hr_dashboard'), (req, res) => {
 });
 
 // ============================================
-// EMPLOYEES LIST
+// ROSTER (new employees list — replaces /employees view)
+// ============================================
+router.get('/roster', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const { employment_type, status, level, search, sort, order, payment_type } = req.query;
+
+  let where = '1=1';
+  const params = [];
+  if (payment_type) { where += ' AND e.payment_type = ?'; params.push(payment_type); }
+  if (employment_type) { where += ' AND e.employment_type = ?'; params.push(employment_type); }
+  if (status) { where += ' AND e.employment_status = ?'; params.push(status); }
+  if (level) { where += ' AND (e.traffic_role_level = ? OR e.role_title = ?)'; params.push(level, level); }
+  if (search) { where += ' AND (e.full_name LIKE ? OR e.employee_code LIKE ? OR e.email LIKE ? OR e.phone LIKE ?)'; const s = `%${search}%`; params.push(s, s, s, s); }
+
+  const sortCol = { full_name: 'e.full_name', employee_code: 'e.employee_code', start_date: 'e.start_date', status: 'e.employment_status' }[sort] || 'e.full_name';
+  const sortOrder = order === 'desc' ? 'DESC' : 'ASC';
+
+  const employees = db.prepare(`
+    SELECT e.*, m.full_name as manager_name,
+      (SELECT MIN(ec.expiry_date) FROM employee_competencies ec WHERE ec.employee_id = e.id AND ec.expiry_date IS NOT NULL AND ec.expiry_date >= DATE('now')) as next_expiry
+    FROM employees e
+    LEFT JOIN employees m ON e.manager_id = m.id
+    WHERE ${where}
+    ORDER BY ${sortCol} ${sortOrder}
+  `).all(...params);
+
+  employees.forEach(emp => {
+    const comps = db.prepare('SELECT * FROM employee_competencies WHERE employee_id = ?').all(emp.id);
+    const docs = db.prepare('SELECT * FROM employee_documents WHERE employee_id = ?').all(emp.id);
+    emp.readiness = computeReadiness(emp, comps, docs);
+  });
+
+  // Stats
+  const totalActive = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'active'").get().c;
+  const totalDeactivated = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status IN ('inactive', 'deactivated')").get().c;
+  const totalOnLeave = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'on_leave'").get().c;
+  const totalTerminated = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status IN ('terminated', 'offboarded')").get().c;
+  const totalCash = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'cash' AND active = 1").get().c;
+  const totalTfn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'tfn' AND active = 1").get().c;
+  const totalAbn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'abn' AND active = 1").get().c;
+
+  res.render('hr/roster', {
+    title: 'Roster',
+    currentPage: 'hr-roster',
+    employees,
+    stats: { totalActive, totalDeactivated, totalOnLeave, totalTerminated, totalCash, totalTfn, totalAbn },
+    filters: { employment_type, status, level, search, sort, order, payment_type },
+    user: req.session.user
+  });
+});
+
+// ============================================
+// ROSTER BULK DELETE
+// ============================================
+router.post('/roster/delete', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  let ids = req.body.ids;
+  if (!ids) { req.flash('error', 'No employees selected.'); return res.redirect('/hr/roster'); }
+  if (!Array.isArray(ids)) ids = [ids];
+  ids = ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+  if (ids.length === 0) { req.flash('error', 'No valid employees selected.'); return res.redirect('/hr/roster'); }
+
+  const placeholders = ids.map(() => '?').join(',');
+  try {
+    const docs = db.prepare(`SELECT file_path FROM employee_documents WHERE employee_id IN (${placeholders})`).all(...ids);
+    for (const doc of docs) { if (doc.file_path) { try { fs.unlinkSync(doc.file_path); } catch (e) { /* ignore */ } } }
+    db.prepare(`DELETE FROM employee_competencies WHERE employee_id IN (${placeholders})`).run(...ids);
+    db.prepare(`DELETE FROM employee_documents WHERE employee_id IN (${placeholders})`).run(...ids);
+    db.prepare(`DELETE FROM employee_leave WHERE employee_id IN (${placeholders})`).run(...ids);
+    db.prepare(`UPDATE employees SET manager_id = NULL WHERE manager_id IN (${placeholders})`).run(...ids);
+    db.prepare(`DELETE FROM employees WHERE id IN (${placeholders})`).run(...ids);
+    for (const id of ids) {
+      const dir = path.join(UPLOAD_BASE, `emp_${id}`);
+      if (fs.existsSync(dir)) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* ignore */ } }
+    }
+    req.flash('success', `${ids.length} employee(s) deleted.`);
+  } catch (err) {
+    console.error('Roster bulk delete error:', err);
+    req.flash('error', 'Error deleting employees: ' + err.message);
+  }
+  res.redirect('/hr/roster');
+});
+
+// ============================================
+// EMPLOYEES LIST (legacy — kept for backward compat)
 // ============================================
 router.get('/employees', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
@@ -304,6 +393,53 @@ router.post('/employees', requirePermission('hr_employees'), (req, res) => {
 });
 
 // ============================================
+// BULK DELETE EMPLOYEES
+// ============================================
+router.post('/employees/delete', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  let ids = req.body.ids;
+  if (!ids) { req.flash('error', 'No employees selected.'); return res.redirect('/hr/employees'); }
+  if (!Array.isArray(ids)) ids = [ids];
+  ids = ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+  if (ids.length === 0) { req.flash('error', 'No valid employees selected.'); return res.redirect('/hr/employees'); }
+
+  const placeholders = ids.map(() => '?').join(',');
+
+  // Delete uploaded document files from disk first (before deleting DB records)
+  try {
+    const docs = db.prepare(`SELECT file_path FROM employee_documents WHERE employee_id IN (${placeholders})`).all(...ids);
+    for (const doc of docs) {
+      if (doc.file_path) { try { fs.unlinkSync(doc.file_path); } catch (e) { /* ignore */ } }
+    }
+  } catch (e) { /* ignore */ }
+
+  // Delete related records from all tables that reference employees
+  const relatedTables = ['employee_competencies', 'employee_documents', 'employee_leave'];
+  for (const table of relatedTables) {
+    try { db.prepare(`DELETE FROM ${table} WHERE employee_id IN (${placeholders})`).run(...ids); } catch (e) { /* table may not exist */ }
+  }
+
+  // Null out manager_id self-references so other employees aren't blocked
+  try { db.prepare(`UPDATE employees SET manager_id = NULL WHERE manager_id IN (${placeholders})`).run(...ids); } catch (e) { /* ignore */ }
+
+  // Delete uploaded HR folders
+  for (const id of ids) {
+    const empDir = path.join(UPLOAD_BASE, `emp_${id}`);
+    try { fs.rmSync(empDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+  }
+
+  try {
+    const result = db.prepare(`DELETE FROM employees WHERE id IN (${placeholders})`).run(...ids);
+    const count = result.changes;
+    req.flash('success', `Deleted ${count} employee${count !== 1 ? 's' : ''}.`);
+  } catch (e) {
+    console.error('Employee delete error:', e.message);
+    req.flash('error', 'Could not delete employee(s): ' + e.message);
+  }
+  res.redirect('/hr/employees');
+});
+
+// ============================================
 // EMPLOYEE DETAIL
 // ============================================
 router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
@@ -414,6 +550,7 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
     b.emergency_contact_name || '', b.emergency_contact_phone || '', b.emergency_contact_relationship || '',
     b.date_of_birth || null, b.payroll_reference || '', b.internal_notes || '',
     b.linked_crew_member_id || null, b.linked_user_id || null,
+    b.white_card_number || '', b.tc_licence_number || '', b.tc_licence_state || '', b.tc_licence_date_of_issue || '', b.drivers_licence_number || '',
   ];
 
   const rateParams = canViewRates(req.session.user)
@@ -437,7 +574,8 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
       primary_work_region = ?, base_location = ?,
       emergency_contact_name = ?, emergency_contact_phone = ?, emergency_contact_relationship = ?,
       date_of_birth = ?, payroll_reference = ?, internal_notes = ?,
-      linked_crew_member_id = ?, linked_user_id = ?
+      linked_crew_member_id = ?, linked_user_id = ?,
+      white_card_number = ?, tc_licence_number = ?, tc_licence_state = ?, tc_licence_date_of_issue = ?, drivers_licence_number = ?
       ${rateSet},
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
@@ -448,6 +586,81 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
 
   req.flash('success', 'Employee updated successfully.');
   res.redirect(`/hr/employees/${req.params.id}`);
+});
+
+// ============================================
+// WORKER PORTAL PIN MANAGEMENT
+// ============================================
+
+// Helper: load employee + linked crew member, or flash error
+function loadEmployeeWithCrew(req, res) {
+  const db = getDb();
+  const employee = db.prepare('SELECT * FROM employees WHERE id = ?').get(req.params.id);
+  if (!employee) { req.flash('error', 'Employee not found.'); return null; }
+  if (!employee.linked_crew_member_id) { req.flash('error', 'Employee is not linked to a crew member.'); return null; }
+  const crewMember = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(employee.linked_crew_member_id);
+  if (!crewMember) { req.flash('error', 'Linked crew member not found.'); return null; }
+  return { employee, crewMember };
+}
+
+// POST /employees/:id/set-pin — Set or reset worker portal PIN
+router.post('/employees/:id/set-pin', requirePermission('hr_employees'), (req, res) => {
+  const data = loadEmployeeWithCrew(req, res);
+  if (!data) return res.redirect(`/hr/employees/${req.params.id}#workforce`);
+  const { employee, crewMember } = data;
+
+  const { pin } = req.body;
+  if (!pin || !/^\d{4,6}$/.test(pin)) {
+    req.flash('error', 'PIN must be 4-6 digits.');
+    return res.redirect(`/hr/employees/${employee.id}#workforce`);
+  }
+
+  const pinHash = bcrypt.hashSync(pin, 12);
+  getDb().prepare('UPDATE crew_members SET pin_hash = ?, pin_set_at = CURRENT_TIMESTAMP, pin_set_by_id = ? WHERE id = ?')
+    .run(pinHash, req.session.user.id, crewMember.id);
+
+  logActivity({ user: req.session.user, action: 'update', entityType: 'crew_member', entityId: crewMember.id, entityLabel: crewMember.full_name, details: 'Set worker portal PIN (from HR)', ip: req.ip });
+  req.flash('success', 'Portal PIN set for ' + crewMember.full_name);
+  res.redirect(`/hr/employees/${employee.id}#workforce`);
+});
+
+// POST /employees/:id/clear-pin — Remove worker portal PIN
+router.post('/employees/:id/clear-pin', requirePermission('hr_employees'), (req, res) => {
+  const data = loadEmployeeWithCrew(req, res);
+  if (!data) return res.redirect(`/hr/employees/${req.params.id}#workforce`);
+  const { employee, crewMember } = data;
+
+  getDb().prepare('UPDATE crew_members SET pin_hash = NULL, pin_set_at = NULL, pin_set_by_id = NULL WHERE id = ?')
+    .run(crewMember.id);
+
+  logActivity({ user: req.session.user, action: 'update', entityType: 'crew_member', entityId: crewMember.id, entityLabel: crewMember.full_name, details: 'Cleared worker portal PIN (from HR)', ip: req.ip });
+  req.flash('success', 'Portal PIN cleared for ' + crewMember.full_name);
+  res.redirect(`/hr/employees/${employee.id}#workforce`);
+});
+
+// POST /employees/:id/send-invite — Send email invitation for worker portal
+router.post('/employees/:id/send-invite', requirePermission('hr_employees'), async (req, res) => {
+  const data = loadEmployeeWithCrew(req, res);
+  if (!data) return res.redirect(`/hr/employees/${req.params.id}#workforce`);
+  const { employee, crewMember } = data;
+
+  if (!crewMember.email || !crewMember.employee_id) {
+    req.flash('error', 'Crew member needs both an email and Employee ID to receive an invite.');
+    return res.redirect(`/hr/employees/${employee.id}#workforce`);
+  }
+
+  try {
+    const { token } = createInvitation({ type: 'crew_member', targetId: crewMember.id, email: crewMember.email, createdById: req.session.user.id });
+    const setupUrl = (process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`) + '/w/setup/' + token;
+    await sendEmail(crewMember.email, 'Set up your T&S Worker Portal PIN', workerInviteEmail(crewMember.full_name, setupUrl, TOKEN_EXPIRY_HOURS));
+
+    logActivity({ user: req.session.user, action: 'update', entityType: 'crew_member', entityId: crewMember.id, entityLabel: crewMember.full_name, details: 'Sent worker portal email invitation (from HR)', ip: req.ip });
+    req.flash('success', `Invitation email sent to ${crewMember.email}`);
+  } catch (err) {
+    console.error('Send invite error:', err);
+    req.flash('error', 'Failed to send invitation email.');
+  }
+  res.redirect(`/hr/employees/${employee.id}#workforce`);
 });
 
 // ============================================
@@ -504,6 +717,19 @@ router.get('/documents/:id/download', requirePermission('hr_documents'), (req, r
     req.flash('error', 'File not found on disk.');
     return res.redirect('back');
   }
+
+  // If ?inline=1 or the request is for an image, serve inline for preview
+  const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg|avif|heic|heif)$/i.test(doc.original_name || doc.filename);
+  if (req.query.inline || isImage) {
+    const ext = path.extname(doc.original_name || doc.filename).toLowerCase();
+    const mimeTypes = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp', '.svg': 'image/svg+xml', '.avif': 'image/avif', '.pdf': 'application/pdf' };
+    const mime = mimeTypes[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `inline; filename="${doc.original_name || doc.filename}"`);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    return res.sendFile(path.resolve(doc.file_path));
+  }
+
   res.download(doc.file_path, doc.original_name);
 });
 
@@ -820,6 +1046,25 @@ router.get('/compliance', requirePermission('hr_compliance_view'), (req, res) =>
     filterOptions: { companies },
     user: req.session.user
   });
+});
+
+// ============================================
+// DEACTIVATE / REACTIVATE EMPLOYEE
+// ============================================
+router.post('/employees/:id/toggle-active', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const employee = db.prepare('SELECT id, employment_status, active FROM employees WHERE id = ?').get(req.params.id);
+  if (!employee) { req.flash('error', 'Employee not found.'); return res.redirect('/hr/employees'); }
+
+  const action = req.body.action; // 'deactivate' or 'reactivate'
+  if (action === 'deactivate') {
+    db.prepare('UPDATE employees SET employment_status = ?, active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('inactive', employee.id);
+    req.flash('success', 'Employee deactivated.');
+  } else if (action === 'reactivate') {
+    db.prepare('UPDATE employees SET employment_status = ?, active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run('active', employee.id);
+    req.flash('success', 'Employee reactivated.');
+  }
+  res.redirect(`/hr/employees/${employee.id}`);
 });
 
 // ============================================

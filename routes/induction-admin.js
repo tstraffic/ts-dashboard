@@ -141,22 +141,81 @@ router.post('/submissions/:id/status', (req, res) => {
           employment_type, employment_status, payment_type, start_date,
           email, phone, address, suburb, state, postcode,
           date_of_birth, induction_status, allocatable, active,
-          linked_crew_member_id, internal_notes)
-        VALUES (?, ?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', ?, date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?)
+          linked_crew_member_id, internal_notes,
+          white_card_number, tc_licence_number, tc_licence_state, tc_licence_date_of_issue, drivers_licence_number,
+          emergency_contact_name, emergency_contact_phone, emergency_contact_relationship)
+        VALUES (?, ?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', ?, date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?)
       `).run(
         employeeId, firstName, middleName, lastName, fullName, employmentType,
         s.payment_type || '',
         s.email || '', s.phone || '', s.address || '', s.suburb || '', s.state || '', s.postcode || '',
         s.date_of_birth || null, crewMemberId,
-        `Auto-created from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''} AccName: ${s.bank_account_name || ''}`
+        `Auto-created from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''} AccName: ${s.bank_account_name || ''}`,
+        s.white_card_number || '', s.tc_licence_number || '', s.tc_licence_state || '', s.tc_licence_date_of_issue || '', s.drivers_licence_number || '',
+        s.emergency_contact_name || '', s.emergency_contact_phone || '', s.emergency_contact_relationship || ''
       );
 
-      // 3. Update submission with link to crew member (stay as 'approved' — conversion tracked by linked_crew_member_id)
+      // 3. Get the new employee record ID
+      const newEmployee = db.prepare("SELECT id FROM employees WHERE employee_code = ?").get(employeeId);
+      const newEmpId = newEmployee ? newEmployee.id : null;
+
+      // 4. Auto-create employee documents from induction uploads
+      if (newEmpId) {
+        const inductionUploadsDir = path.resolve(__dirname, '..', 'data', 'uploads', 'inductions');
+        const hrUploadsBase = path.resolve(__dirname, '..', 'data', 'uploads', 'hr');
+
+        const docMappings = [
+          { field: 'white_card_photo', type: 'white_card', name: 'White Card', mandatory: 1 },
+          { field: 'tc_licence_photo', type: 'tc_licence', name: 'TC Licence', mandatory: 1 },
+          { field: 'drivers_licence_photo', type: 'drivers_licence_front', name: "Driver's Licence (Front)", mandatory: 1 },
+          { field: 'drivers_licence_back_photo', type: 'drivers_licence_back', name: "Driver's Licence (Back)", mandatory: 1 },
+        ];
+
+        for (const mapping of docMappings) {
+          const srcFilename = s[mapping.field];
+          if (!srcFilename) continue;
+
+          try {
+            // Source path (induction uploads)
+            const srcPath = path.join(inductionUploadsDir, srcFilename);
+            if (!fs.existsSync(srcPath)) continue;
+
+            // Destination directory for this employee + doc type
+            const destDir = path.join(hrUploadsBase, `emp_${newEmpId}`, mapping.type);
+            fs.mkdirSync(destDir, { recursive: true });
+
+            // Copy file to HR uploads
+            const destFilename = `${Date.now()}-${srcFilename}`;
+            const destPath = path.join(destDir, destFilename);
+            fs.copyFileSync(srcPath, destPath);
+
+            // Get file size
+            const stats = fs.statSync(destPath);
+
+            // Insert document record
+            db.prepare(`
+              INSERT INTO employee_documents (employee_id, document_type, document_name, filename, original_name, file_path, file_size,
+                mandatory, verification_status, notes, uploaded_by_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+            `).run(
+              newEmpId, mapping.type, mapping.name, destFilename, srcFilename, destPath, stats.size,
+              mapping.mandatory, `Auto-imported from induction #${s.id}`, req.session.user.id
+            );
+          } catch (docErr) {
+            console.error(`Failed to copy induction doc ${mapping.field}:`, docErr);
+            // Continue with other docs even if one fails
+          }
+        }
+      }
+
+      // 5. Update submission with link to crew member (stay as 'approved' — conversion tracked by linked_crew_member_id)
       db.prepare(`
         UPDATE induction_submissions SET linked_crew_member_id = ?, updated_at = datetime('now') WHERE id = ?
       `).run(crewMemberId, s.id);
 
-      req.flash('success', `${fullName} approved and added as employee ${employeeId}. They now appear in Crew Roster and Employees.`);
+      req.flash('success', `${fullName} approved and added as employee ${employeeId}. Documents imported to their profile.`);
       return res.redirect(`/induction/admin/submissions/${req.params.id}`);
     } catch (err) {
       console.error('Auto-convert error:', err);
@@ -205,16 +264,53 @@ router.post('/submissions/:id/convert', (req, res) => {
         employment_type, employment_status, payment_type, start_date,
         email, phone, address, suburb, state, postcode,
         date_of_birth, induction_status, allocatable, active,
-        linked_crew_member_id, internal_notes)
-      VALUES (?, ?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', ?, date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?)
+        linked_crew_member_id, internal_notes,
+        white_card_number, tc_licence_number, tc_licence_state, tc_licence_date_of_issue, drivers_licence_number,
+        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship)
+      VALUES (?, ?, ?, ?, ?, 'T&S Traffic Control', ?, 'active', ?, date('now'), ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 1, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?)
     `).run(employeeId, firstName, middleName, lastName, fullName, employmentType, s.payment_type || '',
       s.email || '', s.phone || '', s.address || '', s.suburb || '', s.state || '', s.postcode || '',
       s.date_of_birth || null, crewMemberId,
-      `Converted from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''}`);
+      `Converted from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''}`,
+      s.white_card_number || '', s.tc_licence_number || '', s.tc_licence_state || '', s.tc_licence_date_of_issue || '', s.drivers_licence_number || '',
+      s.emergency_contact_name || '', s.emergency_contact_phone || '', s.emergency_contact_relationship || '');
+
+    // Auto-create employee documents from induction uploads
+    const newEmployee = db.prepare("SELECT id FROM employees WHERE employee_code = ?").get(employeeId);
+    const newEmpId = newEmployee ? newEmployee.id : null;
+    if (newEmpId) {
+      const inductionUploadsDir = path.resolve(__dirname, '..', 'data', 'uploads', 'inductions');
+      const hrUploadsBase = path.resolve(__dirname, '..', 'data', 'uploads', 'hr');
+      const docMappings = [
+        { field: 'white_card_photo', type: 'white_card', name: 'White Card', mandatory: 1 },
+        { field: 'tc_licence_photo', type: 'tc_licence', name: 'TC Licence', mandatory: 1 },
+        { field: 'drivers_licence_photo', type: 'drivers_licence_front', name: "Driver's Licence (Front)", mandatory: 1 },
+        { field: 'drivers_licence_back_photo', type: 'drivers_licence_back', name: "Driver's Licence (Back)", mandatory: 1 },
+      ];
+      for (const mapping of docMappings) {
+        const srcFilename = s[mapping.field];
+        if (!srcFilename) continue;
+        try {
+          const srcPath = path.join(inductionUploadsDir, srcFilename);
+          if (!fs.existsSync(srcPath)) continue;
+          const destDir = path.join(hrUploadsBase, `emp_${newEmpId}`, mapping.type);
+          fs.mkdirSync(destDir, { recursive: true });
+          const destFilename = `${Date.now()}-${srcFilename}`;
+          const destPath = path.join(destDir, destFilename);
+          fs.copyFileSync(srcPath, destPath);
+          const stats = fs.statSync(destPath);
+          db.prepare(`INSERT INTO employee_documents (employee_id, document_type, document_name, filename, original_name, file_path, file_size, mandatory, verification_status, notes, uploaded_by_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`).run(
+            newEmpId, mapping.type, mapping.name, destFilename, srcFilename, destPath, stats.size, mapping.mandatory, `Auto-imported from induction #${s.id}`, req.session.user.id
+          );
+        } catch (docErr) { console.error(`Failed to copy induction doc ${mapping.field}:`, docErr); }
+      }
+    }
 
     db.prepare("UPDATE induction_submissions SET linked_crew_member_id = ?, updated_at = datetime('now') WHERE id = ?").run(crewMemberId, s.id);
 
-    req.flash('success', `${fullName} converted to employee ${employeeId}.`);
+    req.flash('success', `${fullName} converted to employee ${employeeId}. Documents imported.`);
   } catch (err) {
     console.error('Convert error:', err);
     req.flash('error', `Failed to convert: ${err.message}`);
@@ -222,15 +318,64 @@ router.post('/submissions/:id/convert', (req, res) => {
   res.redirect(`/induction/admin/submissions/${req.params.id}`);
 });
 
+// POST /induction/admin/submissions/delete — bulk delete submissions
+router.post('/submissions/delete', (req, res) => {
+  const db = getDb();
+  let ids = req.body.ids;
+
+  // Support both single id and array of ids
+  if (!ids) {
+    req.flash('error', 'No submissions selected.');
+    return res.redirect('/induction/admin/submissions');
+  }
+  if (!Array.isArray(ids)) ids = [ids];
+
+  // Sanitize to integers
+  ids = ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+  if (ids.length === 0) {
+    req.flash('error', 'No valid submissions selected.');
+    return res.redirect('/induction/admin/submissions');
+  }
+
+  // Fetch submissions to clean up uploaded files
+  const placeholders = ids.map(() => '?').join(',');
+  const submissions = db.prepare(`SELECT id, white_card_photo, tc_licence_photo, drivers_licence_photo, drivers_licence_back_photo FROM induction_submissions WHERE id IN (${placeholders})`).all(...ids);
+
+  // Delete uploaded files from disk (check both new and legacy paths)
+  const newUploadsDir = path.resolve(__dirname, '..', 'data', 'uploads', 'inductions');
+  const legacyUploadsDir = path.resolve(__dirname, '..', 'uploads', 'inductions');
+  for (const s of submissions) {
+    for (const field of ['white_card_photo', 'tc_licence_photo', 'drivers_licence_photo', 'drivers_licence_back_photo']) {
+      if (s[field]) {
+        try { fs.unlinkSync(path.join(newUploadsDir, s[field])); } catch (e) { /* ignore */ }
+        try { fs.unlinkSync(path.join(legacyUploadsDir, s[field])); } catch (e) { /* ignore */ }
+      }
+    }
+  }
+
+  // Delete from database
+  db.prepare(`DELETE FROM induction_submissions WHERE id IN (${placeholders})`).run(...ids);
+
+  const count = submissions.length;
+  req.flash('success', `Deleted ${count} submission${count !== 1 ? 's' : ''}.`);
+  res.redirect('/induction/admin/submissions');
+});
+
 // Serve uploaded induction files (authenticated)
 // View URLs: /induction/admin/uploads/:id/:filename — :id is for context only, files are stored flat
 router.get('/uploads/:id/:filename', (req, res) => {
   // Sanitize filename — prevent path traversal attacks
   const filename = path.basename(req.params.filename);
-  const uploadsDir = path.resolve(__dirname, '..', 'uploads', 'inductions');
-  const filePath = path.resolve(uploadsDir, filename);
-  if (!filePath.startsWith(uploadsDir) || !fs.existsSync(filePath)) {
-    return res.status(404).send('File not found');
+  // Check both new (data/uploads) and legacy (uploads) paths for backwards compat
+  const newUploadsDir = path.resolve(__dirname, '..', 'data', 'uploads', 'inductions');
+  const legacyUploadsDir = path.resolve(__dirname, '..', 'uploads', 'inductions');
+  let filePath = path.resolve(newUploadsDir, filename);
+  if (!filePath.startsWith(newUploadsDir) || !fs.existsSync(filePath)) {
+    // Fallback to legacy path
+    filePath = path.resolve(legacyUploadsDir, filename);
+    if (!filePath.startsWith(legacyUploadsDir) || !fs.existsSync(filePath)) {
+      return res.status(404).send('File not found');
+    }
   }
   res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
   res.sendFile(filePath);
