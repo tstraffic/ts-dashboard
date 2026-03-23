@@ -191,6 +191,16 @@ router.get('/:id', (req, res) => {
   `).all(job.id);
   const totalSpend = db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM cost_entries WHERE job_id = ?`).get(job.id).total;
 
+  // Compliance costs for this job (council fees + plan costs)
+  const complianceCosts = db.prepare(`SELECT COALESCE(SUM(costs), 0) + COALESCE(SUM(council_fee_amount), 0) as total FROM compliance WHERE job_id = ?`).get(job.id).total;
+
+  // Equipment maintenance costs for equipment assigned to this job
+  const equipmentCosts = db.prepare(`
+    SELECT COALESCE(SUM(em.cost), 0) as total FROM equipment_maintenance em
+    INNER JOIN equipment_assignments ea ON em.equipment_id = ea.equipment_id
+    WHERE ea.job_id = ?
+  `).get(job.id).total;
+
   // Equipment assigned to this job
   const equipmentAssignments = db.prepare(`
     SELECT ea.*, e.name as equipment_name, e.asset_number, e.category, e.current_condition as equipment_condition,
@@ -233,6 +243,7 @@ router.get('/:id', (req, res) => {
     title: job.job_number,
     job, tasks, updates, complianceItems, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
+    complianceCosts, equipmentCosts,
     equipmentAssignments, defects, trafficPlans, chatThreadId,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
