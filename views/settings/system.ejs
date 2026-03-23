@@ -96,3 +96,196 @@
     Or set SMTP_* environment variables in Railway instead.
   </p>
 </div>
+
+<!-- Push Notifications Section -->
+<div class="mt-6 bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+  <h2 class="text-lg font-semibold text-gray-900 mb-2">Push Notifications</h2>
+  <p class="text-sm text-gray-500 mb-4">Browser push notifications for overdue tasks, compliance deadlines, incidents, and more. Each user must enable notifications on their device.</p>
+
+  <!-- Status -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+    <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">This Browser</p>
+      <p id="pushStatus" class="text-sm font-semibold text-gray-500 mt-1">Checking...</p>
+    </div>
+    <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Your Subscriptions</p>
+      <p id="pushSubCount" class="text-sm font-semibold text-gray-500 mt-1">Loading...</p>
+    </div>
+    <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">VAPID Keys</p>
+      <p id="vapidStatus" class="text-sm font-semibold text-gray-500 mt-1">Checking...</p>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex flex-wrap gap-3">
+    <button type="button" id="enablePushBtn" onclick="enablePush()" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      Enable Notifications
+    </button>
+    <button type="button" id="testPushBtn" onclick="testPush()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors">
+      Send Test Notification
+    </button>
+    <button type="button" id="disablePushBtn" onclick="disablePush()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors hidden">
+      Disable Notifications
+    </button>
+  </div>
+  <p id="pushMessage" class="text-sm mt-3 hidden"></p>
+
+  <!-- Info -->
+  <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+    <p class="text-xs text-blue-700"><strong>How it works:</strong> Notifications are generated every 15 minutes for overdue tasks, expiring compliance, missing updates, open incidents, and more. Each user needs to click "Enable Notifications" on their own device/browser.</p>
+    <p class="text-xs text-blue-600 mt-1"><strong>iOS:</strong> On iPhone/iPad, first add the site to your Home Screen (Share &rarr; Add to Home Screen), then open from there and enable notifications.</p>
+  </div>
+</div>
+
+<script>
+(function() {
+  var csrfToken = document.querySelector('input[name="_csrf"]') ? document.querySelector('input[name="_csrf"]').value : '';
+  var statusEl = document.getElementById('pushStatus');
+  var subCountEl = document.getElementById('pushSubCount');
+  var vapidEl = document.getElementById('vapidStatus');
+  var enableBtn = document.getElementById('enablePushBtn');
+  var disableBtn = document.getElementById('disablePushBtn');
+  var testBtn = document.getElementById('testPushBtn');
+  var msgEl = document.getElementById('pushMessage');
+
+  function showMsg(text, isError) {
+    msgEl.textContent = text;
+    msgEl.className = 'text-sm mt-3 ' + (isError ? 'text-red-600' : 'text-emerald-600');
+    msgEl.classList.remove('hidden');
+  }
+
+  // Check current state
+  function checkStatus() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      statusEl.textContent = 'Not Supported';
+      statusEl.className = 'text-sm font-semibold text-red-600 mt-1';
+      enableBtn.disabled = true;
+      enableBtn.classList.add('opacity-50');
+      return;
+    }
+
+    Notification.permission === 'granted'
+      ? (statusEl.textContent = 'Enabled', statusEl.className = 'text-sm font-semibold text-emerald-600 mt-1', enableBtn.classList.add('hidden'), disableBtn.classList.remove('hidden'))
+      : Notification.permission === 'denied'
+        ? (statusEl.textContent = 'Blocked by Browser', statusEl.className = 'text-sm font-semibold text-red-600 mt-1', enableBtn.textContent = 'Blocked — Check Browser Settings')
+        : (statusEl.textContent = 'Not Enabled', statusEl.className = 'text-sm font-semibold text-amber-600 mt-1');
+
+    // Check subscription count
+    navigator.serviceWorker.ready.then(function(reg) {
+      return reg.pushManager.getSubscription();
+    }).then(function(sub) {
+      subCountEl.textContent = sub ? 'Subscribed on this device' : 'Not subscribed';
+      subCountEl.className = 'text-sm font-semibold ' + (sub ? 'text-emerald-600' : 'text-amber-600') + ' mt-1';
+    });
+
+    // Check VAPID
+    fetch('/notifications/push/vapid-key')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        vapidEl.textContent = d.publicKey ? 'Configured' : 'Not Set';
+        vapidEl.className = 'text-sm font-semibold ' + (d.publicKey ? 'text-emerald-600' : 'text-red-600') + ' mt-1';
+      })
+      .catch(function() {
+        vapidEl.textContent = 'Error';
+        vapidEl.className = 'text-sm font-semibold text-red-600 mt-1';
+      });
+  }
+
+  // Enable push
+  window.enablePush = function() {
+    enableBtn.textContent = 'Enabling...';
+    enableBtn.disabled = true;
+
+    Notification.requestPermission().then(function(permission) {
+      if (permission !== 'granted') {
+        showMsg('Notification permission denied. Check your browser settings.', true);
+        enableBtn.textContent = 'Enable Notifications';
+        enableBtn.disabled = false;
+        checkStatus();
+        return;
+      }
+
+      fetch('/notifications/push/vapid-key')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          return navigator.serviceWorker.ready.then(function(reg) {
+            var key = urlBase64ToUint8Array(data.publicKey);
+            return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+          });
+        })
+        .then(function(subscription) {
+          return fetch('/notifications/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            body: JSON.stringify(subscription),
+          });
+        })
+        .then(function() {
+          showMsg('Push notifications enabled! You will now receive alerts.', false);
+          checkStatus();
+        })
+        .catch(function(err) {
+          showMsg('Failed to enable: ' + err.message, true);
+          enableBtn.textContent = 'Enable Notifications';
+          enableBtn.disabled = false;
+        });
+    });
+  };
+
+  // Disable push
+  window.disablePush = function() {
+    navigator.serviceWorker.ready.then(function(reg) {
+      return reg.pushManager.getSubscription();
+    }).then(function(sub) {
+      if (sub) {
+        return fetch('/notifications/push/unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        }).then(function() { return sub.unsubscribe(); });
+      }
+    }).then(function() {
+      showMsg('Push notifications disabled on this device.', false);
+      checkStatus();
+    });
+  };
+
+  // Test push
+  window.testPush = function() {
+    testBtn.textContent = 'Sending...';
+    testBtn.disabled = true;
+    fetch('/notifications/push/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) {
+          showMsg(d.error, true);
+        } else {
+          showMsg('Test notification sent! Check your device.', false);
+        }
+        testBtn.textContent = 'Send Test Notification';
+        testBtn.disabled = false;
+      })
+      .catch(function() {
+        showMsg('Failed to send test notification.', true);
+        testBtn.textContent = 'Send Test Notification';
+        testBtn.disabled = false;
+      });
+  };
+
+  function urlBase64ToUint8Array(base64String) {
+    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+    var base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    var rawData = window.atob(base64);
+    var outputArray = new Uint8Array(rawData.length);
+    for (var i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  checkStatus();
+})();
+</script>
