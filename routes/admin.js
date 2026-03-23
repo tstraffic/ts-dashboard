@@ -147,6 +147,29 @@ router.post('/users/:id/delete', (req, res) => {
   res.redirect('/admin/users');
 });
 
+// Reset password
+router.post('/users/:id/reset-password', (req, res) => {
+  const db = getDb();
+  const targetUser = db.prepare('SELECT id, username, full_name FROM users WHERE id = ?').get(req.params.id);
+  if (!targetUser) { req.flash('error', 'User not found.'); return res.redirect('/admin/users'); }
+
+  const newPassword = req.body.new_password;
+  if (!newPassword || newPassword.length < 6) {
+    req.flash('error', 'Password must be at least 6 characters.');
+    return res.redirect('/admin/users');
+  }
+
+  try {
+    const hash = bcrypt.hashSync(newPassword, 12);
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.params.id);
+    logActivity({ user: req.session.user, action: 'update', entityType: 'user', entityId: targetUser.id, entityLabel: targetUser.full_name, details: 'Reset password', ip: req.ip });
+    req.flash('success', `Password reset for ${targetUser.username}.`);
+  } catch (err) {
+    req.flash('error', 'Failed to reset password: ' + err.message);
+  }
+  res.redirect('/admin/users');
+});
+
 // Resend invitation email
 router.post('/users/:id/resend-invite', async (req, res) => {
   const db = getDb();
