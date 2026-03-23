@@ -3581,6 +3581,27 @@ function runMigrations(db) {
     console.log('Migration 65 complete.');
   }
 
+  // Migration 66: Compliance documents table
+  if (!isMigrationApplied.get(66)) {
+    console.log('Running migration 66: Compliance documents table');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS compliance_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        compliance_id INTEGER NOT NULL REFERENCES compliance(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_size INTEGER NOT NULL DEFAULT 0,
+        mime_type TEXT DEFAULT '',
+        uploaded_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_compliance_docs_compliance ON compliance_documents(compliance_id);
+    `);
+    recordMigration.run(66, 'Compliance documents table');
+    console.log('Migration 66 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
