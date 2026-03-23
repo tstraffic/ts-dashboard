@@ -3544,6 +3544,43 @@ function runMigrations(db) {
     console.log('Migration 64 complete — 92 TGS entries imported.');
   }
 
+  // Migration 65: Add police_notification and letter_drop to compliance item_type CHECK
+  if (!isMigrationApplied.get(65)) {
+    console.log('Running migration 65: Expand compliance item_type CHECK constraint');
+    try {
+      const oldDDL = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'compliance'").get().sql;
+      if (!oldDDL.includes('police_notification')) {
+        const cols = db.prepare("PRAGMA table_info(compliance)").all();
+        const colDefs = cols.map(c => {
+          let def = `${c.name} ${c.type}`;
+          if (c.name === 'item_type') {
+            def = "item_type TEXT NOT NULL CHECK(item_type IN ('tmp_approval','council_permit','traffic_guidance','insurance','swms_review','induction','road_occupancy','utility_clearance','environmental','rol','insurance_certificate','public_liability','vehicle_registration','plant_inspection','staff_certification','spa','police_notification','letter_drop','other'))";
+          } else {
+            if (c.notnull) def += ' NOT NULL';
+            if (c.dflt_value !== null) def += ` DEFAULT ${c.dflt_value}`;
+          }
+          if (c.pk) def += ' PRIMARY KEY AUTOINCREMENT';
+          return def;
+        }).join(', ');
+
+        db.exec('PRAGMA foreign_keys = OFF');
+        db.exec('BEGIN');
+        db.exec(`CREATE TABLE compliance_new (${colDefs})`);
+        db.exec('INSERT INTO compliance_new SELECT * FROM compliance');
+        db.exec('DROP TABLE compliance');
+        db.exec('ALTER TABLE compliance_new RENAME TO compliance');
+        db.exec('COMMIT');
+        db.exec('PRAGMA foreign_keys = ON');
+        console.log('  Rebuilt compliance table with expanded item_type CHECK.');
+      }
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch (_) {}
+      console.error('Migration 65 error:', e.message);
+    }
+    recordMigration.run(65, 'Add police_notification and letter_drop to compliance item_type');
+    console.log('Migration 65 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

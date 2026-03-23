@@ -87,6 +87,43 @@ router.get('/', (req, res) => {
   });
 });
 
+// API: Generate next reference number for a given item_type
+router.get('/api/next-ref', (req, res) => {
+  const db = getDb();
+  const type = req.query.item_type || '';
+
+  const prefixMap = {
+    traffic_guidance: 'TSTGS',
+    road_occupancy: 'TSROL',
+    rol: 'TSROL',
+    council_permit: 'TSCA',
+    tmp_approval: 'TSTMP',
+    swms_review: 'TSSWMS',
+    insurance: 'TSINS',
+    induction: 'TSIND',
+    environmental: 'TSENV',
+    utility_clearance: 'TSUC',
+    spa: 'TSSPA',
+    police_notification: 'TSPN',
+    letter_drop: 'TSLD',
+    other: 'TSOTH',
+  };
+  const prefix = prefixMap[type] || 'TSREF';
+
+  // Find highest existing number with this prefix
+  const rows = db.prepare("SELECT reference_number FROM compliance WHERE reference_number LIKE ? || '%'").all(prefix);
+  let maxNum = 3000; // Start from 3001 to continue after existing TSTGS3xxx series
+  rows.forEach(r => {
+    const match = r.reference_number.match(new RegExp(prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\d+)'));
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  });
+
+  res.json({ reference_number: prefix + (maxNum + 1) });
+});
+
 router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();

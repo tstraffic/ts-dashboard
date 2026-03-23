@@ -12,6 +12,9 @@
     { value: 'spa',                  label: 'SPA (Special Permit Application)' },
     { value: 'rol',                  label: 'ROL (Road Occupancy Licence)' },
     { value: 'council_permit',       label: 'Council Permit' },
+    { value: 'police_notification',  label: 'Police Notification' },
+    { value: 'letter_drop',         label: 'Letter Drop' },
+    { value: 'other',               label: 'Other' },
   ];
   const statusOptions = [
     { value: 'not_started', label: 'Not Started' },
@@ -188,10 +191,15 @@
         <!-- Reference Number -->
         <div>
           <label for="reference_number" class="block text-sm font-medium text-gray-600 mb-1">Reference Number</label>
-          <input type="text" id="reference_number" name="reference_number"
-            value="<%= isEdit && item.reference_number ? item.reference_number : '' %>"
-            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            placeholder="External ref number">
+          <div class="flex gap-2">
+            <input type="text" id="reference_number" name="reference_number"
+              value="<%= isEdit && item.reference_number ? item.reference_number : '' %>"
+              class="flex-1 bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder="Auto-generated or manual entry">
+            <button type="button" id="generateRefBtn" onclick="generateRefNumber()"
+              class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition-colors whitespace-nowrap"
+              title="Generate next reference number">Generate</button>
+          </div>
         </div>
 
         <!-- Client PM -->
@@ -387,4 +395,32 @@ document.getElementById('item_type').addEventListener('change', toggleCouncilFee
 document.getElementById('council_fee_paid').addEventListener('change', toggleFeeAmount);
 toggleCouncilFee();
 toggleFeeAmount();
+
+// Auto-generate reference number
+function generateRefNumber() {
+  var type = document.getElementById('item_type').value;
+  var btn = document.getElementById('generateRefBtn');
+  btn.textContent = '...';
+  btn.disabled = true;
+  fetch('/compliance/api/next-ref?item_type=' + encodeURIComponent(type))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('reference_number').value = data.reference_number;
+      btn.textContent = 'Generate';
+      btn.disabled = false;
+    })
+    .catch(function() {
+      btn.textContent = 'Generate';
+      btn.disabled = false;
+    });
+}
+
+// Auto-generate ref on type change for new items only
+<% if (!isEdit) { %>
+document.getElementById('item_type').addEventListener('change', function() {
+  if (!document.getElementById('reference_number').value) {
+    generateRefNumber();
+  }
+});
+<% } %>
 </script>
