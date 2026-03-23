@@ -28,6 +28,31 @@
   }
   const todayStr = new Date().toISOString().split('T')[0];
   const soonStr = new Date(Date.now() + 14*24*60*60*1000).toISOString().split('T')[0];
+
+  // Expiry band calculations
+  const day7Str = new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
+  const day30Str = new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0];
+  const day60Str = new Date(Date.now() + 60*24*60*60*1000).toISOString().split('T')[0];
+
+  let expiryExpired = 0, expiry7d = 0, expiry30d = 0, expiry60d = 0, expiryOk = 0;
+  items.forEach(function(item) {
+    if (!item.expiry_date) { expiryOk++; return; }
+    if (item.expiry_date < todayStr) { expiryExpired++; }
+    else if (item.expiry_date <= day7Str) { expiry7d++; }
+    else if (item.expiry_date <= day30Str) { expiry30d++; }
+    else if (item.expiry_date <= day60Str) { expiry60d++; }
+    else { expiryOk++; }
+  });
+  const expiryTotal = expiryExpired + expiry7d + expiry30d + expiry60d + expiryOk;
+
+  function getExpiryRowClass(item) {
+    if (!item.expiry_date) return '';
+    if (item.expiry_date < todayStr) return 'bg-red-50/70';
+    if (item.expiry_date <= day7Str) return 'bg-red-50/50';
+    if (item.expiry_date <= day30Str) return 'bg-amber-50/50';
+    if (item.expiry_date <= day60Str) return 'bg-yellow-50/40';
+    return '';
+  }
 %>
 
 <!-- Header -->
@@ -43,31 +68,55 @@
   </div>
 
   <!-- Summary Cards -->
-  <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
     <div class="bg-white border border-gray-200 rounded-lg p-3 text-center">
-      <div class="text-2xl font-bold text-gray-900"><%= summary.total %></div>
+      <div class="text-xl font-bold text-gray-900"><%= summary.total %></div>
       <div class="text-xs text-gray-500 mt-0.5">Total</div>
     </div>
     <div class="bg-white border border-gray-200 rounded-lg p-3 text-center">
-      <div class="text-2xl font-bold text-emerald-600"><%= summary.approved %></div>
+      <div class="text-xl font-bold text-emerald-600"><%= summary.approved %></div>
       <div class="text-xs text-gray-500 mt-0.5">Approved</div>
     </div>
     <div class="bg-white border border-gray-200 rounded-lg p-3 text-center">
-      <div class="text-2xl font-bold text-blue-600"><%= summary.pending %></div>
+      <div class="text-xl font-bold text-blue-600"><%= summary.pending %></div>
       <div class="text-xs text-gray-500 mt-0.5">Pending</div>
     </div>
     <div class="bg-white border border-gray-200 rounded-lg p-3 text-center">
-      <div class="text-2xl font-bold text-red-600"><%= summary.overdue %></div>
+      <div class="text-xl font-bold text-red-600"><%= summary.overdue %></div>
       <div class="text-xs text-gray-500 mt-0.5">Overdue</div>
     </div>
     <div class="bg-white border border-gray-200 rounded-lg p-3 text-center">
-      <div class="text-2xl font-bold text-amber-600"><%= summary.expiringSoon %></div>
+      <div class="text-xl font-bold text-amber-600"><%= summary.expiringSoon %></div>
       <div class="text-xs text-gray-500 mt-0.5">Expiring Soon</div>
     </div>
   </div>
 
+  <!-- Expiry Urgency Bar -->
+  <% if (expiryTotal > 0) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-4">
+    <div class="flex items-center justify-between mb-2">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Expiry Distribution</p>
+      <p class="text-[10px] text-gray-400"><%= expiryTotal %> items</p>
+    </div>
+    <div class="flex h-4 rounded-full overflow-hidden bg-gray-100">
+      <% if (expiryExpired > 0) { %><div class="bg-red-500 transition-all" style="width: <%= (expiryExpired / expiryTotal * 100) %>%" title="Expired: <%= expiryExpired %>"></div><% } %>
+      <% if (expiry7d > 0) { %><div class="bg-red-300 transition-all" style="width: <%= (expiry7d / expiryTotal * 100) %>%" title="Within 7 days: <%= expiry7d %>"></div><% } %>
+      <% if (expiry30d > 0) { %><div class="bg-amber-400 transition-all" style="width: <%= (expiry30d / expiryTotal * 100) %>%" title="7-30 days: <%= expiry30d %>"></div><% } %>
+      <% if (expiry60d > 0) { %><div class="bg-yellow-300 transition-all" style="width: <%= (expiry60d / expiryTotal * 100) %>%" title="30-60 days: <%= expiry60d %>"></div><% } %>
+      <% if (expiryOk > 0) { %><div class="bg-emerald-400 transition-all" style="width: <%= (expiryOk / expiryTotal * 100) %>%" title="OK: <%= expiryOk %>"></div><% } %>
+    </div>
+    <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span> Expired (<%= expiryExpired %>)</span>
+      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-red-300 inline-block"></span> &le; 7 days (<%= expiry7d %>)</span>
+      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span> 7-30 days (<%= expiry30d %>)</span>
+      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-yellow-300 inline-block"></span> 30-60 days (<%= expiry60d %>)</span>
+      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span> OK (<%= expiryOk %>)</span>
+    </div>
+  </div>
+  <% } %>
+
   <!-- Filters Panel -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-5">
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-4">
     <!-- Type Chips -->
     <div class="flex flex-wrap gap-2 mb-4">
       <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider self-center mr-1">Type</span>
@@ -161,7 +210,7 @@
   <!-- Register Table -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
     <% if (items.length === 0) { %>
-      <div class="py-16 text-center text-gray-400">
+      <div class="py-6 text-center text-gray-400">
         <svg class="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         <p class="text-sm">No items found<% if (view !== 'all') { %> for this <%= view === 'week' ? 'week' : 'month' %><% } %>.</p>
         <a href="/compliance/new" class="mt-3 inline-block text-sm text-brand-600 hover:text-brand-700 font-medium">+ Add first item</a>
@@ -171,16 +220,16 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-gray-50 border-b border-gray-200">
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Title</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Project</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Due Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Expiry</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Fee</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Edit</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-8">#</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Title</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Due Date</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Expiry</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Assigned</th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fee</th>
+              <th class="px-3 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Edit</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -193,18 +242,18 @@
               const isExpired = item.expiry_date && item.expiry_date < todayStr;
               const returnTo = '/compliance?' + Object.keys(filters).filter(k => filters[k]).map(k => k + '=' + encodeURIComponent(filters[k])).join('&');
             %>
-              <tr class="hover:bg-gray-50 transition-colors">
-                <td class="px-4 py-3 text-gray-400 text-xs"><%= idx + 1 %></td>
-                <td class="px-4 py-3 font-medium text-gray-900 max-w-xs">
+              <tr class="<%= getExpiryRowClass(item) %> hover:bg-gray-50 transition-colors">
+                <td class="px-3 py-2 text-gray-400 text-xs"><%= idx + 1 %></td>
+                <td class="px-3 py-2 font-medium text-gray-900 max-w-xs">
                   <span class="truncate block"><%= item.title %></span>
                   <% if (item.authority_approver) { %>
                     <span class="text-xs text-gray-400"><%= item.authority_approver %></span>
                   <% } %>
                 </td>
-                <td class="px-4 py-3">
+                <td class="px-3 py-2">
                   <span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full <%= tc.color %>"><%= tc.short %></span>
                 </td>
-                <td class="px-4 py-3">
+                <td class="px-3 py-2">
                   <% if (item.job_id) { %>
                     <a href="/projects/<%= item.job_id %>" class="text-brand-600 hover:text-brand-700 font-medium"><%= item.job_number %></a>
                     <div class="text-xs text-gray-400 truncate max-w-24"><%= item.job_client %></div>
@@ -215,10 +264,10 @@
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="px-4 py-3">
-                  <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full <%= sc.color %>"><%= sc.label %></span>
+                <td class="px-3 py-2">
+                  <span class="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full <%= sc.color %>"><%= sc.label %></span>
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-3 py-2 whitespace-nowrap">
                   <% if (item.due_date) { %>
                     <span class="<%= isOverdue ? 'text-red-600 font-semibold' : isDueSoon ? 'text-amber-600 font-medium' : 'text-gray-700' %>">
                       <%= new Date(item.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
@@ -229,7 +278,7 @@
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-3 py-2 whitespace-nowrap">
                   <% if (item.expiry_date) { %>
                     <span class="<%= isExpired ? 'text-red-500 line-through' : isExpiryNear ? 'text-amber-600 font-medium' : 'text-gray-600' %>">
                       <%= new Date(item.expiry_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
@@ -239,7 +288,7 @@
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="px-4 py-3">
+                <td class="px-3 py-2">
                   <% if (item.assigned_name) { %>
                     <span class="inline-flex items-center gap-1 text-xs text-gray-600">
                       <span class="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-semibold text-xs flex-shrink-0"><%= item.assigned_name.charAt(0) %></span>
@@ -249,7 +298,7 @@
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="px-4 py-3 text-sm">
+                <td class="px-3 py-2 text-sm">
                   <% if (item.item_type === 'council_permit' && item.council_fee_amount > 0) { %>
                     <div>$<%= item.council_fee_amount.toLocaleString() %></div>
                     <% if (item.council_fee_paid) { %>
@@ -261,7 +310,7 @@
                     <span class="text-gray-300">-</span>
                   <% } %>
                 </td>
-                <td class="px-4 py-3 text-right">
+                <td class="px-3 py-2 text-right">
                   <a href="/compliance/<%= item.id %>/edit?return_to=<%= encodeURIComponent(returnTo) %>"
                     class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-brand-50 hover:text-brand-700 rounded-lg transition">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>

@@ -8,7 +8,7 @@
 %>
 
 <!-- Hero Banner -->
-<div class="hero-banner relative bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700 rounded-2xl p-5 sm:p-7 mb-5 overflow-hidden">
+<div class="hero-banner relative bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700 rounded-2xl p-4 sm:p-5 mb-4 overflow-hidden">
   <!-- Animated decorative orbs -->
   <div class="hero-orb absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-white/[0.07] to-transparent rounded-full -translate-y-1/2 translate-x-1/4"></div>
   <div class="hero-orb absolute bottom-0 left-1/4 w-56 h-56 bg-gradient-to-t from-white/[0.04] to-transparent rounded-full translate-y-1/2"></div>
@@ -74,7 +74,7 @@
 
 <% if (typeof onboarding !== 'undefined' && onboarding) { %>
 <!-- Onboarding Checklist -->
-<div class="bg-white border border-brand-200 rounded-2xl shadow-sm p-4 sm:p-5 mb-5 relative" id="onboarding-banner">
+<div class="bg-white border border-brand-200 rounded-2xl shadow-sm p-3 sm:p-4 mb-5 relative" id="onboarding-banner">
   <button onclick="fetch('/profile/dismiss-onboarding',{method:'POST',headers:{'Content-Type':'application/json','x-csrf-token':document.querySelector('meta[name=csrf-token]').content}}).then(()=>document.getElementById('onboarding-banner').remove())"
     class="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-lg leading-none" title="Dismiss">&times;</button>
   <h3 class="text-sm font-bold text-gray-900 mb-0.5">Getting Started</h3>
@@ -99,36 +99,68 @@
 
 <!-- Urgency Tiles -->
 <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3 mb-5 stagger-children">
-  <a href="/tasks" class="urgency-tile group border rounded-xl p-3 <%= kpi.overdueTasks > 0 ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
-    <p class="text-2xl font-extrabold <%= kpi.overdueTasks > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.overdueTasks %>">0</span></p>
+  <!-- CRITICAL: Overdue Tasks -->
+  <a href="/tasks" class="urgency-tile group rounded-xl p-3 border-l-4 <%= kpi.overdueTasks > 0 ? 'bg-red-50/60 border-l-red-500 border-t border-r border-b border-t-red-200 border-r-red-200 border-b-red-200' : 'bg-white border-l-gray-200 border border-gray-200' %> hover:shadow-md transition-shadow">
+    <div class="flex items-center justify-between">
+      <p class="text-2xl font-extrabold <%= kpi.overdueTasks > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.overdueTasks %>">0</span></p>
+      <% if (kpi.overdueTasks > 0) { %><svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg><% } %>
+    </div>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Overdue Tasks</p>
   </a>
-  <a href="/incidents" class="urgency-tile group border rounded-xl p-3 <%= kpi.openIncidents > 0 ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
-    <p class="text-2xl font-extrabold <%= kpi.openIncidents > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.openIncidents %>">0</span></p>
+  <!-- CRITICAL: Open Incidents -->
+  <a href="/incidents" class="urgency-tile group rounded-xl p-3 border-l-4 <%= kpi.openIncidents > 0 ? 'bg-red-50/60 border-l-red-500 border-t border-r border-b border-t-red-200 border-r-red-200 border-b-red-200' : 'bg-white border-l-gray-200 border border-gray-200' %> hover:shadow-md transition-shadow">
+    <div class="flex items-center justify-between">
+      <p class="text-2xl font-extrabold <%= kpi.openIncidents > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.openIncidents %>">0</span></p>
+      <% if (kpi.openIncidents > 0) { %><svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg><% } %>
+    </div>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Open Incidents</p>
   </a>
-  <a href="/timesheets?approved=0" class="urgency-tile group border rounded-xl p-3 <%= kpi.pendingTimesheets > 0 ? 'bg-amber-50/60 border-amber-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
-    <p class="text-2xl font-extrabold <%= kpi.pendingTimesheets > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.pendingTimesheets %>">0</span></p>
+  <!-- WARNING: Pending Timesheets -->
+  <a href="/timesheets?approved=0" class="urgency-tile group rounded-xl p-3 border-l-4 <%= kpi.pendingTimesheets > 0 ? 'bg-amber-50/60 border-l-amber-500 border-t border-r border-b border-t-amber-200 border-r-amber-200 border-b-amber-200' : 'bg-white border-l-gray-200 border border-gray-200' %> hover:shadow-md transition-shadow">
+    <div class="flex items-center justify-between">
+      <p class="text-2xl font-extrabold <%= kpi.pendingTimesheets > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.pendingTimesheets %>">0</span></p>
+      <% if (kpi.pendingTimesheets > 0) { %><svg class="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg><% } %>
+    </div>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Pending Timesheets</p>
   </a>
-  <a href="/allocations" class="urgency-tile group border rounded-xl p-3 <%= kpi.unconfirmedAllocations > 0 ? 'bg-amber-50/60 border-amber-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
-    <p class="text-2xl font-extrabold <%= kpi.unconfirmedAllocations > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.unconfirmedAllocations %>">0</span></p>
+  <!-- INFO: Unconfirmed -->
+  <a href="/allocations" class="urgency-tile group rounded-xl p-3 border-l-4 <%= kpi.unconfirmedAllocations > 0 ? 'bg-blue-50/60 border-l-blue-500 border-t border-r border-b border-t-blue-200 border-r-blue-200 border-b-blue-200' : 'bg-white border-l-gray-200 border border-gray-200' %> hover:shadow-md transition-shadow">
+    <div class="flex items-center justify-between">
+      <p class="text-2xl font-extrabold <%= kpi.unconfirmedAllocations > 0 ? 'text-blue-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.unconfirmedAllocations %>">0</span></p>
+      <% if (kpi.unconfirmedAllocations > 0) { %><svg class="w-3.5 h-3.5 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg><% } %>
+    </div>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Unconfirmed</p>
   </a>
-  <a href="/defects" class="urgency-tile group border rounded-xl p-3 <%= kpi.openDefects > 0 ? 'bg-amber-50/60 border-amber-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
-    <p class="text-2xl font-extrabold <%= kpi.openDefects > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.openDefects %>">0</span></p>
+  <!-- WARNING: Open Defects -->
+  <a href="/defects" class="urgency-tile group rounded-xl p-3 border-l-4 <%= kpi.openDefects > 0 ? 'bg-amber-50/60 border-l-amber-500 border-t border-r border-b border-t-amber-200 border-r-amber-200 border-b-amber-200' : 'bg-white border-l-gray-200 border border-gray-200' %> hover:shadow-md transition-shadow">
+    <div class="flex items-center justify-between">
+      <p class="text-2xl font-extrabold <%= kpi.openDefects > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.openDefects %>">0</span></p>
+      <% if (kpi.openDefects > 0) { %><svg class="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg><% } %>
+    </div>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Open Defects</p>
   </a>
-  <a href="/compliance" class="urgency-tile group border rounded-xl p-3 <%= kpi.overdueCompliance > 0 ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
-    <p class="text-2xl font-extrabold <%= kpi.overdueCompliance > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.overdueCompliance %>">0</span></p>
+  <!-- CRITICAL: Overdue Plans -->
+  <a href="/compliance" class="urgency-tile group rounded-xl p-3 border-l-4 <%= kpi.overdueCompliance > 0 ? 'bg-red-50/60 border-l-red-500 border-t border-r border-b border-t-red-200 border-r-red-200 border-b-red-200' : 'bg-white border-l-gray-200 border border-gray-200' %> hover:shadow-md transition-shadow">
+    <div class="flex items-center justify-between">
+      <p class="text-2xl font-extrabold <%= kpi.overdueCompliance > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.overdueCompliance %>">0</span></p>
+      <% if (kpi.overdueCompliance > 0) { %><svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg><% } %>
+    </div>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Overdue Plans</p>
   </a>
-  <a href="/crew" class="urgency-tile group border rounded-xl p-3 <%= kpi.ticketsExpiring > 0 ? 'bg-amber-50/60 border-amber-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
-    <p class="text-2xl font-extrabold <%= kpi.ticketsExpiring > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.ticketsExpiring %>">0</span></p>
+  <!-- WARNING: Expiring Tickets -->
+  <a href="/crew" class="urgency-tile group rounded-xl p-3 border-l-4 <%= kpi.ticketsExpiring > 0 ? 'bg-amber-50/60 border-l-amber-500 border-t border-r border-b border-t-amber-200 border-r-amber-200 border-b-amber-200' : 'bg-white border-l-gray-200 border border-gray-200' %> hover:shadow-md transition-shadow">
+    <div class="flex items-center justify-between">
+      <p class="text-2xl font-extrabold <%= kpi.ticketsExpiring > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.ticketsExpiring %>">0</span></p>
+      <% if (kpi.ticketsExpiring > 0) { %><svg class="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg><% } %>
+    </div>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Expiring Tickets</p>
   </a>
-  <a href="/allocations" class="urgency-tile group border rounded-xl p-3 <%= kpi.crewGaps > 0 ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200' %> hover:shadow-md transition-shadow">
-    <p class="text-2xl font-extrabold <%= kpi.crewGaps > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.crewGaps %>">0</span></p>
+  <!-- CRITICAL: Crew Gaps -->
+  <a href="/allocations" class="urgency-tile group rounded-xl p-3 border-l-4 <%= kpi.crewGaps > 0 ? 'bg-red-50/60 border-l-red-500 border-t border-r border-b border-t-red-200 border-r-red-200 border-b-red-200' : 'bg-white border-l-gray-200 border border-gray-200' %> hover:shadow-md transition-shadow">
+    <div class="flex items-center justify-between">
+      <p class="text-2xl font-extrabold <%= kpi.crewGaps > 0 ? 'text-red-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.crewGaps %>">0</span></p>
+      <% if (kpi.crewGaps > 0) { %><svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg><% } %>
+    </div>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Crew Gaps</p>
   </a>
 </div>

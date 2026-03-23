@@ -110,10 +110,12 @@ app.post('/w/login', loginLimiter);
 app.use('/w', require('./routes/worker/auth'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/home'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/jobs'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/clock'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/shifts'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/chat'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/timesheets'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/availability'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/incidents'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/dockets'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/hr'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/profile'));
@@ -159,6 +161,9 @@ app.use('/admin/integrations', requireLogin, requirePermission('admin'), require
 app.use('/admin', requireLogin, requirePermission('admin'), require('./routes/admin'));
 app.use('/settings', requireLogin, requirePermission('settings'), require('./routes/settings'));
 app.use('/api/views', requireLogin, require('./routes/saved-views'));
+
+// Roster redirects to crew page
+app.get('/roster', requireLogin, (req, res) => res.redirect('/crew'));
 
 // Home redirects to dashboard or worker portal
 app.get('/', (req, res) => {

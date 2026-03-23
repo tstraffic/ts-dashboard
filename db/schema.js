@@ -3602,6 +3602,32 @@ function runMigrations(db) {
     console.log('Migration 66 complete.');
   }
 
+  // =============================================
+  // Migration 67: Worker Availability table (Sprint 2 — detailed per-day availability)
+  // =============================================
+  if (!isMigrationApplied.get(67)) {
+    console.log('Running migration 67: Worker Availability table');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS worker_availability (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('available', 'unavailable', 'partial')),
+        start_time TEXT,
+        end_time TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT (datetime('now')),
+        updated_at DATETIME DEFAULT (datetime('now')),
+        FOREIGN KEY (crew_member_id) REFERENCES crew_members(id),
+        UNIQUE(crew_member_id, date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_worker_availability_crew ON worker_availability(crew_member_id);
+      CREATE INDEX IF NOT EXISTS idx_worker_availability_date ON worker_availability(crew_member_id, date);
+    `);
+    recordMigration.run(67, 'Worker Availability table');
+    console.log('Migration 67 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

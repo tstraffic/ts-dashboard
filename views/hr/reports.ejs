@@ -47,6 +47,121 @@
     </div>
   </div>
 
+  <!-- Visual Charts Row -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+    <!-- Headcount by Status Bar Chart -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Headcount by Status</h2>
+      <% if (typeof headcountByStatus !== 'undefined' && headcountByStatus && headcountByStatus.length > 0) { %>
+      <%
+        const maxStatusCount = headcountByStatus.reduce(function(max, s) { return Math.max(max, s.count); }, 1);
+        const statusBarColors = {
+          active: 'bg-emerald-500',
+          onboarding: 'bg-purple-500',
+          on_leave: 'bg-blue-500',
+          suspended: 'bg-red-500',
+          inactive: 'bg-gray-400',
+          offboarded: 'bg-gray-300',
+          probation: 'bg-amber-500'
+        };
+      %>
+      <div class="space-y-2.5">
+        <% headcountByStatus.forEach(function(s) {
+          const barPct = maxStatusCount > 0 ? Math.round((s.count / maxStatusCount) * 100) : 0;
+          const barColor = statusBarColors[s.employment_status] || 'bg-gray-400';
+        %>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-medium text-gray-600"><%= formatType(s.employment_status) %></span>
+            <span class="text-xs font-bold text-gray-900 tabular-nums"><%= s.count %></span>
+          </div>
+          <div class="w-full bg-gray-100 rounded-full h-2.5">
+            <div class="h-2.5 rounded-full transition-all duration-500 <%= barColor %>" style="width: <%= Math.max(barPct, 3) %>%"></div>
+          </div>
+        </div>
+        <% }) %>
+      </div>
+      <% } else { %>
+      <p class="text-sm text-gray-400 text-center py-4">No status data available</p>
+      <% } %>
+    </div>
+
+    <!-- Licence Expiry Timeline (90 days) -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Licence Expiry Timeline</h2>
+      <p class="text-[10px] text-gray-400 mb-3">Next 90 days</p>
+      <% if (typeof expiringCompetencies90 !== 'undefined' && expiringCompetencies90 && expiringCompetencies90.length > 0) { %>
+      <div class="relative">
+        <!-- Timeline bar -->
+        <div class="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+        <div class="space-y-3 max-h-[240px] overflow-y-auto">
+          <% expiringCompetencies90.slice(0, 12).forEach(function(comp) {
+            const daysLeft = comp.days_left != null ? comp.days_left : Math.ceil((new Date(comp.expiry_date) - new Date()) / (1000*60*60*24));
+            let dotColor = 'bg-amber-500';
+            if (daysLeft <= 7) dotColor = 'bg-red-500';
+            else if (daysLeft <= 30) dotColor = 'bg-orange-500';
+            else dotColor = 'bg-yellow-400';
+          %>
+          <div class="flex items-start gap-3 relative pl-7">
+            <div class="absolute left-1.5 top-1.5 w-3 h-3 rounded-full border-2 border-white <%= dotColor %> shadow-sm"></div>
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-medium text-gray-900 truncate"><%= comp.full_name %></p>
+              <p class="text-[10px] text-gray-500 truncate"><%= formatType(comp.competency_type) %></p>
+            </div>
+            <span class="text-[10px] font-bold shrink-0 tabular-nums <%= daysLeft <= 7 ? 'text-red-600' : daysLeft <= 30 ? 'text-orange-600' : 'text-amber-600' %>"><%= daysLeft %>d</span>
+          </div>
+          <% }) %>
+        </div>
+        <% if (expiringCompetencies90.length > 12) { %>
+        <p class="text-[10px] text-gray-400 mt-2 pl-7">+ <%= expiringCompetencies90.length - 12 %> more</p>
+        <% } %>
+      </div>
+      <% } else { %>
+      <div class="text-center py-6">
+        <div class="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-2">
+          <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <p class="text-xs text-gray-500">No licences expiring in 90 days</p>
+      </div>
+      <% } %>
+    </div>
+
+    <!-- Compliance Rate Ring Chart -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Compliance Rate</h2>
+      <%
+        const rate = typeof complianceRate !== 'undefined' ? complianceRate : 100;
+        const ringColor = rate >= 90 ? '#10b981' : rate >= 70 ? '#f59e0b' : '#ef4444';
+        const circumference = 2 * Math.PI * 54;
+        const dashOffset = circumference - (rate / 100) * circumference;
+      %>
+      <div class="flex flex-col items-center">
+        <div class="relative" style="width: 130px; height: 130px;">
+          <svg viewBox="0 0 120 120" class="w-full h-full transform -rotate-90">
+            <!-- Background ring -->
+            <circle cx="60" cy="60" r="54" fill="none" stroke="#f3f4f6" stroke-width="10"/>
+            <!-- Progress ring -->
+            <circle cx="60" cy="60" r="54" fill="none" stroke="<%= ringColor %>" stroke-width="10"
+              stroke-linecap="round"
+              stroke-dasharray="<%= circumference %>"
+              stroke-dashoffset="<%= dashOffset %>"
+              style="transition: stroke-dashoffset 1s ease-in-out;"/>
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span class="text-2xl font-bold" style="color: <%= ringColor %>"><%= rate %>%</span>
+            <span class="text-[9px] text-gray-400 uppercase font-medium">Compliant</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 mt-3 text-[10px] text-gray-500">
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Compliant (<%= (typeof totalActive !== 'undefined' ? totalActive : 0) - (typeof blockedCount !== 'undefined' ? blockedCount : 0) %>)</span>
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span> Blocked (<%= typeof blockedCount !== 'undefined' ? blockedCount : 0 %>)</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
   <!-- Employment Type Breakdown -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
     <div class="px-4 py-3 border-b border-gray-100">

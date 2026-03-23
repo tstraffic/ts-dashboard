@@ -40,7 +40,7 @@
   <div class="flex items-center gap-2">
     <a href="/projects/<%= job.id %>/edit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Edit</a>
     <a href="/documents/job/<%= job.id %>" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Documents</a>
-    <form method="POST" action="/projects/<%= job.id %>/delete" class="inline" onsubmit="return confirm('Delete project <%= job.job_number %>? All associated tasks, updates, allocations, timesheets, and other data will also be removed. This cannot be undone.')">
+    <form method="POST" action="/projects/<%= job.id %>/delete" class="inline" onsubmit="return confirm('Delete job <%= job.job_number %>? All associated tasks, updates, allocations, timesheets, and other data will also be removed. This cannot be undone.')">
       <%- include('../partials/csrf') %>
       <button type="submit" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg border border-red-200 transition-colors">Delete</button>
     </form>
@@ -365,7 +365,7 @@
   <!-- Updates Tab -->
   <div id="updates" class="tab-content">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">Project Updates</h2>
+      <h2 class="text-lg font-semibold text-gray-900">Job Updates</h2>
       <a href="/updates/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Submit Update</a>
     </div>
     <% if (updates.length === 0) { %>

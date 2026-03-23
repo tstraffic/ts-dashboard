@@ -3,17 +3,17 @@
 
 <!-- Page Header -->
 <div class="mb-6">
-  <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit Project: ' + job.job_number : 'Create New Project' %></h1>
-  <p class="text-gray-500 text-sm mt-1"><%= isEdit ? 'Update project details below' : 'Fill in the details to create a new project' %></p>
+  <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit Job: ' + job.job_number : 'Create New Job' %></h1>
+  <p class="text-gray-500 text-sm mt-1"><%= isEdit ? 'Update job details below' : 'Fill in the details to create a new job' %></p>
 </div>
 
 <!-- Form -->
 <form method="POST" action="<%= isEdit ? '/projects/' + job.id : '/projects' %>" class="space-y-6">
   <%- include('../partials/csrf') %>
 
-  <!-- Project Identification -->
+  <!-- Job Identification -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Project Identification</h2>
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Job Identification</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- Job Number -->
       <div>
@@ -330,7 +330,7 @@
   <!-- Actions -->
   <div class="flex items-center gap-3">
     <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
-      <%= isEdit ? 'Update Project' : 'Create Project' %>
+      <%= isEdit ? 'Update Job' : 'Create Job' %>
     </button>
     <a href="/projects" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</a>
   </div>
