@@ -211,6 +211,9 @@
     <a href="#defects" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Defects</a>
+    <a href="#diary" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
+      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Site Diary</a>
     <a href="#chat" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Chat</a>
@@ -776,6 +779,143 @@
             </td>
             <td class="px-4 py-3 text-gray-500"><%= d.assigned_to_name || '-' %></td>
             <td class="px-4 py-3 text-gray-500 text-xs"><%= d.target_close_date || '-' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Site Diary Tab -->
+  <div id="diary" class="tab-content">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Site Diary</h2>
+      <button onclick="document.getElementById('diary-form').classList.toggle('hidden')" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ New Entry</button>
+    </div>
+
+    <!-- Inline Add Form -->
+    <div id="diary-form" class="hidden bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
+      <form method="POST" action="/jobs/<%= job.id %>/diary">
+        <%- include('../partials/csrf') %>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date *</label>
+            <input type="date" name="entry_date" required value="<%= new Date().toISOString().split('T')[0] %>"
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Task</label>
+            <input type="text" name="task" placeholder="e.g. Site Walk, TGS received..."
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Representative</label>
+            <input type="text" name="representative" placeholder="T&S staff..."
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client Representative</label>
+            <input type="text" name="client_representative" placeholder="Client contact..."
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Outcomes</label>
+            <input type="text" name="outcomes" placeholder="What was achieved..."
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Issues</label>
+            <input type="text" name="issues" placeholder="Any issues..."
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Comments</label>
+            <input type="text" name="comments" placeholder="Additional notes..."
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Stage</label>
+            <input type="text" name="stage" placeholder="e.g. Stage 1..."
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TGS No.</label>
+            <input type="text" name="tgs_number" placeholder="e.g. 1892..."
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TGS Scope</label>
+            <input type="text" name="tgs_scope" placeholder="e.g. Tree Lopping..."
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TGS Link</label>
+            <select name="tgs_plan_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+              <option value="">None</option>
+              <% if (typeof tgsPlans !== 'undefined') { tgsPlans.forEach(function(tp) { %>
+                <option value="<%= tp.id %>"><%= tp.plan_number %></option>
+              <% }) } %>
+            </select>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 mt-4">
+          <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Add Entry</button>
+          <button type="button" onclick="document.getElementById('diary-form').classList.add('hidden')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <% if (typeof diaryEntries === 'undefined' || diaryEntries.length === 0) { %>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
+        <p class="text-gray-400 text-sm">No diary entries yet.</p>
+        <button onclick="document.getElementById('diary-form').classList.remove('hidden')" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Add the first entry</button>
+      </div>
+    <% } else { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
+            <th class="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Task</th>
+            <th class="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden md:table-cell">Representative</th>
+            <th class="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden md:table-cell">Client Rep</th>
+            <th class="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden lg:table-cell">Outcomes</th>
+            <th class="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden xl:table-cell">Issues</th>
+            <th class="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden xl:table-cell">Comments</th>
+            <th class="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden lg:table-cell">Stage</th>
+            <th class="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden xl:table-cell">TGS</th>
+            <th class="px-3 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% diaryEntries.forEach(function(entry) { %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-3 py-2.5 text-gray-600 text-xs whitespace-nowrap"><%= entry.entry_date %></td>
+            <td class="px-3 py-2.5 text-gray-900 font-medium max-w-[200px] truncate"><%= entry.task || '-' %></td>
+            <td class="px-3 py-2.5 text-gray-600 text-xs hidden md:table-cell"><%= entry.representative || '-' %></td>
+            <td class="px-3 py-2.5 text-gray-600 text-xs hidden md:table-cell"><%= entry.client_representative || '-' %></td>
+            <td class="px-3 py-2.5 text-gray-600 text-xs hidden lg:table-cell max-w-[200px] truncate"><%= entry.outcomes || '-' %></td>
+            <td class="px-3 py-2.5 text-gray-600 text-xs hidden xl:table-cell"><%= entry.issues || '-' %></td>
+            <td class="px-3 py-2.5 text-gray-600 text-xs hidden xl:table-cell max-w-[150px] truncate"><%= entry.comments || '-' %></td>
+            <td class="px-3 py-2.5 text-gray-600 text-xs hidden lg:table-cell"><%= entry.stage || '-' %></td>
+            <td class="px-3 py-2.5 hidden xl:table-cell">
+              <% if (entry.tgs_plan_id) { %>
+                <a href="/plans/<%= entry.tgs_plan_id %>/edit" class="text-brand-600 hover:underline text-xs"><%= entry.tgs_plan_number || entry.tgs_number %></a>
+              <% } else if (entry.tgs_number) { %>
+                <span class="text-gray-600 text-xs"><%= entry.tgs_number %> <% if (entry.tgs_scope) { %>(<%= entry.tgs_scope %>)<% } %></span>
+              <% } else { %>
+                <span class="text-gray-300 text-xs">-</span>
+              <% } %>
+            </td>
+            <td class="px-3 py-2.5 text-right">
+              <form method="POST" action="/jobs/<%= job.id %>/diary/<%= entry.id %>/delete" class="inline" onsubmit="return confirm('Delete this entry?')">
+                <%- include('../partials/csrf') %>
+                <button type="submit" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </form>
+            </td>
           </tr>
           <% }) %>
         </tbody>

@@ -49,6 +49,7 @@
           <option value="TGS" <%= filters.plan_type === 'TGS' ? 'selected' : '' %>>TGS</option>
           <option value="TCP" <%= filters.plan_type === 'TCP' ? 'selected' : '' %>>TCP</option>
           <option value="TMP" <%= filters.plan_type === 'TMP' ? 'selected' : '' %>>TMP</option>
+          <option value="ROL" <%= filters.plan_type === 'ROL' ? 'selected' : '' %>>ROL</option>
         </select>
       </div>
       <div class="flex-1 sm:flex-none sm:min-w-[120px]">
@@ -128,10 +129,16 @@
               <% } %>
             </td>
             <td class="px-3 py-2.5">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
-                <% if (plan.plan_type === 'TGS') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
-                <% } else if (plan.plan_type === 'TCP') { %>bg-teal-50 text-teal-700 ring-1 ring-teal-600/20
-                <% } else { %>bg-purple-50 text-purple-700 ring-1 ring-purple-600/20<% } %>"><%= plan.plan_type %></span>
+              <div class="flex flex-wrap gap-1">
+                <% const displayTypes = (plan.plan_types || plan.plan_type || '').split(',').filter(Boolean); %>
+                <% displayTypes.forEach(function(t) { %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold
+                    <% if (t === 'TGS') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
+                    <% } else if (t === 'TCP') { %>bg-teal-50 text-teal-700 ring-1 ring-teal-600/20
+                    <% } else if (t === 'ROL') { %>bg-orange-50 text-orange-700 ring-1 ring-orange-600/20
+                    <% } else { %>bg-purple-50 text-purple-700 ring-1 ring-purple-600/20<% } %>"><%= t %></span>
+                <% }) %>
+              </div>
             </td>
             <td class="px-3 py-2.5 text-gray-600 text-xs hidden lg:table-cell"><%= plan.designer || '-' %></td>
             <td class="px-3 py-2.5 hidden lg:table-cell">
