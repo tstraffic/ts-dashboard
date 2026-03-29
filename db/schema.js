@@ -3689,6 +3689,61 @@ function runMigrations(db) {
     console.log('Migration 70 complete.');
   }
 
+  if (!isMigrationApplied.get(71)) {
+    console.log('Running migration 71: Remove CHECK constraint on jobs.stage');
+    db.exec('PRAGMA foreign_keys=OFF;');
+    try {
+      db.exec(`
+        CREATE TABLE jobs_stage_fix AS SELECT * FROM jobs;
+        DROP TABLE jobs;
+        CREATE TABLE jobs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_number TEXT UNIQUE NOT NULL,
+          job_name TEXT NOT NULL,
+          client TEXT NOT NULL,
+          site_address TEXT NOT NULL,
+          suburb TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'tender',
+          stage TEXT NOT NULL DEFAULT 'tender',
+          percent_complete INTEGER NOT NULL DEFAULT 0 CHECK(percent_complete >= 0 AND percent_complete <= 100),
+          start_date DATE NOT NULL,
+          end_date DATE,
+          project_manager_id INTEGER REFERENCES users(id),
+          ops_supervisor_id INTEGER REFERENCES users(id),
+          planning_owner_id INTEGER REFERENCES users(id),
+          marketing_owner_id INTEGER REFERENCES users(id),
+          accounts_owner_id INTEGER REFERENCES users(id),
+          health TEXT DEFAULT 'good',
+          accounts_status TEXT DEFAULT 'not_invoiced',
+          division_tags TEXT DEFAULT '[]',
+          notes TEXT DEFAULT '',
+          client_project_number TEXT DEFAULT '',
+          project_name TEXT DEFAULT '',
+          principal_contractor TEXT DEFAULT '',
+          traffic_supervisor_id INTEGER REFERENCES users(id),
+          contract_value REAL DEFAULT 0,
+          estimated_hours REAL DEFAULT 0,
+          crew_size INTEGER DEFAULT 0,
+          rol_required INTEGER DEFAULT 0,
+          tmp_required INTEGER DEFAULT 0,
+          sharepoint_url TEXT DEFAULT '',
+          state TEXT DEFAULT 'NSW',
+          required_tcp_level TEXT DEFAULT '',
+          client_id INTEGER REFERENCES clients(id),
+          parent_project_id INTEGER REFERENCES jobs(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO jobs SELECT * FROM jobs_stage_fix;
+        DROP TABLE jobs_stage_fix;
+      `);
+    } finally {
+      db.exec('PRAGMA foreign_keys=ON;');
+    }
+    recordMigration.run(71, 'Remove CHECK constraint on jobs.stage');
+    console.log('Migration 71 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
