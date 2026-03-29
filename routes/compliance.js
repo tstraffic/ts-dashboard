@@ -54,7 +54,7 @@ router.get('/', (req, res) => {
   if (status && status !== 'all')       { query += ` AND c.status = ?`;     params.push(status); }
   if (job_id)                           { query += ` AND c.job_id = ?`;     params.push(job_id); }
   if (client_id)                        { query += ` AND c.client_id = ?`;  params.push(client_id); }
-  if (item_type && item_type !== 'all') { query += ` AND c.item_type = ?`;  params.push(item_type); }
+  if (item_type && item_type !== 'all') { query += ` AND (c.item_type = ? OR c.item_types LIKE ?)`; params.push(item_type, `%${item_type}%`); }
 
   const today = new Date();
   let prevRef = null, nextRef = null, periodLabel = null;
@@ -163,11 +163,15 @@ router.get('/new', (req, res) => {
 router.post('/', (req, res) => {
   const db = getDb();
   const b = req.body;
+  // Handle multi-select item types
+  const typesArr = b.item_types ? (Array.isArray(b.item_types) ? b.item_types : [b.item_types]) : (b.item_type ? [b.item_type] : []);
+  const itemTypes = typesArr.join(',');
+  const itemType = typesArr[0] || '';
   db.prepare(`
-    INSERT INTO compliance (job_id, client_id, item_type, title, authority_approver, internal_approver_id, assigned_to_id, due_date, submitted_date, approved_date, expiry_date, status, notes, designer, file_link, council_fee_paid, council_fee_amount,
+    INSERT INTO compliance (job_id, client_id, item_type, item_types, title, authority_approver, internal_approver_id, assigned_to_id, due_date, submitted_date, approved_date, expiry_date, status, notes, designer, file_link, council_fee_paid, council_fee_amount,
       reference_number, rol_required, rol_response, bus_approvals_required, bus_approvals_response, client_pm, costs, action_required, charge_client, charge_amount, invoiced, invoice_number, police_notification, letter_drop)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(b.job_id || null, b.client_id || null, b.item_type, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status || 'not_started', b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid ? 1 : 0, parseFloat(b.council_fee_amount) || 0,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(b.job_id || null, b.client_id || null, itemType, itemTypes, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status || 'not_started', b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid ? 1 : 0, parseFloat(b.council_fee_amount) || 0,
     b.reference_number || '', b.rol_required ? 1 : 0, b.rol_response || '', b.bus_approvals_required ? 1 : 0, b.bus_approvals_response || '', b.client_pm || '', parseFloat(b.costs) || 0, b.action_required || '', b.charge_client ? 1 : 0, parseFloat(b.charge_amount) || 0, b.invoiced ? 1 : 0, b.invoice_number || '', b.police_notification ? 1 : 0, b.letter_drop ? 1 : 0);
   req.flash('success', 'Item created.');
   res.redirect(b.return_to || '/compliance');
@@ -189,13 +193,17 @@ router.get('/:id/edit', (req, res) => {
 router.post('/:id', (req, res) => {
   const db = getDb();
   const b = req.body;
+  // Handle multi-select item types
+  const typesArr = b.item_types ? (Array.isArray(b.item_types) ? b.item_types : [b.item_types]) : (b.item_type ? [b.item_type] : []);
+  const itemTypes = typesArr.join(',');
+  const itemType = typesArr[0] || '';
   db.prepare(`
-    UPDATE compliance SET job_id=?, client_id=?, item_type=?, title=?, authority_approver=?, internal_approver_id=?, assigned_to_id=?,
+    UPDATE compliance SET job_id=?, client_id=?, item_type=?, item_types=?, title=?, authority_approver=?, internal_approver_id=?, assigned_to_id=?,
       due_date=?, submitted_date=?, approved_date=?, expiry_date=?, status=?, notes=?, designer=?, file_link=?, council_fee_paid=?, council_fee_amount=?,
       reference_number=?, rol_required=?, rol_response=?, bus_approvals_required=?, bus_approvals_response=?, client_pm=?, costs=?, action_required=?, charge_client=?, charge_amount=?, invoiced=?, invoice_number=?, police_notification=?, letter_drop=?,
       updated_at=CURRENT_TIMESTAMP
     WHERE id=?
-  `).run(b.job_id || null, b.client_id || null, b.item_type, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status, b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid ? 1 : 0, parseFloat(b.council_fee_amount) || 0,
+  `).run(b.job_id || null, b.client_id || null, itemType, itemTypes, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status, b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid ? 1 : 0, parseFloat(b.council_fee_amount) || 0,
     b.reference_number || '', b.rol_required ? 1 : 0, b.rol_response || '', b.bus_approvals_required ? 1 : 0, b.bus_approvals_response || '', b.client_pm || '', parseFloat(b.costs) || 0, b.action_required || '', b.charge_client ? 1 : 0, parseFloat(b.charge_amount) || 0, b.invoiced ? 1 : 0, b.invoice_number || '', b.police_notification ? 1 : 0, b.letter_drop ? 1 : 0, req.params.id);
   req.flash('success', 'Item updated.');
   res.redirect(b.return_to || '/compliance');

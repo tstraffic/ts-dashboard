@@ -137,7 +137,7 @@ app.use('/jobs', requireLogin, requirePermission('jobs'), require('./routes/jobs
 app.use('/tasks', requireLogin, requirePermission('tasks'), require('./routes/tasks'));
 app.use('/updates', requireLogin, requirePermission('updates'), require('./routes/updates'));
 app.use('/compliance', requireLogin, requirePermission('compliance'), require('./routes/compliance'));
-app.use('/plans', requireLogin, requirePermission('plans'), require('./routes/plans'));
+app.use('/plans', requireLogin, (req, res) => res.redirect('/compliance'));
 app.use('/incidents', requireLogin, requirePermission('incidents'), require('./routes/incidents'));
 app.use('/contacts', requireLogin, requirePermission('contacts'), require('./routes/contacts'));
 app.use('/documents', requireLogin, requirePermission('documents'), require('./routes/documents'));

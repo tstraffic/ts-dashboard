@@ -488,12 +488,12 @@
   <div id="plans" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Traffic Plans</h2>
-      <a href="/plans/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ New Plan</a>
+      <a href="/compliance/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ New Plan</a>
     </div>
     <% if (typeof trafficPlans === 'undefined' || trafficPlans.length === 0) { %>
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
         <p class="text-gray-400 text-sm">No traffic plans for this job yet.</p>
-        <a href="/plans/new?job_id=<%= job.id %>" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Create the first plan</a>
+        <a href="/compliance/new?job_id=<%= job.id %>" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Create the first plan</a>
       </div>
     <% } else { %>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
@@ -543,7 +543,7 @@
             <td class="px-4 py-3 text-gray-500 text-xs"><%= tp.approved_date || '-' %></td>
             <td class="px-4 py-3 text-gray-500 text-xs"><%= tp.expiry_date || '-' %></td>
             <td class="px-4 py-3">
-              <a href="/plans/<%= tp.id %>/edit" class="text-brand-600 hover:text-brand-700 text-xs">Edit</a>
+              <a href="/compliance/<%= tp.id %>/edit" class="text-brand-600 hover:text-brand-700 text-xs">Edit</a>
             </td>
           </tr>
           <% }) %>
@@ -901,7 +901,7 @@
             <td class="px-3 py-2.5 text-gray-600 text-xs hidden lg:table-cell"><%= entry.stage || '-' %></td>
             <td class="px-3 py-2.5 hidden xl:table-cell">
               <% if (entry.tgs_plan_id) { %>
-                <a href="/plans/<%= entry.tgs_plan_id %>/edit" class="text-brand-600 hover:underline text-xs"><%= entry.tgs_plan_number || entry.tgs_number %></a>
+                <a href="/compliance/<%= entry.tgs_plan_id %>/edit" class="text-brand-600 hover:underline text-xs"><%= entry.tgs_plan_number || entry.tgs_number %></a>
               <% } else if (entry.tgs_number) { %>
                 <span class="text-gray-600 text-xs"><%= entry.tgs_number %> <% if (entry.tgs_scope) { %>(<%= entry.tgs_scope %>)<% } %></span>
               <% } else { %>

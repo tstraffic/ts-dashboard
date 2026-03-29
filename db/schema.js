@@ -3678,6 +3678,17 @@ function runMigrations(db) {
     console.log('Migration 69 complete.');
   }
 
+  // =============================================
+  // Migration 70: Compliance item_types multi-select
+  // =============================================
+  if (!isMigrationApplied.get(70)) {
+    console.log('Running migration 70: Compliance item_types multi-select');
+    try { db.exec("ALTER TABLE compliance ADD COLUMN item_types TEXT DEFAULT ''"); } catch(e) { /* column may exist */ }
+    try { db.exec("UPDATE compliance SET item_types = item_type WHERE (item_types = '' OR item_types IS NULL) AND item_type IS NOT NULL AND item_type != ''"); } catch(e) {}
+    recordMigration.run(70, 'Compliance item_types multi-select column');
+    console.log('Migration 70 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
