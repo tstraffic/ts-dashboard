@@ -4,8 +4,9 @@
   const isEdit = !!plan;
   const formAction = isEdit ? '/plans/' + plan.id : '/plans';
   const selectedJobId = (isEdit && plan.job_id) ? plan.job_id : (preselectedJobId || '');
-  const planTypeOptions = (settingsOptions.plan_type || []).map(opt => ({ value: opt.key, label: opt.label }));
   const statusOptions = (settingsOptions.plan_status || []).map(opt => ({ value: opt.key, label: opt.label }));
+  const selectedTypes = isEdit && plan.plan_types ? plan.plan_types.split(',') : [];
+  const returnTo = isEdit && plan.job_id ? '/projects/' + plan.job_id + '#plans' : '/plans';
 %>
 
 <!-- Breadcrumb -->
@@ -18,13 +19,17 @@
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
   <div>
     <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit Traffic Plan' : 'New Traffic Plan' %></h1>
-    <p class="text-gray-500 text-sm mt-0.5"><%= isEdit ? 'Update plan details' : 'Create a new TGS, TCP, or TMP submission' %></p>
+    <p class="text-gray-500 text-sm mt-0.5"><%= isEdit ? 'Update plan details' : 'Create a new traffic plan submission' %></p>
   </div>
 </div>
 
-<form method="POST" action="<%= formAction %>" class="space-y-5" data-wizard>
+<form method="POST" action="<%= formAction %>" class="space-y-5" data-wizard enctype="multipart/form-data">
   <%- include('../partials/csrf') %>
-  <input type="hidden" name="return_to" value="/plans">
+  <input type="hidden" name="return_to" value="<%= returnTo %>">
+  <% if (isEdit && plan.file_path) { %>
+    <input type="hidden" name="existing_file_path" value="<%= plan.file_path %>">
+    <input type="hidden" name="existing_file_original_name" value="<%= plan.file_original_name || '' %>">
+  <% } %>
 
   <!-- Step 1: Plan Details -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="0" data-wizard-title="Plan Details">
@@ -40,13 +45,30 @@
         </select>
       </div>
       <div>
-        <label for="plan_type" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Plan Type</label>
-        <select id="plan_type" name="plan_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-          <option value="">Select type...</option>
-          <% planTypeOptions.forEach(function(opt) { %>
-            <option value="<%= opt.value %>" <%= isEdit && plan.plan_type === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job Address</label>
+        <p id="job_address_display" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 text-sm min-h-[38px] flex items-center">
+          <%
+            let initialAddress = 'Select a job above';
+            if (selectedJobId) {
+              const selectedJob = jobs.find(j => String(j.id) === String(selectedJobId));
+              if (selectedJob) initialAddress = [selectedJob.site_address, selectedJob.suburb].filter(Boolean).join(', ') || 'No address';
+            }
+          %>
+          <%= initialAddress %>
+        </p>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Plan Type(s)</label>
+        <div class="flex flex-wrap gap-4">
+          <% ['TGS','TCP','TMP','ROL'].forEach(function(type) { %>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="plan_types" value="<%= type %>"
+                <%= selectedTypes.includes(type) ? 'checked' : '' %>
+                class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+              <span class="text-sm font-medium text-gray-600"><%= type %></span>
+            </label>
           <% }) %>
-        </select>
+        </div>
       </div>
       <div>
         <label for="designer" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Designer</label>
@@ -98,10 +120,20 @@
     </div>
   </div>
 
-  <!-- Step 3: Dates & Links -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="2" data-wizard-title="Dates">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Dates & File Link</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <!-- Step 3: Dates, Documents & Notes -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="2" data-wizard-title="Dates & Docs">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Dates, Documents & Notes</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label for="client_required_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client Required Date</label>
+        <input type="date" id="client_required_date" name="client_required_date" value="<%= isEdit && plan.client_required_date ? new Date(plan.client_required_date).toISOString().split('T')[0] : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label for="works_expected_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Works Expected Date</label>
+        <input type="date" id="works_expected_date" name="works_expected_date" value="<%= isEdit && plan.works_expected_date ? new Date(plan.works_expected_date).toISOString().split('T')[0] : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
       <div>
         <label for="submitted_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Submitted Date</label>
         <input type="date" id="submitted_date" name="submitted_date" value="<%= isEdit && plan.submitted_date ? new Date(plan.submitted_date).toISOString().split('T')[0] : '' %>"
@@ -123,10 +155,22 @@
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
     </div>
-    <div class="mt-4">
-      <label for="file_link" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">File Link (URL)</label>
-      <input type="url" id="file_link" name="file_link" value="<%= isEdit && plan.file_link ? plan.file_link : '' %>"
-        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="https://...">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+      <div>
+        <label for="file_link" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">File Link (URL)</label>
+        <input type="url" id="file_link" name="file_link" value="<%= isEdit && plan.file_link ? plan.file_link : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="https://...">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Upload Document</label>
+        <input type="file" name="plan_file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <% if (isEdit && plan.file_path) { %>
+          <p class="text-xs text-gray-500 mt-1">Current: <a href="/<%= plan.file_path %>" target="_blank" class="text-brand-600 hover:underline"><%= plan.file_original_name || 'Download' %></a></p>
+        <% } else { %>
+          <p class="text-xs text-gray-400 mt-1">PDF, JPEG, PNG, GIF, WebP. Max 10MB.</p>
+        <% } %>
+      </div>
     </div>
     <div class="mt-4">
       <label for="notes" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Notes</label>
@@ -144,3 +188,15 @@
     </div>
   </noscript>
 </form>
+
+<script>
+  // Auto-populate job address when job is selected
+  const jobAddresses = {<% jobs.forEach(function(j) { %>'<%= j.id %>':'<%= ([j.site_address, j.suburb].filter(Boolean).join(", ") || "No address").replace(/'/g, "\\'") %>',<% }) %>};
+  const jobSelect = document.getElementById('job_id');
+  const addressDisplay = document.getElementById('job_address_display');
+  if (jobSelect && addressDisplay) {
+    jobSelect.addEventListener('change', function() {
+      addressDisplay.textContent = jobAddresses[this.value] || 'Select a job above';
+    });
+  }
+</script>

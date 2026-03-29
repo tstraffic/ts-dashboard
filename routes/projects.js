@@ -45,9 +45,23 @@ router.get('/', (req, res) => {
   updatesQuery += ` ORDER BY pu.week_ending DESC, pu.created_at DESC LIMIT 100`;
   const recentUpdates = db.prepare(updatesQuery).all(...updateParams);
 
+  // Group jobs by client
+  const clientGroupsMap = {};
+  jobs.forEach(job => {
+    const key = job.client || 'Unassigned';
+    if (!clientGroupsMap[key]) {
+      clientGroupsMap[key] = { name: key, clientId: job.client_id || 0, jobs: [], activeCount: 0, totalCount: 0 };
+    }
+    clientGroupsMap[key].jobs.push(job);
+    clientGroupsMap[key].totalCount++;
+    if (job.status === 'active') clientGroupsMap[key].activeCount++;
+  });
+  const clientGroups = Object.values(clientGroupsMap).sort((a, b) => a.name.localeCompare(b.name));
+
   res.render('projects/index', {
     title: 'Project Register',
     jobs, suburbs, filters: { status, search, suburb },
+    clientGroups,
     recentUpdates, updateJobFilter: updateJobFilter || '',
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)

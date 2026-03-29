@@ -227,6 +227,19 @@ router.get('/:id', (req, res) => {
     WHERE tp.job_id = ? ORDER BY tp.created_at DESC
   `).all(job.id);
 
+  // Site diary entries for this job
+  const diaryEntries = db.prepare(`
+    SELECT sd.*, u.full_name as created_by_name,
+      tp.plan_number as tgs_plan_number
+    FROM site_diary_entries sd
+    LEFT JOIN users u ON sd.created_by_id = u.id
+    LEFT JOIN traffic_plans tp ON sd.tgs_plan_id = tp.id
+    WHERE sd.job_id = ? ORDER BY sd.entry_date DESC
+  `).all(job.id);
+
+  // TGS plans for the diary TGS Link dropdown
+  const tgsPlans = db.prepare(`SELECT id, plan_number FROM traffic_plans WHERE job_id = ? ORDER BY plan_number`).all(job.id);
+
   // Lazy-create chat thread for pre-existing jobs
   let chatThreadId = getThreadForEntity('job', job.id);
   if (!chatThreadId) {
@@ -244,7 +257,7 @@ router.get('/:id', (req, res) => {
     job, tasks, updates, complianceItems, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
     complianceCosts, equipmentCosts,
-    equipmentAssignments, defects, trafficPlans, chatThreadId,
+    equipmentAssignments, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });
@@ -312,6 +325,64 @@ router.post('/:id/delete', (req, res) => {
   db.prepare('DELETE FROM jobs WHERE id = ?').run(req.params.id);
   req.flash('success', 'Job deleted.');
   res.redirect('/jobs');
+});
+
+// =============================================
+// Site Diary CRUD
+// =============================================
+
+// Create diary entry
+router.post('/:id/diary', (req, res) => {
+  const db = getDb();
+  const b = req.body;
+  try {
+    db.prepare(`
+      INSERT INTO site_diary_entries (job_id, entry_date, task, representative, client_representative, outcomes, issues, comments, stage, tgs_number, tgs_scope, tgs_plan_id, created_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      req.params.id, b.entry_date, b.task || '', b.representative || '', b.client_representative || '',
+      b.outcomes || '', b.issues || '', b.comments || '', b.stage || '',
+      b.tgs_number || '', b.tgs_scope || '', b.tgs_plan_id || null,
+      req.session.user.id
+    );
+    req.flash('success', 'Diary entry added.');
+  } catch (err) {
+    req.flash('error', 'Failed to add diary entry: ' + err.message);
+  }
+  res.redirect(`/jobs/${req.params.id}#diary`);
+});
+
+// Update diary entry
+router.post('/:id/diary/:entryId', (req, res) => {
+  const db = getDb();
+  const b = req.body;
+  try {
+    db.prepare(`
+      UPDATE site_diary_entries SET entry_date=?, task=?, representative=?, client_representative=?, outcomes=?, issues=?, comments=?, stage=?, tgs_number=?, tgs_scope=?, tgs_plan_id=?, updated_at=CURRENT_TIMESTAMP
+      WHERE id = ? AND job_id = ?
+    `).run(
+      b.entry_date, b.task || '', b.representative || '', b.client_representative || '',
+      b.outcomes || '', b.issues || '', b.comments || '', b.stage || '',
+      b.tgs_number || '', b.tgs_scope || '', b.tgs_plan_id || null,
+      req.params.entryId, req.params.id
+    );
+    req.flash('success', 'Diary entry updated.');
+  } catch (err) {
+    req.flash('error', 'Failed to update diary entry: ' + err.message);
+  }
+  res.redirect(`/jobs/${req.params.id}#diary`);
+});
+
+// Delete diary entry
+router.post('/:id/diary/:entryId/delete', (req, res) => {
+  const db = getDb();
+  try {
+    db.prepare('DELETE FROM site_diary_entries WHERE id = ? AND job_id = ?').run(req.params.entryId, req.params.id);
+    req.flash('success', 'Diary entry deleted.');
+  } catch (err) {
+    req.flash('error', 'Failed to delete diary entry: ' + err.message);
+  }
+  res.redirect(`/jobs/${req.params.id}#diary`);
 });
 
 module.exports = router;

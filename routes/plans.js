@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
+const upload = require('../middleware/upload');
 
 // List all traffic plans
 router.get('/', (req, res) => {
@@ -14,7 +15,10 @@ router.get('/', (req, res) => {
 
   if (status && status !== 'all') { query += ' AND tp.status = ?'; params.push(status); }
   if (job_id) { query += ' AND tp.job_id = ?'; params.push(job_id); }
-  if (plan_type && plan_type !== 'all') { query += ' AND tp.plan_type = ?'; params.push(plan_type); }
+  if (plan_type && plan_type !== 'all') {
+    query += " AND (tp.plan_type = ? OR tp.plan_types LIKE ?)";
+    params.push(plan_type, `%${plan_type}%`);
+  }
   query += ' ORDER BY tp.created_at DESC';
 
   const plans = db.prepare(query).all(...params);
@@ -27,13 +31,13 @@ router.get('/', (req, res) => {
 // New plan form
 router.get('/new', (req, res) => {
   const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
+  const jobs = db.prepare("SELECT id, job_number, client, site_address, suburb FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('plans/form', { title: 'New Traffic Plan', plan: null, jobs, users, user: req.session.user, preselectedJobId: req.query.job_id || null });
 });
 
 // Create plan
-router.post('/', (req, res) => {
+router.post('/', upload.single('plan_file'), (req, res) => {
   const db = getDb();
   const b = req.body;
 
@@ -46,20 +50,38 @@ router.post('/', (req, res) => {
   }
   const planNumber = 'TP-' + String(nextNum).padStart(5, '0');
 
+  // Handle multi-select plan types
+  let planTypes = '';
+  let planType = '';
+  if (b.plan_types) {
+    const types = Array.isArray(b.plan_types) ? b.plan_types : [b.plan_types];
+    planTypes = types.join(',');
+    planType = types[0]; // backward compat
+  } else if (b.plan_type) {
+    planType = b.plan_type;
+    planTypes = b.plan_type;
+  }
+
+  // Handle file upload
+  const filePath = req.file ? req.file.path.replace(/\\/g, '/') : '';
+  const fileOriginalName = req.file ? req.file.originalname : '';
+
   try {
     db.prepare(`
-      INSERT INTO traffic_plans (job_id, plan_number, plan_type, designer, rol_required, rol_submitted, rol_approved, council, tfnsw, submitted_date, approval_date, approved_date, expiry_date, status, file_link, notes, created_by_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO traffic_plans (job_id, plan_number, plan_type, plan_types, designer, rol_required, rol_submitted, rol_approved, council, tfnsw, submitted_date, approval_date, approved_date, expiry_date, client_required_date, works_expected_date, status, file_link, file_path, file_original_name, notes, created_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      b.job_id, planNumber, b.plan_type, b.designer || '',
+      b.job_id || null, planNumber, planType, planTypes, b.designer || '',
       b.rol_required ? 1 : 0, b.rol_submitted ? 1 : 0, b.rol_approved ? 1 : 0,
       b.council || '', b.tfnsw || '',
       b.submitted_date || null, b.approval_date || null, b.approved_date || null, b.expiry_date || null,
-      b.status || 'draft', b.file_link || '', b.notes || '',
+      b.client_required_date || null, b.works_expected_date || null,
+      b.status || 'draft', b.file_link || '', filePath, fileOriginalName, b.notes || '',
       req.session.user.id
     );
     req.flash('success', `Traffic Plan ${planNumber} created successfully.`);
-    res.redirect('/plans');
+    const returnTo = b.return_to && b.return_to !== '/plans' ? b.return_to : '/plans';
+    res.redirect(returnTo);
   } catch (err) {
     req.flash('error', 'Failed to create plan: ' + err.message);
     res.redirect('/plans/new');
@@ -71,29 +93,52 @@ router.get('/:id/edit', (req, res) => {
   const db = getDb();
   const plan = db.prepare('SELECT * FROM traffic_plans WHERE id = ?').get(req.params.id);
   if (!plan) { req.flash('error', 'Plan not found.'); return res.redirect('/plans'); }
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
+  const jobs = db.prepare("SELECT id, job_number, client, site_address, suburb FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('plans/form', { title: 'Edit Traffic Plan', plan, jobs, users, user: req.session.user, preselectedJobId: null });
 });
 
 // Update plan
-router.post('/:id', (req, res) => {
+router.post('/:id', upload.single('plan_file'), (req, res) => {
   const db = getDb();
   const b = req.body;
+
+  // Handle multi-select plan types
+  let planTypes = '';
+  let planType = '';
+  if (b.plan_types) {
+    const types = Array.isArray(b.plan_types) ? b.plan_types : [b.plan_types];
+    planTypes = types.join(',');
+    planType = types[0];
+  } else if (b.plan_type) {
+    planType = b.plan_type;
+    planTypes = b.plan_type;
+  }
+
+  // Handle file upload (keep existing file if no new upload)
+  let filePath = b.existing_file_path || '';
+  let fileOriginalName = b.existing_file_original_name || '';
+  if (req.file) {
+    filePath = req.file.path.replace(/\\/g, '/');
+    fileOriginalName = req.file.originalname;
+  }
+
   try {
     db.prepare(`
-      UPDATE traffic_plans SET job_id=?, plan_type=?, designer=?, rol_required=?, rol_submitted=?, rol_approved=?, council=?, tfnsw=?, submitted_date=?, approval_date=?, approved_date=?, expiry_date=?, status=?, file_link=?, notes=?, updated_at=CURRENT_TIMESTAMP
+      UPDATE traffic_plans SET job_id=?, plan_type=?, plan_types=?, designer=?, rol_required=?, rol_submitted=?, rol_approved=?, council=?, tfnsw=?, submitted_date=?, approval_date=?, approved_date=?, expiry_date=?, client_required_date=?, works_expected_date=?, status=?, file_link=?, file_path=?, file_original_name=?, notes=?, updated_at=CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
-      b.job_id, b.plan_type, b.designer || '',
+      b.job_id || null, planType, planTypes, b.designer || '',
       b.rol_required ? 1 : 0, b.rol_submitted ? 1 : 0, b.rol_approved ? 1 : 0,
       b.council || '', b.tfnsw || '',
       b.submitted_date || null, b.approval_date || null, b.approved_date || null, b.expiry_date || null,
-      b.status || 'draft', b.file_link || '', b.notes || '',
+      b.client_required_date || null, b.works_expected_date || null,
+      b.status || 'draft', b.file_link || '', filePath, fileOriginalName, b.notes || '',
       req.params.id
     );
     req.flash('success', 'Traffic plan updated successfully.');
-    res.redirect('/plans');
+    const returnTo = b.return_to && b.return_to !== '/plans' ? b.return_to : '/plans';
+    res.redirect(returnTo);
   } catch (err) {
     req.flash('error', 'Failed to update plan: ' + err.message);
     res.redirect(`/plans/${req.params.id}/edit`);

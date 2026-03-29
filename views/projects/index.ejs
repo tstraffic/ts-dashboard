@@ -95,98 +95,119 @@
       </a>
     </div>
   <% } else { %>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="border-b border-gray-200">
-          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Job Number</th>
-          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Client</th>
-          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Suburb</th>
-          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Stage</th>
-          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Health</th>
-          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">% Complete</th>
-          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Start Date</th>
-          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">PM</th>
-          <% if (typeof canViewAccounts !== 'undefined' && canViewAccounts) { %>
-          <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wide">Budget</th>
+  <!-- Client Grouped Accordion -->
+  <div class="space-y-3">
+    <% clientGroups.forEach(function(group, gi) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <!-- Client Header (accordion toggle) -->
+      <button type="button" onclick="var el=document.getElementById('cg-<%= gi %>');el.classList.toggle('hidden');this.querySelector('.chevron').classList.toggle('rotate-90')" class="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left">
+        <div class="flex items-center gap-3">
+          <svg class="w-4 h-4 text-gray-400 chevron transition-transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          <span class="text-sm font-semibold text-gray-900"><%= group.name %></span>
+          <span class="text-xs text-gray-400"><%= group.totalCount %> job<%= group.totalCount !== 1 ? 's' : '' %></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <% if (group.activeCount > 0) { %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 ring-1 ring-blue-600/30"><%= group.activeCount %> active</span>
           <% } %>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        <% jobs.forEach(job => {
-          const healthColor = job.health === 'green' ? '#10b981' : job.health === 'amber' ? '#f59e0b' : job.health === 'red' ? '#ef4444' : '#e5e7eb';
-          const pct = job.percent_complete || 0;
-          const barColor = pct >= 100 ? 'bg-emerald-500' : pct >= 60 ? 'bg-blue-500' : pct >= 30 ? 'bg-amber-400' : 'bg-red-400';
-        %>
-        <tr class="hover:bg-gray-50" style="border-left: 3px solid <%= healthColor %>">
-          <td class="px-3 py-2 font-medium">
-            <a href="/projects/<%= job.id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= job.job_number %></a>
-          </td>
-          <td class="px-3 py-2 text-gray-600"><%= job.client %></td>
-          <td class="px-3 py-2 text-gray-600"><%= job.suburb || '-' %></td>
-          <td class="px-3 py-2">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-              <% if (job.status === 'active') { %>bg-blue-100 text-blue-800 ring-1 ring-blue-600/30
-              <% } else if (job.status === 'on_hold') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
-              <% } else if (job.status === 'completed') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
-              <% } else if (job.status === 'won') { %>bg-teal-50 text-teal-700 ring-1 ring-teal-600/20
-              <% } else if (job.status === 'tender') { %>bg-purple-50 text-purple-700 ring-1 ring-purple-600/20
-              <% } else if (job.status === 'prestart') { %>bg-sky-50 text-sky-700 ring-1 ring-sky-600/20
-              <% } else if (job.status === 'closed') { %>bg-gray-100/60 text-gray-600
-              <% } else { %>bg-white text-gray-600<% } %>">
-              <%= job.status ? job.status.replace('_', ' ') : '-' %>
-            </span>
-          </td>
-          <td class="px-3 py-2 text-gray-600"><%= job.stage || '-' %></td>
-          <td class="px-3 py-2">
-            <% if (job.health) { %>
-              <span class="inline-flex items-center gap-1.5 text-xs font-medium
-                <% if (job.health === 'green') { %>text-emerald-600
-                <% } else if (job.health === 'amber') { %>text-amber-600
-                <% } else if (job.health === 'red') { %>text-red-600
-                <% } else { %>text-gray-400<% } %>">
-                <span class="inline-block w-2.5 h-2.5 rounded-full
-                  <% if (job.health === 'green') { %>bg-emerald-500
-                  <% } else if (job.health === 'amber') { %>bg-amber-500
-                  <% } else if (job.health === 'red') { %>bg-red-500
-                  <% } else { %>bg-gray-300<% } %>"></span>
-                <%= job.health.charAt(0).toUpperCase() + job.health.slice(1) %>
-              </span>
-            <% } else { %>
-              <span class="text-gray-400">-</span>
-            <% } %>
-          </td>
-          <td class="px-3 py-2">
-            <div class="flex items-center gap-2">
-              <div class="w-16 bg-gray-200 rounded-full h-2 overflow-hidden">
-                <div class="h-2 rounded-full <%= barColor %> transition-all" style="width: <%= Math.min(pct, 100) %>%"></div>
-              </div>
-              <span class="text-xs text-gray-500 tabular-nums"><%= pct %>%</span>
-            </div>
-          </td>
-          <td class="px-3 py-2 text-gray-500 text-xs"><%= job.start_date ? new Date(job.start_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></td>
-          <td class="px-3 py-2 text-gray-600"><%= job.pm_name || '-' %></td>
-          <% if (typeof canViewAccounts !== 'undefined' && canViewAccounts) { %>
-          <td class="px-3 py-2 text-center">
-            <% if (!job.budget_contract) { %>
-              <span class="text-gray-400">—</span>
-            <% } else {
-              const budgetMargin = (job.budget_contract - (job.budget_spent || 0)) / job.budget_contract * 100;
-            %>
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium <% if (budgetMargin > 20) { %>text-emerald-700 bg-emerald-50<% } else if (budgetMargin >= 0) { %>text-orange-700 bg-orange-50<% } else { %>text-red-700 bg-red-50<% } %>" title="Margin: <%= budgetMargin.toFixed(1) %>%">
-                <span class="inline-block w-1.5 h-1.5 rounded-full <% if (budgetMargin > 20) { %>bg-emerald-500<% } else if (budgetMargin >= 0) { %>bg-orange-500<% } else { %>bg-red-500<% } %>"></span>
-                <%= budgetMargin > 20 ? 'On track' : budgetMargin >= 0 ? 'Tight' : 'Over' %>
-              </span>
-            <% } %>
-          </td>
-          <% } %>
-        </tr>
-        <% }) %>
-      </tbody>
-    </table>
+        </div>
+      </button>
+      <!-- Jobs Table (expanded by default) -->
+      <div id="cg-<%= gi %>" class="">
+        <div class="border-t border-gray-100 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-100 bg-gray-50/50">
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Job Number</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Suburb</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden md:table-cell">Stage</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden sm:table-cell">Health</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden lg:table-cell">% Complete</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden md:table-cell">Start Date</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden lg:table-cell">PM</th>
+                <% if (typeof canViewAccounts !== 'undefined' && canViewAccounts) { %>
+                <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wide hidden xl:table-cell">Budget</th>
+                <% } %>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <% group.jobs.forEach(function(job) {
+                const healthColor = job.health === 'green' ? '#10b981' : job.health === 'amber' ? '#f59e0b' : job.health === 'red' ? '#ef4444' : '#e5e7eb';
+                const pct = job.percent_complete || 0;
+                const barColor = pct >= 100 ? 'bg-emerald-500' : pct >= 60 ? 'bg-blue-500' : pct >= 30 ? 'bg-amber-400' : 'bg-red-400';
+              %>
+              <tr class="hover:bg-gray-50" style="border-left: 3px solid <%= healthColor %>">
+                <td class="px-3 py-2 font-medium">
+                  <a href="/projects/<%= job.id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= job.job_number %></a>
+                </td>
+                <td class="px-3 py-2 text-gray-600"><%= job.suburb || '-' %></td>
+                <td class="px-3 py-2">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                    <% if (job.status === 'active') { %>bg-blue-100 text-blue-800 ring-1 ring-blue-600/30
+                    <% } else if (job.status === 'on_hold') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
+                    <% } else if (job.status === 'completed') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
+                    <% } else if (job.status === 'won') { %>bg-teal-50 text-teal-700 ring-1 ring-teal-600/20
+                    <% } else if (job.status === 'tender') { %>bg-purple-50 text-purple-700 ring-1 ring-purple-600/20
+                    <% } else if (job.status === 'prestart') { %>bg-sky-50 text-sky-700 ring-1 ring-sky-600/20
+                    <% } else if (job.status === 'closed') { %>bg-gray-100/60 text-gray-600
+                    <% } else { %>bg-white text-gray-600<% } %>">
+                    <%= job.status ? job.status.replace('_', ' ') : '-' %>
+                  </span>
+                </td>
+                <td class="px-3 py-2 text-gray-600 hidden md:table-cell"><%= job.stage || '-' %></td>
+                <td class="px-3 py-2 hidden sm:table-cell">
+                  <% if (job.health) { %>
+                    <span class="inline-flex items-center gap-1.5 text-xs font-medium
+                      <% if (job.health === 'green') { %>text-emerald-600
+                      <% } else if (job.health === 'amber') { %>text-amber-600
+                      <% } else if (job.health === 'red') { %>text-red-600
+                      <% } else { %>text-gray-400<% } %>">
+                      <span class="inline-block w-2.5 h-2.5 rounded-full
+                        <% if (job.health === 'green') { %>bg-emerald-500
+                        <% } else if (job.health === 'amber') { %>bg-amber-500
+                        <% } else if (job.health === 'red') { %>bg-red-500
+                        <% } else { %>bg-gray-300<% } %>"></span>
+                      <%= job.health.charAt(0).toUpperCase() + job.health.slice(1) %>
+                    </span>
+                  <% } else { %>
+                    <span class="text-gray-400">-</span>
+                  <% } %>
+                </td>
+                <td class="px-3 py-2 hidden lg:table-cell">
+                  <div class="flex items-center gap-2">
+                    <div class="w-16 bg-gray-200 rounded-full h-2 overflow-hidden">
+                      <div class="h-2 rounded-full <%= barColor %> transition-all" style="width: <%= Math.min(pct, 100) %>%"></div>
+                    </div>
+                    <span class="text-xs text-gray-500 tabular-nums"><%= pct %>%</span>
+                  </div>
+                </td>
+                <td class="px-3 py-2 text-gray-500 text-xs hidden md:table-cell"><%= job.start_date ? new Date(job.start_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></td>
+                <td class="px-3 py-2 text-gray-600 hidden lg:table-cell"><%= job.pm_name || '-' %></td>
+                <% if (typeof canViewAccounts !== 'undefined' && canViewAccounts) { %>
+                <td class="px-3 py-2 text-center hidden xl:table-cell">
+                  <% if (!job.budget_contract) { %>
+                    <span class="text-gray-400">—</span>
+                  <% } else {
+                    const budgetMargin = (job.budget_contract - (job.budget_spent || 0)) / job.budget_contract * 100;
+                  %>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium <% if (budgetMargin > 20) { %>text-emerald-700 bg-emerald-50<% } else if (budgetMargin >= 0) { %>text-orange-700 bg-orange-50<% } else { %>text-red-700 bg-red-50<% } %>" title="Margin: <%= budgetMargin.toFixed(1) %>%">
+                      <span class="inline-block w-1.5 h-1.5 rounded-full <% if (budgetMargin > 20) { %>bg-emerald-500<% } else if (budgetMargin >= 0) { %>bg-orange-500<% } else { %>bg-red-500<% } %>"></span>
+                      <%= budgetMargin > 20 ? 'On track' : budgetMargin >= 0 ? 'Tight' : 'Over' %>
+                    </span>
+                  <% } %>
+                </td>
+                <% } %>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <% }) %>
   </div>
-  <div class="mt-3 text-xs text-gray-400"><%= jobs.length %> job<%= jobs.length !== 1 ? 's' : '' %> found</div>
+  <div class="mt-3 text-xs text-gray-400"><%= jobs.length %> job<%= jobs.length !== 1 ? 's' : '' %> across <%= clientGroups.length %> client<%= clientGroups.length !== 1 ? 's' : '' %></div>
   <% } %>
 
 </div><!-- #register -->

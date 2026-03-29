@@ -3628,6 +3628,56 @@ function runMigrations(db) {
     console.log('Migration 67 complete.');
   }
 
+  // =============================================
+  // Migration 68: Site Diary Entries table
+  // =============================================
+  if (!isMigrationApplied.get(68)) {
+    console.log('Running migration 68: Site Diary Entries table');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS site_diary_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        entry_date DATE NOT NULL,
+        task TEXT DEFAULT '',
+        representative TEXT DEFAULT '',
+        client_representative TEXT DEFAULT '',
+        outcomes TEXT DEFAULT '',
+        issues TEXT DEFAULT '',
+        comments TEXT DEFAULT '',
+        stage TEXT DEFAULT '',
+        tgs_number TEXT DEFAULT '',
+        tgs_scope TEXT DEFAULT '',
+        tgs_plan_id INTEGER REFERENCES traffic_plans(id),
+        created_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_site_diary_job ON site_diary_entries(job_id);
+      CREATE INDEX IF NOT EXISTS idx_site_diary_date ON site_diary_entries(entry_date);
+    `);
+    recordMigration.run(68, 'Site Diary Entries table');
+    console.log('Migration 68 complete.');
+  }
+
+  // =============================================
+  // Migration 69: Traffic Plans enhancements
+  // =============================================
+  if (!isMigrationApplied.get(69)) {
+    console.log('Running migration 69: Traffic Plans enhancements');
+    const planCols = [
+      "ALTER TABLE traffic_plans ADD COLUMN plan_types TEXT DEFAULT ''",
+      "ALTER TABLE traffic_plans ADD COLUMN client_required_date DATE",
+      "ALTER TABLE traffic_plans ADD COLUMN works_expected_date DATE",
+      "ALTER TABLE traffic_plans ADD COLUMN file_path TEXT DEFAULT ''",
+      "ALTER TABLE traffic_plans ADD COLUMN file_original_name TEXT DEFAULT ''"
+    ];
+    planCols.forEach(sql => { try { db.exec(sql); } catch(e) { /* column may exist */ } });
+    // Backfill plan_types from plan_type
+    try { db.exec("UPDATE traffic_plans SET plan_types = plan_type WHERE (plan_types = '' OR plan_types IS NULL) AND plan_type IS NOT NULL"); } catch(e) {}
+    recordMigration.run(69, 'Traffic Plans enhancements: plan_types, new dates, file upload');
+    console.log('Migration 69 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
