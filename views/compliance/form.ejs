@@ -42,15 +42,21 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-        <!-- Item Type -->
-        <div>
-          <label for="item_type" class="block text-sm font-medium text-gray-600 mb-1">Type <span class="text-red-600">*</span></label>
-          <select id="item_type" name="item_type" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="">Select type...</option>
+        <!-- Item Type(s) - Multi-select checkboxes -->
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-600 mb-2">Type(s) <span class="text-red-600">*</span></label>
+          <% const selectedTypes = isEdit && item.item_types ? item.item_types.split(',') : (isEdit && item.item_type ? [item.item_type] : []); %>
+          <div class="flex flex-wrap gap-3">
             <% typeOptions.forEach(function(opt) { %>
-              <option value="<%= opt.value %>" <%= isEdit && item.item_type === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+              <label class="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg border transition-colors
+                <%= selectedTypes.includes(opt.value) ? 'border-brand-500 bg-brand-50' : 'border-gray-200 bg-white hover:bg-gray-50' %>">
+                <input type="checkbox" name="item_types" value="<%= opt.value %>"
+                  <%= selectedTypes.includes(opt.value) ? 'checked' : '' %>
+                  class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+                <span class="text-sm font-medium text-gray-700"><%= opt.label %></span>
+              </label>
             <% }) %>
-          </select>
+          </div>
         </div>
 
         <!-- Title -->
