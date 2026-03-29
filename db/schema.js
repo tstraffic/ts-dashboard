@@ -3693,10 +3693,20 @@ function runMigrations(db) {
     console.log('Running migration 71: Remove CHECK constraint on jobs.stage');
     db.exec('PRAGMA foreign_keys=OFF;');
     try {
-      db.exec(`
-        CREATE TABLE jobs_stage_fix AS SELECT * FROM jobs;
-        DROP TABLE jobs;
-        CREATE TABLE jobs (
+      const fixExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='jobs_stage_fix'").get();
+      const jobsExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='jobs'").get();
+      // Step 1: backup jobs data (skip if already done in a previous partial run)
+      if (!fixExists && jobsExists) {
+        db.exec('CREATE TABLE jobs_stage_fix AS SELECT * FROM jobs;');
+      }
+      // Step 2: drop old jobs table (skip if already dropped)
+      if (jobsExists) {
+        db.exec('DROP TABLE jobs;');
+      }
+      // Step 3: recreate jobs without CHECK constraint on stage
+      const jobsExistsNow = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='jobs'").get();
+      if (!jobsExistsNow) {
+        db.exec(`CREATE TABLE jobs (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           job_number TEXT UNIQUE NOT NULL,
           job_name TEXT NOT NULL,
@@ -3731,12 +3741,30 @@ function runMigrations(db) {
           required_tcp_level TEXT DEFAULT '',
           client_id INTEGER REFERENCES clients(id),
           parent_project_id INTEGER REFERENCES jobs(id),
+          last_update_date DATE,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
-        INSERT INTO jobs SELECT * FROM jobs_stage_fix;
-        DROP TABLE jobs_stage_fix;
-      `);
+        );`);
+      }
+      // Step 4: restore data from backup using explicit column list to avoid count mismatches
+      const fixStillExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='jobs_stage_fix'").get();
+      if (fixStillExists) {
+        db.exec(`INSERT INTO jobs (id, job_number, job_name, client, site_address, suburb, status, stage,
+          percent_complete, start_date, end_date, project_manager_id, ops_supervisor_id,
+          planning_owner_id, marketing_owner_id, accounts_owner_id, health, accounts_status,
+          division_tags, notes, client_project_number, project_name, principal_contractor,
+          traffic_supervisor_id, contract_value, estimated_hours, crew_size, rol_required,
+          tmp_required, sharepoint_url, state, required_tcp_level, client_id, parent_project_id,
+          last_update_date, created_at, updated_at)
+          SELECT id, job_number, job_name, client, site_address, suburb, status, stage,
+          percent_complete, start_date, end_date, project_manager_id, ops_supervisor_id,
+          planning_owner_id, marketing_owner_id, accounts_owner_id, health, accounts_status,
+          division_tags, notes, client_project_number, project_name, principal_contractor,
+          traffic_supervisor_id, contract_value, estimated_hours, crew_size, rol_required,
+          tmp_required, sharepoint_url, state, required_tcp_level, client_id, parent_project_id,
+          last_update_date, created_at, updated_at FROM jobs_stage_fix;`);
+        db.exec('DROP TABLE jobs_stage_fix;');
+      }
     } finally {
       db.exec('PRAGMA foreign_keys=ON;');
     }
