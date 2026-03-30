@@ -209,6 +209,26 @@ router.post('/:id', (req, res) => {
   res.redirect(b.return_to || '/compliance');
 });
 
+// Bulk operations
+router.post('/bulk-delete', express.json(), (req, res) => {
+  const db = getDb();
+  const ids = req.body.ids;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No items selected' });
+  const placeholders = ids.map(() => '?').join(',');
+  db.prepare(`DELETE FROM compliance WHERE id IN (${placeholders})`).run(...ids);
+  res.json({ success: true });
+});
+
+router.post('/bulk-status', express.json(), (req, res) => {
+  const db = getDb();
+  const { ids, status } = req.body;
+  const validStatuses = ['not_started', 'submitted', 'approved', 'rejected', 'expired'];
+  if (!Array.isArray(ids) || ids.length === 0 || !validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid request' });
+  const placeholders = ids.map(() => '?').join(',');
+  db.prepare(`UPDATE compliance SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`).run(status, ...ids);
+  res.json({ success: true });
+});
+
 router.post('/:id/delete', (req, res) => {
   const db = getDb();
   db.prepare('DELETE FROM compliance WHERE id = ?').run(req.params.id);
