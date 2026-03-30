@@ -384,7 +384,7 @@ function bulkDelete() {
   if (!confirm('Delete ' + ids.length + ' selected item(s)? This cannot be undone.')) return;
   fetch('/compliance/bulk-delete', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: csrfHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ ids: ids })
   }).then(r => { if (r.ok) window.location.reload(); else alert('Failed to delete items.'); });
 }
@@ -396,7 +396,7 @@ function bulkUpdateStatus(status) {
   if (!confirm('Mark ' + ids.length + ' item(s) as ' + label + '?')) return;
   fetch('/compliance/bulk-status', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: csrfHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ ids: ids, status: status })
   }).then(r => { if (r.ok) window.location.reload(); else alert('Failed to update items.'); });
 }
