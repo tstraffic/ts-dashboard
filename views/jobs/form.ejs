@@ -185,16 +185,44 @@
           <% }) %>
         </select>
       </div>
-      <div class="flex items-end gap-4 sm:col-span-2">
+      <div>
+        <label for="vehicles" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Vehicles</label>
+        <input type="number" id="vehicles" name="vehicles" min="0" value="<%= isEdit && job.vehicles ? job.vehicles : '' %>" placeholder="0"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+    </div>
+    <div class="mt-4">
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Approvals Required</label>
+      <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" name="rol_required" value="1" <%= isEdit && job.rol_required ? 'checked' : '' %>
             class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500">
-          <span class="text-sm font-medium text-gray-600">ROL Required</span>
+          <span class="text-sm font-medium text-gray-600">ROL</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" name="tmp_required" value="1" <%= isEdit && job.tmp_required ? 'checked' : '' %>
             class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500">
-          <span class="text-sm font-medium text-gray-600">TMP Required</span>
+          <span class="text-sm font-medium text-gray-600">TMP</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="tgs_required" value="1" <%= isEdit && job.tgs_required ? 'checked' : '' %>
+            class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500">
+          <span class="text-sm font-medium text-gray-600">TGS</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="spa_required" value="1" <%= isEdit && job.spa_required ? 'checked' : '' %>
+            class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500">
+          <span class="text-sm font-medium text-gray-600">SPA</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="council_approval" value="1" <%= isEdit && job.council_approval ? 'checked' : '' %>
+            class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500">
+          <span class="text-sm font-medium text-gray-600">Council</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="bus_approval" value="1" <%= isEdit && job.bus_approval ? 'checked' : '' %>
+            class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500">
+          <span class="text-sm font-medium text-gray-600">Bus Approval</span>
         </label>
       </div>
     </div>

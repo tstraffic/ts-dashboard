@@ -3826,6 +3826,22 @@ function runMigrations(db) {
     console.log('Migration 72 complete.');
   }
 
+  // Migration 73: Add approval flags and vehicles to jobs table
+  if (!isMigrationApplied.get(73)) {
+    const newCols73 = [
+      ['tgs_required', 'INTEGER DEFAULT 0'],
+      ['spa_required', 'INTEGER DEFAULT 0'],
+      ['council_approval', 'INTEGER DEFAULT 0'],
+      ['bus_approval', 'INTEGER DEFAULT 0'],
+      ['vehicles', 'INTEGER DEFAULT 0'],
+    ];
+    newCols73.forEach(([col, def]) => {
+      try { db.exec(`ALTER TABLE jobs ADD COLUMN ${col} ${def}`); } catch(e) { /* exists */ }
+    });
+    recordMigration.run(73, 'Add approval flags and vehicles to jobs');
+    console.log('Migration 73 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

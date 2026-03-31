@@ -80,8 +80,8 @@ router.post('/', (req, res) => {
     db.prepare(`
       INSERT INTO jobs (job_number, job_name, client, client_id, site_address, suburb, status, stage, percent_complete, start_date, end_date, project_manager_id, ops_supervisor_id, planning_owner_id, marketing_owner_id, accounts_owner_id, health, accounts_status, division_tags, notes,
         client_project_number, project_name, principal_contractor, traffic_supervisor_id,
-        contract_value, estimated_hours, crew_size, rol_required, tmp_required, sharepoint_url, state, required_tcp_level)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        contract_value, estimated_hours, crew_size, vehicles, rol_required, tmp_required, tgs_required, spa_required, council_approval, bus_approval, sharepoint_url, state, required_tcp_level)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       b.job_number, jobName, clientName, b.client_id || null, b.site_address, b.suburb,
       b.status || 'tender', b.stage || 'tender', parseInt(b.percent_complete) || 0,
@@ -91,8 +91,9 @@ router.post('/', (req, res) => {
       b.health || 'green', b.accounts_status || 'na',
       b.division_tags || '', b.notes || '',
       b.client_project_number || '', b.project_name || '', b.principal_contractor || '', b.traffic_supervisor_id || null,
-      parseFloat(b.contract_value) || 0, parseFloat(b.estimated_hours) || 0, parseInt(b.crew_size) || 0,
-      b.rol_required ? 1 : 0, b.tmp_required ? 1 : 0, b.sharepoint_url || '', b.state || '',
+      parseFloat(b.contract_value) || 0, parseFloat(b.estimated_hours) || 0, parseInt(b.crew_size) || 0, parseInt(b.vehicles) || 0,
+      b.rol_required ? 1 : 0, b.tmp_required ? 1 : 0, b.tgs_required ? 1 : 0, b.spa_required ? 1 : 0, b.council_approval ? 1 : 0, b.bus_approval ? 1 : 0,
+      b.sharepoint_url || '', b.state || '',
       b.required_tcp_level || ''
     );
     // Auto-create chat thread for this job
@@ -297,7 +298,8 @@ router.post('/:id', (req, res) => {
         project_manager_id=?, ops_supervisor_id=?, planning_owner_id=?, marketing_owner_id=?, accounts_owner_id=?,
         health=?, accounts_status=?, division_tags=?, notes=?,
         client_project_number=?, project_name=?, principal_contractor=?, traffic_supervisor_id=?,
-        contract_value=?, estimated_hours=?, crew_size=?, rol_required=?, tmp_required=?, sharepoint_url=?, state=?,
+        contract_value=?, estimated_hours=?, crew_size=?, vehicles=?, rol_required=?, tmp_required=?, tgs_required=?, spa_required=?, council_approval=?, bus_approval=?,
+        sharepoint_url=?, state=?,
         required_tcp_level=?,
         updated_at=CURRENT_TIMESTAMP
       WHERE id = ?
@@ -310,8 +312,9 @@ router.post('/:id', (req, res) => {
       b.health, b.accounts_status || 'na',
       b.division_tags || '', b.notes || '',
       b.client_project_number || '', b.project_name || '', b.principal_contractor || '', b.traffic_supervisor_id || null,
-      parseFloat(b.contract_value) || 0, parseFloat(b.estimated_hours) || 0, parseInt(b.crew_size) || 0,
-      b.rol_required ? 1 : 0, b.tmp_required ? 1 : 0, b.sharepoint_url || '', b.state || '',
+      parseFloat(b.contract_value) || 0, parseFloat(b.estimated_hours) || 0, parseInt(b.crew_size) || 0, parseInt(b.vehicles) || 0,
+      b.rol_required ? 1 : 0, b.tmp_required ? 1 : 0, b.tgs_required ? 1 : 0, b.spa_required ? 1 : 0, b.council_approval ? 1 : 0, b.bus_approval ? 1 : 0,
+      b.sharepoint_url || '', b.state || '',
       b.required_tcp_level || '',
       req.params.id
     );
