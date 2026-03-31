@@ -3773,7 +3773,7 @@ function runMigrations(db) {
   }
 
   // Migration 72: Remove status CHECK constraint from compliance (allow any status value)
-  if (!completedMigrations.has(72)) {
+  if (!isMigrationApplied.get(72)) {
     try {
       // First check if backup table was left from a failed previous attempt
       const backupExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_compliance_backup_72'").get();
