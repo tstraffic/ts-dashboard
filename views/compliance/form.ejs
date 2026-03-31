@@ -295,12 +295,32 @@
                 class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 placeholder="SPA status or response">
             </div>
-            <!-- Council response -->
-            <div data-response-for="council_permit" class="hidden">
-              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Council Response</label>
-              <input type="text" name="council_response" value="<%= isEdit && item.council_response ? item.council_response : '' %>"
-                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                placeholder="Council approval status">
+            <!-- Council response + fee -->
+            <div data-response-for="council_permit" class="hidden sm:col-span-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Council Response</label>
+                  <input type="text" name="council_response" value="<%= isEdit && item.council_response ? item.council_response : '' %>"
+                    class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    placeholder="Council approval status">
+                </div>
+                <div class="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="hidden" name="council_fee_paid" value="0">
+                    <input type="checkbox" id="council_fee_paid" name="council_fee_paid" value="1"
+                      <%= isEdit && item.council_fee_paid ? 'checked' : '' %>
+                      class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500 focus:ring-offset-0 focus:ring-2">
+                    <span class="text-sm font-medium text-amber-800">Council fee paid</span>
+                  </label>
+                  <div id="council-fee-amount-row" class="mt-2" style="display: none;">
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Fee Amount ($)</label>
+                    <input type="number" id="council_fee_amount" name="council_fee_amount" step="0.01" min="0"
+                      value="<%= isEdit && item.council_fee_amount ? item.council_fee_amount : '' %>"
+                      class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      placeholder="0.00">
+                  </div>
+                </div>
+              </div>
             </div>
             <!-- Bus Approvals response -->
             <div data-response-for="bus_approval" class="hidden">
@@ -405,28 +425,7 @@
             placeholder="Additional comments..."><%= isEdit && item.notes ? item.notes : '' %></textarea>
         </div>
 
-        <!-- Council Fee (shown for council_permit type) -->
-        <div class="md:col-span-2 p-4 bg-amber-50 rounded-lg border border-amber-200" id="council-fee-section" style="display: none;">
-          <h3 class="text-sm font-semibold text-amber-800 mb-3">Council Fee</h3>
-          <div class="space-y-4">
-            <div>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="hidden" name="council_fee_paid" value="0">
-                <input type="checkbox" id="council_fee_paid" name="council_fee_paid" value="1"
-                  <%= isEdit && item.council_fee_paid ? 'checked' : '' %>
-                  class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500 focus:ring-offset-0 focus:ring-2">
-                <span class="text-sm font-medium text-gray-700">Council fee has been paid</span>
-              </label>
-            </div>
-            <div id="council-fee-amount-row" style="display: none;">
-              <label for="council_fee_amount" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Fee Amount ($)</label>
-              <input type="number" id="council_fee_amount" name="council_fee_amount" step="0.01" min="0"
-                value="<%= isEdit && item.council_fee_amount ? item.council_fee_amount : '' %>"
-                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 max-w-xs"
-                placeholder="0.00">
-            </div>
-          </div>
-        </div>
+        <!-- Council fee is now inside the council_permit response field above -->
       </div>
 
       <!-- Ready for Invoice banner -->
@@ -543,42 +542,14 @@ function clearAssignmentError() {
     document.getElementById(id).classList.remove('border-red-400', 'ring-1', 'ring-red-400');
   });
 }
-// Show/hide council fee section based on item type
-function toggleCouncilFee() {
-  var type = document.getElementById('item_type').value;
-  var section = document.getElementById('council-fee-section');
-  if (type === 'council_permit') {
-    section.style.display = '';
-  } else {
-    section.style.display = 'none';
-  }
-}
 // Show/hide fee amount based on paid checkbox
 function toggleFeeAmount() {
-  var paid = document.getElementById('council_fee_paid').checked;
-  document.getElementById('council-fee-amount-row').style.display = paid ? '' : 'none';
+  var paid = document.getElementById('council_fee_paid');
+  var row = document.getElementById('council-fee-amount-row');
+  if (paid && row) row.style.display = paid.checked ? '' : 'none';
 }
-// Council fee toggle — show when council_permit type is checked
-var itemTypeEl = document.getElementById('item_type');
-if (itemTypeEl) {
-  itemTypeEl.addEventListener('change', toggleCouncilFee);
-}
-// Also listen on multi-select checkboxes
-document.querySelectorAll('input[name="item_types"]').forEach(function(cb) {
-  cb.addEventListener('change', function() {
-    var councilChecked = document.querySelector('input[name="item_types"][value="council_permit"]');
-    var section = document.getElementById('council-fee-section');
-    if (section) section.style.display = (councilChecked && councilChecked.checked) ? '' : 'none';
-  });
-});
 var councilFeePaid = document.getElementById('council_fee_paid');
 if (councilFeePaid) councilFeePaid.addEventListener('change', toggleFeeAmount);
-// Run on load
-(function() {
-  var councilChecked = document.querySelector('input[name="item_types"][value="council_permit"]');
-  var section = document.getElementById('council-fee-section');
-  if (section) section.style.display = (councilChecked && councilChecked.checked) ? '' : 'none';
-})();
 toggleFeeAmount();
 
 // Toggle "Other" description field
