@@ -257,7 +257,15 @@ router.get('/:id/edit', (req, res) => {
     ORDER BY al.created_at DESC LIMIT 20
   `).all(req.params.id);
 
-  res.render('tasks/form', { title: 'Edit Task', task, jobs, users, user: req.session.user, prefillJobId: '', editable, subtasks, comments, dependencies, dependents, allTasks, activityLog });
+  // Linked compliance item (if auto-created from Plans & Approvals)
+  let linkedCompliance = null;
+  try {
+    if (task.compliance_id) {
+      linkedCompliance = db.prepare('SELECT id, title, reference_number, status, item_types FROM compliance WHERE id = ?').get(task.compliance_id);
+    }
+  } catch (e) { /* compliance_id column may not exist yet */ }
+
+  res.render('tasks/form', { title: 'Edit Task', task, jobs, users, user: req.session.user, prefillJobId: '', editable, subtasks, comments, dependencies, dependents, allTasks, activityLog, linkedCompliance });
 });
 
 // POST /:id — Update task

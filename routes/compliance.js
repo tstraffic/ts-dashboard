@@ -156,7 +156,7 @@ router.get('/new', (req, res) => {
   res.render('compliance/form', {
     title: 'New Plan / Approval', item: null, jobs, clients, users,
     user: req.session.user, prefillJobId: req.query.job_id || '', prefillClientId: req.query.client_id || '',
-    returnTo: req.query.return_to || '/compliance'
+    returnTo: req.query.return_to || '/compliance', linkedTask: null
   });
 });
 
@@ -167,7 +167,7 @@ router.post('/', (req, res) => {
   const typesArr = b.item_types ? (Array.isArray(b.item_types) ? b.item_types : [b.item_types]) : (b.item_type ? [b.item_type] : []);
   const itemTypes = typesArr.join(',');
   const itemType = typesArr[0] || '';
-  db.prepare(`
+  const result = db.prepare(`
     INSERT INTO compliance (job_id, client_id, item_type, item_types, title, authority_approver, internal_approver_id, assigned_to_id, due_date, submitted_date, approved_date, expiry_date, status, notes, designer, file_link, council_fee_paid, council_fee_amount,
       reference_number, rol_required, rol_response, bus_approvals_required, bus_approvals_response, client_pm, costs, action_required, charge_client, charge_amount, invoiced, invoice_number, police_notification, letter_drop,
       tmp_response, spa_response, sza_response, council_response, tgs_response, police_response, letter_drop_response)
@@ -175,7 +175,33 @@ router.post('/', (req, res) => {
   `).run(b.job_id || null, b.client_id || null, itemType, itemTypes, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status || 'not_started', b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid === '1' || b.council_fee_paid === 1 ? 1 : 0, parseFloat(b.council_fee_amount) || 0,
     b.reference_number || '', b.rol_required ? 1 : 0, b.rol_response || '', b.bus_approvals_required ? 1 : 0, b.bus_approvals_response || '', b.client_pm || '', parseFloat(b.costs) || 0, b.action_required || '', b.charge_client === '1' || b.charge_client === 1 ? 1 : 0, parseFloat(b.charge_amount) || 0, b.invoiced === '1' || b.invoiced === 1 ? 1 : 0, b.invoice_number || '', b.police_notification ? 1 : 0, b.letter_drop ? 1 : 0,
     b.tmp_response || '', b.spa_response || '', b.sza_response || '', b.council_response || '', b.tgs_response || '', b.police_response || '', b.letter_drop_response || '');
-  req.flash('success', 'Item created.');
+
+  // Auto-create linked task when someone is assigned
+  const complianceId = result.lastInsertRowid;
+  if (b.assigned_to_id && b.status !== 'approved') {
+    try {
+      const typeLabels = { traffic_guidance: 'TGS', road_occupancy: 'ROL', rol: 'ROL', council_permit: 'Council Permit', tmp_approval: 'TMP', swms_review: 'SWMS', insurance: 'Insurance', induction: 'Induction', environmental: 'Environmental', utility_clearance: 'Utility Clearance', spa: 'SPA', sza: 'SZA', police_notification: 'Police Notification', letter_drop: 'Letter Drop', other: 'Other' };
+      const typeLabel = typesArr.map(t => typeLabels[t] || t).join(' / ') || 'Plan';
+      const taskTitle = `${typeLabel}: ${b.title || 'Compliance Item'}`;
+      db.prepare(`
+        INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority, task_type, notes, created_by, compliance_id)
+        VALUES (?, 'planning', ?, ?, ?, ?, 'not_started', 'medium', 'one_off', ?, ?, ?)
+      `).run(
+        b.job_id || null,
+        taskTitle,
+        `Auto-created from Plans & Approvals. Reference: ${b.reference_number || 'N/A'}`,
+        b.assigned_to_id,
+        b.due_date || new Date().toISOString().split('T')[0],
+        b.action_required || '',
+        req.session.user ? req.session.user.id : null,
+        complianceId
+      );
+    } catch (taskErr) {
+      console.error('[Compliance] Auto-task creation error:', taskErr.message);
+    }
+  }
+
+  req.flash('success', 'Item created.' + (b.assigned_to_id && b.status !== 'approved' ? ' Task auto-created for assignee.' : ''));
   res.redirect(b.return_to || '/compliance');
 });
 
@@ -237,7 +263,9 @@ router.get('/:id/edit', (req, res) => {
   const returnTo = req.query.return_to || '/compliance';
   let documents = [];
   try { documents = db.prepare('SELECT cd.*, u.full_name as uploaded_by_name FROM compliance_documents cd LEFT JOIN users u ON cd.uploaded_by_id = u.id WHERE cd.compliance_id = ? ORDER BY cd.created_at DESC').all(item.id); } catch (e) { /* table may not exist yet */ }
-  res.render('compliance/form', { title: 'Edit Plan / Approval', item, jobs, clients, users, user: req.session.user, prefillJobId: '', prefillClientId: '', returnTo, documents });
+  let linkedTask = null;
+  try { linkedTask = db.prepare('SELECT t.id, t.title, t.status, t.owner_id, u.full_name as owner_name FROM tasks t LEFT JOIN users u ON t.owner_id = u.id WHERE t.compliance_id = ?').get(item.id); } catch (e) { /* column may not exist yet */ }
+  res.render('compliance/form', { title: 'Edit Plan / Approval', item, jobs, clients, users, user: req.session.user, prefillJobId: '', prefillClientId: '', returnTo, documents, linkedTask });
 });
 
 router.post('/:id', (req, res) => {
@@ -259,6 +287,43 @@ router.post('/:id', (req, res) => {
       b.reference_number || '', b.rol_required ? 1 : 0, b.rol_response || '', b.bus_approvals_required ? 1 : 0, b.bus_approvals_response || '', b.client_pm || '', parseFloat(b.costs) || 0, b.action_required || '', b.charge_client === '1' || b.charge_client === 1 ? 1 : 0, parseFloat(b.charge_amount) || 0, b.invoiced === '1' || b.invoiced === 1 ? 1 : 0, b.invoice_number || '', b.police_notification ? 1 : 0, b.letter_drop ? 1 : 0,
       b.tmp_response || '', b.spa_response || '', b.sza_response || '', b.council_response || '', b.tgs_response || '', b.police_response || '', b.letter_drop_response || '',
       req.params.id);
+
+    // Sync linked task: create if new assignee, update if exists, complete if plan approved
+    try {
+      const existingTask = db.prepare('SELECT id, status FROM tasks WHERE compliance_id = ?').get(req.params.id);
+      const typeLabels = { traffic_guidance: 'TGS', road_occupancy: 'ROL', rol: 'ROL', council_permit: 'Council Permit', tmp_approval: 'TMP', swms_review: 'SWMS', insurance: 'Insurance', induction: 'Induction', environmental: 'Environmental', utility_clearance: 'Utility Clearance', spa: 'SPA', sza: 'SZA', police_notification: 'Police Notification', letter_drop: 'Letter Drop', other: 'Other' };
+      const typeLabel = typesArr.map(t => typeLabels[t] || t).join(' / ') || 'Plan';
+      const taskTitle = `${typeLabel}: ${b.title || 'Compliance Item'}`;
+
+      if (b.status === 'approved' && existingTask && existingTask.status !== 'complete') {
+        // Plan approved → auto-complete the linked task
+        db.prepare("UPDATE tasks SET status = 'complete', completed_date = date('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(existingTask.id);
+      } else if (b.assigned_to_id && b.status !== 'approved') {
+        if (existingTask) {
+          // Update existing linked task
+          db.prepare(`UPDATE tasks SET title=?, owner_id=?, due_date=?, job_id=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+            .run(taskTitle, b.assigned_to_id, b.due_date || new Date().toISOString().split('T')[0], b.job_id || null, b.action_required || '', existingTask.id);
+        } else {
+          // Create new linked task
+          db.prepare(`
+            INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority, task_type, notes, created_by, compliance_id)
+            VALUES (?, 'planning', ?, ?, ?, ?, 'not_started', 'medium', 'one_off', ?, ?, ?)
+          `).run(
+            b.job_id || null,
+            taskTitle,
+            `Auto-created from Plans & Approvals. Reference: ${b.reference_number || 'N/A'}`,
+            b.assigned_to_id,
+            b.due_date || new Date().toISOString().split('T')[0],
+            b.action_required || '',
+            req.session.user ? req.session.user.id : null,
+            req.params.id
+          );
+        }
+      }
+    } catch (taskErr) {
+      console.error('[Compliance] Auto-task sync error:', taskErr.message);
+    }
+
     req.flash('success', 'Item updated.');
   } catch (err) {
     console.error('Compliance update error:', err.message);

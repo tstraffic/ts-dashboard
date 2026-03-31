@@ -19,6 +19,13 @@
         Read-only — this task is assigned to someone else. Only the task owner or an admin can edit it.
       </p>
     <% } %>
+    <% if (isEdit && typeof linkedCompliance !== 'undefined' && linkedCompliance) { %>
+      <div class="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-violet-50 border border-violet-200 rounded-lg text-sm">
+        <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+        <span class="text-violet-700">Linked to Plan: <strong><%= linkedCompliance.reference_number || linkedCompliance.title %></strong></span>
+        <a href="/compliance/<%= linkedCompliance.id %>/edit" class="text-violet-600 hover:text-violet-800 underline ml-1">View Plan</a>
+      </div>
+    <% } %>
   </div>
 
   <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">

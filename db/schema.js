@@ -3955,6 +3955,14 @@ function runMigrations(db) {
     console.log('Migration 79 complete.');
   }
 
+  // Migration 80: Add compliance_id to tasks (links auto-generated tasks to compliance items)
+  if (!isMigrationApplied.get(80)) {
+    try { db.exec("ALTER TABLE tasks ADD COLUMN compliance_id INTEGER REFERENCES compliance(id) ON DELETE SET NULL"); } catch(e) { /* exists */ }
+    try { db.exec("ALTER TABLE tasks ADD COLUMN created_by INTEGER REFERENCES users(id)"); } catch(e) { /* exists */ }
+    recordMigration.run(80, 'Add compliance_id to tasks for auto-linking');
+    console.log('Migration 80 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
