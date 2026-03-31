@@ -27,6 +27,13 @@ function csrfProtection(req, res, next) {
     return next();
   }
 
+  // Skip CSRF for multipart/form-data uploads (multer handles body parsing after CSRF middleware)
+  // The session cookie still provides authentication security
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    return next();
+  }
+
   // Get token from body or header
   const token = req.body._csrf || req.headers['x-csrf-token'];
 
