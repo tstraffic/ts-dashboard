@@ -112,13 +112,32 @@
       <p class="text-sm text-gray-600 mt-1"><%= job.crew_size %></p>
     </div>
     <% } %>
+    <% if (job.vehicles) { %>
     <div>
-      <p class="text-xs text-gray-400 uppercase tracking-wide">ROL Required</p>
-      <p class="text-sm mt-1 <%= job.rol_required ? 'text-emerald-600' : 'text-gray-400' %>"><%= job.rol_required ? 'Yes' : 'No' %></p>
+      <p class="text-xs text-gray-400 uppercase tracking-wide">Vehicles</p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.vehicles %></p>
     </div>
-    <div>
-      <p class="text-xs text-gray-400 uppercase tracking-wide">TMP Required</p>
-      <p class="text-sm mt-1 <%= job.tmp_required ? 'text-emerald-600' : 'text-gray-400' %>"><%= job.tmp_required ? 'Yes' : 'No' %></p>
+    <% } %>
+    <div class="col-span-2 lg:col-span-4">
+      <p class="text-xs text-gray-400 uppercase tracking-wide mb-1.5">Approvals Required</p>
+      <div class="flex flex-wrap gap-2">
+        <% const approvals = [
+          { key: 'rol_required', label: 'ROL' },
+          { key: 'tmp_required', label: 'TMP' },
+          { key: 'tgs_required', label: 'TGS' },
+          { key: 'spa_required', label: 'SPA' },
+          { key: 'council_approval', label: 'Council' },
+          { key: 'bus_approval', label: 'Bus' },
+        ]; %>
+        <% approvals.forEach(function(a) { %>
+          <% if (job[a.key]) { %>
+            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20"><%= a.label %></span>
+          <% } %>
+        <% }) %>
+        <% if (!approvals.some(function(a) { return job[a.key]; })) { %>
+          <span class="text-sm text-gray-400">None</span>
+        <% } %>
+      </div>
     </div>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Start Date</p>
