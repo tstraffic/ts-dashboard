@@ -408,6 +408,22 @@ router.post('/:id/delete', (req, res) => {
   res.redirect('/jobs');
 });
 
+// Add member to job chat
+router.post('/:id/chat/add-member', (req, res) => {
+  const db = getDb();
+  const userId = parseInt(req.body.user_id);
+  if (!userId) { req.flash('error', 'No user selected.'); return res.redirect(`/projects/${req.params.id}#chat`); }
+  const chatThreadId = getThreadForEntity('job', parseInt(req.params.id));
+  if (chatThreadId) {
+    const user = db.prepare('SELECT full_name FROM users WHERE id = ?').get(userId);
+    addMembersToThread(chatThreadId, [userId], 'member', false);
+    req.flash('success', `${user ? user.full_name : 'User'} added to chat.`);
+  } else {
+    req.flash('error', 'Chat thread not found.');
+  }
+  res.redirect(`/projects/${req.params.id}#chat`);
+});
+
 // Link an existing compliance item to this job
 router.post('/:id/link-compliance', (req, res) => {
   const db = getDb();

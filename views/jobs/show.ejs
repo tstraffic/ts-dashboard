@@ -1103,13 +1103,32 @@
     <div class="mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Job Chat</h2>
       <p class="text-sm text-gray-500 mt-1">Operational messages for this job</p>
-      <% if (typeof chatMembers !== 'undefined' && chatMembers.length > 0) { %>
+      <% if (typeof chatMembers !== 'undefined') { %>
       <div class="mt-2">
-        <span class="text-xs text-gray-400 uppercase tracking-wide font-medium">Members (<%= chatMembers.length %>):</span>
-        <div class="flex flex-wrap gap-1.5 mt-1">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="text-xs text-gray-400 uppercase tracking-wide font-medium">Members (<%= chatMembers.length %>)</span>
+          <button type="button" onclick="document.getElementById('add-chat-member').classList.toggle('hidden')" class="w-5 h-5 flex items-center justify-center rounded-full bg-brand-600 hover:bg-brand-500 text-white text-xs transition" title="Add member">+</button>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
           <% chatMembers.forEach(function(m) { %>
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700"><%= m.full_name %></span>
           <% }) %>
+        </div>
+        <!-- Add member form -->
+        <div id="add-chat-member" class="hidden mt-2">
+          <form method="POST" action="/jobs/<%= job.id %>/chat/add-member" class="flex items-center gap-2">
+            <%- include('../partials/csrf') %>
+            <select name="user_id" required class="flex-1 px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs focus:ring-2 focus:ring-brand-500">
+              <option value="">Select user...</option>
+              <% const memberIds = chatMembers.map(function(m) { return m.id; }); %>
+              <% (typeof allUsers !== 'undefined' ? allUsers : []).forEach(function(u) { %>
+                <% if (!memberIds.includes(u.id)) { %>
+                  <option value="<%= u.id %>"><%= u.full_name %></option>
+                <% } %>
+              <% }) %>
+            </select>
+            <button type="submit" class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-500 transition">Add</button>
+          </form>
         </div>
       </div>
       <% } %>
