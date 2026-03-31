@@ -3948,6 +3948,13 @@ function runMigrations(db) {
     console.log('Migration 78 complete.');
   }
 
+  // Migration 79: Add priority column to jobs
+  if (!isMigrationApplied.get(79)) {
+    try { db.exec("ALTER TABLE jobs ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'"); } catch(e) { /* exists */ }
+    recordMigration.run(79, 'Add priority column to jobs');
+    console.log('Migration 79 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

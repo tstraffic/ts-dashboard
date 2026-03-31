@@ -9,7 +9,9 @@ const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadF
 router.get('/', (req, res) => {
   const db = getDb();
   const { status, search, suburb } = req.query;
-  let query = `SELECT j.*, u.full_name as pm_name, bm.budget_contract, bm.total_spent as budget_spent
+  let query = `SELECT j.*, u.full_name as pm_name, bm.budget_contract, bm.total_spent as budget_spent,
+    (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.due_date < date('now')) as overdue_tasks,
+    (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved') AND c.due_date IS NOT NULL AND c.due_date < date('now')) as overdue_compliance
     FROM jobs j
     LEFT JOIN users u ON j.project_manager_id = u.id
     LEFT JOIN (SELECT b.job_id, b.contract_value as budget_contract, COALESCE((SELECT SUM(amount) FROM cost_entries ce WHERE ce.job_id = b.job_id), 0) as total_spent FROM job_budgets b) bm ON j.id = bm.job_id
@@ -29,7 +31,7 @@ router.get('/', (req, res) => {
     query += ` AND j.suburb = ?`;
     params.push(suburb);
   }
-  query += ` ORDER BY CASE j.status WHEN 'active' THEN 1 WHEN 'on_hold' THEN 2 WHEN 'won' THEN 3 WHEN 'tender' THEN 4 WHEN 'prestart' THEN 5 WHEN 'completed' THEN 6 ELSE 7 END, j.start_date DESC`;
+  query += ` ORDER BY CASE j.priority WHEN 'high' THEN 0 ELSE 1 END, CASE j.status WHEN 'active' THEN 1 WHEN 'on_hold' THEN 2 WHEN 'won' THEN 3 WHEN 'tender' THEN 4 WHEN 'prestart' THEN 5 WHEN 'completed' THEN 6 ELSE 7 END, j.start_date DESC`;
 
   const jobs = db.prepare(query).all(...params);
   const suburbs = db.prepare('SELECT DISTINCT suburb FROM jobs WHERE parent_project_id IS NULL ORDER BY suburb').all().map(r => r.suburb);
@@ -95,8 +97,8 @@ router.post('/', (req, res) => {
     db.prepare(`
       INSERT INTO jobs (job_number, job_name, client, client_id, site_address, suburb, status, stage, percent_complete, start_date, end_date, project_manager_id, ops_supervisor_id, planning_owner_id, marketing_owner_id, accounts_owner_id, health, accounts_status, division_tags, notes,
         client_project_number, project_name, principal_contractor, traffic_supervisor_id,
-        contract_value, estimated_hours, crew_size, rol_required, tmp_required, sharepoint_url, state, required_tcp_level)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        contract_value, estimated_hours, crew_size, rol_required, tmp_required, sharepoint_url, state, required_tcp_level, priority)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       b.job_number, jobName, clientName, b.client_id || null, b.site_address, b.suburb,
       b.status || 'tender', b.stage || 'tender', parseInt(b.percent_complete) || 0,
@@ -108,7 +110,8 @@ router.post('/', (req, res) => {
       b.client_project_number || '', b.project_name || '', b.principal_contractor || '', b.traffic_supervisor_id || null,
       parseFloat(b.contract_value) || 0, parseFloat(b.estimated_hours) || 0, parseInt(b.crew_size) || 0,
       b.rol_required ? 1 : 0, b.tmp_required ? 1 : 0, b.sharepoint_url || '', b.state || '',
-      b.required_tcp_level || ''
+      b.required_tcp_level || '',
+      b.priority || 'normal'
     );
     req.flash('success', `Project ${b.job_number} created successfully.`);
 
@@ -323,7 +326,7 @@ router.post('/:id', (req, res) => {
         health=?, accounts_status=?, division_tags=?, notes=?,
         client_project_number=?, project_name=?, principal_contractor=?, traffic_supervisor_id=?,
         contract_value=?, estimated_hours=?, crew_size=?, rol_required=?, tmp_required=?, sharepoint_url=?, state=?,
-        required_tcp_level=?,
+        required_tcp_level=?, priority=?,
         updated_at=CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
@@ -338,6 +341,7 @@ router.post('/:id', (req, res) => {
       parseFloat(b.contract_value) || 0, parseFloat(b.estimated_hours) || 0, parseInt(b.crew_size) || 0,
       b.rol_required ? 1 : 0, b.tmp_required ? 1 : 0, b.sharepoint_url || '', b.state || '',
       b.required_tcp_level || '',
+      b.priority || 'normal',
       req.params.id
     );
     req.flash('success', 'Project updated successfully.');

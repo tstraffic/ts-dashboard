@@ -142,6 +142,16 @@
         </select>
       </div>
     </div>
+    <!-- Priority toggle -->
+    <div class="mt-4">
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" name="priority" value="high"
+          <%= isEdit && job.priority === 'high' ? 'checked' : '' %>
+          class="w-4 h-4 rounded border-gray-300 text-red-500 focus:ring-red-500">
+        <span class="text-sm font-medium text-gray-700">High Priority</span>
+        <span class="text-xs text-gray-400">(pins to top of register)</span>
+      </label>
+    </div>
   </div>
 
   <!-- 4. Dates & Completion -->
