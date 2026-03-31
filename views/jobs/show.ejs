@@ -141,12 +141,12 @@
     </div>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">Start Date</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.start_date || 'TBC' %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= job.start_date ? formatDate(job.start_date) : 'TBC' %></p>
     </div>
     <% if (job.end_date) { %>
     <div>
       <p class="text-xs text-gray-400 uppercase tracking-wide">End Date</p>
-      <p class="text-sm text-gray-600 mt-1"><%= job.end_date %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= formatDate(job.end_date) %></p>
     </div>
     <% } %>
     <% if (job.pm_name) { %>
@@ -312,7 +312,7 @@
             </div>
             <div>
               <dt class="text-xs text-gray-400">Duration</dt>
-              <dd class="text-sm text-gray-600"><%= job.start_date || '?' %> &rarr; <%= job.end_date || '?' %></dd>
+              <dd class="text-sm text-gray-600"><%= job.start_date ? formatDate(job.start_date) : '?' %> &rarr; <%= job.end_date ? formatDate(job.end_date) : '?' %></dd>
             </div>
           </dl>
         </div>
@@ -338,7 +338,7 @@
         <div class="space-y-2">
           <% recentDiary.forEach(function(d) { %>
           <div class="flex items-start gap-3 text-sm">
-            <span class="text-xs text-gray-400 whitespace-nowrap mt-0.5 font-mono"><%= d.entry_date %></span>
+            <span class="text-xs text-gray-400 whitespace-nowrap mt-0.5 font-mono"><%= d.entry_date ? formatDate(d.entry_date) : '' %></span>
             <div class="min-w-0">
               <span class="font-medium text-gray-900"><%= d.task || 'Entry' %></span>
               <% if (d.representative_name || d.representative) { %><span class="text-gray-400"> — <%= d.representative_name || d.representative %></span><% } %>
@@ -406,7 +406,7 @@
             <td class="px-4 py-3 text-gray-600 font-medium"><%= task.title %></td>
             <td class="px-4 py-3 text-gray-500"><%= task.division || '-' %></td>
             <td class="px-4 py-3 text-gray-600"><%= task.owner_name || '-' %></td>
-            <td class="px-4 py-3 text-gray-500 text-xs"><%= task.due_date || '-' %></td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= task.due_date ? formatDate(task.due_date) : '-' %></td>
             <td class="px-4 py-3">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
                 <% if (task.status === 'completed') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
@@ -525,7 +525,7 @@
                 <%= item.status ? item.status.replace('_', ' ') : 'pending' %>
               </span>
             </td>
-            <td class="px-4 py-3 text-gray-500 text-xs"><%= item.due_date || '-' %></td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= item.due_date ? formatDate(item.due_date) : '-' %></td>
             <td class="px-4 py-3 text-right text-gray-900 font-medium"><%= itemCost > 0 ? '$' + itemCost.toLocaleString() : '-' %></td>
             <td class="px-4 py-3 text-right">
               <% if (item.charge_amount > 0) { %>
@@ -639,8 +639,8 @@
             <td class="px-4 py-3">
               <span class="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full <%= statusColors[item.status] || 'bg-gray-100 text-gray-600' %>"><%= (item.status || 'not_started').replace(/_/g, ' ') %></span>
             </td>
-            <td class="px-4 py-3 text-gray-500 text-xs"><%= item.due_date ? new Date(item.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></td>
-            <td class="px-4 py-3 text-gray-500 text-xs"><%= item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= item.due_date ? formatDateShort(item.due_date) : '-' %></td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= item.expiry_date ? formatDateShort(item.expiry_date) : '-' %></td>
             <td class="px-4 py-3 whitespace-nowrap">
               <a href="/compliance/<%= item.id %>/edit" class="text-brand-600 hover:text-brand-700 text-xs font-medium mr-2">Edit</a>
               <form method="POST" action="/jobs/<%= job.id %>/unlink-compliance" class="inline" onsubmit="return confirm('Unlink this item from the job?')">
@@ -665,8 +665,8 @@
                 <% } else if (tp.status === 'submitted') { %>bg-blue-50 text-blue-700
                 <% } else { %>bg-gray-100 text-gray-600<% } %>"><%= tp.status ? tp.status.replace(/_/g, ' ') : 'draft' %></span>
             </td>
-            <td class="px-4 py-3 text-gray-500 text-xs"><%= tp.submitted_date || '-' %></td>
-            <td class="px-4 py-3 text-gray-500 text-xs"><%= tp.expiry_date || '-' %></td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= tp.submitted_date ? formatDate(tp.submitted_date) : '-' %></td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= tp.expiry_date ? formatDate(tp.expiry_date) : '-' %></td>
             <td class="px-4 py-3">
               <a href="/compliance/<%= tp.id %>/edit" class="text-brand-600 hover:text-brand-700 text-xs font-medium">Edit</a>
             </td>
@@ -704,7 +704,7 @@
         <tbody class="divide-y divide-gray-200">
           <% incidents.forEach(inc => { %>
           <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/incidents/<%= inc.id %>'">
-            <td class="px-4 py-3 text-gray-600 text-xs"><%= inc.incident_date %></td>
+            <td class="px-4 py-3 text-gray-600 text-xs"><%= inc.incident_date ? formatDate(inc.incident_date) : '-' %></td>
             <td class="px-4 py-3 text-gray-600"><%= inc.incident_type ? inc.incident_type.replace(/_/g, ' ') : '-' %></td>
             <td class="px-4 py-3">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
@@ -796,7 +796,7 @@
         <tbody class="divide-y divide-gray-200">
           <% timesheets.forEach(ts => { %>
           <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3 text-gray-600 text-xs"><%= ts.work_date %></td>
+            <td class="px-4 py-3 text-gray-600 text-xs"><%= ts.work_date ? formatDate(ts.work_date) : '-' %></td>
             <td class="px-4 py-3 text-gray-600"><%= ts.crew_name || '-' %></td>
             <td class="px-4 py-3 text-gray-500"><%= ts.start_time || '-' %></td>
             <td class="px-4 py-3 text-gray-500"><%= ts.end_time || '-' %></td>
@@ -850,8 +850,8 @@
                 <% } else if (ea.equipment_condition === 'fair') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
                 <% } else { %>bg-red-50 text-red-700 ring-1 ring-red-600/20<% } %>"><%= ea.equipment_condition || '-' %></span>
             </td>
-            <td class="px-4 py-3 text-gray-500 text-xs"><%= ea.assigned_date || '-' %></td>
-            <td class="px-4 py-3 text-xs"><%= ea.actual_return_date ? '<span class="text-emerald-600">' + ea.actual_return_date + '</span>' : '<span class="text-brand-600">On site</span>' %></td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= ea.assigned_date ? formatDate(ea.assigned_date) : '-' %></td>
+            <td class="px-4 py-3 text-xs"><%= ea.actual_return_date ? '<span class="text-emerald-600">' + formatDate(ea.actual_return_date) + '</span>' : '<span class="text-brand-600">On site</span>' %></td>
           </tr>
           <% }) %>
         </tbody>
@@ -903,7 +903,7 @@
                 <% } else { %>bg-red-50 text-red-700 ring-1 ring-red-600/20<% } %>"><%= d.status ? d.status.replace(/_/g, ' ') : 'open' %></span>
             </td>
             <td class="px-4 py-3 text-gray-500"><%= d.assigned_to_name || '-' %></td>
-            <td class="px-4 py-3 text-gray-500 text-xs"><%= d.target_close_date || '-' %></td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= d.target_close_date ? formatDate(d.target_close_date) : '-' %></td>
           </tr>
           <% }) %>
         </tbody>
@@ -1050,7 +1050,7 @@
             const entryAttach = (typeof diaryAttachments !== 'undefined' ? diaryAttachments : []).filter(a => a.diary_entry_id === entry.id);
           %>
           <tr class="hover:bg-gray-50">
-            <td class="px-3 py-2.5 text-gray-600 text-xs whitespace-nowrap"><%= entry.entry_date %></td>
+            <td class="px-3 py-2.5 text-gray-600 text-xs whitespace-nowrap"><%= entry.entry_date ? formatDate(entry.entry_date) : '' %></td>
             <td class="px-3 py-2.5 text-gray-900 font-medium max-w-[200px] truncate">
               <%= entry.task || '-' %>
               <% if (entryAttach.length > 0) { %>
@@ -1281,7 +1281,7 @@
         <tbody class="divide-y divide-gray-200">
           <% costEntries.forEach(ce => { %>
           <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3 text-gray-500 text-xs"><%= ce.entry_date %></td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= ce.entry_date ? formatDate(ce.entry_date) : '' %></td>
             <td class="px-4 py-3 text-gray-600"><%= ce.category ? ce.category.replace(/_/g, ' ') : '-' %></td>
             <td class="px-4 py-3 text-gray-600"><%= ce.description || '-' %></td>
             <td class="px-4 py-3 text-gray-500"><%= ce.supplier || '-' %></td>

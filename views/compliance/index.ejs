@@ -309,7 +309,7 @@
                 <td class="px-3 py-2 whitespace-nowrap">
                   <% if (item.due_date) { %>
                     <span class="<%= isOverdue ? 'text-red-600 font-semibold' : isDueSoon ? 'text-amber-600 font-medium' : 'text-gray-700' %>">
-                      <%= new Date(item.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
+                      <%= formatDate(item.due_date) %>
                     </span>
                     <% if (isOverdue) { %><span class="block text-xs text-red-500 font-medium">OVERDUE</span><% } %>
                     <% if (isDueSoon) { %><span class="block text-xs text-amber-500 font-medium">DUE SOON</span><% } %>
@@ -320,7 +320,7 @@
                 <td class="px-3 py-2 whitespace-nowrap">
                   <% if (item.expiry_date) { %>
                     <span class="<%= isExpired ? 'text-red-500 line-through' : isExpiryNear ? 'text-amber-600 font-medium' : 'text-gray-600' %>">
-                      <%= new Date(item.expiry_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %>
+                      <%= formatDate(item.expiry_date) %>
                     </span>
                     <% if (isExpiryNear && !isExpired) { %><span class="block text-xs text-amber-500">EXPIRING</span><% } %>
                   <% } else { %>

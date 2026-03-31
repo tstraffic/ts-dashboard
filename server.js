@@ -75,12 +75,28 @@ if (isProduction) app.set('trust proxy', 1);
 
 app.use(flash());
 
+// Global date formatter — DD/MM/YYYY Australian format
+function formatDateAU(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+function formatDateShortAU(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 // Flash messages + permission helper available in all templates
 app.use((req, res, next) => {
   res.locals.flash_success = req.flash('success');
   res.locals.flash_error = req.flash('error');
   res.locals.user = req.session.user || null;
   res.locals.canAccess = canAccess;
+  res.locals.formatDate = formatDateAU;
+  res.locals.formatDateShort = formatDateShortAU;
   next();
 });
 
