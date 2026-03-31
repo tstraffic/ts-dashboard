@@ -68,6 +68,7 @@ router.get('/new', (req, res) => {
 router.post('/', (req, res) => {
   const db = getDb();
   const b = req.body;
+  console.log('[Jobs] POST / — creating job:', b.job_number, 'client_id:', b.client_id, 'suburb:', b.suburb);
   // Resolve client name from client_id
   let clientName = b.client || '';
   if (b.client_id) {
@@ -114,12 +115,14 @@ router.post('/', (req, res) => {
     req.flash('success', `Job ${b.job_number} created successfully.`);
     res.redirect('/jobs');
   } catch (err) {
+    console.error('[Jobs] CREATE ERROR:', err.message);
     if (err.message.includes('UNIQUE')) {
       req.flash('error', `Job number ${b.job_number} already exists.`);
     } else {
       req.flash('error', 'Failed to create job: ' + err.message);
     }
-    res.redirect('/jobs/new');
+    // Redirect to jobs list so flash is visible
+    res.redirect('/jobs');
   }
 });
 

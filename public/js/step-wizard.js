@@ -112,8 +112,8 @@
           return;
         }
       }
-      // All steps valid — submit the form
-      this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit();
+      // All steps valid — submit directly (bypass native validation since we already checked)
+      this.form.submit();
     }
 
     _validateStep(stepIndex) {
