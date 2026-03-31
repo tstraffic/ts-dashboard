@@ -147,6 +147,18 @@ router.post('/', (req, res) => {
   }
 });
 
+// API: Get unlinked compliance items (must be before /:id routes)
+router.get('/api/compliance/unlinked', (req, res) => {
+  const db = getDb();
+  const jobId = req.query.job_id;
+  const items = db.prepare(`
+    SELECT id, title, item_type, item_types FROM compliance
+    WHERE job_id IS NULL OR job_id != ?
+    ORDER BY title LIMIT 100
+  `).all(jobId || 0);
+  res.json(items);
+});
+
 // Job detail page
 router.get('/:id', (req, res) => {
   const db = getDb();
@@ -394,6 +406,22 @@ router.post('/:id/delete', (req, res) => {
   db.prepare('DELETE FROM jobs WHERE id = ?').run(req.params.id);
   req.flash('success', 'Job deleted.');
   res.redirect('/jobs');
+});
+
+// Link an existing compliance item to this job
+router.post('/:id/link-compliance', (req, res) => {
+  const db = getDb();
+  const complianceId = req.body.compliance_id;
+  if (complianceId) {
+    try {
+      db.prepare('UPDATE compliance SET job_id = ? WHERE id = ?').run(req.params.id, complianceId);
+      req.flash('success', 'Item linked to this job.');
+    } catch(e) {
+      req.flash('error', 'Failed to link item: ' + e.message);
+    }
+  }
+  const hash = req.body.redirect_hash || 'compliance';
+  res.redirect(`/projects/${req.params.id}#${hash}`);
 });
 
 // =============================================

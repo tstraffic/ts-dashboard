@@ -444,7 +444,27 @@
   <div id="compliance" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Compliance Items</h2>
-      <a href="/compliance/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ New Compliance Item</a>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="document.getElementById('link-compliance-form').classList.toggle('hidden')" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">Link Existing</button>
+        <a href="/compliance/new?job_id=<%= job.id %>&return_to=/projects/<%= job.id %>%23compliance" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ New Item</a>
+      </div>
+    </div>
+    <!-- Link existing compliance item to this job -->
+    <div id="link-compliance-form" class="hidden bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
+      <form method="POST" action="/jobs/<%= job.id %>/link-compliance">
+        <%- include('../partials/csrf') %>
+        <div class="flex items-end gap-3">
+          <div class="flex-1">
+            <label class="block text-xs font-medium text-gray-500 mb-1">Select item from Plans & Approvals register</label>
+            <select name="compliance_id" required id="link-compliance-select" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">Choose an item...</option>
+            </select>
+            <p class="text-xs text-gray-400 mt-1">Shows unlinked items or items from other jobs</p>
+          </div>
+          <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">Link to Job</button>
+          <button type="button" onclick="document.getElementById('link-compliance-form').classList.add('hidden')" class="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg">Cancel</button>
+        </div>
+      </form>
     </div>
     <% if (complianceItems.length === 0) { %>
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
@@ -516,12 +536,32 @@
   <div id="plans" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Traffic Plans</h2>
-      <a href="/compliance/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ New Plan</a>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="document.getElementById('link-plan-form').classList.toggle('hidden')" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">Link Existing</button>
+        <a href="/compliance/new?job_id=<%= job.id %>&return_to=/projects/<%= job.id %>%23plans" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ New Plan</a>
+      </div>
+    </div>
+    <!-- Link existing plan from register -->
+    <div id="link-plan-form" class="hidden bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
+      <form method="POST" action="/jobs/<%= job.id %>/link-compliance">
+        <%- include('../partials/csrf') %>
+        <input type="hidden" name="redirect_hash" value="plans">
+        <div class="flex items-end gap-3">
+          <div class="flex-1">
+            <label class="block text-xs font-medium text-gray-500 mb-1">Select plan from register</label>
+            <select name="compliance_id" required id="link-plan-select" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">Choose a plan...</option>
+            </select>
+          </div>
+          <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">Link to Job</button>
+          <button type="button" onclick="document.getElementById('link-plan-form').classList.add('hidden')" class="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg">Cancel</button>
+        </div>
+      </form>
     </div>
     <% if (typeof trafficPlans === 'undefined' || trafficPlans.length === 0) { %>
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
         <p class="text-gray-400 text-sm">No traffic plans for this job yet.</p>
-        <a href="/compliance/new?job_id=<%= job.id %>" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Create the first plan</a>
+        <a href="/compliance/new?job_id=<%= job.id %>&return_to=/projects/<%= job.id %>%23plans" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Create the first plan</a>
       </div>
     <% } else { %>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
@@ -1270,5 +1310,28 @@
     } else if (tabs.length > 0) {
       activateTab(tabs[0]);
     }
+  });
+
+  // Load unlinked compliance items for the "Link Existing" dropdowns
+  var complianceLoaded = false;
+  function loadUnlinkedCompliance() {
+    if (complianceLoaded) return;
+    complianceLoaded = true;
+    fetch('/api/compliance/unlinked?job_id=<%= job.id %>', { headers: csrfHeaders() })
+      .then(function(r) { return r.json(); })
+      .then(function(items) {
+        ['link-compliance-select', 'link-plan-select'].forEach(function(id) {
+          var sel = document.getElementById(id);
+          if (!sel) return;
+          items.forEach(function(item) {
+            var opt = new Option(item.title + (item.item_type ? ' (' + item.item_type.replace(/_/g, ' ') + ')' : ''), item.id);
+            sel.add(opt);
+          });
+        });
+      }).catch(function() {});
+  }
+  // Load when either link form is shown
+  document.querySelectorAll('[onclick*="link-compliance-form"], [onclick*="link-plan-form"]').forEach(function(btn) {
+    btn.addEventListener('click', loadUnlinkedCompliance);
   });
 </script>
