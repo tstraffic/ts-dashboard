@@ -45,6 +45,16 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/data/uploads', express.static(path.join(__dirname, 'data', 'uploads')));
 
+// Prevent caching of HTML pages so service worker always gets fresh content
+app.use((req, res, next) => {
+  if (req.method === 'GET' && req.headers.accept && req.headers.accept.includes('text/html')) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
+
 // Sessions (secure cookies in production)
 const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production';
 app.use(session({

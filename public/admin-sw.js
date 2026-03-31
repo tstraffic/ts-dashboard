@@ -1,5 +1,5 @@
 // T&S Admin Dashboard Service Worker — Network-first with offline fallback
-const CACHE_NAME = 'ts-admin-v22';
+const CACHE_NAME = 'ts-admin-v23';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to pre-cache
@@ -60,22 +60,10 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // HTML pages — network-first with offline fallback
+  // HTML pages — network only, offline fallback (never cache HTML)
   if (request.headers.get('accept') && request.headers.get('accept').includes('text/html')) {
     event.respondWith(
-      fetch(request)
-        .then(response => {
-          // Cache successful page responses
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => {
-          // Try cached version first, then offline page
-          return caches.match(request).then(cached => cached || caches.match(OFFLINE_URL));
-        })
+      fetch(request).catch(() => caches.match(OFFLINE_URL))
     );
     return;
   }
