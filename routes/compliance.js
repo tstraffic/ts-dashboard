@@ -172,8 +172,8 @@ router.post('/', (req, res) => {
       reference_number, rol_required, rol_response, bus_approvals_required, bus_approvals_response, client_pm, costs, action_required, charge_client, charge_amount, invoiced, invoice_number, police_notification, letter_drop,
       tmp_response, spa_response, council_response, tgs_response, police_response, letter_drop_response)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(b.job_id || null, b.client_id || null, itemType, itemTypes, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status || 'not_started', b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid ? 1 : 0, parseFloat(b.council_fee_amount) || 0,
-    b.reference_number || '', b.rol_required ? 1 : 0, b.rol_response || '', b.bus_approvals_required ? 1 : 0, b.bus_approvals_response || '', b.client_pm || '', parseFloat(b.costs) || 0, b.action_required || '', b.charge_client ? 1 : 0, parseFloat(b.charge_amount) || 0, b.invoiced ? 1 : 0, b.invoice_number || '', b.police_notification ? 1 : 0, b.letter_drop ? 1 : 0,
+  `).run(b.job_id || null, b.client_id || null, itemType, itemTypes, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status || 'not_started', b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid === '1' || b.council_fee_paid === 1 ? 1 : 0, parseFloat(b.council_fee_amount) || 0,
+    b.reference_number || '', b.rol_required ? 1 : 0, b.rol_response || '', b.bus_approvals_required ? 1 : 0, b.bus_approvals_response || '', b.client_pm || '', parseFloat(b.costs) || 0, b.action_required || '', b.charge_client === '1' || b.charge_client === 1 ? 1 : 0, parseFloat(b.charge_amount) || 0, b.invoiced === '1' || b.invoiced === 1 ? 1 : 0, b.invoice_number || '', b.police_notification ? 1 : 0, b.letter_drop ? 1 : 0,
     b.tmp_response || '', b.spa_response || '', b.council_response || '', b.tgs_response || '', b.police_response || '', b.letter_drop_response || '');
   req.flash('success', 'Item created.');
   res.redirect(b.return_to || '/compliance');
@@ -196,6 +196,34 @@ router.post('/bulk-status', (req, res) => {
   if (!Array.isArray(ids) || ids.length === 0 || !validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid request' });
   const placeholders = ids.map(() => '?').join(',');
   db.prepare(`UPDATE compliance SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`).run(status, ...ids);
+  res.json({ success: true });
+});
+
+router.post('/bulk-ready-invoice', (req, res) => {
+  const db = getDb();
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No items' });
+  const placeholders = ids.map(() => '?').join(',');
+  db.prepare(`UPDATE compliance SET ready_for_invoice = 1, ready_for_invoice_at = CURRENT_TIMESTAMP, ready_for_invoice_by = ? WHERE id IN (${placeholders})`).run(req.session.user.id, ...ids);
+  // Notify admin/accounts
+  try {
+    const accountsUsers = db.prepare("SELECT id FROM users WHERE active = 1 AND role IN ('admin','finance','accounts')").all();
+    const insertNotif = db.prepare("INSERT INTO notifications (user_id, type, title, message, link) VALUES (?, 'invoice_ready', ?, ?, '/compliance')");
+    accountsUsers.forEach(u => {
+      try { insertNotif.run(u.id, ids.length + ' items ready for invoice', ids.length + ' compliance item(s) marked ready for invoice.', '/compliance'); } catch(e) {}
+    });
+  } catch(e) {}
+  res.json({ success: true });
+});
+
+router.post('/bulk-invoiced', (req, res) => {
+  const db = getDb();
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No items' });
+  // Only admin/finance/accounts can mark as invoiced
+  if (!['admin', 'finance', 'accounts'].includes(req.session.user.role)) return res.status(403).json({ error: 'Only admin/accounts can mark as invoiced' });
+  const placeholders = ids.map(() => '?').join(',');
+  db.prepare(`UPDATE compliance SET invoiced = 1, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`).run(...ids);
   res.json({ success: true });
 });
 
@@ -227,8 +255,8 @@ router.post('/:id', (req, res) => {
         tmp_response=?, spa_response=?, council_response=?, tgs_response=?, police_response=?, letter_drop_response=?,
         updated_at=CURRENT_TIMESTAMP
       WHERE id=?
-    `).run(b.job_id || null, b.client_id || null, itemType, itemTypes, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status, b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid ? 1 : 0, parseFloat(b.council_fee_amount) || 0,
-      b.reference_number || '', b.rol_required ? 1 : 0, b.rol_response || '', b.bus_approvals_required ? 1 : 0, b.bus_approvals_response || '', b.client_pm || '', parseFloat(b.costs) || 0, b.action_required || '', b.charge_client ? 1 : 0, parseFloat(b.charge_amount) || 0, b.invoiced ? 1 : 0, b.invoice_number || '', b.police_notification ? 1 : 0, b.letter_drop ? 1 : 0,
+    `).run(b.job_id || null, b.client_id || null, itemType, itemTypes, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status, b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid === '1' || b.council_fee_paid === 1 ? 1 : 0, parseFloat(b.council_fee_amount) || 0,
+      b.reference_number || '', b.rol_required ? 1 : 0, b.rol_response || '', b.bus_approvals_required ? 1 : 0, b.bus_approvals_response || '', b.client_pm || '', parseFloat(b.costs) || 0, b.action_required || '', b.charge_client === '1' || b.charge_client === 1 ? 1 : 0, parseFloat(b.charge_amount) || 0, b.invoiced === '1' || b.invoiced === 1 ? 1 : 0, b.invoice_number || '', b.police_notification ? 1 : 0, b.letter_drop ? 1 : 0,
       b.tmp_response || '', b.spa_response || '', b.council_response || '', b.tgs_response || '', b.police_response || '', b.letter_drop_response || '',
       req.params.id);
     req.flash('success', 'Item updated.');

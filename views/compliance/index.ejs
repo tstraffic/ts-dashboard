@@ -215,9 +215,13 @@
   <!-- Bulk Actions Bar (hidden until items selected) -->
   <div id="bulkBar" class="hidden bg-white border-2 border-brand-500 rounded-xl shadow-sm p-3 mb-4 flex items-center justify-between">
     <span class="text-sm text-gray-600"><span id="selectedCount" class="text-gray-900 font-bold">0</span> item(s) selected</span>
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 flex-wrap">
       <button onclick="bulkUpdateStatus('approved')" class="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition">Mark Approved</button>
       <button onclick="bulkUpdateStatus('submitted')" class="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition">Mark Submitted</button>
+      <button onclick="bulkReadyForInvoice()" class="px-3 py-1.5 text-xs font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-400 transition">Ready for Invoice</button>
+      <% if (user.role === 'admin' || user.role === 'finance' || user.role === 'accounts') { %>
+        <button onclick="bulkMarkInvoiced()" class="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-500 transition">Mark Invoiced</button>
+      <% } %>
       <button onclick="bulkDelete()" class="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-500 transition">Delete Selected</button>
     </div>
   </div>
@@ -413,5 +417,27 @@ function bulkUpdateStatus(status) {
     headers: csrfHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ ids: ids, status: status })
   }).then(r => { if (r.ok) window.location.reload(); else alert('Failed to update items.'); });
+}
+
+function bulkReadyForInvoice() {
+  const ids = getSelectedIds();
+  if (ids.length === 0) return;
+  if (!confirm('Mark ' + ids.length + ' item(s) as Ready for Invoice? Admin/accounts will be notified.')) return;
+  fetch('/compliance/bulk-ready-invoice', {
+    method: 'POST',
+    headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ ids: ids })
+  }).then(r => { if (r.ok) window.location.reload(); else alert('Failed to update.'); });
+}
+
+function bulkMarkInvoiced() {
+  const ids = getSelectedIds();
+  if (ids.length === 0) return;
+  if (!confirm('Mark ' + ids.length + ' item(s) as Invoiced?')) return;
+  fetch('/compliance/bulk-invoiced', {
+    method: 'POST',
+    headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ ids: ids })
+  }).then(r => { if (r.ok) window.location.reload(); else alert('Failed to update.'); });
 }
 </script>
