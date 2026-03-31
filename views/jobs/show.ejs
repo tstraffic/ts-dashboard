@@ -1086,8 +1086,9 @@
   <!-- Budget Tab (conditional) -->
   <% if (canViewAccounts) { %>
   <div id="budget" class="tab-content">
-    <div class="mb-4">
+    <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Budget & Costs</h2>
+      <a href="/budgets/job/<%= job.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Edit Budget</a>
     </div>
     <% if (budget) { %>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

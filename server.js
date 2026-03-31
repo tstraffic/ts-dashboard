@@ -43,6 +43,7 @@ app.use(helmet({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/data/uploads', express.static(path.join(__dirname, 'data', 'uploads')));
 
 // Sessions (secure cookies in production)
 const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production';

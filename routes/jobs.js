@@ -113,9 +113,14 @@ router.post('/', (req, res) => {
       b.sharepoint_url || '', b.state || '',
       b.required_tcp_level || ''
     );
-    // Auto-create chat thread for this job
+    // Auto-create budget record for this job
     const newJobId = db.prepare('SELECT id FROM jobs WHERE job_number = ?').get(b.job_number);
     if (newJobId) {
+      try {
+        db.prepare('INSERT OR IGNORE INTO job_budgets (job_id, contract_value, updated_by_id) VALUES (?, ?, ?)').run(newJobId.id, parseFloat(b.contract_value) || 0, req.session.user.id);
+      } catch(e) { /* budget may already exist */ }
+
+      // Auto-create chat thread for this job
       const threadId = ensureThreadForEntity('job', newJobId.id, `Job ${b.job_number}`, req.session.user.id);
       const memberIds = [...new Set([req.session.user.id,
         b.project_manager_id ? parseInt(b.project_manager_id) : null,

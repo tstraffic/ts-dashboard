@@ -247,20 +247,30 @@ router.post('/:id/upload', complianceUpload.array('documents', 10), (req, res) =
   const db = getDb();
   const complianceId = req.params.id;
   const item = db.prepare('SELECT id FROM compliance WHERE id = ?').get(complianceId);
-  if (!item) return res.status(404).json({ error: 'Item not found' });
-
-  const ins = db.prepare('INSERT INTO compliance_documents (compliance_id, filename, original_name, file_path, file_size, mime_type, uploaded_by_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
-  const files = req.files || [];
-  files.forEach(f => {
-    const relPath = '/uploads/compliance/' + complianceId + '/' + f.filename;
-    ins.run(complianceId, f.filename, f.originalname, relPath, f.size, f.mimetype || '', req.session.user.id);
-  });
-
-  if (req.headers['accept'] && req.headers['accept'].includes('json')) {
-    const docs = db.prepare('SELECT * FROM compliance_documents WHERE compliance_id = ? ORDER BY created_at DESC').all(complianceId);
-    return res.json({ success: true, count: files.length, documents: docs });
+  if (!item) {
+    req.flash('error', 'Item not found.');
+    return res.redirect('/compliance');
   }
-  req.flash('success', `${files.length} file(s) uploaded.`);
+
+  try {
+    const ins = db.prepare('INSERT INTO compliance_documents (compliance_id, filename, original_name, file_path, file_size, mime_type, uploaded_by_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    const files = req.files || [];
+    console.log(`[Compliance] Upload ${files.length} file(s) for item ${complianceId}`);
+    files.forEach(f => {
+      console.log(`  File: ${f.originalname} -> ${f.path} (${f.size} bytes)`);
+      const relPath = '/data/uploads/compliance/' + complianceId + '/' + f.filename;
+      ins.run(complianceId, f.filename, f.originalname, relPath, f.size, f.mimetype || '', req.session.user.id);
+    });
+
+    if (files.length === 0) {
+      req.flash('error', 'No files selected. Please choose files to upload.');
+    } else {
+      req.flash('success', `${files.length} file(s) uploaded.`);
+    }
+  } catch (err) {
+    console.error('[Compliance] Upload error:', err.message);
+    req.flash('error', 'Upload failed: ' + err.message);
+  }
   res.redirect(req.body.return_to || '/compliance/' + complianceId + '/edit');
 });
 
@@ -283,6 +293,7 @@ router.post('/:id/documents/:docId/delete', (req, res) => {
 // Serve compliance uploads
 router.get('/:id/documents/:filename', (req, res) => {
   const filePath = path.join(__dirname, '..', 'data', 'uploads', 'compliance', req.params.id, req.params.filename);
+  console.log('[Compliance] Download:', filePath, 'exists:', fs.existsSync(filePath));
   if (fs.existsSync(filePath)) return res.sendFile(filePath);
   res.status(404).send('File not found');
 });
