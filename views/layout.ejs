@@ -60,10 +60,10 @@
   <link rel="stylesheet" href="/css/custom.css">
   <link rel="stylesheet" href="/css/chat.css?v=3">
   <style>/* Hide Tailwind CDN dev indicator */#__tailwind_indicator,div[style*="z-index: 2147483647"]{display:none!important}</style>
-  <!-- Apply theme BEFORE paint to prevent flash — also sets inline style so it works regardless of CSS cache -->
-  <script>(function(){var DARK_BG='linear-gradient(135deg,#020817 0%,#0A1628 25%,#0F2847 50%,#0A1628 80%,#020817 100%)';try{var t=localStorage.getItem('ts-theme');var dark=(t===null||t==='dark');var h=document.documentElement;if(dark){h.classList.add('ts-dark');h.style.background=DARK_BG;h.style.backgroundAttachment='fixed';}else{h.classList.remove('ts-dark');h.style.background='';h.style.backgroundAttachment='';}}catch(e){document.documentElement.classList.add('ts-dark');}})()</script>
+  <!-- Remove dark-glass early if user prefers light -->
+  <script>(function(){try{if(localStorage.getItem('ts-theme')==='light'){document.addEventListener('DOMContentLoaded',function(){document.body.classList.remove('dark-glass');});}}catch(e){}})();</script>
 </head>
-<body class="h-full text-gray-900 font-sans antialiased">
+<body class="h-full text-gray-900 font-sans antialiased dark-glass">
   <div class="flex h-full">
     <%- include('partials/sidebar') %>
 

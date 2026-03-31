@@ -256,7 +256,7 @@
   var iconSun  = document.getElementById('icon-sun');
 
   function applyThemeIcons() {
-    var isDark = document.documentElement.classList.contains('ts-dark');
+    var isDark = document.body.classList.contains('dark-glass');
     // Dark mode: show sun (to switch to light), hide moon
     // Light mode: show moon (to switch to dark), hide sun
     if (isDark) {
@@ -268,18 +268,8 @@
     }
   }
 
-  var DARK_BG = 'linear-gradient(135deg,#020817 0%,#0A1628 25%,#0F2847 50%,#0A1628 80%,#020817 100%)';
   window.toggleTheme = function() {
-    var html = document.documentElement;
-    var nowDark = html.classList.toggle('ts-dark');
-    // Set inline style directly — works even if CSS is cached from old SW
-    if (nowDark) {
-      html.style.background = DARK_BG;
-      html.style.backgroundAttachment = 'fixed';
-    } else {
-      html.style.background = '';
-      html.style.backgroundAttachment = '';
-    }
+    var nowDark = document.body.classList.toggle('dark-glass');
     try { localStorage.setItem('ts-theme', nowDark ? 'dark' : 'light'); } catch(e) {}
     applyThemeIcons();
   };
