@@ -60,8 +60,8 @@
   <link rel="stylesheet" href="/css/custom.css">
   <link rel="stylesheet" href="/css/chat.css?v=3">
   <style>/* Hide Tailwind CDN dev indicator */#__tailwind_indicator,div[style*="z-index: 2147483647"]{display:none!important}</style>
-  <!-- Remove dark-glass early if user prefers light -->
-  <script>(function(){try{if(localStorage.getItem('ts-theme')==='light'){document.addEventListener('DOMContentLoaded',function(){document.body.classList.remove('dark-glass');});}}catch(e){}})();</script>
+  <!-- Remove dark-glass early if user explicitly chose light mode -->
+  <script>(function(){try{if(localStorage.getItem('ts-theme-2')==='light'){document.addEventListener('DOMContentLoaded',function(){document.body.classList.remove('dark-glass');});}}catch(e){}})();</script>
 </head>
 <body class="h-full text-gray-900 font-sans antialiased dark-glass">
   <div class="flex h-full">
