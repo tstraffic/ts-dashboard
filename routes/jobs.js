@@ -215,7 +215,14 @@ router.get('/:id', (req, res) => {
   `).all(job.id);
 
   // Budget for this job
-  const budget = db.prepare(`SELECT * FROM job_budgets WHERE job_id = ?`).get(job.id);
+  let budget = db.prepare(`SELECT * FROM job_budgets WHERE job_id = ?`).get(job.id);
+  // Auto-create budget if none exists
+  if (!budget) {
+    try {
+      db.prepare('INSERT INTO job_budgets (job_id, contract_value, updated_by_id) VALUES (?, ?, ?)').run(job.id, job.contract_value || 0, req.session.user.id);
+      budget = db.prepare(`SELECT * FROM job_budgets WHERE job_id = ?`).get(job.id);
+    } catch(e) { /* ignore */ }
+  }
   const costEntries = db.prepare(`
     SELECT ce.*, u.full_name as entered_by_name FROM cost_entries ce
     LEFT JOIN users u ON ce.entered_by_id = u.id
