@@ -11,6 +11,7 @@ const {
   getMyTasks,
   getTasksIAssigned,
   getComplianceUrgent,
+  getMyPlans,
   getRecentActivity,
 } = require('./helpers/dashboard-queries');
 
@@ -27,6 +28,7 @@ router.get('/', (req, res) => {
   const myTasks = getMyTasks(db, user.id, today);
   const tasksIAssigned = getTasksIAssigned(db, user.id, today);
   const complianceUrgent = getComplianceUrgent(db, today);
+  const myPlans = getMyPlans(db, user.id, today);
   const recentActivity = getRecentActivity(db);
 
   // Finance data (role-gated)
@@ -108,6 +110,7 @@ router.get('/', (req, res) => {
     availableCrew: ops.availableCrew,
     recentActivity,
     myTasks,
+    myPlans,
     tasksIAssigned,
     userRole: user.role,
   });

@@ -249,6 +249,49 @@
       <% } %>
     </div>
 
+    <!-- My Plans -->
+    <% if (myPlans && myPlans.length > 0) { %>
+    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <h2 class="text-sm font-bold text-gray-900">My Plans & Approvals</h2>
+          <span class="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full"><%= myPlans.length %></span>
+        </div>
+        <a href="/compliance" class="text-xs text-emerald-600 hover:text-emerald-700 font-medium">View all &rarr;</a>
+      </div>
+      <div class="divide-y divide-gray-100">
+        <% myPlans.forEach(p => {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const isOverdue = p.due_date && p.due_date < todayStr;
+          const isDueSoon = !isOverdue && p.due_date && p.due_date <= new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+          const statusColors = { not_started: 'bg-gray-100 text-gray-600', started: 'bg-purple-50 text-purple-700', submitted: 'bg-blue-50 text-blue-700', rejected: 'bg-red-50 text-red-700' };
+          const sc = statusColors[p.status] || 'bg-gray-100 text-gray-600';
+        %>
+        <a href="/compliance/<%= p.id %>/edit" class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-gray-900 truncate"><%= p.title %></p>
+            <div class="flex items-center gap-2 mt-1.5">
+              <% if (p.job_number) { %><span class="job-id-chip" style="font-size:10px;padding:1px 6px"><%= p.job_number %></span><% } %>
+              <% if (p.client_name && !p.job_number) { %><span class="text-[10px] text-gray-400"><%= p.client_name %></span><% } %>
+              <span class="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded-full <%= sc %>"><%= p.status.replace(/_/g, ' ') %></span>
+            </div>
+          </div>
+          <div class="ml-3 text-right flex-shrink-0">
+            <% if (p.due_date) { %>
+              <span class="text-xs font-semibold <%= isOverdue ? 'text-red-600' : isDueSoon ? 'text-amber-600' : 'text-gray-500' %>"><%= new Date(p.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }) %></span>
+              <% if (isOverdue) { %><p class="text-[10px] text-red-500 font-medium">OVERDUE</p><% } %>
+              <% if (isDueSoon) { %><p class="text-[10px] text-amber-500 font-medium">DUE SOON</p><% } %>
+            <% } else { %>
+              <span class="text-xs text-gray-400">No date</span>
+            <% } %>
+          </div>
+        </a>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
+
     <!-- Tasks I Assigned -->
     <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">

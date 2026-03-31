@@ -179,6 +179,26 @@ function getComplianceUrgent(db, today) {
   `).all(today, today, next14, today, next30, today, today, today, next14, next30);
 }
 
+function getMyPlans(db, userId, today) {
+  return db.prepare(`
+    SELECT c.id, c.title, c.item_type, c.item_types, c.status, c.due_date, c.expiry_date,
+      j.job_number, j.client as job_client,
+      cl.company_name as client_name
+    FROM compliance c
+    LEFT JOIN jobs j ON c.job_id = j.id
+    LEFT JOIN clients cl ON c.client_id = cl.id
+    WHERE c.assigned_to_id = ? AND c.status NOT IN ('approved','expired')
+    ORDER BY
+      CASE
+        WHEN c.due_date IS NOT NULL AND c.due_date < ? THEN 1
+        WHEN c.due_date IS NOT NULL AND c.due_date <= date(?, '+14 days') THEN 2
+        ELSE 3
+      END,
+      COALESCE(c.due_date, '9999-12-31') ASC
+    LIMIT 10
+  `).all(userId, today, today);
+}
+
 function getRecentActivity(db) {
   return db.prepare(`
     SELECT al.*, u.full_name as user_name
@@ -197,5 +217,6 @@ module.exports = {
   getMyTasks,
   getTasksIAssigned,
   getComplianceUrgent,
+  getMyPlans,
   getRecentActivity,
 };
