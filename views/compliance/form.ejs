@@ -534,7 +534,10 @@ function saveQuickClient() {
     method: 'POST',
     headers: csrfHeaders({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
     body: JSON.stringify({ company_name: name })
-  }).then(function(r) { return r.json(); }).then(function(data) {
+  }).then(function(r) {
+    if (!r.ok) return r.text().then(function(t) { throw new Error('HTTP ' + r.status); });
+    return r.json();
+  }).then(function(data) {
     if (data.success && data.client) {
       // Add to client dropdown and select it
       var sel = document.getElementById('client_id');

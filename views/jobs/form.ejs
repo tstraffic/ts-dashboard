@@ -302,18 +302,22 @@ function saveJobClient() {
     method: 'POST',
     headers: csrfHeaders({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
     body: JSON.stringify({ company_name: name })
-  }).then(function(r) { return r.json(); }).then(function(data) {
+  }).then(function(r) {
+    if (!r.ok) return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t.substring(0, 100)); });
+    return r.json();
+  }).then(function(data) {
     if (data.success && data.client) {
       var sel = document.getElementById('client_id');
       var opt = new Option(data.client.company_name, data.client.id, true, true);
       sel.add(opt);
+      sel.value = data.client.id;
       document.getElementById('client').value = data.client.company_name;
       document.getElementById('qa_job_client_name').value = '';
       document.getElementById('jobQuickAddClient').classList.add('hidden');
     } else {
-      alert('Failed to create client.');
+      alert('Failed to create client: ' + JSON.stringify(data));
     }
-  }).catch(function() { alert('Error creating client.'); });
+  }).catch(function(e) { alert('Error creating client: ' + e.message); });
 }
 
 // Sync hidden client name field on form submit
