@@ -3775,27 +3775,44 @@ function runMigrations(db) {
   // Migration 72: Add 'started' status to compliance CHECK constraint
   if (!completedMigrations.has(72)) {
     try {
-      // SQLite doesn't support ALTER CHECK, so rebuild the table
-      const cols = db.prepare("PRAGMA table_info(compliance)").all().map(c => c.name);
-      const colList = cols.join(', ');
-      db.exec('PRAGMA foreign_keys = OFF');
-      db.exec('BEGIN');
-      db.exec('ALTER TABLE compliance RENAME TO compliance_old_72');
-      // Get original DDL and replace CHECK constraint
-      const ddl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='compliance_old_72'").get();
-      let newDDL = ddl.sql
-        .replace('compliance_old_72', 'compliance')
-        .replace(
-          "status IN ('not_started','submitted','approved','rejected','expired')",
+      // Check if 'started' is already allowed
+      const testStarted = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='compliance'").get();
+      if (testStarted && testStarted.sql && testStarted.sql.includes("'started'")) {
+        console.log('Migration 72: started status already in CHECK, skipping rebuild.');
+      } else {
+        // SQLite doesn't support ALTER CHECK, so rebuild the table
+        const cols = db.prepare("PRAGMA table_info(compliance)").all().map(c => c.name);
+        const colList = cols.join(', ');
+        db.exec('PRAGMA foreign_keys = OFF');
+        db.exec('BEGIN');
+        db.exec('ALTER TABLE compliance RENAME TO _compliance_backup_72');
+        // Get original DDL and fix table name + status CHECK
+        const ddl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='_compliance_backup_72'").get();
+        if (!ddl || !ddl.sql) throw new Error('Could not read compliance DDL');
+        let newDDL = ddl.sql.replace('_compliance_backup_72', 'compliance');
+        // Use regex to handle any whitespace variations in the CHECK constraint
+        newDDL = newDDL.replace(
+          /status\s+IN\s*\(\s*'not_started'\s*,\s*'submitted'\s*,\s*'approved'\s*,\s*'rejected'\s*,\s*'expired'\s*\)/i,
           "status IN ('not_started','started','submitted','approved','rejected','expired')"
         );
-      db.exec(newDDL);
-      db.exec(`INSERT INTO compliance (${colList}) SELECT ${colList} FROM compliance_old_72`);
-      db.exec('DROP TABLE compliance_old_72');
-      db.exec('COMMIT');
-      db.exec('PRAGMA foreign_keys = ON');
+        db.exec(newDDL);
+        db.exec(`INSERT INTO compliance (${colList}) SELECT ${colList} FROM _compliance_backup_72`);
+        db.exec('DROP TABLE _compliance_backup_72');
+        db.exec('COMMIT');
+        db.exec('PRAGMA foreign_keys = ON');
+        console.log('Migration 72: Rebuilt compliance table with started status.');
+      }
     } catch (e) {
       try { db.exec('ROLLBACK'); } catch (_) {}
+      try { db.exec('PRAGMA foreign_keys = ON'); } catch (_) {}
+      // If rebuild failed, try to restore
+      try {
+        const backupExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_compliance_backup_72'").get();
+        if (backupExists) {
+          db.exec('ALTER TABLE _compliance_backup_72 RENAME TO compliance');
+          console.log('Migration 72: Restored compliance from backup after error.');
+        }
+      } catch (_) {}
       console.error('Migration 72 error:', e.message);
     }
     recordMigration.run(72, 'Add started status to compliance CHECK constraint');
