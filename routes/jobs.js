@@ -440,6 +440,18 @@ router.post('/:id/link-compliance', (req, res) => {
   res.redirect(`/projects/${req.params.id}#${hash}`);
 });
 
+// Unlink a compliance item from this job
+router.post('/:id/unlink-compliance', (req, res) => {
+  const db = getDb();
+  const complianceId = req.body.compliance_id;
+  if (complianceId) {
+    db.prepare('UPDATE compliance SET job_id = NULL WHERE id = ? AND job_id = ?').run(complianceId, req.params.id);
+    req.flash('success', 'Item unlinked from this job.');
+  }
+  const hash = req.body.redirect_hash || 'compliance';
+  res.redirect(`/projects/${req.params.id}#${hash}`);
+});
+
 // =============================================
 // Site Diary CRUD
 // =============================================

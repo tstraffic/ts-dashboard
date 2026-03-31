@@ -502,6 +502,7 @@
             <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Cost</th>
             <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Charged</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Approver</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
@@ -533,6 +534,15 @@
               <% } else { %>-<% } %>
             </td>
             <td class="px-4 py-3 text-gray-600"><%= item.approver_name || '-' %></td>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <a href="/compliance/<%= item.id %>/edit" class="text-brand-600 text-xs font-medium mr-2">Edit</a>
+              <form method="POST" action="/jobs/<%= job.id %>/unlink-compliance" class="inline" onsubmit="return confirm('Unlink this item?')">
+                <%- include('../partials/csrf') %>
+                <input type="hidden" name="compliance_id" value="<%= item.id %>">
+                <input type="hidden" name="redirect_hash" value="compliance">
+                <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">Unlink</button>
+              </form>
+            </td>
           </tr>
           <% }) %>
         </tbody>
@@ -631,8 +641,14 @@
             </td>
             <td class="px-4 py-3 text-gray-500 text-xs"><%= item.due_date ? new Date(item.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></td>
             <td class="px-4 py-3 text-gray-500 text-xs"><%= item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></td>
-            <td class="px-4 py-3">
-              <a href="/compliance/<%= item.id %>/edit" class="text-brand-600 hover:text-brand-700 text-xs font-medium">Edit</a>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <a href="/compliance/<%= item.id %>/edit" class="text-brand-600 hover:text-brand-700 text-xs font-medium mr-2">Edit</a>
+              <form method="POST" action="/jobs/<%= job.id %>/unlink-compliance" class="inline" onsubmit="return confirm('Unlink this item from the job?')">
+                <%- include('../partials/csrf') %>
+                <input type="hidden" name="compliance_id" value="<%= item.id %>">
+                <input type="hidden" name="redirect_hash" value="plans">
+                <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">Unlink</button>
+              </form>
             </td>
           </tr>
           <% }) %>
