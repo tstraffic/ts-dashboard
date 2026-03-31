@@ -3876,6 +3876,23 @@ function runMigrations(db) {
     console.log('Migration 75 complete.');
   }
 
+  // Migration 76: Add per-type response columns to compliance
+  if (!isMigrationApplied.get(76)) {
+    const cols76 = [
+      ['tmp_response', "TEXT DEFAULT ''"],
+      ['spa_response', "TEXT DEFAULT ''"],
+      ['council_response', "TEXT DEFAULT ''"],
+      ['tgs_response', "TEXT DEFAULT ''"],
+      ['police_response', "TEXT DEFAULT ''"],
+      ['letter_drop_response', "TEXT DEFAULT ''"],
+    ];
+    cols76.forEach(([col, def]) => {
+      try { db.exec(`ALTER TABLE compliance ADD COLUMN ${col} ${def}`); } catch(e) { /* exists */ }
+    });
+    recordMigration.run(76, 'Add per-type response columns to compliance');
+    console.log('Migration 76 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

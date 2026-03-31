@@ -256,45 +256,88 @@
             placeholder="Client project manager">
         </div>
 
-        <!-- Approvals & Notifications (checkboxes row) -->
-        <div class="md:col-span-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Approvals & Notifications</h3>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="rol_required" value="1" <%= isEdit && item.rol_required ? 'checked' : '' %>
-                class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500">
-              <span class="text-sm text-gray-700">ROL Required</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="bus_approvals_required" value="1" <%= isEdit && item.bus_approvals_required ? 'checked' : '' %>
-                class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500">
-              <span class="text-sm text-gray-700">Bus Approvals</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="police_notification" value="1" <%= isEdit && item.police_notification ? 'checked' : '' %>
-                class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500">
-              <span class="text-sm text-gray-700">Police Notified</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="letter_drop" value="1" <%= isEdit && item.letter_drop ? 'checked' : '' %>
-                class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500">
-              <span class="text-sm text-gray-700">Letter Drop</span>
-            </label>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
-            <div>
+        <!-- Dynamic Response Fields (based on selected types) -->
+        <div class="md:col-span-2 p-4 bg-gray-50 rounded-lg border border-gray-200" id="responses-section">
+          <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Responses & Status</h3>
+          <div id="response-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- ROL response (shown when ROL type selected) -->
+            <div data-response-for="rol" class="hidden">
               <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ROL Response</label>
               <input type="text" name="rol_response" value="<%= isEdit && item.rol_response ? item.rol_response : '' %>"
                 class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                placeholder="Response details">
+                placeholder="e.g. Approved 10pm, NEED 9pm or extra day">
+              <label class="flex items-center gap-2 mt-2 cursor-pointer">
+                <input type="checkbox" name="rol_required" value="1" <%= isEdit && item.rol_required ? 'checked' : '' %>
+                  class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500">
+                <span class="text-xs text-gray-600">ROL Submitted</span>
+              </label>
             </div>
-            <div>
+            <!-- CTMP response -->
+            <div data-response-for="tmp_approval" class="hidden">
+              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">CTMP Response</label>
+              <input type="text" name="tmp_response" value="<%= isEdit && item.tmp_response ? item.tmp_response : '' %>"
+                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="CTMP status or response">
+            </div>
+            <!-- SPA response -->
+            <div data-response-for="spa" class="hidden">
+              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">SPA Response</label>
+              <input type="text" name="spa_response" value="<%= isEdit && item.spa_response ? item.spa_response : '' %>"
+                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="SPA status or response">
+            </div>
+            <!-- Council response -->
+            <div data-response-for="council_permit" class="hidden">
+              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Council Response</label>
+              <input type="text" name="council_response" value="<%= isEdit && item.council_response ? item.council_response : '' %>"
+                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="Council approval status">
+            </div>
+            <!-- Bus Approvals response -->
+            <div data-response-for="bus_approval" class="hidden">
               <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Bus Approvals Response</label>
               <input type="text" name="bus_approvals_response" value="<%= isEdit && item.bus_approvals_response ? item.bus_approvals_response : '' %>"
                 class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                placeholder="Response details">
+                placeholder="Bus approvals status">
+              <label class="flex items-center gap-2 mt-2 cursor-pointer">
+                <input type="checkbox" name="bus_approvals_required" value="1" <%= isEdit && item.bus_approvals_required ? 'checked' : '' %>
+                  class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500">
+                <span class="text-xs text-gray-600">Bus Approval Submitted</span>
+              </label>
+            </div>
+            <!-- Police Notification response -->
+            <div data-response-for="police_notification" class="hidden">
+              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Police Notification</label>
+              <input type="text" name="police_response" value="<%= isEdit && item.police_response ? item.police_response : '' %>"
+                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="Notification reference or status">
+              <label class="flex items-center gap-2 mt-2 cursor-pointer">
+                <input type="checkbox" name="police_notification" value="1" <%= isEdit && item.police_notification ? 'checked' : '' %>
+                  class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500">
+                <span class="text-xs text-gray-600">Police Notified</span>
+              </label>
+            </div>
+            <!-- Letter Drop response -->
+            <div data-response-for="letter_drop" class="hidden">
+              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Letter Drop</label>
+              <input type="text" name="letter_drop_response" value="<%= isEdit && item.letter_drop_response ? item.letter_drop_response : '' %>"
+                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="Letter drop details or date">
+              <label class="flex items-center gap-2 mt-2 cursor-pointer">
+                <input type="checkbox" name="letter_drop" value="1" <%= isEdit && item.letter_drop ? 'checked' : '' %>
+                  class="w-4 h-4 bg-white border-gray-300 rounded text-brand-500 focus:ring-brand-500">
+                <span class="text-xs text-gray-600">Letter Drop Completed</span>
+              </label>
+            </div>
+            <!-- TGS response -->
+            <div data-response-for="traffic_guidance" class="hidden">
+              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">TGS Response</label>
+              <input type="text" name="tgs_response" value="<%= isEdit && item.tgs_response ? item.tgs_response : '' %>"
+                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="TGS status or approval details">
             </div>
           </div>
+          <p id="no-responses-msg" class="text-sm text-gray-400 hidden">Select type(s) above to see response fields.</p>
         </div>
 
         <!-- Action Required -->
@@ -507,6 +550,27 @@ document.getElementById('item_type').addEventListener('change', toggleCouncilFee
 document.getElementById('council_fee_paid').addEventListener('change', toggleFeeAmount);
 toggleCouncilFee();
 toggleFeeAmount();
+
+// Toggle response fields based on selected type checkboxes
+function updateResponseFields() {
+  var checked = Array.from(document.querySelectorAll('input[name="item_types"]:checked')).map(function(cb) { return cb.value; });
+  var anyVisible = false;
+  document.querySelectorAll('[data-response-for]').forEach(function(el) {
+    var type = el.getAttribute('data-response-for');
+    // Map type values: 'bus_approval' doesn't exist as a type checkbox — handle mapping
+    var show = checked.includes(type);
+    el.classList.toggle('hidden', !show);
+    if (show) anyVisible = true;
+  });
+  var msg = document.getElementById('no-responses-msg');
+  var section = document.getElementById('responses-section');
+  if (msg) msg.classList.toggle('hidden', anyVisible);
+  if (section) section.classList.toggle('hidden', !anyVisible && checked.length === 0);
+}
+document.querySelectorAll('input[name="item_types"]').forEach(function(cb) {
+  cb.addEventListener('change', updateResponseFields);
+});
+updateResponseFields();
 
 // Auto-generate reference number
 function generateRefNumber() {
