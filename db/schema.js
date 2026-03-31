@@ -3893,6 +3893,54 @@ function runMigrations(db) {
     console.log('Migration 76 complete.');
   }
 
+  // Migration 77: Fix compliance_documents FK after table rebuild + cleanup backup
+  if (!isMigrationApplied.get(77)) {
+    try {
+      // Drop orphaned backup table if it exists
+      db.exec('DROP TABLE IF EXISTS _compliance_backup_72');
+      // Add other_description column
+      try { db.exec("ALTER TABLE compliance ADD COLUMN other_description TEXT DEFAULT ''"); } catch(e) { /* exists */ }
+      // Rebuild compliance_documents to fix broken FK reference
+      const cdExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='compliance_documents'").get();
+      if (cdExists) {
+        const cdCols = db.prepare("PRAGMA table_info(compliance_documents)").all().map(c => c.name);
+        const cdColList = cdCols.join(', ');
+        db.exec('PRAGMA foreign_keys = OFF');
+        db.exec('BEGIN');
+        db.exec('ALTER TABLE compliance_documents RENAME TO _cd_backup_77');
+        db.exec(`
+          CREATE TABLE compliance_documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            compliance_id INTEGER NOT NULL REFERENCES compliance(id) ON DELETE CASCADE,
+            filename TEXT NOT NULL,
+            original_name TEXT DEFAULT '',
+            file_path TEXT DEFAULT '',
+            file_size INTEGER DEFAULT 0,
+            mime_type TEXT DEFAULT '',
+            uploaded_by_id INTEGER REFERENCES users(id),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        db.exec(`INSERT INTO compliance_documents (${cdColList}) SELECT ${cdColList} FROM _cd_backup_77`);
+        db.exec('DROP TABLE _cd_backup_77');
+        db.exec('COMMIT');
+        db.exec('PRAGMA foreign_keys = ON');
+        console.log('Migration 77: Rebuilt compliance_documents with correct FK.');
+      }
+    } catch(e) {
+      try { db.exec('ROLLBACK'); } catch(_) {}
+      try { db.exec('PRAGMA foreign_keys = ON'); } catch(_) {}
+      try {
+        const backup = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_cd_backup_77'").get();
+        const main = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='compliance_documents'").get();
+        if (backup && !main) db.exec('ALTER TABLE _cd_backup_77 RENAME TO compliance_documents');
+      } catch(_) {}
+      console.error('Migration 77 error:', e.message);
+    }
+    recordMigration.run(77, 'Fix compliance_documents FK');
+    console.log('Migration 77 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

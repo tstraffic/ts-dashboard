@@ -58,6 +58,12 @@
               </label>
             <% }) %>
           </div>
+          <!-- Other description (shown when 'Other' is ticked) -->
+          <div id="other-description-field" class="hidden mt-2">
+            <input type="text" name="other_description" value="<%= isEdit && item.other_description ? item.other_description : '' %>"
+              placeholder="Describe the other type..."
+              class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
         </div>
 
         <!-- Title -->
@@ -176,10 +182,12 @@
         <!-- Designer -->
         <div>
           <label for="designer" class="block text-sm font-medium text-gray-600 mb-1">Designer</label>
-          <input type="text" id="designer" name="designer"
-            value="<%= isEdit && item.designer ? item.designer : '' %>"
-            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            placeholder="Plan designer name...">
+          <select id="designer" name="designer" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="">Select designer...</option>
+            <% (typeof users !== 'undefined' ? users : []).forEach(function(u) { %>
+              <option value="<%= u.full_name %>" <%= isEdit && item.designer === u.full_name ? 'selected' : '' %>><%= u.full_name %></option>
+            <% }) %>
+          </select>
         </div>
 
         <!-- File / Document Link -->
@@ -550,6 +558,17 @@ document.getElementById('item_type').addEventListener('change', toggleCouncilFee
 document.getElementById('council_fee_paid').addEventListener('change', toggleFeeAmount);
 toggleCouncilFee();
 toggleFeeAmount();
+
+// Toggle "Other" description field
+function updateOtherField() {
+  var otherChecked = document.querySelector('input[name="item_types"][value="other"]');
+  var field = document.getElementById('other-description-field');
+  if (field) field.classList.toggle('hidden', !(otherChecked && otherChecked.checked));
+}
+document.querySelectorAll('input[name="item_types"]').forEach(function(cb) {
+  cb.addEventListener('change', updateOtherField);
+});
+updateOtherField();
 
 // Toggle response fields based on selected type checkboxes
 function updateResponseFields() {
