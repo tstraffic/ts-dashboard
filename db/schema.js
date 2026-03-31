@@ -3772,50 +3772,57 @@ function runMigrations(db) {
     console.log('Migration 71 complete.');
   }
 
-  // Migration 72: Add 'started' status to compliance CHECK constraint
+  // Migration 72: Remove status CHECK constraint from compliance (allow any status value)
   if (!completedMigrations.has(72)) {
     try {
-      // Check if 'started' is already allowed
-      const testStarted = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='compliance'").get();
-      if (testStarted && testStarted.sql && testStarted.sql.includes("'started'")) {
-        console.log('Migration 72: started status already in CHECK, skipping rebuild.');
-      } else {
-        // SQLite doesn't support ALTER CHECK, so rebuild the table
+      // First check if backup table was left from a failed previous attempt
+      const backupExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_compliance_backup_72'").get();
+      if (backupExists) {
+        // Previous migration attempt failed mid-way — check which table has data
+        const mainExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='compliance'").get();
+        if (!mainExists) {
+          db.exec('ALTER TABLE _compliance_backup_72 RENAME TO compliance');
+          console.log('Migration 72: Restored compliance from orphaned backup.');
+        } else {
+          db.exec('DROP TABLE IF EXISTS _compliance_backup_72');
+          console.log('Migration 72: Cleaned up orphaned backup (compliance exists).');
+        }
+      }
+
+      const ddlRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='compliance'").get();
+      if (ddlRow && ddlRow.sql && ddlRow.sql.includes('status') && ddlRow.sql.includes('CHECK')) {
         const cols = db.prepare("PRAGMA table_info(compliance)").all().map(c => c.name);
         const colList = cols.join(', ');
         db.exec('PRAGMA foreign_keys = OFF');
         db.exec('BEGIN');
         db.exec('ALTER TABLE compliance RENAME TO _compliance_backup_72');
-        // Get original DDL and fix table name + status CHECK
-        const ddl = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='_compliance_backup_72'").get();
-        if (!ddl || !ddl.sql) throw new Error('Could not read compliance DDL');
-        let newDDL = ddl.sql.replace('_compliance_backup_72', 'compliance');
-        // Use regex to handle any whitespace variations in the CHECK constraint
-        newDDL = newDDL.replace(
-          /status\s+IN\s*\(\s*'not_started'\s*,\s*'submitted'\s*,\s*'approved'\s*,\s*'rejected'\s*,\s*'expired'\s*\)/i,
-          "status IN ('not_started','started','submitted','approved','rejected','expired')"
-        );
+        // Remove the status CHECK entirely — enforce at app level instead
+        let newDDL = ddlRow.sql.replace('_compliance_backup_72', 'compliance');
+        // Remove CHECK(status IN (...)) with any content
+        newDDL = newDDL.replace(/,?\s*CHECK\s*\(\s*status\s+IN\s*\([^)]+\)\s*\)/gi, '');
         db.exec(newDDL);
         db.exec(`INSERT INTO compliance (${colList}) SELECT ${colList} FROM _compliance_backup_72`);
         db.exec('DROP TABLE _compliance_backup_72');
         db.exec('COMMIT');
         db.exec('PRAGMA foreign_keys = ON');
-        console.log('Migration 72: Rebuilt compliance table with started status.');
+        console.log('Migration 72: Removed status CHECK from compliance table.');
+      } else {
+        console.log('Migration 72: No status CHECK found, skipping.');
       }
     } catch (e) {
       try { db.exec('ROLLBACK'); } catch (_) {}
       try { db.exec('PRAGMA foreign_keys = ON'); } catch (_) {}
-      // If rebuild failed, try to restore
       try {
-        const backupExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_compliance_backup_72'").get();
-        if (backupExists) {
+        const backupStillExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='_compliance_backup_72'").get();
+        const mainStillExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='compliance'").get();
+        if (backupStillExists && !mainStillExists) {
           db.exec('ALTER TABLE _compliance_backup_72 RENAME TO compliance');
-          console.log('Migration 72: Restored compliance from backup after error.');
+          console.log('Migration 72: Restored from backup after error.');
         }
       } catch (_) {}
       console.error('Migration 72 error:', e.message);
     }
-    recordMigration.run(72, 'Add started status to compliance CHECK constraint');
+    recordMigration.run(72, 'Remove status CHECK from compliance');
     console.log('Migration 72 complete.');
   }
 
