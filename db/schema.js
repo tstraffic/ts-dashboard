@@ -3867,6 +3867,15 @@ function runMigrations(db) {
     console.log('Migration 74 complete.');
   }
 
+  // Migration 75: Add ready_for_invoice flag to compliance
+  if (!isMigrationApplied.get(75)) {
+    try { db.exec("ALTER TABLE compliance ADD COLUMN ready_for_invoice INTEGER DEFAULT 0"); } catch(e) { /* exists */ }
+    try { db.exec("ALTER TABLE compliance ADD COLUMN ready_for_invoice_at DATETIME"); } catch(e) { /* exists */ }
+    try { db.exec("ALTER TABLE compliance ADD COLUMN ready_for_invoice_by INTEGER REFERENCES users(id)"); } catch(e) { /* exists */ }
+    recordMigration.run(75, 'Add ready_for_invoice to compliance');
+    console.log('Migration 75 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

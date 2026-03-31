@@ -242,6 +242,34 @@ router.post('/:id/delete', (req, res) => {
   res.redirect(req.body.return_to || '/compliance');
 });
 
+// Mark as ready for invoice
+router.post('/:id/ready-for-invoice', (req, res) => {
+  const db = getDb();
+  const item = db.prepare('SELECT c.*, j.job_number FROM compliance c LEFT JOIN jobs j ON c.job_id = j.id WHERE c.id = ?').get(req.params.id);
+  if (!item) { req.flash('error', 'Item not found.'); return res.redirect('/compliance'); }
+
+  db.prepare('UPDATE compliance SET ready_for_invoice = 1, ready_for_invoice_at = CURRENT_TIMESTAMP, ready_for_invoice_by = ? WHERE id = ?')
+    .run(req.session.user.id, req.params.id);
+
+  // Notify admin and accounts users
+  try {
+    const accountsUsers = db.prepare("SELECT id FROM users WHERE active = 1 AND role IN ('admin','finance','accounts')").all();
+    const insertNotif = db.prepare(`
+      INSERT INTO notifications (user_id, type, title, message, link)
+      VALUES (?, 'invoice_ready', ?, ?, ?)
+    `);
+    const title = 'Ready for Invoice: ' + item.title;
+    const message = (item.job_number ? item.job_number + ' — ' : '') + item.title + ' is ready to be invoiced.';
+    const link = '/compliance/' + req.params.id + '/edit';
+    accountsUsers.forEach(u => {
+      try { insertNotif.run(u.id, title, message, link); } catch(e) {}
+    });
+  } catch(e) { console.error('[Compliance] Notification error:', e.message); }
+
+  req.flash('success', 'Marked as ready for invoice. Admin/accounts team notified.');
+  res.redirect(req.body.return_to || '/compliance/' + req.params.id + '/edit');
+});
+
 // Upload documents to a compliance item
 router.post('/:id/upload', complianceUpload.array('documents', 10), (req, res) => {
   const db = getDb();
