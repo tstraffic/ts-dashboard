@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDb } = require('../db/database');
 const { canViewAccounts } = require('../middleware/auth');
 const { logActivity } = require('../middleware/audit');
+const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadForEntity } = require('../lib/chat');
 
 // List all projects (top-level jobs only, parent_project_id IS NULL)
 router.get('/', (req, res) => {
@@ -192,13 +193,23 @@ router.get('/:id', (req, res) => {
     WHERE ts.job_id = ? ORDER BY ts.work_date DESC LIMIT 50
   `).all(job.id);
 
-  const budget = db.prepare(`SELECT * FROM job_budgets WHERE job_id = ?`).get(job.id);
+  let budget = db.prepare(`SELECT * FROM job_budgets WHERE job_id = ?`).get(job.id);
+  if (!budget) {
+    try {
+      db.prepare('INSERT INTO job_budgets (job_id, contract_value, updated_by_id) VALUES (?, ?, ?)').run(job.id, job.contract_value || 0, req.session.user.id);
+      budget = db.prepare(`SELECT * FROM job_budgets WHERE job_id = ?`).get(job.id);
+    } catch(e) {}
+  }
   const costEntries = db.prepare(`
     SELECT ce.*, u.full_name as entered_by_name FROM cost_entries ce
     LEFT JOIN users u ON ce.entered_by_id = u.id
     WHERE ce.job_id = ? ORDER BY ce.entry_date DESC LIMIT 30
   `).all(job.id);
   const totalSpend = db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM cost_entries WHERE job_id = ?`).get(job.id).total;
+
+  // Compliance cost totals
+  const complianceCosts = db.prepare(`SELECT COALESCE(SUM(costs), 0) as total FROM compliance WHERE job_id = ?`).get(job.id).total;
+  const equipmentCosts = 0;
 
   const equipmentAssignments = db.prepare(`
     SELECT ea.*, e.name as equipment_name, e.asset_number, e.category, e.current_condition as equipment_condition,
@@ -223,7 +234,44 @@ router.get('/:id', (req, res) => {
     WHERE tp.job_id = ? ORDER BY tp.created_at DESC
   `).all(job.id);
 
-  // Activity log for this job + child entities
+  // Site diary entries
+  const diaryEntries = db.prepare(`
+    SELECT sd.*, u.full_name as created_by_name,
+      tp.plan_number as tgs_plan_number,
+      rep.full_name as representative_name,
+      comp.title as compliance_item_title,
+      eq.name as linked_equipment_name, eq.asset_number as linked_asset_number
+    FROM site_diary_entries sd
+    LEFT JOIN users u ON sd.created_by_id = u.id
+    LEFT JOIN traffic_plans tp ON sd.tgs_plan_id = tp.id
+    LEFT JOIN users rep ON sd.representative_id = rep.id
+    LEFT JOIN compliance comp ON sd.compliance_item_id = comp.id
+    LEFT JOIN equipment_assignments eqa ON sd.equipment_assignment_id = eqa.id
+    LEFT JOIN equipment eq ON eqa.equipment_id = eq.id
+    WHERE sd.job_id = ? ORDER BY sd.entry_date DESC
+  `).all(job.id);
+
+  const tgsPlans = db.prepare(`SELECT id, plan_number FROM traffic_plans WHERE job_id = ? ORDER BY plan_number`).all(job.id);
+  const complianceTgsItems = db.prepare(`SELECT id, title, item_type, item_types FROM compliance WHERE job_id = ? AND (item_type = 'traffic_guidance' OR item_types LIKE '%traffic_guidance%') ORDER BY title`).all(job.id);
+  const allUsers = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
+  let diaryAttachments = [];
+  try { diaryAttachments = db.prepare('SELECT * FROM site_diary_attachments WHERE diary_entry_id IN (SELECT id FROM site_diary_entries WHERE job_id = ?)').all(job.id); } catch(e) {}
+
+  // Chat thread
+  let chatThreadId = getThreadForEntity('job', job.id);
+  if (!chatThreadId) {
+    chatThreadId = ensureThreadForEntity('job', job.id, `Job ${job.job_number}`, req.session.user.id);
+    const memberIds = [...new Set([req.session.user.id,
+      job.project_manager_id, job.ops_supervisor_id,
+      job.planning_owner_id, job.marketing_owner_id, job.accounts_owner_id
+    ].filter(Boolean))];
+    addMembersToThread(chatThreadId, memberIds, 'member', true);
+    postSystemMessage(chatThreadId, `Thread created for job ${job.job_number}`);
+  }
+  let chatMembers = [];
+  try { chatMembers = db.prepare('SELECT u.id, u.full_name, u.role FROM chat_thread_members ctm JOIN users u ON ctm.user_id = u.id WHERE ctm.thread_id = ? AND u.active = 1 ORDER BY u.full_name').all(chatThreadId); } catch(e) {}
+
+  // Activity log
   const activities = db.prepare(`
     SELECT al.*, u.full_name as user_name
     FROM activity_log al
@@ -233,11 +281,13 @@ router.get('/:id', (req, res) => {
     ORDER BY al.created_at DESC LIMIT 30
   `).all(job.id, job.id);
 
-  res.render('projects/show', {
+  res.render('jobs/show', {
     title: job.job_number,
     job, tasks, updates, complianceItems, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
-    equipmentAssignments, defects, trafficPlans, activities,
+    complianceCosts, equipmentCosts,
+    equipmentAssignments, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
+    complianceTgsItems, allUsers, diaryAttachments, chatMembers, activities,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });
