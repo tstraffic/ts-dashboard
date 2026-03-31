@@ -555,9 +555,27 @@ function toggleFeeAmount() {
   var paid = document.getElementById('council_fee_paid').checked;
   document.getElementById('council-fee-amount-row').style.display = paid ? '' : 'none';
 }
-document.getElementById('item_type').addEventListener('change', toggleCouncilFee);
-document.getElementById('council_fee_paid').addEventListener('change', toggleFeeAmount);
-toggleCouncilFee();
+// Council fee toggle — show when council_permit type is checked
+var itemTypeEl = document.getElementById('item_type');
+if (itemTypeEl) {
+  itemTypeEl.addEventListener('change', toggleCouncilFee);
+}
+// Also listen on multi-select checkboxes
+document.querySelectorAll('input[name="item_types"]').forEach(function(cb) {
+  cb.addEventListener('change', function() {
+    var councilChecked = document.querySelector('input[name="item_types"][value="council_permit"]');
+    var section = document.getElementById('council-fee-section');
+    if (section) section.style.display = (councilChecked && councilChecked.checked) ? '' : 'none';
+  });
+});
+var councilFeePaid = document.getElementById('council_fee_paid');
+if (councilFeePaid) councilFeePaid.addEventListener('change', toggleFeeAmount);
+// Run on load
+(function() {
+  var councilChecked = document.querySelector('input[name="item_types"][value="council_permit"]');
+  var section = document.getElementById('council-fee-section');
+  if (section) section.style.display = (councilChecked && councilChecked.checked) ? '' : 'none';
+})();
 toggleFeeAmount();
 
 // Toggle "Other" description field
