@@ -1317,7 +1317,7 @@
   function loadUnlinkedCompliance() {
     if (complianceLoaded) return;
     complianceLoaded = true;
-    fetch('/api/compliance/unlinked?job_id=<%= job.id %>', { headers: csrfHeaders() })
+    fetch('/jobs/api/compliance/unlinked?job_id=<%= job.id %>', { headers: csrfHeaders() })
       .then(function(r) { return r.json(); })
       .then(function(items) {
         ['link-compliance-select', 'link-plan-select'].forEach(function(id) {
