@@ -60,23 +60,30 @@ router.post('/:id/status', (req, res) => {
 router.get('/new', (req, res) => {
   const db = getDb();
   const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
-  res.render('jobs/form', { title: 'Create New Job', job: null, users, user: req.session.user });
+  const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
+  res.render('jobs/form', { title: 'Create New Job', job: null, users, clients, user: req.session.user });
 });
 
 // Create job
 router.post('/', (req, res) => {
   const db = getDb();
   const b = req.body;
-  const jobName = `${b.job_number} | ${b.client} | ${b.suburb} | ${b.start_date}`;
+  // Resolve client name from client_id
+  let clientName = b.client || '';
+  if (b.client_id) {
+    const cl = db.prepare('SELECT company_name FROM clients WHERE id = ?').get(b.client_id);
+    if (cl) clientName = cl.company_name;
+  }
+  const jobName = `${b.job_number} | ${clientName} | ${b.suburb} | ${b.start_date}`;
 
   try {
     db.prepare(`
-      INSERT INTO jobs (job_number, job_name, client, site_address, suburb, status, stage, percent_complete, start_date, end_date, project_manager_id, ops_supervisor_id, planning_owner_id, marketing_owner_id, accounts_owner_id, health, accounts_status, division_tags, notes,
+      INSERT INTO jobs (job_number, job_name, client, client_id, site_address, suburb, status, stage, percent_complete, start_date, end_date, project_manager_id, ops_supervisor_id, planning_owner_id, marketing_owner_id, accounts_owner_id, health, accounts_status, division_tags, notes,
         client_project_number, project_name, principal_contractor, traffic_supervisor_id,
         contract_value, estimated_hours, crew_size, rol_required, tmp_required, sharepoint_url, state, required_tcp_level)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      b.job_number, jobName, b.client, b.site_address, b.suburb,
+      b.job_number, jobName, clientName, b.client_id || null, b.site_address, b.suburb,
       b.status || 'tender', b.stage || 'tender', parseInt(b.percent_complete) || 0,
       b.start_date, b.end_date || null,
       b.project_manager_id || null, b.ops_supervisor_id || null,
@@ -269,18 +276,24 @@ router.get('/:id/edit', (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(req.params.id);
   if (!job) { req.flash('error', 'Job not found.'); return res.redirect('/jobs'); }
   const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
-  res.render('jobs/form', { title: 'Edit Job', job, users, user: req.session.user });
+  const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
+  res.render('jobs/form', { title: 'Edit Job', job, users, clients, user: req.session.user });
 });
 
 // Update job
 router.post('/:id', (req, res) => {
   const db = getDb();
   const b = req.body;
-  const jobName = `${b.job_number} | ${b.client} | ${b.suburb} | ${b.start_date}`;
+  let clientName = b.client || '';
+  if (b.client_id) {
+    const cl = db.prepare('SELECT company_name FROM clients WHERE id = ?').get(b.client_id);
+    if (cl) clientName = cl.company_name;
+  }
+  const jobName = `${b.job_number} | ${clientName} | ${b.suburb} | ${b.start_date}`;
 
   try {
     db.prepare(`
-      UPDATE jobs SET job_number=?, job_name=?, client=?, site_address=?, suburb=?, status=?, stage=?, percent_complete=?, start_date=?, end_date=?,
+      UPDATE jobs SET job_number=?, job_name=?, client=?, client_id=?, site_address=?, suburb=?, status=?, stage=?, percent_complete=?, start_date=?, end_date=?,
         project_manager_id=?, ops_supervisor_id=?, planning_owner_id=?, marketing_owner_id=?, accounts_owner_id=?,
         health=?, accounts_status=?, division_tags=?, notes=?,
         client_project_number=?, project_name=?, principal_contractor=?, traffic_supervisor_id=?,
@@ -289,7 +302,7 @@ router.post('/:id', (req, res) => {
         updated_at=CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
-      b.job_number, jobName, b.client, b.site_address, b.suburb,
+      b.job_number, jobName, clientName, b.client_id || null, b.site_address, b.suburb,
       b.status, b.stage, parseInt(b.percent_complete) || 0,
       b.start_date, b.end_date || null,
       b.project_manager_id || null, b.ops_supervisor_id || null,

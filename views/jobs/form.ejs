@@ -31,9 +31,26 @@
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
       <div>
-        <label for="client" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client <span class="text-red-500">*</span></label>
-        <input type="text" id="client" name="client" required value="<%= isEdit ? job.client : '' %>" placeholder="Client name"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <div class="flex items-center justify-between mb-1">
+          <label for="client_id" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Client <span class="text-red-500">*</span></label>
+          <button type="button" onclick="toggleJobClientAdd()" class="text-[10px] text-brand-600 hover:text-brand-700 font-medium">+ Add new</button>
+        </div>
+        <select id="client_id" name="client_id" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">Select client...</option>
+          <% (typeof clients !== 'undefined' ? clients : []).forEach(function(c) { %>
+            <option value="<%= c.id %>" <%= isEdit && job.client_id == c.id ? 'selected' : '' %>><%= c.company_name %></option>
+          <% }) %>
+        </select>
+        <input type="hidden" id="client" name="client" value="<%= isEdit ? job.client : '' %>">
+        <!-- Inline quick-add client -->
+        <div id="jobQuickAddClient" class="hidden mt-2 p-2.5 bg-brand-50 border border-brand-200 rounded-lg">
+          <div class="flex items-center gap-2">
+            <input type="text" id="qa_job_client_name" placeholder="Company name" class="flex-1 bg-white border border-gray-300 text-gray-900 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <button type="button" onclick="saveJobClient()" class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-500 transition">Create</button>
+            <button type="button" onclick="toggleJobClientAdd()" class="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+          </div>
+        </div>
       </div>
       <div>
         <label for="job_name" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job Name</label>
@@ -244,3 +261,38 @@
     </div>
   </noscript>
 </form>
+
+<script>
+function toggleJobClientAdd() {
+  document.getElementById('jobQuickAddClient').classList.toggle('hidden');
+}
+
+function saveJobClient() {
+  var name = document.getElementById('qa_job_client_name').value.trim();
+  if (!name) { document.getElementById('qa_job_client_name').focus(); return; }
+  fetch('/clients', {
+    method: 'POST',
+    headers: csrfHeaders({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
+    body: JSON.stringify({ company_name: name })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.success && data.client) {
+      var sel = document.getElementById('client_id');
+      var opt = new Option(data.client.company_name, data.client.id, true, true);
+      sel.add(opt);
+      document.getElementById('client').value = data.client.company_name;
+      document.getElementById('qa_job_client_name').value = '';
+      document.getElementById('jobQuickAddClient').classList.add('hidden');
+    } else {
+      alert('Failed to create client.');
+    }
+  }).catch(function() { alert('Error creating client.'); });
+}
+
+// Sync hidden client name field on form submit
+document.querySelector('form').addEventListener('submit', function() {
+  var sel = document.getElementById('client_id');
+  if (sel.selectedIndex > 0) {
+    document.getElementById('client').value = sel.options[sel.selectedIndex].text;
+  }
+});
+</script>
