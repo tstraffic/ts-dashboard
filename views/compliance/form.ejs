@@ -18,6 +18,7 @@
   ];
   const statusOptions = [
     { value: 'not_started', label: 'Not Started' },
+    { value: 'started',     label: 'Started' },
     { value: 'submitted',   label: 'Submitted' },
     { value: 'approved',    label: 'Approved' },
     { value: 'rejected',    label: 'Rejected' },
@@ -82,7 +83,7 @@
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label for="job_id" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Project</label>
-                <a href="/projects/new" target="_blank" class="text-xs text-brand-600 hover:text-brand-700 font-medium">+ Add new</a>
+                <button type="button" onclick="toggleQuickAdd('project')" class="text-xs text-brand-600 hover:text-brand-700 font-medium" id="toggleProjectBtn">+ Add new</button>
               </div>
               <select id="job_id" name="job_id" onchange="clearAssignmentError()"
                 class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -91,12 +92,33 @@
                   <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> – <%= job.client %></option>
                 <% }) %>
               </select>
+              <!-- Inline quick-add project -->
+              <div id="quickAddProject" class="hidden mt-2 p-3 bg-brand-50 border border-brand-200 rounded-lg">
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                  <input type="text" id="qa_job_number" placeholder="Job number *" class="bg-white border border-gray-300 text-gray-900 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <input type="text" id="qa_suburb" placeholder="Suburb *" class="bg-white border border-gray-300 text-gray-900 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                  <input type="date" id="qa_start_date" class="bg-white border border-gray-300 text-gray-900 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <select id="qa_project_client" class="bg-white border border-gray-300 text-gray-900 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <option value="">Client (optional)</option>
+                    <% clients.forEach(function(c) { %>
+                      <option value="<%= c.id %>"><%= c.company_name %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="saveQuickProject()" class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-500 transition">Create Project</button>
+                  <button type="button" onclick="toggleQuickAdd('project')" class="px-3 py-1.5 text-gray-500 text-xs font-medium hover:text-gray-700">Cancel</button>
+                  <span id="projectQuickMsg" class="text-xs text-emerald-600 hidden ml-auto"></span>
+                </div>
+              </div>
             </div>
             <!-- Client -->
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label for="client_id" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</label>
-                <a href="/clients/new" target="_blank" class="text-xs text-brand-600 hover:text-brand-700 font-medium">+ Add new</a>
+                <button type="button" onclick="toggleQuickAdd('client')" class="text-xs text-brand-600 hover:text-brand-700 font-medium" id="toggleClientBtn">+ Add new</button>
               </div>
               <select id="client_id" name="client_id" onchange="clearAssignmentError()"
                 class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -105,6 +127,17 @@
                   <option value="<%= c.id %>" <%= String(selectedClientId) === String(c.id) ? 'selected' : '' %>><%= c.company_name %></option>
                 <% }) %>
               </select>
+              <!-- Inline quick-add client -->
+              <div id="quickAddClient" class="hidden mt-2 p-3 bg-brand-50 border border-brand-200 rounded-lg">
+                <div class="mb-2">
+                  <input type="text" id="qa_company_name" placeholder="Company name *" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="saveQuickClient()" class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-500 transition">Create Client</button>
+                  <button type="button" onclick="toggleQuickAdd('client')" class="px-3 py-1.5 text-gray-500 text-xs font-medium hover:text-gray-700">Cancel</button>
+                  <span id="clientQuickMsg" class="text-xs text-emerald-600 hidden ml-auto"></span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -477,6 +510,77 @@ function generateRefNumber() {
       btn.textContent = 'Generate';
       btn.disabled = false;
     });
+}
+
+// Quick-add toggle
+function toggleQuickAdd(type) {
+  var el = type === 'project' ? document.getElementById('quickAddProject') : document.getElementById('quickAddClient');
+  el.classList.toggle('hidden');
+}
+
+// Quick-add client
+function saveQuickClient() {
+  var name = document.getElementById('qa_company_name').value.trim();
+  if (!name) { document.getElementById('qa_company_name').focus(); return; }
+  fetch('/clients', {
+    method: 'POST',
+    headers: csrfHeaders({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
+    body: JSON.stringify({ company_name: name })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.success && data.client) {
+      // Add to client dropdown and select it
+      var sel = document.getElementById('client_id');
+      var opt = new Option(data.client.company_name, data.client.id, true, true);
+      sel.add(opt);
+      // Also add to the project's client dropdown
+      var projClientSel = document.getElementById('qa_project_client');
+      if (projClientSel) projClientSel.add(new Option(data.client.company_name, data.client.id));
+      // Show success + hide form
+      var msg = document.getElementById('clientQuickMsg');
+      msg.textContent = 'Created!';
+      msg.classList.remove('hidden');
+      document.getElementById('qa_company_name').value = '';
+      clearAssignmentError();
+      setTimeout(function() { document.getElementById('quickAddClient').classList.add('hidden'); msg.classList.add('hidden'); }, 1200);
+    } else {
+      alert('Failed to create client.');
+    }
+  }).catch(function() { alert('Error creating client.'); });
+}
+
+// Quick-add project
+function saveQuickProject() {
+  var jobNum = document.getElementById('qa_job_number').value.trim();
+  var suburb = document.getElementById('qa_suburb').value.trim();
+  var startDate = document.getElementById('qa_start_date').value;
+  var clientId = document.getElementById('qa_project_client').value;
+  if (!jobNum) { document.getElementById('qa_job_number').focus(); return; }
+  if (!suburb) { document.getElementById('qa_suburb').focus(); return; }
+  if (!startDate) { document.getElementById('qa_start_date').focus(); return; }
+  fetch('/projects', {
+    method: 'POST',
+    headers: csrfHeaders({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
+    body: JSON.stringify({ job_number: jobNum, suburb: suburb, start_date: startDate, client_id: clientId, status: 'active' })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.success && data.job) {
+      // Add to project dropdown and select it
+      var sel = document.getElementById('job_id');
+      var label = data.job.job_number + ' – ' + (data.job.client || suburb);
+      var opt = new Option(label, data.job.id, true, true);
+      sel.add(opt);
+      // Show success + hide form
+      var msg = document.getElementById('projectQuickMsg');
+      msg.textContent = 'Created!';
+      msg.classList.remove('hidden');
+      document.getElementById('qa_job_number').value = '';
+      document.getElementById('qa_suburb').value = '';
+      document.getElementById('qa_start_date').value = '';
+      clearAssignmentError();
+      setTimeout(function() { document.getElementById('quickAddProject').classList.add('hidden'); msg.classList.add('hidden'); }, 1200);
+    } else {
+      alert('Failed to create project. ' + (data.error || ''));
+    }
+  }).catch(function() { alert('Error creating project.'); });
 }
 
 // Auto-generate ref on type change for new items only

@@ -110,6 +110,13 @@ router.post('/', (req, res) => {
       b.required_tcp_level || ''
     );
     req.flash('success', `Project ${b.job_number} created successfully.`);
+
+    // JSON response for inline create (e.g. compliance form)
+    if (req.xhr || req.headers.accept?.includes('application/json')) {
+      const newJob = db.prepare('SELECT id, job_number, client FROM jobs WHERE job_number = ?').get(b.job_number);
+      return res.json({ success: true, job: newJob });
+    }
+
     res.redirect('/projects');
   } catch (err) {
     if (err.message.includes('UNIQUE')) {

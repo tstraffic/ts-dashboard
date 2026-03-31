@@ -15,6 +15,7 @@
   };
   const STATUS_CONFIG = {
     not_started: { label: 'Not Started', color: 'bg-gray-100 text-gray-600' },
+    started:     { label: 'Started',     color: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20' },
     submitted:   { label: 'Submitted',   color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' },
     approved:    { label: 'Approved',    color: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' },
     rejected:    { label: 'Rejected',    color: 'bg-red-50 text-red-700 ring-1 ring-red-600/20' },
@@ -179,6 +180,7 @@
         <select name="status" onchange="document.getElementById('filterForm').submit()" class="bg-white border border-gray-200 text-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Statuses</option>
           <option value="not_started" <%= filters.status === 'not_started' ? 'selected' : '' %>>Not Started</option>
+          <option value="started"     <%= filters.status === 'started'     ? 'selected' : '' %>>Started</option>
           <option value="submitted"   <%= filters.status === 'submitted'   ? 'selected' : '' %>>Submitted</option>
           <option value="approved"    <%= filters.status === 'approved'    ? 'selected' : '' %>>Approved</option>
           <option value="rejected"    <%= filters.status === 'rejected'    ? 'selected' : '' %>>Rejected</option>
