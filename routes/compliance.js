@@ -87,7 +87,7 @@ router.get('/', (req, res) => {
 
   query += ` ORDER BY c.due_date ASC, c.id ASC`;
   const items = db.prepare(query).all(...params);
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
 
@@ -150,7 +150,7 @@ router.get('/api/next-ref', (req, res) => {
 
 router.get('/new', (req, res) => {
   const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('compliance/form', {
@@ -201,7 +201,7 @@ router.get('/:id/edit', (req, res) => {
   const db = getDb();
   const item = db.prepare('SELECT * FROM compliance WHERE id = ?').get(req.params.id);
   if (!item) { req.flash('error', 'Item not found.'); return res.redirect('/compliance'); }
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   const returnTo = req.query.return_to || '/compliance';
