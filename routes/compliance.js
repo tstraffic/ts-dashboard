@@ -275,6 +275,14 @@ router.post('/:id/ready-for-invoice', (req, res) => {
   res.redirect(req.body.return_to || '/compliance/' + req.params.id + '/edit');
 });
 
+// Unmark ready for invoice
+router.post('/:id/unmark-invoice', (req, res) => {
+  const db = getDb();
+  db.prepare('UPDATE compliance SET ready_for_invoice = 0, ready_for_invoice_at = NULL, ready_for_invoice_by = NULL WHERE id = ?').run(req.params.id);
+  req.flash('success', 'Invoice mark removed.');
+  res.redirect(req.body.return_to || '/compliance/' + req.params.id + '/edit');
+});
+
 // Upload documents to a compliance item
 router.post('/:id/upload', complianceUpload.array('documents', 10), (req, res) => {
   const db = getDb();
