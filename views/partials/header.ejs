@@ -268,9 +268,18 @@
     }
   }
 
+  var DARK_BG = 'linear-gradient(135deg,#020817 0%,#0A1628 25%,#0F2847 50%,#0A1628 80%,#020817 100%)';
   window.toggleTheme = function() {
     var html = document.documentElement;
     var nowDark = html.classList.toggle('ts-dark');
+    // Set inline style directly — works even if CSS is cached from old SW
+    if (nowDark) {
+      html.style.background = DARK_BG;
+      html.style.backgroundAttachment = 'fixed';
+    } else {
+      html.style.background = '';
+      html.style.backgroundAttachment = '';
+    }
     try { localStorage.setItem('ts-theme', nowDark ? 'dark' : 'light'); } catch(e) {}
     applyThemeIcons();
   };
