@@ -60,8 +60,10 @@
   <link rel="stylesheet" href="/css/custom.css">
   <link rel="stylesheet" href="/css/chat.css?v=3">
   <style>/* Hide Tailwind CDN dev indicator */#__tailwind_indicator,div[style*="z-index: 2147483647"]{display:none!important}</style>
+  <!-- Apply theme BEFORE paint to prevent flash -->
+  <script>(function(){try{var t=localStorage.getItem('ts-theme');if(t===null||t==='dark'){document.documentElement.classList.add('ts-dark');}else{document.documentElement.classList.remove('ts-dark');}}catch(e){document.documentElement.classList.add('ts-dark');}})()</script>
 </head>
-<body class="h-full text-gray-900 font-sans antialiased dark-glass">
+<body class="h-full text-gray-900 font-sans antialiased">
   <div class="flex h-full">
     <%- include('partials/sidebar') %>
 

@@ -17,6 +17,18 @@
       </div>
       <div class="flex items-center gap-1.5 sm:gap-3">
         <% if (user) { %>
+          <!-- Dark / Light Mode Toggle -->
+          <button id="theme-toggle" onclick="toggleTheme()" class="p-2.5 text-gray-400 hover:text-brand-600 transition-all focus:outline-none rounded-xl hover:bg-brand-50 active:scale-95 w-10 h-10 flex items-center justify-center" title="Toggle dark/light mode" aria-label="Toggle theme">
+            <!-- Moon icon: visible in light mode → click to go dark -->
+            <svg id="icon-moon" class="theme-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+            </svg>
+            <!-- Sun icon: visible in dark mode → click to go light -->
+            <svg id="icon-sun" class="theme-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/>
+            </svg>
+          </button>
+
           <!-- Notification Bell + Popup -->
           <div class="relative" id="notif-container">
             <button onclick="toggleNotifDropdown()" class="relative p-2.5 text-gray-400 hover:text-brand-600 transition-all focus:outline-none rounded-xl hover:bg-brand-50 active:scale-95" title="Notifications" id="notif-bell">
@@ -238,6 +250,33 @@
   document.addEventListener('click', function(e) {
     if (qaOpen && !qaContainer.contains(e.target)) { qaDropdown.classList.add('hidden'); qaDropdown.classList.add('pointer-events-none'); qaDropdown.classList.remove('pointer-events-auto'); qaOpen = false; }
   });
+
+  // ===== Theme Toggle =====
+  var iconMoon = document.getElementById('icon-moon');
+  var iconSun  = document.getElementById('icon-sun');
+
+  function applyThemeIcons() {
+    var isDark = document.documentElement.classList.contains('ts-dark');
+    // Dark mode: show sun (to switch to light), hide moon
+    // Light mode: show moon (to switch to dark), hide sun
+    if (isDark) {
+      iconSun.classList.remove('theme-icon-hidden'); iconSun.classList.add('theme-icon-visible');
+      iconMoon.classList.remove('theme-icon-visible'); iconMoon.classList.add('theme-icon-hidden');
+    } else {
+      iconMoon.classList.remove('theme-icon-hidden'); iconMoon.classList.add('theme-icon-visible');
+      iconSun.classList.remove('theme-icon-visible'); iconSun.classList.add('theme-icon-hidden');
+    }
+  }
+
+  window.toggleTheme = function() {
+    var html = document.documentElement;
+    var nowDark = html.classList.toggle('ts-dark');
+    try { localStorage.setItem('ts-theme', nowDark ? 'dark' : 'light'); } catch(e) {}
+    applyThemeIcons();
+  };
+
+  // Set initial icon state
+  applyThemeIcons();
 })();
 </script>
 <% } %>
