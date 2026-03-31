@@ -1,8 +1,24 @@
 const express = require('express');
 const router = express.Router();
+const pathLib = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const { getDb } = require('../db/database');
 const { canViewAccounts } = require('../middleware/auth');
 const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadForEntity } = require('../lib/chat');
+
+// Multer for diary attachments
+const diaryStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = pathLib.join(__dirname, '..', 'data', 'uploads', 'diary', req.params.id);
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + pathLib.extname(file.originalname));
+  }
+});
+const diaryUpload = multer({ storage: diaryStorage, limits: { fileSize: 25 * 1024 * 1024 } });
 
 // List all jobs
 router.get('/', (req, res) => {
@@ -241,15 +257,32 @@ router.get('/:id', (req, res) => {
   // Site diary entries for this job
   const diaryEntries = db.prepare(`
     SELECT sd.*, u.full_name as created_by_name,
-      tp.plan_number as tgs_plan_number
+      tp.plan_number as tgs_plan_number,
+      rep.full_name as representative_name,
+      comp.title as compliance_item_title,
+      eq.name as linked_equipment_name, eq.asset_number as linked_asset_number
     FROM site_diary_entries sd
     LEFT JOIN users u ON sd.created_by_id = u.id
     LEFT JOIN traffic_plans tp ON sd.tgs_plan_id = tp.id
+    LEFT JOIN users rep ON sd.representative_id = rep.id
+    LEFT JOIN compliance comp ON sd.compliance_item_id = comp.id
+    LEFT JOIN equipment_assignments eqa ON sd.equipment_assignment_id = eqa.id
+    LEFT JOIN equipment eq ON eqa.equipment_id = eq.id
     WHERE sd.job_id = ? ORDER BY sd.entry_date DESC
   `).all(job.id);
 
   // TGS plans for the diary TGS Link dropdown
   const tgsPlans = db.prepare(`SELECT id, plan_number FROM traffic_plans WHERE job_id = ? ORDER BY plan_number`).all(job.id);
+
+  // Compliance TGS items for diary linking
+  const complianceTgsItems = db.prepare(`SELECT id, title, item_type, item_types FROM compliance WHERE job_id = ? AND (item_type = 'traffic_guidance' OR item_types LIKE '%traffic_guidance%') ORDER BY title`).all(job.id);
+
+  // Users list for representative dropdown
+  const allUsers = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
+
+  // Diary attachments (bulk fetch for all entries)
+  let diaryAttachments = [];
+  try { diaryAttachments = db.prepare('SELECT * FROM site_diary_attachments WHERE diary_entry_id IN (SELECT id FROM site_diary_entries WHERE job_id = ?)').all(job.id); } catch(e) { /* table may not exist yet */ }
 
   // Lazy-create chat thread for pre-existing jobs
   let chatThreadId = getThreadForEntity('job', job.id);
@@ -263,12 +296,17 @@ router.get('/:id', (req, res) => {
     postSystemMessage(chatThreadId, `Thread created for job ${job.job_number}`);
   }
 
+  // Chat members
+  let chatMembers = [];
+  try { chatMembers = db.prepare('SELECT u.id, u.full_name, u.role FROM chat_thread_members ctm JOIN users u ON ctm.user_id = u.id WHERE ctm.thread_id = ? AND u.active = 1 ORDER BY u.full_name').all(chatThreadId); } catch(e) {}
+
   res.render('jobs/show', {
     title: job.job_number,
     job, tasks, updates, complianceItems, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
     complianceCosts, equipmentCosts,
     equipmentAssignments, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
+    complianceTgsItems, allUsers, diaryAttachments, chatMembers,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });
@@ -351,42 +389,65 @@ router.post('/:id/delete', (req, res) => {
 // =============================================
 
 // Create diary entry
-router.post('/:id/diary', (req, res) => {
+router.post('/:id/diary', diaryUpload.array('attachments', 5), (req, res) => {
   const db = getDb();
   const b = req.body;
   try {
-    db.prepare(`
-      INSERT INTO site_diary_entries (job_id, entry_date, task, representative, client_representative, outcomes, issues, comments, stage, tgs_number, tgs_scope, tgs_plan_id, created_by_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    const result = db.prepare(`
+      INSERT INTO site_diary_entries (job_id, entry_date, task, representative, representative_id, client_representative, outcomes, issues, comments, stage, tgs_number, tgs_scope, tgs_plan_id, compliance_item_id, equipment_assignment_id, created_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      req.params.id, b.entry_date, b.task || '', b.representative || '', b.client_representative || '',
+      req.params.id, b.entry_date, b.task || '', b.representative || '', b.representative_id || null,
+      b.client_representative || '',
       b.outcomes || '', b.issues || '', b.comments || '', b.stage || '',
       b.tgs_number || '', b.tgs_scope || '', b.tgs_plan_id || null,
+      b.compliance_item_id || null, b.equipment_assignment_id || null,
       req.session.user.id
     );
+    // Save file attachments
+    const entryId = result.lastInsertRowid;
+    if (req.files && req.files.length > 0) {
+      const ins = db.prepare('INSERT INTO site_diary_attachments (diary_entry_id, file_path, original_name) VALUES (?, ?, ?)');
+      req.files.forEach(f => ins.run(entryId, '/data/uploads/diary/' + req.params.id + '/' + f.filename, f.originalname));
+    }
+    if (b.sharepoint_link && b.sharepoint_link.trim()) {
+      db.prepare('INSERT INTO site_diary_attachments (diary_entry_id, sharepoint_link) VALUES (?, ?)').run(entryId, b.sharepoint_link.trim());
+    }
     req.flash('success', 'Diary entry added.');
   } catch (err) {
+    console.error('[Diary] CREATE ERROR:', err.message);
     req.flash('error', 'Failed to add diary entry: ' + err.message);
   }
   res.redirect(`/jobs/${req.params.id}#diary`);
 });
 
 // Update diary entry
-router.post('/:id/diary/:entryId', (req, res) => {
+router.post('/:id/diary/:entryId', diaryUpload.array('attachments', 5), (req, res) => {
   const db = getDb();
   const b = req.body;
   try {
     db.prepare(`
-      UPDATE site_diary_entries SET entry_date=?, task=?, representative=?, client_representative=?, outcomes=?, issues=?, comments=?, stage=?, tgs_number=?, tgs_scope=?, tgs_plan_id=?, updated_at=CURRENT_TIMESTAMP
+      UPDATE site_diary_entries SET entry_date=?, task=?, representative=?, representative_id=?, client_representative=?, outcomes=?, issues=?, comments=?, stage=?, tgs_number=?, tgs_scope=?, tgs_plan_id=?, compliance_item_id=?, equipment_assignment_id=?, updated_at=CURRENT_TIMESTAMP
       WHERE id = ? AND job_id = ?
     `).run(
-      b.entry_date, b.task || '', b.representative || '', b.client_representative || '',
+      b.entry_date, b.task || '', b.representative || '', b.representative_id || null,
+      b.client_representative || '',
       b.outcomes || '', b.issues || '', b.comments || '', b.stage || '',
       b.tgs_number || '', b.tgs_scope || '', b.tgs_plan_id || null,
+      b.compliance_item_id || null, b.equipment_assignment_id || null,
       req.params.entryId, req.params.id
     );
+    // Save new attachments
+    if (req.files && req.files.length > 0) {
+      const ins = db.prepare('INSERT INTO site_diary_attachments (diary_entry_id, file_path, original_name) VALUES (?, ?, ?)');
+      req.files.forEach(f => ins.run(req.params.entryId, '/data/uploads/diary/' + req.params.id + '/' + f.filename, f.originalname));
+    }
+    if (b.sharepoint_link && b.sharepoint_link.trim()) {
+      db.prepare('INSERT INTO site_diary_attachments (diary_entry_id, sharepoint_link) VALUES (?, ?)').run(req.params.entryId, b.sharepoint_link.trim());
+    }
     req.flash('success', 'Diary entry updated.');
   } catch (err) {
+    console.error('[Diary] UPDATE ERROR:', err.message);
     req.flash('error', 'Failed to update diary entry: ' + err.message);
   }
   res.redirect(`/jobs/${req.params.id}#diary`);

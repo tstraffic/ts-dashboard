@@ -3842,6 +3842,31 @@ function runMigrations(db) {
     console.log('Migration 73 complete.');
   }
 
+  // Migration 74: Site Diary enhancements — rep dropdown, compliance link, equipment, attachments
+  if (!isMigrationApplied.get(74)) {
+    const newCols74 = [
+      ['representative_id', 'INTEGER REFERENCES users(id)'],
+      ['compliance_item_id', 'INTEGER REFERENCES compliance(id)'],
+      ['equipment_assignment_id', 'INTEGER REFERENCES equipment_assignments(id)'],
+    ];
+    newCols74.forEach(([col, def]) => {
+      try { db.exec(`ALTER TABLE site_diary_entries ADD COLUMN ${col} ${def}`); } catch(e) { /* exists */ }
+    });
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS site_diary_attachments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        diary_entry_id INTEGER NOT NULL REFERENCES site_diary_entries(id) ON DELETE CASCADE,
+        file_path TEXT DEFAULT '',
+        original_name TEXT DEFAULT '',
+        sharepoint_link TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_diary_attach_entry ON site_diary_attachments(diary_entry_id)'); } catch(e) {}
+    recordMigration.run(74, 'Site diary enhancements');
+    console.log('Migration 74 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
