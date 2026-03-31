@@ -380,11 +380,7 @@
       <!-- Buttons -->
       <div class="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
         <% if (isEdit) { %>
-          <form method="POST" action="/compliance/<%= item.id %>/delete" onsubmit="return confirm('Delete this item?')" style="display:inline;">
-            <%- include('../partials/csrf') %>
-            <input type="hidden" name="return_to" value="<%= cancelHref %>">
-            <button type="submit" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition text-sm font-medium">Delete</button>
-          </form>
+          <button type="button" onclick="deleteItem()" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition text-sm font-medium">Delete</button>
         <% } else { %>
           <div></div>
         <% } %>
@@ -510,6 +506,18 @@ function generateRefNumber() {
       btn.textContent = 'Generate';
       btn.disabled = false;
     });
+}
+
+// Delete item via fetch (avoids nested form issue)
+function deleteItem() {
+  if (!confirm('Delete this item? This cannot be undone.')) return;
+  <% if (isEdit) { %>
+  fetch('/compliance/<%= item.id %>/delete', {
+    method: 'POST',
+    headers: csrfHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
+    body: 'return_to=<%= encodeURIComponent(cancelHref) %>'
+  }).then(function() { window.location.href = '<%= cancelHref %>'; });
+  <% } %>
 }
 
 // Quick-add toggle

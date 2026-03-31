@@ -231,7 +231,8 @@ router.post('/:id', (req, res) => {
     console.error('Compliance update error:', err.message);
     req.flash('error', 'Failed to update: ' + err.message);
   }
-  res.redirect(b.return_to || '/compliance');
+  // Stay on edit page after update
+  res.redirect('/compliance/' + req.params.id + '/edit' + (b.return_to ? '?return_to=' + encodeURIComponent(b.return_to) : ''));
 });
 
 router.post('/:id/delete', (req, res) => {
