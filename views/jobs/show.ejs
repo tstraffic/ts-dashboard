@@ -577,7 +577,18 @@
         </div>
       </form>
     </div>
-    <% if (typeof trafficPlans === 'undefined' || trafficPlans.length === 0) { %>
+    <%
+      // Combine traffic_plans + compliance items with plan-related types for this tab
+      const planTypes = ['traffic_guidance','tmp_approval','spa','rol'];
+      const compliancePlans = (typeof complianceItems !== 'undefined' ? complianceItems : []).filter(function(c) {
+        const types = (c.item_types || c.item_type || '').split(',');
+        return types.some(function(t) { return planTypes.includes(t.trim()); });
+      });
+      const allPlans = compliancePlans;
+      // Also include traffic_plans entries
+      const tpEntries = typeof trafficPlans !== 'undefined' ? trafficPlans : [];
+    %>
+    <% if (allPlans.length === 0 && tpEntries.length === 0) { %>
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
         <p class="text-gray-400 text-sm">No traffic plans for this job yet.</p>
         <a href="/compliance/new?job_id=<%= job.id %>&return_to=/projects/<%= job.id %>%23plans" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Create the first plan</a>
@@ -587,50 +598,61 @@
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-gray-200">
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Plan #</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Title / Ref</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Types</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Designer</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">ROL</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Submitted</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Approved</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Due</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Expiry</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
-          <% trafficPlans.forEach(tp => { %>
+          <% allPlans.forEach(function(item) {
+            const types = (item.item_types || item.item_type || '').split(',').filter(Boolean);
+            const typeLabels = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', spa: 'SPA', rol: 'ROL', council_permit: 'Council', bus_approval: 'Bus' };
+            const statusColors = { not_started: 'bg-gray-100 text-gray-600', started: 'bg-purple-50 text-purple-700', submitted: 'bg-blue-50 text-blue-700', approved: 'bg-emerald-50 text-emerald-700', rejected: 'bg-red-50 text-red-700', expired: 'bg-amber-50 text-amber-700' };
+          %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3">
+              <a href="/compliance/<%= item.id %>/edit" class="text-brand-600 hover:text-brand-700 font-medium"><%= item.title %></a>
+              <% if (item.reference_number) { %><div class="text-xs text-gray-400"><%= item.reference_number %></div><% } %>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <% types.forEach(function(t) { %>
+                  <span class="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700"><%= typeLabels[t] || t %></span>
+                <% }) %>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-gray-600 text-xs"><%= item.designer || item.approver_name || '-' %></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full <%= statusColors[item.status] || 'bg-gray-100 text-gray-600' %>"><%= (item.status || 'not_started').replace(/_/g, ' ') %></span>
+            </td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= item.due_date ? new Date(item.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></td>
+            <td class="px-4 py-3 text-gray-500 text-xs"><%= item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></td>
+            <td class="px-4 py-3">
+              <a href="/compliance/<%= item.id %>/edit" class="text-brand-600 hover:text-brand-700 text-xs font-medium">Edit</a>
+            </td>
+          </tr>
+          <% }) %>
+          <% tpEntries.forEach(function(tp) { %>
           <tr class="hover:bg-gray-50">
             <td class="px-4 py-3 text-brand-600 font-medium"><%= tp.plan_number %></td>
             <td class="px-4 py-3">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                <% if (tp.plan_type === 'TGS') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
-                <% } else if (tp.plan_type === 'TCP') { %>bg-teal-50 text-teal-700 ring-1 ring-teal-600/20
-                <% } else { %>bg-purple-50 text-purple-700 ring-1 ring-purple-600/20<% } %>"><%= tp.plan_type %></span>
+              <span class="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700"><%= tp.plan_type %></span>
             </td>
-            <td class="px-4 py-3 text-gray-600"><%= tp.designer || '-' %></td>
+            <td class="px-4 py-3 text-gray-600 text-xs"><%= tp.designer || '-' %></td>
             <td class="px-4 py-3">
-              <% if (tp.rol_required) { %>
-                <span class="text-xs <%= tp.rol_approved ? 'text-emerald-600' : tp.rol_submitted ? 'text-brand-600' : 'text-orange-600' %>">
-                  <%= tp.rol_approved ? 'Approved' : tp.rol_submitted ? 'Submitted' : 'Required' %>
-                </span>
-              <% } else { %>
-                <span class="text-xs text-gray-400">N/A</span>
-              <% } %>
-            </td>
-            <td class="px-4 py-3">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                <% if (tp.status === 'approved') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
-                <% } else if (tp.status === 'submitted' || tp.status === 'under_review') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
-                <% } else if (tp.status === 'rejected') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
-                <% } else if (tp.status === 'expired') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
-                <% } else { %>bg-white text-gray-600<% } %>"><%= tp.status ? tp.status.replace(/_/g, ' ') : 'draft' %></span>
+              <span class="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full
+                <% if (tp.status === 'approved') { %>bg-emerald-50 text-emerald-700
+                <% } else if (tp.status === 'submitted') { %>bg-blue-50 text-blue-700
+                <% } else { %>bg-gray-100 text-gray-600<% } %>"><%= tp.status ? tp.status.replace(/_/g, ' ') : 'draft' %></span>
             </td>
             <td class="px-4 py-3 text-gray-500 text-xs"><%= tp.submitted_date || '-' %></td>
-            <td class="px-4 py-3 text-gray-500 text-xs"><%= tp.approved_date || '-' %></td>
             <td class="px-4 py-3 text-gray-500 text-xs"><%= tp.expiry_date || '-' %></td>
             <td class="px-4 py-3">
-              <a href="/compliance/<%= tp.id %>/edit" class="text-brand-600 hover:text-brand-700 text-xs">Edit</a>
+              <a href="/compliance/<%= tp.id %>/edit" class="text-brand-600 hover:text-brand-700 text-xs font-medium">Edit</a>
             </td>
           </tr>
           <% }) %>
