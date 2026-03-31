@@ -76,11 +76,12 @@
           next.addEventListener('click', () => this._tryNext(i));
           right.appendChild(next);
         } else {
-          // Last step — show submit
+          // Last step — show submit (use button type to bypass native validation, validate all steps first)
           const submit = document.createElement('button');
-          submit.type = 'submit';
+          submit.type = 'button';
           submit.className = 'px-5 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-500 rounded-lg transition inline-flex items-center gap-2';
           submit.innerHTML = 'Save <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+          submit.addEventListener('click', () => this._trySubmit());
           right.appendChild(submit);
         }
 
@@ -101,6 +102,18 @@
       if (this._validateStep(fromStep)) {
         this._goToStep(fromStep + 1);
       }
+    }
+
+    _trySubmit() {
+      // Validate all steps before submitting
+      for (let i = 0; i < this.totalSteps; i++) {
+        if (!this._validateStep(i)) {
+          this._showStep(i);
+          return;
+        }
+      }
+      // All steps valid — submit the form
+      this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit();
     }
 
     _validateStep(stepIndex) {

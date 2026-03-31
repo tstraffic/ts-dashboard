@@ -81,8 +81,21 @@
   <!-- 2. Location -->
   <div id="section-1" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="1" data-wizard-title="Location">
     <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Location</h2>
+    <!-- Address search -->
+    <div class="mb-4 relative">
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Search Address</label>
+      <div class="relative">
+        <input type="text" id="address_search" placeholder="Start typing an address..." autocomplete="off"
+          class="w-full px-3 py-2 pl-9 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <div id="address_spinner" class="hidden absolute right-3 top-1/2 -translate-y-1/2">
+          <svg class="animate-spin w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+        </div>
+      </div>
+      <div id="address_results" class="hidden absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+    </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
+      <div class="sm:col-span-2">
         <label for="site_address" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Site Address</label>
         <input type="text" id="site_address" name="site_address" value="<%= isEdit && job.site_address ? job.site_address : '' %>" placeholder="Full site address"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
@@ -91,6 +104,11 @@
         <label for="suburb" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Suburb</label>
         <input type="text" id="suburb" name="suburb" value="<%= isEdit && job.suburb ? job.suburb : '' %>" placeholder="Suburb"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label for="location_state" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">State</label>
+        <input type="text" id="location_state" readonly tabindex="-1" value=""
+          class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 text-sm">
       </div>
     </div>
   </div>
@@ -319,6 +337,82 @@ function saveJobClient() {
     }
   }).catch(function(e) { alert('Error creating client: ' + e.message); });
 }
+
+// Address autocomplete (OpenStreetMap Nominatim — free, no API key)
+(function() {
+  var input = document.getElementById('address_search');
+  var results = document.getElementById('address_results');
+  var spinner = document.getElementById('address_spinner');
+  if (!input) return;
+  var timer;
+
+  input.addEventListener('input', function() {
+    clearTimeout(timer);
+    var q = input.value.trim();
+    if (q.length < 3) { results.classList.add('hidden'); return; }
+    timer = setTimeout(function() {
+      spinner.classList.remove('hidden');
+      fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=au&limit=6&q=' + encodeURIComponent(q), {
+        headers: { 'Accept': 'application/json' }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        spinner.classList.add('hidden');
+        if (!data.length) { results.innerHTML = '<div class="px-3 py-2 text-sm text-gray-400">No results found</div>'; results.classList.remove('hidden'); return; }
+        results.innerHTML = data.map(function(item, i) {
+          var addr = item.address || {};
+          var suburb = addr.suburb || addr.town || addr.city || addr.village || '';
+          var state = addr.state || '';
+          return '<button type="button" data-idx="' + i + '" class="w-full text-left px-3 py-2.5 hover:bg-brand-50 transition text-sm border-b border-gray-100 last:border-0">' +
+            '<div class="font-medium text-gray-900 truncate">' + item.display_name.split(',').slice(0, 3).join(', ') + '</div>' +
+            '<div class="text-xs text-gray-400 mt-0.5">' + (suburb ? suburb + ', ' : '') + state + '</div>' +
+            '</button>';
+        }).join('');
+        results.classList.remove('hidden');
+        // Store data for click handler
+        results._data = data;
+      })
+      .catch(function() { spinner.classList.add('hidden'); });
+    }, 350);
+  });
+
+  results.addEventListener('click', function(e) {
+    var btn = e.target.closest('button[data-idx]');
+    if (!btn || !results._data) return;
+    var item = results._data[parseInt(btn.dataset.idx)];
+    var addr = item.address || {};
+
+    // Fill fields
+    var street = (addr.road ? (addr.house_number ? addr.house_number + ' ' : '') + addr.road : '');
+    var suburb = addr.suburb || addr.town || addr.city || addr.village || '';
+    var state = addr.state || '';
+    var fullAddr = street || item.display_name.split(',').slice(0, 2).join(', ').trim();
+
+    document.getElementById('site_address').value = fullAddr + (suburb ? ', ' + suburb : '');
+    document.getElementById('suburb').value = suburb;
+    document.getElementById('location_state').value = state;
+
+    // Also try to set the State dropdown on step 1 if it matches
+    var stateSelect = document.getElementById('state');
+    if (stateSelect) {
+      var abbr = { 'New South Wales': 'NSW', 'Victoria': 'VIC', 'Queensland': 'QLD', 'South Australia': 'SA', 'Western Australia': 'WA', 'Tasmania': 'TAS', 'Northern Territory': 'NT', 'Australian Capital Territory': 'ACT' };
+      var stateCode = abbr[state] || state;
+      for (var i = 0; i < stateSelect.options.length; i++) {
+        if (stateSelect.options[i].value === stateCode) { stateSelect.value = stateCode; break; }
+      }
+    }
+
+    input.value = '';
+    results.classList.add('hidden');
+  });
+
+  // Close results on outside click
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#address_search') && !e.target.closest('#address_results')) {
+      results.classList.add('hidden');
+    }
+  });
+})();
 
 // Sync hidden client name field on form submit
 document.querySelector('form').addEventListener('submit', function() {
