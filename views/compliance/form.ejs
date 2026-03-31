@@ -9,7 +9,8 @@
   const typeOptions = [
     { value: 'traffic_guidance',     label: 'TGS (Traffic Guidance Scheme)' },
     { value: 'tmp_approval',         label: 'CTMP (Construction Traffic Mgmt Plan)' },
-    { value: 'spa',                  label: 'SPA (Special Permit Application)' },
+    { value: 'spa',                  label: 'SPA (Swept Path Analysis)' },
+    { value: 'sza',                  label: 'SZA (Speed Zone Authorisation)' },
     { value: 'rol',                  label: 'ROL (Road Occupancy Licence)' },
     { value: 'council_permit',       label: 'Council Permit' },
     { value: 'bus_approval',        label: 'Bus Approval' },
@@ -294,6 +295,13 @@
               <input type="text" name="spa_response" value="<%= isEdit && item.spa_response ? item.spa_response : '' %>"
                 class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 placeholder="SPA status or response">
+            </div>
+            <!-- SZA response -->
+            <div data-response-for="sza" class="hidden">
+              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">SZA Response</label>
+              <input type="text" name="sza_response" value="<%= isEdit && item.sza_response ? item.sza_response : '' %>"
+                class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="Speed Zone Authorisation status or response">
             </div>
             <!-- Council response + fee -->
             <div data-response-for="council_permit" class="hidden sm:col-span-2">

@@ -3941,6 +3941,13 @@ function runMigrations(db) {
     console.log('Migration 77 complete.');
   }
 
+  // Migration 78: Add sza_response column to compliance
+  if (!isMigrationApplied.get(78)) {
+    try { db.exec("ALTER TABLE compliance ADD COLUMN sza_response TEXT DEFAULT ''"); } catch(e) { /* exists */ }
+    recordMigration.run(78, 'Add sza_response column to compliance');
+    console.log('Migration 78 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
