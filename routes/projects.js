@@ -55,7 +55,7 @@ router.get('/', (req, res) => {
   jobs.forEach(job => {
     const key = job.client || 'Unassigned';
     if (!clientGroupsMap[key]) {
-      clientGroupsMap[key] = { name: key, clientId: job.client_id || 0, jobs: [], activeCount: 0, totalCount: 0, pendingTasks: 0, pendingPlans: 0, overdueTasks: 0, overdueCompliance: 0 };
+      clientGroupsMap[key] = { name: key, clientId: job.client_id || 0, jobs: [], activeCount: 0, totalCount: 0, pendingTasks: 0, pendingPlans: 0, overdueTasks: 0, overdueCompliance: 0, hasHighPriority: false };
     }
     clientGroupsMap[key].jobs.push(job);
     clientGroupsMap[key].totalCount++;
@@ -64,8 +64,13 @@ router.get('/', (req, res) => {
     clientGroupsMap[key].pendingPlans += (job.pending_plans || 0);
     clientGroupsMap[key].overdueTasks += (job.overdue_tasks || 0);
     clientGroupsMap[key].overdueCompliance += (job.overdue_compliance || 0);
+    if (job.priority === 'high') clientGroupsMap[key].hasHighPriority = true;
   });
-  const clientGroups = Object.values(clientGroupsMap).sort((a, b) => a.name.localeCompare(b.name));
+  const clientGroups = Object.values(clientGroupsMap).sort((a, b) => {
+    if (a.hasHighPriority && !b.hasHighPriority) return -1;
+    if (!a.hasHighPriority && b.hasHighPriority) return 1;
+    return a.name.localeCompare(b.name);
+  });
 
   res.render('projects/index', {
     title: 'Project Register',
