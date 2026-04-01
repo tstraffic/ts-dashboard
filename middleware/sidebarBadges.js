@@ -37,6 +37,7 @@ function sidebarBadges(req, res, next) {
         )
       `, [today, next30, today, next30, today, next30, today, next30, today, next30]),
       compliance: safeCount(db, "SELECT COUNT(*) as c FROM compliance WHERE status NOT IN ('approved','expired')", []),
+      jobActions: safeCount(db, "SELECT COUNT(DISTINCT j.id) as c FROM jobs j WHERE j.status NOT IN ('completed','closed','cancelled') AND (EXISTS (SELECT 1 FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') OR EXISTS (SELECT 1 FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired')))", []),
     };
 
     cache = { data: badges, expires: now + 60000 };
