@@ -33,6 +33,7 @@ router.get('/', (req, res) => {
   else if (tab === 'in_progress') { baseWhere += " AND t.status = 'in_progress'"; }
   else if (tab === 'blocked') { baseWhere += " AND t.status = 'blocked'"; }
   else if (tab === 'completed') { baseWhere += " AND t.status = 'complete'"; }
+  else { baseWhere += " AND t.status != 'complete'"; } // Hide completed by default
 
   // View-based date filtering
   if (activeView === 'today') {
