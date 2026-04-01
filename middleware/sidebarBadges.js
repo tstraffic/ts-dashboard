@@ -23,10 +23,25 @@ function sidebarBadges(req, res, next) {
     const next30 = new Date(now + 30 * 86400000).toISOString().split('T')[0];
 
     const badges = {
+      // Bookings — today's allocations
       allocations: safeCount(db, "SELECT COUNT(*) as c FROM crew_allocations WHERE allocation_date = ? AND status = 'allocated'", [today]),
-      tasks: safeCount(db, "SELECT COUNT(*) as c FROM tasks WHERE status != 'complete'"),
+
+      // Jobs — jobs with outstanding items (blue)
+      jobActions: safeCount(db, "SELECT COUNT(DISTINCT j.id) as c FROM jobs j WHERE j.status NOT IN ('completed','closed','cancelled') AND (EXISTS (SELECT 1 FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') OR EXISTS (SELECT 1 FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired')))", []),
+
+      // Tasks — split: overdue (red) vs outstanding non-overdue (blue)
+      tasksOverdue: safeCount(db, "SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND due_date < ?", [today]),
+      tasks: safeCount(db, "SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND (due_date >= ? OR due_date IS NULL)", [today]),
+
+      // Plans & Approvals — split: overdue (red) vs outstanding non-overdue (blue)
+      complianceOverdue: safeCount(db, "SELECT COUNT(*) as c FROM compliance WHERE status NOT IN ('approved','expired') AND due_date IS NOT NULL AND due_date < ?", [today]),
+      compliance: safeCount(db, "SELECT COUNT(*) as c FROM compliance WHERE status NOT IN ('approved','expired') AND (due_date >= ? OR due_date IS NULL)", [today]),
+
+      // Safety
       incidents: safeCount(db, "SELECT COUNT(*) as c FROM incidents WHERE investigation_status NOT IN ('closed', 'resolved')"),
       defects: safeCount(db, "SELECT COUNT(*) as c FROM defects WHERE status NOT IN ('closed', 'deferred')"),
+
+      // Crew — expiring certs within 30 days
       crew: safeCount(db, `
         SELECT COUNT(*) as c FROM crew_members WHERE active = 1 AND (
           (tc_ticket_expiry IS NOT NULL AND tc_ticket_expiry BETWEEN ? AND ?)
@@ -36,8 +51,6 @@ function sidebarBadges(req, res, next) {
           OR (medical_expiry IS NOT NULL AND medical_expiry BETWEEN ? AND ?)
         )
       `, [today, next30, today, next30, today, next30, today, next30, today, next30]),
-      compliance: safeCount(db, "SELECT COUNT(*) as c FROM compliance WHERE status NOT IN ('approved','expired')", []),
-      jobActions: safeCount(db, "SELECT COUNT(DISTINCT j.id) as c FROM jobs j WHERE j.status NOT IN ('completed','closed','cancelled') AND (EXISTS (SELECT 1 FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') OR EXISTS (SELECT 1 FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired')))", []),
     };
 
     cache = { data: badges, expires: now + 60000 };
