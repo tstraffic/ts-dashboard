@@ -115,7 +115,7 @@
   <!-- Register admin service worker -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/admin-sw.js?v=26', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('/admin-sw.js?v=27', { updateViaCache: 'none' })
         .then(function(reg) {
           reg.update();
           console.log('Admin SW registered, scope:', reg.scope);
