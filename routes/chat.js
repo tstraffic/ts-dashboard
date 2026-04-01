@@ -449,6 +449,22 @@ router.post('/api/upload', chatUpload.single('file'), async (req, res) => {
     return res.status(400).json({ error: 'No file uploaded or invalid file type. Allowed: images, PDF, Word, Excel, CSV, TXT.' });
   }
 
+  // Verify thread membership (admin/management can access all)
+  const threadId = req.body.thread_id;
+  if (threadId && threadId !== 'general') {
+    const db = getDb();
+    const userRole = (req.session.user.role || '').toLowerCase();
+    const isAdmin = ['admin', 'management'].includes(userRole);
+    if (!isAdmin) {
+      const member = db.prepare('SELECT 1 FROM chat_thread_members WHERE thread_id = ? AND user_id = ?').get(threadId, req.session.user.id);
+      if (!member) {
+        // Clean up uploaded file
+        try { fs.unlinkSync(req.file.path); } catch (e) {}
+        return res.status(403).json({ error: 'Not a member of this thread.' });
+      }
+    }
+  }
+
   const threadDir = path.basename(req.file.destination);
   const fileUrl = `/uploads/chat/${threadDir}/${req.file.filename}`;
   const isImage = req.file.mimetype.startsWith('image/');

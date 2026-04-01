@@ -34,7 +34,7 @@ router.get('/', requireRole('admin'), (req, res) => {
     params.push(req.query.from_date);
   }
   if (req.query.to_date) {
-    where.push('al.created_at <= ? || " 23:59:59"');
+    where.push("al.created_at <= (? || ' 23:59:59')");
     params.push(req.query.to_date);
   }
 

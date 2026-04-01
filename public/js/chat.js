@@ -274,7 +274,7 @@
             <div class="chat-msg-time">${timeStr}</div>
           </div>
           ${actionsHtml}
-          <button class="chat-reply-btn text-slate-600 hover:text-slate-300 text-xs self-center" onclick="window._chatReply(${msg.id}, '${this.escapeHtml(msg.sender_name || '')}', '${this.escapeHtml((msg.body || '').substring(0, 50))}', '${this.threadId}')" title="Reply" style="opacity:0;transition:opacity 0.15s">&#8617;</button>
+          <button class="chat-reply-btn text-slate-600 hover:text-slate-300 text-xs self-center" onclick="window._chatReply(${msg.id}, '${this.escapeJs(msg.sender_name || '')}', '${this.escapeJs((msg.body || '').substring(0, 50))}', '${this.threadId}')" title="Reply" style="opacity:0;transition:opacity 0.15s">&#8617;</button>
         `;
 
         // Show reply button on hover
@@ -326,6 +326,11 @@
       const d = document.createElement('div');
       d.textContent = str;
       return d.innerHTML;
+    }
+
+    escapeJs(str) {
+      if (!str) return '';
+      return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
     }
 
     isScrolledToBottom() {

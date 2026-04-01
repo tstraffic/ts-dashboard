@@ -14,15 +14,15 @@ router.use(requireRole('admin'));
 
 router.get('/users', (req, res) => {
   const db = getDb();
-  const users = db.prepare('SELECT id, username, password_hash, full_name, email, role, active, created_at FROM users ORDER BY full_name').all();
+  const users = db.prepare('SELECT id, username, full_name, email, role, active, created_at, CASE WHEN password_hash = \'INVITE_PENDING\' THEN 0 ELSE 1 END as has_password FROM users ORDER BY full_name').all();
 
   // Stats
   const roleAliases = { management: 'admin', accounts: 'finance', marketing: 'operations' };
   const stats = {
     total: users.length,
-    active: users.filter(u => u.active && u.password_hash !== 'INVITE_PENDING').length,
-    pending: users.filter(u => u.password_hash === 'INVITE_PENDING').length,
-    inactive: users.filter(u => !u.active && u.password_hash !== 'INVITE_PENDING').length,
+    active: users.filter(u => u.active && u.has_password).length,
+    pending: users.filter(u => !u.has_password).length,
+    inactive: users.filter(u => !u.active && u.has_password).length,
     byRole: {}
   };
   users.forEach(u => {

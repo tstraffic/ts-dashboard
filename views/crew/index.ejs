@@ -73,11 +73,11 @@
       <%- include('../partials/csrf') %>
       <!-- Status Tabs -->
       <div class="flex rounded-lg overflow-hidden border border-gray-300 self-start">
-        <a href="/crew?filter=all&search=<%= search %>&role=<%= roleFilter %>" class="px-3 py-2 text-xs font-medium <%= filter === 'all' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">All</a>
-        <a href="/crew?filter=active&search=<%= search %>&role=<%= roleFilter %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'active' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Active</a>
-        <a href="/crew?filter=blocked&search=<%= search %>&role=<%= roleFilter %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'blocked' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Blocked</a>
-        <a href="/crew?filter=fatigued&search=<%= search %>&role=<%= roleFilter %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'fatigued' ? 'bg-orange-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Fatigued</a>
-        <a href="/crew?filter=expiring&search=<%= search %>&role=<%= roleFilter %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'expiring' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Expiring</a>
+        <a href="/crew?filter=all&search=<%= encodeURIComponent(search || '') %>&role=<%= encodeURIComponent(roleFilter || '') %>" class="px-3 py-2 text-xs font-medium <%= filter === 'all' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">All</a>
+        <a href="/crew?filter=active&search=<%= encodeURIComponent(search || '') %>&role=<%= encodeURIComponent(roleFilter || '') %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'active' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Active</a>
+        <a href="/crew?filter=blocked&search=<%= encodeURIComponent(search || '') %>&role=<%= encodeURIComponent(roleFilter || '') %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'blocked' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Blocked</a>
+        <a href="/crew?filter=fatigued&search=<%= encodeURIComponent(search || '') %>&role=<%= encodeURIComponent(roleFilter || '') %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'fatigued' ? 'bg-orange-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Fatigued</a>
+        <a href="/crew?filter=expiring&search=<%= encodeURIComponent(search || '') %>&role=<%= encodeURIComponent(roleFilter || '') %>" class="px-3 py-2 text-xs font-medium border-l border-gray-300 <%= filter === 'expiring' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100' %>">Expiring</a>
       </div>
 
       <!-- Role Filter -->

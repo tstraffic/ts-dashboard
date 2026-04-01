@@ -76,7 +76,7 @@
     <tbody class="divide-y divide-gray-100">
       <% users.forEach(function(u) {
         const dr = displayRole(u.role);
-        const isPending = u.password_hash === 'INVITE_PENDING';
+        const isPending = !u.has_password;
         const isInactive = !u.active && !isPending;
       %>
       <tr class="hover:bg-gray-50 <%= isInactive ? 'opacity-50' : '' %>">

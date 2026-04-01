@@ -176,21 +176,33 @@ router.post('/', (req, res) => {
   }
 });
 
-// POST /bulk — Bulk actions on tasks
+// POST /bulk — Bulk actions on tasks (with ownership check)
 router.post('/bulk', (req, res) => {
   const db = getDb();
   const ids = (req.body.ids || '').split(',').map(Number).filter(n => n > 0);
   const action = req.body.action;
   if (ids.length === 0) return res.redirect('/tasks');
 
+  // Verify ownership on each task — only owner or admin/management can bulk-act
+  const allowedIds = [];
+  ids.forEach(id => {
+    const task = db.prepare('SELECT id, owner_id FROM tasks WHERE id = ?').get(id);
+    if (task && canModifyTask(task, req.session.user)) allowedIds.push(id);
+  });
+
+  if (allowedIds.length === 0) {
+    req.flash('error', 'You can only modify tasks assigned to you.');
+    return res.redirect('/tasks');
+  }
+
   if (action === 'complete') {
     const stmt = db.prepare("UPDATE tasks SET status = 'complete', completed_date = date('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-    ids.forEach(id => stmt.run(id));
-    req.flash('success', ids.length + ' task(s) marked complete.');
+    allowedIds.forEach(id => stmt.run(id));
+    req.flash('success', allowedIds.length + ' task(s) marked complete.');
   } else if (action === 'delete') {
     const stmt = db.prepare('DELETE FROM tasks WHERE id = ?');
-    ids.forEach(id => stmt.run(id));
-    req.flash('success', ids.length + ' task(s) deleted.');
+    allowedIds.forEach(id => stmt.run(id));
+    req.flash('success', allowedIds.length + ' task(s) deleted.');
   }
   res.redirect('/tasks');
 });

@@ -69,7 +69,7 @@ router.post('/:id/read', (req, res) => {
   const db = getDb();
   db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?').run(req.params.id, req.session.user.id);
   // If there is a link, redirect there
-  const notif = db.prepare('SELECT link FROM notifications WHERE id = ?').get(req.params.id);
+  const notif = db.prepare('SELECT link FROM notifications WHERE id = ? AND user_id = ?').get(req.params.id, req.session.user.id);
   if (notif && notif.link) return res.redirect(notif.link);
   res.redirect('/notifications');
 });
