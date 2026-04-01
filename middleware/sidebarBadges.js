@@ -19,7 +19,7 @@ function sidebarBadges(req, res, next) {
 
     const badges = {
       allocations: db.prepare("SELECT COUNT(*) as c FROM crew_allocations WHERE allocation_date = ? AND status = 'allocated'").get(today).c,
-      tasks: db.prepare("SELECT COUNT(*) as c FROM tasks WHERE due_date < ? AND status != 'complete'").get(today).c,
+      tasks: db.prepare("SELECT COUNT(*) as c FROM tasks WHERE status != 'complete'").get().c,
       incidents: db.prepare("SELECT COUNT(*) as c FROM incidents WHERE investigation_status NOT IN ('closed', 'resolved')").get().c,
       defects: db.prepare("SELECT COUNT(*) as c FROM defects WHERE status NOT IN ('closed', 'deferred')").get().c,
       crew: db.prepare(`
