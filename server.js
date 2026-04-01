@@ -154,6 +154,31 @@ app.get('/w/more', requireWorker, workerLocals, (req, res) => {
 // Block worker-only sessions from admin routes
 app.use(blockWorkerFromAdmin);
 
+// Force password change for accounts with default credentials
+app.use((req, res, next) => {
+  if (req.session && req.session.user) {
+    // Check if user must change password (lazy check from DB)
+    if (req.session._mustChangePassword === undefined) {
+      try {
+        const { getDb } = require('./db/database');
+        const db = getDb();
+        const row = db.prepare('SELECT must_change_password FROM users WHERE id = ?').get(req.session.user.id);
+        req.session._mustChangePassword = row && row.must_change_password ? true : false;
+      } catch (e) { req.session._mustChangePassword = false; }
+    }
+    if (req.session._mustChangePassword) {
+      // Allow access to profile, logout, and static assets only
+      const allowed = ['/profile', '/logout', '/login'];
+      const isAllowed = allowed.some(p => req.path === p || req.path.startsWith(p + '/'));
+      if (!isAllowed && !req.path.startsWith('/css') && !req.path.startsWith('/js') && !req.path.startsWith('/images') && !req.path.startsWith('/notifications/push')) {
+        req.flash('error', 'Please change your password before continuing. Your account is using a default password.');
+        return res.redirect('/profile');
+      }
+    }
+  }
+  next();
+});
+
 // Routes (auth is public, everything else requires login + permission)
 app.use('/', require('./routes/auth'));
 app.use('/profile', requireLogin, require('./routes/profile'));
@@ -240,7 +265,22 @@ app.use((err, req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`T&S Operations Dashboard running at http://localhost:${PORT}`);
-  if (!isProduction) console.log(`Dev login: admin / admin123`);
+
+  // ── Production security checks ──
+  if (isProduction) {
+    if (!process.env.SESSION_SECRET) {
+      console.warn('⚠️  SECURITY: SESSION_SECRET not set! Sessions use an auto-generated secret that changes on restart.');
+    }
+    if (!process.env.RESEND_API_KEY && !(process.env.SMTP_PASS && process.env.SMTP_PASS.startsWith('re_'))) {
+      console.warn('⚠️  EMAIL: No Resend API key configured. Password resets and notifications will not send.');
+    }
+    const fromEmail = process.env.SMTP_FROM_EMAIL || '';
+    if (fromEmail.includes('resend.dev')) {
+      console.warn('⚠️  EMAIL: Still using onboarding@resend.dev. Verify your domain in Resend for custom from address.');
+    }
+  } else {
+    console.log(`Dev login: admin / admin123`);
+  }
 
   // Initialize web push VAPID keys
   initVapid();

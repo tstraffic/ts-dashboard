@@ -29,6 +29,12 @@ router.post('/login', (req, res) => {
     role: user.role
   };
 
+  // Force password change for accounts with default/seed credentials
+  if (user.must_change_password) {
+    req.flash('error', 'You must change your password before continuing. This account is using a default password.');
+    return res.redirect('/profile');
+  }
+
   const returnTo = req.session.returnTo || '/dashboard';
   delete req.session.returnTo;
   res.redirect(returnTo);

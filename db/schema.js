@@ -3963,6 +3963,30 @@ function runMigrations(db) {
     console.log('Migration 80 complete.');
   }
 
+  // Migration 81: Add must_change_password flag + flag default admin
+  if (!isMigrationApplied.get(81)) {
+    try { db.exec("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0"); } catch(e) { /* exists */ }
+    // Flag the default admin if they still have the seed password
+    try {
+      const admin = db.prepare("SELECT id, password_hash FROM users WHERE username = 'admin'").get();
+      if (admin && bcrypt.compareSync('admin123', admin.password_hash)) {
+        db.prepare("UPDATE users SET must_change_password = 1 WHERE id = ?").run(admin.id);
+        console.log('Migration 81: Default admin flagged for password change.');
+      }
+    } catch(e) { /* ok */ }
+    // Also flag any seed users with 'password' as their password
+    try {
+      const seedUsers = db.prepare("SELECT id, password_hash FROM users WHERE username IN ('ops_user','planning_user','finance_user','accounts_user')").all();
+      seedUsers.forEach(u => {
+        if (bcrypt.compareSync('password', u.password_hash)) {
+          db.prepare("UPDATE users SET must_change_password = 1 WHERE id = ?").run(u.id);
+        }
+      });
+    } catch(e) { /* ok */ }
+    recordMigration.run(81, 'Add must_change_password flag for default credentials');
+    console.log('Migration 81 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

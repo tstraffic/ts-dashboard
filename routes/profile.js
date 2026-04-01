@@ -92,7 +92,10 @@ router.post('/change-password', (req, res) => {
   }
 
   const hash = bcrypt.hashSync(new_password, 12);
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.session.user.id);
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(hash, req.session.user.id);
+
+  // Clear the forced password change flag in session
+  req.session._mustChangePassword = false;
 
   req.flash('success', 'Password changed successfully.');
   res.redirect('/profile');
