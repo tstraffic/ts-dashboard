@@ -12,13 +12,13 @@ router.get('/', (req, res) => {
   query += ` ORDER BY pu.week_ending DESC, pu.created_at DESC LIMIT 100`;
 
   const updates = db.prepare(query).all(...params);
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status NOT IN ('completed','closed','cancelled') ORDER BY job_number").all();
   res.render('updates/index', { title: 'Project Updates', updates, jobs, filters: req.query, user: req.session.user });
 });
 
 router.get('/new', (req, res) => {
   const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status NOT IN ('completed','closed','cancelled') ORDER BY job_number").all();
   res.render('updates/form', { title: 'Submit Weekly Update', update: null, jobs, user: req.session.user, prefillJobId: req.query.job_id || '', returnTo: req.query.return_to || '/projects#updates' });
 });
 

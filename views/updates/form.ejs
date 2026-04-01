@@ -26,13 +26,20 @@
       <div class="space-y-6">
         <!-- Job -->
         <div>
-          <label for="job_id" class="block text-sm font-medium text-gray-600 mb-1">Job <span class="text-red-600">*</span></label>
-          <select id="job_id" name="job_id" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="">Select a job...</option>
-            <% jobs.forEach(function(job) { %>
-              <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
-            <% }) %>
-          </select>
+          <% const prefillJob = selectedJobId ? jobs.find(j => String(j.id) === String(selectedJobId)) : null; %>
+          <% if (prefillJob) { %>
+            <input type="hidden" name="job_id" value="<%= prefillJob.id %>">
+            <label class="block text-sm font-medium text-gray-600 mb-1">Job</label>
+            <div class="w-full bg-gray-100 border border-gray-300 text-gray-900 rounded-lg px-3 py-2 font-medium"><%= prefillJob.job_number %> - <%= prefillJob.client %></div>
+          <% } else { %>
+            <label for="job_id" class="block text-sm font-medium text-gray-600 mb-1">Job <span class="text-red-600">*</span></label>
+            <select id="job_id" name="job_id" required class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">Select a job...</option>
+              <% jobs.forEach(function(job) { %>
+                <option value="<%= job.id %>"><%= job.job_number %> - <%= job.client %></option>
+              <% }) %>
+            </select>
+          <% } %>
         </div>
 
         <!-- Week Ending -->
