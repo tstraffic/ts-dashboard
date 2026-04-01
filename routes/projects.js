@@ -10,7 +10,9 @@ router.get('/', (req, res) => {
   const db = getDb();
   const { status, search, suburb } = req.query;
   let query = `SELECT j.*, u.full_name as pm_name, bm.budget_contract, bm.total_spent as budget_spent,
+    (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') as pending_tasks,
     (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.due_date < date('now')) as overdue_tasks,
+    (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved')) as pending_plans,
     (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved') AND c.due_date IS NOT NULL AND c.due_date < date('now')) as overdue_compliance
     FROM jobs j
     LEFT JOIN users u ON j.project_manager_id = u.id
