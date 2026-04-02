@@ -5,6 +5,20 @@ const path = require('path');
 const fs = require('fs');
 const { getDb } = require('../db/database');
 
+// Auto-create site diary entry when a compliance item linked to a job changes
+function autoLogDiary(db, { jobId, complianceItemId, summary, userId }) {
+  if (!jobId) return; // No diary entry without a job
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    db.prepare(`
+      INSERT INTO site_diary_entries (job_id, entry_date, task, outcomes, compliance_item_id, created_by_id)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(jobId, today, 'Plans & Approvals Update', summary, complianceItemId || null, userId || null);
+  } catch (e) {
+    console.error('[Compliance] Auto diary log error:', e.message);
+  }
+}
+
 // Multer config for compliance document uploads
 const complianceStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -203,6 +217,16 @@ router.post('/', (req, res) => {
     }
   }
 
+  // Auto-log to site diary
+  const typeLabelsForDiary = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', rol: 'ROL', council_permit: 'Council Permit', spa: 'SPA', sza: 'SZA', bus_approval: 'Bus Approval', police_notification: 'Police Notification', letter_drop: 'Letter Drop' };
+  const typeLabel = typesArr.map(t => typeLabelsForDiary[t] || t).join(' / ') || 'Plan';
+  autoLogDiary(db, {
+    jobId: b.job_id,
+    complianceItemId: complianceId,
+    summary: `${typeLabel} created: ${b.title || 'Untitled'}. Ref: ${b.reference_number || 'N/A'}. Status: ${b.status || 'not_started'}.`,
+    userId: req.session.user ? req.session.user.id : null
+  });
+
   req.flash('success', 'Item created.' + (b.assigned_to_id && b.status !== 'approved' ? ' Task auto-created for assignee.' : ''));
   res.redirect(b.return_to || '/compliance');
 });
@@ -223,7 +247,21 @@ router.post('/bulk-status', (req, res) => {
   const validStatuses = ['not_started', 'started', 'submitted', 'approved', 'rejected', 'expired'];
   if (!Array.isArray(ids) || ids.length === 0 || !validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid request' });
   const placeholders = ids.map(() => '?').join(',');
+  // Log to diary before updating
+  const items = db.prepare(`SELECT id, job_id, title, reference_number, item_type, item_types, status as old_status FROM compliance WHERE id IN (${placeholders})`).all(...ids);
   db.prepare(`UPDATE compliance SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`).run(status, ...ids);
+  // Auto-log bulk status change to diary
+  items.forEach(item => {
+    if (item.job_id && item.old_status !== status) {
+      const typeMap = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', rol: 'ROL', council_permit: 'Council', spa: 'SPA', sza: 'SZA' };
+      const types = (item.item_types || item.item_type || '').split(',').map(t => typeMap[t] || t).join(' / ');
+      autoLogDiary(db, {
+        jobId: item.job_id, complianceItemId: item.id,
+        summary: `${types} status changed (${item.reference_number || 'N/A'}): ${item.title}. ${(item.old_status || 'not_started').replace(/_/g, ' ')} → ${status.replace(/_/g, ' ')}.`,
+        userId: req.session.user ? req.session.user.id : null
+      });
+    }
+  });
   res.json({ success: true });
 });
 
@@ -275,6 +313,8 @@ router.get('/:id/edit', (req, res) => {
 router.post('/:id', (req, res) => {
   const db = getDb();
   const b = req.body;
+  // Load old item to detect changes for diary logging
+  const oldItem = db.prepare('SELECT * FROM compliance WHERE id = ?').get(req.params.id);
   // Handle multi-select item types
   const typesArr = b.item_types ? (Array.isArray(b.item_types) ? b.item_types : [b.item_types]) : (b.item_type ? [b.item_type] : []);
   const itemTypes = typesArr.join(',');
@@ -331,6 +371,29 @@ router.post('/:id', (req, res) => {
       }
     } catch (taskErr) {
       console.error('[Compliance] Auto-task sync error:', taskErr.message);
+    }
+
+    // Auto-log changes to site diary
+    if (oldItem) {
+      const changes = [];
+      if (oldItem.status !== b.status) changes.push(`Status: ${(oldItem.status || 'not_started').replace(/_/g, ' ')} → ${(b.status || '').replace(/_/g, ' ')}`);
+      if ((oldItem.submitted_date || '') !== (b.submitted_date || '')) changes.push(`Submitted: ${b.submitted_date || 'cleared'}`);
+      if ((oldItem.approved_date || '') !== (b.approved_date || '')) changes.push(`Approved: ${b.approved_date || 'cleared'}`);
+      if ((oldItem.received_date || '') !== (b.received_date || '')) changes.push(`Received: ${b.received_date || 'cleared'}`);
+      if ((oldItem.start_date || '') !== (b.start_date || '')) changes.push(`Start date: ${b.start_date || 'cleared'}`);
+      if ((oldItem.finish_date || '') !== (b.finish_date || '')) changes.push(`Finish date: ${b.finish_date || 'cleared'}`);
+      if ((oldItem.designer || '') !== (b.designer || '')) changes.push(`Designer: ${b.designer || 'unassigned'}`);
+      if (oldItem.revision_required != (b.revision_required ? 1 : 0)) changes.push(b.revision_required ? 'Revision required flagged' : 'Revision required cleared');
+      if (changes.length > 0) {
+        const diaryTypeLabels = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', rol: 'ROL', council_permit: 'Council Permit', spa: 'SPA', sza: 'SZA', bus_approval: 'Bus Approval', police_notification: 'Police Notification', letter_drop: 'Letter Drop' };
+        const diaryTypeLabel = typesArr.map(t => diaryTypeLabels[t] || t).join(' / ') || 'Plan';
+        autoLogDiary(db, {
+          jobId: b.job_id || oldItem.job_id,
+          complianceItemId: parseInt(req.params.id),
+          summary: `${diaryTypeLabel} updated (${b.reference_number || oldItem.reference_number || 'N/A'}): ${b.title || oldItem.title}. ${changes.join('. ')}.`,
+          userId: req.session.user ? req.session.user.id : null
+        });
+      }
     }
 
     req.flash('success', 'Item updated.');
@@ -449,6 +512,19 @@ router.post('/:id/revisions', (req, res) => {
   // Update revision_count on parent
   const count = db.prepare('SELECT COUNT(*) as c FROM compliance_revisions WHERE compliance_id = ?').get(complianceId).c;
   db.prepare('UPDATE compliance SET revision_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(count, complianceId);
+
+  // Auto-log revision to site diary
+  const revItem = db.prepare('SELECT job_id, title, reference_number, item_type, item_types FROM compliance WHERE id = ?').get(complianceId);
+  if (revItem) {
+    const typeMap = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', rol: 'ROL', council_permit: 'Council', spa: 'SPA', sza: 'SZA' };
+    const types = (revItem.item_types || revItem.item_type || '').split(',').map(t => typeMap[t] || t).join(' / ');
+    autoLogDiary(db, {
+      jobId: revItem.job_id,
+      complianceItemId: parseInt(complianceId),
+      summary: `${types} revision ${maxRev + 1} added (${revItem.reference_number || 'N/A'}): ${revItem.title}. ${b.revision_notes || ''}`.trim(),
+      userId: req.session.user ? req.session.user.id : null
+    });
+  }
 
   req.flash('success', 'Revision ' + (maxRev + 1) + ' added.');
   res.redirect(b.return_to || '/compliance/' + complianceId + '/edit');
