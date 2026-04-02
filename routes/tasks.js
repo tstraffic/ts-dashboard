@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDb } = require('../db/database');
 const { sendTaskAssignmentEmail, sendTaskStatusEmail } = require('../middleware/email');
 const { sendPushToUser } = require('../services/pushNotification');
+const { autoLogDiary } = require('../lib/diary');
 
 /**
  * Check if current user can modify a task.
@@ -331,6 +332,24 @@ router.post('/:id', (req, res) => {
       }
     }
 
+    // Auto-log to site diary
+    if (existingTask.job_id || b.job_id) {
+      const changes = [];
+      if (existingTask.status !== b.status) changes.push(`Status: ${(existingTask.status || '').replace(/_/g, ' ')} → ${(b.status || '').replace(/_/g, ' ')}`);
+      if (ownerChanged) {
+        const newOwner = b.owner_id ? db.prepare('SELECT full_name FROM users WHERE id = ?').get(b.owner_id) : null;
+        changes.push(`Reassigned to ${newOwner ? newOwner.full_name : 'unassigned'}`);
+      }
+      if (existingTask.priority !== b.priority) changes.push(`Priority: ${b.priority}`);
+      if (changes.length > 0) {
+        autoLogDiary(db, {
+          jobId: b.job_id || existingTask.job_id,
+          summary: `Task updated: ${b.title}. ${changes.join('. ')}.`,
+          userId: req.session.user ? req.session.user.id : null
+        });
+      }
+    }
+
     req.flash('success', 'Task updated.');
     res.redirect(b.return_to || '/tasks');
   } catch (err) {
@@ -387,6 +406,17 @@ router.post('/:id/status', (req, res) => {
       console.error('[Tasks] Email send error on status change:', emailErr.message);
     }
 
+    // Auto-log to site diary
+    if (task.job_id && task.status !== newStatus) {
+      const statusLabel = newStatus.replace(/_/g, ' ');
+      const changedBy = req.session.user ? req.session.user.full_name : '';
+      autoLogDiary(db, {
+        jobId: task.job_id,
+        summary: `Task ${statusLabel}: ${task.title}. Changed by ${changedBy}.`,
+        userId: req.session.user ? req.session.user.id : null
+      });
+    }
+
     req.flash('success', 'Status updated.');
     res.redirect(req.headers.referer || '/tasks');
   } catch (err) {
@@ -406,6 +436,16 @@ router.post('/:id/complete', (req, res) => {
   }
   const today = new Date().toISOString().split('T')[0];
   db.prepare("UPDATE tasks SET status = 'complete', completed_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(today, req.params.id);
+
+  // Auto-log to site diary
+  if (task && task.job_id) {
+    autoLogDiary(db, {
+      jobId: task.job_id,
+      summary: `Task completed: ${task.title}. Completed by ${req.session.user ? req.session.user.full_name : ''}.`,
+      userId: req.session.user ? req.session.user.id : null
+    });
+  }
+
   req.flash('success', 'Task completed.');
   res.redirect(req.headers.referer || '/tasks');
 });
