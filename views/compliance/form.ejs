@@ -66,6 +66,15 @@
               placeholder="Describe the other type..."
               class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
           </div>
+          <!-- TGS Quantity (shown when TGS selected) -->
+          <div id="tgs-quantity-field" class="hidden mt-3">
+            <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <label class="text-sm font-medium text-blue-800 whitespace-nowrap">Number of TGS Plans</label>
+              <input type="number" name="tgs_quantity" id="tgs_quantity" min="1" value="<%= isEdit && item.tgs_quantity ? item.tgs_quantity : 1 %>"
+                class="w-20 bg-white border border-blue-300 text-gray-900 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <span class="text-xs text-blue-600">Plans appear as TSTGS3001-1, TSTGS3001-2, etc.</span>
+            </div>
+          </div>
         </div>
 
         <!-- Title -->
@@ -223,36 +232,65 @@
           </select>
         </div>
 
-        <!-- Due Date -->
-        <div>
+        <!-- Received Date (TGS/CTMP only) -->
+        <div id="received-date-field" class="hidden">
+          <label for="received_date" class="block text-sm font-medium text-gray-600 mb-1">Received Date</label>
+          <input type="date" id="received_date" name="received_date"
+            value="<%= isEdit && item.received_date ? item.received_date.split('T')[0] : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <!-- Submitted Date (shown for TGS/CTMP as "Submission Date", and for all other types) -->
+        <div id="submitted-date-field">
+          <label for="submitted_date" class="block text-sm font-medium text-gray-600 mb-1" id="submitted-date-label">Submitted Date</label>
+          <input type="date" id="submitted_date" name="submitted_date"
+            value="<%= isEdit && item.submitted_date ? item.submitted_date.split('T')[0] : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <!-- Due Date (hidden for TGS/CTMP) -->
+        <div id="due-date-field">
           <label for="due_date" class="block text-sm font-medium text-gray-600 mb-1">Due Date</label>
           <input type="date" id="due_date" name="due_date"
             value="<%= isEdit && item.due_date ? item.due_date.split('T')[0] : '' %>"
             class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
         </div>
 
-        <!-- Submitted Date -->
-        <div>
-          <label for="submitted_date" class="block text-sm font-medium text-gray-600 mb-1">Submitted Date</label>
-          <input type="date" id="submitted_date" name="submitted_date"
-            value="<%= isEdit && item.submitted_date ? item.submitted_date.split('T')[0] : '' %>"
-            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
-
-        <!-- Approved Date -->
-        <div>
+        <!-- Approved Date (hidden for TGS/CTMP) -->
+        <div id="approved-date-field">
           <label for="approved_date" class="block text-sm font-medium text-gray-600 mb-1">Approved Date</label>
           <input type="date" id="approved_date" name="approved_date"
             value="<%= isEdit && item.approved_date ? item.approved_date.split('T')[0] : '' %>"
             class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
         </div>
 
-        <!-- Expiry Date -->
-        <div>
+        <!-- Expiry Date (hidden for TGS/CTMP) -->
+        <div id="expiry-date-field">
           <label for="expiry_date" class="block text-sm font-medium text-gray-600 mb-1">Expiry Date</label>
           <input type="date" id="expiry_date" name="expiry_date"
             value="<%= isEdit && item.expiry_date ? item.expiry_date.split('T')[0] : '' %>"
             class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <!-- Start/Finish Dates (ROL, Council, SZA) -->
+        <div id="start-date-field" class="hidden">
+          <label for="start_date" class="block text-sm font-medium text-gray-600 mb-1">Start Date</label>
+          <input type="date" id="start_date" name="start_date"
+            value="<%= isEdit && item.start_date ? item.start_date.split('T')[0] : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div id="finish-date-field" class="hidden">
+          <label for="finish_date" class="block text-sm font-medium text-gray-600 mb-1">Finish Date</label>
+          <input type="date" id="finish_date" name="finish_date"
+            value="<%= isEdit && item.finish_date ? item.finish_date.split('T')[0] : '' %>"
+            class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <!-- SZA + ROL info note -->
+        <div id="sza-rol-note" class="hidden md:col-span-2">
+          <div class="flex items-center gap-2 p-2 bg-violet-50 rounded-lg border border-violet-200 text-xs text-violet-700">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            SZA uses the same start/finish dates as ROL
+          </div>
         </div>
 
         <!-- Reference Number -->
@@ -387,6 +425,63 @@
             </div>
           </div>
           <p id="no-responses-msg" class="text-sm text-gray-400 hidden">Select type(s) above to see response fields.</p>
+        </div>
+
+        <!-- Revision Tracking (TGS/CTMP only) -->
+        <div id="revision-section" class="md:col-span-2 hidden">
+          <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest">Revision Tracking</h3>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="revision_required" value="1" <%= isEdit && item.revision_required ? 'checked' : '' %>
+                  class="w-4 h-4 bg-white border-gray-300 rounded text-red-500 focus:ring-red-500">
+                <span class="text-xs font-medium text-red-600">Revision Required</span>
+              </label>
+            </div>
+
+            <% const revs = (typeof revisions !== 'undefined') ? revisions : []; %>
+            <% if (revs.length > 0) { %>
+            <div class="space-y-2 mb-3">
+              <% revs.forEach(function(rev) { %>
+              <div class="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-3 py-2">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex-shrink-0">R<%= rev.revision_number %></span>
+                <span class="text-sm text-gray-700"><%= rev.revision_date ? new Date(rev.revision_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : 'No date' %></span>
+                <span class="text-sm text-gray-500 flex-1 truncate"><%= rev.notes || '' %></span>
+                <% if (isEdit) { %>
+                <form method="POST" action="/compliance/<%= item.id %>/revisions/<%= rev.id %>/delete" class="inline" onsubmit="return confirm('Delete revision <%= rev.revision_number %>?')">
+                  <%- include('../partials/csrf') %>
+                  <button type="submit" class="p-1 text-gray-300 hover:text-red-600 transition" title="Delete revision">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </form>
+                <% } %>
+              </div>
+              <% }) %>
+            </div>
+            <% } else { %>
+            <p class="text-sm text-gray-400 mb-3">No revisions logged yet.</p>
+            <% } %>
+
+            <% if (isEdit) { %>
+            <div class="pt-3 border-t border-gray-200">
+              <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Add Revision</p>
+              <div class="flex items-end gap-3" id="add-revision-row">
+                <div class="flex-shrink-0">
+                  <label class="block text-xs text-gray-500 mb-1">Date</label>
+                  <input type="date" id="new_revision_date" class="bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div class="flex-1">
+                  <label class="block text-xs text-gray-500 mb-1">Notes</label>
+                  <input type="text" id="new_revision_notes" placeholder="What changed in this revision..."
+                    class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+                <button type="button" onclick="addRevision()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-white text-xs font-medium rounded-lg transition whitespace-nowrap">+ Add</button>
+              </div>
+            </div>
+            <% } else { %>
+            <p class="text-xs text-gray-400 italic">Save this item first, then add revisions.</p>
+            <% } %>
+          </div>
         </div>
 
         <!-- Action Required -->
@@ -583,13 +678,12 @@ document.querySelectorAll('input[name="item_types"]').forEach(function(cb) {
 });
 updateOtherField();
 
-// Toggle response fields based on selected type checkboxes
+// Toggle response fields and new conditional fields based on selected type checkboxes
 function updateResponseFields() {
   var checked = Array.from(document.querySelectorAll('input[name="item_types"]:checked')).map(function(cb) { return cb.value; });
   var anyVisible = false;
   document.querySelectorAll('[data-response-for]').forEach(function(el) {
     var type = el.getAttribute('data-response-for');
-    // Map type values: 'bus_approval' doesn't exist as a type checkbox — handle mapping
     var show = checked.includes(type);
     el.classList.toggle('hidden', !show);
     if (show) anyVisible = true;
@@ -598,6 +692,45 @@ function updateResponseFields() {
   var section = document.getElementById('responses-section');
   if (msg) msg.classList.toggle('hidden', anyVisible);
   if (section) section.classList.toggle('hidden', !anyVisible && checked.length === 0);
+
+  // TGS/CTMP specific fields
+  var isTgsCtmp = checked.includes('traffic_guidance') || checked.includes('tmp_approval');
+  var isTgs = checked.includes('traffic_guidance');
+
+  // TGS quantity field
+  var qtyField = document.getElementById('tgs-quantity-field');
+  if (qtyField) qtyField.classList.toggle('hidden', !isTgs);
+
+  // Received date (TGS/CTMP only)
+  var receivedField = document.getElementById('received-date-field');
+  if (receivedField) receivedField.classList.toggle('hidden', !isTgsCtmp);
+
+  // Hide due/approved/expiry for TGS/CTMP, show for others
+  var dueField = document.getElementById('due-date-field');
+  var approvedField = document.getElementById('approved-date-field');
+  var expiryField = document.getElementById('expiry-date-field');
+  if (dueField) dueField.classList.toggle('hidden', isTgsCtmp);
+  if (approvedField) approvedField.classList.toggle('hidden', isTgsCtmp);
+  if (expiryField) expiryField.classList.toggle('hidden', isTgsCtmp);
+
+  // Rename submitted date label for TGS/CTMP
+  var submittedLabel = document.getElementById('submitted-date-label');
+  if (submittedLabel) submittedLabel.textContent = isTgsCtmp ? 'Submission Date' : 'Submitted Date';
+
+  // Revision section (TGS/CTMP only)
+  var revSection = document.getElementById('revision-section');
+  if (revSection) revSection.classList.toggle('hidden', !isTgsCtmp);
+
+  // Start/Finish dates (ROL, Council, SZA)
+  var isRolCouncilSza = checked.includes('rol') || checked.includes('council_permit') || checked.includes('sza');
+  var startField = document.getElementById('start-date-field');
+  var finishField = document.getElementById('finish-date-field');
+  if (startField) startField.classList.toggle('hidden', !isRolCouncilSza);
+  if (finishField) finishField.classList.toggle('hidden', !isRolCouncilSza);
+
+  // SZA + ROL note
+  var szaRolNote = document.getElementById('sza-rol-note');
+  if (szaRolNote) szaRolNote.classList.toggle('hidden', !(checked.includes('sza') && checked.includes('rol')));
 }
 document.querySelectorAll('input[name="item_types"]').forEach(function(cb) {
   cb.addEventListener('change', updateResponseFields);
@@ -606,7 +739,8 @@ updateResponseFields();
 
 // Auto-generate reference number
 function generateRefNumber() {
-  var type = document.getElementById('item_type').value;
+  var checked = document.querySelectorAll('input[name="item_types"]:checked');
+  var type = checked.length > 0 ? checked[0].value : '';
   var btn = document.getElementById('generateRefBtn');
   btn.textContent = '...';
   btn.disabled = true;
@@ -733,10 +867,32 @@ function saveQuickProject() {
 
 // Auto-generate ref on type change for new items only
 <% if (!isEdit) { %>
-document.getElementById('item_type').addEventListener('change', function() {
-  if (!document.getElementById('reference_number').value) {
-    generateRefNumber();
-  }
+document.querySelectorAll('input[name="item_types"]').forEach(function(cb) {
+  cb.addEventListener('change', function() {
+    if (!document.getElementById('reference_number').value) {
+      generateRefNumber();
+    }
+  });
 });
 <% } %>
+
+// Add revision via fetch
+function addRevision() {
+  <% if (isEdit) { %>
+  var dateInput = document.getElementById('new_revision_date');
+  var notesInput = document.getElementById('new_revision_notes');
+  var revDate = dateInput.value;
+  var revNotes = notesInput.value;
+  if (!revDate) { dateInput.focus(); return; }
+  var formData = new URLSearchParams();
+  formData.append('revision_date', revDate);
+  formData.append('revision_notes', revNotes);
+  formData.append('return_to', window.location.href);
+  fetch('/compliance/<%= item ? item.id : '' %>/revisions', {
+    method: 'POST',
+    headers: csrfHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
+    body: formData.toString()
+  }).then(function() { window.location.reload(); });
+  <% } %>
+}
 </script>
