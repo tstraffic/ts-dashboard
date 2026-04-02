@@ -54,6 +54,30 @@
       <p class="text-xs text-slate-500 uppercase tracking-wide">Expiry Date</p>
       <p class="text-sm text-slate-300 mt-1"><%= item.expiry_date || '-' %></p>
     </div>
+    <% if (item.received_date) { %>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Received Date</p>
+      <p class="text-sm text-slate-300 mt-1"><%= item.received_date %></p>
+    </div>
+    <% } %>
+    <% if (item.start_date || item.finish_date) { %>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Start / Finish</p>
+      <p class="text-sm text-slate-300 mt-1"><%= item.start_date || '?' %> – <%= item.finish_date || '?' %></p>
+    </div>
+    <% } %>
+    <% if (item.tgs_quantity > 1) { %>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">TGS Quantity</p>
+      <p class="text-sm text-slate-300 mt-1"><%= item.tgs_quantity %> plans</p>
+    </div>
+    <% } %>
+    <% if (item.revision_count > 0) { %>
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Revisions</p>
+      <p class="text-sm text-slate-300 mt-1"><%= item.revision_count %></p>
+    </div>
+    <% } %>
   </div>
   <% if (item.notes) { %>
     <div class="mt-4 pt-4 border-t border-slate-700">

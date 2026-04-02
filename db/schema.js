@@ -3987,6 +3987,36 @@ function runMigrations(db) {
     console.log('Migration 81 complete.');
   }
 
+  // Migration 82: Plans & approvals enhancements — TGS quantity, revision tracking, start/finish dates
+  if (!isMigrationApplied.get(82)) {
+    // New columns on compliance table
+    const newCols82 = [
+      ['tgs_quantity', 'INTEGER DEFAULT 1'],
+      ['received_date', 'DATE'],
+      ['revision_required', 'INTEGER DEFAULT 0'],
+      ['revision_count', 'INTEGER DEFAULT 0'],
+      ['start_date', 'DATE'],
+      ['finish_date', 'DATE'],
+    ];
+    newCols82.forEach(([col, type]) => {
+      try { db.prepare(`ALTER TABLE compliance ADD COLUMN ${col} ${type}`).run(); } catch(e) { /* already exists */ }
+    });
+
+    // New compliance_revisions table for revision log
+    db.prepare(`CREATE TABLE IF NOT EXISTS compliance_revisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      compliance_id INTEGER NOT NULL REFERENCES compliance(id) ON DELETE CASCADE,
+      revision_number INTEGER NOT NULL,
+      revision_date DATE,
+      notes TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run();
+    try { db.prepare('CREATE INDEX IF NOT EXISTS idx_compliance_revisions_compliance ON compliance_revisions(compliance_id)').run(); } catch(e) {}
+
+    recordMigration.run(82, 'Plans enhancements: TGS quantity, revision tracking, start/finish dates');
+    console.log('Migration 82 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

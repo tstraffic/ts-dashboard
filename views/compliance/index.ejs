@@ -243,6 +243,7 @@
               <th class="px-3 py-2 w-10">
                 <input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)" class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 focus:ring-offset-0 cursor-pointer">
               </th>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ref</th>
               <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Title</th>
               <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type</th>
               <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project</th>
@@ -268,6 +269,20 @@
                 <td class="px-3 py-2">
                   <input type="checkbox" class="row-checkbox w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 focus:ring-offset-0 cursor-pointer" data-id="<%= item.id %>" onclick="updateBulkBar()">
                 </td>
+                <td class="px-3 py-2 whitespace-nowrap">
+                  <% if (item.reference_number) { %>
+                    <span class="text-xs font-mono text-gray-600"><%= item.reference_number %></span>
+                    <% if (item.item_type === 'traffic_guidance' && item.tgs_quantity > 1) { %>
+                      <div class="flex flex-wrap gap-0.5 mt-0.5">
+                        <% for (var qi = 1; qi <= item.tgs_quantity; qi++) { %>
+                          <span class="text-[10px] font-mono text-blue-600 bg-blue-50 px-1 rounded"><%= item.reference_number %>-<%= qi %></span>
+                        <% } %>
+                      </div>
+                    <% } %>
+                  <% } else { %>
+                    <span class="text-gray-300">—</span>
+                  <% } %>
+                </td>
                 <td class="px-3 py-2 font-medium text-gray-900 max-w-xs">
                   <span class="truncate block"><%= item.title %></span>
                   <% if (item.ready_for_invoice && !item.invoiced) { %>
@@ -287,6 +302,12 @@
                     %>
                       <span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full <%= ttc.color %>"><%= ttc.short %></span>
                     <% }) %>
+                    <% if (item.revision_count > 0) { %>
+                      <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-700">Rev <%= item.revision_count %></span>
+                    <% } %>
+                    <% if (item.revision_required) { %>
+                      <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-100 text-red-700">REV REQ</span>
+                    <% } %>
                   </div>
                 </td>
                 <td class="px-3 py-2">
@@ -316,6 +337,15 @@
                     <% if (isDueSoon) { %><span class="block text-xs text-amber-500 font-medium">DUE SOON</span><% } %>
                   <% } else { %>
                     <span class="text-gray-300">—</span>
+                  <% } %>
+                  <%
+                    const itemTypes = (item.item_types || item.item_type || '').split(',');
+                    const hasStartFinish = (itemTypes.includes('rol') || itemTypes.includes('council_permit') || itemTypes.includes('sza')) && (item.start_date || item.finish_date);
+                  %>
+                  <% if (hasStartFinish) { %>
+                    <div class="text-[10px] text-teal-600 mt-0.5">
+                      <%= item.start_date ? formatDate(item.start_date) : '?' %> – <%= item.finish_date ? formatDate(item.finish_date) : '?' %>
+                    </div>
                   <% } %>
                 </td>
                 <td class="px-3 py-2 whitespace-nowrap">

@@ -156,7 +156,7 @@ router.get('/new', (req, res) => {
   res.render('compliance/form', {
     title: 'New Plan / Approval', item: null, jobs, clients, users,
     user: req.session.user, prefillJobId: req.query.job_id || '', prefillClientId: req.query.client_id || '',
-    returnTo: req.query.return_to || '/compliance', linkedTask: null
+    returnTo: req.query.return_to || '/compliance', linkedTask: null, revisions: []
   });
 });
 
@@ -170,11 +170,13 @@ router.post('/', (req, res) => {
   const result = db.prepare(`
     INSERT INTO compliance (job_id, client_id, item_type, item_types, title, authority_approver, internal_approver_id, assigned_to_id, due_date, submitted_date, approved_date, expiry_date, status, notes, designer, file_link, council_fee_paid, council_fee_amount,
       reference_number, rol_required, rol_response, bus_approvals_required, bus_approvals_response, client_pm, costs, action_required, charge_client, charge_amount, invoiced, invoice_number, police_notification, letter_drop,
-      tmp_response, spa_response, sza_response, council_response, tgs_response, police_response, letter_drop_response)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      tmp_response, spa_response, sza_response, council_response, tgs_response, police_response, letter_drop_response,
+      tgs_quantity, received_date, revision_required, revision_count, start_date, finish_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(b.job_id || null, b.client_id || null, itemType, itemTypes, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status || 'not_started', b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid === '1' || b.council_fee_paid === 1 ? 1 : 0, parseFloat(b.council_fee_amount) || 0,
     b.reference_number || '', b.rol_required ? 1 : 0, b.rol_response || '', b.bus_approvals_required ? 1 : 0, b.bus_approvals_response || '', b.client_pm || '', parseFloat(b.costs) || 0, b.action_required || '', b.charge_client === '1' || b.charge_client === 1 ? 1 : 0, parseFloat(b.charge_amount) || 0, b.invoiced === '1' || b.invoiced === 1 ? 1 : 0, b.invoice_number || '', b.police_notification ? 1 : 0, b.letter_drop ? 1 : 0,
-    b.tmp_response || '', b.spa_response || '', b.sza_response || '', b.council_response || '', b.tgs_response || '', b.police_response || '', b.letter_drop_response || '');
+    b.tmp_response || '', b.spa_response || '', b.sza_response || '', b.council_response || '', b.tgs_response || '', b.police_response || '', b.letter_drop_response || '',
+    parseInt(b.tgs_quantity) || 1, b.received_date || null, b.revision_required ? 1 : 0, 0, b.start_date || null, b.finish_date || null);
 
   // Auto-create linked task when someone is assigned
   const complianceId = result.lastInsertRowid;
@@ -265,7 +267,9 @@ router.get('/:id/edit', (req, res) => {
   try { documents = db.prepare('SELECT cd.*, u.full_name as uploaded_by_name FROM compliance_documents cd LEFT JOIN users u ON cd.uploaded_by_id = u.id WHERE cd.compliance_id = ? ORDER BY cd.created_at DESC').all(item.id); } catch (e) { /* table may not exist yet */ }
   let linkedTask = null;
   try { linkedTask = db.prepare('SELECT t.id, t.title, t.status, t.owner_id, u.full_name as owner_name FROM tasks t LEFT JOIN users u ON t.owner_id = u.id WHERE t.compliance_id = ?').get(item.id); } catch (e) { /* column may not exist yet */ }
-  res.render('compliance/form', { title: 'Edit Plan / Approval', item, jobs, clients, users, user: req.session.user, prefillJobId: '', prefillClientId: '', returnTo, documents, linkedTask });
+  let revisions = [];
+  try { revisions = db.prepare('SELECT * FROM compliance_revisions WHERE compliance_id = ? ORDER BY revision_number ASC').all(item.id); } catch (e) { /* table may not exist yet */ }
+  res.render('compliance/form', { title: 'Edit Plan / Approval', item, jobs, clients, users, user: req.session.user, prefillJobId: '', prefillClientId: '', returnTo, documents, linkedTask, revisions });
 });
 
 router.post('/:id', (req, res) => {
@@ -276,16 +280,21 @@ router.post('/:id', (req, res) => {
   const itemTypes = typesArr.join(',');
   const itemType = typesArr[0] || '';
   try {
+    // Recalculate revision_count from revisions table
+    let revCount = 0;
+    try { revCount = db.prepare('SELECT COUNT(*) as c FROM compliance_revisions WHERE compliance_id = ?').get(req.params.id)?.c || 0; } catch(e) {}
     db.prepare(`
       UPDATE compliance SET job_id=?, client_id=?, item_type=?, item_types=?, title=?, authority_approver=?, internal_approver_id=?, assigned_to_id=?,
         due_date=?, submitted_date=?, approved_date=?, expiry_date=?, status=?, notes=?, designer=?, file_link=?, council_fee_paid=?, council_fee_amount=?,
         reference_number=?, rol_required=?, rol_response=?, bus_approvals_required=?, bus_approvals_response=?, client_pm=?, costs=?, action_required=?, charge_client=?, charge_amount=?, invoiced=?, invoice_number=?, police_notification=?, letter_drop=?,
         tmp_response=?, spa_response=?, sza_response=?, council_response=?, tgs_response=?, police_response=?, letter_drop_response=?,
+        tgs_quantity=?, received_date=?, revision_required=?, revision_count=?, start_date=?, finish_date=?,
         updated_at=CURRENT_TIMESTAMP
       WHERE id=?
     `).run(b.job_id || null, b.client_id || null, itemType, itemTypes, b.title, b.authority_approver || '', b.internal_approver_id || null, b.assigned_to_id || null, b.due_date || null, b.submitted_date || null, b.approved_date || null, b.expiry_date || null, b.status, b.notes || '', b.designer || '', b.file_link || '', b.council_fee_paid === '1' || b.council_fee_paid === 1 ? 1 : 0, parseFloat(b.council_fee_amount) || 0,
       b.reference_number || '', b.rol_required ? 1 : 0, b.rol_response || '', b.bus_approvals_required ? 1 : 0, b.bus_approvals_response || '', b.client_pm || '', parseFloat(b.costs) || 0, b.action_required || '', b.charge_client === '1' || b.charge_client === 1 ? 1 : 0, parseFloat(b.charge_amount) || 0, b.invoiced === '1' || b.invoiced === 1 ? 1 : 0, b.invoice_number || '', b.police_notification ? 1 : 0, b.letter_drop ? 1 : 0,
       b.tmp_response || '', b.spa_response || '', b.sza_response || '', b.council_response || '', b.tgs_response || '', b.police_response || '', b.letter_drop_response || '',
+      parseInt(b.tgs_quantity) || 1, b.received_date || null, b.revision_required ? 1 : 0, revCount, b.start_date || null, b.finish_date || null,
       req.params.id);
 
     // Sync linked task: create if new assignee, update if exists, complete if plan approved
@@ -421,6 +430,43 @@ router.post('/:id/documents/:docId/delete', (req, res) => {
     return res.json({ success: true });
   }
   req.flash('success', 'Document deleted.');
+  res.redirect(req.body.return_to || '/compliance/' + req.params.id + '/edit');
+});
+
+// Add a revision to a compliance item
+router.post('/:id/revisions', (req, res) => {
+  const db = getDb();
+  const complianceId = req.params.id;
+  const item = db.prepare('SELECT id FROM compliance WHERE id = ?').get(complianceId);
+  if (!item) { req.flash('error', 'Item not found.'); return res.redirect('/compliance'); }
+
+  const b = req.body;
+  // Get next revision number
+  const maxRev = db.prepare('SELECT MAX(revision_number) as m FROM compliance_revisions WHERE compliance_id = ?').get(complianceId)?.m || 0;
+  db.prepare('INSERT INTO compliance_revisions (compliance_id, revision_number, revision_date, notes) VALUES (?, ?, ?, ?)')
+    .run(complianceId, maxRev + 1, b.revision_date || null, b.revision_notes || '');
+
+  // Update revision_count on parent
+  const count = db.prepare('SELECT COUNT(*) as c FROM compliance_revisions WHERE compliance_id = ?').get(complianceId).c;
+  db.prepare('UPDATE compliance SET revision_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(count, complianceId);
+
+  req.flash('success', 'Revision ' + (maxRev + 1) + ' added.');
+  res.redirect(b.return_to || '/compliance/' + complianceId + '/edit');
+});
+
+// Delete a revision
+router.post('/:id/revisions/:revId/delete', (req, res) => {
+  const db = getDb();
+  db.prepare('DELETE FROM compliance_revisions WHERE id = ? AND compliance_id = ?').run(req.params.revId, req.params.id);
+
+  // Update revision_count on parent
+  const count = db.prepare('SELECT COUNT(*) as c FROM compliance_revisions WHERE compliance_id = ?').get(req.params.id)?.c || 0;
+  db.prepare('UPDATE compliance SET revision_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(count, req.params.id);
+
+  if (req.headers['accept'] && req.headers['accept'].includes('json')) {
+    return res.json({ success: true });
+  }
+  req.flash('success', 'Revision deleted.');
   res.redirect(req.body.return_to || '/compliance/' + req.params.id + '/edit');
 });
 
