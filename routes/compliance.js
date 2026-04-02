@@ -4,20 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { getDb } = require('../db/database');
-
-// Auto-create site diary entry when a compliance item linked to a job changes
-function autoLogDiary(db, { jobId, complianceItemId, summary, userId }) {
-  if (!jobId) return; // No diary entry without a job
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    db.prepare(`
-      INSERT INTO site_diary_entries (job_id, entry_date, task, outcomes, compliance_item_id, created_by_id)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(jobId, today, 'Plans & Approvals Update', summary, complianceItemId || null, userId || null);
-  } catch (e) {
-    console.error('[Compliance] Auto diary log error:', e.message);
-  }
-}
+const { autoLogDiary } = require('../lib/diary');
 
 // Multer config for compliance document uploads
 const complianceStorage = multer.diskStorage({

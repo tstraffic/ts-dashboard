@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const upload = require('../middleware/upload');
+const { autoLogDiary } = require('../lib/diary');
 
 // List all traffic plans
 router.get('/', (req, res) => {
@@ -79,6 +80,14 @@ router.post('/', upload.single('plan_file'), (req, res) => {
       b.status || 'draft', b.file_link || '', filePath, fileOriginalName, b.notes || '',
       req.session.user.id
     );
+    const typeMap = { TGS: 'TGS', TCP: 'TCP', TMP: 'TMP', ROL: 'ROL' };
+    const typeLabel = (planTypes || planType || '').split(',').map(t => typeMap[t] || t).join(' / ');
+    autoLogDiary(db, {
+      jobId: b.job_id,
+      summary: `Traffic plan created: ${planNumber} (${typeLabel}). Designer: ${b.designer || 'unassigned'}. Status: ${b.status || 'draft'}.`,
+      userId: req.session.user.id
+    });
+
     req.flash('success', `Traffic Plan ${planNumber} created successfully.`);
     const returnTo = b.return_to && b.return_to !== '/plans' ? b.return_to : '/plans';
     res.redirect(returnTo);
@@ -102,6 +111,7 @@ router.get('/:id/edit', (req, res) => {
 router.post('/:id', upload.single('plan_file'), (req, res) => {
   const db = getDb();
   const b = req.body;
+  const oldPlan = db.prepare('SELECT * FROM traffic_plans WHERE id = ?').get(req.params.id);
 
   // Handle multi-select plan types
   let planTypes = '';
@@ -136,6 +146,24 @@ router.post('/:id', upload.single('plan_file'), (req, res) => {
       b.status || 'draft', b.file_link || '', filePath, fileOriginalName, b.notes || '',
       req.params.id
     );
+    // Auto-log changes to site diary
+    if (oldPlan) {
+      const changes = [];
+      if ((oldPlan.status || '') !== (b.status || '')) changes.push(`Status: ${oldPlan.status || 'draft'} → ${b.status || 'draft'}`);
+      if ((oldPlan.submitted_date || '') !== (b.submitted_date || '')) changes.push(`Submitted: ${b.submitted_date || 'cleared'}`);
+      if ((oldPlan.approved_date || '') !== (b.approved_date || '')) changes.push(`Approved: ${b.approved_date || 'cleared'}`);
+      if ((oldPlan.designer || '') !== (b.designer || '')) changes.push(`Designer: ${b.designer || 'unassigned'}`);
+      if (oldPlan.rol_required != (b.rol_required ? 1 : 0)) changes.push(b.rol_required ? 'ROL required' : 'ROL not required');
+      if (oldPlan.rol_approved != (b.rol_approved ? 1 : 0)) changes.push(b.rol_approved ? 'ROL approved' : 'ROL approval removed');
+      if (changes.length > 0) {
+        autoLogDiary(db, {
+          jobId: b.job_id || oldPlan.job_id,
+          summary: `Traffic plan updated (${oldPlan.plan_number}): ${changes.join('. ')}.`,
+          userId: req.session.user ? req.session.user.id : null
+        });
+      }
+    }
+
     req.flash('success', 'Traffic plan updated successfully.');
     const returnTo = b.return_to && b.return_to !== '/plans' ? b.return_to : '/plans';
     res.redirect(returnTo);
