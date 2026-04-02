@@ -92,12 +92,12 @@
 
 /* Dark mode overrides */
 body.dark-glass .chat-msg:not(.chat-msg-own) .chat-msg-bubble {
-  background: #334155;
-  color: #e2e8f0;
+  background: #334155 !important;
+  color: #e2e8f0 !important;
 }
 body.dark-glass .chat-msg-own .chat-msg-bubble {
-  background: #2563eb;
-  color: #ffffff;
+  background: #2563eb !important;
+  color: #ffffff !important;
 }
 body.dark-glass .chat-msg-time {
   color: #64748b;
