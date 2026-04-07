@@ -719,20 +719,60 @@ function updateResponseFields() {
   if (approvedField) approvedField.classList.toggle('hidden', isTgsCtmp);
   if (expiryField) expiryField.classList.toggle('hidden', isTgsCtmp);
 
-  // Rename submitted date label for TGS/CTMP
+  // Contextual date labels based on selected types
+  var typeLabel = isTgs ? 'TGS' : checked.includes('tmp_approval') ? 'CTMP' : '';
+  var isRol = checked.includes('rol');
+  var isCouncil = checked.includes('council_permit');
+  var isSza = checked.includes('sza');
+  var isSpa = checked.includes('spa');
+
+  // Build prefix for labels (e.g. "TGS" or "ROL" or "TGS / ROL")
+  var prefixes = [];
+  if (isTgs) prefixes.push('TGS');
+  if (checked.includes('tmp_approval')) prefixes.push('CTMP');
+  if (isRol) prefixes.push('ROL');
+  if (isCouncil) prefixes.push('Council');
+  if (isSza) prefixes.push('SZA');
+  if (isSpa) prefixes.push('SPA');
+  var prefix = prefixes.length > 0 ? prefixes.join(' / ') + ' ' : '';
+
+  // Received date label
+  var receivedLabel = document.querySelector('#received-date-field label');
+  if (receivedLabel) receivedLabel.textContent = (isTgs ? 'TGS' : 'CTMP') + ' Received Date';
+
+  // Submitted date label
   var submittedLabel = document.getElementById('submitted-date-label');
-  if (submittedLabel) submittedLabel.textContent = isTgsCtmp ? 'Submission Date' : 'Submitted Date';
+  if (submittedLabel) submittedLabel.textContent = isTgsCtmp ? (typeLabel + ' Submission Date') : (prefix + 'Submitted Date');
+
+  // Approved date label
+  var approvedLabel = document.querySelector('#approved-date-field label');
+  if (approvedLabel) approvedLabel.textContent = prefix + 'Approved Date';
+
+  // Due date label
+  var dueLabel = document.querySelector('#due-date-field label');
+  if (dueLabel) dueLabel.textContent = prefix + 'Due Date';
+
+  // Expiry date label
+  var expiryLabel = document.querySelector('#expiry-date-field label');
+  if (expiryLabel) expiryLabel.textContent = prefix + 'Expiry Date';
 
   // Revision section (TGS/CTMP only)
   var revSection = document.getElementById('revision-section');
   if (revSection) revSection.classList.toggle('hidden', !isTgsCtmp);
 
   // Start/Finish dates (ROL, Council, SZA)
-  var isRolCouncilSza = checked.includes('rol') || checked.includes('council_permit') || checked.includes('sza');
+  var isRolCouncilSza = isRol || isCouncil || isSza;
   var startField = document.getElementById('start-date-field');
   var finishField = document.getElementById('finish-date-field');
   if (startField) startField.classList.toggle('hidden', !isRolCouncilSza);
   if (finishField) finishField.classList.toggle('hidden', !isRolCouncilSza);
+
+  // Start/Finish date labels
+  var startPrefix = isRol ? 'ROL' : isCouncil ? 'Council' : isSza ? 'SZA' : '';
+  var startLabel = document.querySelector('#start-date-field label');
+  var finishLabel = document.querySelector('#finish-date-field label');
+  if (startLabel) startLabel.textContent = startPrefix + ' Start Date';
+  if (finishLabel) finishLabel.textContent = startPrefix + ' Finish Date';
 
   // SZA + ROL note
   var szaRolNote = document.getElementById('sza-rol-note');
