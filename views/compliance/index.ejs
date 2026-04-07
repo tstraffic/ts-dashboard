@@ -186,8 +186,6 @@
           <option value="not_started" <%= filters.status === 'not_started' ? 'selected' : '' %>>Not Started</option>
           <option value="started"     <%= filters.status === 'started'     ? 'selected' : '' %>>Started</option>
           <option value="submitted"   <%= filters.status === 'submitted'   ? 'selected' : '' %>>Submitted</option>
-          <option value="approved"    <%= filters.status === 'approved'    ? 'selected' : '' %>>Approved</option>
-          <option value="rejected"    <%= filters.status === 'rejected'    ? 'selected' : '' %>>Rejected</option>
           <option value="expired"     <%= filters.status === 'expired'     ? 'selected' : '' %>>Expired</option>
         </select>
 
@@ -217,7 +215,6 @@
   <div id="bulkBar" class="hidden bg-white border-2 border-brand-500 rounded-xl shadow-sm p-3 mb-4 flex items-center justify-between">
     <span class="text-sm text-gray-600"><span id="selectedCount" class="text-gray-900 font-bold">0</span> item(s) selected</span>
     <div class="flex items-center gap-2 flex-wrap">
-      <button onclick="bulkUpdateStatus('approved')" class="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition">Mark Approved</button>
       <button onclick="bulkUpdateStatus('submitted')" class="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition">Mark Submitted</button>
       <button onclick="bulkReadyForInvoice()" class="px-3 py-1.5 text-xs font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-400 transition">Ready for Invoice</button>
       <% if (user.role === 'admin' || user.role === 'finance' || user.role === 'accounts') { %>
@@ -259,9 +256,9 @@
             <% items.forEach(function(item, idx) {
               const tc = TYPE_CONFIG[item.item_type] || { label: item.item_type, short: item.item_type, color: 'bg-gray-100 text-gray-600' };
               const sc = STATUS_CONFIG[item.status] || { label: item.status, color: 'bg-gray-100 text-gray-600' };
-              const isOverdue = item.due_date && item.due_date < todayStr && item.status !== 'approved' && item.status !== 'expired';
-              const isDueSoon = !isOverdue && item.due_date && item.due_date > todayStr && item.due_date <= soonStr && item.status !== 'approved';
-              const isExpiryNear = item.expiry_date && item.expiry_date >= todayStr && item.expiry_date <= soonStr && item.status === 'approved';
+              const isOverdue = item.due_date && item.due_date < todayStr && !['submitted','approved','expired'].includes(item.status);
+              const isDueSoon = !isOverdue && item.due_date && item.due_date > todayStr && item.due_date <= soonStr && !['submitted','approved','expired'].includes(item.status);
+              const isExpiryNear = item.expiry_date && item.expiry_date >= todayStr && item.expiry_date <= soonStr && ['submitted','approved'].includes(item.status);
               const isExpired = item.expiry_date && item.expiry_date < todayStr;
               const returnTo = '/compliance?' + Object.keys(filters).filter(k => filters[k]).map(k => k + '=' + encodeURIComponent(filters[k])).join('&');
             %>

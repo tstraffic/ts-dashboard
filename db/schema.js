@@ -4243,13 +4243,11 @@ function runMigrations(db) {
 
   // Migration 87: Sync ALL task statuses with their linked compliance items
   if (!isMigrationApplied.get(87)) {
-    // started compliance → task in_progress
     const fix1 = db.prepare(`
       UPDATE tasks SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP
       WHERE compliance_id IS NOT NULL AND status = 'not_started'
         AND compliance_id IN (SELECT id FROM compliance WHERE status = 'started')
     `).run();
-    // submitted/approved compliance → task complete
     const fix2 = db.prepare(`
       UPDATE tasks SET status = 'complete', completed_date = date('now'), updated_at = CURRENT_TIMESTAMP
       WHERE compliance_id IS NOT NULL AND status != 'complete'
@@ -4257,6 +4255,14 @@ function runMigrations(db) {
     `).run();
     recordMigration.run(87, 'Sync all task statuses with linked compliance items');
     console.log(`Migration 87 complete. ${fix1.changes} tasks → in_progress, ${fix2.changes} tasks → complete.`);
+  }
+
+  // Migration 88: Remove approved/rejected statuses — migrate existing items
+  if (!isMigrationApplied.get(88)) {
+    const m1 = db.prepare("UPDATE compliance SET status = 'submitted' WHERE status = 'approved'").run();
+    const m2 = db.prepare("UPDATE compliance SET status = 'not_started' WHERE status = 'rejected'").run();
+    recordMigration.run(88, 'Remove approved/rejected statuses: approved→submitted, rejected→not_started');
+    console.log(`Migration 88 complete. ${m1.changes} approved→submitted, ${m2.changes} rejected→not_started.`);
   }
 
   console.log('All migrations checked/applied.');
