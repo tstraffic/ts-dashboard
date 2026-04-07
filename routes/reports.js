@@ -177,7 +177,7 @@ router.get('/', (req, res) => {
   const overdueCompliance = db.prepare(`
     SELECT c.id, c.title, c.item_type, c.due_date, c.status, j.job_number
     FROM compliance c LEFT JOIN jobs j ON c.job_id = j.id
-    WHERE c.status NOT IN ('approved','expired') AND c.due_date < ?
+    WHERE c.status NOT IN ('approved','expired','submitted') AND c.due_date < ?
     ORDER BY c.due_date ASC LIMIT 20
   `).all(today);
 

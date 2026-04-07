@@ -34,7 +34,7 @@ function sidebarBadges(req, res, next) {
       tasks: safeCount(db, "SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND (due_date >= ? OR due_date IS NULL)", [today]),
 
       // Plans & Approvals — split: overdue (red) vs outstanding non-overdue (blue)
-      complianceOverdue: safeCount(db, "SELECT COUNT(*) as c FROM compliance WHERE status NOT IN ('approved','expired') AND due_date IS NOT NULL AND due_date < ?", [today]),
+      complianceOverdue: safeCount(db, "SELECT COUNT(*) as c FROM compliance WHERE status NOT IN ('approved','expired','submitted') AND due_date IS NOT NULL AND due_date < ?", [today]),
       compliance: safeCount(db, "SELECT COUNT(*) as c FROM compliance WHERE status NOT IN ('approved','expired') AND (due_date >= ? OR due_date IS NULL)", [today]),
 
       // Safety

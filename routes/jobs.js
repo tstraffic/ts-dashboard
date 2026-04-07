@@ -28,7 +28,7 @@ router.get('/', (req, res) => {
     (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') as pending_tasks,
     (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.due_date < date('now')) as overdue_tasks,
     (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved')) as pending_plans,
-    (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved') AND c.due_date IS NOT NULL AND c.due_date < date('now')) as overdue_compliance
+    (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired','submitted') AND c.due_date IS NOT NULL AND c.due_date < date('now')) as overdue_compliance
     FROM jobs j LEFT JOIN users u ON j.project_manager_id = u.id LEFT JOIN (SELECT b.job_id, b.contract_value as budget_contract, COALESCE((SELECT SUM(amount) FROM cost_entries ce WHERE ce.job_id = b.job_id), 0) as total_spent FROM job_budgets b) bm ON j.id = bm.job_id WHERE 1=1`;
   const params = [];
 
