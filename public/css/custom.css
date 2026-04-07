@@ -2528,7 +2528,7 @@ canvas {
 
 /* ===== Bookings Board — Enhanced Cards ===== */
 
-/* Crew list on card */
+/* Crew list on card — Traffio style */
 .booking-crew-list {
   margin-top: 0.5rem;
   padding-top: 0.5rem;
@@ -2537,10 +2537,10 @@ canvas {
 .crew-member-row {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.2rem 0;
-  font-size: 0.7rem;
-  color: #94a3b8;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  font-size: 0.8rem;
+  color: #e2e8f0;
 }
 .crew-member-row .crew-name {
   flex: 1;
@@ -2548,36 +2548,50 @@ canvas {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
 }
-.crew-member-row.crew-supervisor {
-  background: rgba(251, 191, 36, 0.08);
-  border: 1px solid rgba(251, 191, 36, 0.2);
-  border-radius: 0.375rem;
-  padding: 0.3rem 0.5rem;
-  margin-bottom: 0.25rem;
-}
-.crew-member-row.crew-supervisor .crew-name {
-  color: #fbbf24;
+
+/* Role prefix — clean inline text (TC, TL, SUP, PV) */
+.crew-role-prefix {
+  font-size: 0.7rem;
   font-weight: 700;
-  font-size: 0.75rem;
-}
-.crew-role-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.5rem;
-  padding: 0 0.25rem;
-  height: 1rem;
-  border-radius: 0.25rem;
-  font-size: 0.6rem;
-  font-weight: 700;
-  background: rgba(43, 127, 255, 0.15);
-  color: #60a5fa;
+  letter-spacing: 0.02em;
+  color: #64748b;
   flex-shrink: 0;
+  min-width: 1.6rem;
 }
-.crew-role-badge.crew-role-sup {
-  background: rgba(251, 191, 36, 0.2);
-  color: #fbbf24;
+.crew-role-prefix.tc { color: #60a5fa; }
+.crew-role-prefix.tl { color: #a78bfa; }
+.crew-role-prefix.sup { color: #fbbf24; }
+.crew-role-prefix.pv { color: #34d399; }
+
+/* Confirmation dot — green circle+tick = confirmed, gray ring = pending */
+.crew-confirm-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.crew-confirm-dot.confirmed {
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.15);
+  position: relative;
+}
+.crew-confirm-dot.confirmed::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  width: 4px;
+  height: 7px;
+  border: solid white;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+.crew-confirm-dot.pending {
+  background: transparent;
+  border: 2px solid #475569;
 }
 
 /* Vehicle plates on card */

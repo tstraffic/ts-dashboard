@@ -285,23 +285,24 @@
         </div>
         <% } %>
 
-        <!-- Crew list with confirmation ticks -->
+        <!-- Crew list — Traffio style: role prefix + name + confirmation circle -->
         <div class="booking-crew-list">
           <% if (booking.supervisor) { %>
-          <div class="crew-member-row crew-supervisor">
-            <span class="crew-role-badge crew-role-sup">SUP</span>
+          <div class="crew-member-row">
+            <span class="crew-role-prefix sup">SUP</span>
             <span class="crew-name"><%= booking.supervisor %></span>
-            <svg class="w-3 h-3 text-emerald-500 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span class="crew-confirm-dot confirmed" title="Confirmed"></span>
           </div>
           <% } %>
           <% booking.personnel.forEach(function(p) { %>
           <div class="crew-member-row">
-            <span class="crew-role-badge"><%= p.role === 'traffic_controller' ? 'TC' : (p.role === 'leading_hand' ? 'LH' : (p.role === 'supervisor' ? 'SUP' : '')) %></span>
+            <% const roleLabel = p.role === 'traffic_controller' ? 'TC' : (p.role === 'leading_hand' ? 'TL' : (p.role === 'supervisor' ? 'SUP' : (p.role === 'pilot_vehicle' ? 'PV' : ''))); %>
+            <% if (roleLabel) { %><span class="crew-role-prefix <%= roleLabel.toLowerCase() %>"><%= roleLabel %></span><% } %>
             <span class="crew-name"><%= p.name %></span>
             <% if (p.confirmed) { %>
-              <svg class="w-3 h-3 text-emerald-500 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <span class="crew-confirm-dot confirmed" title="Confirmed"></span>
             <% } else { %>
-              <svg class="w-3 h-3 text-gray-300 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="crew-confirm-dot pending" title="Pending"></span>
             <% } %>
           </div>
           <% }) %>
