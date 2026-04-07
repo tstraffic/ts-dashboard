@@ -4017,6 +4017,153 @@ function runMigrations(db) {
     console.log('Migration 82 complete.');
   }
 
+  // Migration 83: Import/update clients from Dashboard CSV export
+  if (!isMigrationApplied.get(83)) {
+    const csvClients83 = [
+      {extId:"74577",name:"2 Way Concrete",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"94296",name:"Abergeldie Complex Infrastructure",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73797",name:"Active Civil Group",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"94846",name:"Aesthetic Buildings and Facades",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73796",name:"AGM Constructions",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"93884",name:"Al-Faisal College",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"74461",name:"All Civil Works",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"27671",name:"Alpha Cranes & Rigging",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"74154",name:"AM2PM Group",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"36003",name:"ANR Engineering",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"75094",name:"Apex Sewer & Water",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"90622",name:"Atlantis",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"74215",name:"Atlas Plumbing",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73798",name:"Axial Construction",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"34044",name:"Blaq Projects",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73799",name:"Brushwood Engineering",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"77632",name:"Build Life",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"86602",name:"Builtwise Projects",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"35767",name:"BXD Projects",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"94092",name:"Carlton Projects",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"90484",name:"CIP Projects",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"75913",name:"City Line Marking",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"87649",name:"City Traffic",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"88399",name:"Civil Com Group",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"35733",name:"Civil Environmental Services",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73800",name:"Civil Environmental Services",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"32044",name:"Civil Ops",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"33209",name:"Combined",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"92421",name:"Compass Developments",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"33187",name:"Construx Solutions",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"83863",name:"Cubic Construction",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73801",name:"D&M Asphalt",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"89044",name:"Daracon Group",abn:"82 002 344 667",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"85666",name:"Delaney Civil",abn:"85 086 897 476",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73805",name:"Designline Building",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"91246",name:"Domain Constructions",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"74792",name:"Dynamic Lanemarking",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"78459",name:"E.M.O Civil",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"84307",name:"Earthbuilt",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"78546",name:"Fleek Constructions",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"88257",name:"Greenbrook",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"31906",name:"Ground King Civil",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"86054",name:"H Lap Projects",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"29781",name:"Hacer Group",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"33644",name:"HPAC",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73807",name:"I Connected",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73802",name:"Icon Build",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73803",name:"Impact Cranes",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"91325",name:"InTech Electrical",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"87594",name:"Issacon",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"78848",name:"Just Flow Trade Services",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"90807",name:"Kandaq Civil",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"78557",name:"Kaycorp",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"75669",name:"Kinetic Pools",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"84220",name:"Kwikflogroup",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"75279",name:"Labour Connect",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"94716",name:"M&S Electrical",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"82538",name:"Mabna",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"74665",name:"Masjid Omar",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"37821",name:"Masscon",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"89629",name:"Metway Developments",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"32264",name:"Mosque",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"75256",name:"Multi Home Builders",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"91091",name:"NIS Corporate",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"37893",name:"Pavement Management Services",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"32948",name:"Pro Arbor Services",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"91730",name:"Pro Workforce",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"27575",name:"Quality Management & Construction",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"80386",name:"Rose Testing",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"86916",name:"Sabeh Group",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"28681",name:"SafeRoadsRUs",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"86950",name:"Shad Family Super P/L",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73804",name:"SIFU Services",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"27733",name:"Silver Star Maintenance",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"83728",name:"Skyscraper Tower Cranes",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"30586",name:"Stateline Asphalt",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"75606",name:"Steller Group",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"75452",name:"Streamlined Property Services Pty Ltd",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"33506",name:"T&S Traffic Control",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"93813",name:"Tamaki Constructions",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"28030",name:"TQM",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"33005",name:"Traffic Australia Group",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"35774",name:"TRX Construction",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"77965",name:"UMA",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"27674",name:"Vari Group",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"86901",name:"Vigilant Group",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"37958",name:"Virtus Traffic",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"29362",name:"Wonderfield Property Group",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"90474",name:"Zenmark",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+      {extId:"73806",name:"Zett Group",abn:"",phone:"",email:"",billingAddr:"",billingAttn:"",billingSub:"",billingSt:"",billingPC:"",cancel:3,creditStop:0,notes:"",payTerms:"30 days"},
+    ];
+
+    let inserted83 = 0, updated83 = 0;
+
+    const updateStmt83 = db.prepare(`
+      UPDATE clients SET
+        external_id = COALESCE(NULLIF(?, ''), external_id),
+        abn = COALESCE(NULLIF(?, ''), abn),
+        primary_contact_phone = COALESCE(NULLIF(?, ''), primary_contact_phone),
+        primary_contact_email = COALESCE(NULLIF(?, ''), primary_contact_email),
+        billing_address = COALESCE(NULLIF(?, ''), billing_address),
+        billing_attention = COALESCE(NULLIF(?, ''), billing_attention),
+        billing_suburb = COALESCE(NULLIF(?, ''), billing_suburb),
+        billing_state = COALESCE(NULLIF(?, ''), billing_state),
+        billing_postcode = COALESCE(NULLIF(?, ''), billing_postcode),
+        cancellation_window_hrs = ?,
+        credit_stop = ?,
+        payment_terms = COALESCE(NULLIF(?, ''), payment_terms),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+
+    const insertStmt83 = db.prepare(`
+      INSERT INTO clients (company_name, company_type, external_id, abn, primary_contact_phone, primary_contact_email,
+        billing_address, billing_attention, billing_suburb, billing_state, billing_postcode,
+        cancellation_window_hrs, credit_stop, notes, payment_terms, active)
+      VALUES (?, 'client', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `);
+
+    for (const c of csvClients83) {
+      // Match by company_name (first match wins for duplicates)
+      const existing = db.prepare('SELECT id FROM clients WHERE company_name = ?').get(c.name);
+      if (existing) {
+        updateStmt83.run(
+          c.extId, c.abn, c.phone, c.email,
+          c.billingAddr, c.billingAttn, c.billingSub, c.billingSt, c.billingPC,
+          c.cancel, c.creditStop, c.payTerms,
+          existing.id
+        );
+        updated83++;
+      } else {
+        insertStmt83.run(
+          c.name, c.extId, c.abn, c.phone, c.email,
+          c.billingAddr, c.billingAttn, c.billingSub, c.billingSt, c.billingPC,
+          c.cancel, c.creditStop, c.notes, c.payTerms
+        );
+        inserted83++;
+      }
+    }
+
+    recordMigration.run(83, 'Import/update clients from Dashboard CSV export');
+    console.log(`Migration 83 complete. Clients: ${inserted83} inserted, ${updated83} updated.`);
+  }
+
   console.log('All migrations checked/applied.');
 }
 
