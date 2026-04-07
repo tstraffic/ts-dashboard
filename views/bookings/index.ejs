@@ -811,6 +811,7 @@ function handleCalDrop(event, targetDate) {
   const resBtn = document.getElementById('toggle-resource-panel');
   const resPanel = document.getElementById('resource-panel');
   const resClose = document.getElementById('close-resource-panel');
+  let _resourceData = null; // cache for filtering
   function loadResources() {
     const list = document.getElementById('resource-list');
     const label = document.getElementById('resource-count-label');
@@ -818,21 +819,52 @@ function handleCalDrop(event, targetDate) {
     fetch('/bookings/resources?date=<%= currentDate %>')
       .then(r => r.json())
       .then(data => {
-        label.textContent = data.available.length + ' available, ' + data.assigned.length + ' assigned';
-        if (data.available.length === 0 && data.assigned.length === 0) {
-          list.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm">No crew members found</div>';
-          return;
-        }
-        list.innerHTML = '';
-        function renderItem(c, statusClass, statusLabel) {
-          const initials = c.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-          list.innerHTML += '<div class="resource-item" draggable="true" data-crew-id="' + c.id + '" data-crew-name="' + c.full_name + '" data-crew-role="' + (c.role||'') + '" style="cursor:grab" ondragstart="event.dataTransfer.setData(\'application/crew\', JSON.stringify({id:' + c.id + ',name:\'' + c.full_name.replace(/'/g, '') + '\',role:\'' + (c.role||'').replace(/'/g, '') + '\'}))">' +
-            '<div class="resource-avatar">' + initials + '</div><div class="resource-info"><span class="resource-name">' + c.full_name + '</span><span class="resource-role">' + (c.role || '').replace(/_/g, ' ') + (c.employee_id ? ' · ' + c.employee_id : '') + '</span></div><span class="resource-status ' + statusClass + '">' + statusLabel + '</span></div>';
-        }
-        data.available.forEach(c => renderItem(c, 'available', 'Available'));
-        data.assigned.forEach(c => renderItem(c, 'busy', 'On shift'));
+        _resourceData = data;
+        renderResourceList(data);
       })
       .catch(() => { list.innerHTML = '<div class="p-4 text-center text-red-400 text-sm">Failed to load</div>'; });
+  }
+  function renderResourceList(data) {
+    const list = document.getElementById('resource-list');
+    const label = document.getElementById('resource-count-label');
+    if (!list) return;
+    label.textContent = data.available.length + ' available, ' + data.assigned.length + ' assigned';
+    if (data.available.length === 0 && data.assigned.length === 0) {
+      list.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm">No crew members found</div>';
+      return;
+    }
+    list.innerHTML = '';
+    function renderItem(c, statusClass, statusLabel) {
+      const initials = c.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      const warningHtml = (c.warnings && c.warnings.length > 0)
+        ? '<div class="resource-warnings">' + c.warnings.map(w => '<span class="resource-warning-badge">' + w + '</span>').join('') + '</div>'
+        : '';
+      const blockedClass = c.blocked ? ' resource-item-blocked' : '';
+      const safeRole = (c.role||'').replace(/'/g, "\\'");
+      const safeName = c.full_name.replace(/'/g, "\\'");
+      list.innerHTML += '<div class="resource-item' + blockedClass + '" draggable="' + (!c.blocked) + '" '
+        + 'data-crew-id="' + c.id + '" '
+        + 'data-crew-name="' + c.full_name + '" '
+        + 'data-crew-role="' + (c.role||'') + '" '
+        + 'data-depot="' + (c.depot||'').toLowerCase() + '" '
+        + 'data-employment="' + (c.employment_type||'').toLowerCase() + '" '
+        + 'data-blocked="' + (c.blocked ? '1' : '0') + '" '
+        + 'data-first-aid="' + (c.has_first_aid ? '1' : '0') + '" '
+        + 'data-can-drive="' + (c.can_drive_truck ? '1' : '0') + '" '
+        + 'data-assigned="' + (statusClass === 'busy' ? '1' : '0') + '" '
+        + (c.blocked ? '' : 'style="cursor:grab" ondragstart="event.dataTransfer.setData(\'application/crew\', JSON.stringify({id:' + c.id + ',name:\'' + safeName + '\',role:\'' + safeRole + '\'}))"')
+        + '>'
+        + '<div class="resource-avatar">' + initials + '</div>'
+        + '<div class="resource-info">'
+        + '<span class="resource-name">' + c.full_name + '</span>'
+        + '<span class="resource-role">' + (c.role || '').replace(/_/g, ' ') + (c.employee_id ? ' · ' + c.employee_id : '') + '</span>'
+        + warningHtml
+        + '</div>'
+        + '<span class="resource-status ' + statusClass + '">' + (c.blocked ? 'Blocked' : statusLabel) + '</span>'
+        + '</div>';
+    }
+    data.available.forEach(c => renderItem(c, c.blocked ? 'blocked' : 'available', 'Available'));
+    data.assigned.forEach(c => renderItem(c, 'busy', 'On shift'));
   }
   if (resBtn && resPanel) {
     resBtn.addEventListener('click', function() {
@@ -857,21 +889,88 @@ function handleCalDrop(event, targetDate) {
     });
   });
 
-  // Resource panel search — filter crew list by name
-  const resSearch = document.getElementById('resource-search');
-  if (resSearch) {
-    resSearch.addEventListener('input', function() {
-      const q = this.value.toLowerCase();
-      document.querySelectorAll('#resource-list .resource-item').forEach(item => {
-        const name = (item.getAttribute('data-crew-name') || '').toLowerCase();
-        item.style.display = name.includes(q) ? '' : 'none';
-      });
+  // Unified resource filtering — applies search, toggles, and dropdowns together
+  function applyResourceFilters() {
+    const searchQ = (document.getElementById('resource-search')?.value || '').toLowerCase();
+    const specFilter = (document.getElementById('res-filter-spec')?.value || '').toLowerCase();
+    const depotFilter = (document.getElementById('res-filter-depot')?.value || '').toLowerCase();
+    const empFilter = (document.getElementById('res-filter-employment')?.value || '').toLowerCase();
+
+    // Read active toggle states
+    const activeToggles = {};
+    document.querySelectorAll('.res-toggle-btn.active').forEach(btn => {
+      activeToggles[btn.getAttribute('data-filter')] = true;
     });
+
+    document.querySelectorAll('#resource-list .resource-item').forEach(item => {
+      const name = (item.getAttribute('data-crew-name') || '').toLowerCase();
+      const role = (item.getAttribute('data-crew-role') || '').toLowerCase();
+      const depot = (item.getAttribute('data-depot') || '');
+      const emp = (item.getAttribute('data-employment') || '');
+      const isBlocked = item.getAttribute('data-blocked') === '1';
+      const isAssigned = item.getAttribute('data-assigned') === '1';
+      const hasFirstAid = item.getAttribute('data-first-aid') === '1';
+      const canDrive = item.getAttribute('data-can-drive') === '1';
+
+      let show = true;
+
+      // Text search
+      if (searchQ && !name.includes(searchQ)) show = false;
+
+      // Specialisation dropdown
+      if (specFilter && role !== specFilter) show = false;
+
+      // Depot dropdown
+      if (depotFilter && depot !== depotFilter.toLowerCase()) show = false;
+
+      // Employment dropdown
+      if (empFilter && emp !== empFilter.toLowerCase()) show = false;
+
+      // Toggle: Only TLs — show only leading_hand/supervisor
+      if (activeToggles['tl-only'] && role !== 'leading_hand' && role !== 'supervisor') show = false;
+
+      // Toggle: Assigned — show only assigned crew
+      if (activeToggles['assigned'] && !isAssigned) show = false;
+
+      // Toggle: Blocked — show only blocked crew
+      if (activeToggles['blocked'] && !isBlocked) show = false;
+
+      // Toggle: Can Drive
+      if (activeToggles['can-drive'] && !canDrive) show = false;
+
+      // Toggle: Only First Aid
+      if (activeToggles['first-aid'] && !hasFirstAid) show = false;
+
+      item.style.display = show ? '' : 'none';
+    });
+
+    // Update visible count
+    const visible = document.querySelectorAll('#resource-list .resource-item:not([style*="display: none"])').length;
+    const total = document.querySelectorAll('#resource-list .resource-item').length;
+    const label = document.getElementById('resource-count-label');
+    if (label && total > 0) {
+      label.textContent = visible + ' of ' + total + ' shown';
+    }
   }
 
-  // Resource toggle buttons
+  // Resource panel search
+  const resSearch = document.getElementById('resource-search');
+  if (resSearch) {
+    resSearch.addEventListener('input', applyResourceFilters);
+  }
+
+  // Resource toggle buttons — toggle active + filter
   document.querySelectorAll('.res-toggle-btn').forEach(btn => {
-    btn.addEventListener('click', function() { this.classList.toggle('active'); });
+    btn.addEventListener('click', function() {
+      this.classList.toggle('active');
+      applyResourceFilters();
+    });
+  });
+
+  // Dropdown filters
+  ['res-filter-spec', 'res-filter-depot', 'res-filter-employment'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', applyResourceFilters);
   });
 
   // Sort buttons
