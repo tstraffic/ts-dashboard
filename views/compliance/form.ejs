@@ -569,6 +569,36 @@
       </div>
       <% } %>
 
+      <% if (isEdit) { %>
+      <!-- Documents & Attachments (above buttons) -->
+      <div class="mt-6 pt-6 border-t border-gray-200">
+        <h3 class="text-sm font-semibold text-gray-900 mb-4">Documents & Attachments</h3>
+        <% const docsInline = (typeof documents !== 'undefined') ? documents : []; %>
+        <% if (docsInline.length > 0) { %>
+        <div class="space-y-2 mb-4">
+          <% docsInline.forEach(function(doc) { %>
+          <div class="flex items-center justify-between bg-gray-50 rounded-lg border border-gray-200 px-3 py-2.5">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <% if (doc.mime_type && doc.mime_type.startsWith('image/')) { %>
+                <svg class="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              <% } else if (doc.original_name && doc.original_name.match(/\.pdf$/i)) { %>
+                <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              <% } else { %>
+                <svg class="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <% } %>
+              <a href="/compliance/<%= item.id %>/documents/<%= doc.filename %>" target="_blank" class="text-sm text-brand-600 hover:underline truncate"><%= doc.original_name %></a>
+              <span class="text-xs text-gray-400 flex-shrink-0"><%= doc.file_size ? (doc.file_size / 1024).toFixed(0) + ' KB' : '' %></span>
+              <% if (doc.uploaded_by_name) { %><span class="text-xs text-gray-400 flex-shrink-0">by <%= doc.uploaded_by_name %></span><% } %>
+            </div>
+          </div>
+          <% }) %>
+        </div>
+        <% } else { %>
+        <p class="text-sm text-gray-400 mb-4">No documents uploaded yet.</p>
+        <% } %>
+      </div>
+      <% } %>
+
       <!-- Buttons -->
       <div class="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
         <div class="flex items-center gap-2">
@@ -589,46 +619,14 @@
     </form>
 
     <% if (isEdit) { %>
-    <!-- Documents & Attachments -->
+    <!-- Upload Files (separate form for multipart) -->
     <div class="mt-6 bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-      <h3 class="text-sm font-semibold text-gray-900 mb-4">Documents & Attachments</h3>
-
-      <% const docs = (typeof documents !== 'undefined') ? documents : []; %>
-      <% if (docs.length > 0) { %>
-      <div class="space-y-2 mb-4">
-        <% docs.forEach(function(doc) { %>
-        <div class="flex items-center justify-between bg-gray-50 rounded-lg border border-gray-200 px-3 py-2.5">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <% if (doc.mime_type && doc.mime_type.startsWith('image/')) { %>
-              <svg class="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            <% } else if (doc.original_name && doc.original_name.match(/\.pdf$/i)) { %>
-              <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-            <% } else { %>
-              <svg class="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            <% } %>
-            <a href="/compliance/<%= item.id %>/documents/<%= doc.filename %>" target="_blank" class="text-sm text-brand-600 hover:underline truncate"><%= doc.original_name %></a>
-            <span class="text-xs text-gray-400 flex-shrink-0"><%= doc.file_size ? (doc.file_size / 1024).toFixed(0) + ' KB' : '' %></span>
-            <% if (doc.uploaded_by_name) { %><span class="text-xs text-gray-400 flex-shrink-0">by <%= doc.uploaded_by_name %></span><% } %>
-          </div>
-          <form method="POST" action="/compliance/<%= item.id %>/documents/<%= doc.id %>/delete" class="inline" onsubmit="return confirm('Delete this document?')">
-            <%- include('../partials/csrf') %>
-            <button type="submit" class="p-1 text-gray-300 hover:text-red-600 transition" title="Delete">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-            </button>
-          </form>
-        </div>
-        <% }) %>
-      </div>
-      <% } else { %>
-      <p class="text-sm text-gray-400 mb-4">No documents uploaded yet.</p>
-      <% } %>
-
+      <h3 class="text-sm font-semibold text-gray-900 mb-3">Upload Files</h3>
       <form method="POST" action="/compliance/<%= item.id %>/upload" enctype="multipart/form-data">
         <%- include('../partials/csrf') %>
         <input type="hidden" name="return_to" value="/compliance/<%= item.id %>/edit<%= (typeof returnTo !== 'undefined' && returnTo) ? '?return_to=' + encodeURIComponent(returnTo) : '' %>">
         <div class="flex items-end gap-3">
           <div class="flex-1">
-            <label class="block text-sm font-medium text-gray-600 mb-1">Upload Files</label>
             <input type="file" name="documents" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.dwg,.dxf"
               class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 cursor-pointer">
           </div>
