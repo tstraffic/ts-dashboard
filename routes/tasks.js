@@ -3,7 +3,7 @@ const router = express.Router();
 const { getDb } = require('../db/database');
 const { sendTaskAssignmentEmail, sendTaskStatusEmail } = require('../middleware/email');
 const { sendPushToUser } = require('../services/pushNotification');
-const { autoLogDiary } = require('../lib/diary');
+const { autoLogDiary, logStatusChange } = require('../lib/diary');
 
 /**
  * Check if current user can modify a task.
@@ -406,14 +406,14 @@ router.post('/:id/status', (req, res) => {
       console.error('[Tasks] Email send error on status change:', emailErr.message);
     }
 
-    // Auto-log to site diary
+    // Auto-log to site diary + notify
     if (task.job_id && task.status !== newStatus) {
-      const statusLabel = newStatus.replace(/_/g, ' ');
-      const changedBy = req.session.user ? req.session.user.full_name : '';
-      autoLogDiary(db, {
-        jobId: task.job_id,
-        summary: `Task ${statusLabel}: ${task.title}. Changed by ${changedBy}.`,
-        userId: req.session.user ? req.session.user.id : null
+      logStatusChange(db, {
+        jobId: task.job_id, entityType: 'task',
+        entityLabel: `Task: ${task.title}`,
+        oldStatus: task.status, newStatus,
+        userId: req.session.user ? req.session.user.id : null,
+        userName: req.session.user ? req.session.user.full_name : 'System'
       });
     }
 
@@ -437,12 +437,14 @@ router.post('/:id/complete', (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   db.prepare("UPDATE tasks SET status = 'complete', completed_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(today, req.params.id);
 
-  // Auto-log to site diary
+  // Auto-log to site diary + notify
   if (task && task.job_id) {
-    autoLogDiary(db, {
-      jobId: task.job_id,
-      summary: `Task completed: ${task.title}. Completed by ${req.session.user ? req.session.user.full_name : ''}.`,
-      userId: req.session.user ? req.session.user.id : null
+    logStatusChange(db, {
+      jobId: task.job_id, entityType: 'task',
+      entityLabel: `Task: ${task.title}`,
+      oldStatus: task.status || 'not_started', newStatus: 'complete',
+      userId: req.session.user ? req.session.user.id : null,
+      userName: req.session.user ? req.session.user.full_name : 'System'
     });
   }
 

@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { getDb } = require('../db/database');
-const { autoLogDiary } = require('../lib/diary');
+const { autoLogDiary, logStatusChange } = require('../lib/diary');
 
 // Multer config for compliance document uploads
 const complianceStorage = multer.diskStorage({
@@ -380,6 +380,18 @@ router.post('/:id', (req, res) => {
           summary: `${diaryTypeLabel} updated (${b.reference_number || oldItem.reference_number || 'N/A'}): ${b.title || oldItem.title}. ${changes.join('. ')}.`,
           userId: req.session.user ? req.session.user.id : null
         });
+        // Notify relevant users on status change
+        if (oldItem.status !== b.status) {
+          logStatusChange(db, {
+            jobId: b.job_id || oldItem.job_id,
+            entityType: 'compliance',
+            entityLabel: `${diaryTypeLabel} ${b.reference_number || oldItem.reference_number || b.title || oldItem.title}`,
+            oldStatus: oldItem.status,
+            newStatus: b.status,
+            userId: req.session.user ? req.session.user.id : null,
+            userName: req.session.user ? req.session.user.full_name : 'System'
+          });
+        }
       }
     }
 
