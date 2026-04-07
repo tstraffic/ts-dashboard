@@ -82,8 +82,14 @@
         <!-- Photo Upload -->
         <div class="md:col-span-2">
           <label class="block text-sm font-medium text-gray-600 mb-1">Photo</label>
-          <input type="file" name="photo" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
-          <p class="text-xs text-gray-400 mt-1">Upload a photo of the defect (max 10MB, JPEG/PNG/GIF/WebP/PDF)</p>
+          <div data-dropzone>
+            <input type="file" name="photo" accept="image/*,.pdf">
+            <div class="dropzone-label">
+              <svg class="w-6 h-6 mx-auto mb-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+              <p class="text-xs text-gray-500">Drop photo or <span class="text-brand-600 font-medium">browse</span></p>
+              <p class="text-xs text-gray-400 mt-0.5">Max 10MB. JPEG, PNG, GIF, WebP, PDF</p>
+            </div>
+          </div>
           <% if (isEdit && defect.photo_path) { %>
             <div class="mt-2">
               <p class="text-xs text-gray-500 mb-1">Current photo:</p>

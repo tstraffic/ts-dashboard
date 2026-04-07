@@ -457,7 +457,10 @@
         <%- include('../partials/csrf') %>
         <div>
           <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Upload Document</label>
-          <input type="file" name="file" required class="w-full text-sm text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+          <div data-dropzone>
+            <input type="file" name="file" required>
+            <p class="dropzone-label text-xs text-gray-500">Drop file or <span class="text-brand-600 font-medium">browse</span></p>
+          </div>
         </div>
         <div class="flex items-end gap-2">
           <div class="flex-1">
