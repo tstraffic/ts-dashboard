@@ -417,37 +417,57 @@
       <span class="text-xs text-gray-400 uppercase tracking-wide">Operations View — Read Only</span>
     </div>
     <% const fp = typeof finalPlans !== 'undefined' ? finalPlans : []; %>
+    <% const fpDocs = typeof finalPlanDocs !== 'undefined' ? finalPlanDocs : []; %>
     <% if (fp.length === 0) { %>
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
         <svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        <p class="text-gray-400 text-sm">No plans have been finalised for this job yet.</p>
-        <p class="text-gray-300 text-xs mt-1">Plans appear here once the planning team marks them as final.</p>
+        <p class="text-gray-400 text-sm">No plans have been submitted or approved for this job yet.</p>
+        <p class="text-gray-300 text-xs mt-1">Plans appear here once the planning team submits or approves them.</p>
       </div>
     <% } else { %>
     <div class="space-y-3">
-      <% fp.forEach(function(plan) { %>
+      <% fp.forEach(function(plan) {
+        const typeMap = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', rol: 'ROL', council_permit: 'Council', spa: 'SPA', sza: 'SZA', bus_approval: 'Bus', police_notification: 'Police', letter_drop: 'Letter Drop' };
+        const types = (plan.item_types || plan.item_type || '').split(',').map(function(t) { return typeMap[t.trim()] || t.trim(); }).filter(Boolean).join(' / ');
+        const docs = fpDocs.filter(function(d) { return d.compliance_id === plan.id; });
+      %>
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
         <div class="flex items-start justify-between gap-4">
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-3 mb-2">
-              <span class="text-sm font-bold text-gray-900"><%= plan.plan_number %></span>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">FINAL</span>
-              <span class="text-xs text-gray-400"><%= plan.current_revision_label || 'Rev A' %></span>
+            <div class="flex items-center gap-3 mb-2 flex-wrap">
+              <span class="text-sm font-bold text-gray-900"><%= plan.title %></span>
+              <% if (plan.reference_number) { %><span class="text-xs text-gray-400 font-mono"><%= plan.reference_number %></span><% } %>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                <% if (plan.status === 'approved') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
+                <% } else { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20<% } %>"><%= plan.status === 'approved' ? 'APPROVED' : 'SUBMITTED' %></span>
             </div>
             <div class="flex flex-wrap gap-4 text-xs text-gray-500 mb-2">
-              <span>Type: <span class="text-gray-700 font-medium"><%= (plan.plan_types || plan.plan_type || '').replace(/,/g, ' / ') %></span></span>
-              <% if (plan.designer) { %><span>Designer: <span class="text-gray-700"><%= plan.designer %></span></span><% } %>
-              <% if (plan.marked_final_at) { %><span>Finalised: <span class="text-gray-700"><%= new Date(plan.marked_final_at).toLocaleDateString('en-AU') %></span></span><% } %>
+              <% if (types) { %><span>Type: <span class="text-gray-700 font-medium"><%= types %></span></span><% } %>
+              <% if (plan.designer || plan.designer_name) { %><span>Designer: <span class="text-gray-700"><%= plan.designer || plan.designer_name %></span></span><% } %>
+              <% if (plan.approved_date) { %><span>Approved: <span class="text-gray-700"><%= new Date(plan.approved_date).toLocaleDateString('en-AU') %></span></span><% } %>
+              <% if (plan.submitted_date) { %><span>Submitted: <span class="text-gray-700"><%= new Date(plan.submitted_date).toLocaleDateString('en-AU') %></span></span><% } %>
             </div>
             <% if (plan.notes) { %><p class="text-xs text-gray-500 mt-1"><%= plan.notes %></p><% } %>
+
+            <!-- Attached Documents -->
+            <% if (docs.length > 0) { %>
+            <div class="mt-3 pt-3 border-t border-gray-100">
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Documents</p>
+              <div class="space-y-1.5">
+                <% docs.forEach(function(doc) { %>
+                <div class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                  <a href="/compliance/<%= plan.id %>/documents/<%= doc.filename %>" target="_blank" class="text-sm text-brand-600 hover:underline truncate"><%= doc.original_name %></a>
+                  <span class="text-xs text-gray-400 flex-shrink-0"><%= doc.file_size ? (doc.file_size / 1024).toFixed(0) + ' KB' : '' %></span>
+                </div>
+                <% }) %>
+              </div>
+            </div>
+            <% } else { %>
+            <p class="text-xs text-gray-400 mt-2 italic">No documents attached yet.</p>
+            <% } %>
           </div>
           <div class="flex flex-col items-end gap-2 flex-shrink-0">
-            <% if (plan.file_link || plan.file_path) { %>
-              <a href="<%= plan.file_link || plan.file_path %>" target="_blank" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                Download
-              </a>
-            <% } %>
             <% if (canAccess(user, 'ops_flag')) { %>
               <button type="button" onclick="document.getElementById('flag-form-<%= plan.id %>').classList.toggle('hidden')"
                 class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-medium rounded-lg border border-amber-200 transition-colors inline-flex items-center gap-1">

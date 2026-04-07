@@ -284,9 +284,22 @@ router.get('/:id', (req, res) => {
     ORDER BY al.created_at DESC LIMIT 30
   `).all(job.id, job.id);
 
-  // Final plans (only is_final = 1) for operations view
+  // Final plans = approved/submitted compliance items + documents (for operations view)
   let finalPlans = [];
-  try { finalPlans = db.prepare('SELECT tp.*, u.full_name as finalised_by_name FROM traffic_plans tp LEFT JOIN users u ON tp.marked_final_by = u.id WHERE tp.job_id = ? AND tp.is_final = 1 ORDER BY tp.plan_number').all(job.id); } catch(e) {}
+  let finalPlanDocs = [];
+  try {
+    finalPlans = db.prepare(`
+      SELECT c.*, u.full_name as approver_name, d.full_name as designer_name
+      FROM compliance c LEFT JOIN users u ON c.internal_approver_id = u.id LEFT JOIN users d ON c.assigned_to_id = d.id
+      WHERE c.job_id = ? AND c.status IN ('approved','submitted') ORDER BY c.title
+    `).all(job.id);
+    if (finalPlans.length > 0) {
+      finalPlanDocs = db.prepare(`
+        SELECT cd.*, u.full_name as uploaded_by_name FROM compliance_documents cd LEFT JOIN users u ON cd.uploaded_by_id = u.id
+        WHERE cd.compliance_id IN (SELECT id FROM compliance WHERE job_id = ? AND status IN ('approved','submitted')) ORDER BY cd.created_at DESC
+      `).all(job.id);
+    }
+  } catch(e) {}
 
   // Plan flags and revisions
   let planFlags = [];
@@ -303,7 +316,7 @@ router.get('/:id', (req, res) => {
     complianceCosts, equipmentCosts,
     equipmentAssignments, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
     complianceTgsItems, allUsers, diaryAttachments, chatMembers, activities,
-    finalPlans, planFlags, planRevisions, viewMode,
+    finalPlans, finalPlanDocs, planFlags, planRevisions, viewMode,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });
