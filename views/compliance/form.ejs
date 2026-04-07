@@ -599,29 +599,12 @@
       </div>
       <% } %>
 
-      <!-- Buttons -->
-      <div class="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
-        <div class="flex items-center gap-2">
-          <% if (isEdit) { %>
-            <button type="button" onclick="deleteItem()" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition text-sm font-medium">Delete</button>
-          <% } %>
-          <% if (isEdit && !item.ready_for_invoice && !item.invoiced && item.charge_client) { %>
-            <button type="button" onclick="markReadyForInvoice()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-lg transition text-sm font-medium">Ready for Invoice</button>
-          <% } %>
-        </div>
-        <div class="flex gap-3">
-          <a href="<%= cancelHref %>" class="px-4 py-2 bg-white text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition font-medium text-sm">Cancel</a>
-          <button type="submit" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold text-sm">
-            <%= isEdit ? 'Update Item' : 'Create Item' %>
-          </button>
-        </div>
-      </div>
     </form>
 
     <% if (isEdit) { %>
     <!-- Upload Files (separate form for multipart) -->
-    <div class="mt-6 bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-      <h3 class="text-sm font-semibold text-gray-900 mb-3">Upload Files</h3>
+    <div class="mt-6 pt-6 border-t border-gray-200">
+      <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Upload Files</h3>
       <form method="POST" action="/compliance/<%= item.id %>/upload" enctype="multipart/form-data">
         <%- include('../partials/csrf') %>
         <input type="hidden" name="return_to" value="/compliance/<%= item.id %>/edit<%= (typeof returnTo !== 'undefined' && returnTo) ? '?return_to=' + encodeURIComponent(returnTo) : '' %>">
@@ -636,6 +619,24 @@
       </form>
     </div>
     <% } %>
+
+    <!-- Buttons (outside both forms — uses JS to submit main form) -->
+    <div class="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
+      <div class="flex items-center gap-2">
+        <% if (isEdit) { %>
+          <button type="button" onclick="deleteItem()" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition text-sm font-medium">Delete</button>
+        <% } %>
+        <% if (isEdit && typeof item !== 'undefined' && item && !item.ready_for_invoice && !item.invoiced && item.charge_client) { %>
+          <button type="button" onclick="markReadyForInvoice()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-lg transition text-sm font-medium">Ready for Invoice</button>
+        <% } %>
+      </div>
+      <div class="flex gap-3">
+        <a href="<%= cancelHref %>" class="px-4 py-2 bg-white text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition font-medium text-sm">Cancel</a>
+        <button type="button" onclick="document.getElementById('complianceForm').requestSubmit()" class="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold text-sm">
+          <%= isEdit ? 'Update Item' : 'Create Item' %>
+        </button>
+      </div>
+    </div>
 
   </div>
 </div>
