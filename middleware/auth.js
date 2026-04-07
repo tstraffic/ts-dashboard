@@ -21,52 +21,63 @@ function normaliseRole(role) {
 // Roles: admin (full), operations (no finance), planning (no finance), finance (finance + reporting),
 //        hr (HR modules + limited ops), sales (CRM + limited ops)
 const PERMISSIONS = {
+  // ── Shared ──
   dashboard:     ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'marketing', 'accounts'],
   jobs:          ['admin', 'operations', 'planning', 'finance', 'sales', 'management'],
   projects:      ['admin', 'operations', 'planning', 'finance', 'sales', 'management'],
   clients:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'marketing', 'accounts'],
-  tasks:         ['admin', 'operations', 'planning'],
-  updates:       ['admin', 'operations', 'planning'],
-  compliance:    ['admin', 'operations', 'planning'],
-  plans:         ['admin', 'operations', 'planning'],
-  incidents:     ['admin', 'operations', 'planning'],
-  contacts:      ['admin', 'operations', 'planning', 'hr', 'sales'],
-  timesheets:    ['admin', 'operations', 'planning', 'finance'],
-  crew:          ['admin', 'operations', 'planning'],
-  allocations:   ['admin', 'operations', 'planning'],
-  schedule:      ['admin', 'operations', 'planning'],
-  equipment:     ['admin', 'operations', 'planning'],
-  defects:       ['admin', 'operations', 'planning'],
-  documents:     ['admin', 'operations', 'planning', 'finance'],
-  budgets:       ['admin', 'finance'],
-  reports:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
-  exports:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
   notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'marketing', 'accounts'],
-  bookings:      ['admin', 'operations', 'planning'],
+
+  // ── Operations only (no planning) ──
+  tasks:         ['admin', 'operations'],
+  incidents:     ['admin', 'operations'],
+  contacts:      ['admin', 'operations', 'hr', 'sales'],
+  timesheets:    ['admin', 'operations', 'finance'],
+  crew:          ['admin', 'operations'],
+  allocations:   ['admin', 'operations'],
+  schedule:      ['admin', 'operations'],
+  equipment:     ['admin', 'operations'],
+  defects:       ['admin', 'operations'],
+  documents:     ['admin', 'operations', 'finance'],
+  bookings:      ['admin', 'operations'],
+  reports:       ['admin', 'operations', 'finance', 'hr', 'sales', 'management', 'accounts'],
+  exports:       ['admin', 'operations', 'finance', 'hr', 'sales', 'management', 'accounts'],
+
+  // ── Planning only (no operations) ──
+  compliance:    ['admin', 'planning'],
+  plans:         ['admin', 'planning'],
+  updates:       ['admin', 'planning'],
+
+  // ── Finance / Admin ──
+  budgets:       ['admin', 'finance'],
   crm:           ['admin'],
   admin:         ['admin'],
   activity:      ['admin'],
   settings:      ['admin'],
-  // Dual-view: Planning-only modules (planners + admin)
-  planning_plans:     ['admin', 'planning'],          // full plan workspace (drafts, revisions, mark final)
-  planning_diary:     ['admin', 'planning', 'operations'],  // site diary (both views)
-  planning_chat:      ['admin', 'planning'],          // job-level chat
-  // Dual-view: Operations-only modules (ops + admin)
-  ops_final_plans:    ['admin', 'operations'],        // read-only final plans
-  ops_tasks:          ['admin', 'operations', 'planning'], // tasks visible to both
-  ops_timesheets:     ['admin', 'operations', 'finance'],  // timesheet entry
-  ops_incidents:      ['admin', 'operations'],        // incident reporting
-  ops_flag:           ['admin', 'operations'],        // flag for review on final plans
-  // Induction
+
+  // ── Dual-view: Planning job tabs ──
+  planning_plans:     ['admin', 'planning'],              // full plan workspace (drafts, revisions, mark final)
+  planning_diary:     ['admin', 'planning', 'operations'],// site diary (both views)
+  planning_chat:      ['admin', 'planning'],              // job-level chat
+
+  // ── Dual-view: Operations job tabs ──
+  ops_final_plans:    ['admin', 'operations'],            // read-only final plans
+  ops_tasks:          ['admin', 'operations'],            // tasks (ops only)
+  ops_timesheets:     ['admin', 'operations', 'finance'], // timesheet entry
+  ops_incidents:      ['admin', 'operations'],            // incident reporting
+  ops_flag:           ['admin', 'operations'],            // flag for review on final plans
+
+  // ── Induction ──
   induction:          ['admin', 'operations', 'hr'],
-  // HR modules
+
+  // ── HR modules ──
   hr_dashboard:       ['admin', 'hr'],
   hr_employees:       ['admin', 'hr'],
   hr_documents:       ['admin', 'hr'],
   hr_competencies:    ['admin', 'hr'],
   hr_reports:         ['admin', 'hr'],
   hr_settings:        ['admin'],
-  hr_compliance_view: ['admin', 'hr', 'operations', 'planning'],
+  hr_compliance_view: ['admin', 'hr', 'operations'],
 };
 
 // ---- Helpers ----
