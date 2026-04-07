@@ -53,7 +53,7 @@ const PERMISSIONS = {
   crm:           ['admin'],
   admin:         ['admin'],
   activity:      ['admin'],
-  settings:      ['admin'],
+  settings:      ['admin', 'planning'],
 
   // ── Dual-view: Planning job tabs ──
   planning_plans:     ['admin', 'planning'],              // full plan workspace (drafts, revisions, mark final)
