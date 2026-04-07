@@ -380,16 +380,30 @@ router.post('/:id', (req, res) => {
       console.error('[Compliance] Auto-task sync error:', taskErr.message);
     }
 
-    // Auto-log changes to site diary
+    // Auto-log changes to site diary with user name
     if (oldItem) {
+      const userName = req.session.user ? req.session.user.full_name : 'System';
       const changes = [];
       if (oldItem.status !== b.status) changes.push(`Status: ${(oldItem.status || 'not_started').replace(/_/g, ' ')} → ${(b.status || '').replace(/_/g, ' ')}`);
+      if ((oldItem.title || '') !== (b.title || '')) changes.push(`Title: ${b.title}`);
       if ((oldItem.submitted_date || '') !== (b.submitted_date || '')) changes.push(`Submitted: ${b.submitted_date || 'cleared'}`);
       if ((oldItem.approved_date || '') !== (b.approved_date || '')) changes.push(`Approved: ${b.approved_date || 'cleared'}`);
       if ((oldItem.received_date || '') !== (b.received_date || '')) changes.push(`Received: ${b.received_date || 'cleared'}`);
       if ((oldItem.start_date || '') !== (b.start_date || '')) changes.push(`Start date: ${b.start_date || 'cleared'}`);
       if ((oldItem.finish_date || '') !== (b.finish_date || '')) changes.push(`Finish date: ${b.finish_date || 'cleared'}`);
       if ((oldItem.designer || '') !== (b.designer || '')) changes.push(`Designer: ${b.designer || 'unassigned'}`);
+      if ((oldItem.reference_number || '') !== (b.reference_number || '')) changes.push(`Ref: ${b.reference_number}`);
+      if ((oldItem.client_pm || '') !== (b.client_pm || '')) changes.push(`Client PM: ${b.client_pm || 'cleared'}`);
+      if ((oldItem.file_link || '') !== (b.file_link || '')) changes.push(`File link updated`);
+      if ((oldItem.notes || '') !== (b.notes || '')) changes.push(`Notes updated`);
+      if (String(oldItem.assigned_to_id || '') !== String(b.assigned_to_id || '')) {
+        const newAssignee = b.assigned_to_id ? (db.prepare('SELECT full_name FROM users WHERE id = ?').get(b.assigned_to_id) || {}).full_name || 'Unknown' : 'Unassigned';
+        changes.push(`Assigned to: ${newAssignee}`);
+      }
+      if (String(oldItem.internal_approver_id || '') !== String(b.internal_approver_id || '')) {
+        const newApprover = b.internal_approver_id ? (db.prepare('SELECT full_name FROM users WHERE id = ?').get(b.internal_approver_id) || {}).full_name || 'Unknown' : 'None';
+        changes.push(`Approver: ${newApprover}`);
+      }
       if (oldItem.revision_required != (b.revision_required ? 1 : 0)) changes.push(b.revision_required ? 'Revision required flagged' : 'Revision required cleared');
       if (changes.length > 0) {
         const diaryTypeLabels = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', rol: 'ROL', council_permit: 'Council Permit', spa: 'SPA', sza: 'SZA', bus_approval: 'Bus Approval', police_notification: 'Police Notification', letter_drop: 'Letter Drop' };
@@ -397,7 +411,7 @@ router.post('/:id', (req, res) => {
         autoLogDiary(db, {
           jobId: b.job_id || oldItem.job_id,
           complianceItemId: parseInt(req.params.id),
-          summary: `${diaryTypeLabel} updated (${b.reference_number || oldItem.reference_number || 'N/A'}): ${b.title || oldItem.title}. ${changes.join('. ')}.`,
+          summary: `[${userName}] ${diaryTypeLabel} updated (${b.reference_number || oldItem.reference_number || 'N/A'}): ${b.title || oldItem.title}. ${changes.join('. ')}.`,
           userId: req.session.user ? req.session.user.id : null
         });
         // Notify relevant users on status change
@@ -491,6 +505,19 @@ router.post('/:id/upload', complianceUpload.array('documents', 10), (req, res) =
       req.flash('error', 'No files selected. Please choose files to upload.');
     } else {
       req.flash('success', `${files.length} file(s) uploaded.`);
+      // Audit trail: log upload to site diary
+      const compItem = db.prepare('SELECT job_id, title, reference_number, item_type, item_types FROM compliance WHERE id = ?').get(complianceId);
+      if (compItem && compItem.job_id) {
+        const userName = req.session.user ? req.session.user.full_name : 'System';
+        const typeMap = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', rol: 'ROL', council_permit: 'Council', spa: 'SPA', sza: 'SZA' };
+        const typeLabel = (compItem.item_types || compItem.item_type || '').split(',').map(t => typeMap[t.trim()] || t.trim()).join(' / ');
+        const fileNames = files.map(f => f.originalname).join(', ');
+        autoLogDiary(db, {
+          jobId: compItem.job_id, complianceItemId: parseInt(complianceId),
+          summary: `[${userName}] Uploaded ${files.length} file(s) to ${typeLabel} ${compItem.reference_number || compItem.title}: ${fileNames}`,
+          userId: req.session.user ? req.session.user.id : null
+        });
+      }
     }
   } catch (err) {
     console.error('[Compliance] Upload error:', err.message);
@@ -507,6 +534,18 @@ router.post('/:id/documents/:docId/delete', (req, res) => {
     const fullPath = path.join(__dirname, '..', 'data', doc.file_path);
     try { fs.unlinkSync(fullPath); } catch (e) { /* file may not exist */ }
     db.prepare('DELETE FROM compliance_documents WHERE id = ?').run(doc.id);
+    // Audit trail: log deletion to site diary
+    const compItem = db.prepare('SELECT job_id, title, reference_number, item_type, item_types FROM compliance WHERE id = ?').get(req.params.id);
+    if (compItem && compItem.job_id) {
+      const userName = req.session.user ? req.session.user.full_name : 'System';
+      const typeMap = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', rol: 'ROL', council_permit: 'Council', spa: 'SPA', sza: 'SZA' };
+      const typeLabel = (compItem.item_types || compItem.item_type || '').split(',').map(t => typeMap[t.trim()] || t.trim()).join(' / ');
+      autoLogDiary(db, {
+        jobId: compItem.job_id, complianceItemId: parseInt(req.params.id),
+        summary: `[${userName}] Deleted document from ${typeLabel} ${compItem.reference_number || compItem.title}: ${doc.original_name}`,
+        userId: req.session.user ? req.session.user.id : null
+      });
+    }
   }
   if (req.headers['accept'] && req.headers['accept'].includes('json')) {
     return res.json({ success: true });
