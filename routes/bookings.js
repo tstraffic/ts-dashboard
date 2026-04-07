@@ -40,8 +40,11 @@ function generateBookingNumber(db) {
 }
 
 function transformBooking(db, row) {
+  const today = new Date().toISOString().split('T')[0];
   const crew = db.prepare(`
-    SELECT bc.id, bc.crew_member_id, bc.role_on_site, bc.status, cm.full_name
+    SELECT bc.id, bc.crew_member_id, bc.role_on_site, bc.status, cm.full_name,
+      cm.tc_ticket_expiry, cm.white_card_expiry, cm.licence_expiry, cm.tcp_level,
+      cm.role as crew_role, cm.licence_type
     FROM booking_crew bc LEFT JOIN crew_members cm ON cm.id = bc.crew_member_id
     WHERE bc.booking_id = ?
   `).all(row.id);
@@ -78,7 +81,14 @@ function transformBooking(db, row) {
     startDateTime: row.start_datetime, endDateTime: row.end_datetime,
     depot: row.depot || '', supervisor: supervisorName,
     project: { name: projectName, client: clientName, address: projectAddress, orderNumber: row.order_number || '', billingCode: row.billing_code || '' },
-    personnel: crew.map(c => ({ id: c.crew_member_id, name: c.full_name || 'Unknown', role: c.role_on_site || '', confirmed: c.status === 'confirmed' })),
+    personnel: crew.map(c => {
+      const warnings = [];
+      if (c.tc_ticket_expiry && c.tc_ticket_expiry < today) warnings.push('TC ticket expired');
+      if (c.white_card_expiry && c.white_card_expiry < today) warnings.push('White card expired');
+      if (c.licence_expiry && c.licence_expiry < today) warnings.push('Licence expired');
+      if ((c.role_on_site === 'traffic_controller' || c.role_on_site === 'TC') && !c.tc_ticket_expiry) warnings.push('No TC ticket');
+      return { id: c.crew_member_id, name: c.full_name || 'Unknown', role: c.role_on_site || '', confirmed: c.status === 'confirmed', tcpLevel: c.tcp_level || '', warnings };
+    }),
     vehicles: vehicles.map(v => ({ id: v.id, registration: v.registration || '', name: v.vehicle_name || '' })),
     scheduleWarning,
     dockets: db.prepare("SELECT COUNT(*) as c FROM booking_dockets WHERE booking_id = ?").get(row.id).c,
