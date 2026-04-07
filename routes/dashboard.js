@@ -21,7 +21,7 @@ router.get('/', (req, res) => {
   const today = new Date().toISOString().split('T')[0];
 
   // Always-needed data
-  const urgency = getUrgencyKpis(db, today);
+  const urgency = getUrgencyKpis(db, today, req.session.user);
   const ops = getOpsData(db, today);
   const charts = getChartData(db);
   const myWork = getMyWork(db, user.id, today);

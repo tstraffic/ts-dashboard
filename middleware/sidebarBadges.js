@@ -1,7 +1,8 @@
 // Sidebar badge counts — lightweight middleware, cached for 60 seconds
 const { getDb } = require('../db/database');
 
-let cache = { data: null, expires: 0 };
+// Per-role cache — different counts for different roles
+let cacheByRole = {};
 
 function safeCount(db, sql, params) {
   try { return db.prepare(sql).get(...(params || [])).c; }
@@ -12,8 +13,12 @@ function sidebarBadges(req, res, next) {
   if (!req.session || !req.session.user) return next();
 
   const now = Date.now();
-  if (cache.data && now < cache.expires) {
-    res.locals.sidebarBadges = cache.data;
+  const userRole = (req.session.user.role || '').toLowerCase();
+  const userId = req.session.user.id;
+  const cacheKey = userRole === 'planning' ? `planning_${userId}` : 'global';
+
+  if (cacheByRole[cacheKey] && now < cacheByRole[cacheKey].expires) {
+    res.locals.sidebarBadges = cacheByRole[cacheKey].data;
     return next();
   }
 
@@ -21,6 +26,12 @@ function sidebarBadges(req, res, next) {
     const db = getDb();
     const today = new Date().toISOString().split('T')[0];
     const next30 = new Date(now + 30 * 86400000).toISOString().split('T')[0];
+    const isPlanningRole = userRole === 'planning';
+
+    // Task filter: planning only sees planning division + their own + compliance-linked
+    const taskFilter = isPlanningRole
+      ? `(division = 'planning' OR owner_id = ${userId} OR compliance_id IS NOT NULL)`
+      : '1=1';
 
     const badges = {
       // Bookings — today's allocations
@@ -29,9 +40,9 @@ function sidebarBadges(req, res, next) {
       // Jobs — jobs with outstanding items (blue)
       jobActions: safeCount(db, "SELECT COUNT(DISTINCT j.id) as c FROM jobs j WHERE j.status NOT IN ('completed','closed','cancelled') AND (EXISTS (SELECT 1 FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') OR EXISTS (SELECT 1 FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired')))", []),
 
-      // Tasks — split: overdue (red) vs outstanding non-overdue (blue)
-      tasksOverdue: safeCount(db, "SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND due_date < ?", [today]),
-      tasks: safeCount(db, "SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND (due_date >= ? OR due_date IS NULL)", [today]),
+      // Tasks — filtered by role
+      tasksOverdue: safeCount(db, `SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND due_date < ? AND ${taskFilter}`, [today]),
+      tasks: safeCount(db, `SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND (due_date >= ? OR due_date IS NULL) AND ${taskFilter}`, [today]),
 
       // Plans & Approvals — split: overdue (red) vs outstanding non-overdue (blue)
       complianceOverdue: safeCount(db, "SELECT COUNT(*) as c FROM compliance WHERE status NOT IN ('approved','expired','submitted') AND due_date IS NOT NULL AND due_date < ?", [today]),
@@ -53,7 +64,7 @@ function sidebarBadges(req, res, next) {
       `, [today, next30, today, next30, today, next30, today, next30, today, next30]),
     };
 
-    cache = { data: badges, expires: now + 60000 };
+    cacheByRole[cacheKey] = { data: badges, expires: now + 60000 };
     res.locals.sidebarBadges = badges;
   } catch (e) {
     res.locals.sidebarBadges = {};
