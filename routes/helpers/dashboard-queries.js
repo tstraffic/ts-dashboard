@@ -9,7 +9,7 @@ function getUrgencyKpis(db, today) {
     openIncidents: db.prepare("SELECT COUNT(*) as c FROM incidents WHERE investigation_status NOT IN ('closed', 'resolved')").get().c,
     openDefects: db.prepare("SELECT COUNT(*) as c FROM defects WHERE status NOT IN ('closed', 'deferred')").get().c,
     unconfirmedAllocations: db.prepare("SELECT COUNT(*) as c FROM crew_allocations WHERE allocation_date = ? AND status = 'allocated'").get(today).c,
-    overdueCompliance: db.prepare("SELECT COUNT(*) as c FROM compliance WHERE due_date < ? AND status NOT IN ('approved','expired')").get(today).c,
+    overdueCompliance: db.prepare("SELECT COUNT(*) as c FROM compliance WHERE due_date < ? AND status NOT IN ('approved','expired','submitted')").get(today).c,
     ticketsExpiring: db.prepare(`
       SELECT COUNT(*) as c FROM crew_members WHERE active = 1 AND (
         (tc_ticket_expiry IS NOT NULL AND tc_ticket_expiry BETWEEN ? AND ?)
@@ -160,23 +160,24 @@ function getComplianceUrgent(db, today) {
     LEFT JOIN clients cl ON c.client_id = cl.id
     LEFT JOIN users a ON c.assigned_to_id = a.id
     WHERE (
-      (c.due_date IS NOT NULL AND c.due_date <= ? AND c.status NOT IN ('approved','expired'))
-      OR (c.due_date IS NOT NULL AND c.due_date > ? AND c.due_date <= ? AND c.status NOT IN ('approved','expired'))
+      (c.due_date IS NOT NULL AND c.due_date <= ? AND c.status NOT IN ('approved','expired','submitted'))
+      OR (c.due_date IS NOT NULL AND c.due_date > ? AND c.due_date <= ? AND c.status NOT IN ('approved','expired','submitted'))
+      OR (c.due_date IS NOT NULL AND c.due_date <= ? AND c.status = 'submitted')
       OR (c.expiry_date IS NOT NULL AND c.expiry_date >= ? AND c.expiry_date <= ? AND c.status = 'approved')
       OR (c.expiry_date IS NOT NULL AND c.expiry_date < ? AND c.status = 'approved')
       OR (c.status IN ('not_started','submitted') AND c.due_date IS NOT NULL)
     )
     ORDER BY
       CASE
-        WHEN c.due_date IS NOT NULL AND c.due_date < ? AND c.status NOT IN ('approved','expired') THEN 1
+        WHEN c.due_date IS NOT NULL AND c.due_date < ? AND c.status NOT IN ('approved','expired','submitted') THEN 1
         WHEN c.expiry_date IS NOT NULL AND c.expiry_date < ? THEN 2
-        WHEN c.due_date IS NOT NULL AND c.due_date <= ? AND c.status NOT IN ('approved','expired') THEN 3
+        WHEN c.due_date IS NOT NULL AND c.due_date <= ? AND c.status NOT IN ('approved','expired','submitted') THEN 3
         WHEN c.expiry_date IS NOT NULL AND c.expiry_date <= ? THEN 4
         ELSE 5
       END,
       COALESCE(c.due_date, c.expiry_date) ASC
     LIMIT 10
-  `).all(today, today, next14, today, next30, today, today, today, next14, next30);
+  `).all(today, today, next14, today, today, next30, today, today, today, next14, next30);
 }
 
 function getMyPlans(db, userId, today) {
