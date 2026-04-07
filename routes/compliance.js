@@ -346,30 +346,35 @@ router.post('/:id', (req, res) => {
       const typeLabel = typesArr.map(t => typeLabels[t] || t).join(' / ') || 'Plan';
       const taskTitle = `${typeLabel}: ${b.title || 'Compliance Item'}`;
 
-      if (['submitted', 'approved'].includes(b.status) && existingTask && existingTask.status !== 'complete') {
-        // Plan submitted or approved → auto-complete the linked task (planner has done their part)
-        db.prepare("UPDATE tasks SET status = 'complete', completed_date = date('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(existingTask.id);
-      } else if (b.assigned_to_id && !['submitted', 'approved'].includes(b.status)) {
-        if (existingTask) {
-          // Update existing linked task
-          db.prepare(`UPDATE tasks SET title=?, owner_id=?, due_date=?, job_id=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
-            .run(taskTitle, b.assigned_to_id, b.due_date || new Date().toISOString().split('T')[0], b.job_id || null, b.action_required || '', existingTask.id);
-        } else {
-          // Create new linked task
-          db.prepare(`
-            INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority, task_type, notes, created_by, compliance_id)
-            VALUES (?, 'planning', ?, ?, ?, ?, 'not_started', 'medium', 'one_off', ?, ?, ?)
-          `).run(
-            b.job_id || null,
-            taskTitle,
-            `Auto-created from Plans & Approvals. Reference: ${b.reference_number || 'N/A'}`,
-            b.assigned_to_id,
-            b.due_date || new Date().toISOString().split('T')[0],
-            b.action_required || '',
-            req.session.user ? req.session.user.id : null,
-            req.params.id
-          );
-        }
+      // Map compliance status → task status (single source of truth)
+      const statusMap = { not_started: 'not_started', started: 'in_progress', submitted: 'complete', approved: 'complete', rejected: 'not_started', expired: 'not_started' };
+      const mappedTaskStatus = statusMap[b.status] || 'not_started';
+      const isTaskComplete = mappedTaskStatus === 'complete';
+      const today = new Date().toISOString().split('T')[0];
+
+      if (existingTask) {
+        // Always sync task status + title to match compliance
+        db.prepare(`UPDATE tasks SET title=?, status=?, completed_date=?, owner_id=COALESCE(?, owner_id), due_date=COALESCE(?, due_date), job_id=COALESCE(?, job_id), notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+          .run(taskTitle, mappedTaskStatus, isTaskComplete ? today : null,
+            b.assigned_to_id || null, b.due_date || null, b.job_id || null,
+            b.action_required || '', existingTask.id);
+      } else if (b.assigned_to_id) {
+        // Create new linked task with correct initial status
+        db.prepare(`
+          INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, completed_date, priority, task_type, notes, created_by, compliance_id)
+          VALUES (?, 'planning', ?, ?, ?, ?, ?, ?, 'medium', 'one_off', ?, ?, ?)
+        `).run(
+          b.job_id || null,
+          taskTitle,
+          `Auto-created from Plans & Approvals. Reference: ${b.reference_number || 'N/A'}`,
+          b.assigned_to_id,
+          b.due_date || today,
+          mappedTaskStatus,
+          isTaskComplete ? today : null,
+          b.action_required || '',
+          req.session.user ? req.session.user.id : null,
+          req.params.id
+        );
       }
     } catch (taskErr) {
       console.error('[Compliance] Auto-task sync error:', taskErr.message);

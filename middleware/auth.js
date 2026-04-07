@@ -29,7 +29,7 @@ const PERMISSIONS = {
   notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'marketing', 'accounts'],
 
   // ── Operations only (no planning) ──
-  tasks:         ['admin', 'operations'],
+  tasks:         ['admin', 'operations', 'planning'],  // planning sees only their own + plan-linked tasks
   incidents:     ['admin', 'operations'],
   contacts:      ['admin', 'operations', 'hr', 'sales'],
   timesheets:    ['admin', 'operations', 'finance'],

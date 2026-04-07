@@ -51,8 +51,15 @@ router.get('/', (req, res) => {
   }
 
   // Additional filters — admin/management defaults to all tasks, others default to their own
-  const isAdminRole = ['admin', 'management'].includes((req.session.user.role || '').toLowerCase());
+  const userRole = (req.session.user.role || '').toLowerCase();
+  const isAdminRole = ['admin', 'management'].includes(userRole);
+  const isPlanningRole = userRole === 'planning';
   if (owner === 'all' || (!owner && isAdminRole)) { /* show all tasks */ }
+  else if (!owner && isPlanningRole) {
+    // Planning sees: their own tasks + planning division tasks + compliance-linked tasks
+    baseWhere += " AND (t.owner_id = ? OR t.division = 'planning' OR t.compliance_id IS NOT NULL)";
+    params.push(req.session.user.id);
+  }
   else if (owner === 'me' || (!owner && !isAdminRole)) { baseWhere += ' AND t.owner_id = ?'; params.push(req.session.user.id); }
   else if (owner) { baseWhere += ' AND t.owner_id = ?'; params.push(owner); }
   if (priority && priority !== 'all') { baseWhere += ' AND t.priority = ?'; params.push(priority); }
