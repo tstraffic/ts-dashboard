@@ -2562,7 +2562,6 @@ canvas {
 }
 .crew-role-prefix.tc { color: #2563eb; }
 .crew-role-prefix.tl { color: #7c3aed; }
-.crew-role-prefix.sup { color: #d97706; }
 .crew-role-prefix.pv { color: #059669; }
 
 /* Confirmation dot — green circle+tick = confirmed, gray ring = pending */
@@ -2600,7 +2599,6 @@ canvas {
 .dark-glass .crew-role-prefix { color: #64748b; }
 .dark-glass .crew-role-prefix.tc { color: #60a5fa; }
 .dark-glass .crew-role-prefix.tl { color: #a78bfa; }
-.dark-glass .crew-role-prefix.sup { color: #fbbf24; }
 .dark-glass .crew-role-prefix.pv { color: #34d399; }
 .dark-glass .crew-confirm-dot.pending { border-color: #475569; }
 
