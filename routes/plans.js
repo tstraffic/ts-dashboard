@@ -210,6 +210,31 @@ router.post('/:id/delete', (req, res) => {
   }
 });
 
+// ─── DELETE FILE FROM PLAN ────────────────────────
+router.post('/:id/delete-file', (req, res) => {
+  const db = getDb();
+  const plan = db.prepare('SELECT * FROM traffic_plans WHERE id = ?').get(req.params.id);
+  if (!plan) { req.flash('error', 'Plan not found.'); return res.redirect('/plans'); }
+
+  // Delete physical file
+  if (plan.file_path) {
+    const fullPath = require('path').join(__dirname, '..', plan.file_path);
+    try { require('fs').unlinkSync(fullPath); } catch (e) { /* file may not exist */ }
+  }
+
+  // Clear file columns
+  db.prepare('UPDATE traffic_plans SET file_path = NULL, file_original_name = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(plan.id);
+
+  autoLogDiary(db, {
+    jobId: plan.job_id,
+    summary: `[${req.session.user ? req.session.user.full_name : 'System'}] Deleted file from plan ${plan.plan_number}: ${plan.file_original_name || 'unknown'}`,
+    userId: req.session.user ? req.session.user.id : null
+  });
+
+  req.flash('success', `File deleted from plan ${plan.plan_number}.`);
+  res.redirect(req.body.return_to || `/plans/${plan.id}/edit`);
+});
+
 // ─── MARK AS FINAL ───────────────────────────────
 router.post('/:id/mark-final', (req, res) => {
   const db = getDb();
