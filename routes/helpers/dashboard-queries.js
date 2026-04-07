@@ -1,4 +1,5 @@
 // Dashboard query helpers — extracted for clarity and role-based filtering
+const { HEALTH_CALC_SQL } = require('../../middleware/jobHealth');
 
 function getUrgencyKpis(db, today) {
   const next30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
@@ -72,7 +73,7 @@ function getFinanceData(db) {
 function getChartData(db) {
   return {
     jobStatusDist: db.prepare("SELECT status, COUNT(*) as count FROM jobs GROUP BY status").all(),
-    jobHealthDist: db.prepare("SELECT health, COUNT(*) as count FROM jobs WHERE status = 'active' GROUP BY health").all(),
+    jobHealthDist: db.prepare(`SELECT ${HEALTH_CALC_SQL} as health, COUNT(*) as count FROM jobs j WHERE status = 'active' GROUP BY 1`).all(),
     crewHoursByDay: db.prepare(`
       SELECT work_date, COALESCE(SUM(total_hours), 0) as hours
       FROM timesheets WHERE work_date >= date('now', '-7 days')

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { canViewAccounts } = require('../middleware/auth');
+const { recalculateJobHealth, HEALTH_CALC_SQL } = require('../middleware/jobHealth');
 const { logActivity } = require('../middleware/audit');
 const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadForEntity } = require('../lib/chat');
 
@@ -13,7 +14,8 @@ router.get('/', (req, res) => {
     (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') as pending_tasks,
     (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.due_date < date('now')) as overdue_tasks,
     (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved')) as pending_plans,
-    (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired','submitted') AND c.due_date IS NOT NULL AND c.due_date < date('now')) as overdue_compliance
+    (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired','submitted') AND c.due_date IS NOT NULL AND c.due_date < date('now')) as overdue_compliance,
+    ${HEALTH_CALC_SQL} as calculated_health
     FROM jobs j
     LEFT JOIN users u ON j.project_manager_id = u.id
     LEFT JOIN (SELECT b.job_id, b.contract_value as budget_contract, COALESCE((SELECT SUM(amount) FROM cost_entries ce WHERE ce.job_id = b.job_id), 0) as total_spent FROM job_budgets b) bm ON j.id = bm.job_id
@@ -36,6 +38,8 @@ router.get('/', (req, res) => {
   query += ` ORDER BY CASE j.priority WHEN 'high' THEN 0 ELSE 1 END, CASE j.status WHEN 'active' THEN 1 WHEN 'on_hold' THEN 2 WHEN 'won' THEN 3 WHEN 'tender' THEN 4 WHEN 'prestart' THEN 5 WHEN 'completed' THEN 6 ELSE 7 END, j.start_date DESC`;
 
   const jobs = db.prepare(query).all(...params);
+  // Use auto-calculated health instead of stale DB value
+  jobs.forEach(j => { if (j.calculated_health) j.health = j.calculated_health; });
   const suburbs = db.prepare('SELECT DISTINCT suburb FROM jobs WHERE parent_project_id IS NULL ORDER BY suburb').all().map(r => r.suburb);
 
   // Group jobs by client
@@ -152,6 +156,9 @@ router.get('/:id', (req, res) => {
     req.flash('error', 'Project not found.');
     return res.redirect('/projects');
   }
+
+  // Auto-calculate health from live data
+  job.health = recalculateJobHealth(db, job.id);
 
   const tasks = db.prepare(`
     SELECT t.*, u.full_name as owner_name FROM tasks t
