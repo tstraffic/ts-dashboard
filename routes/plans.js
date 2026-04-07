@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const upload = require('../middleware/upload');
-const { autoLogDiary } = require('../lib/diary');
+const { autoLogDiary, logStatusChange } = require('../lib/diary');
 
 // List all traffic plans
 router.get('/', (req, res) => {
@@ -220,10 +220,11 @@ router.post('/:id/mark-final', (req, res) => {
     db.prepare('UPDATE traffic_plans SET is_final = 1, marked_final_at = CURRENT_TIMESTAMP, marked_final_by = ?, status = ? WHERE id = ?')
       .run(req.session.user.id, 'approved', plan.id);
 
-    autoLogDiary(db, {
-      jobId: plan.job_id,
-      summary: `Plan ${plan.plan_number} marked as FINAL by ${req.session.user.full_name}. Now visible to operations.`,
-      userId: req.session.user.id
+    logStatusChange(db, {
+      jobId: plan.job_id, entityType: 'plan',
+      entityLabel: `Plan ${plan.plan_number}`,
+      oldStatus: plan.status || 'draft', newStatus: 'final',
+      userId: req.session.user.id, userName: req.session.user.full_name
     });
 
     req.flash('success', `Plan ${plan.plan_number} marked as final and published to operations.`);
@@ -243,10 +244,11 @@ router.post('/:id/revoke-final', (req, res) => {
     db.prepare('UPDATE traffic_plans SET is_final = 0, status = ? WHERE id = ?')
       .run('draft', plan.id);
 
-    autoLogDiary(db, {
-      jobId: plan.job_id,
-      summary: `Plan ${plan.plan_number} revoked from final by ${req.session.user.full_name}. No longer visible to operations.`,
-      userId: req.session.user.id
+    logStatusChange(db, {
+      jobId: plan.job_id, entityType: 'plan',
+      entityLabel: `Plan ${plan.plan_number}`,
+      oldStatus: 'final', newStatus: 'draft',
+      userId: req.session.user.id, userName: req.session.user.full_name
     });
 
     req.flash('success', `Plan ${plan.plan_number} revoked — no longer visible to operations.`);
