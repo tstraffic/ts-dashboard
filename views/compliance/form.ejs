@@ -240,8 +240,8 @@
             class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
         </div>
 
-        <!-- Submitted Date (shown for TGS/CTMP as "Submission Date", and for all other types) -->
-        <div id="submitted-date-field">
+        <!-- Submitted Date (hidden until type selected) -->
+        <div id="submitted-date-field" class="<%= isEdit ? '' : 'hidden' %>">
           <label for="submitted_date" class="block text-sm font-medium text-gray-600 mb-1" id="submitted-date-label">Submitted Date</label>
           <input type="date" id="submitted_date" name="submitted_date"
             value="<%= isEdit && item.submitted_date ? item.submitted_date.split('T')[0] : '' %>"
@@ -714,13 +714,16 @@ function updateResponseFields() {
   var receivedField = document.getElementById('received-date-field');
   if (receivedField) receivedField.classList.toggle('hidden', !isTgsCtmp);
 
-  // Hide due/approved/expiry for TGS/CTMP, show for others
+  // Hide ALL date fields when nothing selected; show appropriate ones based on type
+  var noTypeSelected = checked.length === 0;
   var dueField = document.getElementById('due-date-field');
   var approvedField = document.getElementById('approved-date-field');
   var expiryField = document.getElementById('expiry-date-field');
-  if (dueField) dueField.classList.toggle('hidden', isTgsCtmp);
-  if (approvedField) approvedField.classList.toggle('hidden', isTgsCtmp);
-  if (expiryField) expiryField.classList.toggle('hidden', isTgsCtmp);
+  var submittedField = document.getElementById('submitted-date-field');
+  if (dueField) dueField.classList.toggle('hidden', noTypeSelected || isTgsCtmp);
+  if (approvedField) approvedField.classList.toggle('hidden', noTypeSelected || isTgsCtmp);
+  if (expiryField) expiryField.classList.toggle('hidden', noTypeSelected || isTgsCtmp);
+  if (submittedField) submittedField.classList.toggle('hidden', noTypeSelected);
 
   // Contextual date labels based on selected types
   var typeLabel = isTgs ? 'TGS' : checked.includes('tmp_approval') ? 'CTMP' : '';

@@ -4229,6 +4229,18 @@ function runMigrations(db) {
     console.log('Migration 85 complete.');
   }
 
+  // Migration 86: Bulk-fix stale tasks linked to submitted/approved compliance items
+  if (!isMigrationApplied.get(86)) {
+    const fixed = db.prepare(`
+      UPDATE tasks SET status = 'complete', completed_date = date('now'), updated_at = CURRENT_TIMESTAMP
+      WHERE compliance_id IS NOT NULL
+        AND status != 'complete'
+        AND compliance_id IN (SELECT id FROM compliance WHERE status IN ('submitted', 'approved'))
+    `).run();
+    recordMigration.run(86, 'Bulk-fix stale tasks: auto-complete tasks linked to submitted/approved compliance');
+    console.log(`Migration 86 complete. ${fixed.changes} stale tasks auto-completed.`);
+  }
+
   console.log('All migrations checked/applied.');
 }
 

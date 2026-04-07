@@ -346,13 +346,10 @@ router.post('/:id', (req, res) => {
       const typeLabel = typesArr.map(t => typeLabels[t] || t).join(' / ') || 'Plan';
       const taskTitle = `${typeLabel}: ${b.title || 'Compliance Item'}`;
 
-      if (b.status === 'approved' && existingTask && existingTask.status !== 'complete') {
-        // Plan approved → auto-complete the linked task
+      if (['submitted', 'approved'].includes(b.status) && existingTask && existingTask.status !== 'complete') {
+        // Plan submitted or approved → auto-complete the linked task (planner has done their part)
         db.prepare("UPDATE tasks SET status = 'complete', completed_date = date('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(existingTask.id);
-      } else if (b.status === 'submitted' && existingTask) {
-        // Plan submitted → mark linked task as in_progress
-        db.prepare("UPDATE tasks SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'not_started'").run(existingTask.id);
-      } else if (b.assigned_to_id && b.status !== 'approved') {
+      } else if (b.assigned_to_id && !['submitted', 'approved'].includes(b.status)) {
         if (existingTask) {
           // Update existing linked task
           db.prepare(`UPDATE tasks SET title=?, owner_id=?, due_date=?, job_id=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
