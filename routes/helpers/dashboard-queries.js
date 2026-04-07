@@ -1,12 +1,20 @@
 // Dashboard query helpers — extracted for clarity and role-based filtering
 const { HEALTH_CALC_SQL } = require('../../middleware/jobHealth');
 
-function getUrgencyKpis(db, today) {
+function getUrgencyKpis(db, today, user) {
   const next30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
   const last7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+  const userRole = user ? (user.role || '').toLowerCase() : '';
+  const userId = user ? user.id : 0;
+  const isPlanningRole = userRole === 'planning';
+
+  // Planning only sees planning division + own + compliance-linked tasks
+  const taskFilter = isPlanningRole
+    ? `AND (division = 'planning' OR owner_id = ${userId} OR compliance_id IS NOT NULL)`
+    : '';
 
   return {
-    overdueTasks: db.prepare("SELECT COUNT(*) as c FROM tasks WHERE due_date < ? AND status != 'complete'").get(today).c,
+    overdueTasks: db.prepare(`SELECT COUNT(*) as c FROM tasks WHERE due_date < ? AND status != 'complete' ${taskFilter}`).get(today).c,
     openIncidents: db.prepare("SELECT COUNT(*) as c FROM incidents WHERE investigation_status NOT IN ('closed', 'resolved')").get().c,
     openDefects: db.prepare("SELECT COUNT(*) as c FROM defects WHERE status NOT IN ('closed', 'deferred')").get().c,
     unconfirmedAllocations: db.prepare("SELECT COUNT(*) as c FROM crew_allocations WHERE allocation_date = ? AND status = 'allocated'").get(today).c,
