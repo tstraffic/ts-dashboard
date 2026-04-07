@@ -89,23 +89,29 @@ router.get('/new', (req, res) => {
 router.post('/', (req, res) => {
   const db = getDb();
   const b = req.body;
-  console.log('[Jobs] POST / — creating job:', b.job_number, 'client_id:', b.client_id, 'suburb:', b.suburb);
+
+  // Auto-generate TSJ-XXXX job code
+  const seqResult = db.prepare('UPDATE job_code_sequence SET last_number = last_number + 1 WHERE id = 1').run();
+  const seq = db.prepare('SELECT last_number FROM job_code_sequence WHERE id = 1').get();
+  const jobNumber = 'TSJ-' + String(seq.last_number).padStart(4, '0');
+
+  console.log('[Jobs] POST / — creating job:', jobNumber, 'client_id:', b.client_id, 'suburb:', b.suburb);
   // Resolve client name from client_id
   let clientName = b.client || '';
   if (b.client_id) {
     const cl = db.prepare('SELECT company_name FROM clients WHERE id = ?').get(b.client_id);
     if (cl) clientName = cl.company_name;
   }
-  const jobName = `${b.job_number} | ${clientName} | ${b.suburb} | ${b.start_date}`;
+  const jobName = `${jobNumber} | ${clientName} | ${b.suburb} | ${b.start_date}`;
 
   try {
     db.prepare(`
       INSERT INTO jobs (job_number, job_name, client, client_id, site_address, suburb, status, stage, percent_complete, start_date, end_date, project_manager_id, ops_supervisor_id, planning_owner_id, marketing_owner_id, accounts_owner_id, health, accounts_status, division_tags, notes,
         client_project_number, project_name, principal_contractor, traffic_supervisor_id,
-        contract_value, estimated_hours, crew_size, vehicles, rol_required, tmp_required, tgs_required, spa_required, council_approval, bus_approval, sharepoint_url, state, required_tcp_level, priority)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        contract_value, estimated_hours, crew_size, vehicles, rol_required, tmp_required, tgs_required, spa_required, council_approval, bus_approval, sharepoint_url, state, required_tcp_level, priority, created_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      b.job_number, jobName, clientName, b.client_id || null, b.site_address, b.suburb,
+      jobNumber, jobName, clientName, b.client_id || null, b.site_address, b.suburb,
       b.status || 'tender', b.stage || 'tender', parseInt(b.percent_complete) || 0,
       b.start_date, b.end_date || null,
       b.project_manager_id || null, b.ops_supervisor_id || null,
@@ -117,17 +123,18 @@ router.post('/', (req, res) => {
       b.rol_required ? 1 : 0, b.tmp_required ? 1 : 0, b.tgs_required ? 1 : 0, b.spa_required ? 1 : 0, b.council_approval ? 1 : 0, b.bus_approval ? 1 : 0,
       b.sharepoint_url || '', b.state || '',
       b.required_tcp_level || '',
-      b.priority || 'normal'
+      b.priority || 'normal',
+      req.session.user.id
     );
     // Auto-create budget record for this job
-    const newJobId = db.prepare('SELECT id FROM jobs WHERE job_number = ?').get(b.job_number);
+    const newJobId = db.prepare('SELECT id FROM jobs WHERE job_number = ?').get(jobNumber);
     if (newJobId) {
       try {
         db.prepare('INSERT OR IGNORE INTO job_budgets (job_id, contract_value, updated_by_id) VALUES (?, ?, ?)').run(newJobId.id, parseFloat(b.contract_value) || 0, req.session.user.id);
       } catch(e) { /* budget may already exist */ }
 
       // Auto-create chat thread for this job
-      const threadId = ensureThreadForEntity('job', newJobId.id, `Job ${b.job_number}`, req.session.user.id);
+      const threadId = ensureThreadForEntity('job', newJobId.id, `Job ${jobNumber}`, req.session.user.id);
       const memberIds = [...new Set([req.session.user.id,
         b.project_manager_id ? parseInt(b.project_manager_id) : null,
         b.ops_supervisor_id ? parseInt(b.ops_supervisor_id) : null,
@@ -139,16 +146,15 @@ router.post('/', (req, res) => {
       postSystemMessage(threadId, `Thread created for job ${b.job_number}`);
     }
 
-    req.flash('success', `Job ${b.job_number} created successfully.`);
+    req.flash('success', `Job ${jobNumber} created successfully.`);
     res.redirect('/jobs');
   } catch (err) {
     console.error('[Jobs] CREATE ERROR:', err.message);
     if (err.message.includes('UNIQUE')) {
-      req.flash('error', `Job number ${b.job_number} already exists.`);
+      req.flash('error', `Job number ${jobNumber} already exists. Please try again.`);
     } else {
       req.flash('error', 'Failed to create job: ' + err.message);
     }
-    // Redirect to jobs list so flash is visible
     res.redirect('/jobs');
   }
 });
@@ -325,6 +331,21 @@ router.get('/:id', (req, res) => {
   let chatMembers = [];
   try { chatMembers = db.prepare('SELECT u.id, u.full_name, u.role FROM chat_thread_members ctm JOIN users u ON ctm.user_id = u.id WHERE ctm.thread_id = ? AND u.active = 1 ORDER BY u.full_name').all(chatThreadId); } catch(e) {}
 
+  // Final plans (only is_final = 1) for operations view
+  let finalPlans = [];
+  try { finalPlans = db.prepare('SELECT tp.*, u.full_name as finalised_by_name FROM traffic_plans tp LEFT JOIN users u ON tp.marked_final_by = u.id WHERE tp.job_id = ? AND tp.is_final = 1 ORDER BY tp.plan_number').all(job.id); } catch(e) {}
+
+  // Plan flags for this job
+  let planFlags = [];
+  try { planFlags = db.prepare('SELECT pf.*, u.full_name as flagged_by_name, tp.plan_number FROM plan_flags pf LEFT JOIN users u ON pf.flagged_by = u.id LEFT JOIN traffic_plans tp ON pf.plan_id = tp.id WHERE pf.job_id = ? ORDER BY pf.created_at DESC').all(job.id); } catch(e) {}
+
+  // Plan revisions for plans in this job
+  let planRevisions = [];
+  try { planRevisions = db.prepare('SELECT pr.*, u.full_name as created_by_name FROM plan_revisions pr LEFT JOIN users u ON pr.created_by = u.id WHERE pr.plan_id IN (SELECT id FROM traffic_plans WHERE job_id = ?) ORDER BY pr.created_at DESC').all(job.id); } catch(e) {}
+
+  // View mode: planning, operations, or all (admin toggle)
+  const viewMode = req.query.view || '';
+
   res.render('jobs/show', {
     title: job.job_number,
     job, tasks, complianceItems, complianceDocs, deliveryDocs, accountsDocs,
@@ -332,6 +353,7 @@ router.get('/:id', (req, res) => {
     complianceCosts, equipmentCosts,
     equipmentAssignments, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
     complianceTgsItems, allUsers, diaryAttachments, chatMembers,
+    finalPlans, planFlags, planRevisions, viewMode,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });

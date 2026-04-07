@@ -4164,6 +4164,71 @@ function runMigrations(db) {
     console.log(`Migration 83 complete. Clients: ${inserted83} inserted, ${updated83} updated.`);
   }
 
+  // Migration 84: Job system rearchitecture — auto-codes, plan revisions, plan flags, dual-view
+  if (!isMigrationApplied.get(84)) {
+    // 1. Job code sequence table for TSJ-XXXX auto-generation
+    db.prepare(`CREATE TABLE IF NOT EXISTS job_code_sequence (
+      id INTEGER PRIMARY KEY,
+      last_number INTEGER NOT NULL DEFAULT 0
+    )`).run();
+    // Seed with current max job count so we don't collide
+    const maxJobCount = db.prepare('SELECT COUNT(*) as cnt FROM jobs').get().cnt;
+    db.prepare('INSERT OR IGNORE INTO job_code_sequence (id, last_number) VALUES (1, ?)').run(maxJobCount);
+
+    // 2. Plan revisions table for revision history
+    db.prepare(`CREATE TABLE IF NOT EXISTS plan_revisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id INTEGER NOT NULL REFERENCES traffic_plans(id) ON DELETE CASCADE,
+      revision_label TEXT NOT NULL,
+      file_url TEXT DEFAULT '',
+      file_path TEXT DEFAULT '',
+      file_original_name TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      created_by INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run();
+    try { db.prepare('CREATE INDEX IF NOT EXISTS idx_plan_revisions_plan ON plan_revisions(plan_id)').run(); } catch(e) {}
+
+    // 3. Plan flags table (operations → planning feedback)
+    db.prepare(`CREATE TABLE IF NOT EXISTS plan_flags (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id INTEGER NOT NULL REFERENCES traffic_plans(id) ON DELETE CASCADE,
+      job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      flagged_by INTEGER NOT NULL REFERENCES users(id),
+      description TEXT NOT NULL,
+      status TEXT DEFAULT 'open' CHECK(status IN ('open','acknowledged','resolved')),
+      resolved_by INTEGER REFERENCES users(id),
+      resolved_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run();
+    try { db.prepare('CREATE INDEX IF NOT EXISTS idx_plan_flags_plan ON plan_flags(plan_id)').run(); } catch(e) {}
+    try { db.prepare('CREATE INDEX IF NOT EXISTS idx_plan_flags_job ON plan_flags(job_id)').run(); } catch(e) {}
+
+    // 4. Add is_final and revision columns to traffic_plans
+    const newPlanCols84 = [
+      ['is_final', 'INTEGER DEFAULT 0'],
+      ['marked_final_at', 'DATETIME'],
+      ['marked_final_by', 'INTEGER REFERENCES users(id)'],
+      ['current_revision_label', "TEXT DEFAULT 'Rev A'"],
+    ];
+    newPlanCols84.forEach(([col, type]) => {
+      try { db.prepare(`ALTER TABLE traffic_plans ADD COLUMN ${col} ${type}`).run(); } catch(e) { /* already exists */ }
+    });
+
+    // 5. Add created_by_id to jobs table (tracks which planner started the job)
+    try { db.prepare('ALTER TABLE jobs ADD COLUMN created_by_id INTEGER REFERENCES users(id)').run(); } catch(e) {}
+
+    recordMigration.run(84, 'Job system rearchitecture: auto-codes, plan revisions, plan flags, dual-view');
+    console.log('Migration 84 complete.');
+  }
+
+  // Migration 85: Add client_issued flag to compliance_revisions (for charging)
+  if (!isMigrationApplied.get(85)) {
+    try { db.prepare('ALTER TABLE compliance_revisions ADD COLUMN client_issued INTEGER DEFAULT 0').run(); } catch(e) { /* already exists */ }
+    recordMigration.run(85, 'Add client_issued flag to compliance_revisions');
+    console.log('Migration 85 complete.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

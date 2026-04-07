@@ -42,14 +42,28 @@ router.post('/', upload.single('plan_file'), (req, res) => {
   const db = getDb();
   const b = req.body;
 
-  // Auto-generate plan number
-  const lastPlan = db.prepare("SELECT plan_number FROM traffic_plans ORDER BY id DESC LIMIT 1").get();
-  let nextNum = 1;
-  if (lastPlan && lastPlan.plan_number) {
-    const match = lastPlan.plan_number.match(/TP-(\d+)/);
-    if (match) nextNum = parseInt(match[1]) + 1;
+  // Auto-generate document code: TSTGS-XXXX-XX or TSTMP-XXXX-XX
+  // Extract job sequence number from job code (TSJ-XXXX → XXXX)
+  let jobSeq = '0000';
+  if (b.job_id) {
+    const parentJob = db.prepare('SELECT job_number FROM jobs WHERE id = ?').get(b.job_id);
+    if (parentJob && parentJob.job_number) {
+      const seqMatch = parentJob.job_number.match(/TSJ-(\d+)/);
+      if (seqMatch) jobSeq = seqMatch[1];
+      else jobSeq = parentJob.job_number.replace(/[^0-9]/g, '').padStart(4, '0').slice(-4);
+    }
   }
-  const planNumber = 'TP-' + String(nextNum).padStart(5, '0');
+
+  // Determine plan type prefix
+  const primaryType = (Array.isArray(b.plan_types) ? b.plan_types[0] : b.plan_types || b.plan_type || 'TGS').toUpperCase();
+  const codePrefix = primaryType === 'TMP' ? 'TSTMP' : 'TSTGS';
+
+  // Count existing plans of this type for this job to get next suffix
+  const existingCount = b.job_id
+    ? db.prepare(`SELECT COUNT(*) as cnt FROM traffic_plans WHERE job_id = ? AND plan_number LIKE ?`).get(b.job_id, `${codePrefix}-${jobSeq}-%`).cnt
+    : 0;
+  const planSuffix = String(existingCount + 1).padStart(2, '0');
+  const planNumber = `${codePrefix}-${jobSeq}-${planSuffix}`;
 
   // Handle multi-select plan types
   let planTypes = '';
@@ -194,6 +208,125 @@ router.post('/:id/delete', (req, res) => {
     req.flash('error', 'Failed to delete plan: ' + err.message);
     res.redirect('/plans');
   }
+});
+
+// ─── MARK AS FINAL ───────────────────────────────
+router.post('/:id/mark-final', (req, res) => {
+  const db = getDb();
+  const plan = db.prepare('SELECT tp.*, j.job_number FROM traffic_plans tp LEFT JOIN jobs j ON tp.job_id = j.id WHERE tp.id = ?').get(req.params.id);
+  if (!plan) { req.flash('error', 'Plan not found.'); return res.redirect('/plans'); }
+
+  try {
+    db.prepare('UPDATE traffic_plans SET is_final = 1, marked_final_at = CURRENT_TIMESTAMP, marked_final_by = ?, status = ? WHERE id = ?')
+      .run(req.session.user.id, 'approved', plan.id);
+
+    autoLogDiary(db, {
+      jobId: plan.job_id,
+      summary: `Plan ${plan.plan_number} marked as FINAL by ${req.session.user.full_name}. Now visible to operations.`,
+      userId: req.session.user.id
+    });
+
+    req.flash('success', `Plan ${plan.plan_number} marked as final and published to operations.`);
+  } catch (err) {
+    req.flash('error', 'Failed to mark plan as final: ' + err.message);
+  }
+  res.redirect(req.body.return_to || `/plans/${plan.id}`);
+});
+
+// ─── REVOKE FINAL ────────────────────────────────
+router.post('/:id/revoke-final', (req, res) => {
+  const db = getDb();
+  const plan = db.prepare('SELECT tp.*, j.job_number FROM traffic_plans tp LEFT JOIN jobs j ON tp.job_id = j.id WHERE tp.id = ?').get(req.params.id);
+  if (!plan) { req.flash('error', 'Plan not found.'); return res.redirect('/plans'); }
+
+  try {
+    db.prepare('UPDATE traffic_plans SET is_final = 0, status = ? WHERE id = ?')
+      .run('draft', plan.id);
+
+    autoLogDiary(db, {
+      jobId: plan.job_id,
+      summary: `Plan ${plan.plan_number} revoked from final by ${req.session.user.full_name}. No longer visible to operations.`,
+      userId: req.session.user.id
+    });
+
+    req.flash('success', `Plan ${plan.plan_number} revoked — no longer visible to operations.`);
+  } catch (err) {
+    req.flash('error', 'Failed to revoke plan: ' + err.message);
+  }
+  res.redirect(req.body.return_to || `/plans/${plan.id}`);
+});
+
+// ─── ADD REVISION ────────────────────────────────
+router.post('/:id/revisions', upload.single('revision_file'), (req, res) => {
+  const db = getDb();
+  const plan = db.prepare('SELECT * FROM traffic_plans WHERE id = ?').get(req.params.id);
+  if (!plan) { req.flash('error', 'Plan not found.'); return res.redirect('/plans'); }
+
+  const b = req.body;
+  const filePath = req.file ? req.file.path.replace(/\\/g, '/') : '';
+  const fileOriginalName = req.file ? req.file.originalname : '';
+
+  // Auto-increment revision label (Rev A → Rev B → Rev C...)
+  const lastRevision = db.prepare('SELECT revision_label FROM plan_revisions WHERE plan_id = ? ORDER BY id DESC LIMIT 1').get(plan.id);
+  let nextLabel = 'Rev A';
+  if (lastRevision) {
+    const letter = lastRevision.revision_label.replace('Rev ', '');
+    nextLabel = 'Rev ' + String.fromCharCode(letter.charCodeAt(0) + 1);
+  } else if (plan.current_revision_label) {
+    const letter = plan.current_revision_label.replace('Rev ', '');
+    nextLabel = 'Rev ' + String.fromCharCode(letter.charCodeAt(0) + 1);
+  }
+
+  try {
+    db.prepare('INSERT INTO plan_revisions (plan_id, revision_label, file_url, file_path, file_original_name, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(plan.id, nextLabel, b.file_url || '', filePath, fileOriginalName, b.notes || '', req.session.user.id);
+
+    db.prepare('UPDATE traffic_plans SET current_revision_label = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(nextLabel, plan.id);
+
+    autoLogDiary(db, {
+      jobId: plan.job_id,
+      summary: `Plan ${plan.plan_number} revised to ${nextLabel}. ${b.notes || ''}`,
+      userId: req.session.user.id
+    });
+
+    req.flash('success', `Revision ${nextLabel} added to plan ${plan.plan_number}.`);
+  } catch (err) {
+    req.flash('error', 'Failed to add revision: ' + err.message);
+  }
+  res.redirect(req.body.return_to || `/plans/${plan.id}`);
+});
+
+// ─── FLAG FOR REVIEW (Operations → Planning) ────
+router.post('/:id/flag', (req, res) => {
+  const db = getDb();
+  const plan = db.prepare('SELECT tp.*, j.job_number, j.id as jid FROM traffic_plans tp LEFT JOIN jobs j ON tp.job_id = j.id WHERE tp.id = ?').get(req.params.id);
+  if (!plan) { req.flash('error', 'Plan not found.'); return res.redirect('/plans'); }
+
+  const description = req.body.description;
+  if (!description || !description.trim()) {
+    req.flash('error', 'Please describe the issue.');
+    return res.redirect(req.body.return_to || `/jobs/${plan.jid}#final-plans`);
+  }
+
+  try {
+    // Create flag record
+    db.prepare('INSERT INTO plan_flags (plan_id, job_id, flagged_by, description) VALUES (?, ?, ?, ?)')
+      .run(plan.id, plan.jid, req.session.user.id, description.trim());
+
+    // Create a task on the planning side tagged to this document
+    db.prepare(`INSERT INTO tasks (job_id, title, description, status, priority, division, created_at)
+      VALUES (?, ?, ?, 'not_started', 'high', 'planning', CURRENT_TIMESTAMP)`)
+      .run(plan.jid,
+        `⚠️ Site issue flagged on ${plan.plan_number}`,
+        `Flagged by ${req.session.user.full_name}: "${description.trim()}"`
+      );
+
+    req.flash('success', `Issue flagged on ${plan.plan_number}. Planning team has been notified.`);
+  } catch (err) {
+    req.flash('error', 'Failed to flag issue: ' + err.message);
+  }
+  res.redirect(req.body.return_to || `/jobs/${plan.jid}#final-plans`);
 });
 
 module.exports = router;

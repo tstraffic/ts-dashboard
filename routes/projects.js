@@ -277,6 +277,18 @@ router.get('/:id', (req, res) => {
     ORDER BY al.created_at DESC LIMIT 30
   `).all(job.id, job.id);
 
+  // Final plans (only is_final = 1) for operations view
+  let finalPlans = [];
+  try { finalPlans = db.prepare('SELECT tp.*, u.full_name as finalised_by_name FROM traffic_plans tp LEFT JOIN users u ON tp.marked_final_by = u.id WHERE tp.job_id = ? AND tp.is_final = 1 ORDER BY tp.plan_number').all(job.id); } catch(e) {}
+
+  // Plan flags and revisions
+  let planFlags = [];
+  try { planFlags = db.prepare('SELECT pf.*, u.full_name as flagged_by_name, tp.plan_number FROM plan_flags pf LEFT JOIN users u ON pf.flagged_by = u.id LEFT JOIN traffic_plans tp ON pf.plan_id = tp.id WHERE pf.job_id = ? ORDER BY pf.created_at DESC').all(job.id); } catch(e) {}
+  let planRevisions = [];
+  try { planRevisions = db.prepare('SELECT pr.*, u.full_name as created_by_name FROM plan_revisions pr LEFT JOIN users u ON pr.created_by = u.id WHERE pr.plan_id IN (SELECT id FROM traffic_plans WHERE job_id = ?) ORDER BY pr.created_at DESC').all(job.id); } catch(e) {}
+
+  const viewMode = req.query.view || '';
+
   res.render('jobs/show', {
     title: job.job_number,
     job, tasks, complianceItems, complianceDocs, deliveryDocs, accountsDocs,
@@ -284,6 +296,7 @@ router.get('/:id', (req, res) => {
     complianceCosts, equipmentCosts,
     equipmentAssignments, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
     complianceTgsItems, allUsers, diaryAttachments, chatMembers, activities,
+    finalPlans, planFlags, planRevisions, viewMode,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });
