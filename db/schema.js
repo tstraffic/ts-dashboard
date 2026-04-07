@@ -4241,6 +4241,24 @@ function runMigrations(db) {
     console.log(`Migration 86 complete. ${fixed.changes} stale tasks auto-completed.`);
   }
 
+  // Migration 87: Sync ALL task statuses with their linked compliance items
+  if (!isMigrationApplied.get(87)) {
+    // started compliance → task in_progress
+    const fix1 = db.prepare(`
+      UPDATE tasks SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP
+      WHERE compliance_id IS NOT NULL AND status = 'not_started'
+        AND compliance_id IN (SELECT id FROM compliance WHERE status = 'started')
+    `).run();
+    // submitted/approved compliance → task complete
+    const fix2 = db.prepare(`
+      UPDATE tasks SET status = 'complete', completed_date = date('now'), updated_at = CURRENT_TIMESTAMP
+      WHERE compliance_id IS NOT NULL AND status != 'complete'
+        AND compliance_id IN (SELECT id FROM compliance WHERE status IN ('submitted', 'approved'))
+    `).run();
+    recordMigration.run(87, 'Sync all task statuses with linked compliance items');
+    console.log(`Migration 87 complete. ${fix1.changes} tasks → in_progress, ${fix2.changes} tasks → complete.`);
+  }
+
   console.log('All migrations checked/applied.');
 }
 
