@@ -38,18 +38,6 @@ router.get('/', (req, res) => {
   const jobs = db.prepare(query).all(...params);
   const suburbs = db.prepare('SELECT DISTINCT suburb FROM jobs WHERE parent_project_id IS NULL ORDER BY suburb').all().map(r => r.suburb);
 
-  // Recent updates for the Updates tab
-  const updateJobFilter = req.query.update_job_id;
-  let updatesQuery = `SELECT pu.*, j.job_number, j.client, u.full_name as submitted_by_name
-    FROM project_updates pu
-    JOIN jobs j ON pu.job_id = j.id
-    LEFT JOIN users u ON pu.submitted_by_id = u.id
-    WHERE 1=1`;
-  const updateParams = [];
-  if (updateJobFilter) { updatesQuery += ` AND pu.job_id = ?`; updateParams.push(updateJobFilter); }
-  updatesQuery += ` ORDER BY pu.week_ending DESC, pu.created_at DESC LIMIT 100`;
-  const recentUpdates = db.prepare(updatesQuery).all(...updateParams);
-
   // Group jobs by client
   const clientGroupsMap = {};
   jobs.forEach(job => {
@@ -76,7 +64,6 @@ router.get('/', (req, res) => {
     title: 'Project Register',
     jobs, suburbs, filters: { status, search, suburb },
     clientGroups,
-    recentUpdates, updateJobFilter: updateJobFilter || '',
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });
@@ -170,12 +157,6 @@ router.get('/:id', (req, res) => {
     SELECT t.*, u.full_name as owner_name FROM tasks t
     LEFT JOIN users u ON t.owner_id = u.id
     WHERE t.job_id = ? ORDER BY CASE t.status WHEN 'blocked' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'not_started' THEN 3 ELSE 4 END, t.due_date ASC
-  `).all(job.id);
-
-  const updates = db.prepare(`
-    SELECT pu.*, u.full_name as submitted_by_name FROM project_updates pu
-    LEFT JOIN users u ON pu.submitted_by_id = u.id
-    WHERE pu.job_id = ? ORDER BY pu.week_ending DESC
   `).all(job.id);
 
   const complianceItems = db.prepare(`
@@ -298,7 +279,7 @@ router.get('/:id', (req, res) => {
 
   res.render('jobs/show', {
     title: job.job_number,
-    job, tasks, updates, complianceItems, complianceDocs, deliveryDocs, accountsDocs,
+    job, tasks, complianceItems, complianceDocs, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
     complianceCosts, equipmentCosts,
     equipmentAssignments, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,

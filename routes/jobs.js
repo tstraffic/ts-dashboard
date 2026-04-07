@@ -194,12 +194,6 @@ router.get('/:id', (req, res) => {
     WHERE t.job_id = ? ORDER BY CASE t.status WHEN 'blocked' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'not_started' THEN 3 ELSE 4 END, t.due_date ASC
   `).all(job.id);
 
-  const updates = db.prepare(`
-    SELECT pu.*, u.full_name as submitted_by_name FROM project_updates pu
-    LEFT JOIN users u ON pu.submitted_by_id = u.id
-    WHERE pu.job_id = ? ORDER BY pu.week_ending DESC
-  `).all(job.id);
-
   const complianceItems = db.prepare(`
     SELECT c.*, u.full_name as approver_name FROM compliance c
     LEFT JOIN users u ON c.internal_approver_id = u.id
@@ -333,7 +327,7 @@ router.get('/:id', (req, res) => {
 
   res.render('jobs/show', {
     title: job.job_number,
-    job, tasks, updates, complianceItems, complianceDocs, deliveryDocs, accountsDocs,
+    job, tasks, complianceItems, complianceDocs, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
     complianceCosts, equipmentCosts,
     equipmentAssignments, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
