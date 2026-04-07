@@ -49,7 +49,7 @@ const PERMISSIONS = {
   settings:      ['admin'],
   // Dual-view: Planning-only modules (planners + admin)
   planning_plans:     ['admin', 'planning'],          // full plan workspace (drafts, revisions, mark final)
-  planning_diary:     ['admin', 'planning'],          // site diary
+  planning_diary:     ['admin', 'planning', 'operations'],  // site diary (both views)
   planning_chat:      ['admin', 'planning'],          // job-level chat
   // Dual-view: Operations-only modules (ops + admin)
   ops_final_plans:    ['admin', 'operations'],        // read-only final plans
