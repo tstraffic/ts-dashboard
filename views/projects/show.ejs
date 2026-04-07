@@ -40,7 +40,7 @@
   <div class="flex items-center gap-2">
     <a href="/projects/<%= job.id %>/edit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Edit</a>
     <a href="/documents/job/<%= job.id %>" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Documents</a>
-    <form method="POST" action="/projects/<%= job.id %>/delete" class="inline" onsubmit="return confirm('Delete job <%= job.job_number %>? All associated tasks, updates, allocations, timesheets, and other data will also be removed. This cannot be undone.')">
+    <form method="POST" action="/projects/<%= job.id %>/delete" class="inline" onsubmit="return confirm('Delete job <%= job.job_number %>? All associated tasks, allocations, timesheets, and other data will also be removed. This cannot be undone.')">
       <%- include('../partials/csrf') %>
       <button type="submit" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg border border-red-200 transition-colors">Delete</button>
     </form>
@@ -166,9 +166,6 @@
     <a href="#tasks" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Tasks</a>
-    <a href="#updates" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
-      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
-      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Updates</a>
     <a href="#compliance" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Compliance</a>
@@ -362,31 +359,6 @@
     <% } %>
   </div>
 
-  <!-- Updates Tab -->
-  <div id="updates" class="tab-content">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">Job Updates</h2>
-      <a href="/updates/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Submit Update</a>
-    </div>
-    <% if (updates.length === 0) { %>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
-        <p class="text-gray-400 text-sm">No updates submitted for this job yet.</p>
-        <a href="/updates/new?job_id=<%= job.id %>" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Submit the first update</a>
-      </div>
-    <% } else { %>
-    <div class="space-y-3">
-      <% updates.forEach(update => { %>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Week ending <%= update.week_ending %></span>
-          <span class="text-xs text-gray-400">by <%= update.submitted_by_name || 'Unknown' %></span>
-        </div>
-        <p class="text-sm text-gray-600"><%= update.summary %></p>
-      </div>
-      <% }) %>
-    </div>
-    <% } %>
-  </div>
 
   <!-- Compliance Tab -->
   <div id="compliance" class="tab-content">
