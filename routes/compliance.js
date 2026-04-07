@@ -493,8 +493,9 @@ router.post('/:id/revisions', (req, res) => {
   const b = req.body;
   // Get next revision number
   const maxRev = db.prepare('SELECT MAX(revision_number) as m FROM compliance_revisions WHERE compliance_id = ?').get(complianceId)?.m || 0;
-  db.prepare('INSERT INTO compliance_revisions (compliance_id, revision_number, revision_date, notes) VALUES (?, ?, ?, ?)')
-    .run(complianceId, maxRev + 1, b.revision_date || null, b.revision_notes || '');
+  const clientIssued = b.client_issued === '1' || b.client_issued === 'on' ? 1 : 0;
+  db.prepare('INSERT INTO compliance_revisions (compliance_id, revision_number, revision_date, notes, client_issued) VALUES (?, ?, ?, ?, ?)')
+    .run(complianceId, maxRev + 1, b.revision_date || null, b.revision_notes || '', clientIssued);
 
   // Update revision_count on parent
   const count = db.prepare('SELECT COUNT(*) as c FROM compliance_revisions WHERE compliance_id = ?').get(complianceId).c;
@@ -508,7 +509,7 @@ router.post('/:id/revisions', (req, res) => {
     autoLogDiary(db, {
       jobId: revItem.job_id,
       complianceItemId: parseInt(complianceId),
-      summary: `${types} revision ${maxRev + 1} added (${revItem.reference_number || 'N/A'}): ${revItem.title}. ${b.revision_notes || ''}`.trim(),
+      summary: `${types} revision ${maxRev + 1} added (${revItem.reference_number || 'N/A'}): ${revItem.title}.${clientIssued ? ' [CLIENT ISSUED]' : ''} ${b.revision_notes || ''}`.trim(),
       userId: req.session.user ? req.session.user.id : null
     });
   }
