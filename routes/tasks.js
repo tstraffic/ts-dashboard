@@ -351,7 +351,7 @@ router.post('/:id', (req, res) => {
       if (changes.length > 0) {
         autoLogDiary(db, {
           jobId: b.job_id || existingTask.job_id,
-          summary: `Task updated: ${b.title}. ${changes.join('. ')}.`,
+          summary: `[${req.session.user ? req.session.user.full_name : 'System'}] Task updated: ${b.title}. ${changes.join('. ')}.`,
           userId: req.session.user ? req.session.user.id : null
         });
       }

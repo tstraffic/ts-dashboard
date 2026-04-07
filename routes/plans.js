@@ -98,7 +98,7 @@ router.post('/', upload.single('plan_file'), (req, res) => {
     const typeLabel = (planTypes || planType || '').split(',').map(t => typeMap[t] || t).join(' / ');
     autoLogDiary(db, {
       jobId: b.job_id,
-      summary: `Traffic plan created: ${planNumber} (${typeLabel}). Designer: ${b.designer || 'unassigned'}. Status: ${b.status || 'draft'}.`,
+      summary: `[${req.session.user.full_name}] Traffic plan created: ${planNumber} (${typeLabel}). Designer: ${b.designer || 'unassigned'}. Status: ${b.status || 'draft'}.`,
       userId: req.session.user.id
     });
 
@@ -172,7 +172,7 @@ router.post('/:id', upload.single('plan_file'), (req, res) => {
       if (changes.length > 0) {
         autoLogDiary(db, {
           jobId: b.job_id || oldPlan.job_id,
-          summary: `Traffic plan updated (${oldPlan.plan_number}): ${changes.join('. ')}.`,
+          summary: `[${req.session.user ? req.session.user.full_name : 'System'}] Traffic plan updated (${oldPlan.plan_number}): ${changes.join('. ')}.`,
           userId: req.session.user ? req.session.user.id : null
         });
       }
@@ -288,7 +288,7 @@ router.post('/:id/revisions', upload.single('revision_file'), (req, res) => {
 
     autoLogDiary(db, {
       jobId: plan.job_id,
-      summary: `Plan ${plan.plan_number} revised to ${nextLabel}. ${b.notes || ''}`,
+      summary: `[${req.session.user.full_name}] Plan ${plan.plan_number} revised to ${nextLabel}. ${b.notes || ''}`,
       userId: req.session.user.id
     });
 

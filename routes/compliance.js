@@ -225,7 +225,7 @@ router.post('/', (req, res) => {
   autoLogDiary(db, {
     jobId: b.job_id,
     complianceItemId: complianceId,
-    summary: `${typeLabel} created: ${b.title || 'Untitled'}. Ref: ${b.reference_number || 'N/A'}. Status: ${b.status || 'not_started'}.`,
+    summary: `[${req.session.user ? req.session.user.full_name : 'System'}] ${typeLabel} created: ${b.title || 'Untitled'}. Ref: ${b.reference_number || 'N/A'}. Status: ${b.status || 'not_started'}.`,
     userId: req.session.user ? req.session.user.id : null
   });
 
@@ -259,7 +259,7 @@ router.post('/bulk-status', (req, res) => {
       const types = (item.item_types || item.item_type || '').split(',').map(t => typeMap[t] || t).join(' / ');
       autoLogDiary(db, {
         jobId: item.job_id, complianceItemId: item.id,
-        summary: `${types} status changed (${item.reference_number || 'N/A'}): ${item.title}. ${(item.old_status || 'not_started').replace(/_/g, ' ')} → ${status.replace(/_/g, ' ')}.`,
+        summary: `[${req.session.user ? req.session.user.full_name : 'System'}] ${types} status changed (${item.reference_number || 'N/A'}): ${item.title}. ${(item.old_status || 'not_started').replace(/_/g, ' ')} → ${status.replace(/_/g, ' ')}.`,
         userId: req.session.user ? req.session.user.id : null
       });
     }
@@ -541,7 +541,7 @@ router.post('/:id/revisions', (req, res) => {
     autoLogDiary(db, {
       jobId: revItem.job_id,
       complianceItemId: parseInt(complianceId),
-      summary: `${types} revision ${maxRev + 1} added (${revItem.reference_number || 'N/A'}): ${revItem.title}.${clientIssued ? ' [CLIENT ISSUED]' : ''} ${b.revision_notes || ''}`.trim(),
+      summary: `[${req.session.user ? req.session.user.full_name : 'System'}] ${types} revision ${maxRev + 1} added (${revItem.reference_number || 'N/A'}): ${revItem.title}.${clientIssued ? ' [CLIENT ISSUED]' : ''} ${b.revision_notes || ''}`.trim(),
       userId: req.session.user ? req.session.user.id : null
     });
   }
