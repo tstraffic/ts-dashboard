@@ -285,18 +285,19 @@
         </div>
         <% } %>
 
-        <!-- Crew list — Traffio style: role prefix + name + confirmation circle -->
+        <!-- Site contact (client supervisor) — shown in info grid like Traffio -->
+        <% if (booking.supervisor) { %>
+        <div class="booking-info-item">
+          <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+          <span><%= booking.supervisor %></span>
+        </div>
+        <% } %>
+
+        <!-- Crew list — Traffio style: role prefix + name + confirmation dot -->
         <div class="booking-crew-list">
-          <% if (booking.supervisor) { %>
-          <div class="crew-member-row">
-            <span class="crew-role-prefix sup">SUP</span>
-            <span class="crew-name"><%= booking.supervisor %></span>
-            <span class="crew-confirm-dot confirmed" title="Confirmed"></span>
-          </div>
-          <% } %>
           <% booking.personnel.forEach(function(p) { %>
           <div class="crew-member-row">
-            <% const roleLabel = p.role === 'traffic_controller' ? 'TC' : (p.role === 'leading_hand' ? 'TL' : (p.role === 'supervisor' ? 'SUP' : (p.role === 'pilot_vehicle' ? 'PV' : ''))); %>
+            <% const roleLabel = p.role === 'traffic_controller' ? 'TC' : (p.role === 'leading_hand' ? 'TL' : (p.role === 'pilot_vehicle' ? 'PV' : '')); %>
             <% if (roleLabel) { %><span class="crew-role-prefix <%= roleLabel.toLowerCase() %>"><%= roleLabel %></span><% } %>
             <span class="crew-name"><%= p.name %></span>
             <% if (p.confirmed) { %>
