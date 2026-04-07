@@ -134,7 +134,8 @@ function loadBookingDetail(db, bookingId) {
 router.get('/', (req, res) => {
   const db = getDb();
   const view = req.query.view || 'board';
-  const dateStr = req.query.date || new Date().toISOString().split('T')[0];
+  // Use Australia/Sydney local date as default (not UTC — avoids showing yesterday after midnight AEST)
+  const dateStr = req.query.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
   const depot = req.query.depot || '', status = req.query.status || '', search = req.query.search || '';
 
   // Calendar view: load whole month. Board/List: load single day.
@@ -201,8 +202,9 @@ router.post('/', (req, res) => {
 
 // GET /resources — Available crew (JSON) with qualification data
 router.get('/resources', (req, res) => {
-  const db = getDb(); const date = req.query.date || new Date().toISOString().split('T')[0];
-  const today = new Date().toISOString().split('T')[0];
+  const db = getDb();
+  const date = req.query.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
   const assignedIds = db.prepare(`SELECT DISTINCT bc.crew_member_id FROM booking_crew bc JOIN bookings b ON b.id = bc.booking_id WHERE DATE(b.start_datetime) = ? AND b.status NOT IN ('cancelled','completed')`).all(date).map(r => r.crew_member_id);
   const allCrew = db.prepare(`SELECT id, full_name, role, phone, employee_id, depot, employment_type,
     tc_ticket_expiry, white_card_expiry, licence_expiry, tcp_level,
