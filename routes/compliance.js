@@ -149,6 +149,21 @@ router.get('/api/next-ref', (req, res) => {
   res.json({ reference_number: prefix + (maxNum + 1) });
 });
 
+// API: Check if a reference number already exists
+router.get('/api/check-ref', (req, res) => {
+  const db = getDb();
+  const refNum = req.query.reference_number || '';
+  const excludeId = req.query.exclude_id || '';
+  if (!refNum) return res.json({ exists: false });
+
+  let query = 'SELECT id, title FROM compliance WHERE reference_number = ?';
+  const params = [refNum];
+  if (excludeId) { query += ' AND id != ?'; params.push(excludeId); }
+
+  const existing = db.prepare(query).get(...params);
+  res.json({ exists: !!existing, title: existing ? existing.title : '' });
+});
+
 router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
@@ -334,6 +349,9 @@ router.post('/:id', (req, res) => {
       if (b.status === 'approved' && existingTask && existingTask.status !== 'complete') {
         // Plan approved → auto-complete the linked task
         db.prepare("UPDATE tasks SET status = 'complete', completed_date = date('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(existingTask.id);
+      } else if (b.status === 'submitted' && existingTask) {
+        // Plan submitted → mark linked task as in_progress
+        db.prepare("UPDATE tasks SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'not_started'").run(existingTask.id);
       } else if (b.assigned_to_id && b.status !== 'approved') {
         if (existingTask) {
           // Update existing linked task
