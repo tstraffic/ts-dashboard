@@ -791,19 +791,51 @@ function generateRefNumber() {
   var checked = document.querySelectorAll('input[name="item_types"]:checked');
   var type = checked.length > 0 ? checked[0].value : '';
   var btn = document.getElementById('generateRefBtn');
-  btn.textContent = '...';
-  btn.disabled = true;
+  if (btn) { btn.textContent = '...'; btn.disabled = true; }
   fetch('/compliance/api/next-ref?item_type=' + encodeURIComponent(type))
     .then(function(r) { return r.json(); })
     .then(function(data) {
       document.getElementById('reference_number').value = data.reference_number;
-      btn.textContent = 'Generate';
-      btn.disabled = false;
+      if (btn) { btn.textContent = 'Generate'; btn.disabled = false; }
+      clearRefWarning();
     })
     .catch(function() {
-      btn.textContent = 'Generate';
-      btn.disabled = false;
+      if (btn) { btn.textContent = 'Generate'; btn.disabled = false; }
     });
+}
+
+// Auto-fill ref number on NEW items when type checkbox changes (if field is empty)
+<% if (!isEdit) { %>
+document.querySelectorAll('input[name="item_types"]').forEach(function(cb) {
+  cb.addEventListener('change', function() {
+    var refInput = document.getElementById('reference_number');
+    if (!refInput.value) generateRefNumber();
+  });
+});
+<% } %>
+
+// Duplicate reference number check
+var refInput = document.getElementById('reference_number');
+var refWarning = null;
+function clearRefWarning() {
+  if (refWarning) { refWarning.remove(); refWarning = null; }
+}
+if (refInput) {
+  refInput.addEventListener('blur', function() {
+    var val = refInput.value.trim();
+    if (!val) { clearRefWarning(); return; }
+    fetch('/compliance/api/check-ref?reference_number=' + encodeURIComponent(val) + '&exclude_id=<%= isEdit && item ? item.id : '' %>')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        clearRefWarning();
+        if (data.exists) {
+          refWarning = document.createElement('p');
+          refWarning.className = 'text-xs text-amber-600 mt-1 font-medium';
+          refWarning.textContent = 'Warning: Reference number "' + val + '" is already in use (' + data.title + '). You can still save, but consider using a unique number.';
+          refInput.parentNode.appendChild(refWarning);
+        }
+      });
+  });
 }
 
 // Delete item via fetch (avoids nested form issue)

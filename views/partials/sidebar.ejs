@@ -95,8 +95,8 @@
     </a>
     <% } %>
 
-    <%/* ── OPERATIONS SECTION (ops + admin) ── */%>
-    <% if (canAccess(user, 'ops_final_plans') || canAccess(user, 'ops_tasks')) { %>
+    <%/* ── OPERATIONS SECTION (ops + admin only — planners don't see this) ── */%>
+    <% if (canAccess(user, 'ops_final_plans')) { %>
     <div class="pt-3 mt-2 border-t border-white/10">
       <p class="px-3 text-[10px] font-bold text-brand-400/45 uppercase tracking-widest mb-1.5">Operations</p>
     </div>
