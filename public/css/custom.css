@@ -1628,6 +1628,38 @@ canvas {
 }
 .resource-status.available { background: #F0FDF4; color: #16A34A; }
 .resource-status.busy { background: #FEF3C7; color: #D97706; }
+.resource-status.blocked { background: #FEF2F2; color: #DC2626; font-weight: 600; }
+
+/* Resource item — blocked state */
+.resource-item-blocked {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+  border-left: 3px solid #EF4444;
+  background: rgba(239, 68, 68, 0.03);
+}
+.resource-item-blocked .resource-avatar {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+/* Resource item — qualification warning badges */
+.resource-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 2px;
+}
+.resource-warning-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #F87171;
+  line-height: 1.4;
+}
 
 /* --- List view --- */
 .bookings-list-wrap { background: white; border-radius: 12px; box-shadow: var(--shadow-card); overflow: hidden; }
@@ -2367,6 +2399,10 @@ canvas {
 .dark-glass .distance-pill.active { background: rgba(43,127,255,0.15) !important; border-color: rgba(43,127,255,0.35) !important; color: #60a5fa !important; }
 .dark-glass .resource-status.available { background: rgba(22,163,74,0.15) !important; color: #86efac !important; }
 .dark-glass .resource-status.busy { background: rgba(217,119,6,0.15) !important; color: #fcd34d !important; }
+.dark-glass .resource-status.blocked { background: rgba(239,68,68,0.15) !important; color: #fca5a5 !important; }
+.dark-glass .resource-item-blocked { background: rgba(239,68,68,0.05) !important; border-left-color: #f87171; }
+.dark-glass .resource-item-blocked .resource-avatar { background: rgba(239,68,68,0.15) !important; color: #fca5a5 !important; }
+.dark-glass .resource-warning-badge { background: rgba(239,68,68,0.15) !important; color: #fca5a5 !important; }
 .dark-glass .resource-distance-filters label { color: var(--dark-text-tertiary) !important; }
 
 /* --- KPI / stat cards --- */
