@@ -4474,6 +4474,28 @@ function runMigrations(db) {
     console.log('Migration 92: 18 new booking columns added');
   }
 
+  // Migration 93: Fix broken FK references (_bookings_backup_89 → bookings)
+  if (!isMigrationApplied.get(93)) {
+    console.log('Running migration 93: Fix FK references on booking child tables');
+    db.pragma('foreign_keys = OFF');
+    const childTables = ['booking_crew', 'booking_notes', 'booking_vehicles', 'booking_dockets', 'booking_documents', 'booking_requirements', 'booking_equipment'];
+    for (const tbl of childTables) {
+      try {
+        const info = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(tbl);
+        if (!info || !info.sql.includes('_bookings_backup_89')) continue;
+        const fixedSql = info.sql.replace(/_bookings_backup_89/g, 'bookings');
+        db.exec(`ALTER TABLE ${tbl} RENAME TO _${tbl}_fix93`);
+        db.exec(fixedSql);
+        const cols = db.prepare(`PRAGMA table_info(${tbl})`).all().map(c => c.name).join(', ');
+        db.exec(`INSERT INTO ${tbl} (${cols}) SELECT ${cols} FROM _${tbl}_fix93`);
+        db.exec(`DROP TABLE _${tbl}_fix93`);
+      } catch (e) { console.log('Migration 93: skip ' + tbl + ': ' + e.message); }
+    }
+    db.pragma('foreign_keys = ON');
+    recordMigration.run(93, 'Fix broken FK references on booking child tables');
+    console.log('Migration 93: FK references fixed');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

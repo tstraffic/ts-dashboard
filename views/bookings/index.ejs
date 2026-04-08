@@ -726,11 +726,11 @@ function handleCalDrop(event, targetDate) {
 
     <!-- Modal footer -->
     <div class="booking-modal-footer">
-      <button class="modal-footer-btn secondary">
+      <button class="modal-footer-btn secondary" onclick="cloneFromModal()">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
         Clone
       </button>
-      <button class="modal-footer-btn secondary">
+      <button class="modal-footer-btn secondary" onclick="printBooking()">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
         Print
       </button>
@@ -870,6 +870,19 @@ function handleCalDrop(event, targetDate) {
               </select>
             </div>
           </div>
+          <% if (formContacts.length > 0) { %>
+          <div class="modal-field" style="margin-top:12px">
+            <label>Site Contacts</label>
+            <div class="grid grid-cols-2 gap-1 max-h-24 overflow-y-auto border border-gray-200 rounded-lg p-2" id="panel-site-contacts">
+              <% formContacts.forEach(ct => { %>
+                <label class="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                  <input type="checkbox" name="site_contacts" value="<%= ct.id %>" class="rounded border-gray-300 text-brand-600">
+                  <%= ct.full_name %>
+                </label>
+              <% }); %>
+            </div>
+          </div>
+          <% } %>
         </div>
 
         <!-- BOOKING INFORMATION -->
@@ -1382,13 +1395,14 @@ function openBookingDetail(id) {
 
       // Status flow — Traffio lifecycle
       const statuses = ['Client Bk.', 'Unconf.', 'Confirmed', 'Locked', 'Conflict', 'G T G', 'Complete', 'Finalised'];
+      const statusKeys = ['client_booking', 'unconfirmed', 'confirmed', 'locked', 'conflict', 'green_to_go', 'complete', 'finalised'];
       const statusMap = { client_booking: 0, unconfirmed: 1, confirmed: 2, locked: 3, conflict: 4, green_to_go: 5, in_progress: 5, complete: 6, finalised: 7, cancelled: -1, late_cancellation: -1, on_hold: -1 };
       const activeIdx = statusMap[booking.status] ?? 0;
       const statusColours = ['#6B7280','#7C3AED','#D97706','#475569','#DC2626','#16A34A','#6B7280','#4F46E5'];
       statusFlow.innerHTML = statuses.map((s, i) => {
         const isActive = i === activeIdx;
         const isDone = activeIdx >= 0 && i < activeIdx;
-        return `<button class="status-flow-step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}" style="${isActive ? 'background:' + statusColours[i] + ';color:#fff;border-color:' + statusColours[i] : ''}">${s}</button>`;
+        return `<button class="status-flow-step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}" style="${isActive ? 'background:' + statusColours[i] + ';color:#fff;border-color:' + statusColours[i] : ''}" onclick="changeBookingStatus(${booking.id}, '${statusKeys[i]}', this)">${s}</button>`;
       }).join('');
 
       const start = new Date(booking.startDateTime);
@@ -1572,7 +1586,13 @@ function openBookingDetail(id) {
         <div class="modal-tab-content" id="tab-resources" style="display:none"><div class="modal-section"><h4 class="modal-section-title">CREW (${(booking.crew||[]).length})</h4>${crewHtml}</div></div>
         <div class="modal-tab-content" id="tab-tasks" style="display:none"><div class="modal-section"><p class="text-sm text-gray-400">Tasks linked to this booking will appear here.</p></div></div>
         <div class="modal-tab-content" id="tab-dockets" style="display:none"><div class="modal-section"><h4 class="modal-section-title">DOCKETS</h4>${docketsHtml}</div></div>
-        <div class="modal-tab-content" id="tab-notes" style="display:none"><div class="modal-section"><h4 class="modal-section-title">NOTES</h4>${notesHtml}</div></div>
+        <div class="modal-tab-content" id="tab-notes" style="display:none"><div class="modal-section"><h4 class="modal-section-title">NOTES</h4>
+          <div class="flex gap-2 mb-3">
+            <input type="text" id="modal-note-input" class="modal-input flex-1" placeholder="Add a note..." onkeydown="if(event.key==='Enter'){addNoteFromModal(${bkId});event.preventDefault();}">
+            <button onclick="addNoteFromModal(${bkId})" class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition">Add</button>
+          </div>
+          <div id="modal-notes-list">${notesHtml}</div>
+        </div></div>
         <div class="modal-tab-content" id="tab-history" style="display:none"><div class="modal-section"><h4 class="modal-section-title">ACTIVITY LOG</h4>${historyHtml}</div></div>
         <div class="modal-tab-content" id="tab-documents" style="display:none"><div class="modal-section"><h4 class="modal-section-title">DOCUMENTS</h4>${docsHtml}</div></div>
       `;
@@ -1603,16 +1623,100 @@ function closeBookingDetail() {
 }
 
 function duplicateBooking(id) {
-  // Show a brief toast confirming duplication
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  fetch('/bookings/' + id + '/clone', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': csrf },
+    body: ''
+  }).then(r => r.json()).then(data => {
+    if (data.ok) {
+      showToast('Cloned as ' + data.booking_number, 'success');
+      setTimeout(() => window.location.reload(), 800);
+    } else { showToast(data.error || 'Clone failed', 'error'); }
+  }).catch(() => showToast('Clone failed', 'error'));
+}
+
+function changeBookingStatus(id, newStatus, btn) {
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  fetch('/bookings/' + id + '/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': csrf },
+    body: 'status=' + encodeURIComponent(newStatus)
+  }).then(r => r.json()).then(data => {
+    if (data.ok) {
+      showToast('Status → ' + newStatus.replace(/_/g, ' '), 'success');
+      // Re-render status flow
+      const statusFlow = document.getElementById('modal-status-flow');
+      if (statusFlow) {
+        const statuses = ['Client Bk.', 'Unconf.', 'Confirmed', 'Locked', 'Conflict', 'G T G', 'Complete', 'Finalised'];
+        const statusKeys = ['client_booking', 'unconfirmed', 'confirmed', 'locked', 'conflict', 'green_to_go', 'complete', 'finalised'];
+        const statusMap = { client_booking: 0, unconfirmed: 1, confirmed: 2, locked: 3, conflict: 4, green_to_go: 5, complete: 6, finalised: 7 };
+        const activeIdx = statusMap[data.status] ?? 0;
+        const statusColours = ['#6B7280','#7C3AED','#D97706','#475569','#DC2626','#16A34A','#6B7280','#4F46E5'];
+        statusFlow.innerHTML = statuses.map((s, i) => {
+          const isActive = i === activeIdx;
+          const isDone = activeIdx >= 0 && i < activeIdx;
+          return '<button class="status-flow-step ' + (isActive ? 'active' : '') + ' ' + (isDone ? 'done' : '') + '" style="' + (isActive ? 'background:' + statusColours[i] + ';color:#fff;border-color:' + statusColours[i] : '') + '" onclick="changeBookingStatus(' + id + ', \'' + statusKeys[i] + '\', this)">' + s + '</button>';
+        }).join('');
+      }
+      // Reload page after brief delay so card status updates
+      setTimeout(() => window.location.reload(), 1200);
+    } else { showToast(data.error || 'Update failed', 'error'); }
+  }).catch(() => showToast('Status update failed', 'error'));
+}
+
+function cloneFromModal() {
+  const editBtn = document.getElementById('modal-edit-btn');
+  if (!editBtn || !editBtn.dataset.bookingId) return;
+  duplicateBooking(editBtn.dataset.bookingId);
+  closeBookingDetail();
+}
+
+function printBooking() {
+  const editBtn = document.getElementById('modal-edit-btn');
+  if (!editBtn || !editBtn.dataset.bookingId) return;
+  window.open('/bookings/' + editBtn.dataset.bookingId, '_blank');
+}
+
+function addNoteFromModal(bookingId) {
+  const input = document.getElementById('modal-note-input');
+  if (!input || !input.value.trim()) return;
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const content = input.value.trim();
+  input.disabled = true;
+  fetch('/bookings/' + bookingId + '/notes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': csrf },
+    body: 'content=' + encodeURIComponent(content)
+  }).then(r => r.json()).then(data => {
+    input.disabled = false;
+    if (data.ok) {
+      input.value = '';
+      // Prepend the new note to the notes list
+      const notesList = document.getElementById('modal-notes-list');
+      if (notesList) {
+        const noNotes = notesList.querySelector('.text-gray-400');
+        if (noNotes) noNotes.remove();
+        const noteEl = document.createElement('div');
+        noteEl.className = 'p-3 rounded-lg bg-gray-50 border border-gray-100 mb-2';
+        noteEl.innerHTML = '<div class="flex justify-between mb-1"><span class="text-xs font-medium text-gray-600">' + (data.author_name || 'You') + '</span><span class="text-[10px] text-gray-400">Just now</span></div><p class="text-sm text-gray-700">' + content.replace(/</g, '&lt;') + '</p>';
+        notesList.insertBefore(noteEl, notesList.firstChild);
+      }
+      showToast('Note added', 'success');
+    } else { showToast(data.error || 'Failed to add note', 'error'); }
+  }).catch(() => { input.disabled = false; showToast('Failed to add note', 'error'); });
+}
+
+function showToast(message, type) {
   const toast = document.createElement('div');
   toast.className = 'booking-toast';
-  toast.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Booking #' + id + ' duplicated';
+  const icon = type === 'error'
+    ? '<svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>'
+    : '<svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+  toast.innerHTML = icon + ' ' + message;
   document.body.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add('show'));
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
-  }, 2000);
+  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 2000);
 }
 
 // Click backdrop to close
@@ -1713,6 +1817,14 @@ function openBookingFormEdit(id) {
       setVal('chainage_to', b.chainage_to || '');
       setVal('has_mobile_works', b.has_mobile_works);
       setVal('marker_is_accurate', b.marker_is_accurate);
+
+      // Site Contacts
+      const siteContactsBox = document.getElementById('panel-site-contacts');
+      if (siteContactsBox) {
+        siteContactsBox.querySelectorAll('input[name="site_contacts"]').forEach(cb => {
+          cb.checked = (b.site_contact_ids || []).includes(parseInt(cb.value));
+        });
+      }
 
       // Booking Type
       setVal('booking_type', b.booking_type || 'regular');
