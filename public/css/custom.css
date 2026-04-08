@@ -2623,7 +2623,7 @@ textarea.modal-input { resize: vertical; min-height: 48px; }
 
 /* --- Resource panel --- */
 /* Resource drawer — dark mode */
-.dark-glass .res-drawer { background: var(--dark-surface) !important; border-left-color: var(--dark-border) !important; box-shadow: -8px 0 24px rgba(0,0,0,0.4) !important; }
+.dark-glass .res-drawer { background: #0F1729 !important; border-left-color: var(--dark-border) !important; box-shadow: -8px 0 24px rgba(0,0,0,0.4) !important; }
 .dark-glass .res-drawer-backdrop.open { background: rgba(0,0,0,0.5) !important; }
 .dark-glass .res-drawer-header { border-bottom-color: var(--dark-border) !important; }
 .dark-glass .res-drawer-title { color: var(--dark-text-primary) !important; }
