@@ -237,9 +237,9 @@
       const totalPeople = booking.personnel.length;
     %>
     <div class="booking-card<%= booking.deletedAt ? ' booking-card-deleted' : '' %>" data-id="<%= booking.id %>" data-status="<%= booking.status %>" style="animation-delay: <%= idx * 40 %>ms"
-      ondragover="event.preventDefault(); this.style.outline='2px solid #2B7FFF'; this.style.outlineOffset='2px'"
-      ondragleave="this.style.outline=''; this.style.outlineOffset=''"
-      ondrop="handleCrewDrop(event, <%= booking.id %>)">
+      ondragover="event.preventDefault(); this.classList.add('drag-over')"
+      ondragleave="this.classList.remove('drag-over')"
+      ondrop="this.classList.remove('drag-over'); handleCrewDrop(event, <%= booking.id %>)">
       <!-- Quick actions (hover) -->
       <div class="booking-card-actions">
         <button class="card-action-btn" title="Edit" onclick="event.stopPropagation(); openBookingFormEdit(<%= booking.id %>)">
@@ -1578,32 +1578,75 @@ function handleCalDrop(event, targetDate) {
       }, parseInt(delay));
     });
   });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    // Skip if user is typing in an input/textarea/select
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) {
+      if (e.key === 'Escape') { e.target.blur(); }
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    switch (e.key.toLowerCase()) {
+      case 'n':
+        e.preventDefault();
+        openBookingForm();
+        break;
+      case 'r':
+        e.preventDefault();
+        if (resBtn) resBtn.click();
+        break;
+      case 'f':
+      case '/':
+        e.preventDefault();
+        document.getElementById('bookings-search')?.focus();
+        break;
+      case 'escape':
+        // Close whatever is open: form panel → modal → resource drawer
+        const formPanel = document.getElementById('booking-form-panel');
+        if (formPanel && formPanel.classList.contains('open')) {
+          closeBookingForm();
+        } else if (document.getElementById('booking-modal-backdrop')?.style.display !== 'none'
+                  && document.getElementById('booking-modal-backdrop')?.style.display !== '') {
+          closeBookingDetail();
+        } else if (resPanel && resPanel.classList.contains('open')) {
+          closeResDrawer();
+        }
+        break;
+    }
+  });
 })();
 
 // Drag-and-drop: assign crew from resource panel to booking card
 function handleCrewDrop(event, bookingId) {
   event.preventDefault();
-  event.currentTarget.style.outline = '';
-  event.currentTarget.style.outlineOffset = '';
+  const card = event.currentTarget;
+  card.classList.remove('drag-over');
 
   const crewData = event.dataTransfer.getData('application/crew');
   if (!crewData) return;
 
   try {
     const crew = JSON.parse(crewData);
+    // Flash card to show drop registered
+    card.classList.add('drop-success');
     fetch('/bookings/' + bookingId + '/crew', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' },
       body: 'crew_member_id=' + crew.id + '&role_on_site=' + encodeURIComponent(crew.role.replace(/_/g, ' '))
     }).then(r => {
       if (r.redirected || r.ok) {
-        // Show toast and reload
-        const toast = document.createElement('div');
-        toast.className = 'booking-toast show';
-        toast.innerHTML = '<svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> ' + crew.name + ' assigned';
-        document.body.appendChild(toast);
-        setTimeout(() => { toast.remove(); window.location.reload(); }, 1200);
+        showToast(crew.name + ' assigned', 'success');
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        card.classList.remove('drop-success');
+        showToast('Assignment failed', 'error');
       }
+    }).catch(() => {
+      card.classList.remove('drop-success');
+      showToast('Assignment failed', 'error');
     });
   } catch(e) { console.error('Drop error:', e); }
 }
