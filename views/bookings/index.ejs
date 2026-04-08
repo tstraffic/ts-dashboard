@@ -239,7 +239,8 @@
     <div class="booking-card<%= booking.deletedAt ? ' booking-card-deleted' : '' %>" data-id="<%= booking.id %>" data-status="<%= booking.status %>" style="animation-delay: <%= idx * 40 %>ms"
       ondragover="event.preventDefault(); this.classList.add('drag-over')"
       ondragleave="this.classList.remove('drag-over')"
-      ondrop="this.classList.remove('drag-over'); handleCrewDrop(event, <%= booking.id %>)">
+      ondrop="this.classList.remove('drag-over'); handleCrewDrop(event, <%= booking.id %>)"
+      oncontextmenu="showCardContextMenu(event, <%= booking.id %>, '<%= booking.status %>')"
       <!-- Quick actions (hover) -->
       <div class="booking-card-actions">
         <button class="card-action-btn" title="Edit" onclick="event.stopPropagation(); openBookingFormEdit(<%= booking.id %>)">
@@ -317,23 +318,24 @@
         <% } %>
       </div>
 
-      <!-- Crew section -->
+      <!-- Crew avatars -->
       <% if (booking.personnel.length > 0) { %>
-      <div class="bc-crew-section">
-        <div class="bc-crew-header">
-          <span class="bc-crew-label">Crew</span>
-          <span class="bc-crew-count <%= confirmedCount === totalPeople ? 'all-good' : '' %>"><%= confirmedCount %>/<%= totalPeople %></span>
-        </div>
-        <div class="bc-crew-list">
-          <% booking.personnel.forEach(function(p) { %>
-          <div class="bc-crew-row">
-            <% const roleLabel = p.role === 'traffic_controller' ? 'TC' : (p.role === 'leading_hand' ? 'TL' : (p.role === 'pilot_vehicle' ? 'PV' : '')); %>
-            <% if (roleLabel) { %><span class="bc-crew-role <%= roleLabel.toLowerCase() %>"><%= roleLabel %></span><% } %>
-            <span class="bc-crew-name"><%= p.name %></span>
-            <span class="bc-crew-dot <%= p.confirmed ? 'confirmed' : 'pending' %>"></span>
-          </div>
+      <div class="bc-crew-avatars">
+        <div class="bc-avatar-stack">
+          <% const maxShow = 4; %>
+          <% booking.personnel.slice(0, maxShow).forEach(function(p, i) { %>
+          <%
+            const initials = p.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            const roleLabel = p.role === 'traffic_controller' ? 'TC' : (p.role === 'leading_hand' ? 'TL' : (p.role === 'pilot_vehicle' ? 'PV' : ''));
+            const roleClass = roleLabel ? roleLabel.toLowerCase() : '';
+          %>
+          <div class="bc-avatar <%= roleClass %><%= p.confirmed ? ' confirmed' : '' %>" title="<%= p.name %><%= roleLabel ? ' (' + roleLabel + ')' : '' %><%= p.confirmed ? ' ✓' : '' %>"><%= initials %></div>
           <% }) %>
+          <% if (booking.personnel.length > maxShow) { %>
+          <div class="bc-avatar bc-avatar-more">+<%= booking.personnel.length - maxShow %></div>
+          <% } %>
         </div>
+        <span class="bc-crew-count <%= confirmedCount === totalPeople ? 'all-good' : '' %>"><%= confirmedCount %>/<%= totalPeople %></span>
       </div>
       <% } %>
 
@@ -388,6 +390,21 @@
   </div>
 
   </div>
+
+<!-- Card context menu -->
+<div class="card-ctx-menu" id="card-ctx-menu" style="display:none;">
+  <div class="card-ctx-title" id="card-ctx-title">Change Status</div>
+  <button class="card-ctx-item" data-status="client_booking">Client Booking</button>
+  <button class="card-ctx-item" data-status="unconfirmed">Unconfirmed</button>
+  <button class="card-ctx-item" data-status="confirmed">Confirmed</button>
+  <button class="card-ctx-item" data-status="locked">Locked</button>
+  <button class="card-ctx-item" data-status="green_to_go">Green to Go</button>
+  <button class="card-ctx-item" data-status="complete">Complete</button>
+  <button class="card-ctx-item" data-status="finalised">Finalised</button>
+  <div class="card-ctx-divider"></div>
+  <button class="card-ctx-item" data-status="conflict">Conflict</button>
+  <button class="card-ctx-item" data-status="cancelled">Cancelled</button>
+</div>
 
 <!-- Resource drawer (slide-over from right) -->
 <div class="res-drawer-backdrop" id="res-drawer-backdrop"></div>
@@ -1650,6 +1667,37 @@ function handleCrewDrop(event, bookingId) {
     });
   } catch(e) { console.error('Drop error:', e); }
 }
+
+// Right-click context menu for quick status change
+let _ctxBookingId = null;
+function showCardContextMenu(event, bookingId, currentStatus) {
+  event.preventDefault();
+  event.stopPropagation();
+  _ctxBookingId = bookingId;
+  const menu = document.getElementById('card-ctx-menu');
+  if (!menu) return;
+  // Highlight current status
+  menu.querySelectorAll('.card-ctx-item').forEach(item => {
+    item.classList.toggle('active', item.getAttribute('data-status') === currentStatus);
+  });
+  menu.style.display = 'block';
+  // Position near click, keep on screen
+  const x = Math.min(event.clientX, window.innerWidth - 200);
+  const y = Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 10);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+}
+document.addEventListener('click', function() {
+  const menu = document.getElementById('card-ctx-menu');
+  if (menu) menu.style.display = 'none';
+});
+document.getElementById('card-ctx-menu')?.addEventListener('click', function(e) {
+  const btn = e.target.closest('.card-ctx-item');
+  if (!btn || !_ctxBookingId) return;
+  const newStatus = btn.getAttribute('data-status');
+  changeBookingStatus(_ctxBookingId, newStatus, btn);
+  this.style.display = 'none';
+});
 
 function openBookingDetail(id) {
   const backdrop = document.getElementById('booking-modal-backdrop');
