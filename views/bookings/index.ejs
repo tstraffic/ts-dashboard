@@ -1355,12 +1355,16 @@ function handleCalDrop(event, targetDate) {
     const label = document.getElementById('resource-count-label');
     if (!list) return;
     fetch('/bookings/resources?date=<%= currentDate %>')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(data => {
+        if (data.error) console.warn('[Resources] Server error:', data.error);
         _resourceData = data;
         renderResourceList(data);
       })
-      .catch(() => { list.innerHTML = '<div class="p-4 text-center text-red-400 text-sm">Failed to load</div>'; });
+      .catch(err => {
+        console.error('Resources load failed:', err);
+        list.innerHTML = '<div class="p-4 text-center text-red-400 text-sm">Failed to load resources</div>';
+      });
   }
   function renderResourceList(data) {
     const list = document.getElementById('resource-list');
