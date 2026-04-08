@@ -1993,6 +1993,26 @@ canvas {
   box-shadow: 0 4px 12px rgba(37,99,235,0.4);
 }
 
+/* Modal form inputs */
+.modal-input {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: #111827;
+  background: white;
+  border: 1px solid #D1D5DB;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.modal-input:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+}
+.modal-input::placeholder { color: #9CA3AF; }
+select.modal-input { cursor: pointer; }
+textarea.modal-input { resize: vertical; min-height: 48px; }
+
 /* --- Booking status pill (for show page) --- */
 .booking-status-pill {
   display: inline-flex;
