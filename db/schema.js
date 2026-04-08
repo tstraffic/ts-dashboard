@@ -4369,6 +4369,79 @@ function runMigrations(db) {
     }
   }
 
+  // Migration 91: Seed Villawood crew into employees table (HR roster)
+  if (!isMigrationApplied.get(91)) {
+    try {
+      const villawood = [
+        ['Abdalaziz','Rabeea','','0481568010','abdalazizrabeea24@gmail.com','EMP-150863'],
+        ['Abdelhadi','Mustapha','','0422786488','abdelhadi.mustapha7999@gmail.com','EMP-136928'],
+        ['Adam','Chami','','0414633050','adamchami2004@hotmail.com','EMP-120716'],
+        ['Ali','Khanafer','','0413431349','alii747@icloud.com','EMP-125390'],
+        ['Anhar','Al-kamisie','','0420775393','anharalkamisie36@gmail.com','EMP-160972'],
+        ['Antony','Kaldas','','0415305804','antonykaldas24@gmail.com','EMP-162463'],
+        ['Bailey','Davis','','0434741774','baileydavis293@gmail.com','EMP-160973'],
+        ['Bassam','Bashir','','0414791308','bassamkbashir99@hotmail.com','EMP-43600'],
+        ['Batoul','Abou Samra','','0404908057','Batoul_Elbaba1997@hotmail.com','EMP-137256'],
+        ['Charbel','Andonian','','0410586324','candonian@hotmail.com','EMP-160926'],
+        ['Dean','Tinellis','','0450355483','dtinellis@gmail.com','EMP-154761'],
+        ['Fahad','Rahman','','0456789345','FAHAD.RAHMAN@LIVE.COM','EMP-154891'],
+        ['Fardeen','Rahman','','0420239102','fardeen4094@gmail.com','EMP-164224'],
+        ['Faysal','Rahman','','0456893723','FAYSAL@TSTC.COM.AU','EMP-154890'],
+        ['Francis','Faupula','','0466246051','francisfaupula06@gmail.com','EMP-158826'],
+        ['Gabriela','Santana','','0451111862','gabrielacsantana10@gmail.com','EMP-152966'],
+        ['Hassan','Albarak','','0413992809','hassanalbarak@icloud.com','EMP-155712'],
+        ['Helen','Vesga','','0421779622','helen_tamayo@hotmail.com','EMP-152999'],
+        ['Husain','Naji','','0435995617','husainnaji2007@gmail.com','EMP-152266'],
+        ['Irina','Faupula','','0452481292','faupulamaumi22@gmail.com','EMP-157941'],
+        ['Jaleel','Kakar','','0478698955','Jaleel.Kakar@hotmail.com','EMP-159506'],
+        ['Jaycee','Cross','','0484740119','jaycee.cross05@gmail.com','EMP-148984'],
+        ['Kaoutar','Diani','Katty','0450087053','Kawtar.1989diani@gmail.com','EMP-136456'],
+        ['Karanpreet','Singh','','0435791514','karan98preet@icloud.com','EMP-162492'],
+        ['Keanu','Rosso','','0411210765','keanu.rosso5@gmail.com','EMP-160971'],
+        ['Lake','Armstrong','','0452622293','larmstrongpr@gmail.com','EMP-119469'],
+        ['Lucien','Reynolds','','0410755283','lucienr2006@gmail.com','EMP-121299'],
+        ['Madison','Nichols','','0424532392','mady1327@icloud.com','EMP-161151'],
+        ['Mar','Subirats','','0478931191','subiratsmar@gmail.com','EMP-158508'],
+        ['Marcella','Patti','','0466693455','Marcela.patti123@gmail.com','EMP-164164'],
+        ['Mohamad','Merheb','','0421378796','mm.merhebb@gmail.com','EMP-162462'],
+        ['Mostafa','El-Masry','','0478703602','mostafaog836@gmail.com','EMP-162385'],
+        ['Muntasir','Ahmed','','0435023366','muntasir0405@gmail.com','EMP-119475'],
+        ['Rabah','Sabouh','','0432720817','rabsabouh98@icloud.com','EMP-119479'],
+        ['Rafat','Islam','','0450809000','rhythm8.au@gmail.com','EMP-151117'],
+        ['Rania','Bakri','','0451663265','Rania_bakri98@hotmail.com','EMP-119451'],
+        ['Rohan','Jamil','','0456560982','Rohanjamil@hotmail.com','EMP-160884'],
+        ['Rumman','Khan','','0469071966','ronnyex1234@hotmail.com','EMP-45438'],
+        ['Ryan','Hand','','0474783388','ryanhand05@gmail.com','EMP-160209'],
+        ['Saadat','Ahmed','','0469295448','saadat@tstc.com.au','EMP-128575'],
+        ['Sajid','Rahman','Captain Sajidur','0422207176','sajidr2104@gmail.com','EMP-39940'],
+        ['Salif','Hoque','','0405033348','hoquesalif@gmail.com','EMP-121302'],
+        ['Samir','Elkheir','','0414983988','Elkheirsamir96@gmail.com','EMP-162541'],
+        ['Savanah','Armstrong','','0435913943','Savannah@tstc.com.au','EMP-55896'],
+        ['Shahid','Hussain','','0416353660','Shady187@y7mail.com','EMP-155502'],
+        ['Shanaq','Hasan','','0411160825','hasanshanaq@gmail.com','EMP-128318'],
+        ['Skye','Smallfield','','0477642302','skyesmallfield1@gmail.com','EMP-162328'],
+        ['Suhail','Ahmed','','0404865150','operations@tstc.com.au','EMP-155771'],
+        ['Syed','Ali','','0498162260','saalishanali@gmail.com','EMP-120485'],
+        ['Taj','Rahman','','0416221801','TAJ@tstc.com.au','EMP-39938'],
+        ['Ummay','Honey','','0404865150','ummayhayderhoney@outlook.com','EMP-156687'],
+        ['Wendy','Del Castillo','','0405914340','wendydelcas@hotmail.com','EMP-164161'],
+        ['Yusuf','Rahman','','04123456789','yusufrahman284@gmail.com','EMP-154892'],
+        ['Zayn','Pao','','0426539626','paozayn08@gmail.com','EMP-162464'],
+      ];
+      const insertEmp = db.prepare(`INSERT OR IGNORE INTO employees (employee_code, first_name, last_name, full_name, preferred_name, phone, email, role_title, employment_type, employment_status, company, active, payment_type, start_date, linked_crew_member_id) VALUES (?, ?, ?, ?, ?, ?, ?, 'Traffic Controller', 'casual', 'active', 'T&S Traffic Control', 1, 'abn', DATE('now'), ?)`);
+      for (const [first, last, pref, phone, email, empCode] of villawood) {
+        const fullName = pref ? pref + ' ' + last : first + ' ' + last;
+        const crewLink = db.prepare('SELECT id FROM crew_members WHERE employee_id = ?').get(empCode);
+        insertEmp.run(empCode, first, last, fullName, pref, phone, email, crewLink ? crewLink.id : null);
+      }
+      const empCount = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'active'").get().c;
+      console.log('Migration 91: Villawood employees seeded. Active employees: ' + empCount);
+      recordMigration.run(91, 'Seed Villawood depot into employees table for HR roster');
+    } catch (e) {
+      console.error('Migration 91 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
