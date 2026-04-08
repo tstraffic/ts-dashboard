@@ -1434,22 +1434,46 @@ canvas {
 }
 
 /* Crew section */
-.bc-crew-section {
-  padding: 8px 14px 6px;
-  border-top: 1px solid #F3F4F6;
-}
-.bc-crew-header {
+/* Crew avatar stack on booking cards */
+.bc-crew-avatars {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  padding: 8px 14px 6px;
+  border-top: 1px solid #F3F4F6;
 }
-.bc-crew-label {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #9CA3AF;
+.bc-avatar-stack {
+  display: flex;
+  align-items: center;
+}
+.bc-avatar-stack .bc-avatar { margin-left: -6px; }
+.bc-avatar-stack .bc-avatar:first-child { margin-left: 0; }
+.bc-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  background: #6B7280;
+  border: 2px solid #fff;
+  position: relative;
+  z-index: 1;
+  cursor: default;
+}
+.bc-avatar:hover { z-index: 10; transform: scale(1.15); transition: transform 0.1s; }
+.bc-avatar.tc { background: #2563EB; }
+.bc-avatar.tl { background: #7C3AED; }
+.bc-avatar.pv { background: #059669; }
+.bc-avatar.confirmed { box-shadow: 0 0 0 2px #22C55E; border-color: #22C55E; }
+.bc-avatar-more {
+  background: #E5E7EB;
+  color: #6B7280;
+  font-size: 9px;
+  font-weight: 700;
 }
 .bc-crew-count {
   font-size: 10px;
@@ -1463,41 +1487,6 @@ canvas {
   color: #15803D;
   background: #DCFCE7;
 }
-.bc-crew-list { display: flex; flex-direction: column; gap: 1px; }
-.bc-crew-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 0;
-  font-size: 12px;
-  color: #374151;
-}
-.bc-crew-role {
-  font-size: 10px;
-  font-weight: 700;
-  color: #94a3b8;
-  flex-shrink: 0;
-  min-width: 18px;
-}
-.bc-crew-role.tc { color: #2563eb; }
-.bc-crew-role.tl { color: #7c3aed; }
-.bc-crew-role.pv { color: #059669; }
-.bc-crew-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 500;
-}
-.bc-crew-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.bc-crew-dot.confirmed { background: #22c55e; }
-.bc-crew-dot.pending { background: #E5E7EB; }
 
 /* Alerts */
 .bc-alerts { padding: 0 14px 8px; }
@@ -1578,6 +1567,51 @@ canvas {
   50% { transform: scale(1.03); }
   100% { transform: scale(1); }
 }
+/* Card context menu (right-click) */
+.card-ctx-menu {
+  position: fixed;
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+  padding: 6px;
+  min-width: 170px;
+  animation: ctx-pop 0.12s ease;
+}
+@keyframes ctx-pop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+.card-ctx-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9CA3AF;
+  padding: 4px 10px 6px;
+}
+.card-ctx-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.card-ctx-item:hover { background: #F3F4F6; }
+.card-ctx-item.active { background: #EFF6FF; color: #2563EB; font-weight: 600; }
+.card-ctx-divider { height: 1px; background: #E5E7EB; margin: 4px 6px; }
+
+/* Dark mode context menu */
+.dark-glass .card-ctx-menu { background: #1E293B; border-color: rgba(255,255,255,0.1); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.dark-glass .card-ctx-title { color: rgba(255,255,255,0.4); }
+.dark-glass .card-ctx-item { color: rgba(255,255,255,0.8); }
+.dark-glass .card-ctx-item:hover { background: rgba(255,255,255,0.08); }
+.dark-glass .card-ctx-item.active { background: rgba(43,127,255,0.15); color: #60a5fa; }
+.dark-glass .card-ctx-divider { background: rgba(255,255,255,0.08); }
+
 /* Dragging state on crew item */
 .resource-item[draggable="true"]:active {
   opacity: 0.7;
@@ -2817,7 +2851,11 @@ textarea.modal-input { resize: vertical; min-height: 48px; }
 .dark-glass .bc-meta { color: #94A3B8; }
 .dark-glass .bc-meta-icon { color: #475569; }
 .dark-glass .bc-id { color: #64748B; }
-.dark-glass .bc-crew-section { border-top-color: rgba(255,255,255,0.06); }
+.dark-glass .bc-crew-avatars { border-top-color: rgba(255,255,255,0.06); }
+.dark-glass .bc-avatar { border-color: var(--dark-surface); }
+.dark-glass .bc-avatar-more { background: rgba(255,255,255,0.1); color: var(--dark-text-tertiary); }
+.dark-glass .bc-crew-count { background: rgba(217,119,6,0.15); color: #fbbf24; }
+.dark-glass .bc-crew-count.all-good { background: rgba(22,163,74,0.15); color: #86efac; }
 .dark-glass .bc-crew-row { color: #E2E8F0; }
 .dark-glass .bc-crew-role { color: #64748B; }
 .dark-glass .bc-crew-role.tc { color: #60A5FA; }
