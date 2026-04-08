@@ -146,7 +146,7 @@ function loadBookingDetail(db, bookingId) {
     r.status = assigned >= r.quantity_required ? 'fulfilled' : assigned > 0 ? 'partial' : 'unfulfilled';
   });
 
-  return { ...row, supervisor_name: supervisorName, crew, notes, vehicles, dockets, documents, activity, requirements, equipment: equipmentList, job: jobInfo, client: clientInfo };
+  return { ...row, supervisor_name: supervisorName, internal_notes: row.notes || '', crew, notes, vehicles, dockets, documents, activity, requirements, equipment: equipmentList, job: jobInfo, client: clientInfo };
 }
 
 // GET / — Board view
@@ -290,23 +290,35 @@ router.get('/resources', (req, res) => {
 router.get('/:id', (req, res) => {
   const db = getDb(); const booking = loadBookingDetail(db, req.params.id);
   if (!booking) { if (req.headers.accept && req.headers.accept.includes('application/json')) return res.status(404).json({ error: 'Booking not found' }); req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
-  if (req.headers.accept && req.headers.accept.includes('application/json')) {
-    const t = transformBooking(db, booking);
-    return res.json({ ...t, booking_number: booking.booking_number, description: booking.description, requirements_text: booking.requirements_text, order_number: booking.order_number, billing_code: booking.billing_code, client_contact: booking.client_contact, is_emergency: booking.is_emergency, is_callout: booking.is_callout, billable: booking.billable, invoiced: booking.invoiced, site_address: booking.site_address, suburb: booking.suburb, state: booking.state, postcode: booking.postcode, crew: booking.crew, allNotes: booking.notes, allVehicles: booking.vehicles, dockets: booking.dockets, documents: booking.documents, activity: booking.activity, requirements: booking.requirements, equipment: booking.equipment, job: booking.job, client: booking.client });
-  }
-  // Resolve requester/planner names
+  // Resolve requester/planner names (used by both JSON and HTML paths)
   let requesterName = '', plannerName = '';
   if (booking.requester_id) { const r = db.prepare("SELECT full_name FROM crew_members WHERE id = ?").get(booking.requester_id); if (r) requesterName = r.full_name; }
   if (booking.planner_id) { const p = db.prepare("SELECT full_name FROM crew_members WHERE id = ?").get(booking.planner_id); if (p) plannerName = p.full_name; }
   // Parse site contacts JSON → resolve names
   let siteContactNames = [];
+  let siteContactIds = [];
   try {
-    const ids = JSON.parse(booking.site_contacts || '[]');
-    if (ids.length) { siteContactNames = ids.map(id => { const c = db.prepare("SELECT full_name FROM client_contacts WHERE id = ?").get(id); return c ? c.full_name : null; }).filter(Boolean); }
+    siteContactIds = JSON.parse(booking.site_contacts || '[]');
+    if (siteContactIds.length) { siteContactNames = siteContactIds.map(id => { const c = db.prepare("SELECT full_name FROM client_contacts WHERE id = ?").get(id); return c ? c.full_name : null; }).filter(Boolean); }
   } catch (e) {}
   // Parse booking tags
   let tagsList = [];
   try { tagsList = JSON.parse(booking.booking_tags || '[]'); } catch (e) {}
+
+  if (req.headers.accept && req.headers.accept.includes('application/json')) {
+    const t = transformBooking(db, booking);
+    return res.json({ ...t, booking_number: booking.booking_number, description: booking.description, requirements_text: booking.requirements_text, order_number: booking.order_number, billing_code: booking.billing_code, client_contact: booking.client_contact, is_emergency: booking.is_emergency, is_callout: booking.is_callout, billable: booking.billable, invoiced: booking.invoiced, site_address: booking.site_address, suburb: booking.suburb, state: booking.state, postcode: booking.postcode, crew: booking.crew, allNotes: booking.notes, allVehicles: booking.vehicles, dockets: booking.dockets, documents: booking.documents, activity: booking.activity, requirements: booking.requirements, equipment: booking.equipment, job: booking.job, client: booking.client,
+      requester_name: requesterName, planner_name: plannerName, requester_id: booking.requester_id, planner_id: booking.planner_id,
+      site_contact_names: siteContactNames, site_contact_ids: siteContactIds, tags_list: tagsList,
+      location_context: booking.location_context || '', worksite_location: booking.worksite_location || '', works_direction: booking.works_direction || '',
+      chainage_from: booking.chainage_from || '', chainage_to: booking.chainage_to || '', has_mobile_works: booking.has_mobile_works || 0,
+      location_notes: booking.location_notes || '', marker_is_accurate: booking.marker_is_accurate || 0,
+      depot_meeting_time: booking.depot_meeting_time || '', straight_to_site_time: booking.straight_to_site_time || '',
+      booking_type: booking.booking_type || 'regular', is_booking_pool: booking.is_booking_pool || 0,
+      title: booking.title || '', job_id: booking.job_id, client_id: booking.client_id, supervisor_id: booking.supervisor_id,
+      internal_notes: booking.internal_notes || '', start_datetime: booking.start_datetime, end_datetime: booking.end_datetime
+    });
+  }
 
   const allCrew = db.prepare("SELECT id, full_name, role, employee_id FROM crew_members WHERE active = 1 ORDER BY full_name").all();
   res.render('bookings/show', {
