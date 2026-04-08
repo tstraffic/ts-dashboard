@@ -31,7 +31,7 @@
 <!-- Page header -->
 <div class="bookings-header">
   <div class="bookings-header-left">
-    <h1 class="bookings-title">Bookings<br><span>Board</span></h1>
+    <h1 class="bookings-title">Bookings<br><span><%= currentView.charAt(0).toUpperCase() + currentView.slice(1) %></span></h1>
   </div>
   <div class="bookings-header-center">
     <div class="bookings-search-wrap">
@@ -41,7 +41,7 @@
     </div>
   </div>
   <div class="bookings-header-right">
-    <button class="bookings-action-btn" title="Export">
+    <button class="bookings-action-btn" title="Export" onclick="exportBookingsCSV()">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       Export
     </button>
@@ -2102,5 +2102,31 @@ const panelStartDate = document.querySelector('#booking-slide-form input[name="s
 const panelEndDate = document.querySelector('#booking-slide-form input[name="end_date"]');
 if (panelStartDate && panelEndDate) {
   panelStartDate.addEventListener('change', function() { if (!panelEndDate.value || panelEndDate.value === panelStartDate.defaultValue) panelEndDate.value = this.value; });
+}
+
+function exportBookingsCSV() {
+  const data = <%- JSON.stringify(bookings.map(b => ({
+    booking_number: b.bookingNumber,
+    status: b.status,
+    title: b.project.name,
+    client: b.project.client,
+    start: b.startDateTime,
+    end: b.endDateTime,
+    depot: b.depot,
+    supervisor: b.supervisor,
+    address: b.project.address,
+    crew_count: b.personnel.length
+  }))) %>;
+  if (!data.length) { showToast('No bookings to export', 'error'); return; }
+  const headers = ['Booking #','Status','Title','Client','Start','End','Depot','Supervisor','Address','Crew'];
+  const rows = data.map(r => [r.booking_number, r.status, r.title, r.client, r.start, r.end, r.depot, r.supervisor, r.address, r.crew_count].map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'bookings-<%= currentDate %>.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('Exported ' + data.length + ' bookings', 'success');
 }
 </script>
