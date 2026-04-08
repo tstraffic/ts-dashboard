@@ -4496,6 +4496,13 @@ function runMigrations(db) {
     console.log('Migration 93: FK references fixed');
   }
 
+  // Migration 94: Add deleted_at column for soft-delete
+  if (!isMigrationApplied.get(94)) {
+    try { db.exec("ALTER TABLE bookings ADD COLUMN deleted_at DATETIME"); } catch (e) { /* column may exist */ }
+    db.prepare("INSERT OR REPLACE INTO migrations (id, name, applied_at) VALUES (94, 'bookings_soft_delete', datetime('now'))").run();
+    console.log('Migration 94 applied: bookings soft delete column');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

@@ -94,7 +94,7 @@ function transformBooking(db, row) {
     dockets: db.prepare("SELECT COUNT(*) as c FROM booking_dockets WHERE booking_id = ?").get(row.id).c,
     notes: noteCount, tasks: 0,
     docs: (() => { try { return db.prepare("SELECT COUNT(*) as c FROM booking_documents WHERE booking_id = ?").get(row.id).c; } catch(e) { return 0; } })(),
-    bookingNumber: row.booking_number || '', suburb: row.suburb || '',
+    bookingNumber: row.booking_number || '', suburb: row.suburb || '', deletedAt: row.deleted_at || null,
     latitude: row.latitude || null, longitude: row.longitude || null,
     stillRequired: (() => {
       try {
@@ -179,6 +179,11 @@ router.get('/', (req, res) => {
     where = "WHERE DATE(b.start_datetime) = ?";
     params.push(dateStr);
   }
+  // Soft-delete filter
+  if (deletedFilter === 'hide') { where += " AND b.deleted_at IS NULL"; }
+  else if (deletedFilter === 'only') { where += " AND b.deleted_at IS NOT NULL"; }
+  // 'show' = no filter, shows all
+
   if (depot) { where += " AND b.depot = ?"; params.push(depot); }
   if (status && view !== 'requests') { where += " AND b.status = ?"; params.push(status); }
   if (search) { where += " AND (b.title LIKE ? OR b.booking_number LIKE ? OR b.site_address LIKE ? OR b.suburb LIKE ?)"; const s = '%' + search + '%'; params.push(s, s, s, s); }
@@ -186,7 +191,7 @@ router.get('/', (req, res) => {
   const orderDir = (view === 'archive') ? 'DESC' : 'ASC';
   const rows = db.prepare(`SELECT b.* FROM bookings b ${where} ORDER BY b.start_datetime ${orderDir} LIMIT ${view === 'archive' ? 200 : 500}`).all(...params);
   const bookings = rows.map(r => transformBooking(db, r));
-  const allForDate = db.prepare("SELECT status FROM bookings WHERE DATE(start_datetime) = ?").all(dateStr);
+  const allForDate = db.prepare("SELECT status FROM bookings WHERE DATE(start_datetime) = ? AND deleted_at IS NULL").all(dateStr);
   const stats = {
     total: allForDate.length,
     greenToGo: allForDate.filter(r => r.status === 'green_to_go').length,
@@ -209,7 +214,7 @@ router.get('/', (req, res) => {
   let contacts = []; try { contacts = db.prepare("SELECT id, full_name, company_id FROM client_contacts ORDER BY full_name").all(); } catch (e) {}
   let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
 
-  res.render('bookings/index', { title: 'Bookings Board', bookings, stats, depots: DEPOTS, currentView: view, currentDate: dateStr, currentDepot: depot, currentStatus: status, currentSearch: search, user: req.session.user, jobs, clients, supervisors, contacts, crewForSelect });
+  res.render('bookings/index', { title: 'Bookings Board', bookings, stats, depots: DEPOTS, currentView: view, currentDate: dateStr, currentDepot: depot, currentStatus: status, currentSearch: search, currentDeleted: deletedFilter, user: req.session.user, jobs, clients, supervisors, contacts, crewForSelect });
 });
 
 // GET /new
@@ -420,6 +425,30 @@ router.post('/:id/status', (req, res) => {
   logActivity({ user: req.session.user, action: 'update', entityType: 'booking', entityId: req.params.id, details: `Status: ${existing.status} → ${newStatus} on ${existing.booking_number}`, req });
   if (isJson) return res.json({ ok: true, status: newStatus });
   req.flash('success', `Status updated to ${newStatus.replace(/_/g, ' ')}.`); res.redirect('/bookings/' + req.params.id);
+});
+
+// POST /:id/delete — Soft delete
+router.post('/:id/delete', (req, res) => {
+  const db = getDb();
+  const isJson = req.headers.accept && req.headers.accept.includes('application/json');
+  const booking = db.prepare("SELECT id, booking_number FROM bookings WHERE id = ?").get(req.params.id);
+  if (!booking) { if (isJson) return res.status(404).json({ error: 'Not found' }); req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
+  db.prepare("UPDATE bookings SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+  logActivity({ user: req.session.user, action: 'delete', entityType: 'booking', entityId: req.params.id, details: `Soft-deleted ${booking.booking_number}`, req });
+  if (isJson) return res.json({ ok: true });
+  req.flash('success', `Booking ${booking.booking_number} deleted.`); res.redirect('/bookings');
+});
+
+// POST /:id/undelete — Restore soft-deleted booking
+router.post('/:id/undelete', (req, res) => {
+  const db = getDb();
+  const isJson = req.headers.accept && req.headers.accept.includes('application/json');
+  const booking = db.prepare("SELECT id, booking_number FROM bookings WHERE id = ?").get(req.params.id);
+  if (!booking) { if (isJson) return res.status(404).json({ error: 'Not found' }); req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
+  db.prepare("UPDATE bookings SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+  logActivity({ user: req.session.user, action: 'update', entityType: 'booking', entityId: req.params.id, details: `Restored ${booking.booking_number}`, req });
+  if (isJson) return res.json({ ok: true });
+  req.flash('success', `Booking ${booking.booking_number} restored.`); res.redirect('/bookings');
 });
 
 // Crew management

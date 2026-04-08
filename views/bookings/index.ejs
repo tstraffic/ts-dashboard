@@ -125,10 +125,10 @@
     </button>
 
     <!-- Deleted items -->
-    <select class="filter-select filter-select-sm">
-      <option>Hide Deleted</option>
-      <option>Show Deleted</option>
-      <option>Only Deleted</option>
+    <select class="filter-select filter-select-sm" id="deleted-filter" onchange="applyDeletedFilter(this.value)">
+      <option value="hide"<%= (typeof currentDeleted !== 'undefined' && currentDeleted === 'hide') || typeof currentDeleted === 'undefined' ? ' selected' : '' %>>Hide Deleted</option>
+      <option value="show"<%= typeof currentDeleted !== 'undefined' && currentDeleted === 'show' ? ' selected' : '' %>>Show Deleted</option>
+      <option value="only"<%= typeof currentDeleted !== 'undefined' && currentDeleted === 'only' ? ' selected' : '' %>>Only Deleted</option>
     </select>
   </div>
 
@@ -236,7 +236,7 @@
       const confirmedCount = booking.personnel.filter(p => p.confirmed).length;
       const totalPeople = booking.personnel.length;
     %>
-    <div class="booking-card" data-id="<%= booking.id %>" data-status="<%= booking.status %>" style="animation-delay: <%= idx * 40 %>ms"
+    <div class="booking-card<%= booking.deletedAt ? ' booking-card-deleted' : '' %>" data-id="<%= booking.id %>" data-status="<%= booking.status %>" style="animation-delay: <%= idx * 40 %>ms"
       ondragover="event.preventDefault(); this.style.outline='2px solid #2B7FFF'; this.style.outlineOffset='2px'"
       ondragleave="this.style.outline=''; this.style.outlineOffset=''"
       ondrop="handleCrewDrop(event, <%= booking.id %>)">
@@ -248,6 +248,15 @@
         <button class="card-action-btn" title="Duplicate" onclick="event.stopPropagation(); duplicateBooking(<%= booking.id %>)">
           <svg class="w-3.5 h-3.5" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
         </button>
+        <% if (!booking.deletedAt) { %>
+        <button class="card-action-btn card-action-delete" title="Delete" onclick="event.stopPropagation(); deleteBooking(<%= booking.id %>, '<%= (booking.bookingNumber || '#' + booking.id).replace(/'/g, "\\'") %>')">
+          <svg class="w-3.5 h-3.5" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+        <% } else { %>
+        <button class="card-action-btn card-action-restore" title="Restore" onclick="event.stopPropagation(); undeleteBooking(<%= booking.id %>, '<%= (booking.bookingNumber || '#' + booking.id).replace(/'/g, "\\'") %>')">
+          <svg class="w-3.5 h-3.5" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </button>
+        <% } %>
       </div>
 
       <%
@@ -378,102 +387,104 @@
     <% } %>
   </div>
 
-  <!-- Right resource panel (togglable) -->
-  <div class="resource-panel" id="resource-panel" style="display:none;">
-    <div class="resource-panel-header">
-      <div class="flex items-center gap-2">
-        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-        <h3>People</h3>
-      </div>
-      <button id="close-resource-panel" class="resource-close-btn">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
+  </div>
+
+<!-- Resource drawer (slide-over from right) -->
+<div class="res-drawer-backdrop" id="res-drawer-backdrop"></div>
+<div class="res-drawer" id="resource-panel">
+  <div class="res-drawer-header">
+    <div class="res-drawer-title">
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <span>Resources</span>
+      <span class="res-drawer-count" id="resource-count-label">--</span>
     </div>
-    <div class="resource-panel-body">
-      <!-- Show/Hide filter toggles (like screenshot) -->
-      <div class="resource-show-hide">
-        <button class="res-toggle-btn" data-filter="tl-only">Only TLs</button>
-        <button class="res-toggle-btn" data-filter="assigned">Assigned</button>
-        <button class="res-toggle-btn" data-filter="blocked">Blocked</button>
-        <button class="res-toggle-btn" data-filter="on-leave">On Leave</button>
-        <button class="res-toggle-btn" data-filter="can-drive">Can Drive</button>
-        <button class="res-toggle-btn" data-filter="first-aid">Only First Aid</button>
-      </div>
+    <button id="close-resource-panel" class="res-drawer-close">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
 
-      <!-- Dropdowns -->
-      <div class="resource-filter-row">
-        <div class="resource-filter-group">
-          <label>Specialisation</label>
-          <select class="filter-select" id="res-filter-spec">
-            <option value="">All</option>
-            <option value="traffic_controller">Traffic Controller</option>
-            <option value="leading_hand">Team Leader</option>
-            <option value="supervisor">Supervisor</option>
-            <option value="pilot_vehicle">Pilot Vehicle</option>
-          </select>
-        </div>
-        <div class="resource-filter-group">
-          <label>Depot</label>
-          <select class="filter-select" id="res-filter-depot">
-            <option value="">All Depots</option>
-            <% depots.forEach(d => { %>
-            <option value="<%= d %>"><%= d %></option>
-            <% }) %>
-          </select>
-        </div>
-      </div>
-      <div class="resource-filter-row">
-        <div class="resource-filter-group">
-          <label>Employment Type</label>
-          <select class="filter-select" id="res-filter-employment">
-            <option value="">All</option>
-            <option value="employee">Employee</option>
-            <option value="casual">Casual</option>
-            <option value="subcontractor">Subcontractor</option>
-          </select>
-        </div>
-      </div>
+  <!-- Search -->
+  <div class="res-drawer-search">
+    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+    <input type="text" id="resource-search" placeholder="Search crew...">
+  </div>
 
-      <!-- Distance pills -->
-      <div class="resource-distance-filters">
-        <label>Distance</label>
-        <div class="distance-pills">
-          <button class="distance-pill">5km</button>
-          <button class="distance-pill">10km</button>
-          <button class="distance-pill">20km</button>
-          <button class="distance-pill">30km</button>
-          <button class="distance-pill">50km</button>
-          <button class="distance-pill active">All</button>
-        </div>
-      </div>
+  <!-- Quick filter chips -->
+  <div class="res-drawer-chips">
+    <button class="res-chip" data-filter="tl-only">Team Leaders</button>
+    <button class="res-chip" data-filter="assigned">Assigned</button>
+    <button class="res-chip" data-filter="blocked">Blocked</button>
+    <button class="res-chip" data-filter="on-leave">On Leave</button>
+    <button class="res-chip" data-filter="can-drive">Can Drive</button>
+    <button class="res-chip" data-filter="first-aid">First Aid</button>
+  </div>
 
-      <!-- Hours pills -->
-      <div class="resource-distance-filters">
-        <label>Hours</label>
-        <div class="distance-pills">
-          <button class="distance-pill">8 Hrs</button>
-          <button class="distance-pill">16 Hrs</button>
-          <button class="distance-pill">24 Hrs</button>
-          <button class="distance-pill">32 Hrs</button>
-          <button class="distance-pill">40 Hrs</button>
-          <button class="distance-pill active">All</button>
-        </div>
+  <!-- Collapsible filters -->
+  <details class="res-drawer-filters">
+    <summary>
+      <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+      Filters
+    </summary>
+    <div class="res-filter-grid">
+      <div class="res-filter-col">
+        <label>Specialisation</label>
+        <select class="res-filter-select" id="res-filter-spec">
+          <option value="">All</option>
+          <option value="traffic_controller">Traffic Controller</option>
+          <option value="leading_hand">Team Leader</option>
+          <option value="supervisor">Supervisor</option>
+          <option value="pilot_vehicle">Pilot Vehicle</option>
+        </select>
       </div>
-
-      <!-- Search crew -->
-      <div class="resource-search-wrap">
-        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        <input type="text" id="resource-search" class="resource-search-input" placeholder="Search crew...">
+      <div class="res-filter-col">
+        <label>Depot</label>
+        <select class="res-filter-select" id="res-filter-depot">
+          <option value="">All Depots</option>
+          <% depots.forEach(d => { %>
+          <option value="<%= d %>"><%= d %></option>
+          <% }) %>
+        </select>
       </div>
-
-      <div class="resource-available-header">
-        <span>Resources available from 6am to 6pm (day shift)</span>
-        <span class="text-xs text-gray-400" id="resource-count-label">Loading...</span>
-      </div>
-      <div class="resource-list" id="resource-list">
-        <div class="p-4 text-center text-gray-400 text-sm">Loading crew...</div>
+      <div class="res-filter-col">
+        <label>Employment</label>
+        <select class="res-filter-select" id="res-filter-employment">
+          <option value="">All</option>
+          <option value="employee">Employee</option>
+          <option value="casual">Casual</option>
+          <option value="subcontractor">Subcontractor</option>
+        </select>
       </div>
     </div>
+    <div class="res-pill-section">
+      <label>Distance</label>
+      <div class="distance-pills">
+        <button class="distance-pill">5km</button>
+        <button class="distance-pill">10km</button>
+        <button class="distance-pill">20km</button>
+        <button class="distance-pill">30km</button>
+        <button class="distance-pill">50km</button>
+        <button class="distance-pill active">All</button>
+      </div>
+    </div>
+    <div class="res-pill-section">
+      <label>Hours</label>
+      <div class="distance-pills">
+        <button class="distance-pill">8 Hrs</button>
+        <button class="distance-pill">16 Hrs</button>
+        <button class="distance-pill">24 Hrs</button>
+        <button class="distance-pill">32 Hrs</button>
+        <button class="distance-pill">40 Hrs</button>
+        <button class="distance-pill active">All</button>
+      </div>
+    </div>
+  </details>
+
+  <!-- Crew list -->
+  <div class="res-drawer-list-header">
+    <span>Available crew</span>
+  </div>
+  <div class="resource-list" id="resource-list">
+    <div class="p-4 text-center text-gray-400 text-sm">Loading crew...</div>
   </div>
 </div>
 
@@ -944,6 +955,14 @@ function handleCalDrop(event, targetDate) {
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
         Print
       </button>
+      <button class="modal-footer-btn danger" id="modal-delete-btn" onclick="deleteFromModal()">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        Delete
+      </button>
+      <button class="modal-footer-btn restore" id="modal-restore-btn" style="display:none;" onclick="undeleteFromModal()">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Restore
+      </button>
       <div class="flex-1"></div>
       <button class="modal-footer-btn primary" id="modal-edit-btn" onclick="closeBookingDetail(); openBookingFormEdit(this.dataset.bookingId);">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -1370,7 +1389,7 @@ function handleCalDrop(event, targetDate) {
     const list = document.getElementById('resource-list');
     const label = document.getElementById('resource-count-label');
     if (!list) return;
-    label.textContent = data.available.length + ' available, ' + data.assigned.length + ' assigned';
+    label.textContent = (data.available.length + data.assigned.length) + ' crew';
     if (data.available.length === 0 && data.assigned.length === 0) {
       list.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm">No crew members found</div>';
       return;
@@ -1408,19 +1427,28 @@ function handleCalDrop(event, targetDate) {
     data.available.forEach(c => renderItem(c, c.blocked ? 'blocked' : 'available', 'Available'));
     data.assigned.forEach(c => renderItem(c, 'busy', 'On shift'));
   }
+  const resBackdrop = document.getElementById('res-drawer-backdrop');
+  function openResDrawer() {
+    resPanel.classList.add('open');
+    if (resBackdrop) resBackdrop.classList.add('open');
+    if (resBtn) resBtn.classList.add('active');
+    loadResources();
+  }
+  function closeResDrawer() {
+    resPanel.classList.remove('open');
+    if (resBackdrop) resBackdrop.classList.remove('open');
+    if (resBtn) resBtn.classList.remove('active');
+  }
   if (resBtn && resPanel) {
     resBtn.addEventListener('click', function() {
-      const isOpen = resPanel.style.display !== 'none';
-      resPanel.style.display = isOpen ? 'none' : 'block';
-      this.classList.toggle('active', !isOpen);
-      if (!isOpen) loadResources();
+      resPanel.classList.contains('open') ? closeResDrawer() : openResDrawer();
     });
   }
   if (resClose && resPanel) {
-    resClose.addEventListener('click', function() {
-      resPanel.style.display = 'none';
-      if (resBtn) resBtn.classList.remove('active');
-    });
+    resClose.addEventListener('click', closeResDrawer);
+  }
+  if (resBackdrop) {
+    resBackdrop.addEventListener('click', closeResDrawer);
   }
 
   // Distance pill clicks
@@ -1605,7 +1633,15 @@ function openBookingDetail(id) {
       titleEl.textContent = 'Job ' + booking.id + ': ' + booking.project.name;
       // Store booking ID for edit button
       const editBtn = document.getElementById('modal-edit-btn');
-      if (editBtn) editBtn.dataset.bookingId = booking.id;
+      if (editBtn) {
+        editBtn.dataset.bookingId = booking.id;
+        editBtn.dataset.bookingNumber = booking.bookingNumber || '';
+      }
+      // Show delete or restore button based on deleted status
+      const delBtn = document.getElementById('modal-delete-btn');
+      const restBtn = document.getElementById('modal-restore-btn');
+      if (delBtn) delBtn.style.display = booking.deletedAt ? 'none' : '';
+      if (restBtn) restBtn.style.display = booking.deletedAt ? '' : 'none';
 
       // Status flow — Traffio lifecycle
       const statuses = ['Client Bk.', 'Unconf.', 'Confirmed', 'Locked', 'Conflict', 'G T G', 'Complete', 'Finalised'];
@@ -1834,6 +1870,59 @@ function closeBookingDetail() {
     backdrop.style.display = 'none';
     document.body.style.overflow = '';
   }, 250);
+}
+
+function deleteBooking(id, name) {
+  if (!confirm('Delete booking ' + name + '? You can restore it later from the Deleted filter.')) return;
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  fetch('/bookings/' + id + '/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': csrf },
+    body: ''
+  }).then(r => r.json()).then(data => {
+    if (data.ok) {
+      showToast('Booking ' + name + ' deleted', 'success');
+      setTimeout(() => window.location.reload(), 800);
+    } else { showToast(data.error || 'Delete failed', 'error'); }
+  }).catch(() => showToast('Delete failed', 'error'));
+}
+
+function undeleteBooking(id, name) {
+  if (!confirm('Restore booking ' + name + '?')) return;
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  fetch('/bookings/' + id + '/undelete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': csrf },
+    body: ''
+  }).then(r => r.json()).then(data => {
+    if (data.ok) {
+      showToast('Booking ' + name + ' restored', 'success');
+      setTimeout(() => window.location.reload(), 800);
+    } else { showToast(data.error || 'Restore failed', 'error'); }
+  }).catch(() => showToast('Restore failed', 'error'));
+}
+
+function applyDeletedFilter(value) {
+  const url = new URL(window.location.href);
+  if (value === 'hide') { url.searchParams.delete('deleted'); }
+  else { url.searchParams.set('deleted', value); }
+  window.location.href = url.toString();
+}
+
+function deleteFromModal() {
+  const editBtn = document.getElementById('modal-edit-btn');
+  if (!editBtn || !editBtn.dataset.bookingId) return;
+  const name = editBtn.dataset.bookingNumber || '#' + editBtn.dataset.bookingId;
+  deleteBooking(editBtn.dataset.bookingId, name);
+  closeBookingDetail();
+}
+
+function undeleteFromModal() {
+  const editBtn = document.getElementById('modal-edit-btn');
+  if (!editBtn || !editBtn.dataset.bookingId) return;
+  const name = editBtn.dataset.bookingNumber || '#' + editBtn.dataset.bookingId;
+  undeleteBooking(editBtn.dataset.bookingId, name);
+  closeBookingDetail();
 }
 
 function duplicateBooking(id) {
