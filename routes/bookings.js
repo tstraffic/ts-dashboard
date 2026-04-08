@@ -202,7 +202,9 @@ router.get('/new', (req, res) => {
     let jobs = []; try { jobs = db.prepare("SELECT id, job_number, job_name, client FROM jobs WHERE status NOT IN ('closed','completed') ORDER BY job_name").all(); } catch (e) {}
     let clients = []; try { clients = db.prepare("SELECT id, company_name FROM clients ORDER BY company_name").all(); } catch (e) {}
     let supervisors = []; try { supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
-    res.render('bookings/form', { title: 'New Booking', booking: null, jobs, clients, supervisors, depots: DEPOTS, user: req.session.user });
+    let contacts = []; try { contacts = db.prepare("SELECT id, full_name, company_id FROM client_contacts ORDER BY full_name").all(); } catch (e) {}
+    let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
+    res.render('bookings/form', { title: 'New Booking', booking: null, jobs, clients, supervisors, contacts, crewForSelect, depots: DEPOTS, user: req.session.user });
   } catch (err) {
     console.error('Bookings /new error:', err);
     req.flash('error', 'Failed to load form: ' + err.message);
@@ -215,14 +217,36 @@ router.post('/', (req, res) => {
   const db = getDb(); const b = req.body;
   if (!b.title || !b.start_date || !b.start_time || !b.end_date || !b.end_time) { req.flash('error', 'Title and schedule are required.'); return res.redirect('/bookings/new'); }
   const bookingNumber = generateBookingNumber(db);
+  const siteContacts = Array.isArray(b.site_contacts) ? JSON.stringify(b.site_contacts) : (b.site_contacts ? JSON.stringify([b.site_contacts]) : '[]');
+  const bookingTags = b.booking_tags ? JSON.stringify(b.booking_tags.split(',').map(t => t.trim()).filter(Boolean)) : '[]';
   const result = db.prepare(`
-    INSERT INTO bookings (booking_number, job_id, client_id, title, description, status, depot, start_datetime, end_datetime, site_address, suburb, state, postcode, order_number, billing_code, client_contact, supervisor_id, requirements_text, is_emergency, is_callout, billable, invoiced, notes, created_by_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+    INSERT INTO bookings (booking_number, job_id, client_id, title, description, status, depot, start_datetime, end_datetime, site_address, suburb, state, postcode, order_number, billing_code, client_contact, supervisor_id, requirements_text, is_emergency, is_callout, billable, invoiced, notes, created_by_id,
+      site_contacts, depot_meeting_time, straight_to_site_time, booking_tags, latitude, longitude, marker_is_accurate, location_notes, worksite_location, works_direction, chainage_from, chainage_to, has_mobile_works, booking_type, is_booking_pool, requester_id, planner_id, location_context)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(bookingNumber, b.job_id || null, b.client_id || null, b.title, b.description || '', b.status || 'unconfirmed', b.depot || '',
     b.start_date + 'T' + b.start_time + ':00', b.end_date + 'T' + b.end_time + ':00',
     b.site_address || '', b.suburb || '', b.state || '', b.postcode || '', b.order_number || '', b.billing_code || '', b.client_contact || '',
-    b.supervisor_id || null, b.requirements_text || '', b.is_emergency ? 1 : 0, b.is_callout ? 1 : 0, b.billable ? 1 : 0, b.notes || '', req.session.user.id);
-  logActivity({ user: req.session.user, action: 'create', entityType: 'booking', entityId: result.lastInsertRowid, details: `Created booking ${bookingNumber}`, req });
+    b.supervisor_id || null, b.requirements_text || '', b.is_emergency ? 1 : 0, b.is_callout ? 1 : 0, b.billable ? 1 : 0, b.notes || '', req.session.user.id,
+    siteContacts, b.depot_meeting_time || '', b.straight_to_site_time || '', bookingTags,
+    b.latitude ? parseFloat(b.latitude) : null, b.longitude ? parseFloat(b.longitude) : null,
+    b.marker_is_accurate ? 1 : 0, b.location_notes || '', b.worksite_location || '', b.works_direction || '',
+    b.chainage_from || '', b.chainage_to || '', b.has_mobile_works ? 1 : 0,
+    b.booking_type || 'regular', b.is_booking_pool ? 1 : 0,
+    b.requester_id || null, b.planner_id || null, b.location_context || '');
+
+  // Save requirements grid
+  const bookingId = result.lastInsertRowid;
+  const reqTypes = Array.isArray(b.req_resource_type) ? b.req_resource_type : (b.req_resource_type ? [b.req_resource_type] : []);
+  const reqQtys = Array.isArray(b.req_quantity) ? b.req_quantity : (b.req_quantity ? [b.req_quantity] : []);
+  const insertReq = db.prepare("INSERT INTO booking_requirements (booking_id, resource_type, quantity_required) VALUES (?, ?, ?)");
+  for (let i = 0; i < reqTypes.length; i++) {
+    if (reqTypes[i] && reqQtys[i] && parseInt(reqQtys[i]) > 0) {
+      insertReq.run(bookingId, reqTypes[i], parseInt(reqQtys[i]));
+    }
+  }
+
+  logActivity({ user: req.session.user, action: 'create', entityType: 'booking', entityId: bookingId, details: `Created booking ${bookingNumber}`, req });
   req.flash('success', `Booking ${bookingNumber} created.`);
   res.redirect('/bookings');
 });
@@ -287,10 +311,18 @@ router.get('/:id/edit', (req, res) => {
   if (!booking) { req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
   if (booking.start_datetime) { const p = booking.start_datetime.split('T'); booking.start_date = p[0]; booking.start_time = (p[1] || '').substring(0, 5); }
   if (booking.end_datetime) { const p = booking.end_datetime.split('T'); booking.end_date = p[0]; booking.end_time = (p[1] || '').substring(0, 5); }
+  // Parse JSON fields for the form
+  try { booking.site_contacts_arr = JSON.parse(booking.site_contacts || '[]'); } catch (e) { booking.site_contacts_arr = []; }
+  try { booking.booking_tags_str = JSON.parse(booking.booking_tags || '[]').join(', '); } catch (e) { booking.booking_tags_str = ''; }
+  // Load requirements for the grid
+  let requirements = []; try { requirements = db.prepare("SELECT resource_type, quantity_required FROM booking_requirements WHERE booking_id = ?").all(req.params.id); } catch (e) {}
+  booking.requirements = requirements;
   const jobs = db.prepare("SELECT id, job_number, job_name, client FROM jobs WHERE status NOT IN ('closed','completed') ORDER BY job_name").all();
   let clients = []; try { clients = db.prepare("SELECT id, company_name FROM clients ORDER BY company_name").all(); } catch (e) {}
   const supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all();
-  res.render('bookings/form', { title: 'Edit Booking ' + booking.booking_number, booking, jobs, clients, supervisors, depots: DEPOTS, user: req.session.user });
+  let contacts = []; try { contacts = db.prepare("SELECT id, full_name, company_id FROM client_contacts ORDER BY full_name").all(); } catch (e) {}
+  let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
+  res.render('bookings/form', { title: 'Edit Booking ' + booking.booking_number, booking, jobs, clients, supervisors, contacts, crewForSelect, depots: DEPOTS, user: req.session.user });
 });
 
 // POST /:id — Update
@@ -299,8 +331,31 @@ router.post('/:id', (req, res) => {
   if (!existing) { req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
   const b = req.body;
   if (!b.title || !b.start_date || !b.start_time || !b.end_date || !b.end_time) { req.flash('error', 'Title and schedule are required.'); return res.redirect('/bookings/' + req.params.id + '/edit'); }
-  db.prepare(`UPDATE bookings SET job_id=?, client_id=?, title=?, description=?, status=?, depot=?, start_datetime=?, end_datetime=?, site_address=?, suburb=?, state=?, postcode=?, order_number=?, billing_code=?, client_contact=?, supervisor_id=?, requirements_text=?, is_emergency=?, is_callout=?, billable=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
-    .run(b.job_id || null, b.client_id || null, b.title, b.description || '', b.status || 'unconfirmed', b.depot || '', b.start_date + 'T' + b.start_time + ':00', b.end_date + 'T' + b.end_time + ':00', b.site_address || '', b.suburb || '', b.state || '', b.postcode || '', b.order_number || '', b.billing_code || '', b.client_contact || '', b.supervisor_id || null, b.requirements_text || '', b.is_emergency ? 1 : 0, b.is_callout ? 1 : 0, b.billable ? 1 : 0, b.notes || '', req.params.id);
+  const siteContacts = Array.isArray(b.site_contacts) ? JSON.stringify(b.site_contacts) : (b.site_contacts ? JSON.stringify([b.site_contacts]) : '[]');
+  const bookingTags = b.booking_tags ? JSON.stringify(b.booking_tags.split(',').map(t => t.trim()).filter(Boolean)) : '[]';
+  db.prepare(`UPDATE bookings SET job_id=?, client_id=?, title=?, description=?, status=?, depot=?, start_datetime=?, end_datetime=?, site_address=?, suburb=?, state=?, postcode=?, order_number=?, billing_code=?, client_contact=?, supervisor_id=?, requirements_text=?, is_emergency=?, is_callout=?, billable=?, notes=?,
+    site_contacts=?, depot_meeting_time=?, straight_to_site_time=?, booking_tags=?, latitude=?, longitude=?, marker_is_accurate=?, location_notes=?, worksite_location=?, works_direction=?, chainage_from=?, chainage_to=?, has_mobile_works=?, booking_type=?, is_booking_pool=?, requester_id=?, planner_id=?, location_context=?,
+    updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    .run(b.job_id || null, b.client_id || null, b.title, b.description || '', b.status || 'unconfirmed', b.depot || '', b.start_date + 'T' + b.start_time + ':00', b.end_date + 'T' + b.end_time + ':00', b.site_address || '', b.suburb || '', b.state || '', b.postcode || '', b.order_number || '', b.billing_code || '', b.client_contact || '', b.supervisor_id || null, b.requirements_text || '', b.is_emergency ? 1 : 0, b.is_callout ? 1 : 0, b.billable ? 1 : 0, b.notes || '',
+      siteContacts, b.depot_meeting_time || '', b.straight_to_site_time || '', bookingTags,
+      b.latitude ? parseFloat(b.latitude) : null, b.longitude ? parseFloat(b.longitude) : null,
+      b.marker_is_accurate ? 1 : 0, b.location_notes || '', b.worksite_location || '', b.works_direction || '',
+      b.chainage_from || '', b.chainage_to || '', b.has_mobile_works ? 1 : 0,
+      b.booking_type || 'regular', b.is_booking_pool ? 1 : 0,
+      b.requester_id || null, b.planner_id || null, b.location_context || '',
+      req.params.id);
+
+  // Update requirements grid — delete existing, re-insert from form
+  db.prepare("DELETE FROM booking_requirements WHERE booking_id = ?").run(req.params.id);
+  const reqTypes = Array.isArray(b.req_resource_type) ? b.req_resource_type : (b.req_resource_type ? [b.req_resource_type] : []);
+  const reqQtys = Array.isArray(b.req_quantity) ? b.req_quantity : (b.req_quantity ? [b.req_quantity] : []);
+  const insertReq = db.prepare("INSERT INTO booking_requirements (booking_id, resource_type, quantity_required) VALUES (?, ?, ?)");
+  for (let i = 0; i < reqTypes.length; i++) {
+    if (reqTypes[i] && reqQtys[i] && parseInt(reqQtys[i]) > 0) {
+      insertReq.run(req.params.id, reqTypes[i], parseInt(reqQtys[i]));
+    }
+  }
+
   logActivity({ user: req.session.user, action: 'update', entityType: 'booking', entityId: req.params.id, details: `Updated booking ${existing.booking_number}`, req });
   req.flash('success', `Booking ${existing.booking_number} updated.`); res.redirect('/bookings/' + req.params.id);
 });
