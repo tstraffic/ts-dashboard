@@ -397,11 +397,13 @@ router.post('/:id', (req, res) => {
 // POST /:id/status
 router.post('/:id/status', (req, res) => {
   const db = getDb(); const newStatus = req.body.status;
-  if (!VALID_STATUSES.includes(newStatus)) { req.flash('error', 'Invalid status.'); return res.redirect('back'); }
+  const isJson = req.headers.accept && req.headers.accept.includes('application/json');
+  if (!VALID_STATUSES.includes(newStatus)) { if (isJson) return res.status(400).json({ error: 'Invalid status' }); req.flash('error', 'Invalid status.'); return res.redirect('back'); }
   const existing = db.prepare("SELECT id, booking_number, status FROM bookings WHERE id = ?").get(req.params.id);
-  if (!existing) { req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
+  if (!existing) { if (isJson) return res.status(404).json({ error: 'Not found' }); req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
   db.prepare("UPDATE bookings SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?").run(newStatus, req.params.id);
   logActivity({ user: req.session.user, action: 'update', entityType: 'booking', entityId: req.params.id, details: `Status: ${existing.status} → ${newStatus} on ${existing.booking_number}`, req });
+  if (isJson) return res.json({ ok: true, status: newStatus });
   req.flash('success', `Status updated to ${newStatus.replace(/_/g, ' ')}.`); res.redirect('/bookings/' + req.params.id);
 });
 
@@ -439,10 +441,12 @@ router.post('/:id/crew/:crewId/confirm', (req, res) => { getDb().prepare("UPDATE
 // Notes
 router.post('/:id/notes', (req, res) => {
   const db = getDb();
-  if (!db.prepare("SELECT id FROM bookings WHERE id=?").get(req.params.id)) { req.flash('error', 'Not found.'); return res.redirect('/bookings'); }
+  const isJson = req.headers.accept && req.headers.accept.includes('application/json');
+  if (!db.prepare("SELECT id FROM bookings WHERE id=?").get(req.params.id)) { if (isJson) return res.status(404).json({ error: 'Not found' }); req.flash('error', 'Not found.'); return res.redirect('/bookings'); }
   const { content, is_private } = req.body;
-  if (!content || !content.trim()) { req.flash('error', 'Content required.'); return res.redirect('/bookings/' + req.params.id); }
-  db.prepare("INSERT INTO booking_notes (booking_id, user_id, content, is_private) VALUES (?, ?, ?, ?)").run(req.params.id, req.session.user.id, content.trim(), is_private ? 1 : 0);
+  if (!content || !content.trim()) { if (isJson) return res.status(400).json({ error: 'Content required' }); req.flash('error', 'Content required.'); return res.redirect('/bookings/' + req.params.id); }
+  const result = db.prepare("INSERT INTO booking_notes (booking_id, user_id, content, is_private) VALUES (?, ?, ?, ?)").run(req.params.id, req.session.user.id, content.trim(), is_private ? 1 : 0);
+  if (isJson) return res.json({ ok: true, id: result.lastInsertRowid, author_name: req.session.user.full_name, content: content.trim(), created_at: new Date().toISOString() });
   req.flash('success', 'Note added.'); res.redirect('/bookings/' + req.params.id);
 });
 router.post('/:id/notes/:noteId/delete', (req, res) => { getDb().prepare("DELETE FROM booking_notes WHERE id=? AND booking_id=?").run(req.params.noteId, req.params.id); req.flash('success', 'Deleted.'); res.redirect('/bookings/' + req.params.id); });
@@ -703,18 +707,27 @@ router.post('/:id/move', (req, res) => {
 // Clone
 router.post('/:id/clone', (req, res) => {
   const db = getDb(); const source = db.prepare("SELECT * FROM bookings WHERE id = ?").get(req.params.id);
-  if (!source) { req.flash('error', 'Not found.'); return res.redirect('/bookings'); }
+  const isJson = req.headers.accept && req.headers.accept.includes('application/json');
+  if (!source) { if (isJson) return res.status(404).json({ error: 'Not found' }); req.flash('error', 'Not found.'); return res.redirect('/bookings'); }
   const bookingNumber = generateBookingNumber(db);
   function addDay(dt) { if (!dt) return dt; const d = new Date(dt); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${(dt.split('T')[1] || '00:00:00')}`; }
-  const result = db.prepare(`INSERT INTO bookings (booking_number, job_id, client_id, title, description, status, depot, start_datetime, end_datetime, site_address, suburb, state, postcode, order_number, billing_code, client_contact, supervisor_id, requirements_text, is_emergency, is_callout, billable, invoiced, notes, created_by_id)
-    VALUES (?, ?, ?, ?, ?, 'unconfirmed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`).run(
+  const result = db.prepare(`INSERT INTO bookings (booking_number, job_id, client_id, title, description, status, depot, start_datetime, end_datetime, site_address, suburb, state, postcode, order_number, billing_code, client_contact, supervisor_id, requirements_text, is_emergency, is_callout, billable, invoiced, notes, created_by_id,
+    site_contacts, depot_meeting_time, straight_to_site_time, booking_tags, latitude, longitude, marker_is_accurate, location_notes, worksite_location, works_direction, chainage_from, chainage_to, has_mobile_works, booking_type, is_booking_pool, requester_id, planner_id, location_context)
+    VALUES (?, ?, ?, ?, ?, 'unconfirmed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     bookingNumber, source.job_id, source.client_id, source.title, source.description, source.depot, addDay(source.start_datetime), addDay(source.end_datetime),
     source.site_address, source.suburb, source.state, source.postcode, source.order_number, source.billing_code, source.client_contact, source.supervisor_id,
-    source.requirements_text, source.is_emergency, source.is_callout, source.billable, source.notes, req.session.user.id);
+    source.requirements_text, source.is_emergency, source.is_callout, source.billable, source.notes, req.session.user.id,
+    source.site_contacts || '[]', source.depot_meeting_time || '', source.straight_to_site_time || '', source.booking_tags || '[]',
+    source.latitude, source.longitude, source.marker_is_accurate || 0, source.location_notes || '', source.worksite_location || '', source.works_direction || '',
+    source.chainage_from || '', source.chainage_to || '', source.has_mobile_works || 0, source.booking_type || 'regular', source.is_booking_pool || 0,
+    source.requester_id, source.planner_id, source.location_context || '');
   const newId = result.lastInsertRowid;
   for (const c of db.prepare("SELECT crew_member_id, role_on_site FROM booking_crew WHERE booking_id=?").all(source.id)) db.prepare("INSERT INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'assigned')").run(newId, c.crew_member_id, c.role_on_site);
   for (const v of db.prepare("SELECT vehicle_name, registration, notes FROM booking_vehicles WHERE booking_id=?").all(source.id)) db.prepare("INSERT INTO booking_vehicles (booking_id, vehicle_name, registration, notes) VALUES (?, ?, ?, ?)").run(newId, v.vehicle_name, v.registration, v.notes);
+  try { for (const r of db.prepare("SELECT resource_type, quantity_required FROM booking_requirements WHERE booking_id=?").all(source.id)) db.prepare("INSERT INTO booking_requirements (booking_id, resource_type, quantity_required) VALUES (?, ?, ?)").run(newId, r.resource_type, r.quantity_required); } catch(e) {}
   logActivity({ user: req.session.user, action: 'create', entityType: 'booking', entityId: newId, details: `Cloned ${source.booking_number} → ${bookingNumber}`, req });
+  if (isJson) return res.json({ ok: true, id: newId, booking_number: bookingNumber });
   req.flash('success', `Cloned as ${bookingNumber}.`); res.redirect('/bookings/' + newId);
 });
 
