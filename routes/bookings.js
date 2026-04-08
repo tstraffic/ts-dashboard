@@ -270,30 +270,35 @@ router.post('/', (req, res) => {
 
 // GET /resources — Available crew (JSON) with qualification data
 router.get('/resources', (req, res) => {
-  const db = getDb();
-  const date = req.query.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
-  const assignedIds = db.prepare(`SELECT DISTINCT bc.crew_member_id FROM booking_crew bc JOIN bookings b ON b.id = bc.booking_id WHERE DATE(b.start_datetime) = ? AND b.status NOT IN ('cancelled','complete','late_cancellation')`).all(date).map(r => r.crew_member_id);
-  const allCrew = db.prepare(`SELECT id, full_name, role, phone, employee_id, depot, employment_type,
-    tc_ticket_expiry, white_card_expiry, licence_expiry, tcp_level,
-    has_first_aid, can_drive_truck, specialisations
-    FROM crew_members WHERE active = 1 ORDER BY full_name`).all();
+  try {
+    const db = getDb();
+    const date = req.query.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+    const assignedIds = db.prepare(`SELECT DISTINCT bc.crew_member_id FROM booking_crew bc JOIN bookings b ON b.id = bc.booking_id WHERE DATE(b.start_datetime) = ? AND b.status NOT IN ('cancelled','complete','late_cancellation')`).all(date).map(r => r.crew_member_id);
+    const allCrew = db.prepare(`SELECT id, full_name, role, phone, employee_id, employment_type,
+      tc_ticket_expiry, white_card_expiry, licence_expiry, tcp_level,
+      first_aid, company
+      FROM crew_members WHERE active = 1 ORDER BY full_name`).all();
 
-  // Enrich with warnings
-  const enriched = allCrew.map(c => {
-    const warnings = [];
-    if (c.tc_ticket_expiry && c.tc_ticket_expiry < today) warnings.push('TC ticket expired');
-    if (c.white_card_expiry && c.white_card_expiry < today) warnings.push('White card expired');
-    if (c.licence_expiry && c.licence_expiry < today) warnings.push('Licence expired');
-    if (c.role === 'traffic_controller' && !c.tc_ticket_expiry) warnings.push('No TC ticket');
-    return { ...c, warnings, blocked: warnings.length > 0 };
-  });
+    // Enrich with warnings
+    const enriched = allCrew.map(c => {
+      const warnings = [];
+      if (c.tc_ticket_expiry && c.tc_ticket_expiry < today) warnings.push('TC ticket expired');
+      if (c.white_card_expiry && c.white_card_expiry < today) warnings.push('White card expired');
+      if (c.licence_expiry && c.licence_expiry < today) warnings.push('Licence expired');
+      if (c.role === 'traffic_controller' && !c.tc_ticket_expiry) warnings.push('No TC ticket');
+      return { ...c, warnings, blocked: warnings.length > 0 };
+    });
 
-  res.json({
-    date,
-    available: enriched.filter(c => !assignedIds.includes(c.id)),
-    assigned: enriched.filter(c => assignedIds.includes(c.id))
-  });
+    res.json({
+      date,
+      available: enriched.filter(c => !assignedIds.includes(c.id)),
+      assigned: enriched.filter(c => assignedIds.includes(c.id))
+    });
+  } catch (err) {
+    console.error('[Resources]', err.message);
+    res.status(500).json({ error: err.message, available: [], assigned: [] });
+  }
 });
 
 // GET /:id — Detail (JSON or show page)
