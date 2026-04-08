@@ -4499,7 +4499,7 @@ function runMigrations(db) {
   // Migration 94: Add deleted_at column for soft-delete
   if (!isMigrationApplied.get(94)) {
     try { db.exec("ALTER TABLE bookings ADD COLUMN deleted_at DATETIME"); } catch (e) { /* column may exist */ }
-    recordMigration(94, 'bookings_soft_delete');
+    recordMigration.run(94, 'bookings_soft_delete');
     console.log('Migration 94 applied: bookings soft delete column');
   }
 
