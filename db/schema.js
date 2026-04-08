@@ -4301,6 +4301,74 @@ function runMigrations(db) {
     }
   }
 
+  // Migration 90: Seed Villawood depot crew members from Traffio export
+  if (!isMigrationApplied.get(90)) {
+    try {
+      db.exec(`
+        INSERT OR IGNORE INTO crew_members (full_name, employee_id, role, phone, email, licence_type, active) VALUES
+        ('Abdalaziz Rabeea', 'EMP-150863', 'traffic_controller', '0481568010', 'abdalazizrabeea24@gmail.com', '', 1),
+        ('Abdelhadi Mustapha', 'EMP-136928', 'traffic_controller', '0422786488', 'abdelhadi.mustapha7999@gmail.com', '', 1),
+        ('Adam Chami', 'EMP-120716', 'traffic_controller', '0414633050', 'adamchami2004@hotmail.com', '', 1),
+        ('Ali Khanafer', 'EMP-125390', 'traffic_controller', '0413431349', 'alii747@icloud.com', '24931586', 1),
+        ('Anhar Al-kamisie', 'EMP-160972', 'traffic_controller', '0420775393', 'anharalkamisie36@gmail.com', '', 1),
+        ('Antony Kaldas', 'EMP-162463', 'traffic_controller', '0415305804', 'antonykaldas24@gmail.com', '', 1),
+        ('Bailey Davis', 'EMP-160973', 'traffic_controller', '0434741774', 'baileydavis293@gmail.com', '', 1),
+        ('Bassam Bashir', 'EMP-43600', 'traffic_controller', '0414791308', 'bassamkbashir99@hotmail.com', '', 1),
+        ('Batoul Abou Samra', 'EMP-137256', 'traffic_controller', '0404908057', 'Batoul_Elbaba1997@hotmail.com', '', 1),
+        ('Charbel Andonian', 'EMP-160926', 'traffic_controller', '0410586324', 'candonian@hotmail.com', '', 1),
+        ('Dean Tinellis', 'EMP-154761', 'traffic_controller', '0450355483', 'dtinellis@gmail.com', '21530116', 1),
+        ('Fahad Rahman', 'EMP-154891', 'traffic_controller', '0456789345', 'FAHAD.RAHMAN@LIVE.COM', '', 1),
+        ('Fardeen Rahman', 'EMP-164224', 'traffic_controller', '0420239102', 'fardeen4094@gmail.com', '', 1),
+        ('Faysal Rahman', 'EMP-154890', 'traffic_controller', '0456893723', 'FAYSAL@TSTC.COM.AU', '', 1),
+        ('Francis Faupula', 'EMP-158826', 'traffic_controller', '0466246051', 'francisfaupula06@gmail.com', '', 1),
+        ('Gabriela Santana', 'EMP-152966', 'traffic_controller', '0451111862', 'gabrielacsantana10@gmail.com', '25660098', 1),
+        ('Hassan Albarak', 'EMP-155712', 'traffic_controller', '0413992809', 'hassanalbarak@icloud.com', '', 1),
+        ('Helen Vesga', 'EMP-152999', 'traffic_controller', '0421779622', 'helen_tamayo@hotmail.com', '', 1),
+        ('Husain Naji', 'EMP-152266', 'traffic_controller', '0435995617', 'husainnaji2007@gmail.com', '', 1),
+        ('Irina Faupula', 'EMP-157941', 'traffic_controller', '0452481292', 'faupulamaumi22@gmail.com', '', 1),
+        ('Jaleel Kakar', 'EMP-159506', 'traffic_controller', '0478698955', 'Jaleel.Kakar@hotmail.com', '', 1),
+        ('Jaycee Cross', 'EMP-148984', 'traffic_controller', '0484740119', 'jaycee.cross05@gmail.com', '24407590', 1),
+        ('Katty Diani', 'EMP-136456', 'traffic_controller', '0450087053', 'Kawtar.1989diani@gmail.com', '23675695', 1),
+        ('Karanpreet Singh', 'EMP-162492', 'traffic_controller', '0435791514', 'karan98preet@icloud.com', '', 1),
+        ('Keanu Rosso', 'EMP-160971', 'traffic_controller', '0411210765', 'keanu.rosso5@gmail.com', '', 1),
+        ('Lake Armstrong', 'EMP-119469', 'traffic_controller', '0452622293', 'larmstrongpr@gmail.com', '', 1),
+        ('Lucien Reynolds', 'EMP-121299', 'traffic_controller', '0410755283', 'lucienr2006@gmail.com', '24532453', 1),
+        ('Madison Nichols', 'EMP-161151', 'traffic_controller', '0424532392', 'mady1327@icloud.com', '', 1),
+        ('Mar Subirats', 'EMP-158508', 'traffic_controller', '0478931191', 'subiratsmar@gmail.com', '25396974', 1),
+        ('Marcella Patti', 'EMP-164164', 'traffic_controller', '0466693455', 'Marcela.patti123@gmail.com', '', 1),
+        ('Mohamad Merheb', 'EMP-162462', 'traffic_controller', '0421378796', 'mm.merhebb@gmail.com', '', 1),
+        ('Mostafa El-Masry', 'EMP-162385', 'traffic_controller', '0478703602', 'mostafaog836@gmail.com', '', 1),
+        ('Muntasir Ahmed', 'EMP-119475', 'traffic_controller', '0435023366', 'muntasir0405@gmail.com', '24544652', 1),
+        ('Rabah Sabouh', 'EMP-119479', 'traffic_controller', '0432720817', 'rabsabouh98@icloud.com', '22022985', 1),
+        ('Rafat Islam', 'EMP-151117', 'traffic_controller', '0450809000', 'rhythm8.au@gmail.com', '25166763', 1),
+        ('Rania Bakri', 'EMP-119451', 'traffic_controller', '0451663265', 'Rania_bakri98@hotmail.com', '28224279', 1),
+        ('Rohan Jamil', 'EMP-160884', 'traffic_controller', '0456560982', 'Rohanjamil@hotmail.com', '', 1),
+        ('Rumman Khan', 'EMP-45438', 'traffic_controller', '0469071966', 'ronnyex1234@hotmail.com', '', 1),
+        ('Ryan Hand', 'EMP-160209', 'traffic_controller', '0474783388', 'ryanhand05@gmail.com', '', 1),
+        ('Saadat Ahmed', 'EMP-128575', 'traffic_controller', '0469295448', 'saadat@tstc.com.au', '21789783', 1),
+        ('Sajid Rahman', 'EMP-39940', 'traffic_controller', '0422207176', 'sajidr2104@gmail.com', '', 1),
+        ('Salif Hoque', 'EMP-121302', 'traffic_controller', '0405033348', 'hoquesalif@gmail.com', '24962179', 1),
+        ('Samir Elkheir', 'EMP-162541', 'traffic_controller', '0414983988', 'Elkheirsamir96@gmail.com', '', 1),
+        ('Savanah Armstrong', 'EMP-55896', 'traffic_controller', '0435913943', 'Savannah@tstc.com.au', '23108923', 1),
+        ('Shahid Hussain', 'EMP-155502', 'traffic_controller', '0416353660', 'Shady187@y7mail.com', '', 1),
+        ('Shanaq Hasan', 'EMP-128318', 'traffic_controller', '0411160825', 'hasanshanaq@gmail.com', '24164148', 0),
+        ('Skye Smallfield', 'EMP-162328', 'traffic_controller', '0477642302', 'skyesmallfield1@gmail.com', '', 1),
+        ('Suhail Ahmed', 'EMP-155771', 'traffic_controller', '0404865150', 'operations@tstc.com.au', '24680795', 0),
+        ('Syed Ali', 'EMP-120485', 'traffic_controller', '0498162260', 'saalishanali@gmail.com', '24588767', 1),
+        ('Taj Rahman', 'EMP-39938', 'traffic_controller', '0416221801', 'TAJ@tstc.com.au', '21959616', 1),
+        ('Ummay Honey', 'EMP-156687', 'traffic_controller', '0404865150', 'ummayhayderhoney@outlook.com', '23495695', 1),
+        ('Wendy Del Castillo', 'EMP-164161', 'traffic_controller', '0405914340', 'wendydelcas@hotmail.com', '', 1),
+        ('Yusuf Rahman', 'EMP-154892', 'traffic_controller', '04123456789', 'yusufrahman284@gmail.com', '', 1),
+        ('Zayn Pao', 'EMP-162464', 'traffic_controller', '0426539626', 'paozayn08@gmail.com', '', 1)
+      `);
+      const crewCount = db.prepare('SELECT COUNT(*) as c FROM crew_members').get().c;
+      console.log('Migration 90: Villawood crew seeded. Total crew now: ' + crewCount);
+      recordMigration.run(90, 'Seed Villawood depot crew members from Traffio export (54 active/reserve TCs)');
+    } catch (e) {
+      console.error('Migration 90 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
