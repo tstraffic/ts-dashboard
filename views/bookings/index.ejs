@@ -1462,6 +1462,23 @@ setInterval(function() {
           </div>
         </div>
 
+        <!-- CREW ASSIGNMENT -->
+        <div class="modal-section">
+          <h4 class="modal-section-title">CREW ASSIGNMENT</h4>
+          <div class="crew-select" id="crew-select-wrap">
+            <div class="crew-chips" id="crew-chips"></div>
+            <div class="crew-search-wrap">
+              <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input type="text" id="crew-search-input" class="crew-search-input" placeholder="Search crew by name or role..." autocomplete="off">
+            </div>
+            <div class="crew-dropdown" id="crew-dropdown" style="display:none;">
+              <div class="crew-dropdown-list" id="crew-dropdown-list"></div>
+            </div>
+            <!-- Hidden inputs for selected crew IDs, injected via JS -->
+          </div>
+          <p class="text-[10px] text-gray-400 mt-1.5">Type to search, click to add. You can also drag crew from the Resources panel.</p>
+        </div>
+
         <!-- NOTES -->
         <div class="modal-section">
           <h4 class="modal-section-title">BOOKING POOL & NOTES</h4>
@@ -2463,6 +2480,11 @@ function openBookingFormEdit(id) {
         b.requirements.forEach(r => addPanelReqRow(r.resource_type, r.quantity_required));
       }
 
+      // Crew assignment pre-fill
+      if (window._setFormCrew && b.crew) {
+        window._setFormCrew(b.crew);
+      }
+
       // Special Instructions & Pool
       setVal('requirements_text', b.requirements_text || '');
       setVal('is_booking_pool', b.is_booking_pool);
@@ -2487,6 +2509,8 @@ function resetBookingForm() {
   form.reset();
   submitBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Create Booking';
   document.getElementById('panel-req-rows').innerHTML = '';
+  // Clear crew selections
+  if (window._clearFormCrew) window._clearFormCrew();
   // Reset default date values
   const startDate = form.querySelector('[name="start_date"]');
   const endDate = form.querySelector('[name="end_date"]');
@@ -2526,6 +2550,116 @@ const panelEndDate = document.querySelector('#booking-slide-form input[name="end
 if (panelStartDate && panelEndDate) {
   panelStartDate.addEventListener('change', function() { if (!panelEndDate.value || panelEndDate.value === panelStartDate.defaultValue) panelEndDate.value = this.value; });
 }
+
+// ===== Crew Search Multi-Select =====
+(function() {
+  var crewList = <%- JSON.stringify(formCrew.map(c => ({ id: c.id, name: c.full_name, role: c.role || '' }))) %>;
+  var selectedCrew = {};
+  var searchInput = document.getElementById('crew-search-input');
+  var dropdown = document.getElementById('crew-dropdown');
+  var dropdownList = document.getElementById('crew-dropdown-list');
+  var chipsContainer = document.getElementById('crew-chips');
+  var formEl = document.getElementById('booking-slide-form');
+
+  if (!searchInput || !dropdown) return;
+
+  var roleColors = {
+    traffic_controller: '#2563eb', tc: '#2563eb', leading_hand: '#7c3aed',
+    team_leader: '#7c3aed', supervisor: '#d97706', pilot_vehicle: '#059669',
+    implementation_officer: '#dc2626'
+  };
+
+  function getRoleColor(role) {
+    var key = (role || '').toLowerCase().replace(/\s+/g, '_');
+    return roleColors[key] || '#6b7280';
+  }
+
+  function renderChips() {
+    var html = '';
+    Object.keys(selectedCrew).forEach(function(id) {
+      var c = selectedCrew[id];
+      var color = getRoleColor(c.role);
+      html += '<div class="crew-chip" data-id="' + id + '" style="border-left-color:' + color + '">';
+      html += '<span>' + c.name + '</span>';
+      html += '<button type="button" class="crew-chip-x" onclick="window._removeCrewChip(' + id + ')">&times;</button>';
+      html += '</div>';
+    });
+    chipsContainer.innerHTML = html;
+    // Update hidden inputs
+    formEl.querySelectorAll('input[name="crew_ids[]"]').forEach(function(el) { el.remove(); });
+    Object.keys(selectedCrew).forEach(function(id) {
+      var inp = document.createElement('input');
+      inp.type = 'hidden';
+      inp.name = 'crew_ids[]';
+      inp.value = id;
+      formEl.appendChild(inp);
+    });
+  }
+
+  function renderDropdown(query) {
+    var q = (query || '').toLowerCase().trim();
+    var filtered = crewList.filter(function(c) {
+      if (selectedCrew[c.id]) return false;
+      if (!q) return true;
+      return c.name.toLowerCase().indexOf(q) !== -1 || (c.role || '').toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 20);
+
+    if (filtered.length === 0) {
+      dropdownList.innerHTML = '<div class="crew-dropdown-empty">No matching crew</div>';
+    } else {
+      var html = '';
+      filtered.forEach(function(c) {
+        var color = getRoleColor(c.role);
+        var roleLabel = (c.role || '').replace(/_/g, ' ');
+        html += '<div class="crew-dropdown-item" onclick="window._selectCrew(' + c.id + ')">';
+        html += '<div class="crew-dropdown-avatar" style="background:' + color + '">' + c.name.split(' ').map(function(n) { return n[0]; }).join('').substring(0, 2).toUpperCase() + '</div>';
+        html += '<div class="crew-dropdown-info"><span class="crew-dropdown-name">' + c.name + '</span>';
+        if (roleLabel) html += '<span class="crew-dropdown-role">' + roleLabel + '</span>';
+        html += '</div></div>';
+      });
+      dropdownList.innerHTML = html;
+    }
+    dropdown.style.display = 'block';
+  }
+
+  searchInput.addEventListener('focus', function() { renderDropdown(this.value); });
+  searchInput.addEventListener('input', function() { renderDropdown(this.value); });
+
+  document.addEventListener('click', function(e) {
+    var wrap = document.getElementById('crew-select-wrap');
+    if (wrap && !wrap.contains(e.target)) dropdown.style.display = 'none';
+  });
+
+  window._selectCrew = function(id) {
+    var c = crewList.find(function(x) { return x.id === id; });
+    if (c && !selectedCrew[id]) {
+      selectedCrew[id] = c;
+      renderChips();
+      searchInput.value = '';
+      renderDropdown('');
+      searchInput.focus();
+    }
+  };
+
+  window._removeCrewChip = function(id) {
+    delete selectedCrew[id];
+    renderChips();
+  };
+
+  // Expose for edit mode pre-fill
+  window._setFormCrew = function(crewArray) {
+    selectedCrew = {};
+    (crewArray || []).forEach(function(c) {
+      selectedCrew[c.id || c.crew_member_id] = { id: c.id || c.crew_member_id, name: c.full_name || c.name || 'Unknown', role: c.role_on_site || c.role || '' };
+    });
+    renderChips();
+  };
+
+  window._clearFormCrew = function() {
+    selectedCrew = {};
+    renderChips();
+  };
+})();
 
 function exportBookingsCSV() {
   const data = <%- JSON.stringify(bookings.map(b => ({
