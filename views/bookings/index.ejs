@@ -1142,11 +1142,34 @@ setInterval(function() {
     <!-- Modal body (scrollable) -->
     <div class="booking-modal-body" id="modal-body">
       <!-- Loading skeleton -->
-      <div class="modal-skeleton" id="modal-skeleton">
-        <div class="skeleton-line w-3/4 h-5"></div>
-        <div class="skeleton-line w-1/2 h-4 mt-3"></div>
-        <div class="skeleton-line w-full h-20 mt-4"></div>
-        <div class="skeleton-line w-full h-20 mt-3"></div>
+      <div class="modal-skeleton" id="modal-skeleton" style="padding:20px;">
+        <!-- Title skeleton -->
+        <div class="skeleton-line" style="width:60%;height:22px;margin-bottom:16px;"></div>
+        <!-- Status flow skeleton -->
+        <div style="display:flex;gap:6px;margin-bottom:20px;">
+          <div class="skeleton-line" style="width:60px;height:28px;border-radius:999px;"></div>
+          <div class="skeleton-line" style="width:60px;height:28px;border-radius:999px;"></div>
+          <div class="skeleton-line" style="width:60px;height:28px;border-radius:999px;"></div>
+          <div class="skeleton-line" style="width:60px;height:28px;border-radius:999px;"></div>
+          <div class="skeleton-line" style="width:60px;height:28px;border-radius:999px;"></div>
+        </div>
+        <!-- Info rows -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+          <div><div class="skeleton-line" style="width:40%;height:10px;margin-bottom:6px;"></div><div class="skeleton-line" style="width:80%;height:16px;"></div></div>
+          <div><div class="skeleton-line" style="width:40%;height:10px;margin-bottom:6px;"></div><div class="skeleton-line" style="width:70%;height:16px;"></div></div>
+          <div><div class="skeleton-line" style="width:40%;height:10px;margin-bottom:6px;"></div><div class="skeleton-line" style="width:90%;height:16px;"></div></div>
+          <div><div class="skeleton-line" style="width:40%;height:10px;margin-bottom:6px;"></div><div class="skeleton-line" style="width:60%;height:16px;"></div></div>
+        </div>
+        <!-- Crew section -->
+        <div class="skeleton-line" style="width:30%;height:12px;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;">
+          <div class="skeleton-line" style="width:32px;height:32px;border-radius:50%;"></div>
+          <div class="skeleton-line" style="width:32px;height:32px;border-radius:50%;"></div>
+          <div class="skeleton-line" style="width:32px;height:32px;border-radius:50%;"></div>
+        </div>
+        <!-- Notes section -->
+        <div class="skeleton-line" style="width:25%;height:12px;margin-top:20px;margin-bottom:10px;"></div>
+        <div class="skeleton-line" style="width:100%;height:60px;"></div>
       </div>
       <div id="modal-content" style="display:none;"></div>
     </div>
@@ -1828,29 +1851,65 @@ setInterval(function() {
 // Drag-and-drop: assign crew from resource panel to booking card
 function handleCrewDrop(event, bookingId) {
   event.preventDefault();
-  const card = event.currentTarget;
+  var card = event.currentTarget;
   card.classList.remove('drag-over');
 
-  const crewData = event.dataTransfer.getData('application/crew');
+  var crewData = event.dataTransfer.getData('application/crew');
   if (!crewData) return;
 
   try {
-    const crew = JSON.parse(crewData);
-    // Flash card to show drop registered
+    var crew = JSON.parse(crewData);
     card.classList.add('drop-success');
+
+    // Optimistic update: instantly add avatar to card
+    var avatarStack = card.querySelector('.bc-avatar-stack');
+    var crewSection = card.querySelector('.bc-crew-avatars');
+    var optimisticAvatar = null;
+    var initials = crew.name.split(' ').map(function(n) { return n[0]; }).join('').substring(0, 2).toUpperCase();
+    var roleClass = (crew.role || '').toLowerCase().replace(/[^a-z]/g, '');
+
+    if (avatarStack) {
+      optimisticAvatar = document.createElement('div');
+      optimisticAvatar.className = 'bc-avatar bc-avatar-' + roleClass;
+      optimisticAvatar.textContent = initials;
+      optimisticAvatar.title = crew.name + ' (' + (crew.role || '').replace(/_/g, ' ') + ') — saving...';
+      optimisticAvatar.style.animation = 'fade-in-up 0.3s ease both';
+      avatarStack.appendChild(optimisticAvatar);
+      // Update crew count
+      var countEl = crewSection ? crewSection.querySelector('.bc-crew-count') : null;
+      if (countEl) {
+        var parts = countEl.textContent.split('/');
+        if (parts.length === 2) countEl.textContent = parts[0] + '/' + (parseInt(parts[1]) + 1);
+      }
+    } else if (!crewSection) {
+      // No crew section yet — create one
+      var cardBody = card.querySelector('.booking-card-body');
+      if (cardBody) {
+        crewSection = document.createElement('div');
+        crewSection.className = 'bc-crew-avatars';
+        crewSection.innerHTML = '<div class="bc-avatar-stack"><div class="bc-avatar bc-avatar-' + roleClass + '" title="' + crew.name + '">' + initials + '</div></div><span class="bc-crew-count">0/1</span>';
+        cardBody.appendChild(crewSection);
+        optimisticAvatar = crewSection.querySelector('.bc-avatar');
+      }
+    }
+
     fetch('/bookings/' + bookingId + '/crew', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' },
       body: 'crew_member_id=' + crew.id + '&role_on_site=' + encodeURIComponent(crew.role.replace(/_/g, ' '))
-    }).then(r => {
+    }).then(function(r) {
       if (r.redirected || r.ok) {
         showToast(crew.name + ' assigned', 'success');
-        setTimeout(() => window.location.reload(), 1000);
+        if (optimisticAvatar) optimisticAvatar.title = crew.name + ' (' + (crew.role || '').replace(/_/g, ' ') + ')';
+        setTimeout(function() { card.classList.remove('drop-success'); }, 600);
       } else {
+        // Revert optimistic avatar
+        if (optimisticAvatar) optimisticAvatar.remove();
         card.classList.remove('drop-success');
         showToast('Assignment failed', 'error');
       }
-    }).catch(() => {
+    }).catch(function() {
+      if (optimisticAvatar) optimisticAvatar.remove();
       card.classList.remove('drop-success');
       showToast('Assignment failed', 'error');
     });
@@ -2240,6 +2299,24 @@ function duplicateBooking(id) {
 
 function changeBookingStatus(id, newStatus, btn) {
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const card = document.querySelector('.booking-card[data-id="' + id + '"]');
+  const oldStatus = card ? card.getAttribute('data-status') : null;
+  const statusLabels = { client_booking: 'Client Bk.', unconfirmed: 'Unconfirmed', confirmed: 'Confirmed', locked: 'Locked', conflict: 'Conflict', green_to_go: 'Green To Go', in_progress: 'In Progress', complete: 'Complete', finalised: 'Finalised', cancelled: 'Cancelled', late_cancellation: 'Late Cancel', on_hold: 'On Hold' };
+
+  // Optimistic update: instantly update card status
+  if (card) {
+    card.setAttribute('data-status', newStatus);
+    var pill = card.querySelector('.bc-status-pill');
+    if (pill) {
+      pill.className = 'bc-status-pill status-' + newStatus;
+      pill.textContent = statusLabels[newStatus] || newStatus.replace(/_/g, ' ');
+    }
+    card.style.transition = 'transform 0.2s, opacity 0.2s';
+    card.style.transform = 'scale(0.97)';
+    card.style.opacity = '0.7';
+    setTimeout(function() { card.style.transform = ''; card.style.opacity = ''; }, 300);
+  }
+
   fetch('/bookings/' + id + '/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': csrf },
@@ -2247,24 +2324,38 @@ function changeBookingStatus(id, newStatus, btn) {
   }).then(r => r.json()).then(data => {
     if (data.ok) {
       showToast('Status → ' + newStatus.replace(/_/g, ' '), 'success');
-      // Re-render status flow
-      const statusFlow = document.getElementById('modal-status-flow');
+      // Re-render status flow in modal if open
+      var statusFlow = document.getElementById('modal-status-flow');
       if (statusFlow) {
-        const statuses = ['Client Bk.', 'Unconf.', 'Confirmed', 'Locked', 'Conflict', 'G T G', 'Complete', 'Finalised'];
-        const statusKeys = ['client_booking', 'unconfirmed', 'confirmed', 'locked', 'conflict', 'green_to_go', 'complete', 'finalised'];
-        const statusMap = { client_booking: 0, unconfirmed: 1, confirmed: 2, locked: 3, conflict: 4, green_to_go: 5, complete: 6, finalised: 7 };
-        const activeIdx = statusMap[data.status] ?? 0;
-        const statusColours = ['#6B7280','#7C3AED','#D97706','#475569','#DC2626','#16A34A','#6B7280','#4F46E5'];
-        statusFlow.innerHTML = statuses.map((s, i) => {
-          const isActive = i === activeIdx;
-          const isDone = activeIdx >= 0 && i < activeIdx;
+        var statuses = ['Client Bk.', 'Unconf.', 'Confirmed', 'Locked', 'Conflict', 'G T G', 'Complete', 'Finalised'];
+        var statusKeys = ['client_booking', 'unconfirmed', 'confirmed', 'locked', 'conflict', 'green_to_go', 'complete', 'finalised'];
+        var statusMap = { client_booking: 0, unconfirmed: 1, confirmed: 2, locked: 3, conflict: 4, green_to_go: 5, complete: 6, finalised: 7 };
+        var activeIdx = statusMap[data.status] ?? 0;
+        var statusColours = ['#6B7280','#7C3AED','#D97706','#475569','#DC2626','#16A34A','#6B7280','#4F46E5'];
+        statusFlow.innerHTML = statuses.map(function(s, i) {
+          var isActive = i === activeIdx;
+          var isDone = activeIdx >= 0 && i < activeIdx;
           return '<button class="status-flow-step ' + (isActive ? 'active' : '') + ' ' + (isDone ? 'done' : '') + '" style="' + (isActive ? 'background:' + statusColours[i] + ';color:#fff;border-color:' + statusColours[i] : '') + '" onclick="changeBookingStatus(' + id + ', \'' + statusKeys[i] + '\', this)">' + s + '</button>';
         }).join('');
       }
-      // Reload page after brief delay so card status updates
-      setTimeout(() => window.location.reload(), 1200);
-    } else { showToast(data.error || 'Update failed', 'error'); }
-  }).catch(() => showToast('Status update failed', 'error'));
+    } else {
+      // Revert optimistic update
+      if (card && oldStatus) {
+        card.setAttribute('data-status', oldStatus);
+        var pill = card.querySelector('.bc-status-pill');
+        if (pill) { pill.className = 'bc-status-pill status-' + oldStatus; pill.textContent = statusLabels[oldStatus] || oldStatus; }
+      }
+      showToast(data.error || 'Update failed', 'error');
+    }
+  }).catch(function() {
+    // Revert on network error
+    if (card && oldStatus) {
+      card.setAttribute('data-status', oldStatus);
+      var pill = card.querySelector('.bc-status-pill');
+      if (pill) { pill.className = 'bc-status-pill status-' + oldStatus; pill.textContent = statusLabels[oldStatus] || oldStatus; }
+    }
+    showToast('Status update failed', 'error');
+  });
 }
 
 function cloneFromModal() {
