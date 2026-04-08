@@ -41,16 +41,25 @@
             </button>
 
             <!-- Dropdown Popup -->
-            <div id="notif-dropdown" class="hidden absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden" style="min-height:120px">
-              <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
-                <span class="font-bold text-sm text-gray-900">Notifications</span>
-                <span id="notif-unread-label" class="text-xs text-gray-400"></span>
+            <div id="notif-dropdown" class="notif-panel hidden absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-md bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden" style="min-height:120px">
+              <div class="notif-panel-header flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+                <div class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                  <span class="font-bold text-sm text-gray-900">Notifications</span>
+                </div>
+                <span id="notif-unread-label" class="text-xs font-medium text-gray-400"></span>
               </div>
-              <div id="notif-list" class="max-h-80 overflow-y-auto">
-                <div class="p-6 text-center text-gray-400 text-sm" id="notif-loading">Loading...</div>
+              <div id="notif-list" class="notif-panel-list max-h-96 overflow-y-auto">
+                <div class="p-6 text-center text-gray-400 text-sm" id="notif-loading">
+                  <div class="notif-spinner mx-auto mb-2"></div>
+                  Loading...
+                </div>
               </div>
-              <div class="flex items-center justify-between px-4 py-2.5 border-t border-gray-100 bg-gray-50/50">
-                <button onclick="markAllReadFromPopup()" class="text-xs font-medium text-gray-500 hover:text-brand-600 transition">Mark All Read</button>
+              <div class="notif-panel-footer flex items-center justify-between px-4 py-2.5 border-t border-gray-100 bg-gray-50/50">
+                <button onclick="markAllReadFromPopup()" class="text-xs font-medium text-gray-500 hover:text-brand-600 transition flex items-center gap-1">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                  Mark All Read
+                </button>
                 <a href="/notifications" class="text-xs font-bold text-brand-600 hover:text-brand-700 transition">View All &rarr;</a>
               </div>
             </div>
@@ -177,25 +186,41 @@
     return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
   }
 
-  function typeColor(type) {
-    if (['overdue_task','new_incident','critical_defect'].includes(type)) return 'bg-red-500';
-    if (['expiring_compliance','equipment_overdue','ticket_expiry'].includes(type)) return 'bg-amber-500';
-    if (type === 'missing_update') return 'bg-yellow-400';
-    if (['corrective_action_due'].includes(type)) return 'bg-rose-500';
-    if (type === 'follow_up_due') return 'bg-purple-500';
-    if (type === 'over_budget') return 'bg-orange-500';
-    return 'bg-brand-500';
+  function typeIcon(type) {
+    var icons = {
+      overdue_task: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+      new_incident: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>',
+      critical_defect: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+      ticket_expiry: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>',
+      expiring_compliance: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>',
+      equipment_overdue: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>',
+      corrective_action_due: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>',
+      over_budget: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+      follow_up_due: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>',
+      missing_update: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>'
+    };
+    return icons[type] || '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+  }
+
+  function typeColorClass(type) {
+    if (['overdue_task','new_incident','critical_defect'].includes(type)) return 'notif-icon-red';
+    if (['expiring_compliance','equipment_overdue','ticket_expiry'].includes(type)) return 'notif-icon-amber';
+    if (type === 'missing_update') return 'notif-icon-yellow';
+    if (['corrective_action_due'].includes(type)) return 'notif-icon-rose';
+    if (type === 'follow_up_due') return 'notif-icon-purple';
+    if (type === 'over_budget') return 'notif-icon-orange';
+    return 'notif-icon-blue';
   }
 
   function loadNotifications() {
-    const list = document.getElementById('notif-list');
-    list.innerHTML = '<div class="p-6 text-center text-gray-400 text-sm">Loading...</div>';
+    var list = document.getElementById('notif-list');
+    list.innerHTML = '<div class="p-6 text-center text-gray-400 text-sm"><div class="notif-spinner mx-auto mb-2"></div>Loading...</div>';
 
     fetch('/notifications/recent')
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        const badge = document.getElementById('notif-badge');
-        const label = document.getElementById('notif-unread-label');
+        var badge = document.getElementById('notif-badge');
+        var label = document.getElementById('notif-unread-label');
         if (data.unreadCount > 0) {
           badge.textContent = data.unreadCount > 9 ? '9+' : data.unreadCount;
           badge.classList.remove('hidden');
@@ -206,28 +231,47 @@
         }
 
         if (data.notifications.length === 0) {
-          list.innerHTML = '<div class="p-6 text-center"><svg class="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><p class="text-gray-400 text-sm">No new notifications</p></div>';
+          list.innerHTML = '<div class="notif-empty"><svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"/></svg><p class="text-gray-400 text-sm font-medium">All caught up!</p><p class="text-gray-300 text-xs mt-1">No unread notifications</p></div>';
           return;
         }
 
         var html = '';
         data.notifications.forEach(function(n) {
-          var dotClass = typeColor(n.type);
-          html += '<form method="POST" action="/notifications/' + n.id + '/read" class="block">';
-          html += '<button type="submit" class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 flex items-start gap-3">';
-          html += '<span class="mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ' + dotClass + '"></span>';
-          html += '<div class="flex-1 min-w-0">';
-          html += '<p class="text-sm font-medium text-gray-900 truncate">' + n.title.replace(/</g, '&lt;') + '</p>';
-          html += '<p class="text-xs text-gray-400 mt-0.5 truncate">' + n.message.replace(/</g, '&lt;') + '</p>';
-          html += '<span class="text-[10px] text-gray-400 mt-0.5 block">' + timeAgo(n.created_at) + '</span>';
-          html += '</div></button></form>';
+          var iconClass = typeColorClass(n.type);
+          var icon = typeIcon(n.type);
+          var link = n.link || '/notifications';
+          var escapedTitle = (n.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          var escapedMsg = (n.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          var ago = timeAgo(n.created_at);
+
+          var readClass = n.is_read ? ' notif-item-read' : '';
+          html += '<a href="' + link + '" class="notif-item' + readClass + '" data-id="' + n.id + '" onclick="markNotifRead(event, ' + n.id + ')">';
+          html += '<div class="notif-item-icon ' + iconClass + '">' + icon + '</div>';
+          html += '<div class="notif-item-body">';
+          html += '<p class="notif-item-title">' + escapedTitle + '</p>';
+          html += '<p class="notif-item-msg">' + escapedMsg + '</p>';
+          html += '<div class="notif-item-meta">';
+          html += '<span class="notif-item-time">' + ago + '</span>';
+          if (n.job_number) html += '<span class="notif-item-tag">' + n.job_number + '</span>';
+          html += '</div>';
+          html += '</div>';
+          html += '<div class="notif-item-action"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></div>';
+          html += '</a>';
         });
         list.innerHTML = html;
       })
       .catch(function() {
-        list.innerHTML = '<div class="p-6 text-center text-red-400 text-sm">Failed to load</div>';
+        list.innerHTML = '<div class="notif-empty"><svg class="w-8 h-8 text-red-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><p class="text-red-400 text-sm">Failed to load notifications</p></div>';
       });
   }
+
+  window.markNotifRead = function(event, id) {
+    // Mark as read in background, let the link navigate
+    fetch('/notifications/' + id + '/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]').content }
+    }).catch(function() {});
+  };
 
   window.markAllReadFromPopup = function() {
     fetch('/notifications/mark-all-read', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]').content } })

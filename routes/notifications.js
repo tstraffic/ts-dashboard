@@ -54,9 +54,9 @@ router.get('/recent', (req, res) => {
     SELECT n.id, n.type, n.title, n.message, n.link, n.is_read, n.created_at, j.job_number
     FROM notifications n
     LEFT JOIN jobs j ON n.job_id = j.id
-    WHERE n.user_id = ? AND n.is_read = 0
-    ORDER BY n.created_at DESC
-    LIMIT 8
+    WHERE n.user_id = ?
+    ORDER BY n.is_read ASC, n.created_at DESC
+    LIMIT 15
   `).all(userId);
   const unreadCount = db.prepare('SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0').get(userId).count;
   res.json({ notifications, unreadCount });
