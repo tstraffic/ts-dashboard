@@ -45,10 +45,10 @@
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       Export
     </button>
-    <a href="/bookings/new" class="bookings-new-btn">
+    <button onclick="openBookingForm()" class="bookings-new-btn">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
       New Booking
-    </a>
+    </button>
   </div>
 </div>
 
@@ -222,7 +222,7 @@
       <p class="text-sm text-gray-400 mt-1 max-w-sm">There are no bookings matching your current filters. Try adjusting your filters or create a new booking.</p>
       <div class="flex gap-3 mt-5">
         <a href="/bookings" class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Clear Filters</a>
-        <a href="/bookings/new" class="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition">New Booking</a>
+        <button onclick="openBookingForm()" class="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition">New Booking</button>
       </div>
     </div>
     <% } else { %>
@@ -738,6 +738,302 @@ function handleCalDrop(event, targetDate) {
       <button class="modal-footer-btn primary" id="modal-save-btn">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
         Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Booking Form Slide-in Panel -->
+<%
+  const formDepots = typeof depots !== 'undefined' ? depots : [];
+  const formJobs = typeof jobs !== 'undefined' ? jobs : [];
+  const formClients = typeof clients !== 'undefined' ? clients : [];
+  const formSupervisors = typeof supervisors !== 'undefined' ? supervisors : [];
+  const formContacts = typeof contacts !== 'undefined' ? contacts : [];
+  const formCrew = typeof crewForSelect !== 'undefined' ? crewForSelect : [];
+  const formStatuses = [
+    { val: 'client_booking', label: 'Client Booking' },
+    { val: 'unconfirmed', label: 'Unconfirmed' },
+    { val: 'confirmed', label: 'Confirmed' },
+    { val: 'locked', label: 'Locked' },
+    { val: 'conflict', label: 'Conflict' },
+    { val: 'green_to_go', label: 'Green to Go' },
+    { val: 'in_progress', label: 'In Progress' },
+    { val: 'complete', label: 'Complete' },
+    { val: 'finalised', label: 'Finalised' },
+    { val: 'cancelled', label: 'Cancelled' },
+    { val: 'late_cancellation', label: 'Late Cancellation' },
+    { val: 'on_hold', label: 'On Hold' },
+  ];
+  const formReqTypes = [
+    '1x TC Crew','2x TC Crew','3x TC Crew','4x TC Crew','5x TC Crew',
+    '6x TC Crew','7x TC Crew','8x TC Crew','9x TC Crew','10x TC Crew',
+    'Arrow Board','Hoist Operator','IP','Pilot Vehicle','Pilot Vehicle Lead',
+    'Portable Traffic Lights','Ute','TL 2x TC Crew','TL 3x TC Crew',
+    'TL 4x TC Crew','TL 5x TC Crew','VMS Board','VMS Ute','Water Cart','Truck'
+  ];
+%>
+<div class="booking-modal-backdrop" id="booking-form-backdrop" style="display:none;">
+  <div class="booking-modal" id="booking-form-modal">
+    <div class="booking-modal-header">
+      <h2 id="form-modal-title">New Booking</h2>
+      <button onclick="closeBookingForm()" class="modal-close-btn">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="booking-modal-body">
+      <form method="POST" action="/bookings" id="booking-slide-form">
+        <%- include('../partials/csrf') %>
+
+        <!-- BOOKING DEPOT -->
+        <div class="modal-section">
+          <h4 class="modal-section-title">BOOKING DEPOT</h4>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Depot <span class="text-red-500">*</span></label>
+              <select name="depot" required class="modal-input">
+                <option value="">-- Select --</option>
+                <% formDepots.forEach(d => { %><option value="<%= d %>"><%= d %></option><% }); %>
+              </select>
+            </div>
+            <div class="modal-field">
+              <label>Supervisor</label>
+              <select name="supervisor_id" class="modal-input">
+                <option value="">-- Select --</option>
+                <% formSupervisors.forEach(s => { %><option value="<%= s.id %>"><%= s.full_name %></option><% }); %>
+              </select>
+            </div>
+          </div>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Status</label>
+              <select name="status" class="modal-input">
+                <% formStatuses.forEach(s => { %><option value="<%= s.val %>"><%= s.label %></option><% }); %>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- CLIENT INFORMATION -->
+        <div class="modal-section highlight">
+          <h4 class="modal-section-title">CLIENT INFORMATION</h4>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Client <span class="text-red-500">*</span></label>
+              <select name="client_id" required class="modal-input">
+                <option value="">-- Select --</option>
+                <% formClients.forEach(c => { %><option value="<%= c.id %>"><%= c.company_name %></option><% }); %>
+              </select>
+            </div>
+            <div class="modal-field">
+              <label>Job / Project</label>
+              <select name="job_id" class="modal-input">
+                <option value="">-- Select --</option>
+                <% formJobs.forEach(j => { %><option value="<%= j.id %>"><%= j.job_number ? j.job_number + ' — ' : '' %><%= j.job_name %></option><% }); %>
+              </select>
+            </div>
+          </div>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Order Number</label>
+              <input type="text" name="order_number" class="modal-input" placeholder="PO or order number">
+            </div>
+            <div class="modal-field">
+              <label>Billing Code</label>
+              <input type="text" name="billing_code" class="modal-input" placeholder="Cost centre">
+            </div>
+          </div>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Client Contact</label>
+              <input type="text" name="client_contact" class="modal-input" placeholder="Contact name or phone">
+            </div>
+            <div class="modal-field">
+              <label>Location Context</label>
+              <input type="text" name="location_context" class="modal-input" placeholder="e.g. Near intersection">
+            </div>
+          </div>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Requester</label>
+              <select name="requester_id" class="modal-input">
+                <option value="">-- Select --</option>
+                <% formCrew.forEach(c => { %><option value="<%= c.id %>"><%= c.full_name %></option><% }); %>
+              </select>
+            </div>
+            <div class="modal-field">
+              <label>Planner</label>
+              <select name="planner_id" class="modal-input">
+                <option value="">-- Select --</option>
+                <% formCrew.forEach(c => { %><option value="<%= c.id %>"><%= c.full_name %></option><% }); %>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOOKING INFORMATION -->
+        <div class="modal-section">
+          <h4 class="modal-section-title">BOOKING INFORMATION</h4>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Start Date <span class="text-red-500">*</span></label>
+              <input type="date" name="start_date" required class="modal-input" value="<%= typeof currentDate !== 'undefined' ? currentDate : '' %>">
+            </div>
+            <div class="modal-field">
+              <label>Start Time <span class="text-red-500">*</span></label>
+              <input type="time" name="start_time" required class="modal-input" value="06:00">
+            </div>
+          </div>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>End Date <span class="text-red-500">*</span></label>
+              <input type="date" name="end_date" required class="modal-input" value="<%= typeof currentDate !== 'undefined' ? currentDate : '' %>">
+            </div>
+            <div class="modal-field">
+              <label>End Time <span class="text-red-500">*</span></label>
+              <input type="time" name="end_time" required class="modal-input" value="14:30">
+            </div>
+          </div>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Depot Meeting Time <span class="text-red-500">*</span></label>
+              <input type="time" name="depot_meeting_time" required class="modal-input">
+            </div>
+            <div class="modal-field">
+              <label>Straight to Site Time</label>
+              <input type="time" name="straight_to_site_time" class="modal-input">
+            </div>
+          </div>
+          <div class="modal-field" style="grid-column: span 2">
+            <label>Title <span class="text-red-500">*</span></label>
+            <input type="text" name="title" required class="modal-input" placeholder="e.g. Lane closure — Main St resurfacing">
+          </div>
+          <div class="modal-field" style="margin-top:12px">
+            <label>Description</label>
+            <textarea name="description" rows="2" class="modal-input" placeholder="Brief description..."></textarea>
+          </div>
+          <div class="modal-field" style="margin-top:12px">
+            <label>Tags</label>
+            <input type="text" name="booking_tags" class="modal-input" placeholder="Comma-separated, e.g. night-work, RMS">
+          </div>
+          <div class="flex gap-6 mt-3">
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" name="is_emergency" value="1" class="rounded border-gray-300 text-red-600"> Emergency
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" name="is_callout" value="1" class="rounded border-gray-300 text-amber-600"> Callout
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" name="billable" value="1" checked class="rounded border-gray-300 text-brand-600"> Billable
+            </label>
+          </div>
+        </div>
+
+        <!-- LOCATION -->
+        <div class="modal-section">
+          <h4 class="modal-section-title">LOCATION</h4>
+          <div class="modal-field" style="margin-bottom:12px">
+            <label>Site Address</label>
+            <input type="text" name="site_address" class="modal-input" placeholder="Street address">
+          </div>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Suburb</label>
+              <input type="text" name="suburb" class="modal-input" placeholder="e.g. Parramatta">
+            </div>
+            <div class="modal-field">
+              <label>State</label>
+              <input type="text" name="state" class="modal-input" placeholder="NSW" value="NSW">
+            </div>
+          </div>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Postcode</label>
+              <input type="text" name="postcode" class="modal-input" placeholder="2000">
+            </div>
+            <div class="modal-field">
+              <label>Works Direction</label>
+              <input type="text" name="works_direction" class="modal-input" placeholder="e.g. Eastbound">
+            </div>
+          </div>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Worksite Location</label>
+              <input type="text" name="worksite_location" class="modal-input" placeholder="e.g. Northbound lanes">
+            </div>
+            <div class="modal-field">
+              <label>Location Notes</label>
+              <input type="text" name="location_notes" class="modal-input" placeholder="Access instructions">
+            </div>
+          </div>
+          <div class="modal-field-grid">
+            <div class="modal-field">
+              <label>Chainage From</label>
+              <input type="text" name="chainage_from" class="modal-input" placeholder="12.500">
+            </div>
+            <div class="modal-field">
+              <label>Chainage To</label>
+              <input type="text" name="chainage_to" class="modal-input" placeholder="14.200">
+            </div>
+          </div>
+          <div class="flex gap-6 mt-3">
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" name="has_mobile_works" value="1" class="rounded border-gray-300 text-brand-600"> Mobile Works
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" name="marker_is_accurate" value="1" class="rounded border-gray-300 text-brand-600"> Marker Accurate
+            </label>
+          </div>
+        </div>
+
+        <!-- BOOKING TYPE -->
+        <div class="modal-section">
+          <h4 class="modal-section-title">BOOKING TYPE</h4>
+          <div class="flex gap-6">
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="radio" name="booking_type" value="regular" checked class="text-brand-600"> Regular
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="radio" name="booking_type" value="hire" class="text-brand-600"> Hire
+            </label>
+          </div>
+        </div>
+
+        <!-- BOOKING REQUIREMENTS -->
+        <div class="modal-section">
+          <h4 class="modal-section-title">BOOKING REQUIREMENTS</h4>
+          <div id="panel-req-rows"></div>
+          <button type="button" onclick="addPanelReqRow()" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-orange-600 hover:text-orange-800 border border-orange-300 rounded-lg hover:bg-orange-50 transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Requirement
+          </button>
+          <div class="mt-3">
+            <label class="block text-xs text-gray-400 mb-1">Special Instructions</label>
+            <textarea name="requirements_text" rows="2" class="modal-input" placeholder="PPE requirements, site rules..."></textarea>
+          </div>
+        </div>
+
+        <!-- NOTES -->
+        <div class="modal-section">
+          <h4 class="modal-section-title">BOOKING POOL & NOTES</h4>
+          <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mb-3">
+            <input type="checkbox" name="is_booking_pool" value="1" class="rounded border-gray-300 text-brand-600"> Add to booking pool
+          </label>
+          <div class="modal-field">
+            <label>Internal Notes</label>
+            <textarea name="notes" rows="2" class="modal-input" placeholder="Internal notes..."></textarea>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="booking-modal-footer">
+      <button type="button" onclick="closeBookingForm()" class="modal-footer-btn secondary">Cancel</button>
+      <div class="flex-1"></div>
+      <button type="submit" form="booking-slide-form" class="modal-footer-btn primary">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        Create Booking
       </button>
     </div>
   </div>
@@ -1304,4 +1600,55 @@ function duplicateBooking(id) {
 document.getElementById('booking-modal-backdrop')?.addEventListener('click', function(e) {
   if (e.target === this) closeBookingDetail();
 });
+
+// ==========================================
+// Booking Form Slide-in Panel
+// ==========================================
+const panelReqTypes = <%- JSON.stringify(formReqTypes) %>;
+
+function openBookingForm() {
+  const backdrop = document.getElementById('booking-form-backdrop');
+  const modal = document.getElementById('booking-form-modal');
+  backdrop.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => { backdrop.classList.add('open'); modal.classList.add('open'); }, 10);
+}
+
+function closeBookingForm() {
+  const backdrop = document.getElementById('booking-form-backdrop');
+  const modal = document.getElementById('booking-form-modal');
+  if (!backdrop || backdrop.style.display === 'none') return;
+  backdrop.classList.remove('open');
+  modal.classList.remove('open');
+  setTimeout(() => { backdrop.style.display = 'none'; document.body.style.overflow = ''; }, 250);
+}
+
+function addPanelReqRow(type, qty) {
+  const container = document.getElementById('panel-req-rows');
+  const row = document.createElement('div');
+  row.className = 'flex items-center gap-2 mb-2';
+  let opts = '<option value="">-- Select --</option>';
+  panelReqTypes.forEach(rt => { opts += '<option value="' + rt + '"' + (rt === type ? ' selected' : '') + '>' + rt + '</option>'; });
+  row.innerHTML = '<select name="req_resource_type" class="modal-input flex-1">' + opts + '</select>'
+    + '<input type="number" name="req_quantity" value="' + (qty || 1) + '" min="1" class="modal-input w-16 text-center">'
+    + '<button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>';
+  container.appendChild(row);
+}
+
+// Escape closes form panel too
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeBookingForm();
+});
+
+// Click backdrop to close form
+document.getElementById('booking-form-backdrop')?.addEventListener('click', function(e) {
+  if (e.target === this) closeBookingForm();
+});
+
+// Auto-sync end date with start date in the panel form
+const panelStartDate = document.querySelector('#booking-slide-form input[name="start_date"]');
+const panelEndDate = document.querySelector('#booking-slide-form input[name="end_date"]');
+if (panelStartDate && panelEndDate) {
+  panelStartDate.addEventListener('change', function() { if (!panelEndDate.value || panelEndDate.value === panelStartDate.defaultValue) panelEndDate.value = this.value; });
+}
 </script>
