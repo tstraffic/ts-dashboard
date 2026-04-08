@@ -1559,6 +1559,31 @@ canvas {
 .card-action-delete:hover { color: #DC2626 !important; background: #FEF2F2 !important; }
 .card-action-restore:hover { color: #16A34A !important; background: #F0FDF4 !important; }
 
+/* Drag-and-drop feedback */
+.booking-card.drag-over {
+  outline: 2px solid #2B7FFF;
+  outline-offset: 2px;
+  box-shadow: 0 0 16px rgba(43,127,255,0.25), var(--shadow-card);
+  transform: scale(1.01);
+  transition: all 0.15s ease;
+}
+.booking-card.drop-success {
+  outline: 2px solid #16A34A;
+  outline-offset: 2px;
+  box-shadow: 0 0 16px rgba(22,163,74,0.25);
+  animation: drop-pulse 0.4s ease;
+}
+@keyframes drop-pulse {
+  0% { transform: scale(1.01); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+/* Dragging state on crew item */
+.resource-item[draggable="true"]:active {
+  opacity: 0.7;
+  transform: scale(0.97);
+}
+
 /* Toast notification */
 .booking-toast {
   position: fixed;
