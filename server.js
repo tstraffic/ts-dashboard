@@ -263,7 +263,7 @@ app.use((err, req, res, _next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`T&S Operations Dashboard running at http://localhost:${PORT}`);
+  console.log(`T&S Operations Dashboard running at http://localhost:${PORT} (build 117)`);
 
   // ── Production security checks ──
   if (isProduction) {
