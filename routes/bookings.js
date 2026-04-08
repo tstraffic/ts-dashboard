@@ -287,10 +287,25 @@ router.get('/:id', (req, res) => {
     const t = transformBooking(db, booking);
     return res.json({ ...t, booking_number: booking.booking_number, description: booking.description, requirements_text: booking.requirements_text, order_number: booking.order_number, billing_code: booking.billing_code, client_contact: booking.client_contact, is_emergency: booking.is_emergency, is_callout: booking.is_callout, billable: booking.billable, invoiced: booking.invoiced, site_address: booking.site_address, suburb: booking.suburb, state: booking.state, postcode: booking.postcode, crew: booking.crew, allNotes: booking.notes, allVehicles: booking.vehicles, dockets: booking.dockets, documents: booking.documents, activity: booking.activity, requirements: booking.requirements, equipment: booking.equipment, job: booking.job, client: booking.client });
   }
+  // Resolve requester/planner names
+  let requesterName = '', plannerName = '';
+  if (booking.requester_id) { const r = db.prepare("SELECT full_name FROM crew_members WHERE id = ?").get(booking.requester_id); if (r) requesterName = r.full_name; }
+  if (booking.planner_id) { const p = db.prepare("SELECT full_name FROM crew_members WHERE id = ?").get(booking.planner_id); if (p) plannerName = p.full_name; }
+  // Parse site contacts JSON → resolve names
+  let siteContactNames = [];
+  try {
+    const ids = JSON.parse(booking.site_contacts || '[]');
+    if (ids.length) { siteContactNames = ids.map(id => { const c = db.prepare("SELECT full_name FROM client_contacts WHERE id = ?").get(id); return c ? c.full_name : null; }).filter(Boolean); }
+  } catch (e) {}
+  // Parse booking tags
+  let tagsList = [];
+  try { tagsList = JSON.parse(booking.booking_tags || '[]'); } catch (e) {}
+
   const allCrew = db.prepare("SELECT id, full_name, role, employee_id FROM crew_members WHERE active = 1 ORDER BY full_name").all();
   res.render('bookings/show', {
     title: 'Booking ' + booking.booking_number,
-    booking: { ...booking, supervisor: booking.supervisor_name, project: { name: booking.title || (booking.job ? booking.job.job_name : ''), client: booking.client ? booking.client.company_name : (booking.job ? booking.job.client : ''), address: booking.site_address || (booking.job ? booking.job.site_address : ''), orderNumber: booking.order_number, billingCode: booking.billing_code },
+    booking: { ...booking, supervisor: booking.supervisor_name, requester_name: requesterName, planner_name: plannerName, site_contact_names: siteContactNames, tags_list: tagsList,
+      project: { name: booking.title || (booking.job ? booking.job.job_name : ''), client: booking.client ? booking.client.company_name : (booking.job ? booking.job.client : ''), address: booking.site_address || (booking.job ? booking.job.site_address : ''), orderNumber: booking.order_number, billingCode: booking.billing_code },
       startDateTime: booking.start_datetime, endDateTime: booking.end_datetime,
       personnel: booking.crew.map(c => ({ id: c.crew_member_id, name: c.full_name || 'Unknown', role: c.role_on_site || '', confirmed: c.status === 'confirmed', bcStatus: c.status })),
       allVehicles: booking.vehicles,

@@ -126,7 +126,73 @@
       <p class="text-sm font-medium text-gray-900 mt-0.5"><%= b.supervisor || '-' %></p>
     </div>
   </div>
+  <% if (b.depot_meeting_time || b.straight_to_site_time) { %>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-50">
+    <% if (b.depot_meeting_time) { %>
+    <div>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Depot Meeting</p>
+      <p class="text-sm font-medium text-gray-900 mt-0.5"><%= b.depot_meeting_time %></p>
+    </div>
+    <% } %>
+    <% if (b.straight_to_site_time) { %>
+    <div>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Straight to Site</p>
+      <p class="text-sm font-medium text-gray-900 mt-0.5"><%= b.straight_to_site_time %></p>
+    </div>
+    <% } %>
+  </div>
+  <% } %>
 </div>
+
+<!-- Location Details (only if any location detail fields have data) -->
+<% if (b.worksite_location || b.works_direction || b.chainage_from || b.chainage_to || b.location_notes || b.latitude || b.has_mobile_works) { %>
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mb-5">
+  <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Location Details</h2>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+    <% if (b.worksite_location) { %>
+    <div>
+      <span class="text-gray-400 text-xs">Worksite Location</span>
+      <p class="font-medium text-gray-700"><%= b.worksite_location %></p>
+    </div>
+    <% } %>
+    <% if (b.works_direction) { %>
+    <div>
+      <span class="text-gray-400 text-xs">Works Direction</span>
+      <p class="font-medium text-gray-700"><%= b.works_direction %></p>
+    </div>
+    <% } %>
+    <% if (b.chainage_from || b.chainage_to) { %>
+    <div>
+      <span class="text-gray-400 text-xs">Chainage</span>
+      <p class="font-medium text-gray-700"><%= b.chainage_from || '-' %> &rarr; <%= b.chainage_to || '-' %></p>
+    </div>
+    <% } %>
+    <% if (b.has_mobile_works) { %>
+    <div>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-600/20">Mobile Works</span>
+    </div>
+    <% } %>
+  </div>
+  <% if (b.location_notes) { %>
+  <div class="mt-3 pt-3 border-t border-gray-100">
+    <span class="text-gray-400 text-xs">Location Notes</span>
+    <p class="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap"><%= b.location_notes %></p>
+  </div>
+  <% } %>
+  <% if (b.latitude && b.longitude) { %>
+  <div class="mt-3 pt-3 border-t border-gray-100 flex items-center gap-4">
+    <span class="text-xs text-gray-400">Coordinates:</span>
+    <span class="text-xs font-mono text-gray-600"><%= b.latitude %>, <%= b.longitude %></span>
+    <% if (b.marker_is_accurate) { %>
+    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">
+      <svg class="w-3 h-3 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+      Accurate
+    </span>
+    <% } %>
+  </div>
+  <% } %>
+</div>
+<% } %>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
@@ -366,9 +432,36 @@
         <% if (b.project.orderNumber) { %><div><span class="text-gray-400">Order #:</span> <span class="font-medium text-gray-700"><%= b.project.orderNumber %></span></div><% } %>
         <% if (b.project.billingCode) { %><div><span class="text-gray-400">Billing:</span> <span class="font-medium text-gray-700"><%= b.project.billingCode %></span></div><% } %>
         <% if (b.client_contact) { %><div><span class="text-gray-400">Contact:</span> <span class="font-medium text-gray-700"><%= b.client_contact %></span></div><% } %>
+        <% if (b.requester_name) { %><div><span class="text-gray-400">Requester:</span> <span class="font-medium text-gray-700"><%= b.requester_name %></span></div><% } %>
+        <% if (b.planner_name) { %><div><span class="text-gray-400">Planner:</span> <span class="font-medium text-gray-700"><%= b.planner_name %></span></div><% } %>
+        <% if (b.location_context) { %><div><span class="text-gray-400">Location Context:</span> <span class="font-medium text-gray-700"><%= b.location_context %></span></div><% } %>
         <% if (b.is_emergency) { %><div class="text-red-500 font-medium">Emergency Booking</div><% } %>
         <% if (b.is_callout) { %><div class="text-amber-500 font-medium">Callout</div><% } %>
         <div><span class="text-gray-400">Billable:</span> <span class="font-medium"><%= b.billable ? 'Yes' : 'No' %></span></div>
+        <% if (b.booking_type && b.booking_type !== 'regular') { %>
+          <div><span class="text-gray-400">Type:</span> <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-600/20 ml-1">Hire</span></div>
+        <% } %>
+        <% if (b.is_booking_pool) { %>
+          <div><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-600/20">Booking Pool</span></div>
+        <% } %>
+        <% if (b.tags_list && b.tags_list.length > 0) { %>
+          <div class="pt-2 border-t border-gray-100">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Tags</p>
+            <div class="flex flex-wrap gap-1.5">
+              <% b.tags_list.forEach(tag => { %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600"><%= tag %></span>
+              <% }); %>
+            </div>
+          </div>
+        <% } %>
+        <% if (b.site_contact_names && b.site_contact_names.length > 0) { %>
+          <div class="pt-2 border-t border-gray-100">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Site Contacts</p>
+            <% b.site_contact_names.forEach(name => { %>
+              <p class="text-sm text-gray-700"><%= name %></p>
+            <% }); %>
+          </div>
+        <% } %>
         <% if (b.requirements_text) { %>
           <div class="pt-2 border-t border-gray-100">
             <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Requirements</p>
