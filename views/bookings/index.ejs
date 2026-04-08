@@ -242,7 +242,7 @@
       ondrop="handleCrewDrop(event, <%= booking.id %>)">
       <!-- Quick actions (hover) -->
       <div class="booking-card-actions">
-        <button class="card-action-btn" title="Edit" onclick="event.stopPropagation(); openBookingDetail(<%= booking.id %>)">
+        <button class="card-action-btn" title="Edit" onclick="event.stopPropagation(); openBookingFormEdit(<%= booking.id %>)">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
         </button>
         <button class="card-action-btn" title="Duplicate" onclick="event.stopPropagation(); duplicateBooking(<%= booking.id %>)">
@@ -735,9 +735,9 @@ function handleCalDrop(event, targetDate) {
         Print
       </button>
       <div class="flex-1"></div>
-      <button class="modal-footer-btn primary" id="modal-save-btn">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-        Save
+      <button class="modal-footer-btn primary" id="modal-edit-btn" onclick="closeBookingDetail(); openBookingFormEdit(this.dataset.bookingId);">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        Edit
       </button>
     </div>
   </div>
@@ -1376,6 +1376,9 @@ function openBookingDetail(id) {
     .then(r => r.json())
     .then(booking => {
       titleEl.textContent = 'Job ' + booking.id + ': ' + booking.project.name;
+      // Store booking ID for edit button
+      const editBtn = document.getElementById('modal-edit-btn');
+      if (editBtn) editBtn.dataset.bookingId = booking.id;
 
       // Status flow — Traffio lifecycle
       const statuses = ['Client Bk.', 'Unconf.', 'Confirmed', 'Locked', 'Conflict', 'G T G', 'Complete', 'Finalised'];
@@ -1415,7 +1418,7 @@ function openBookingDetail(id) {
             </div>
             <div class="modal-field">
               <label>Location Context</label>
-              <p>-</p>
+              <p>${booking.location_context || '-'}</p>
             </div>
           </div>
           <div class="modal-field-grid">
@@ -1437,16 +1440,18 @@ function openBookingDetail(id) {
           <div class="modal-field-grid">
             <div class="modal-field">
               <label>Requester</label>
-              <p>-</p>
+              <p>${booking.requester_name || '-'}</p>
             </div>
             <div class="modal-field">
               <label>Planner</label>
-              <p>-</p>
+              <p>${booking.planner_name || '-'}</p>
             </div>
           </div>
           <div class="modal-field">
             <label>Site Contacts</label>
-            <div class="modal-contact-pill">${booking.supervisor}</div>
+            ${(booking.site_contact_names && booking.site_contact_names.length > 0)
+              ? booking.site_contact_names.map(n => '<div class="modal-contact-pill">' + n + '</div>').join('')
+              : '<div class="modal-contact-pill">' + booking.supervisor + '</div>'}
           </div>
         </div>
 
@@ -1465,34 +1470,48 @@ function openBookingDetail(id) {
           <div class="modal-field-grid">
             <div class="modal-field">
               <label>Depot Meeting Time</label>
-              <p>${booking.depotMeetingTime || '-'}</p>
+              <p>${booking.depot_meeting_time || '-'}</p>
             </div>
             <div class="modal-field">
               <label>Straight-to-Site Time</label>
-              <p>${booking.straightToSiteTime || '-'}</p>
+              <p>${booking.straight_to_site_time || '-'}</p>
             </div>
           </div>
           <div class="modal-field">
             <label>Booking Title</label>
             <p class="font-medium">${booking.title}</p>
           </div>
-          ${booking.bookingDescription ? `
+          ${booking.description ? `
           <div class="modal-field">
             <label>Booking Description</label>
-            <p class="whitespace-pre-line text-gray-600">${booking.bookingDescription}</p>
+            <p class="whitespace-pre-line text-gray-600">${booking.description}</p>
           </div>` : ''}
           <div class="modal-field">
             <label>Booking Tags</label>
-            <p class="text-gray-400">No tags</p>
+            ${(booking.tags_list && booking.tags_list.length > 0)
+              ? '<div class="flex flex-wrap gap-1">' + booking.tags_list.map(t => '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand-50 text-brand-700 border border-brand-200">' + t + '</span>').join('') + '</div>'
+              : '<p class="text-gray-400">No tags</p>'}
           </div>
+          ${booking.booking_type === 'hire' ? '<div class="modal-field"><label>Booking Type</label><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">Hire</span></div>' : ''}
+          ${booking.is_booking_pool ? '<div class="modal-field"><label>Booking Pool</label><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">In Pool</span></div>' : ''}
         </div>
 
         <div class="modal-section">
           <h4 class="modal-section-title">LOCATION</h4>
           <div class="modal-field">
             <label>Main Address</label>
-            <p>${booking.project.address}</p>
+            <p>${booking.project.address}${booking.suburb ? ', ' + booking.suburb : ''}${booking.state ? ' ' + booking.state : ''}${booking.postcode ? ' ' + booking.postcode : ''}</p>
           </div>
+          ${booking.worksite_location || booking.works_direction ? '<div class="modal-field-grid">' +
+            (booking.worksite_location ? '<div class="modal-field"><label>Worksite Location</label><p>' + booking.worksite_location + '</p></div>' : '') +
+            (booking.works_direction ? '<div class="modal-field"><label>Works Direction</label><p>' + booking.works_direction + '</p></div>' : '') +
+          '</div>' : ''}
+          ${booking.chainage_from || booking.chainage_to ? '<div class="modal-field-grid">' +
+            '<div class="modal-field"><label>Chainage From</label><p>' + (booking.chainage_from || '-') + '</p></div>' +
+            '<div class="modal-field"><label>Chainage To</label><p>' + (booking.chainage_to || '-') + '</p></div>' +
+          '</div>' : ''}
+          ${booking.location_notes ? '<div class="modal-field"><label>Location Notes</label><p class="text-gray-600">' + booking.location_notes + '</p></div>' : ''}
+          ${booking.has_mobile_works ? '<div class="modal-field"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">Mobile Works</span></div>' : ''}
         </div>
 
         <div class="modal-section">
@@ -1606,7 +1625,8 @@ document.getElementById('booking-modal-backdrop')?.addEventListener('click', fun
 // ==========================================
 const panelReqTypes = <%- JSON.stringify(formReqTypes) %>;
 
-function openBookingForm() {
+function openBookingForm(skipReset) {
+  if (!skipReset) resetBookingForm();
   const backdrop = document.getElementById('booking-form-backdrop');
   const modal = document.getElementById('booking-form-modal');
   backdrop.style.display = 'flex';
@@ -1621,6 +1641,122 @@ function closeBookingForm() {
   backdrop.classList.remove('open');
   modal.classList.remove('open');
   setTimeout(() => { backdrop.style.display = 'none'; document.body.style.overflow = ''; }, 250);
+}
+
+function openBookingFormEdit(id) {
+  const form = document.getElementById('booking-slide-form');
+  const titleEl = document.getElementById('form-modal-title');
+  const submitBtn = form.closest('.booking-modal').querySelector('.modal-footer-btn.primary');
+
+  // Switch to edit mode
+  titleEl.textContent = 'Edit Booking';
+  form.action = '/bookings/' + id;
+  submitBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Update Booking';
+
+  // Fetch booking data and pre-fill
+  fetch('/bookings/' + id, { headers: { 'Accept': 'application/json' } })
+    .then(r => r.json())
+    .then(b => {
+      // Parse dates from start_datetime / end_datetime
+      const sd = b.start_datetime ? b.start_datetime.split('T') : ['',''];
+      const ed = b.end_datetime ? b.end_datetime.split('T') : ['',''];
+
+      // Helper to set form values
+      function setVal(name, val) {
+        const el = form.querySelector('[name="' + name + '"]');
+        if (!el || val === undefined || val === null) return;
+        if (el.type === 'checkbox') { el.checked = !!val; }
+        else if (el.type === 'radio') {
+          const radio = form.querySelector('[name="' + name + '"][value="' + val + '"]');
+          if (radio) radio.checked = true;
+        } else { el.value = val; }
+      }
+
+      // Booking Depot
+      setVal('depot', b.depot);
+      setVal('supervisor_id', b.supervisor_id || '');
+      setVal('status', b.status);
+
+      // Client Information
+      setVal('client_id', b.client_id || '');
+      setVal('job_id', b.job_id || '');
+      setVal('order_number', b.order_number || '');
+      setVal('billing_code', b.billing_code || '');
+      setVal('client_contact', b.client_contact || '');
+      setVal('location_context', b.location_context || '');
+      setVal('requester_id', b.requester_id || '');
+      setVal('planner_id', b.planner_id || '');
+
+      // Booking Information
+      setVal('start_date', sd[0]);
+      setVal('start_time', (sd[1] || '').substring(0, 5));
+      setVal('end_date', ed[0]);
+      setVal('end_time', (ed[1] || '').substring(0, 5));
+      setVal('depot_meeting_time', b.depot_meeting_time || '');
+      setVal('straight_to_site_time', b.straight_to_site_time || '');
+      setVal('title', b.title || '');
+      setVal('description', b.description || '');
+      setVal('booking_tags', (b.tags_list || []).join(', '));
+      setVal('is_emergency', b.is_emergency);
+      setVal('is_callout', b.is_callout);
+      setVal('billable', b.billable);
+
+      // Location
+      setVal('site_address', b.site_address || '');
+      setVal('suburb', b.suburb || '');
+      setVal('state', b.state || '');
+      setVal('postcode', b.postcode || '');
+      setVal('works_direction', b.works_direction || '');
+      setVal('worksite_location', b.worksite_location || '');
+      setVal('location_notes', b.location_notes || '');
+      setVal('chainage_from', b.chainage_from || '');
+      setVal('chainage_to', b.chainage_to || '');
+      setVal('has_mobile_works', b.has_mobile_works);
+      setVal('marker_is_accurate', b.marker_is_accurate);
+
+      // Booking Type
+      setVal('booking_type', b.booking_type || 'regular');
+
+      // Requirements
+      const reqContainer = document.getElementById('panel-req-rows');
+      reqContainer.innerHTML = '';
+      if (b.requirements && b.requirements.length) {
+        b.requirements.forEach(r => addPanelReqRow(r.resource_type, r.quantity_required));
+      }
+
+      // Special Instructions & Pool
+      setVal('requirements_text', b.requirements_text || '');
+      setVal('is_booking_pool', b.is_booking_pool);
+      setVal('notes', b.internal_notes || '');
+
+      // Open the panel (skip reset since we just populated it)
+      openBookingForm(true);
+    })
+    .catch(err => {
+      console.error('Failed to load booking for edit:', err);
+      // Fallback to full page edit
+      window.location.href = '/bookings/' + id + '/edit';
+    });
+}
+
+function resetBookingForm() {
+  const form = document.getElementById('booking-slide-form');
+  const titleEl = document.getElementById('form-modal-title');
+  const submitBtn = form.closest('.booking-modal').querySelector('.modal-footer-btn.primary');
+  titleEl.textContent = 'New Booking';
+  form.action = '/bookings';
+  form.reset();
+  submitBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Create Booking';
+  document.getElementById('panel-req-rows').innerHTML = '';
+  // Reset default date values
+  const startDate = form.querySelector('[name="start_date"]');
+  const endDate = form.querySelector('[name="end_date"]');
+  if (startDate) startDate.value = '<%= typeof currentDate !== "undefined" ? currentDate : "" %>';
+  if (endDate) endDate.value = '<%= typeof currentDate !== "undefined" ? currentDate : "" %>';
+  const startTime = form.querySelector('[name="start_time"]');
+  const endTime = form.querySelector('[name="end_time"]');
+  if (startTime) startTime.value = '06:00';
+  if (endTime) endTime.value = '14:30';
 }
 
 function addPanelReqRow(type, qty) {
