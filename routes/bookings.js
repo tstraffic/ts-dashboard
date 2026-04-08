@@ -27,7 +27,7 @@ const fileFilter = (req, file, cb) => {
 const uploadDoc = multer({ storage: bookingStorage, limits: { fileSize: 50 * 1024 * 1024 }, fileFilter });
 
 const DEPOTS = ['Villawood', 'Penrith', 'Campbelltown', 'Parramatta'];
-const VALID_STATUSES = ['unconfirmed', 'confirmed', 'green_to_go', 'in_progress', 'completed', 'cancelled', 'on_hold'];
+const VALID_STATUSES = ['client_booking', 'unconfirmed', 'confirmed', 'locked', 'conflict', 'green_to_go', 'in_progress', 'complete', 'finalised', 'cancelled', 'late_cancellation', 'on_hold'];
 
 function generateBookingNumber(db) {
   const last = db.prepare("SELECT booking_number FROM bookings ORDER BY id DESC LIMIT 1").get();
@@ -70,7 +70,7 @@ function transformBooking(db, row) {
   for (const c of crew) {
     const conflict = db.prepare(`
       SELECT b.booking_number FROM booking_crew bc2 JOIN bookings b ON b.id = bc2.booking_id
-      WHERE bc2.crew_member_id = ? AND bc2.booking_id != ? AND b.status NOT IN ('cancelled','completed')
+      WHERE bc2.crew_member_id = ? AND bc2.booking_id != ? AND b.status NOT IN ('cancelled','complete','late_cancellation')
         AND b.start_datetime < ? AND b.end_datetime > ? LIMIT 1
     `).get(c.crew_member_id, row.id, row.end_datetime, row.start_datetime);
     if (conflict) { scheduleWarning = c.full_name + ' also on ' + conflict.booking_number; break; }
@@ -94,6 +94,25 @@ function transformBooking(db, row) {
     dockets: db.prepare("SELECT COUNT(*) as c FROM booking_dockets WHERE booking_id = ?").get(row.id).c,
     notes: noteCount, tasks: 0,
     docs: (() => { try { return db.prepare("SELECT COUNT(*) as c FROM booking_documents WHERE booking_id = ?").get(row.id).c; } catch(e) { return 0; } })(),
+    bookingNumber: row.booking_number || '',
+    stillRequired: (() => {
+      try {
+        const reqs = db.prepare("SELECT resource_type, quantity_required FROM booking_requirements WHERE booking_id = ?").all(row.id);
+        const unfilled = [];
+        for (const r of reqs) {
+          const assignedCount = crew.filter(c => {
+            const role = (c.role_on_site || c.crew_role || '').toLowerCase().replace(/_/g, ' ');
+            return role === r.resource_type.toLowerCase().replace(/_/g, ' ');
+          }).length;
+          const remaining = r.quantity_required - assignedCount;
+          if (remaining > 0) {
+            const label = r.resource_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            unfilled.push(remaining > 1 ? `${remaining}x ${label}` : label);
+          }
+        }
+        return unfilled;
+      } catch(e) { return []; }
+    })(),
   };
 }
 
@@ -159,10 +178,18 @@ router.get('/', (req, res) => {
   const bookings = rows.map(r => transformBooking(db, r));
   const allForDate = db.prepare("SELECT status FROM bookings WHERE DATE(start_datetime) = ?").all(dateStr);
   const stats = {
-    total: allForDate.length, completed: allForDate.filter(r => r.status === 'completed').length,
-    greenToGo: allForDate.filter(r => r.status === 'green_to_go').length, confirmed: allForDate.filter(r => r.status === 'confirmed').length,
-    unconfirmed: allForDate.filter(r => r.status === 'unconfirmed').length, inProgress: allForDate.filter(r => r.status === 'in_progress').length,
+    total: allForDate.length,
+    greenToGo: allForDate.filter(r => r.status === 'green_to_go').length,
+    confirmed: allForDate.filter(r => r.status === 'confirmed').length,
+    unconfirmed: allForDate.filter(r => r.status === 'unconfirmed').length,
+    inProgress: allForDate.filter(r => r.status === 'in_progress').length,
+    complete: allForDate.filter(r => r.status === 'complete').length,
+    finalised: allForDate.filter(r => r.status === 'finalised').length,
     cancelled: allForDate.filter(r => r.status === 'cancelled').length,
+    lateCancellation: allForDate.filter(r => r.status === 'late_cancellation').length,
+    conflict: allForDate.filter(r => r.status === 'conflict').length,
+    locked: allForDate.filter(r => r.status === 'locked').length,
+    clientBooking: allForDate.filter(r => r.status === 'client_booking').length,
   };
 
   res.render('bookings/index', { title: 'Bookings Board', bookings, stats, depots: DEPOTS, currentView: view, currentDate: dateStr, currentDepot: depot, currentStatus: status, currentSearch: search, user: req.session.user });
@@ -205,7 +232,7 @@ router.get('/resources', (req, res) => {
   const db = getDb();
   const date = req.query.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
-  const assignedIds = db.prepare(`SELECT DISTINCT bc.crew_member_id FROM booking_crew bc JOIN bookings b ON b.id = bc.booking_id WHERE DATE(b.start_datetime) = ? AND b.status NOT IN ('cancelled','completed')`).all(date).map(r => r.crew_member_id);
+  const assignedIds = db.prepare(`SELECT DISTINCT bc.crew_member_id FROM booking_crew bc JOIN bookings b ON b.id = bc.booking_id WHERE DATE(b.start_datetime) = ? AND b.status NOT IN ('cancelled','complete','late_cancellation')`).all(date).map(r => r.crew_member_id);
   const allCrew = db.prepare(`SELECT id, full_name, role, phone, employee_id, depot, employment_type,
     tc_ticket_expiry, white_card_expiry, licence_expiry, tcp_level,
     has_first_aid, can_drive_truck, specialisations
@@ -296,6 +323,24 @@ router.post('/:id/crew', (req, res) => {
   const { crew_member_id, role_on_site } = req.body;
   if (!crew_member_id) { req.flash('error', 'Select a crew member.'); return res.redirect('/bookings/' + req.params.id); }
   if (db.prepare("SELECT id FROM booking_crew WHERE booking_id=? AND crew_member_id=?").get(req.params.id, crew_member_id)) { req.flash('error', 'Already assigned.'); return res.redirect('/bookings/' + req.params.id); }
+
+  // Conflict detection — warn if crew member has overlapping bookings on same date
+  const thisBooking = db.prepare("SELECT start_datetime, end_datetime, booking_number FROM bookings WHERE id=?").get(req.params.id);
+  if (thisBooking && thisBooking.start_datetime) {
+    const bookingDate = thisBooking.start_datetime.substring(0, 10);
+    const conflicts = db.prepare(`
+      SELECT b.id, b.booking_number, b.start_datetime, b.end_datetime
+      FROM booking_crew bc
+      JOIN bookings b ON b.id = bc.booking_id
+      WHERE bc.crew_member_id = ? AND b.id != ? AND DATE(b.start_datetime) = ?
+        AND b.status NOT IN ('cancelled','complete','late_cancellation','finalised')
+    `).all(crew_member_id, req.params.id, bookingDate);
+    if (conflicts.length > 0) {
+      const conflictNums = conflicts.map(c => c.booking_number || `#${c.id}`).join(', ');
+      req.flash('warning', `Conflict: this crew member is also assigned to ${conflictNums} on the same date.`);
+    }
+  }
+
   db.prepare("INSERT INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'assigned')").run(req.params.id, crew_member_id, role_on_site || '');
   req.flash('success', 'Crew member added.'); res.redirect('/bookings/' + req.params.id);
 });
