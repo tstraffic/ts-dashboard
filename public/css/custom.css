@@ -2798,3 +2798,15 @@ canvas {
 .resource-crew-item .crew-avail-yes { color: #22c55e; }
 .resource-crew-item .crew-avail-no { color: #ef4444; }
 .resource-crew-item .crew-avail-unknown { color: #94a3b8; }
+
+/* ========== Booking Form — Traffio-style section headers ========== */
+.booking-form-section-header {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #ea580c;
+  padding-left: 0.75rem;
+  border-left: 4px solid #f97316;
+  margin-bottom: 1rem;
+}

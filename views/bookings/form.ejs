@@ -17,6 +17,12 @@
     return booking[field] ? 'checked' : '';
   }
 
+  // Site contacts (JSON array of IDs)
+  const siteContactIds = isEdit && booking.site_contacts_arr ? booking.site_contacts_arr : [];
+
+  // Requirements grid prepopulation
+  const existingReqs = isEdit && booking.requirements ? booking.requirements : [];
+
   const statusOptions = [
     { val: 'client_booking', label: 'Client Booking' },
     { val: 'unconfirmed', label: 'Unconfirmed' },
@@ -30,6 +36,14 @@
     { val: 'cancelled', label: 'Cancelled' },
     { val: 'late_cancellation', label: 'Late Cancellation' },
     { val: 'on_hold', label: 'On Hold' },
+  ];
+
+  const requirementTypes = [
+    '1x TC Crew', '2x TC Crew', '3x TC Crew', '4x TC Crew', '5x TC Crew',
+    '6x TC Crew', '7x TC Crew', '8x TC Crew', '9x TC Crew', '10x TC Crew',
+    'Arrow Board', 'Hoist Operator', 'IP', 'Pilot Vehicle', 'Pilot Vehicle Lead',
+    'Portable Traffic Lights', 'Ute', 'TL 2x TC Crew', 'TL 3x TC Crew',
+    'TL 4x TC Crew', 'TL 5x TC Crew', 'VMS Board', 'VMS Ute', 'Water Cart', 'Truck'
   ];
 %>
 
@@ -50,27 +64,13 @@
 <form method="POST" action="<%= isEdit ? '/bookings/' + booking.id : '/bookings' %>" class="space-y-5">
   <%- include('../partials/csrf') %>
 
-  <!-- Section 1: Basic Info -->
+  <!-- Section 1: BOOKING DEPOT -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Basic Information</h2>
+    <h2 class="booking-form-section-header">BOOKING DEPOT</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div class="sm:col-span-2 lg:col-span-2">
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Title <span class="text-red-500">*</span></label>
-        <input type="text" name="title" value="<%= val('title') %>" required
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-          placeholder="e.g. Lane closure — Main St resurfacing">
-      </div>
       <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Status</label>
-        <select name="status" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-          <% statusOptions.forEach(s => { %>
-            <option value="<%= s.val %>" <%= selected('status', s.val) %>><%= s.label %></option>
-          <% }); %>
-        </select>
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Depot</label>
-        <select name="depot" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Depot <span class="text-red-500">*</span></label>
+        <select name="depot" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select Depot --</option>
           <% depots.forEach(d => { %>
             <option value="<%= d %>" <%= val('depot') === d ? 'selected' : '' %>><%= d %></option>
@@ -86,39 +86,24 @@
           <% }); %>
         </select>
       </div>
-      <div class="flex items-end gap-6">
-        <div class="flex items-center gap-2">
-          <input type="checkbox" name="is_emergency" id="is_emergency" value="1" <%= checked('is_emergency') %>
-            class="rounded border-gray-300 text-red-600 focus:ring-red-500">
-          <label for="is_emergency" class="text-sm text-gray-700">Emergency</label>
-        </div>
-        <div class="flex items-center gap-2">
-          <input type="checkbox" name="is_callout" id="is_callout" value="1" <%= checked('is_callout') %>
-            class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-          <label for="is_callout" class="text-sm text-gray-700">Callout</label>
-        </div>
-        <div class="flex items-center gap-2">
-          <input type="checkbox" name="billable" id="billable" value="1" <%= isEdit ? checked('billable') : 'checked' %>
-            class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
-          <label for="billable" class="text-sm text-gray-700">Billable</label>
-        </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Status</label>
+        <select name="status" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <% statusOptions.forEach(s => { %>
+            <option value="<%= s.val %>" <%= selected('status', s.val) %>><%= s.label %></option>
+          <% }); %>
+        </select>
       </div>
-    </div>
-    <div class="mt-4">
-      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Description</label>
-      <textarea name="description" rows="2"
-        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-        placeholder="Brief description of the booking..."><%= val('description') %></textarea>
     </div>
   </div>
 
-  <!-- Section 2: Client & Project -->
+  <!-- Section 2: CLIENT INFORMATION -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Client & Project</h2>
+    <h2 class="booking-form-section-header">CLIENT INFORMATION</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client</label>
-        <select name="client_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client <span class="text-red-500">*</span></label>
+        <select name="client_id" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select Client --</option>
           <% if (typeof clients !== 'undefined' && clients.length) { clients.forEach(c => { %>
             <option value="<%= c.id %>" <%= isEdit && booking.client_id == c.id ? 'selected' : '' %>><%= c.company_name %></option>
@@ -126,8 +111,8 @@
         </select>
       </div>
       <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job / Project</label>
-        <select name="job_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job / Project <span class="text-red-500">*</span></label>
+        <select name="job_id" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">-- Select Job --</option>
           <% if (typeof jobs !== 'undefined' && jobs.length) { jobs.forEach(j => { %>
             <option value="<%= j.id %>" <%= isEdit && booking.job_id == j.id ? 'selected' : '' %>><%= j.job_number ? j.job_number + ' — ' : '' %><%= j.job_name %></option>
@@ -135,10 +120,10 @@
         </select>
       </div>
       <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client Contact</label>
-        <input type="text" name="client_contact" value="<%= val('client_contact') %>"
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Location Context</label>
+        <input type="text" name="location_context" value="<%= val('location_context') %>"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-          placeholder="Contact name or phone">
+          placeholder="e.g. Near intersection of Main & George">
       </div>
       <div>
         <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Order Number</label>
@@ -152,12 +137,52 @@
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
           placeholder="Cost centre or billing code">
       </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client Contact</label>
+        <input type="text" name="client_contact" value="<%= val('client_contact') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="Contact name or phone">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Requester</label>
+        <select name="requester_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select Requester --</option>
+          <% if (typeof crewForSelect !== 'undefined') { crewForSelect.forEach(c => { %>
+            <option value="<%= c.id %>" <%= isEdit && booking.requester_id == c.id ? 'selected' : '' %>><%= c.full_name %></option>
+          <% }); } %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Planner</label>
+        <select name="planner_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+          <option value="">-- Select Planner --</option>
+          <% if (typeof crewForSelect !== 'undefined') { crewForSelect.forEach(c => { %>
+            <option value="<%= c.id %>" <%= isEdit && booking.planner_id == c.id ? 'selected' : '' %>><%= c.full_name %></option>
+          <% }); } %>
+        </select>
+      </div>
     </div>
+    <!-- Site Contacts -->
+    <% if (typeof contacts !== 'undefined' && contacts.length > 0) { %>
+    <div class="mt-4">
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Site Contacts</label>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-3">
+        <% contacts.forEach(ct => { %>
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="site_contacts" value="<%= ct.id %>"
+              <%= siteContactIds.includes(String(ct.id)) ? 'checked' : '' %>
+              class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+            <%= ct.full_name %>
+          </label>
+        <% }); %>
+      </div>
+    </div>
+    <% } %>
   </div>
 
-  <!-- Section 3: Schedule -->
+  <!-- Section 3: BOOKING INFORMATION -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Schedule</h2>
+    <h2 class="booking-form-section-header">BOOKING INFORMATION</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <div>
         <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Start Date <span class="text-red-500">*</span></label>
@@ -179,12 +204,59 @@
         <input type="time" name="end_time" value="<%= isEdit ? (val('end_time') || '') : '14:30' %>" required
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
       </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Depot Meeting Time <span class="text-red-500">*</span></label>
+        <input type="time" name="depot_meeting_time" value="<%= val('depot_meeting_time') %>" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Straight to Site Time</label>
+        <input type="time" name="straight_to_site_time" value="<%= val('straight_to_site_time') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+      </div>
+      <div class="lg:col-span-2 flex items-end gap-6">
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="is_emergency" id="is_emergency" value="1" <%= checked('is_emergency') %>
+            class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+          <label for="is_emergency" class="text-sm text-gray-700">Emergency</label>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="is_callout" id="is_callout" value="1" <%= checked('is_callout') %>
+            class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+          <label for="is_callout" class="text-sm text-gray-700">Callout</label>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="billable" id="billable" value="1" <%= isEdit ? checked('billable') : 'checked' %>
+            class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+          <label for="billable" class="text-sm text-gray-700">Billable</label>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+      <div class="sm:col-span-2">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Title <span class="text-red-500">*</span></label>
+        <input type="text" name="title" value="<%= val('title') %>" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. Lane closure — Main St resurfacing">
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Description</label>
+        <textarea name="description" rows="2"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="Brief description of the booking..."><%= val('description') %></textarea>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Tags</label>
+        <input type="text" name="booking_tags" value="<%= isEdit && booking.booking_tags_str ? booking.booking_tags_str : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="Comma-separated tags, e.g. night-work, road-closure, RMS">
+      </div>
     </div>
   </div>
 
-  <!-- Section 4: Location -->
+  <!-- Section 4: LOCATION -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Location</h2>
+    <h2 class="booking-form-section-header">LOCATION</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="sm:col-span-2">
         <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Site Address</label>
@@ -213,22 +285,169 @@
         </div>
       </div>
     </div>
+    <!-- Map placeholder -->
+    <div class="mt-4 bg-gray-100 border border-gray-200 rounded-lg h-40 flex items-center justify-center text-gray-400 text-sm">
+      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Map integration coming soon
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Latitude</label>
+        <input type="number" step="any" name="latitude" value="<%= val('latitude') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="-33.8688">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Longitude</label>
+        <input type="number" step="any" name="longitude" value="<%= val('longitude') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="151.2093">
+      </div>
+      <div class="flex items-end">
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="marker_is_accurate" id="marker_is_accurate" value="1" <%= checked('marker_is_accurate') %>
+            class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+          <label for="marker_is_accurate" class="text-sm text-gray-700">Marker is accurate</label>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Location Notes</label>
+        <textarea name="location_notes" rows="2"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="Access instructions, landmarks, parking info..."><%= val('location_notes') %></textarea>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Worksite Location</label>
+        <input type="text" name="worksite_location" value="<%= val('worksite_location') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. Northbound lanes">
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Works Direction</label>
+        <input type="text" name="works_direction" value="<%= val('works_direction') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. Eastbound">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Chainage From</label>
+        <input type="text" name="chainage_from" value="<%= val('chainage_from') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. 12.500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Chainage To</label>
+        <input type="text" name="chainage_to" value="<%= val('chainage_to') %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          placeholder="e.g. 14.200">
+      </div>
+      <div class="flex items-end">
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="has_mobile_works" id="has_mobile_works" value="1" <%= checked('has_mobile_works') %>
+            class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+          <label for="has_mobile_works" class="text-sm text-gray-700">Mobile works</label>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Section 5: Requirements -->
+  <!-- Section 5: PLANS / PERMITS -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Requirements</h2>
-    <div>
+    <h2 class="booking-form-section-header">PLANS / PERMITS</h2>
+    <div class="flex items-center gap-3 text-gray-400 text-sm py-4">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      Plans and permits management coming in a future update
+    </div>
+  </div>
+
+  <!-- Section 6: BOOKING TYPE -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="booking-form-section-header">BOOKING TYPE</h2>
+    <div class="flex gap-6">
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="radio" name="booking_type" value="regular" <%= !isEdit || val('booking_type') === 'regular' || !val('booking_type') ? 'checked' : '' %>
+          class="text-brand-600 focus:ring-brand-500">
+        <span class="text-sm text-gray-700 font-medium">Regular</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="radio" name="booking_type" value="hire" <%= isEdit && val('booking_type') === 'hire' ? 'checked' : '' %>
+          class="text-brand-600 focus:ring-brand-500">
+        <span class="text-sm text-gray-700 font-medium">Hire</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Section 7: BOOKING REQUIREMENTS -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="booking-form-section-header">BOOKING REQUIREMENTS</h2>
+    <div id="requirements-grid">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <th class="text-left pb-2 pr-2">Item Classification</th>
+            <th class="text-left pb-2 pr-2 w-24">Qty</th>
+            <th class="w-10 pb-2"></th>
+          </tr>
+        </thead>
+        <tbody id="req-rows">
+          <% if (existingReqs.length > 0) { existingReqs.forEach(r => { %>
+          <tr class="req-row">
+            <td class="pr-2 pb-2">
+              <select name="req_resource_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                <option value="">-- Select --</option>
+                <% requirementTypes.forEach(rt => { %>
+                  <option value="<%= rt %>" <%= r.resource_type === rt ? 'selected' : '' %>><%= rt %></option>
+                <% }); %>
+              </select>
+            </td>
+            <td class="pr-2 pb-2">
+              <input type="number" name="req_quantity" value="<%= r.quantity_required %>" min="1"
+                class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+            </td>
+            <td class="pb-2 text-center">
+              <button type="button" onclick="this.closest('tr').remove(); updateReqTotals();"
+                class="text-red-400 hover:text-red-600 transition p-1" title="Remove">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </td>
+          </tr>
+          <% }); } %>
+        </tbody>
+      </table>
+      <button type="button" id="add-req-row"
+        class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-orange-600 hover:text-orange-800 border border-orange-300 rounded-lg hover:bg-orange-50 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Add Requirement
+      </button>
+    </div>
+    <!-- Totals summary -->
+    <div id="req-totals" class="mt-4 flex gap-6 text-sm font-medium text-gray-500 border-t border-gray-100 pt-3">
+      <span>People: <strong id="total-people" class="text-gray-900">0</strong></span>
+      <span>Vehicles: <strong id="total-vehicles" class="text-gray-900">0</strong></span>
+      <span>Equipment: <strong id="total-equipment" class="text-gray-900">0</strong></span>
+    </div>
+
+    <!-- Existing requirements_text field for free-text instructions -->
+    <div class="mt-4">
       <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Requirements / Special Instructions</label>
-      <textarea name="requirements_text" rows="3"
+      <textarea name="requirements_text" rows="2"
         class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
         placeholder="PPE requirements, site-specific rules, equipment needed..."><%= val('requirements_text') %></textarea>
     </div>
   </div>
 
-  <!-- Section 6: Notes -->
+  <!-- Section 8: BOOKING POOL + NOTES -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Notes</h2>
+    <h2 class="booking-form-section-header">BOOKING POOL & NOTES</h2>
+    <div class="flex items-center gap-2 mb-4">
+      <input type="checkbox" name="is_booking_pool" id="is_booking_pool" value="1" <%= checked('is_booking_pool') %>
+        class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+      <label for="is_booking_pool" class="text-sm text-gray-700 font-medium">Add to booking pool</label>
+      <span class="text-xs text-gray-400 ml-1">(Available for other planners to claim)</span>
+    </div>
     <div>
       <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Internal Notes</label>
       <textarea name="notes" rows="3"
@@ -253,9 +472,53 @@
   const endDate = document.querySelector('input[name="end_date"]');
   if (startDate && endDate) {
     startDate.addEventListener('change', function() {
-      if (!endDate.value) {
-        endDate.value = this.value;
-      }
+      if (!endDate.value) endDate.value = this.value;
     });
   }
+
+  // Requirements grid — add/remove rows
+  const reqTypes = <%- JSON.stringify(requirementTypes) %>;
+
+  // Categorize requirement types for totals
+  const peopleTypes = ['1x TC Crew','2x TC Crew','3x TC Crew','4x TC Crew','5x TC Crew','6x TC Crew','7x TC Crew','8x TC Crew','9x TC Crew','10x TC Crew','Hoist Operator','IP','TL 2x TC Crew','TL 3x TC Crew','TL 4x TC Crew','TL 5x TC Crew'];
+  const vehicleTypes = ['Pilot Vehicle','Pilot Vehicle Lead','Ute','VMS Ute','Water Cart','Truck'];
+  const equipmentTypes = ['Arrow Board','Portable Traffic Lights','VMS Board'];
+
+  // People count mapping: how many people per item type
+  const peopleCounts = {'1x TC Crew':1,'2x TC Crew':2,'3x TC Crew':3,'4x TC Crew':4,'5x TC Crew':5,'6x TC Crew':6,'7x TC Crew':7,'8x TC Crew':8,'9x TC Crew':9,'10x TC Crew':10,'Hoist Operator':1,'IP':1,'TL 2x TC Crew':3,'TL 3x TC Crew':4,'TL 4x TC Crew':5,'TL 5x TC Crew':6};
+
+  function createReqRow(type, qty) {
+    const tr = document.createElement('tr');
+    tr.className = 'req-row';
+    let opts = '<option value="">-- Select --</option>';
+    reqTypes.forEach(rt => { opts += '<option value="' + rt + '"' + (rt === type ? ' selected' : '') + '>' + rt + '</option>'; });
+    tr.innerHTML = '<td class="pr-2 pb-2"><select name="req_resource_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" onchange="updateReqTotals()">' + opts + '</select></td>'
+      + '<td class="pr-2 pb-2"><input type="number" name="req_quantity" value="' + (qty||1) + '" min="1" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" oninput="updateReqTotals()"></td>'
+      + '<td class="pb-2 text-center"><button type="button" onclick="this.closest(\'tr\').remove(); updateReqTotals();" class="text-red-400 hover:text-red-600 transition p-1" title="Remove"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></td>';
+    return tr;
+  }
+
+  document.getElementById('add-req-row').addEventListener('click', function() {
+    document.getElementById('req-rows').appendChild(createReqRow('', 1));
+    updateReqTotals();
+  });
+
+  // Attach onchange/oninput to existing rows
+  document.querySelectorAll('#req-rows select[name="req_resource_type"]').forEach(s => s.addEventListener('change', updateReqTotals));
+  document.querySelectorAll('#req-rows input[name="req_quantity"]').forEach(s => s.addEventListener('input', updateReqTotals));
+
+  function updateReqTotals() {
+    let people = 0, vehicles = 0, equipment = 0;
+    document.querySelectorAll('.req-row').forEach(row => {
+      const type = row.querySelector('select[name="req_resource_type"]').value;
+      const qty = parseInt(row.querySelector('input[name="req_quantity"]').value) || 0;
+      if (peopleTypes.includes(type)) people += (peopleCounts[type] || 1) * qty;
+      else if (vehicleTypes.includes(type)) vehicles += qty;
+      else if (equipmentTypes.includes(type)) equipment += qty;
+    });
+    document.getElementById('total-people').textContent = people;
+    document.getElementById('total-vehicles').textContent = vehicles;
+    document.getElementById('total-equipment').textContent = equipment;
+  }
+  updateReqTotals();
 </script>

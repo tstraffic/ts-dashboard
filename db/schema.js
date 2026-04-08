@@ -4442,6 +4442,38 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 92: Booking form Phase 2 — new columns
+  // =============================================
+  if (!isMigrationApplied.get(92)) {
+    console.log('Running migration 92: Booking form Phase 2 columns');
+    const newBookingCols = [
+      "ALTER TABLE bookings ADD COLUMN site_contacts TEXT DEFAULT '[]'",
+      "ALTER TABLE bookings ADD COLUMN depot_meeting_time TEXT DEFAULT ''",
+      "ALTER TABLE bookings ADD COLUMN straight_to_site_time TEXT DEFAULT ''",
+      "ALTER TABLE bookings ADD COLUMN booking_tags TEXT DEFAULT '[]'",
+      "ALTER TABLE bookings ADD COLUMN latitude REAL",
+      "ALTER TABLE bookings ADD COLUMN longitude REAL",
+      "ALTER TABLE bookings ADD COLUMN marker_is_accurate INTEGER DEFAULT 0",
+      "ALTER TABLE bookings ADD COLUMN location_notes TEXT DEFAULT ''",
+      "ALTER TABLE bookings ADD COLUMN worksite_location TEXT DEFAULT ''",
+      "ALTER TABLE bookings ADD COLUMN works_direction TEXT DEFAULT ''",
+      "ALTER TABLE bookings ADD COLUMN chainage_from TEXT DEFAULT ''",
+      "ALTER TABLE bookings ADD COLUMN chainage_to TEXT DEFAULT ''",
+      "ALTER TABLE bookings ADD COLUMN has_mobile_works INTEGER DEFAULT 0",
+      "ALTER TABLE bookings ADD COLUMN booking_type TEXT DEFAULT 'regular'",
+      "ALTER TABLE bookings ADD COLUMN is_booking_pool INTEGER DEFAULT 0",
+      "ALTER TABLE bookings ADD COLUMN requester_id INTEGER",
+      "ALTER TABLE bookings ADD COLUMN planner_id INTEGER",
+      "ALTER TABLE bookings ADD COLUMN location_context TEXT DEFAULT ''",
+    ];
+    for (const sql of newBookingCols) {
+      try { db.exec(sql); } catch (e) { /* column likely already exists */ }
+    }
+    recordMigration.run(92, 'Booking form Phase 2 — 18 new columns');
+    console.log('Migration 92: 18 new booking columns added');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
