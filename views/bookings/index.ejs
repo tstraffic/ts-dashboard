@@ -250,122 +250,128 @@
         </button>
       </div>
 
-      <!-- Compact header: status + ID -->
       <%
-        const statusLabels = { client_booking: 'Client Bk.', unconfirmed: 'Unconfirmed', confirmed: 'Confirmed', locked: 'Locked', conflict: 'Conflict', green_to_go: 'Green To Go', in_progress: 'In Progress', complete: 'Complete', finalised: 'Finalised', cancelled: 'Cancelled', late_cancellation: 'Late Cancellation', on_hold: 'On Hold' };
+        const statusLabels = { client_booking: 'Client Bk.', unconfirmed: 'Unconfirmed', confirmed: 'Confirmed', locked: 'Locked', conflict: 'Conflict', green_to_go: 'Green To Go', in_progress: 'In Progress', complete: 'Complete', finalised: 'Finalised', cancelled: 'Cancelled', late_cancellation: 'Late Cancel', on_hold: 'On Hold' };
       %>
-      <div class="booking-card-header status-<%= booking.status %>">
-        <span class="booking-status-label"><%= statusLabels[booking.status] || booking.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) %></span>
-        <span class="booking-id"><%= booking.bookingNumber || '#' + booking.id %></span>
-      </div>
 
-      <!-- Card body — clean and scannable -->
+      <!-- Card body -->
       <div class="booking-card-body" onclick="openBookingDetail(<%= booking.id %>)">
-        <div class="booking-title-row">
-          <span class="booking-project-title"><%= booking.project.name %></span>
+        <!-- Top row: status pill + booking ID -->
+        <div class="bc-top-row">
+          <span class="bc-status-pill status-<%= booking.status %>"><%= statusLabels[booking.status] || booking.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) %></span>
+          <span class="bc-id"><%= booking.bookingNumber || '#' + booking.id %></span>
         </div>
 
-        <div class="booking-info-grid">
-          <div class="booking-info-item">
-            <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <span><%= startStr %> &ndash; <%= endStr %></span>
-          </div>
-          <div class="booking-info-item">
-            <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-            <span><%= booking.project.client %></span>
-          </div>
-          <div class="booking-info-item">
-            <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            <span><%= booking.project.address %></span>
-          </div>
+        <!-- Project title -->
+        <div class="bc-title"><%= booking.project.name %></div>
+
+        <!-- Time -->
+        <div class="bc-meta">
+          <svg class="bc-meta-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span><%= startStr %> &ndash; <%= endStr %></span>
         </div>
 
-        <!-- Vehicle plates (if any) -->
-        <% if (booking.vehicles.length > 0) { %>
-        <div class="booking-vehicles-list">
-          <% booking.vehicles.forEach(function(v) { %>
-          <div class="vehicle-plate-row">
-            <svg class="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
-            <span class="vehicle-plate-text"><%= v.registration ? v.registration.toUpperCase() : '' %> <%= v.name %></span>
-          </div>
-          <% }) %>
+        <!-- Client -->
+        <% if (booking.project.client) { %>
+        <div class="bc-meta">
+          <svg class="bc-meta-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+          <span><%= booking.project.client %></span>
         </div>
         <% } %>
 
-        <!-- Site contact (client supervisor) — shown in info grid like Traffio -->
+        <!-- Address -->
+        <% if (booking.project.address) { %>
+        <div class="bc-meta">
+          <svg class="bc-meta-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          <span><%= booking.project.address %></span>
+        </div>
+        <% } %>
+
+        <!-- Site contact -->
         <% if (booking.supervisor) { %>
-        <div class="booking-info-item">
-          <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        <div class="bc-meta">
+          <svg class="bc-meta-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
           <span><%= booking.supervisor %></span>
         </div>
         <% } %>
 
-        <!-- Crew list — Traffio style: role prefix + name + confirmation dot -->
-        <div class="booking-crew-list">
-          <% booking.personnel.forEach(function(p) { %>
-          <div class="crew-member-row">
-            <% const roleLabel = p.role === 'traffic_controller' ? 'TC' : (p.role === 'leading_hand' ? 'TL' : (p.role === 'pilot_vehicle' ? 'PV' : '')); %>
-            <% if (roleLabel) { %><span class="crew-role-prefix <%= roleLabel.toLowerCase() %>"><%= roleLabel %></span><% } %>
-            <span class="crew-name"><%= p.name %></span>
-            <% if (p.confirmed) { %>
-              <span class="crew-confirm-dot confirmed" title="Confirmed"></span>
-            <% } else { %>
-              <span class="crew-confirm-dot pending" title="Pending"></span>
-            <% } %>
-          </div>
+        <!-- Vehicles -->
+        <% if (booking.vehicles.length > 0) { %>
+        <div class="bc-vehicles">
+          <% booking.vehicles.forEach(function(v) { %>
+          <span class="bc-vehicle-tag">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+            <%= v.registration ? v.registration.toUpperCase() : v.name %>
+          </span>
           <% }) %>
-        </div>
-
-        <!-- Still required — unfilled resource requirements -->
-        <% if (booking.stillRequired && booking.stillRequired.length > 0) { %>
-        <div class="booking-still-required">
-          <span class="still-required-label">Still required:</span>
-          <% booking.stillRequired.forEach(function(req) { %>
-          <span class="still-required-item"><%= req %></span>
-          <% }) %>
-        </div>
-        <% } %>
-
-        <!-- Qualification warnings -->
-        <% const allWarnings = booking.personnel.filter(p => p.warnings && p.warnings.length > 0); %>
-        <% if (allWarnings.length > 0) { %>
-        <div class="booking-warnings">
-          <% allWarnings.forEach(function(p) { p.warnings.forEach(function(w) { %>
-          <div class="booking-warning-badge">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-            <%= w %>
-          </div>
-          <% }) }) %>
-        </div>
-        <% } %>
-
-        <% if (booking.scheduleWarning) { %>
-        <div class="booking-schedule-warning-inline">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg>
-          <%= booking.scheduleWarning %>
         </div>
         <% } %>
       </div>
 
-      <!-- Compact footer — single row with counts -->
-      <div class="booking-card-footer-compact">
-        <span class="footer-badge<%= booking.dockets > 0 ? ' has-count' : '' %>">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          <%= booking.dockets %>
-        </span>
-        <span class="footer-badge<%= booking.notes > 0 ? ' has-count' : '' %>">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-          <%= booking.notes %>
-        </span>
-        <span class="footer-badge<%= booking.tasks > 0 ? ' has-count' : '' %>">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-          <%= booking.tasks %>
-        </span>
-        <span class="footer-badge<%= booking.docs > 0 ? ' has-count' : '' %>">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
-          <%= booking.docs %>
-        </span>
-        <span class="depot-tag"><%= booking.depot %></span>
+      <!-- Crew section -->
+      <% if (booking.personnel.length > 0) { %>
+      <div class="bc-crew-section">
+        <div class="bc-crew-header">
+          <span class="bc-crew-label">Crew</span>
+          <span class="bc-crew-count <%= confirmedCount === totalPeople ? 'all-good' : '' %>"><%= confirmedCount %>/<%= totalPeople %></span>
+        </div>
+        <div class="bc-crew-list">
+          <% booking.personnel.forEach(function(p) { %>
+          <div class="bc-crew-row">
+            <% const roleLabel = p.role === 'traffic_controller' ? 'TC' : (p.role === 'leading_hand' ? 'TL' : (p.role === 'pilot_vehicle' ? 'PV' : '')); %>
+            <% if (roleLabel) { %><span class="bc-crew-role <%= roleLabel.toLowerCase() %>"><%= roleLabel %></span><% } %>
+            <span class="bc-crew-name"><%= p.name %></span>
+            <span class="bc-crew-dot <%= p.confirmed ? 'confirmed' : 'pending' %>"></span>
+          </div>
+          <% }) %>
+        </div>
+      </div>
+      <% } %>
+
+      <!-- Alerts: still required + warnings -->
+      <% if ((booking.stillRequired && booking.stillRequired.length > 0) || (booking.personnel.filter(p => p.warnings && p.warnings.length > 0).length > 0) || booking.scheduleWarning) { %>
+      <div class="bc-alerts">
+        <% if (booking.stillRequired && booking.stillRequired.length > 0) { %>
+        <div class="bc-alert-row bc-alert-required">
+          <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+          <span>Need: <% booking.stillRequired.forEach(function(req, i) { %><%= i > 0 ? ', ' : '' %><%= req %><% }) %></span>
+        </div>
+        <% } %>
+        <% const allWarnings = booking.personnel.filter(p => p.warnings && p.warnings.length > 0); %>
+        <% if (allWarnings.length > 0) { %>
+        <% allWarnings.forEach(function(p) { p.warnings.forEach(function(w) { %>
+        <div class="bc-alert-row bc-alert-warn">
+          <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+          <span><%= w %></span>
+        </div>
+        <% }) }) %>
+        <% } %>
+        <% if (booking.scheduleWarning) { %>
+        <div class="bc-alert-row bc-alert-warn">
+          <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg>
+          <span><%= booking.scheduleWarning %></span>
+        </div>
+        <% } %>
+      </div>
+      <% } %>
+
+      <!-- Footer -->
+      <div class="bc-footer">
+        <div class="bc-footer-badges">
+          <span class="bc-badge<%= booking.dockets > 0 ? ' active' : '' %>" title="Dockets">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <%= booking.dockets %>
+          </span>
+          <span class="bc-badge<%= booking.notes > 0 ? ' active' : '' %>" title="Notes">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+            <%= booking.notes %>
+          </span>
+          <span class="bc-badge<%= booking.tasks > 0 ? ' active' : '' %>" title="Tasks">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            <%= booking.tasks %>
+          </span>
+        </div>
+        <span class="bc-depot"><%= booking.depot %></span>
       </div>
     </div>
     <% }) %>
