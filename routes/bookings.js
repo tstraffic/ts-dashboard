@@ -212,7 +212,7 @@ router.get('/', (req, res) => {
   let clients = []; try { clients = db.prepare("SELECT id, company_name FROM clients ORDER BY company_name").all(); } catch (e) {}
   let supervisors = []; try { supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
   let contacts = []; try { contacts = db.prepare("SELECT id, full_name, company_id FROM client_contacts ORDER BY full_name").all(); } catch (e) {}
-  let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
+  let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name, role FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
 
   res.render('bookings/index', { title: 'Bookings Board', bookings, stats, depots: DEPOTS, currentView: view, currentDate: dateStr, currentDepot: depot, currentStatus: status, currentSearch: search, currentDeleted: deletedFilter, user: req.session.user, jobs, clients, supervisors, contacts, crewForSelect });
 });
@@ -225,7 +225,7 @@ router.get('/new', (req, res) => {
     let clients = []; try { clients = db.prepare("SELECT id, company_name FROM clients ORDER BY company_name").all(); } catch (e) {}
     let supervisors = []; try { supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
     let contacts = []; try { contacts = db.prepare("SELECT id, full_name, company_id FROM client_contacts ORDER BY full_name").all(); } catch (e) {}
-    let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
+    let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name, role FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
     res.render('bookings/form', { title: 'New Booking', booking: null, jobs, clients, supervisors, contacts, crewForSelect, depots: DEPOTS, user: req.session.user });
   } catch (err) {
     console.error('Bookings /new error:', err);
@@ -267,6 +267,16 @@ router.post('/', (req, res) => {
       insertReq.run(bookingId, reqTypes[i], parseInt(reqQtys[i]));
     }
   }
+
+  // Assign crew from form crew selector
+  const crewIds = Array.isArray(b.crew_ids) ? b.crew_ids : (b.crew_ids ? [b.crew_ids] : []);
+  const insertCrew = db.prepare("INSERT OR IGNORE INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'unconfirmed')");
+  crewIds.forEach(cid => {
+    if (cid) {
+      const member = db.prepare("SELECT role FROM crew_members WHERE id = ?").get(cid);
+      insertCrew.run(bookingId, cid, member ? member.role : '');
+    }
+  });
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'booking', entityId: bookingId, details: `Created booking ${bookingNumber}`, req });
   req.flash('success', `Booking ${bookingNumber} created.`);
@@ -375,7 +385,7 @@ router.get('/:id/edit', (req, res) => {
   let clients = []; try { clients = db.prepare("SELECT id, company_name FROM clients ORDER BY company_name").all(); } catch (e) {}
   const supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all();
   let contacts = []; try { contacts = db.prepare("SELECT id, full_name, company_id FROM client_contacts ORDER BY full_name").all(); } catch (e) {}
-  let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
+  let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name, role FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
   res.render('bookings/form', { title: 'Edit Booking ' + booking.booking_number, booking, jobs, clients, supervisors, contacts, crewForSelect, depots: DEPOTS, user: req.session.user });
 });
 
@@ -408,6 +418,19 @@ router.post('/:id', (req, res) => {
     if (reqTypes[i] && reqQtys[i] && parseInt(reqQtys[i]) > 0) {
       insertReq.run(req.params.id, reqTypes[i], parseInt(reqQtys[i]));
     }
+  }
+
+  // Update crew assignments if crew_ids provided
+  const crewIds = Array.isArray(b.crew_ids) ? b.crew_ids : (b.crew_ids ? [b.crew_ids] : []);
+  if (crewIds.length > 0) {
+    db.prepare("DELETE FROM booking_crew WHERE booking_id = ?").run(req.params.id);
+    const insertCrew = db.prepare("INSERT OR IGNORE INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'unconfirmed')");
+    crewIds.forEach(cid => {
+      if (cid) {
+        const member = db.prepare("SELECT role FROM crew_members WHERE id = ?").get(cid);
+        insertCrew.run(req.params.id, cid, member ? member.role : '');
+      }
+    });
   }
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'booking', entityId: req.params.id, details: `Updated booking ${existing.booking_number}`, req });
