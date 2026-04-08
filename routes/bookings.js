@@ -94,7 +94,8 @@ function transformBooking(db, row) {
     dockets: db.prepare("SELECT COUNT(*) as c FROM booking_dockets WHERE booking_id = ?").get(row.id).c,
     notes: noteCount, tasks: 0,
     docs: (() => { try { return db.prepare("SELECT COUNT(*) as c FROM booking_documents WHERE booking_id = ?").get(row.id).c; } catch(e) { return 0; } })(),
-    bookingNumber: row.booking_number || '',
+    bookingNumber: row.booking_number || '', suburb: row.suburb || '',
+    latitude: row.latitude || null, longitude: row.longitude || null,
     stillRequired: (() => {
       try {
         const reqs = db.prepare("SELECT resource_type, quantity_required FROM booking_requirements WHERE booking_id = ?").all(row.id);
@@ -157,24 +158,33 @@ router.get('/', (req, res) => {
   const dateStr = req.query.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
   const depot = req.query.depot || '', status = req.query.status || '', search = req.query.search || '';
 
-  // Calendar view: load whole month. Board/List: load single day.
+  // Load bookings based on view type
   let where;
   const params = [];
+  const deletedFilter = req.query.deleted || 'hide';
   if (view === 'calendar') {
     const d = new Date(dateStr + 'T00:00:00');
     const firstOfMonth = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
     const lastOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
     where = "WHERE DATE(b.start_datetime) BETWEEN ? AND ?";
     params.push(firstOfMonth, lastOfMonth);
+  } else if (view === 'archive') {
+    where = "WHERE b.status IN ('complete','finalised','cancelled','late_cancellation')";
+  } else if (view === 'requests') {
+    where = "WHERE b.status = 'client_booking'";
+  } else if (view === 'map') {
+    where = "WHERE DATE(b.start_datetime) = ?";
+    params.push(dateStr);
   } else {
     where = "WHERE DATE(b.start_datetime) = ?";
     params.push(dateStr);
   }
   if (depot) { where += " AND b.depot = ?"; params.push(depot); }
-  if (status) { where += " AND b.status = ?"; params.push(status); }
+  if (status && view !== 'requests') { where += " AND b.status = ?"; params.push(status); }
   if (search) { where += " AND (b.title LIKE ? OR b.booking_number LIKE ? OR b.site_address LIKE ? OR b.suburb LIKE ?)"; const s = '%' + search + '%'; params.push(s, s, s, s); }
 
-  const rows = db.prepare(`SELECT b.* FROM bookings b ${where} ORDER BY b.start_datetime ASC`).all(...params);
+  const orderDir = (view === 'archive') ? 'DESC' : 'ASC';
+  const rows = db.prepare(`SELECT b.* FROM bookings b ${where} ORDER BY b.start_datetime ${orderDir} LIMIT ${view === 'archive' ? 200 : 500}`).all(...params);
   const bookings = rows.map(r => transformBooking(db, r));
   const allForDate = db.prepare("SELECT status FROM bookings WHERE DATE(start_datetime) = ?").all(dateStr);
   const stats = {
