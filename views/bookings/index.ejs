@@ -18,6 +18,10 @@
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
     Map
   </a>
+  <a href="/bookings?view=timeline" class="subnav-tab <%= currentView === 'timeline' ? 'active' : '' %>">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+    Timeline
+  </a>
   <a href="/bookings?view=archive" class="subnav-tab <%= currentView === 'archive' ? 'active' : '' %>">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
     Archive
@@ -891,6 +895,191 @@ function handleCalDrop(event, targetDate) {
     </div>
   <% } %>
 </div>
+
+<% } else if (currentView === 'timeline') { %>
+<!-- ============ TIMELINE / GANTT VIEW ============ -->
+<%
+  // Build crew timeline data from bookings
+  const tlStartHour = 5; // 5am
+  const tlEndHour = 21;  // 9pm
+  const tlSpan = tlEndHour - tlStartHour; // 16 hours
+
+  // Collect all crew from all bookings, group bookings by crew member
+  const crewTimeline = {};
+  const statusColors = {
+    client_booking: '#6B7280', unconfirmed: '#7C3AED', confirmed: '#D97706',
+    locked: '#6B7280', conflict: '#EF4444', green_to_go: '#16A34A',
+    in_progress: '#2563EB', complete: '#6B7280', finalised: '#4F46E5',
+    cancelled: '#9CA3AF', late_cancellation: '#B91C1C', on_hold: '#EAB308'
+  };
+  const statusLabelsT = {
+    client_booking: 'Client', unconfirmed: 'Unconfirmed', confirmed: 'Confirmed',
+    locked: 'Locked', conflict: 'Conflict', green_to_go: 'Green To Go',
+    in_progress: 'In Progress', complete: 'Complete', finalised: 'Finalised',
+    cancelled: 'Cancelled', late_cancellation: 'Late Cancel', on_hold: 'On Hold'
+  };
+
+  bookings.forEach(bk => {
+    bk.personnel.forEach(p => {
+      if (!crewTimeline[p.id]) {
+        crewTimeline[p.id] = { name: p.name, role: p.role, bookings: [] };
+      }
+      crewTimeline[p.id].bookings.push(bk);
+    });
+  });
+
+  // Also add unassigned bookings row
+  const unassignedBookings = bookings.filter(bk => bk.personnel.length === 0);
+
+  // Sort crew by name
+  const crewIds = Object.keys(crewTimeline).sort((a, b) =>
+    crewTimeline[a].name.localeCompare(crewTimeline[b].name)
+  );
+%>
+
+<div class="tl-container">
+  <!-- Timeline header with hour marks -->
+  <div class="tl-header">
+    <div class="tl-crew-label tl-corner">
+      <span class="tl-crew-count"><%= crewIds.length %> crew</span>
+    </div>
+    <div class="tl-hours">
+      <% for (let h = tlStartHour; h <= tlEndHour; h++) { %>
+        <div class="tl-hour-mark" style="left: <%= ((h - tlStartHour) / tlSpan) * 100 %>%">
+          <span><%= h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : (h - 12) + 'pm' %></span>
+        </div>
+      <% } %>
+      <!-- Current time marker -->
+      <div class="tl-now-line" id="tl-now-line"></div>
+    </div>
+  </div>
+
+  <!-- Timeline body -->
+  <div class="tl-body" id="tl-body">
+    <% if (crewIds.length === 0 && unassignedBookings.length === 0) { %>
+    <div class="tl-empty">
+      <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <p>No crew scheduled for this date</p>
+    </div>
+    <% } else { %>
+
+    <% crewIds.forEach(cid => {
+      const crew = crewTimeline[cid];
+      const initials = crew.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      const roleClass = (crew.role || '').toLowerCase().replace(/[^a-z]/g, '');
+    %>
+    <div class="tl-row">
+      <div class="tl-crew-label">
+        <div class="tl-avatar tl-avatar-<%= roleClass %>"><%= initials %></div>
+        <div class="tl-crew-info">
+          <span class="tl-crew-name"><%= crew.name %></span>
+          <span class="tl-crew-role"><%= (crew.role || '').replace(/_/g, ' ') %></span>
+        </div>
+      </div>
+      <div class="tl-bars">
+        <% crew.bookings.forEach(bk => {
+          const s = new Date(bk.startDateTime);
+          const e = new Date(bk.endDateTime);
+          const startMins = s.getHours() * 60 + s.getMinutes();
+          const endMins = e.getHours() * 60 + e.getMinutes();
+          const tlStartMins = tlStartHour * 60;
+          const tlEndMins = tlEndHour * 60;
+          const left = Math.max(0, ((startMins - tlStartMins) / (tlEndMins - tlStartMins)) * 100);
+          const right = Math.min(100, ((endMins - tlStartMins) / (tlEndMins - tlStartMins)) * 100);
+          const width = Math.max(2, right - left);
+          const barColor = statusColors[bk.status] || '#6B7280';
+          const label = (bk.bookingNumber || '#' + bk.id) + ' ' + (bk.project.name || '').substring(0, 25);
+          const startTime = String(s.getHours()).padStart(2,'0') + ':' + String(s.getMinutes()).padStart(2,'0');
+          const endTime = String(e.getHours()).padStart(2,'0') + ':' + String(e.getMinutes()).padStart(2,'0');
+          const tooltip = label + ' (' + startTime + '–' + endTime + ') ' + (statusLabelsT[bk.status] || bk.status);
+        %>
+        <div class="tl-bar status-bar-<%= bk.status %>"
+             style="left: <%= left %>%; width: <%= width %>%; background: <%= barColor %>;"
+             title="<%= tooltip %>"
+             onclick="openBookingDetail(<%= bk.id %>)"
+             data-booking-id="<%= bk.id %>">
+          <span class="tl-bar-label"><%= label %></span>
+        </div>
+        <% }); %>
+      </div>
+    </div>
+    <% }); %>
+
+    <% if (unassignedBookings.length > 0) { %>
+    <div class="tl-row tl-row-unassigned">
+      <div class="tl-crew-label">
+        <div class="tl-avatar tl-avatar-none">?</div>
+        <div class="tl-crew-info">
+          <span class="tl-crew-name">Unassigned</span>
+          <span class="tl-crew-role"><%= unassignedBookings.length %> booking<%= unassignedBookings.length > 1 ? 's' : '' %></span>
+        </div>
+      </div>
+      <div class="tl-bars">
+        <% unassignedBookings.forEach(bk => {
+          const s = new Date(bk.startDateTime);
+          const e = new Date(bk.endDateTime);
+          const startMins = s.getHours() * 60 + s.getMinutes();
+          const endMins = e.getHours() * 60 + e.getMinutes();
+          const tlStartMins = tlStartHour * 60;
+          const tlEndMins = tlEndHour * 60;
+          const left = Math.max(0, ((startMins - tlStartMins) / (tlEndMins - tlStartMins)) * 100);
+          const right = Math.min(100, ((endMins - tlStartMins) / (tlEndMins - tlStartMins)) * 100);
+          const width = Math.max(2, right - left);
+          const barColor = statusColors[bk.status] || '#6B7280';
+          const label = (bk.bookingNumber || '#' + bk.id) + ' ' + (bk.project.name || '').substring(0, 25);
+          const startTime = String(s.getHours()).padStart(2,'0') + ':' + String(s.getMinutes()).padStart(2,'0');
+          const endTime = String(e.getHours()).padStart(2,'0') + ':' + String(e.getMinutes()).padStart(2,'0');
+          const tooltip = label + ' (' + startTime + '–' + endTime + ') ' + (statusLabelsT[bk.status] || bk.status);
+        %>
+        <div class="tl-bar status-bar-<%= bk.status %>"
+             style="left: <%= left %>%; width: <%= width %>%; background: <%= barColor %>80;"
+             title="<%= tooltip %>"
+             onclick="openBookingDetail(<%= bk.id %>)"
+             data-booking-id="<%= bk.id %>">
+          <span class="tl-bar-label"><%= label %></span>
+        </div>
+        <% }); %>
+      </div>
+    </div>
+    <% } %>
+
+    <% } %>
+  </div>
+</div>
+
+<script>
+// Update current time marker
+(function updateTimelineCursor() {
+  const line = document.getElementById('tl-now-line');
+  if (!line) return;
+  const now = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const startMins = <%= tlStartHour %> * 60;
+  const endMins = <%= tlEndHour %> * 60;
+  if (mins >= startMins && mins <= endMins) {
+    const pct = ((mins - startMins) / (endMins - startMins)) * 100;
+    line.style.left = pct + '%';
+    line.style.display = 'block';
+  } else {
+    line.style.display = 'none';
+  }
+})();
+setInterval(function() {
+  const line = document.getElementById('tl-now-line');
+  if (!line) return;
+  const now = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const startMins = <%= tlStartHour %> * 60;
+  const endMins = <%= tlEndHour %> * 60;
+  if (mins >= startMins && mins <= endMins) {
+    const pct = ((mins - startMins) / (endMins - startMins)) * 100;
+    line.style.left = pct + '%';
+    line.style.display = 'block';
+  } else {
+    line.style.display = 'none';
+  }
+}, 60000);
+</script>
 
 <% } else { %>
 <!-- Other views placeholder -->
