@@ -1356,12 +1356,19 @@ canvas {
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
-.booking-card-header.status-completed { background: #7C3AED; }
+/* Traffio status colours */
+.booking-card-header.status-client_booking { background: #6B7280; }
+.booking-card-header.status-unconfirmed { background: #7C3AED; }
+.booking-card-header.status-confirmed { background: #D97706; }
+.booking-card-header.status-locked { background: #475569; }
+.booking-card-header.status-conflict { background: #DC2626; }
 .booking-card-header.status-green_to_go { background: #16A34A; }
-.booking-card-header.status-confirmed { background: #2563EB; }
-.booking-card-header.status-in_progress { background: #D97706; }
-.booking-card-header.status-unconfirmed { background: #9333EA; }
-.booking-card-header.status-cancelled { background: #6B7280; }
+.booking-card-header.status-in_progress { background: #2563EB; }
+.booking-card-header.status-complete { background: #6B7280; }
+.booking-card-header.status-finalised { background: #4F46E5; }
+.booking-card-header.status-cancelled { background: #9CA3AF; }
+.booking-card-header.status-late_cancellation { background: #B91C1C; }
+.booking-card-header.status-on_hold { background: #D97706; }
 .booking-status-label { flex: 1; }
 .booking-id { font-weight: 700; font-size: 12px; letter-spacing: 0; text-transform: none; }
 
@@ -1689,12 +1696,17 @@ canvas {
   height: 32px;
   border-radius: 99px;
 }
-.list-status-bar.status-completed { background: #7C3AED; }
-.list-status-bar.status-green_to_go { background: #16A34A; }
-.list-status-bar.status-confirmed { background: #2563EB; }
-.list-status-bar.status-in_progress { background: #D97706; }
+.list-status-bar.status-client_booking { background: #6B7280; }
 .list-status-bar.status-unconfirmed { background: #7C3AED; }
-.list-status-bar.status-cancelled { background: #DC2626; }
+.list-status-bar.status-confirmed { background: #D97706; }
+.list-status-bar.status-locked { background: #475569; }
+.list-status-bar.status-conflict { background: #DC2626; }
+.list-status-bar.status-green_to_go { background: #16A34A; }
+.list-status-bar.status-in_progress { background: #2563EB; }
+.list-status-bar.status-complete { background: #6B7280; }
+.list-status-bar.status-finalised { background: #4F46E5; }
+.list-status-bar.status-cancelled { background: #9CA3AF; }
+.list-status-bar.status-late_cancellation { background: #B91C1C; }
 .list-status-badge {
   display: inline-flex;
   padding: 3px 10px;
@@ -1703,12 +1715,17 @@ canvas {
   border-radius: 99px;
   white-space: nowrap;
 }
-.list-status-badge.status-completed { background: #F3E8FF; color: #7C3AED; }
+.list-status-badge.status-client_booking { background: #F3F4F6; color: #6B7280; }
+.list-status-badge.status-unconfirmed { background: #F3E8FF; color: #7C3AED; }
+.list-status-badge.status-confirmed { background: #FEF3C7; color: #D97706; }
+.list-status-badge.status-locked { background: #F1F5F9; color: #475569; }
+.list-status-badge.status-conflict { background: #FEF2F2; color: #DC2626; }
 .list-status-badge.status-green_to_go { background: #F0FDF4; color: #16A34A; }
-.list-status-badge.status-confirmed { background: #EFF6FF; color: #2563EB; }
-.list-status-badge.status-in_progress { background: #FEF3C7; color: #D97706; }
-.list-status-badge.status-unconfirmed { background: #FEF2F2; color: #DC2626; }
-.list-status-badge.status-cancelled { background: #F3F4F6; color: #6B7280; }
+.list-status-badge.status-in_progress { background: #EFF6FF; color: #2563EB; }
+.list-status-badge.status-complete { background: #F3F4F6; color: #6B7280; }
+.list-status-badge.status-finalised { background: #EEF2FF; color: #4F46E5; }
+.list-status-badge.status-cancelled { background: #F3F4F6; color: #9CA3AF; }
+.list-status-badge.status-late_cancellation { background: #FEF2F2; color: #B91C1C; }
 
 /* --- Pagination --- */
 .bookings-pagination {
@@ -1985,12 +2002,17 @@ canvas {
   font-weight: 600;
   border-radius: 99px;
 }
-.booking-status-pill.status-completed { background: #F3E8FF; color: #7C3AED; }
+.booking-status-pill.status-client_booking { background: #F3F4F6; color: #6B7280; }
+.booking-status-pill.status-unconfirmed { background: #F3E8FF; color: #7C3AED; }
+.booking-status-pill.status-confirmed { background: #FEF3C7; color: #D97706; }
+.booking-status-pill.status-locked { background: #F1F5F9; color: #475569; }
+.booking-status-pill.status-conflict { background: #FEF2F2; color: #DC2626; }
 .booking-status-pill.status-green_to_go { background: #F0FDF4; color: #16A34A; }
-.booking-status-pill.status-confirmed { background: #EFF6FF; color: #2563EB; }
-.booking-status-pill.status-in_progress { background: #FEF3C7; color: #D97706; }
-.booking-status-pill.status-unconfirmed { background: #FEF2F2; color: #DC2626; }
-.booking-status-pill.status-cancelled { background: #F3F4F6; color: #6B7280; }
+.booking-status-pill.status-in_progress { background: #EFF6FF; color: #2563EB; }
+.booking-status-pill.status-complete { background: #F3F4F6; color: #6B7280; }
+.booking-status-pill.status-finalised { background: #EEF2FF; color: #4F46E5; }
+.booking-status-pill.status-cancelled { background: #F3F4F6; color: #9CA3AF; }
+.booking-status-pill.status-late_cancellation { background: #FEF2F2; color: #B91C1C; }
 
 /* --- Mobile responsive --- */
 @media (max-width: 767px) {
@@ -2602,6 +2624,38 @@ canvas {
 .dark-glass .crew-role-prefix.pv { color: #34d399; }
 .dark-glass .crew-confirm-dot.pending { border-color: #475569; }
 
+/* Still required — unfilled resource requirements */
+.booking-still-required {
+  margin-top: 0.375rem;
+  padding: 0.3rem 0.4rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.625rem;
+}
+.still-required-label {
+  color: #dc2626;
+  font-weight: 600;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.still-required-item {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.2rem;
+  font-weight: 500;
+  font-size: 0.6rem;
+}
+.dark-glass .booking-still-required { background: rgba(220,38,38,0.1); border-color: rgba(220,38,38,0.2); }
+.dark-glass .still-required-label { color: #f87171; }
+.dark-glass .still-required-item { background: rgba(220,38,38,0.15); color: #fca5a5; }
+
 /* Vehicle plates on card */
 .booking-vehicles-list {
   margin-top: 0.375rem;
@@ -2639,24 +2693,30 @@ canvas {
   color: #f87171;
 }
 
-/* Enhanced status header colors */
+/* Enhanced status header colors — Traffio lifecycle */
 .booking-card-header.status-green_to_go {
   background: linear-gradient(135deg, #059669, #10b981) !important;
 }
 .booking-card-header.status-confirmed {
-  background: linear-gradient(135deg, #1d4ed8, #3b82f6) !important;
+  background: linear-gradient(135deg, #b45309, #d97706) !important;
 }
 .booking-card-header.status-unconfirmed {
-  background: linear-gradient(135deg, #475569, #64748b) !important;
+  background: linear-gradient(135deg, #6d28d9, #7c3aed) !important;
 }
 .booking-card-header.status-in_progress {
   background: linear-gradient(135deg, #1e40af, #2563eb) !important;
 }
-.booking-card-header.status-on_hold {
-  background: linear-gradient(135deg, #b45309, #f59e0b) !important;
+.booking-card-header.status-conflict {
+  background: linear-gradient(135deg, #991b1b, #dc2626) !important;
+}
+.booking-card-header.status-finalised {
+  background: linear-gradient(135deg, #3730a3, #4f46e5) !important;
+}
+.booking-card-header.status-late_cancellation {
+  background: linear-gradient(135deg, #7f1d1d, #b91c1c) !important;
 }
 .booking-card-header.status-cancelled {
-  background: linear-gradient(135deg, #991b1b, #dc2626) !important;
+  background: #9CA3AF !important;
   opacity: 0.7;
 }
 

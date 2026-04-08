@@ -6,12 +6,17 @@
   const timeOpts = { hour: '2-digit', minute: '2-digit', hour12: true };
   const dateOpts = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
   const statusColors = {
-    unconfirmed: 'bg-red-50 text-red-700 ring-1 ring-red-600/20',
-    confirmed: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    client_booking: 'bg-gray-100 text-gray-600 ring-1 ring-gray-300',
+    unconfirmed: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
+    confirmed: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
+    locked: 'bg-gray-100 text-gray-600 ring-1 ring-gray-400',
+    conflict: 'bg-red-50 text-red-700 ring-1 ring-red-600/20',
     green_to_go: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
-    in_progress: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
-    completed: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
+    in_progress: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+    complete: 'bg-gray-100 text-gray-600 ring-1 ring-gray-300',
+    finalised: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20',
     cancelled: 'bg-gray-100 text-gray-500',
+    late_cancellation: 'bg-red-50 text-red-700 ring-1 ring-red-600/20',
     on_hold: 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-600/20',
   };
   const confirmedCount = b.personnel ? b.personnel.filter(p => p.confirmed).length : 0;
@@ -59,7 +64,7 @@
     <form method="POST" action="/bookings/<%= b.id %>/status" class="flex-shrink-0">
       <%- include('../partials/csrf') %>
       <select name="status" onchange="this.form.submit()" class="text-sm font-medium rounded-lg px-3 py-2 border border-gray-300 bg-white text-gray-700 focus:ring-2 focus:ring-brand-500 cursor-pointer">
-        <% ['unconfirmed','confirmed','green_to_go','in_progress','completed','cancelled','on_hold'].forEach(s => { %>
+        <% ['client_booking','unconfirmed','confirmed','locked','conflict','green_to_go','in_progress','complete','finalised','cancelled','late_cancellation','on_hold'].forEach(s => { %>
           <option value="<%= s %>" <%= b.status === s ? 'selected' : '' %>><%= s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) %></option>
         <% }); %>
       </select>
@@ -69,14 +74,14 @@
   <!-- Status Flow Bar -->
   <%
     const flowSteps = [
-      { key: 'unconfirmed', label: 'Unconfirmed' },
+      { key: 'unconfirmed', label: 'Unconf.' },
       { key: 'confirmed', label: 'Confirmed' },
       { key: 'green_to_go', label: 'GTG' },
-      { key: 'in_progress', label: 'In Progress' },
-      { key: 'completed', label: 'Complete' },
+      { key: 'complete', label: 'Complete' },
+      { key: 'finalised', label: 'Finalised' },
     ];
     const currentIdx = flowSteps.findIndex(s => s.key === b.status);
-    const isCancelled = b.status === 'cancelled' || b.status === 'on_hold';
+    const isCancelled = b.status === 'cancelled' || b.status === 'late_cancellation' || b.status === 'on_hold' || b.status === 'conflict' || b.status === 'locked';
   %>
   <div class="flex gap-1.5 mt-4 overflow-x-auto pb-1">
     <% flowSteps.forEach((step, i) => { %>

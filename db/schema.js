@@ -4265,6 +4265,42 @@ function runMigrations(db) {
     console.log(`Migration 88 complete. ${m1.changes} approved→submitted, ${m2.changes} rejected→not_started.`);
   }
 
+  // Migration 89: Expand booking statuses to match Traffio lifecycle
+  // Add: client_booking, locked, conflict, finalised, late_cancellation
+  // SQLite doesn't support ALTER CHECK, so we recreate the table
+  if (!isMigrationApplied.get(89)) {
+    console.log('Running migration 89: Expand booking statuses (Traffio lifecycle)');
+    try {
+      const ddlRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='bookings'").get();
+      if (ddlRow) {
+        const cols = db.prepare("PRAGMA table_info(bookings)").all().map(c => c.name);
+        const colList = cols.join(', ');
+        db.exec('ALTER TABLE bookings RENAME TO _bookings_backup_89');
+        // Recreate with expanded status enum
+        let newDDL = ddlRow.sql.replace('bookings', '_bookings_new_89');
+        newDDL = newDDL.replace(
+          /CHECK\s*\(\s*status\s+IN\s*\([^)]+\)\s*\)/i,
+          "CHECK(status IN ('client_booking','unconfirmed','confirmed','locked','conflict','green_to_go','in_progress','complete','finalised','cancelled','late_cancellation','on_hold'))"
+        );
+        db.exec(newDDL);
+        db.exec(`INSERT INTO _bookings_new_89 (${colList}) SELECT ${colList} FROM _bookings_backup_89`);
+        db.exec('ALTER TABLE _bookings_new_89 RENAME TO bookings');
+        db.exec('DROP TABLE _bookings_backup_89');
+        // Migrate old status names
+        db.prepare("UPDATE bookings SET status = 'complete' WHERE status = 'completed'").run();
+        // Re-create indexes
+        db.exec("CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(start_datetime)");
+        db.exec("CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status)");
+        db.exec("CREATE INDEX IF NOT EXISTS idx_bookings_depot ON bookings(depot)");
+        db.exec("CREATE INDEX IF NOT EXISTS idx_bookings_job ON bookings(job_id)");
+      }
+      recordMigration.run(89, 'Expand booking statuses: add client_booking, locked, conflict, finalised, late_cancellation; rename completed→complete');
+      console.log('Migration 89 complete: Booking statuses expanded to Traffio lifecycle.');
+    } catch (e) {
+      console.error('Migration 89 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

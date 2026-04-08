@@ -52,31 +52,35 @@
   </div>
 </div>
 
-<!-- Status summary pills -->
+<!-- Status summary pills — Traffio lifecycle -->
 <div class="bookings-status-bar">
   <a href="/bookings" class="status-pill <%= !currentStatus ? 'active' : '' %>">
     <span class="status-dot" style="background:#6B7280"></span>
     All <strong><%= stats.total %></strong>
   </a>
   <a href="/bookings?status=green_to_go" class="status-pill <%= currentStatus === 'green_to_go' ? 'active' : '' %>">
-    <span class="status-dot" style="background:#22C55E"></span>
+    <span class="status-dot" style="background:#16A34A"></span>
     Green to Go <strong><%= stats.greenToGo %></strong>
   </a>
   <a href="/bookings?status=confirmed" class="status-pill <%= currentStatus === 'confirmed' ? 'active' : '' %>">
-    <span class="status-dot" style="background:#3B82F6"></span>
+    <span class="status-dot" style="background:#D97706"></span>
     Confirmed <strong><%= stats.confirmed %></strong>
   </a>
   <a href="/bookings?status=in_progress" class="status-pill <%= currentStatus === 'in_progress' ? 'active' : '' %>">
-    <span class="status-dot" style="background:#F59E0B"></span>
+    <span class="status-dot" style="background:#2563EB"></span>
     In Progress <strong><%= stats.inProgress %></strong>
   </a>
-  <a href="/bookings?status=completed" class="status-pill <%= currentStatus === 'completed' ? 'active' : '' %>">
-    <span class="status-dot" style="background:#8B5CF6"></span>
-    Completed <strong><%= stats.completed %></strong>
+  <a href="/bookings?status=complete" class="status-pill <%= currentStatus === 'complete' ? 'active' : '' %>">
+    <span class="status-dot" style="background:#6B7280"></span>
+    Completed <strong><%= stats.complete %></strong>
   </a>
   <a href="/bookings?status=unconfirmed" class="status-pill <%= currentStatus === 'unconfirmed' ? 'active' : '' %>">
-    <span class="status-dot" style="background:#EF4444"></span>
+    <span class="status-dot" style="background:#7C3AED"></span>
     Unconfirmed <strong><%= stats.unconfirmed %></strong>
+  </a>
+  <a href="/bookings?status=finalised" class="status-pill <%= currentStatus === 'finalised' ? 'active' : '' %>">
+    <span class="status-dot" style="background:#2563EB"></span>
+    Finalised <strong><%= stats.finalised %></strong>
   </a>
   <a href="/bookings?status=cancelled" class="status-pill <%= currentStatus === 'cancelled' ? 'active' : '' %>">
     <span class="status-dot" style="background:#9CA3AF"></span>
@@ -246,10 +250,13 @@
         </button>
       </div>
 
-      <!-- Compact header: status + ID + time -->
+      <!-- Compact header: status + ID -->
+      <%
+        const statusLabels = { client_booking: 'Client Bk.', unconfirmed: 'Unconfirmed', confirmed: 'Confirmed', locked: 'Locked', conflict: 'Conflict', green_to_go: 'Green To Go', in_progress: 'In Progress', complete: 'Complete', finalised: 'Finalised', cancelled: 'Cancelled', late_cancellation: 'Late Cancellation', on_hold: 'On Hold' };
+      %>
       <div class="booking-card-header status-<%= booking.status %>">
-        <span class="booking-status-label"><%= booking.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) %></span>
-        <span class="booking-id">#<%= booking.id %></span>
+        <span class="booking-status-label"><%= statusLabels[booking.status] || booking.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) %></span>
+        <span class="booking-id"><%= booking.bookingNumber || '#' + booking.id %></span>
       </div>
 
       <!-- Card body — clean and scannable -->
@@ -308,6 +315,16 @@
           </div>
           <% }) %>
         </div>
+
+        <!-- Still required — unfilled resource requirements -->
+        <% if (booking.stillRequired && booking.stillRequired.length > 0) { %>
+        <div class="booking-still-required">
+          <span class="still-required-label">Still required:</span>
+          <% booking.stillRequired.forEach(function(req) { %>
+          <span class="still-required-item"><%= req %></span>
+          <% }) %>
+        </div>
+        <% } %>
 
         <!-- Qualification warnings -->
         <% const allWarnings = booking.personnel.filter(p => p.warnings && p.warnings.length > 0); %>
@@ -579,7 +596,7 @@
       const today = new Date().toISOString().split('T')[0];
       const isToday = dateStr === today;
       const dayBookings = bookingsByDate[dateStr] || [];
-      const statusColors = { unconfirmed: 'bg-red-400', confirmed: 'bg-blue-400', green_to_go: 'bg-emerald-400', in_progress: 'bg-amber-400', completed: 'bg-purple-400', cancelled: 'bg-gray-300', on_hold: 'bg-yellow-400' };
+      const statusColors = { client_booking: 'bg-gray-400', unconfirmed: 'bg-purple-400', confirmed: 'bg-amber-400', locked: 'bg-gray-500', conflict: 'bg-red-500', green_to_go: 'bg-emerald-400', in_progress: 'bg-blue-400', complete: 'bg-gray-400', finalised: 'bg-indigo-400', cancelled: 'bg-gray-300', late_cancellation: 'bg-red-700', on_hold: 'bg-yellow-400' };
     %>
       <div class="min-h-[100px] border-b border-r border-gray-50 p-1 <%= isToday ? 'bg-brand-50/30' : '' %>"
         data-date="<%= dateStr %>"
@@ -1064,11 +1081,16 @@ function openBookingDetail(id) {
     .then(booking => {
       titleEl.textContent = 'Job ' + booking.id + ': ' + booking.project.name;
 
-      // Status flow
+      // Status flow — Traffio lifecycle
       const statuses = ['Client Bk.', 'Unconf.', 'Confirmed', 'Locked', 'Conflict', 'G T G', 'Complete', 'Finalised'];
-      const statusMap = { unconfirmed: 1, confirmed: 2, in_progress: 5, green_to_go: 5, completed: 6, cancelled: -1 };
-      const activeIdx = statusMap[booking.status] || 0;
-      statusFlow.innerHTML = statuses.map((s, i) => `<button class="status-flow-step ${i === activeIdx ? 'active' : ''} ${i < activeIdx ? 'done' : ''}">${s}</button>`).join('');
+      const statusMap = { client_booking: 0, unconfirmed: 1, confirmed: 2, locked: 3, conflict: 4, green_to_go: 5, in_progress: 5, complete: 6, finalised: 7, cancelled: -1, late_cancellation: -1, on_hold: -1 };
+      const activeIdx = statusMap[booking.status] ?? 0;
+      const statusColours = ['#6B7280','#7C3AED','#D97706','#475569','#DC2626','#16A34A','#6B7280','#4F46E5'];
+      statusFlow.innerHTML = statuses.map((s, i) => {
+        const isActive = i === activeIdx;
+        const isDone = activeIdx >= 0 && i < activeIdx;
+        return `<button class="status-flow-step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}" style="${isActive ? 'background:' + statusColours[i] + ';color:#fff;border-color:' + statusColours[i] : ''}">${s}</button>`;
+      }).join('');
 
       const start = new Date(booking.startDateTime);
       const end = new Date(booking.endDateTime);
