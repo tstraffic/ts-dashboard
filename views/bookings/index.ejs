@@ -1964,33 +1964,52 @@ function closeBookingDetail() {
 }
 
 function deleteBooking(id, name) {
-  if (!confirm('Delete booking ' + name + '? You can restore it later from the Deleted filter.')) return;
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  // Immediately hide the card
+  const card = document.querySelector('.booking-card[data-id="' + id + '"]');
+  if (card) { card.style.transition = 'opacity 0.25s, transform 0.25s'; card.style.opacity = '0'; card.style.transform = 'scale(0.95)'; }
+  // Delete on server
   fetch('/bookings/' + id + '/delete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': csrf },
     body: ''
   }).then(r => r.json()).then(data => {
     if (data.ok) {
-      showToast('Booking ' + name + ' deleted', 'success');
-      setTimeout(() => window.location.reload(), 800);
-    } else { showToast(data.error || 'Delete failed', 'error'); }
-  }).catch(() => showToast('Delete failed', 'error'));
+      showUndoToast('Deleted ' + name, function() {
+        // Undo: restore booking
+        fetch('/bookings/' + id + '/undelete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': csrf },
+          body: ''
+        }).then(() => window.location.reload());
+      }, function() {
+        // No undo — reload to clean up
+        window.location.reload();
+      });
+    } else {
+      if (card) { card.style.opacity = '1'; card.style.transform = ''; }
+      showToast(data.error || 'Delete failed', 'error');
+    }
+  }).catch(() => {
+    if (card) { card.style.opacity = '1'; card.style.transform = ''; }
+    showToast('Delete failed', 'error');
+  });
 }
 
 function undeleteBooking(id, name) {
-  if (!confirm('Restore booking ' + name + '?')) return;
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const card = document.querySelector('.booking-card[data-id="' + id + '"]');
+  if (card) { card.style.transition = 'opacity 0.25s'; card.style.opacity = '0.3'; }
   fetch('/bookings/' + id + '/undelete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': csrf },
     body: ''
   }).then(r => r.json()).then(data => {
     if (data.ok) {
-      showToast('Booking ' + name + ' restored', 'success');
+      showToast(name + ' restored', 'success');
       setTimeout(() => window.location.reload(), 800);
-    } else { showToast(data.error || 'Restore failed', 'error'); }
-  }).catch(() => showToast('Restore failed', 'error'));
+    } else { showToast(data.error || 'Restore failed', 'error'); if (card) card.style.opacity = ''; }
+  }).catch(() => { showToast('Restore failed', 'error'); if (card) card.style.opacity = ''; });
 }
 
 function applyDeletedFilter(value) {
@@ -2111,6 +2130,31 @@ function showToast(message, type) {
   document.body.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add('show'));
   setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 2000);
+}
+
+function showUndoToast(message, onUndo, onExpire) {
+  // Remove any existing undo toast
+  document.querySelectorAll('.undo-toast').forEach(t => t.remove());
+  const toast = document.createElement('div');
+  toast.className = 'undo-toast';
+  toast.innerHTML = '<span class="undo-toast-msg">' + message + '</span>'
+    + '<button class="undo-toast-btn">Undo</button>'
+    + '<div class="undo-toast-timer"></div>';
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  let undone = false;
+  const timer = setTimeout(() => {
+    if (undone) return;
+    toast.classList.remove('show');
+    setTimeout(() => { toast.remove(); if (onExpire) onExpire(); }, 300);
+  }, 5000);
+  toast.querySelector('.undo-toast-btn').addEventListener('click', function() {
+    undone = true;
+    clearTimeout(timer);
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+    if (onUndo) onUndo();
+  });
 }
 
 // Click backdrop to close
