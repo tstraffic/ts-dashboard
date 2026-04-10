@@ -39,7 +39,7 @@ function toDateStr(d) { return d.toISOString().split('T')[0]; }
 
 router.get('/', (req, res) => {
   const db = getDb();
-  const { status, job_id, client_id, item_type, view = 'all', ref } = req.query;
+  const { status, job_id, client_id, item_type, view = 'all', ref, date_from, date_to } = req.query;
 
   let query = `SELECT c.*, j.job_number, j.client as job_client,
     cl.company_name as client_name,
@@ -56,6 +56,8 @@ router.get('/', (req, res) => {
   if (job_id)                           { query += ` AND c.job_id = ?`;     params.push(job_id); }
   if (client_id)                        { query += ` AND c.client_id = ?`;  params.push(client_id); }
   if (item_type && item_type !== 'all') { query += ` AND (c.item_type = ? OR c.item_types LIKE ?)`; params.push(item_type, `%${item_type}%`); }
+  if (date_from) { query += ` AND c.due_date >= ?`; params.push(date_from); }
+  if (date_to)   { query += ` AND c.due_date <= ?`; params.push(date_to); }
 
   const today = new Date();
   let prevRef = null, nextRef = null, periodLabel = null;
@@ -86,7 +88,7 @@ router.get('/', (req, res) => {
     params.push(rangeStart, rangeEnd);
   }
 
-  query += ` ORDER BY c.due_date ASC, c.id ASC`;
+  query += ` ORDER BY c.id DESC`;
   const items = db.prepare(query).all(...params);
   const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
@@ -106,7 +108,7 @@ router.get('/', (req, res) => {
   res.render('compliance/index', {
     title: 'Plans & Approvals',
     items, jobs, clients, users,
-    filters: { status: status || '', job_id: job_id || '', client_id: client_id || '', item_type: item_type || '', view, ref: ref || '' },
+    filters: { status: status || '', job_id: job_id || '', client_id: client_id || '', item_type: item_type || '', view, ref: ref || '', date_from: date_from || '', date_to: date_to || '' },
     view, periodLabel, prevRef, nextRef, summary,
     user: req.session.user
   });

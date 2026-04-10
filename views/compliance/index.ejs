@@ -186,8 +186,24 @@
           <option value="not_started" <%= filters.status === 'not_started' ? 'selected' : '' %>>Not Started</option>
           <option value="started"     <%= filters.status === 'started'     ? 'selected' : '' %>>Started</option>
           <option value="submitted"   <%= filters.status === 'submitted'   ? 'selected' : '' %>>Submitted</option>
+          <option value="approved"    <%= filters.status === 'approved'    ? 'selected' : '' %>>Approved</option>
+          <option value="rejected"    <%= filters.status === 'rejected'    ? 'selected' : '' %>>Rejected</option>
           <option value="expired"     <%= filters.status === 'expired'     ? 'selected' : '' %>>Expired</option>
         </select>
+
+        <!-- Date Range -->
+        <div class="flex items-center gap-1.5">
+          <label class="text-xs text-gray-400 font-medium whitespace-nowrap">From</label>
+          <input type="date" name="date_from" value="<%= filters.date_from || '' %>"
+            onchange="document.getElementById('filterForm').submit()"
+            class="bg-white border border-gray-200 text-gray-700 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div class="flex items-center gap-1.5">
+          <label class="text-xs text-gray-400 font-medium whitespace-nowrap">To</label>
+          <input type="date" name="date_to" value="<%= filters.date_to || '' %>"
+            onchange="document.getElementById('filterForm').submit()"
+            class="bg-white border border-gray-200 text-gray-700 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
 
         <!-- Project -->
         <select name="job_id" onchange="document.getElementById('filterForm').submit()" class="bg-white border border-gray-200 text-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -197,8 +213,8 @@
           <% }) %>
         </select>
 
-        <% if (filters.status || filters.job_id) { %>
-          <a href="<%= buildUrl({ status: '', job_id: '' }) %>" class="text-sm text-gray-400 hover:text-gray-600 transition">Clear filters</a>
+        <% if (filters.status || filters.job_id || filters.date_from || filters.date_to) { %>
+          <a href="<%= buildUrl({ status: '', job_id: '', date_from: '', date_to: '' }) %>" class="text-sm text-gray-400 hover:text-gray-600 transition">Clear filters</a>
         <% } %>
 
         <!-- Export -->
