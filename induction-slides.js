@@ -412,9 +412,6 @@ const employeeGuideSlides = [
     layout: 'quiz-results',
     icon: ''
   },
-];   layout: 'quiz-results',
-    icon: ''
-  },
 ];
 
 const tcTrainingSlides = [
