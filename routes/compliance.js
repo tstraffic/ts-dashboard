@@ -589,6 +589,42 @@ router.post('/:id/revisions', (req, res) => {
   res.redirect(b.return_to || '/compliance/' + complianceId + '/edit');
 });
 
+// Edit a revision
+router.post('/:id/revisions/:revId/edit', (req, res) => {
+  const db = getDb();
+  const complianceId = req.params.id;
+  const revId = req.params.revId;
+  const item = db.prepare('SELECT id FROM compliance WHERE id = ?').get(complianceId);
+  if (!item) { req.flash('error', 'Item not found.'); return res.redirect('/compliance'); }
+
+  const rev = db.prepare('SELECT * FROM compliance_revisions WHERE id = ? AND compliance_id = ?').get(revId, complianceId);
+  if (!rev) { req.flash('error', 'Revision not found.'); return res.redirect('/compliance/' + complianceId + '/edit'); }
+
+  const b = req.body;
+  const clientIssued = b.client_issued === '1' || b.client_issued === 'on' ? 1 : 0;
+  db.prepare('UPDATE compliance_revisions SET revision_date = ?, notes = ?, client_issued = ? WHERE id = ? AND compliance_id = ?')
+    .run(b.revision_date || null, b.revision_notes || '', clientIssued, revId, complianceId);
+
+  // Auto-log edit to site diary
+  const revItem = db.prepare('SELECT job_id, title, reference_number, item_type, item_types FROM compliance WHERE id = ?').get(complianceId);
+  if (revItem) {
+    const typeMap = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', rol: 'ROL', council_permit: 'Council', spa: 'SPA', sza: 'SZA' };
+    const types = (revItem.item_types || revItem.item_type || '').split(',').map(t => typeMap[t] || t).join(' / ');
+    autoLogDiary(db, {
+      jobId: revItem.job_id,
+      complianceItemId: parseInt(complianceId),
+      summary: `[${req.session.user ? req.session.user.full_name : 'System'}] ${types} revision ${rev.revision_number} edited (${revItem.reference_number || 'N/A'}): ${revItem.title}.${clientIssued ? ' [CLIENT ISSUED]' : ''} ${b.revision_notes || ''}`.trim(),
+      userId: req.session.user ? req.session.user.id : null
+    });
+  }
+
+  if (req.headers['accept'] && req.headers['accept'].includes('json')) {
+    return res.json({ success: true });
+  }
+  req.flash('success', 'Revision ' + rev.revision_number + ' updated.');
+  res.redirect(b.return_to || '/compliance/' + complianceId + '/edit');
+});
+
 // Delete a revision
 router.post('/:id/revisions/:revId/delete', (req, res) => {
   const db = getDb();
