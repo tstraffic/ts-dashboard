@@ -262,7 +262,7 @@
               const isExpired = item.expiry_date && item.expiry_date < todayStr;
               const returnTo = '/compliance?' + Object.keys(filters).filter(k => filters[k]).map(k => k + '=' + encodeURIComponent(filters[k])).join('&');
             %>
-              <tr class="<%= item.ready_for_invoice && !item.invoiced ? 'bg-amber-50/50 border-l-2 border-l-amber-400' : item.invoiced ? 'bg-emerald-50/30' : getExpiryRowClass(item) %> hover:bg-gray-50 transition-colors">
+              <tr class="<%= item.ready_for_invoice && !item.invoiced ? 'bg-amber-50/50 border-l-2 border-l-amber-400' : item.invoiced ? 'bg-emerald-50/30' : getExpiryRowClass(item) %> hover:bg-gray-50 transition-colors cursor-pointer" onclick="if(!event.target.closest('a,button,input,.row-checkbox')){window.location.href='/compliance/<%= item.id %>/edit?return_to=<%= encodeURIComponent(returnTo) %>'}">
                 <td class="px-3 py-2">
                   <input type="checkbox" class="row-checkbox w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 focus:ring-offset-0 cursor-pointer" data-id="<%= item.id %>" onclick="updateBulkBar()">
                 </td>
