@@ -121,6 +121,7 @@ app.use('/w/setup', require('./routes/worker/setup'));
 // Induction admin routes (must be BEFORE public /induction/:type to avoid catch-all)
 app.use('/induction/admin', requireLogin, requirePermission('induction'), require('./routes/induction-admin'));
 app.use('/induction', require('./routes/induction'));
+app.use('/training', require('./routes/training'));
 
 // Rate limiting on login endpoints (prevent brute force)
 const loginLimiter = rateLimit({

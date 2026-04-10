@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= moduleTitle %> — T&S Traffic Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-base: #020817;
+      --bg-card: #0a1628;
+      --bg-surface: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.08);
+      --border-hover: rgba(255,255,255,0.15);
+      --text-primary: rgba(255,255,255,0.92);
+      --text-secondary: rgba(255,255,255,0.55);
+      --text-dim: rgba(255,255,255,0.30);
+      --cyan: #06B6D4;
+      --blue: #2563EB;
+      --green: #16A34A;
+      --orange: #F97316;
+      --red: #DC2626;
+      --purple: #7C3AED;
+      --teal: #0D9488;
+    }
+
+    html { height: 100%; }
+    body {
+      min-height: 100%;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: linear-gradient(160deg, var(--bg-base) 0%, var(--bg-card) 40%, #0f2847 100%);
+      background-attachment: fixed;
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    /* ── Header ── */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(2, 8, 23, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-box {
+      width: 28px; height: 28px;
+      background: var(--cyan);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.5rem;
+      color: var(--bg-base);
+    }
+
+    .header-title {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .header-subtitle {
+      color: var(--text-dim);
+      font-size: 0.8rem;
+      margin-left: 0.25rem;
+    }
+
+    .header-counter {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .header-counter .num {
+      color: var(--cyan);
+      font-weight: 700;
+    }
+
+    /* ── Progress Bar ── */
+    .progress-track {
+      height: 3px;
+      background: rgba(255,255,255,0.04);
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), #22d3ee);
+      border-radius: 0 2px 2px 0;
+      transition: width 0.4s ease;
+    }
+
+    /* ── Main Content ── */
+    .main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 6rem;
+      min-height: calc(100vh - 55px);
+    }
+
+    /* ── Slide Panels ── */
+    .slide-panel {
+      display: none;
+    }
+
+    .slide-panel.active {
+      display: block;
+      animation: fadeIn 0.35s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-panel h2 {
+      font-size: clamp(1.4rem, 3vw, 1.9rem);
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      letter-spacing: -0.02em;
+    }
+
+    .slide-panel .subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .slide-panel .body {
+      font-size: clamp(0.88rem, 1.3vw, 1rem);
+      line-height: 1.75;
+      color: var(--text-secondary);
+    }
+
+    .slide-panel .body strong {
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    .slide-panel .body img {
+      border-radius: 10px;
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* ── Glass Cards (used in slide content) ── */
+    .glass {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    /* ── Discussion Card ── */
+    .discussion-slide {
+      text-align: center;
+      padding: 3rem 0;
+    }
+
+    .discussion-card {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 2.5rem 2rem;
+      background: rgba(124, 58, 237, 0.08);
+      border: 1px solid rgba(124, 58, 237, 0.25);
+      border-radius: 16px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 1rem;
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #fff;
+      margin-bottom: 1.25rem;
+    }
+
+    .badge-purple { background: var(--purple); }
+    .badge-blue { background: var(--blue); }
+    .badge-orange { background: var(--orange); }
+    .badge-cyan { background: var(--cyan); color: var(--bg-base); }
+
+    /* ── Quiz Option Cards ── */
+    .quiz-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .quiz-opt {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+    }
+
+    .quiz-opt:hover {
+      border-color: var(--cyan);
+      background: rgba(6, 182, 212, 0.06);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(6, 182, 212, 0.1);
+    }
+
+    .quiz-opt.selected {
+      border-color: var(--cyan);
+      background: rgba(6, 182, 212, 0.1);
+      box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+      color: var(--text-primary);
+    }
+
+    .opt-letter {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+    }
+
+    .quiz-opt.selected .opt-letter {
+      background: var(--cyan);
+      color: var(--bg-base);
+    }
+
+    /* ── Results ── */
+    .results-card {
+      text-align: center;
+      padding: 2.5rem 2rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      max-width: 600px;
+      margin: 2rem auto;
+    }
+
+    .score-big { font-size: 3rem; font-weight: 800; }
+    .score-big.pass { color: var(--green); }
+    .score-big.fail { color: var(--red); }
+
+    .result-badge {
+      display: inline-block;
+      padding: 0.4rem 1.25rem;
+      border-radius: 100px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #fff;
+      margin: 0.75rem 0 1rem;
+    }
+
+    .result-badge.pass { background: var(--green); }
+    .result-badge.fail { background: var(--red); }
+
+    .breakdown { text-align: left; border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1.5rem; }
+    .bd-row { display: flex; gap: 0.6rem; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 0.85rem; }
+    .bd-ok { color: var(--green); font-weight: 700; flex-shrink: 0; }
+    .bd-no { color: var(--red); font-weight: 700; flex-shrink: 0; }
+    .bd-correct { color: var(--green); font-weight: 600; font-size: 0.8rem; margin-top: 2px; }
+
+    /* ── Navigation Buttons ── */
+    .nav-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: scale(0.98); }
+
+    .btn-prev {
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+    .btn-prev:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+
+    .btn-next {
+      background: var(--cyan);
+      color: var(--bg-base);
+    }
+    .btn-next:hover { background: #22d3ee; }
+    .btn-next:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-green:hover { background: #15803d; }
+
+    .btn-red { background: var(--red); color: #fff; }
+    .btn-red:hover { background: #b91c1c; }
+
+    /* ── Title Slide ── */
+    .title-slide {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      min-height: 60vh;
+    }
+
+    .title-slide h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+    }
+
+    .title-slide .tagline {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+    }
+
+    .title-slide .module-label {
+      color: var(--cyan);
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-top: 1.5rem;
+    }
+
+    /* ── Highlight Card ── */
+    .highlight-slide {
+      text-align: center;
+      padding: 2rem 0;
+    }
+
+    .highlight-card {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 2.5rem 2rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--cyan);
+      border-radius: 16px;
+      box-shadow: 0 0 30px rgba(6, 182, 212, 0.06);
+    }
+
+    /* ── Confetti ── */
+    @keyframes confetti-fall {
+      0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+    }
+
+    .confetti-piece {
+      position: fixed;
+      top: 0;
+      z-index: 200;
+      pointer-events: none;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .main { padding: 1.25rem 1rem 5rem; }
+      .quiz-options { grid-template-columns: 1fr; }
+      .results-card { padding: 1.5rem 1rem; }
+      .nav-bar { gap: 0.5rem; }
+      .btn { padding: 0.6rem 1rem; font-size: 0.85rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo-box">T&S</div>
+      <span class="header-title"><%= moduleTitle %></span>
+      <span class="header-subtitle">Module 1</span>
+    </div>
+    <div class="header-counter">
+      <span class="num" id="slideNum">1</span> / <span id="slideTotal"><%= totalSlides %></span>
+    </div>
+  </div>
+  <div class="progress-track">
+    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main" id="slideContainer">
+    <% slides.forEach(function(slide, idx) { %>
+      <% if (slide.layout === 'title') { %>
+        <section class="slide-panel<%= idx === 0 ? ' active' : '' %>" data-idx="<%= idx %>">
+          <div class="title-slide">
+            <%- slide.content %>
+            <h1><%= slide.title %></h1>
+            <div class="tagline"><%= slide.subtitle %></div>
+            <div class="module-label">T&S OPERATIONS</div>
+          </div>
+          <div class="nav-bar">
+            <div></div>
+            <button class="btn btn-next" onclick="nextSlide()">Get Started &#8594;</button>
+          </div>
+        </section>
+
+      <% } else if (slide.layout === 'discussion') { %>
+        <section class="slide-panel" data-idx="<%= idx %>">
+          <div class="discussion-slide">
+            <div class="discussion-card">
+              <div class="badge badge-purple">&#128172; Think About It</div>
+              <h2><%= slide.title %></h2>
+              <div class="body" style="text-align:center;margin-top:0.75rem;"><%- slide.content %></div>
+            </div>
+          </div>
+          <div class="nav-bar">
+            <button class="btn btn-prev" onclick="prevSlide()">&#8592; Back</button>
+            <button class="btn btn-next" onclick="nextSlide()">Continue &#8594;</button>
+          </div>
+        </section>
+
+      <% } else if (slide.layout === 'interactive-quiz' && slide.quizData) { %>
+        <section class="slide-panel" data-idx="<%= idx %>" data-quiz="<%= slide.quizData.questionNumber %>">
+          <div style="text-align:center;padding:1rem 0;">
+            <div class="badge badge-blue">Question <%= slide.quizData.questionNumber %> of 10</div>
+            <h2 style="max-width:600px;margin:0 auto;"><%= slide.quizData.question %></h2>
+            <div class="quiz-options" id="qopts-<%= slide.quizData.questionNumber %>">
+              <% slide.quizData.options.forEach(function(opt) { %>
+                <div class="quiz-opt" data-q="<%= slide.quizData.questionNumber %>" data-v="<%= opt.id %>" onclick="pickAnswer(this, <%= slide.quizData.questionNumber %>, '<%= opt.id %>')">
+                  <span class="opt-letter"><%= opt.id.toUpperCase() %></span>
+                  <span><%= opt.text %></span>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+          <div class="nav-bar">
+            <button class="btn btn-prev" onclick="prevSlide()">&#8592; Back</button>
+            <button class="btn btn-next" id="qnext-<%= slide.quizData.questionNumber %>" onclick="nextSlide()" disabled>Select an answer &#8594;</button>
+          </div>
+        </section>
+
+      <% } else if (slide.layout === 'quiz-results') { %>
+        <section class="slide-panel" data-idx="<%= idx %>" id="resultsSlide">
+          <div class="results-card" id="resultsCard"></div>
+        </section>
+
+      <% } else if (slide.layout === 'highlight') { %>
+        <section class="slide-panel" data-idx="<%= idx %>">
+          <div class="highlight-slide">
+            <div class="highlight-card">
+              <h2><%= slide.title %></h2>
+              <div class="body" style="margin-top:1rem;"><%- slide.content %></div>
+            </div>
+          </div>
+          <div class="nav-bar">
+            <button class="btn btn-prev" onclick="prevSlide()">&#8592; Back</button>
+            <button class="btn btn-next" onclick="nextSlide()">Continue &#8594;</button>
+          </div>
+        </section>
+
+      <% } else { %>
+        <%# content, split, list, quiz (static) layouts %>
+        <section class="slide-panel" data-idx="<%= idx %>">
+          <h2><%= slide.title %></h2>
+          <% if (slide.subtitle) { %><div class="subtitle"><%= slide.subtitle %></div><% } %>
+          <div class="body"><%- slide.content %></div>
+          <div class="nav-bar">
+            <% if (idx > 0) { %>
+              <button class="btn btn-prev" onclick="prevSlide()">&#8592; Back</button>
+            <% } else { %><div></div><% } %>
+            <button class="btn btn-next" onclick="nextSlide()">Continue &#8594;</button>
+          </div>
+        </section>
+      <% } %>
+    <% }); %>
+  </div>
+
+  <script>
+    // ── State ──
+    var current = 0;
+    var total = <%= totalSlides %>;
+    var panels = document.querySelectorAll('.slide-panel');
+    var answers = {};
+
+    // Slide quiz data for scoring
+    var quizData = <%- JSON.stringify(slides.filter(function(s){ return s.layout === 'interactive-quiz' && s.quizData; }).map(function(s){ return s.quizData; })) %>;
+
+    // ── Navigation ──
+    function showSlide(idx) {
+      panels.forEach(function(p) { p.classList.remove('active'); });
+      panels[idx].classList.add('active');
+      current = idx;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Update header
+      document.getElementById('slideNum').textContent = idx + 1;
+      var pct = total > 1 ? (idx / (total - 1)) * 100 : 100;
+      document.getElementById('progressFill').style.width = pct + '%';
+
+      // If results slide, compute
+      if (panels[idx].id === 'resultsSlide') {
+        renderResults();
+      }
+    }
+
+    function nextSlide() {
+      if (current < total - 1) showSlide(current + 1);
+    }
+
+    function prevSlide() {
+      if (current > 0) showSlide(current - 1);
+    }
+
+    // ── Quiz Answer Selection ──
+    function pickAnswer(el, qNum, val) {
+      answers[qNum] = val;
+      // Highlight selected
+      var opts = el.parentElement.querySelectorAll('.quiz-opt');
+      opts.forEach(function(o) { o.classList.remove('selected'); });
+      el.classList.add('selected');
+      // Enable next button
+      var btn = document.getElementById('qnext-' + qNum);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Next \u2192';
+      }
+    }
+
+    // ── Results ──
+    function renderResults() {
+      var correct = 0;
+      var rows = '';
+      quizData.forEach(function(q) {
+        var picked = answers[q.questionNumber] || null;
+        var ok = picked === q.correctAnswer;
+        if (ok) correct++;
+        var correctText = '';
+        q.options.forEach(function(o) { if (o.id === q.correctAnswer) correctText = o.text; });
+        rows += '<div class="bd-row"><span class="' + (ok ? 'bd-ok' : 'bd-no') + '">' + (ok ? '\u2713' : '\u2717') + '</span><div><div style="color:var(--text-secondary)">Q' + q.questionNumber + ': ' + q.question + '</div>';
+        if (!ok) rows += '<div class="bd-correct">Correct: ' + correctText + '</div>';
+        rows += '</div></div>';
+      });
+
+      var pct = Math.round((correct / quizData.length) * 100);
+      var passed = pct >= 90;
+      var card = document.getElementById('resultsCard');
+
+      card.innerHTML =
+        '<div class="score-big ' + (passed ? 'pass' : 'fail') + '">' + correct + ' / ' + quizData.length + '</div>' +
+        '<div style="font-size:1.2rem;font-weight:600;color:var(--text-secondary);">' + pct + '%</div>' +
+        '<div class="result-badge ' + (passed ? 'pass' : 'fail') + '">' + (passed ? '\u2713 PASSED' : '\u2717 NOT YET PASSED') + '</div>' +
+        '<div style="color:var(--text-secondary);margin-bottom:1rem;">' +
+          (passed
+            ? 'Congratulations! You have successfully completed the T&S Employee Guide \u2014 Module 1.'
+            : 'You need 90% or higher to pass. Please review the material and try again.') +
+        '</div>' +
+        '<div class="breakdown"><div style="font-weight:600;margin-bottom:0.5rem;">Question Breakdown</div>' + rows + '</div>' +
+        '<div style="margin-top:1.5rem;">' +
+          (passed
+            ? '<button class="btn btn-green" onclick="window.location.href=\'/training/employee-guide\'">&#10003; Done</button>'
+            : '<button class="btn btn-red" onclick="retryQuiz()">&#8634; Retry Quiz</button>') +
+        '</div>';
+
+      if (passed) spawnConfetti();
+    }
+
+    function retryQuiz() {
+      answers = {};
+      // Reset all quiz option selections
+      document.querySelectorAll('.quiz-opt.selected').forEach(function(o) { o.classList.remove('selected'); });
+      // Reset next buttons
+      quizData.forEach(function(q) {
+        var btn = document.getElementById('qnext-' + q.questionNumber);
+        if (btn) { btn.disabled = true; btn.innerHTML = 'Select an answer &#8594;'; }
+      });
+      // Go to first quiz question
+      for (var i = 0; i < panels.length; i++) {
+        if (panels[i].dataset.quiz) { showSlide(i); return; }
+      }
+    }
+
+    // ── Confetti ──
+    function spawnConfetti() {
+      var colors = ['#06B6D4', '#22c55e', '#facc15', '#f97316', '#a855f7', '#ec4899', '#2563EB', '#14b8a6'];
+      for (var i = 0; i < 50; i++) {
+        var el = document.createElement('div');
+        el.className = 'confetti-piece';
+        el.style.left = Math.random() * 100 + 'vw';
+        el.style.width = (5 + Math.random() * 8) + 'px';
+        el.style.height = (5 + Math.random() * 8) + 'px';
+        el.style.background = colors[Math.floor(Math.random() * colors.length)];
+        el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        el.style.animation = 'confetti-fall ' + (2 + Math.random() * 2.5) + 's linear forwards';
+        el.style.animationDelay = Math.random() * 0.8 + 's';
+        document.body.appendChild(el);
+      }
+      setTimeout(function() {
+        document.querySelectorAll('.confetti-piece').forEach(function(c) { c.remove(); });
+      }, 5500);
+    }
+
+    // ── Keyboard ──
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        // Only advance if next button is not disabled
+        var panel = panels[current];
+        var nextBtn = panel.querySelector('.btn-next');
+        if (nextBtn && !nextBtn.disabled) nextSlide();
+      }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+    });
+  </script>
+</body>
+</html>
