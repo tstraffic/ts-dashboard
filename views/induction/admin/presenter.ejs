@@ -943,8 +943,12 @@
     });
 
     // ── Navigation ──
+    let animTimer = null;
     function goToSlide(index, direction) {
-      if (isAnimating || index < 0 || index >= totalSlides || index === currentIndex) return;
+      if (index < 0 || index >= totalSlides || index === currentIndex) return;
+      // Clear any stuck animation state
+      if (animTimer) { clearTimeout(animTimer); isAnimating = false; }
+      if (isAnimating) return;
       isAnimating = true;
 
       const allSlides = stage.querySelectorAll('.slide');
@@ -977,8 +981,9 @@
         setTimeout(function() { renderQuizResults(); }, 350);
       }
 
-      setTimeout(function() {
+      animTimer = setTimeout(function() {
         isAnimating = false;
+        animTimer = null;
         allSlides.forEach(function(s, i) {
           if (i !== currentIndex) {
             s.classList.remove('active', 'exit-left');
