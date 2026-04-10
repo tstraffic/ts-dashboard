@@ -318,7 +318,7 @@
                     <% if (item.revision_count > 0) { %>
                       <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-700">Rev <%= item.revision_count %></span>
                     <% } %>
-                    <% if (item.revision_required) { %>
+                    <% if (item.revision_required && !item.revision_count) { %>
                       <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-100 text-red-700">REV REQ</span>
                     <% } %>
                   </div>
