@@ -450,4 +450,17 @@ router.post('/present/:module/complete', (req, res) => {
   res.json({ success: true });
 });
 
+// POST /induction/admin/present/:module/quiz-result — save quiz score
+router.post('/present/:module/quiz-result', (req, res) => {
+  const { presentation_id, score, total, passed, answers } = req.body;
+  if (presentation_id) {
+    getDb().prepare(`
+      UPDATE induction_presentations
+      SET quiz_score = ?, quiz_passed = ?, quiz_answers = ?
+      WHERE id = ?
+    `).run(score, passed ? 1 : 0, JSON.stringify(answers || {}), presentation_id);
+  }
+  res.json({ success: true });
+});
+
 module.exports = router;

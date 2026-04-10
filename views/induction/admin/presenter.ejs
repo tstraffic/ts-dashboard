@@ -408,7 +408,7 @@
 
     .slide.layout-highlight .content-body strong { color: var(--ts-cyan); font-weight: 600; }
 
-    /* ── Layout: Quiz ── */
+    /* ── Layout: Quiz (static) ── */
     .slide.layout-quiz {
       justify-content: center;
       align-items: center;
@@ -453,6 +453,253 @@
 
     .slide.layout-quiz .content-body p { margin-bottom: 1rem; }
     .slide.layout-quiz .content-body strong { color: var(--ts-blue); font-weight: 600; }
+
+    /* ── Layout: Discussion ── */
+    .slide.layout-discussion {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 50%, #f5f3ff 100%);
+    }
+
+    .slide.layout-discussion .discussion-card {
+      max-width: 750px;
+      padding: 3rem 3.5rem;
+      background: #ffffff;
+      border: 2px solid var(--ts-purple);
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(124, 58, 237, 0.1), 0 0 0 4px rgba(124, 58, 237, 0.06);
+    }
+
+    .slide.layout-discussion .discussion-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1.25rem;
+      background: var(--ts-purple);
+      border-radius: 100px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #ffffff;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+    }
+
+    .slide.layout-discussion h2 {
+      font-size: clamp(1.5rem, 2.5vw, 2.2rem);
+      font-weight: 700;
+      line-height: 1.4;
+      color: var(--ts-gray-900);
+      margin-bottom: 1.5rem;
+    }
+
+    .slide.layout-discussion .content-body {
+      font-size: 1.15rem;
+      line-height: 1.8;
+      color: var(--ts-gray-500);
+    }
+
+    /* ── Layout: Interactive Quiz ── */
+    .slide.layout-interactive-quiz {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: #ffffff;
+      padding: 60px 80px 80px;
+    }
+
+    .slide.layout-interactive-quiz .iq-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 1rem;
+      background: var(--ts-blue);
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #ffffff;
+      margin-bottom: 1.5rem;
+    }
+
+    .slide.layout-interactive-quiz h2 {
+      font-size: clamp(1.3rem, 2.5vw, 1.8rem);
+      font-weight: 700;
+      line-height: 1.4;
+      color: var(--ts-gray-900);
+      margin-bottom: 2rem;
+      max-width: 700px;
+    }
+
+    .slide.layout-interactive-quiz .quiz-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      max-width: 700px;
+      width: 100%;
+    }
+
+    .quiz-option {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.25rem 1.5rem;
+      background: #ffffff;
+      border: 2px solid var(--ts-gray-200);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+      font-size: 1.05rem;
+      color: var(--ts-gray-700);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .quiz-option:hover {
+      border-color: var(--ts-cyan);
+      background: rgba(6, 182, 212, 0.04);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+      transform: translateY(-1px);
+    }
+
+    .quiz-option.selected {
+      border-color: var(--ts-cyan);
+      background: rgba(6, 182, 212, 0.08);
+      box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15);
+    }
+
+    .quiz-option .opt-letter {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--ts-gray-100);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--ts-gray-500);
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+    }
+
+    .quiz-option.selected .opt-letter {
+      background: var(--ts-cyan);
+      color: #ffffff;
+    }
+
+    /* ── Layout: Quiz Results ── */
+    .slide.layout-quiz-results {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: var(--ts-gray-50);
+      padding: 40px 60px;
+      overflow-y: auto;
+    }
+
+    .results-card {
+      max-width: 700px;
+      width: 100%;
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 2.5rem 3rem;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+    }
+
+    .results-card .score-display {
+      font-size: 3.5rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+
+    .results-card .score-display.pass { color: var(--ts-green); }
+    .results-card .score-display.fail { color: var(--ts-red); }
+
+    .results-card .score-pct {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    .results-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1.5rem;
+      border-radius: 100px;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #ffffff;
+      margin-bottom: 1.5rem;
+    }
+
+    .results-badge.pass { background: var(--ts-green); }
+    .results-badge.fail { background: var(--ts-red); }
+
+    .results-message {
+      font-size: 1.05rem;
+      color: var(--ts-gray-500);
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .quiz-breakdown {
+      text-align: left;
+      border-top: 1px solid var(--ts-gray-200);
+      padding-top: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .quiz-breakdown .qb-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--ts-gray-100);
+      font-size: 0.92rem;
+    }
+
+    .qb-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+    .qb-icon.correct { color: var(--ts-green); }
+    .qb-icon.wrong { color: var(--ts-red); }
+    .qb-text { color: var(--ts-gray-700); }
+    .qb-answer { color: var(--ts-green); font-weight: 600; font-size: 0.85rem; margin-top: 2px; }
+
+    .retry-btn, .complete-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 2rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin: 0 0.5rem;
+    }
+
+    .retry-btn {
+      background: var(--ts-red);
+      color: #ffffff;
+    }
+
+    .retry-btn:hover { background: #b91c1c; transform: translateY(-1px); }
+
+    .complete-btn {
+      background: var(--ts-green);
+      color: #ffffff;
+    }
+
+    .complete-btn:hover { background: #15803d; transform: translateY(-1px); }
 
     /* ── Top Bar ── */
     #top-bar {
@@ -645,6 +892,12 @@
       .slide.layout-split { padding: 60px 30px 60px 50px; }
       .slide.layout-split .split-columns { grid-template-columns: 1fr; gap: 1rem; }
       .slide.layout-highlight .highlight-card { padding: 2rem 2.5rem; }
+      .slide.layout-discussion .discussion-card { padding: 2rem 2rem; }
+      .slide.layout-interactive-quiz { padding: 40px 30px 70px; }
+      .slide.layout-interactive-quiz .quiz-options { grid-template-columns: 1fr; }
+      .slide.layout-quiz-results { padding: 30px 20px; }
+      .results-card { padding: 1.5rem 1.5rem; }
+      .results-card .score-display { font-size: 2.5rem; }
       #bottom-keys { display: none; }
       .slide .brand-bars { left: 14px; }
     }
@@ -703,6 +956,51 @@
     let currentIndex = 0;
     let isAnimating = false;
 
+    // ── Quiz State ──
+    const quizState = { answers: {} };
+
+    function selectQuizOption(questionNumber, optionId, el) {
+      quizState.answers[questionNumber] = optionId;
+      // Update UI — deselect siblings, select this one
+      var parent = el.closest('.quiz-options');
+      parent.querySelectorAll('.quiz-option').forEach(function(opt) { opt.classList.remove('selected'); });
+      el.classList.add('selected');
+    }
+
+    function computeQuizResults() {
+      var quizSlides = slides.filter(function(s) { return s.layout === 'interactive-quiz' && s.quizData; });
+      var total = quizSlides.length;
+      var correct = 0;
+      var breakdown = [];
+      quizSlides.forEach(function(s) {
+        var qd = s.quizData;
+        var userAnswer = quizState.answers[qd.questionNumber] || null;
+        var isCorrect = userAnswer === qd.correctAnswer;
+        if (isCorrect) correct++;
+        var correctText = '';
+        qd.options.forEach(function(o) { if (o.id === qd.correctAnswer) correctText = o.text; });
+        breakdown.push({ question: qd.question, isCorrect: isCorrect, correctAnswer: correctText, questionNumber: qd.questionNumber });
+      });
+      var pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+      return { correct: correct, total: total, pct: pct, passed: pct >= 90, breakdown: breakdown };
+    }
+
+    function retryQuiz() {
+      quizState.answers = {};
+      // Find first interactive-quiz slide index
+      for (var i = 0; i < slides.length; i++) {
+        if (slides[i].layout === 'interactive-quiz') {
+          // Reset selected states on all quiz option elements
+          var allSlideEls = stage.querySelectorAll('.slide');
+          allSlideEls.forEach(function(el) {
+            el.querySelectorAll('.quiz-option.selected').forEach(function(opt) { opt.classList.remove('selected'); });
+          });
+          goToSlide(i);
+          return;
+        }
+      }
+    }
+
     // ── Build Slides ──
     const stage = document.getElementById('stage');
 
@@ -751,6 +1049,41 @@
           html += '<div class="quiz-badge animate-in">&#9889; Knowledge Check</div>';
           html += '<h2 class="animate-in delay-1">' + (slide.title || '') + '</h2>';
           html += '<div class="content-body animate-in delay-2">' + (slide.content || '') + '</div>';
+          break;
+
+        case 'discussion':
+          html += '<div class="discussion-card">';
+          html += '<div class="discussion-badge animate-in">&#128172; Think About It</div>';
+          html += '<h2 class="animate-in delay-1">' + (slide.title || '') + '</h2>';
+          if (slide.content) html += '<div class="content-body animate-in delay-2">' + slide.content + '</div>';
+          html += '</div>';
+          break;
+
+        case 'interactive-quiz':
+          if (slide.quizData) {
+            var qd = slide.quizData;
+            html += '<div class="iq-badge animate-in">Question ' + qd.questionNumber + ' of 10</div>';
+            html += '<h2 class="animate-in delay-1">' + qd.question + '</h2>';
+            html += '<div class="quiz-options animate-in delay-2">';
+            qd.options.forEach(function(opt) {
+              html += '<div class="quiz-option" onclick="selectQuizOption(' + qd.questionNumber + ',\'' + opt.id + '\',this)">';
+              html += '<span class="opt-letter">' + opt.id.toUpperCase() + '</span>';
+              html += '<span>' + opt.text + '</span>';
+              html += '</div>';
+            });
+            html += '</div>';
+          }
+          break;
+
+        case 'quiz-results':
+          html += '<div class="results-card" id="results-card">';
+          html += '<div class="score-display" id="score-display">— / —</div>';
+          html += '<div class="score-pct" id="score-pct"></div>';
+          html += '<div class="results-badge" id="results-badge"></div>';
+          html += '<div class="results-message" id="results-message"></div>';
+          html += '<div class="quiz-breakdown" id="quiz-breakdown"></div>';
+          html += '<div id="results-actions"></div>';
+          html += '</div>';
           break;
 
         default: // content
@@ -806,6 +1139,11 @@
 
       currentIndex = index;
       updateUI();
+
+      // If landing on quiz-results slide, compute and render results
+      if (slides[index] && slides[index].layout === 'quiz-results') {
+        setTimeout(function() { renderQuizResults(); }, 400);
+      }
 
       setTimeout(function() {
         isAnimating = false;
@@ -912,6 +1250,46 @@
         topBar.classList.remove('visible');
       }, 3000);
     });
+
+    // ── Render Quiz Results ──
+    function renderQuizResults() {
+      var r = computeQuizResults();
+      var scoreEl = document.getElementById('score-display');
+      var pctEl = document.getElementById('score-pct');
+      var badgeEl = document.getElementById('results-badge');
+      var msgEl = document.getElementById('results-message');
+      var breakdownEl = document.getElementById('quiz-breakdown');
+      var actionsEl = document.getElementById('results-actions');
+
+      if (!scoreEl) return;
+
+      scoreEl.textContent = r.correct + ' / ' + r.total;
+      scoreEl.className = 'score-display ' + (r.passed ? 'pass' : 'fail');
+      pctEl.textContent = r.pct + '%';
+      badgeEl.textContent = r.passed ? '✓ PASSED' : '✗ NOT YET PASSED';
+      badgeEl.className = 'results-badge ' + (r.passed ? 'pass' : 'fail');
+      msgEl.textContent = r.passed
+        ? 'Congratulations! You have successfully completed the T&S Employee Guide — Module 1.'
+        : 'You need 90% or higher to pass. Please review the material and try again.';
+
+      var bhtml = '<p style="font-weight:700;margin-bottom:0.75rem;color:var(--ts-gray-900);">Question Breakdown</p>';
+      r.breakdown.forEach(function(q) {
+        bhtml += '<div class="qb-row">';
+        bhtml += '<span class="qb-icon ' + (q.isCorrect ? 'correct' : 'wrong') + '">' + (q.isCorrect ? '✓' : '✗') + '</span>';
+        bhtml += '<div><div class="qb-text">Q' + q.questionNumber + ': ' + q.question + '</div>';
+        if (!q.isCorrect) bhtml += '<div class="qb-answer">Correct: ' + q.correctAnswer + '</div>';
+        bhtml += '</div></div>';
+      });
+      breakdownEl.innerHTML = bhtml;
+
+      var ahtml = '';
+      if (!r.passed) {
+        ahtml += '<button class="retry-btn" onclick="retryQuiz()">&#8634; Retry Quiz</button>';
+      } else {
+        ahtml += '<button class="complete-btn" onclick="window.location.href=\'/induction/admin/presentations\'">&#10003; Complete</button>';
+      }
+      actionsEl.innerHTML = ahtml;
+    }
 
     // ── Init ──
     updateUI();

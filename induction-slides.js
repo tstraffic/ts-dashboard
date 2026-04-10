@@ -2,7 +2,9 @@
 // Used by the presenter view for projector-based training sessions
 
 const employeeGuideSlides = [
-  // ── Slide 1: Title ──
+  // ═══════════════════════════════════════
+  //  SECTION 1: COMPANY INTRODUCTION
+  // ═══════════════════════════════════════
   {
     title: 'T&S Employee Guide',
     subtitle: '"A Safe Way Home"',
@@ -42,7 +44,18 @@ const employeeGuideSlides = [
     layout: 'content',
     icon: ''
   },
-  // ── Slide 6: Legal Responsibilities ──
+  // ── Discussion 1: Company Identity ──
+  {
+    title: 'What does "A Safe Way Home" mean to you?',
+    subtitle: '',
+    content: '<p>Discuss with your group how T&S\'s motto applies to your daily work as a traffic controller.</p>',
+    layout: 'discussion',
+    icon: ''
+  },
+  // ═══════════════════════════════════════
+  //  SECTION 2: LEGAL & VALUES
+  // ═══════════════════════════════════════
+  // ── Slide 7: Legal Responsibilities ──
   {
     title: 'Legal Responsibilities',
     subtitle: 'Know your obligations',
@@ -58,7 +71,18 @@ const employeeGuideSlides = [
     layout: 'split',
     icon: ''
   },
-  // ── Slide 8: PPE Title ──
+  // ── Discussion 2: Values in Practice ──
+  {
+    title: 'If you see a coworker not wearing their PPE correctly, what should you do?',
+    subtitle: '',
+    content: '<p>Think about how our values of <strong>Respect</strong> and <strong>Report</strong> apply in this situation. What would a professional approach look like?</p>',
+    layout: 'discussion',
+    icon: ''
+  },
+  // ═══════════════════════════════════════
+  //  SECTION 3: PPE
+  // ═══════════════════════════════════════
+  // ── PPE Title ──
   {
     title: 'Wear the Correct PPE Every Time!',
     subtitle: '',
@@ -74,7 +98,18 @@ const employeeGuideSlides = [
     layout: 'content',
     icon: ''
   },
-  // ── Slide 10: Traffio Intro ──
+  // ── Discussion 3: PPE Scenarios ──
+  {
+    title: 'When would you need to wear optional PPE like hearing protection or safety glasses?',
+    subtitle: '',
+    content: '<p>Think about real scenarios on site — what conditions would require you to go beyond the mandatory PPE?</p>',
+    layout: 'discussion',
+    icon: ''
+  },
+  // ═══════════════════════════════════════
+  //  SECTION 4: TRAFFIO & JOB FLOW
+  // ═══════════════════════════════════════
+  // ── Traffio Intro ──
   {
     title: 'Allocations & Job Site Information',
     subtitle: '',
@@ -114,7 +149,18 @@ const employeeGuideSlides = [
     layout: 'content',
     icon: ''
   },
-  // ── Slide 15: Representing T&S ──
+  // ── Discussion 4: Using Traffio ──
+  {
+    title: 'What do you do if you receive a shift allocation but can\'t make it?',
+    subtitle: '',
+    content: '<p>Remember: you must accept or reject the shift. If you reject it, what is the correct procedure to follow?</p>',
+    layout: 'discussion',
+    icon: ''
+  },
+  // ═══════════════════════════════════════
+  //  SECTION 5: ON-SITE CONDUCT
+  // ═══════════════════════════════════════
+  // ── Representing T&S ──
   {
     title: 'How Do We Represent T&S on Site?',
     subtitle: '',
@@ -154,7 +200,18 @@ const employeeGuideSlides = [
     layout: 'content',
     icon: ''
   },
-  // ── Slide 20: Harassment ──
+  // ── Discussion 5: On the Road ──
+  {
+    title: 'Why must T&S vehicles stay 10 km/h below the posted speed limit?',
+    subtitle: '',
+    content: '<p>Consider the weight of equipment in the vehicle, the consequences of harsh braking, and what it means to represent T&S on the road.</p>',
+    layout: 'discussion',
+    icon: ''
+  },
+  // ═══════════════════════════════════════
+  //  SECTION 6: WORKPLACE POLICIES
+  // ═══════════════════════════════════════
+  // ── Harassment ──
   {
     title: 'Sexual Harassment & Relationships',
     subtitle: '',
@@ -178,12 +235,181 @@ const employeeGuideSlides = [
     layout: 'split',
     icon: ''
   },
-  // ── Slide 23: Quiz ──
+  // ═══════════════════════════════════════
+  //  SECTION 8: MODULE SUMMARY & QUIZ
+  // ═══════════════════════════════════════
+  // ── Summary ──
+  {
+    title: 'Module 1 — Key Takeaways',
+    subtitle: '',
+    content: '<div style="max-width:48rem;margin:0 auto;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;"><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1.25rem;border-left:4px solid var(--ts-blue);"><p style="font-weight:700;color:var(--ts-blue);margin-bottom:0.25rem;">Company</p><p style="color:var(--ts-gray-500);font-size:0.95rem;">T&S — "A Safe Way Home." Family-owned, ISO-certified, built on integrity.</p></div><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1.25rem;border-left:4px solid var(--ts-green);"><p style="font-weight:700;color:var(--ts-green);margin-bottom:0.25rem;">PPE</p><p style="color:var(--ts-gray-500);font-size:0.95rem;">Hard hat, hi-vis, steel-cap boots — mandatory every site, every time.</p></div><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1.25rem;border-left:4px solid var(--ts-orange);"><p style="font-weight:700;color:var(--ts-orange);margin-bottom:0.25rem;">Traffio</p><p style="color:var(--ts-gray-500);font-size:0.95rem;">Accept shifts, follow 6 steps, client signs timesheet, notifications ON.</p></div><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1.25rem;border-left:4px solid var(--ts-red);"><p style="font-weight:700;color:var(--ts-red);margin-bottom:0.25rem;">Safety</p><p style="color:var(--ts-gray-500);font-size:0.95rem;">No phones on site. PASS method for fire. Report all incidents immediately.</p></div><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1.25rem;border-left:4px solid var(--ts-purple);"><p style="font-weight:700;color:var(--ts-purple);margin-bottom:0.25rem;">Driving</p><p style="color:var(--ts-gray-500);font-size:0.95rem;">10 km/h below limit, slow/middle lanes only, pre-start checks every shift.</p></div><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1.25rem;border-left:4px solid var(--ts-teal);"><p style="font-weight:700;color:var(--ts-teal);margin-bottom:0.25rem;">Conduct</p><p style="color:var(--ts-gray-500);font-size:0.95rem;">Respect everyone. Zero tolerance for harassment. Be professional always.</p></div></div></div>',
+    layout: 'highlight',
+    icon: ''
+  },
+  // ── Quiz Introduction ──
   {
     title: 'Module 1 Quiz',
-    subtitle: 'Test your knowledge',
-    content: '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;max-width:48rem;margin:0 auto;"><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1.5rem;border-left:4px solid var(--ts-blue);"><p style="font-weight:700;color:var(--ts-blue);margin-bottom:0.5rem;">Question 1</p><p style="color:var(--ts-gray-700);font-size:1.1rem;">What is the company motto?</p></div><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1.5rem;border-left:4px solid var(--ts-green);"><p style="font-weight:700;color:var(--ts-green);margin-bottom:0.5rem;">Question 2</p><p style="color:var(--ts-gray-700);font-size:1.1rem;">What is the compulsory PPE for every job site?</p></div><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1.5rem;border-left:4px solid var(--ts-orange);"><p style="font-weight:700;color:var(--ts-orange);margin-bottom:0.5rem;">Question 3</p><p style="color:var(--ts-gray-700);font-size:1.1rem;">Where is the fire extinguisher located on every ute?</p></div><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1.5rem;border-left:4px solid var(--ts-red);"><p style="font-weight:700;color:var(--ts-red);margin-bottom:0.5rem;">Question 4</p><p style="color:var(--ts-gray-700);font-size:1.1rem;">How many days earlier should you notify the company about short-term leave?</p></div></div>',
-    layout: 'quiz',
+    subtitle: '',
+    content: '<div style="max-width:40rem;margin:0 auto;text-align:center;"><p style="font-size:1.2rem;color:var(--ts-gray-700);margin-bottom:1.5rem;">You are about to take a <strong>10-question quiz</strong> based on everything covered in this module.</p><div style="display:grid;gap:1rem;text-align:left;margin-bottom:1.5rem;"><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1rem 1.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="font-size:1.3rem;">📝</span><span>10 multiple-choice questions</span></div><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1rem 1.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="font-size:1.3rem;">🎯</span><span>You need <strong>90% or higher</strong> to pass (9 out of 10)</span></div><div style="background:var(--ts-gray-50);border-radius:0.75rem;padding:1rem 1.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="font-size:1.3rem;">🔄</span><span>You can retry if you don\'t pass</span></div></div><p style="color:var(--ts-gray-500);">Select one answer per question, then advance to the next. Your results will be shown at the end.</p></div>',
+    layout: 'highlight',
+    icon: ''
+  },
+  // ── Quiz Q1 ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 1,
+      question: 'What is T&S Traffic Control\'s company motto?',
+      options: [
+        { id: 'a', text: '"Safety First, Always"' },
+        { id: 'b', text: '"A Safe Way Home"' },
+        { id: 'c', text: '"Building Better Roads"' },
+        { id: 'd', text: '"Zero Harm on Every Site"' }
+      ],
+      correctAnswer: 'b'
+    }
+  },
+  // ── Quiz Q2 ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 2,
+      question: 'How many ISO certifications does T&S hold?',
+      options: [
+        { id: 'a', text: '1 — ISO 9001 (Quality)' },
+        { id: 'b', text: '2 — ISO 9001 and ISO 14001' },
+        { id: 'c', text: '3 — ISO 9001, ISO 14001, and ISO 45001' },
+        { id: 'd', text: '4 — including ISO 27001' }
+      ],
+      correctAnswer: 'c'
+    }
+  },
+  // ── Quiz Q3 ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 3,
+      question: 'What credentials must you hold at all times as a traffic controller?',
+      options: [
+        { id: 'a', text: 'A valid driver\'s licence only' },
+        { id: 'b', text: 'A valid White Card and Traffic Controller accreditation' },
+        { id: 'c', text: 'A first aid certificate and White Card' },
+        { id: 'd', text: 'An RSA and traffic management plan' }
+      ],
+      correctAnswer: 'b'
+    }
+  },
+  // ── Quiz Q4 ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 4,
+      question: 'Which PPE is mandatory on EVERY T&S job site?',
+      options: [
+        { id: 'a', text: 'Hi-vis clothing, hard hat, and gloves' },
+        { id: 'b', text: 'Hard hat, safety glasses, and steel-cap boots' },
+        { id: 'c', text: 'Hi-vis clothing, hard hat, and steel-capped boots' },
+        { id: 'd', text: 'Hi-vis clothing, hearing protection, and hard hat' }
+      ],
+      correctAnswer: 'c'
+    }
+  },
+  // ── Quiz Q5 ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 5,
+      question: 'Who must sign the timesheet at the end of each shift in Traffio?',
+      options: [
+        { id: 'a', text: 'The team leader only' },
+        { id: 'b', text: 'The traffic controller and their supervisor' },
+        { id: 'c', text: 'The client' },
+        { id: 'd', text: 'No signature is required — it\'s automatic' }
+      ],
+      correctAnswer: 'c'
+    }
+  },
+  // ── Quiz Q6 ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 6,
+      question: 'How many days\' notice must you give for a leave request?',
+      options: [
+        { id: 'a', text: '1 day before' },
+        { id: 'b', text: 'At least 2 days before' },
+        { id: 'c', text: 'At least 1 week before' },
+        { id: 'd', text: 'Same day is acceptable' }
+      ],
+      correctAnswer: 'b'
+    }
+  },
+  // ── Quiz Q7 ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 7,
+      question: 'What is T&S\'s policy on mobile phone use while on site?',
+      options: [
+        { id: 'a', text: 'Phones may be used during breaks only' },
+        { id: 'b', text: 'Phones must be on silent but can be checked' },
+        { id: 'c', text: 'Zero tolerance — no phones on site' },
+        { id: 'd', text: 'Phones allowed for work-related calls only' }
+      ],
+      correctAnswer: 'c'
+    }
+  },
+  // ── Quiz Q8 ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 8,
+      question: 'When driving a T&S vehicle, how far below the speed limit should you drive?',
+      options: [
+        { id: 'a', text: '5 km/h below the posted limit' },
+        { id: 'b', text: '10 km/h below the posted limit' },
+        { id: 'c', text: '15 km/h below the posted limit' },
+        { id: 'd', text: 'At the posted speed limit exactly' }
+      ],
+      correctAnswer: 'b'
+    }
+  },
+  // ── Quiz Q9 ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 9,
+      question: 'Where is the fire extinguisher located on every T&S ute?',
+      options: [
+        { id: 'a', text: 'Behind the driver\'s seat' },
+        { id: 'b', text: 'In the glove box' },
+        { id: 'c', text: 'On the ute\'s cage — passenger side' },
+        { id: 'd', text: 'Under the back seat' }
+      ],
+      correctAnswer: 'c'
+    }
+  },
+  // ── Quiz Q10 ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 10,
+      question: 'In the fire extinguisher PASS method, what does the "A" stand for?',
+      options: [
+        { id: 'a', text: 'Activate' },
+        { id: 'b', text: 'Aim' },
+        { id: 'c', text: 'Alert' },
+        { id: 'd', text: 'Approach' }
+      ],
+      correctAnswer: 'b'
+    }
+  },
+  // ── Quiz Results ──
+  {
+    title: 'Quiz Results',
+    subtitle: '',
+    content: '',
+    layout: 'quiz-results',
     icon: ''
   },
 ];

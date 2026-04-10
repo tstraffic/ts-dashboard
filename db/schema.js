@@ -4503,6 +4503,15 @@ function runMigrations(db) {
     console.log('Migration 94 applied: bookings soft delete column');
   }
 
+  // Migration 95: Quiz scoring columns on induction_presentations
+  if (!isMigrationApplied.get(95)) {
+    try { db.exec("ALTER TABLE induction_presentations ADD COLUMN quiz_score INTEGER DEFAULT NULL"); } catch (e) { /* column may exist */ }
+    try { db.exec("ALTER TABLE induction_presentations ADD COLUMN quiz_passed INTEGER DEFAULT NULL"); } catch (e) { /* column may exist */ }
+    try { db.exec("ALTER TABLE induction_presentations ADD COLUMN quiz_answers TEXT DEFAULT NULL"); } catch (e) { /* column may exist */ }
+    recordMigration.run(95, 'Quiz scoring columns on induction_presentations');
+    console.log('Migration 95 applied: quiz scoring columns');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
