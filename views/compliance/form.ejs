@@ -22,6 +22,8 @@
     { value: 'not_started', label: 'Not Started' },
     { value: 'started',     label: 'Started' },
     { value: 'submitted',   label: 'Submitted' },
+    { value: 'approved',    label: 'Approved' },
+    { value: 'rejected',    label: 'Rejected' },
     { value: 'expired',     label: 'Expired' },
   ];
 %>
@@ -426,7 +428,7 @@
         </div>
 
         <!-- Revision Tracking (TGS/CTMP only) -->
-        <div id="revision-section" class="md:col-span-2 <%= (isEdit && (item.revision_required || item.revision_count > 0)) ? '' : 'hidden' %>">
+        <div id="revision-section" class="md:col-span-2 <%= (isEdit && (item.revision_required || item.revision_count > 0)) ? '' : 'hidden' %>" data-has-revisions="<%= (isEdit && (item.revision_required || item.revision_count > 0)) ? '1' : '0' %>">
           <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div class="flex items-center justify-between mb-3">
               <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest">Revision Tracking</h3>
@@ -797,9 +799,10 @@ function updateResponseFields() {
   var expiryLabel = document.querySelector('#expiry-date-field label');
   if (expiryLabel) expiryLabel.textContent = prefix + 'Expiry Date';
 
-  // Revision section (TGS/CTMP only)
+  // Revision section (TGS/CTMP, or if item already has revisions)
   var revSection = document.getElementById('revision-section');
-  if (revSection) revSection.classList.toggle('hidden', !isTgsCtmp);
+  var hasRevisions = revSection && revSection.getAttribute('data-has-revisions') === '1';
+  if (revSection) revSection.classList.toggle('hidden', !isTgsCtmp && !hasRevisions);
 
   // Start/Finish dates (ROL, Council, SZA)
   var isRolCouncilSza = isRol || isCouncil || isSza;
