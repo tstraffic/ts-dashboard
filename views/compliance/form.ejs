@@ -456,18 +456,14 @@
                   <button type="button" onclick="toggleRevEdit(<%= rev.id %>)" class="p-1 text-gray-300 hover:text-brand-600 transition" title="Edit revision">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </button>
-                  <form method="POST" action="/compliance/<%= item.id %>/revisions/<%= rev.id %>/delete" class="inline" onsubmit="return confirm('Delete revision <%= rev.revision_number %>?')">
-                    <%- include('../partials/csrf') %>
-                    <button type="submit" class="p-1 text-gray-300 hover:text-red-600 transition" title="Delete revision">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                    </button>
-                  </form>
+                  <button type="button" onclick="deleteRevision(<%= item.id %>, <%= rev.id %>, <%= rev.revision_number %>)" class="p-1 text-gray-300 hover:text-red-600 transition" title="Delete revision">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
                   <% } %>
                 </div>
                 <!-- Edit mode (hidden by default) -->
                 <% if (isEdit) { %>
-                <form method="POST" action="/compliance/<%= item.id %>/revisions/<%= rev.id %>/edit" class="rev-edit hidden bg-white rounded-lg border-2 border-brand-200 px-3 py-2">
-                  <%- include('../partials/csrf') %>
+                <div class="rev-edit hidden bg-white rounded-lg border-2 border-brand-200 px-3 py-2" data-compliance-id="<%= item.id %>" data-rev-id="<%= rev.id %>">
                   <div class="flex items-end gap-3 flex-wrap">
                     <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex-shrink-0">R<%= rev.revision_number %></span>
                     <div class="flex-shrink-0">
@@ -483,10 +479,10 @@
                       <input type="checkbox" name="client_issued" value="1" <%= rev.client_issued ? 'checked' : '' %> class="w-4 h-4 bg-white border-gray-300 rounded text-purple-600 focus:ring-purple-500">
                       <span class="text-xs font-medium text-purple-700">Client Issued</span>
                     </label>
-                    <button type="submit" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition whitespace-nowrap">Save</button>
+                    <button type="button" onclick="saveRevEdit(this)" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition whitespace-nowrap">Save</button>
                     <button type="button" onclick="toggleRevEdit(<%= rev.id %>)" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition whitespace-nowrap">Cancel</button>
                   </div>
-                </form>
+                </div>
                 <% } %>
               </div>
               <% }) %>
@@ -620,13 +616,9 @@
               <span class="text-xs text-gray-400 flex-shrink-0"><%= doc.file_size ? (doc.file_size / 1024).toFixed(0) + ' KB' : '' %></span>
               <% if (doc.uploaded_by_name) { %><span class="text-xs text-gray-400 flex-shrink-0">by <%= doc.uploaded_by_name %></span><% } %>
             </div>
-            <form method="POST" action="/compliance/<%= item.id %>/documents/<%= doc.id %>/delete" class="inline flex-shrink-0" onsubmit="return confirm('Delete this document?')">
-              <%- include('../partials/csrf') %>
-              <input type="hidden" name="return_to" value="/compliance/<%= item.id %>/edit">
-              <button type="submit" class="p-1 text-gray-300 hover:text-red-600 transition" title="Delete">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              </button>
-            </form>
+            <button type="button" onclick="deleteDocument(<%= item.id %>, <%= doc.id %>)" class="p-1 text-gray-300 hover:text-red-600 transition flex-shrink-0" title="Delete">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
           </div>
           <% }) %>
         </div>
@@ -999,6 +991,49 @@ document.querySelectorAll('input[name="item_types"]').forEach(function(cb) {
 <% } %>
 
 // Toggle inline edit for a revision row
+function deleteDocument(complianceId, docId) {
+  if (!confirm('Delete this document?')) return;
+  var csrf = document.querySelector('meta[name="csrf-token"]').content;
+  fetch('/compliance/' + complianceId + '/documents/' + docId + '/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'x-csrf-token': csrf },
+    body: JSON.stringify({ return_to: '/compliance/' + complianceId + '/edit' })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.success) window.location.reload();
+    else alert(data.error || 'Failed to delete');
+  }).catch(function() { alert('Failed to delete document'); });
+}
+
+function deleteRevision(complianceId, revId, revNum) {
+  if (!confirm('Delete revision ' + revNum + '?')) return;
+  var csrf = document.querySelector('meta[name="csrf-token"]').content;
+  fetch('/compliance/' + complianceId + '/revisions/' + revId + '/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'x-csrf-token': csrf }
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.success) window.location.reload();
+    else alert(data.error || 'Failed to delete');
+  }).catch(function() { alert('Failed to delete revision'); });
+}
+
+function saveRevEdit(btn) {
+  var wrap = btn.closest('.rev-edit');
+  var complianceId = wrap.getAttribute('data-compliance-id');
+  var revId = wrap.getAttribute('data-rev-id');
+  var revDate = wrap.querySelector('[name="revision_date"]').value;
+  var revNotes = wrap.querySelector('[name="revision_notes"]').value;
+  var clientIssued = wrap.querySelector('[name="client_issued"]').checked ? '1' : '0';
+  var csrf = document.querySelector('meta[name="csrf-token"]').content;
+  fetch('/compliance/' + complianceId + '/revisions/' + revId + '/edit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'x-csrf-token': csrf },
+    body: 'revision_date=' + encodeURIComponent(revDate) + '&revision_notes=' + encodeURIComponent(revNotes) + '&client_issued=' + clientIssued
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.success) window.location.reload();
+    else alert(data.error || 'Failed to save');
+  }).catch(function() { alert('Failed to save revision'); });
+}
+
 function toggleRevEdit(revId) {
   var row = document.getElementById('rev-row-' + revId);
   if (!row) return;
