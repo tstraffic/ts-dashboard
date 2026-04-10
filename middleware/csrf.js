@@ -34,8 +34,9 @@ function csrfProtection(req, res, next) {
     return next();
   }
 
-  // Get token from body or header
-  const token = req.body._csrf || req.headers['x-csrf-token'];
+  // Get token from body or header (handle array from nested forms)
+  const rawToken = req.body._csrf || req.headers['x-csrf-token'];
+  const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
 
   if (!token || token !== req.session._csrf) {
     // AJAX request — return JSON error
