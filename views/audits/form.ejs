@@ -525,5 +525,92 @@
   } catch (e) {}
 
   recalc();
+
+  // ---- Upload blocks: fetch-based so we can sit inside the main form ----
+  function uplSetBusy(block, busy, err) {
+    const prog = block.querySelector('.upl-progress');
+    const errEl = block.querySelector('.upl-error');
+    if (prog) prog.classList.toggle('hidden', !busy);
+    if (errEl) {
+      if (err) { errEl.textContent = err; errEl.classList.remove('hidden'); }
+      else { errEl.classList.add('hidden'); errEl.textContent = ''; }
+    }
+  }
+  function uplRenderAttachment(att) {
+    const isImg = (att.mime_type || '').startsWith('image/');
+    const div = document.createElement('div');
+    div.className = 'group relative bg-gray-50 border border-gray-200 rounded-lg overflow-hidden';
+    div.setAttribute('data-att-id', att.id);
+    const thumb = isImg
+      ? '<a href="' + att.file_path + '" target="_blank"><img src="' + att.file_path + '" class="w-full h-20 sm:h-24 object-cover"></a>'
+      : '<a href="' + att.file_path + '" target="_blank" class="flex items-center justify-center h-20 sm:h-24 bg-gray-100 text-xs text-gray-500 px-2 text-center break-words">' + (att.original_name || 'file') + '</a>';
+    const caption = att.caption ? '<p class="text-[10px] text-gray-600 truncate px-1.5 py-1 bg-white border-t border-gray-100">' + att.caption + '</p>' : '';
+    div.innerHTML = thumb + caption + '<button type="button" class="upl-delete absolute top-1 right-1 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-bold opacity-80 sm:opacity-0 group-hover:opacity-100 focus:opacity-100 transition" title="Delete" data-att-id="' + att.id + '">×</button>';
+    return div;
+  }
+  async function uplDoUpload(block, files) {
+    if (!files || !files.length) return;
+    const auditId = block.getAttribute('data-audit-id');
+    const ctx = block.getAttribute('data-context-key');
+    const captionEl = block.querySelector('.upl-caption');
+    const caption = captionEl ? captionEl.value : '';
+    uplSetBusy(block, true, '');
+    try {
+      const fd = new FormData();
+      fd.append('context_key', ctx);
+      if (caption) fd.append('caption', caption);
+      for (let i = 0; i < files.length; i++) fd.append('files', files[i]);
+      const r = await fetch('/audits/' + auditId + '/attachments?json=1', {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json', 'X-CSRF-Token': window.AUDIT_CSRF }
+      });
+      if (!r.ok) throw new Error('Upload failed (HTTP ' + r.status + ')');
+      const data = await r.json();
+      if (!data.ok) throw new Error(data.error || 'Upload failed');
+      const grid = block.querySelector('.upl-grid');
+      (data.attachments || []).forEach(function(att) { grid.appendChild(uplRenderAttachment(att)); });
+      grid.classList.remove('hidden');
+      if (captionEl) captionEl.value = '';
+    } catch (e) {
+      uplSetBusy(block, false, e.message || 'Upload failed');
+      return;
+    }
+    uplSetBusy(block, false, '');
+  }
+
+  document.addEventListener('change', function(e) {
+    if (e.target.matches('.upl-file') || e.target.matches('.upl-camera')) {
+      const block = e.target.closest('[data-upload-block]');
+      if (!block) return;
+      const files = e.target.files;
+      uplDoUpload(block, files);
+      e.target.value = '';
+    }
+  });
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.upl-delete');
+    if (!btn) return;
+    const block = btn.closest('[data-upload-block]');
+    if (!block) return;
+    if (!confirm('Delete this file?')) return;
+    const auditId = block.getAttribute('data-audit-id');
+    const attId = btn.getAttribute('data-att-id');
+    fetch('/audits/' + auditId + '/attachments/' + attId + '/delete?json=1', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json', 'X-CSRF-Token': window.AUDIT_CSRF }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data && data.ok) {
+        const wrap = btn.closest('[data-att-id]');
+        if (wrap) wrap.remove();
+        const grid = block.querySelector('.upl-grid');
+        if (grid && !grid.children.length) grid.classList.add('hidden');
+      } else {
+        alert((data && data.error) || 'Delete failed');
+      }
+    }).catch(function() { alert('Delete failed'); });
+  });
 })();
 </script>
