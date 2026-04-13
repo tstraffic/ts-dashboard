@@ -4553,6 +4553,63 @@ function runMigrations(db) {
     }
   }
 
+  // Migration 97: Retry backfill of site diary entries for project-linked tasks
+  // (Migration 96 silently produced 0 rows on production — this version logs each insert and surfaces errors.)
+  if (!isMigrationApplied.get(97)) {
+    console.log('Running migration 97: Retry diary backfill for project-linked tasks (verbose)');
+    try {
+      const tasksWithJobs = db.prepare(`
+        SELECT t.id, t.title, t.job_id, t.due_date, t.created_at, t.created_by,
+               u.full_name as creator_name
+        FROM tasks t
+        LEFT JOIN users u ON t.created_by = u.id
+        WHERE t.job_id IS NOT NULL
+      `).all();
+      console.log(`Migration 97: found ${tasksWithJobs.length} tasks linked to projects`);
+
+      const insertDiary = db.prepare(`
+        INSERT INTO site_diary_entries (job_id, entry_date, task, outcomes, created_by_id)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      const hasEntryForTask = db.prepare(`
+        SELECT id FROM site_diary_entries
+        WHERE job_id = ? AND outcomes LIKE ?
+        LIMIT 1
+      `);
+
+      let added = 0, skipped = 0, failed = 0;
+      for (const t of tasksWithJobs) {
+        const needle = `%Task linked to project: "${t.title.replace(/"/g, '""')}"%`;
+        const exists = hasEntryForTask.get(t.job_id, needle);
+        if (exists) { skipped++; continue; }
+
+        const summary = `[${t.creator_name || 'System'}] Task linked to project: "${t.title}"${t.due_date ? ' (due ' + t.due_date + ')' : ''}.`;
+        const raw = t.created_at || new Date().toISOString();
+        const entryDate = String(raw).split('T')[0].split(' ')[0];
+
+        // Verify created_by actually exists; otherwise use NULL to avoid FK failure
+        let createdById = null;
+        if (t.created_by) {
+          const userRow = db.prepare('SELECT id FROM users WHERE id = ?').get(t.created_by);
+          createdById = userRow ? t.created_by : null;
+        }
+
+        try {
+          insertDiary.run(t.job_id, entryDate, 'Plans & Approvals Update', summary, createdById);
+          added++;
+        } catch (e) {
+          failed++;
+          console.error(`Migration 97: insert failed for task ${t.id} (job ${t.job_id}):`, e.message);
+        }
+      }
+      recordMigration.run(97, `Backfill retry: ${added} added, ${skipped} skipped, ${failed} failed`);
+      console.log(`Migration 97 applied: ${added} added, ${skipped} skipped, ${failed} failed`);
+    } catch (e) {
+      console.error('Migration 97 fatal error:', e.message, e.stack);
+      recordMigration.run(97, 'Backfill retry failed: ' + e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
