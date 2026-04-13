@@ -1,0 +1,299 @@
+<% const a = audit || {}; %>
+<% function val(k, fallback) { return (a && a[k] != null) ? a[k] : (fallback || ''); } %>
+
+<div class="px-4 lg:px-8 py-6">
+  <!-- Sticky header with live score -->
+  <div class="sticky top-[56px] lg:top-0 bg-white/90 backdrop-blur border-b border-gray-200 z-20 -mx-4 lg:-mx-8 px-4 lg:px-8 py-3 mb-4">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h1 class="text-lg lg:text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit Audit #' + a.id : 'New Site Audit' %></h1>
+        <p class="text-xs text-gray-500 hidden lg:block">Traffic Control Site Safety Audit — FORM-663</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="text-right">
+          <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Live Score</div>
+          <div class="flex items-baseline gap-1.5">
+            <span id="live-percent" class="text-2xl font-bold text-gray-900"><%= score.percent %>%</span>
+            <span class="text-xs text-gray-500">(<span id="live-score"><%= score.total %></span>/<span id="live-max"><%= score.max %></span>)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form method="POST" action="<%= isEdit ? '/audits/' + a.id : '/audits' %>" id="auditForm" class="space-y-6">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+
+    <!-- Header fields -->
+    <section class="bg-white border border-gray-200 rounded-xl p-5">
+      <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">Audit Details</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Project / Site</label>
+          <input name="project_site" value="<%= val('project_site') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="e.g. 38 York St">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Client</label>
+          <input name="client" value="<%= val('client') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Location</label>
+          <input name="location" value="<%= val('location') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Date / Time</label>
+          <input type="datetime-local" name="audit_datetime" value="<%= val('audit_datetime') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Linked Project (Job)</label>
+          <select name="job_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+            <option value="">— Not linked —</option>
+            <% jobs.forEach(function(j) { %>
+              <option value="<%= j.id %>" <%= String(val('job_id')) === String(j.id) ? 'selected' : '' %>><%= j.job_number %> — <%= j.client %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">TGS / TCP / TTM Ref</label>
+          <input name="tgs_ref" value="<%= val('tgs_ref') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Auditor</label>
+          <input name="auditor_name" value="<%= val('auditor_name') || (user && user.full_name) || '' %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Supervisor / STMS / Implementer</label>
+          <input name="supervisor_name" value="<%= val('supervisor_name') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Shift</label>
+          <select name="shift" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+            <% ['day','night'].forEach(function(s){ %>
+              <option value="<%= s %>" <%= val('shift') === s ? 'selected' : '' %>><%= s.charAt(0).toUpperCase() + s.slice(1) %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Weather / Visibility</label>
+          <input name="weather" value="<%= val('weather') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+      </div>
+    </section>
+
+    <!-- Checklist sections -->
+    <% sections.forEach(function(section) { %>
+      <section class="bg-white border border-gray-200 rounded-xl overflow-hidden" data-section="<%= section.key %>">
+        <header class="bg-brand-600 text-white px-5 py-3 flex items-center justify-between">
+          <h2 class="text-sm lg:text-base font-bold"><%= section.key %>. <%= section.title %></h2>
+          <span class="text-xs font-semibold bg-white/20 px-2 py-0.5 rounded-full" data-section-score="<%= section.key %>">0/0</span>
+        </header>
+        <div class="divide-y divide-gray-100">
+          <% section.items.forEach(function(item, idx) {
+            const key = section.key + '.' + (idx + 1);
+            const r = responses[key] || {};
+          %>
+            <div class="p-4 lg:px-5 lg:py-3 flex flex-col sm:flex-row sm:items-start gap-3" data-item="<%= key %>">
+              <div class="flex items-center gap-3 flex-1 min-w-0">
+                <!-- Checkbox -->
+                <label class="flex items-center gap-2 cursor-pointer select-none flex-shrink-0">
+                  <input type="checkbox" name="q_<%= key %>_checked" value="1" <%= r.checked ? 'checked' : '' %>
+                    class="q-check w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                </label>
+                <p class="text-sm text-gray-800 flex-1"><span class="font-semibold text-gray-500 mr-1"><%= key %></span><%= item %></p>
+              </div>
+              <div class="flex items-center gap-2 sm:gap-3 sm:flex-shrink-0">
+                <label class="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer select-none">
+                  <input type="checkbox" name="q_<%= key %>_na" value="1" <%= r.na ? 'checked' : '' %>
+                    class="q-na w-4 h-4 rounded border-gray-300 text-gray-500 cursor-pointer">
+                  N/A
+                </label>
+                <input name="q_<%= key %>_notes" value="<%= r.notes || '' %>" placeholder="Notes…" class="text-xs px-2 py-1.5 border border-gray-200 rounded-md w-full sm:w-48">
+              </div>
+            </div>
+          <% }) %>
+        </div>
+        <div class="px-5 py-3 border-t border-gray-100 bg-gray-50">
+          <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Section Comments</label>
+          <textarea name="section_<%= section.key %>_comments" rows="2" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white"><%= sectionComments[section.key] || '' %></textarea>
+        </div>
+      </section>
+    <% }) %>
+
+    <!-- Non-Conformance Register -->
+    <section class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <header class="bg-red-600 text-white px-5 py-3">
+        <h2 class="text-sm lg:text-base font-bold">12. Non-Conformance Register</h2>
+      </header>
+      <div class="p-4 overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs font-semibold text-gray-500 uppercase">
+              <th class="py-2 pr-2 w-10">#</th>
+              <th class="py-2 pr-2">Issue Found</th>
+              <th class="py-2 pr-2">Risk</th>
+              <th class="py-2 pr-2">Action Required</th>
+              <th class="py-2 pr-2">Responsible</th>
+              <th class="py-2 pr-2">Due</th>
+              <th class="py-2 pr-2">Closed</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% for (let i = 1; i <= 10; i++) { const nc = (nonconformances || [])[i-1] || {}; %>
+              <tr class="border-t border-gray-100">
+                <td class="py-1.5 pr-2 text-xs text-gray-500"><%= i %></td>
+                <td class="py-1.5 pr-2"><input name="nc_<%= i %>_issue" value="<%= nc.issue || '' %>" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded"></td>
+                <td class="py-1.5 pr-2">
+                  <select name="nc_<%= i %>_risk" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-white">
+                    <option value="">—</option>
+                    <% ['Low','Medium','High','Critical'].forEach(function(r){ %>
+                      <option value="<%= r %>" <%= nc.risk === r ? 'selected' : '' %>><%= r %></option>
+                    <% }) %>
+                  </select>
+                </td>
+                <td class="py-1.5 pr-2"><input name="nc_<%= i %>_action" value="<%= nc.action || '' %>" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded"></td>
+                <td class="py-1.5 pr-2"><input name="nc_<%= i %>_responsible" value="<%= nc.responsible || '' %>" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded"></td>
+                <td class="py-1.5 pr-2"><input type="date" name="nc_<%= i %>_due" value="<%= nc.due_date || '' %>" class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded"></td>
+                <td class="py-1.5 pr-2 text-center"><input type="checkbox" name="nc_<%= i %>_closed" value="1" <%= nc.closed ? 'checked' : '' %> class="w-4 h-4 rounded border-gray-300"></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Score summary + overall finding -->
+    <section class="bg-white border border-gray-200 rounded-xl p-5">
+      <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">Audit Scoring Summary</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4" id="score-summary">
+        <% scoreGroups.forEach(function(g, i) { const gr = score.groups[i] || {}; %>
+          <div class="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg" data-group="<%= i %>">
+            <span class="text-sm font-medium text-gray-700"><%= g.label %></span>
+            <span class="text-sm font-bold text-gray-900">
+              <span data-g-score><%= gr.score || 0 %></span>/<span data-g-max><%= gr.max || 0 %></span>
+              <span class="text-xs font-semibold text-gray-500 ml-2" data-g-percent><%= gr.percent || 0 %>%</span>
+            </span>
+          </div>
+        <% }) %>
+      </div>
+      <div class="pt-3 border-t border-gray-200">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-bold text-gray-900 uppercase tracking-wide">Overall Score</span>
+          <span class="text-xl font-bold text-brand-700">
+            <span id="live-score-2"><%= score.total %></span>/<span id="live-max-2"><%= score.max %></span>
+            <span class="text-sm font-semibold text-gray-500 ml-2">(<span id="live-percent-2"><%= score.percent %></span>%)</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Overall finding -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-5">
+        <% ['pass','pass_with_actions','fail'].forEach(function(opt) {
+          const labels = { pass: 'Pass', pass_with_actions: 'Pass with actions', fail: 'Fail — immediate rectification' };
+          const colors = { pass: 'emerald', pass_with_actions: 'amber', fail: 'red' };
+          const c = colors[opt];
+        %>
+          <label class="flex items-center gap-2 px-4 py-3 border-2 rounded-lg cursor-pointer transition
+            <%= val('overall_finding') === opt ? `border-${c}-500 bg-${c}-50` : 'border-gray-200 hover:border-gray-300' %>">
+            <input type="radio" name="overall_finding" value="<%= opt %>" <%= val('overall_finding') === opt ? 'checked' : '' %> class="w-4 h-4 text-<%= c %>-600">
+            <span class="text-sm font-semibold text-gray-800"><%= labels[opt] %></span>
+          </label>
+        <% }) %>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+        <label class="flex items-center gap-2">
+          <input type="checkbox" name="follow_up_required" value="1" <%= val('follow_up_required') ? 'checked' : '' %> class="w-4 h-4 rounded border-gray-300">
+          <span class="text-sm font-medium text-gray-700">Follow-up required</span>
+        </label>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Follow-up date</label>
+          <input type="date" name="follow_up_date" value="<%= val('follow_up_date') %>" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg">
+        </div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <div class="flex flex-col sm:flex-row gap-3 pb-6">
+      <button type="submit" name="submit" value="0" class="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl transition">
+        Save as Draft
+      </button>
+      <button type="submit" name="submit" value="1" class="flex-1 px-4 py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl transition">
+        <%= isEdit ? 'Update & Submit' : 'Submit Audit' %>
+      </button>
+      <a href="/audits<%= isEdit ? '/' + a.id : '' %>" class="sm:w-auto px-4 py-3 text-center text-gray-600 hover:text-gray-900 font-medium">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<!-- Pass section structure to client-side scoring -->
+<script>
+  window.AUDIT_SECTIONS = <%- JSON.stringify(sections.map(s => ({ key: s.key, itemCount: s.items.length }))) %>;
+  window.SCORE_GROUPS = <%- JSON.stringify(scoreGroups) %>;
+</script>
+<script>
+(function() {
+  function recalc() {
+    const groups = window.SCORE_GROUPS.map(function(g) {
+      let score = 0, max = 0;
+      g.sectionKeys.forEach(function(secKey) {
+        const section = window.AUDIT_SECTIONS.find(function(s) { return s.key === secKey; });
+        if (!section) return;
+        for (let i = 1; i <= section.itemCount; i++) {
+          const key = secKey + '.' + i;
+          const naEl = document.querySelector('input[name="q_' + key + '_na"]');
+          const chEl = document.querySelector('input[name="q_' + key + '_checked"]');
+          if (naEl && naEl.checked) continue;
+          max++;
+          if (chEl && chEl.checked) score++;
+        }
+      });
+      return { score: score, max: max, percent: max ? Math.round(score / max * 100) : 0 };
+    });
+    // Per-group display
+    document.querySelectorAll('#score-summary [data-group]').forEach(function(el) {
+      const idx = parseInt(el.getAttribute('data-group'), 10);
+      const g = groups[idx] || { score: 0, max: 0, percent: 0 };
+      el.querySelector('[data-g-score]').textContent = g.score;
+      el.querySelector('[data-g-max]').textContent = g.max;
+      el.querySelector('[data-g-percent]').textContent = g.percent + '%';
+    });
+    // Overall
+    const total = groups.reduce(function(a, g) { return a + g.score; }, 0);
+    const max = groups.reduce(function(a, g) { return a + g.max; }, 0);
+    const pct = max ? Math.round(total / max * 100) : 0;
+    ['live-score', 'live-score-2'].forEach(function(id){ const e = document.getElementById(id); if (e) e.textContent = total; });
+    ['live-max', 'live-max-2'].forEach(function(id){ const e = document.getElementById(id); if (e) e.textContent = max; });
+    ['live-percent'].forEach(function(id){ const e = document.getElementById(id); if (e) e.textContent = pct + '%'; });
+    const p2 = document.getElementById('live-percent-2'); if (p2) p2.textContent = pct;
+    // Per-section pill (sum items in that section only)
+    window.AUDIT_SECTIONS.forEach(function(s) {
+      let sScore = 0, sMax = 0;
+      for (let i = 1; i <= s.itemCount; i++) {
+        const key = s.key + '.' + i;
+        const naEl = document.querySelector('input[name="q_' + key + '_na"]');
+        const chEl = document.querySelector('input[name="q_' + key + '_checked"]');
+        if (naEl && naEl.checked) continue;
+        sMax++;
+        if (chEl && chEl.checked) sScore++;
+      }
+      const pill = document.querySelector('[data-section-score="' + s.key + '"]');
+      if (pill) pill.textContent = sScore + '/' + sMax;
+    });
+  }
+
+  document.addEventListener('change', function(e) {
+    if (e.target.matches('.q-check, .q-na')) {
+      // N/A should disable the check visually
+      if (e.target.matches('.q-na')) {
+        const row = e.target.closest('[data-item]');
+        if (row) {
+          const chk = row.querySelector('.q-check');
+          if (chk && e.target.checked) chk.checked = false;
+        }
+      }
+      recalc();
+    }
+  });
+  recalc();
+})();
+</script>

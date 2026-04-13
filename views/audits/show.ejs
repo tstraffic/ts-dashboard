@@ -1,0 +1,151 @@
+<% const a = audit; %>
+<% function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleString('en-AU'); } catch(e) { return d; } } %>
+<% function findingLabel(f) { return f === 'pass_with_actions' ? 'Pass with actions' : (f||'—').replace('_',' '); } %>
+
+<div class="px-4 lg:px-8 py-6">
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-3 mb-6">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <a href="/audits" class="text-sm text-brand-600 hover:underline">← All audits</a>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-900">Audit #<%= a.id %>: <%= a.project_site || 'Untitled site' %></h1>
+      <p class="text-sm text-gray-500">FORM-663 · <%= fmtDate(a.audit_datetime || a.created_at) %></p>
+    </div>
+    <div class="flex items-center gap-2">
+      <% if (a.status !== 'signed_off') { %>
+        <a href="/audits/<%= a.id %>/edit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg">Edit</a>
+      <% } %>
+      <% if (a.status === 'submitted') { %>
+        <form method="POST" action="/audits/<%= a.id %>/sign-off" class="inline">
+          <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+          <button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg">Sign Off</button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Score card -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div class="lg:col-span-1 bg-gradient-to-br from-brand-600 to-brand-800 text-white rounded-xl p-6">
+      <p class="text-xs font-semibold uppercase tracking-wide opacity-80">Overall Score</p>
+      <p class="text-5xl font-bold mt-2"><%= score.percent %>%</p>
+      <p class="text-sm opacity-90 mt-1"><%= score.total %> / <%= score.max %> items passed</p>
+      <div class="mt-4 pt-4 border-t border-white/20">
+        <p class="text-xs font-semibold uppercase tracking-wide opacity-80">Finding</p>
+        <p class="text-lg font-bold mt-1 capitalize"><%= findingLabel(a.overall_finding) %></p>
+      </div>
+    </div>
+    <div class="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">Scoring by Area</h3>
+      <div class="space-y-2">
+        <% score.groups.forEach(function(g) { const c = g.percent >= 90 ? 'emerald' : g.percent >= 70 ? 'amber' : 'red'; %>
+          <div>
+            <div class="flex justify-between text-sm mb-1">
+              <span class="font-medium text-gray-700"><%= g.label %></span>
+              <span class="font-bold text-gray-900"><%= g.score %>/<%= g.max %> <span class="text-xs text-gray-500">(<%= g.percent %>%)</span></span>
+            </div>
+            <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div class="h-full bg-<%= c %>-500" style="width: <%= g.percent %>%"></div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meta -->
+  <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+    <div><p class="text-xs text-gray-500 font-semibold uppercase">Client</p><p class="text-gray-900 mt-0.5"><%= a.client || '—' %></p></div>
+    <div><p class="text-xs text-gray-500 font-semibold uppercase">Location</p><p class="text-gray-900 mt-0.5"><%= a.location || '—' %></p></div>
+    <div><p class="text-xs text-gray-500 font-semibold uppercase">Project</p><p class="text-gray-900 mt-0.5"><%= a.job_number ? a.job_number + ' — ' + (a.job_client || '') : '—' %></p></div>
+    <div><p class="text-xs text-gray-500 font-semibold uppercase">TGS / TCP Ref</p><p class="text-gray-900 mt-0.5"><%= a.tgs_ref || '—' %></p></div>
+    <div><p class="text-xs text-gray-500 font-semibold uppercase">Shift</p><p class="text-gray-900 mt-0.5 capitalize"><%= a.shift || '—' %></p></div>
+    <div><p class="text-xs text-gray-500 font-semibold uppercase">Weather</p><p class="text-gray-900 mt-0.5"><%= a.weather || '—' %></p></div>
+    <div><p class="text-xs text-gray-500 font-semibold uppercase">Auditor</p><p class="text-gray-900 mt-0.5"><%= a.auditor_name || a.created_by_name || '—' %></p></div>
+    <div><p class="text-xs text-gray-500 font-semibold uppercase">Supervisor / STMS</p><p class="text-gray-900 mt-0.5"><%= a.supervisor_name || '—' %></p></div>
+  </div>
+
+  <!-- Sections -->
+  <% sections.forEach(function(section) { %>
+    <section class="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
+      <header class="bg-gray-50 border-b border-gray-200 px-5 py-3">
+        <h2 class="text-sm font-bold text-gray-900"><%= section.key %>. <%= section.title %></h2>
+      </header>
+      <div class="divide-y divide-gray-100">
+        <% section.items.forEach(function(item, idx) {
+          const key = section.key + '.' + (idx + 1);
+          const r = responses[key] || {};
+          let icon, iconClass;
+          if (r.na) { icon = 'N/A'; iconClass = 'bg-gray-100 text-gray-500'; }
+          else if (r.checked) { icon = '✓'; iconClass = 'bg-emerald-100 text-emerald-700'; }
+          else { icon = '✗'; iconClass = 'bg-red-100 text-red-700'; }
+        %>
+          <div class="px-5 py-3 flex items-start gap-3">
+            <span class="inline-flex items-center justify-center w-8 h-6 rounded text-xs font-bold flex-shrink-0 <%= iconClass %>"><%= icon %></span>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-gray-800"><span class="text-gray-500 font-mono mr-1"><%= key %></span><%= item %></p>
+              <% if (r.notes) { %><p class="text-xs text-gray-600 italic mt-1"><%= r.notes %></p><% } %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+      <% if (sectionComments[section.key]) { %>
+        <div class="px-5 py-3 bg-gray-50 border-t border-gray-200">
+          <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Comments</p>
+          <p class="text-sm text-gray-700 mt-0.5"><%= sectionComments[section.key] %></p>
+        </div>
+      <% } %>
+    </section>
+  <% }) %>
+
+  <!-- Non-conformances -->
+  <% if (nonconformances && nonconformances.length) { %>
+    <section class="bg-white border border-gray-200 rounded-xl overflow-hidden mb-6">
+      <header class="bg-red-50 border-b border-red-200 px-5 py-3">
+        <h2 class="text-sm font-bold text-red-900">Non-Conformance Register</h2>
+      </header>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500">
+            <tr><th class="px-4 py-2 text-left">#</th><th class="px-4 py-2 text-left">Issue</th><th class="px-4 py-2 text-left">Risk</th><th class="px-4 py-2 text-left">Action</th><th class="px-4 py-2 text-left">Responsible</th><th class="px-4 py-2 text-left">Due</th><th class="px-4 py-2">Closed</th></tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% nonconformances.forEach(function(nc, i) { %>
+              <tr>
+                <td class="px-4 py-2 text-gray-500"><%= i + 1 %></td>
+                <td class="px-4 py-2 text-gray-900"><%= nc.issue %></td>
+                <td class="px-4 py-2"><%= nc.risk || '—' %></td>
+                <td class="px-4 py-2"><%= nc.action || '—' %></td>
+                <td class="px-4 py-2"><%= nc.responsible || '—' %></td>
+                <td class="px-4 py-2"><%= nc.due_date || '—' %></td>
+                <td class="px-4 py-2 text-center"><%= nc.closed ? '✓' : '—' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% } %>
+
+  <!-- Sign-off info -->
+  <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6 text-sm text-gray-700">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div><span class="text-xs text-gray-500 font-semibold uppercase">Status</span><p class="mt-0.5 capitalize"><%= (a.status || 'draft').replace('_',' ') %></p></div>
+      <div><span class="text-xs text-gray-500 font-semibold uppercase">Created by</span><p class="mt-0.5"><%= a.created_by_name || '—' %> · <%= fmtDate(a.created_at) %></p></div>
+      <% if (a.signed_off_by_name) { %>
+        <div><span class="text-xs text-gray-500 font-semibold uppercase">Signed off by</span><p class="mt-0.5"><%= a.signed_off_by_name %> · <%= fmtDate(a.signed_off_at) %></p></div>
+      <% } %>
+      <% if (a.follow_up_required) { %>
+        <div><span class="text-xs text-gray-500 font-semibold uppercase">Follow-up</span><p class="mt-0.5 text-amber-700 font-semibold">Required by <%= a.follow_up_date || 'TBC' %></p></div>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (['admin','management'].includes((user.role || '').toLowerCase())) { %>
+    <form method="POST" action="/audits/<%= a.id %>/delete" onsubmit="return confirm('Delete this audit permanently?')" class="text-right">
+      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+      <button class="text-sm text-red-600 hover:text-red-800 font-medium">Delete audit</button>
+    </form>
+  <% } %>
+</div>

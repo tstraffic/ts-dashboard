@@ -48,6 +48,9 @@ const PERMISSIONS = {
   plans:         ['admin', 'planning'],
   updates:       ['admin', 'planning'],
 
+  // ── Site audits (safety/ops/planning/admin) ──
+  audits:        ['admin', 'operations', 'planning', 'management'],
+
   // ── Finance / Admin ──
   budgets:       ['admin', 'finance'],
   crm:           ['admin'],

@@ -189,6 +189,7 @@ app.use('/clients', requireLogin, requirePermission('clients'), require('./route
 app.use('/jobs', requireLogin, requirePermission('jobs'), require('./routes/jobs'));
 app.use('/tasks', requireLogin, requirePermission('tasks'), require('./routes/tasks'));
 app.use('/compliance', requireLogin, requirePermission('compliance'), require('./routes/compliance'));
+app.use('/audits', requireLogin, requirePermission('audits'), require('./routes/audits'));
 app.use('/plans', requireLogin, (req, res) => res.redirect('/compliance'));
 app.use('/incidents', requireLogin, requirePermission('incidents'), require('./routes/incidents'));
 app.use('/contacts', requireLogin, requirePermission('contacts'), require('./routes/contacts'));

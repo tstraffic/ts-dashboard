@@ -4610,6 +4610,47 @@ function runMigrations(db) {
     }
   }
 
+  // Migration 99: Site audits (Traffic Control Site Safety Audit — FORM-663)
+  if (!isMigrationApplied.get(99)) {
+    console.log('Running migration 99: Site audits module');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS site_audits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+        project_site TEXT DEFAULT '',
+        client TEXT DEFAULT '',
+        location TEXT DEFAULT '',
+        audit_datetime TEXT DEFAULT '',
+        auditor_id INTEGER REFERENCES users(id),
+        auditor_name TEXT DEFAULT '',
+        supervisor_name TEXT DEFAULT '',
+        tgs_ref TEXT DEFAULT '',
+        shift TEXT DEFAULT 'day',
+        weather TEXT DEFAULT '',
+        overall_result TEXT DEFAULT '',
+        overall_finding TEXT DEFAULT '',
+        responses_json TEXT DEFAULT '{}',
+        nonconformances_json TEXT DEFAULT '[]',
+        score_total INTEGER DEFAULT 0,
+        score_max INTEGER DEFAULT 0,
+        score_percent REAL DEFAULT 0,
+        status TEXT DEFAULT 'draft',
+        signed_off_by_id INTEGER REFERENCES users(id),
+        signed_off_at DATETIME,
+        follow_up_required INTEGER DEFAULT 0,
+        follow_up_date DATE,
+        created_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_site_audits_job ON site_audits(job_id);
+      CREATE INDEX IF NOT EXISTS idx_site_audits_status ON site_audits(status);
+      CREATE INDEX IF NOT EXISTS idx_site_audits_created_by ON site_audits(created_by_id);
+    `);
+    recordMigration.run(99, 'Site audits table (FORM-663)');
+    console.log('Migration 99 applied: site_audits table created');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
