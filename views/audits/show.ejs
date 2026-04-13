@@ -2,6 +2,24 @@
 <% function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleString('en-AU'); } catch(e) { return d; } } %>
 <% function findingLabel(f) { return f === 'pass_with_actions' ? 'Pass with actions' : (f||'—').replace('_',' '); } %>
 <% function stateOf(r) { if (!r) return ''; if (r.state) return r.state; if (r.na) return 'na'; if (r.checked) return 'yes'; return ''; } %>
+<% const ctxMap = (typeof attachmentsByContext !== 'undefined') ? (attachmentsByContext || {}) : {}; %>
+<% function thumbGrid(items) {
+  if (!items || !items.length) return '';
+  let html = '<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 mt-2">';
+  items.forEach(function(att) {
+    const isImg = (att.mime_type || '').startsWith('image/');
+    html += '<div class="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">';
+    if (isImg) {
+      html += '<a href="' + att.file_path + '" target="_blank"><img src="' + att.file_path + '" alt="' + att.original_name + '" class="w-full h-20 sm:h-24 object-cover"></a>';
+    } else {
+      html += '<a href="' + att.file_path + '" target="_blank" class="flex items-center justify-center h-20 sm:h-24 bg-gray-100 text-gray-400">📄</a>';
+    }
+    if (att.caption) html += '<p class="text-[10px] text-gray-600 truncate px-1.5 py-1">' + att.caption + '</p>';
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+} %>
 
 <div class="px-4 lg:px-8 py-6">
   <!-- Header -->
@@ -67,6 +85,14 @@
     <div><p class="text-xs text-gray-500 font-semibold uppercase">Supervisor / STMS</p><p class="text-gray-900 mt-0.5"><%= a.supervisor_name || '—' %></p></div>
   </div>
 
+  <!-- Site Overview Evidence -->
+  <% if ((ctxMap['overview'] || []).length) { %>
+    <section class="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+      <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-2">Site Overview Evidence</h2>
+      <%- thumbGrid(ctxMap['overview']) %>
+    </section>
+  <% } %>
+
   <!-- Sections -->
   <% sections.forEach(function(section) { %>
     <section class="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
@@ -99,6 +125,12 @@
           <p class="text-sm text-gray-700 mt-0.5"><%= sectionComments[section.key] %></p>
         </div>
       <% } %>
+      <% const _secItems = ctxMap['section_' + section.key] || []; if (_secItems.length) { %>
+        <div class="px-5 py-3 bg-blue-50/30 border-t border-gray-200">
+          <p class="text-[11px] font-semibold text-brand-700 uppercase tracking-wide">Evidence (<%= _secItems.length %>)</p>
+          <%- thumbGrid(_secItems) %>
+        </div>
+      <% } %>
     </section>
   <% }) %>
 
@@ -114,7 +146,7 @@
             <tr><th class="px-4 py-2 text-left">#</th><th class="px-4 py-2 text-left">Issue</th><th class="px-4 py-2 text-left">Risk</th><th class="px-4 py-2 text-left">Action</th><th class="px-4 py-2 text-left">Responsible</th><th class="px-4 py-2 text-left">Due</th><th class="px-4 py-2">Closed</th></tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <% nonconformances.forEach(function(nc, i) { %>
+            <% nonconformances.forEach(function(nc, i) { const ncItems = ctxMap['nc_' + (i + 1)] || []; %>
               <tr>
                 <td class="px-4 py-2 text-gray-500"><%= i + 1 %></td>
                 <td class="px-4 py-2 text-gray-900"><%= nc.issue %></td>
@@ -124,6 +156,12 @@
                 <td class="px-4 py-2"><%= nc.due_date || '—' %></td>
                 <td class="px-4 py-2 text-center"><%= nc.closed ? '✓' : '—' %></td>
               </tr>
+              <% if (ncItems.length) { %>
+                <tr class="bg-red-50/30">
+                  <td></td>
+                  <td colspan="6" class="px-4 pb-3"><%- thumbGrid(ncItems) %></td>
+                </tr>
+              <% } %>
             <% }) %>
           </tbody>
         </table>
@@ -131,11 +169,12 @@
     </section>
   <% } %>
 
-  <!-- Photos & Documents -->
+  <!-- General photos & documents (non-contextual) -->
+  <% const _generalAtts = (ctxMap['general'] || []); %>
   <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Photos & Documents</h2>
-      <span class="text-xs text-gray-500"><%= (typeof attachments !== 'undefined' ? attachments.length : 0) %> file(s)</span>
+      <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide">General Photos & Documents</h2>
+      <span class="text-xs text-gray-500"><%= _generalAtts.length %> file(s) · <%= (typeof attachments !== 'undefined' ? attachments.length : 0) %> total</span>
     </div>
 
     <!-- Upload form -->
@@ -150,9 +189,9 @@
       <p class="text-[11px] text-gray-500 mt-2">Max 25MB per file · Images, PDF, Word, Excel</p>
     </form>
 
-    <% if (typeof attachments !== 'undefined' && attachments.length) { %>
+    <% if (_generalAtts.length) { %>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <% attachments.forEach(function(att) { const isImg = (att.mime_type || '').startsWith('image/'); %>
+        <% _generalAtts.forEach(function(att) { const isImg = (att.mime_type || '').startsWith('image/'); %>
           <div class="group relative bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
             <% if (isImg) { %>
               <a href="<%= att.file_path %>" target="_blank">
@@ -179,6 +218,35 @@
       <p class="text-sm text-gray-500 text-center py-4">No photos or documents uploaded yet.</p>
     <% } %>
   </section>
+
+  <!-- Signatures / Annotated TGS -->
+  <% if (a.auditor_signature_text || a.supervisor_signature_text || (ctxMap['annotated_tgs'] || []).length) { %>
+    <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+      <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">Sign-off &amp; Annotations</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <% if (a.auditor_signature_text) { %>
+          <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <p class="text-xs text-gray-500 uppercase font-semibold">Auditor</p>
+            <p class="text-2xl text-gray-900 mt-1" style="font-family:'Brush Script MT','Segoe Script',cursive;"><%= a.auditor_signature_text %></p>
+            <p class="text-[11px] text-emerald-700 mt-1">✓ Signed <%= fmtDate(a.auditor_signed_at) %></p>
+          </div>
+        <% } %>
+        <% if (a.supervisor_signature_text) { %>
+          <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <p class="text-xs text-gray-500 uppercase font-semibold">Supervisor / STMS</p>
+            <p class="text-2xl text-gray-900 mt-1" style="font-family:'Brush Script MT','Segoe Script',cursive;"><%= a.supervisor_signature_text %></p>
+            <p class="text-[11px] text-emerald-700 mt-1">✓ Signed <%= fmtDate(a.supervisor_signed_at) %></p>
+          </div>
+        <% } %>
+      </div>
+      <% if ((ctxMap['annotated_tgs'] || []).length) { %>
+        <div class="mt-4 pt-4 border-t border-gray-100">
+          <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Annotated TGS / Close-out Sketch</p>
+          <%- thumbGrid(ctxMap['annotated_tgs']) %>
+        </div>
+      <% } %>
+    </section>
+  <% } %>
 
   <!-- Sign-off info -->
   <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6 text-sm text-gray-700">

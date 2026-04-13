@@ -4675,6 +4675,30 @@ function runMigrations(db) {
     console.log('Migration 100 applied: audit_attachments table created');
   }
 
+  // Migration 101: Signature columns for site_audits (auditor + supervisor typed signatures)
+  if (!isMigrationApplied.get(101)) {
+    console.log('Running migration 101: Audit signature columns');
+    try {
+      const cols = db.prepare("PRAGMA table_info(site_audits)").all().map(c => c.name);
+      if (!cols.includes('auditor_signature_text')) {
+        db.exec(`ALTER TABLE site_audits ADD COLUMN auditor_signature_text TEXT DEFAULT ''`);
+      }
+      if (!cols.includes('auditor_signed_at')) {
+        db.exec(`ALTER TABLE site_audits ADD COLUMN auditor_signed_at DATETIME`);
+      }
+      if (!cols.includes('supervisor_signature_text')) {
+        db.exec(`ALTER TABLE site_audits ADD COLUMN supervisor_signature_text TEXT DEFAULT ''`);
+      }
+      if (!cols.includes('supervisor_signed_at')) {
+        db.exec(`ALTER TABLE site_audits ADD COLUMN supervisor_signed_at DATETIME`);
+      }
+      recordMigration.run(101, 'Added signature text columns to site_audits');
+      console.log('Migration 101 applied: signature columns added');
+    } catch (e) {
+      console.error('Migration 101 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

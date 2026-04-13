@@ -1,0 +1,58 @@
+<%
+// Reusable upload block for per-context audit evidence (mobile-first).
+// Params: auditId, contextKey, label, hint, accept, returnTo, items (array), csrfToken
+const _items = items || [];
+%>
+<div class="space-y-2">
+  <!-- Upload form: opens file picker / camera on mobile, note Enctype multipart -->
+  <form method="POST" action="/audits/<%= auditId %>/attachments" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-2">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="context_key" value="<%= contextKey %>">
+    <input type="hidden" name="return_to" value="<%= returnTo %>">
+
+    <label class="flex-1 flex items-center justify-center gap-2 px-3 py-3 bg-white border-2 border-dashed border-brand-300 rounded-lg text-sm font-semibold text-brand-700 cursor-pointer hover:bg-brand-50 active:bg-brand-100 transition">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16l3-8 3 4 4-6 4 8 4-4v10H3z M12 4v2"/></svg>
+      <span><%= label %></span>
+      <input type="file" name="files" multiple accept="<%= accept %>" capture="environment" class="sr-only file-input">
+    </label>
+    <input name="caption" placeholder="Caption (optional)" class="sm:w-48 px-3 py-2.5 text-sm border border-gray-200 rounded-lg">
+    <button type="submit" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-sm font-semibold rounded-lg">Upload</button>
+  </form>
+  <p class="text-[11px] text-gray-500"><%= hint %> · Max 25MB</p>
+
+  <% if (_items.length) { %>
+    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+      <% _items.forEach(function(att) { const isImg = (att.mime_type || '').startsWith('image/'); %>
+        <div class="group relative bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+          <% if (isImg) { %>
+            <a href="<%= att.file_path %>" target="_blank">
+              <img src="<%= att.file_path %>" alt="<%= att.original_name %>" class="w-full h-20 sm:h-24 object-cover">
+            </a>
+          <% } else { %>
+            <a href="<%= att.file_path %>" target="_blank" class="flex items-center justify-center h-20 sm:h-24 bg-gray-100">
+              <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            </a>
+          <% } %>
+          <% if (att.caption) { %><p class="text-[10px] text-gray-600 truncate px-1.5 py-1 bg-white border-t border-gray-100"><%= att.caption %></p><% } %>
+          <form method="POST" action="/audits/<%= auditId %>/attachments/<%= att.id %>/delete" onsubmit="return confirm('Delete this file?')" class="absolute top-1 right-1">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="return_to" value="<%= returnTo %>">
+            <button type="submit" class="w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-bold opacity-80 sm:opacity-0 group-hover:opacity-100 focus:opacity-100 transition" title="Delete">×</button>
+          </form>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<script>
+// Auto-submit when file(s) selected (skips tap-to-upload button on mobile)
+(function(){
+  const scope = document.currentScript.previousElementSibling;
+  if (!scope) return;
+  const inp = scope.querySelector('.file-input');
+  if (inp) inp.addEventListener('change', function() {
+    if (inp.files && inp.files.length) inp.form.submit();
+  });
+})();
+</script>
