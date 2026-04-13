@@ -4512,6 +4512,47 @@ function runMigrations(db) {
     console.log('Migration 95 applied: quiz scoring columns');
   }
 
+  // Migration 96: Backfill site diary entries for existing tasks linked to a project
+  if (!isMigrationApplied.get(96)) {
+    console.log('Running migration 96: Backfill site diary entries for project-linked tasks');
+    try {
+      const tasksWithJobs = db.prepare(`
+        SELECT t.id, t.title, t.job_id, t.due_date, t.created_at, t.created_by,
+               u.full_name as creator_name
+        FROM tasks t
+        LEFT JOIN users u ON t.created_by = u.id
+        WHERE t.job_id IS NOT NULL
+      `).all();
+
+      const insertDiary = db.prepare(`
+        INSERT INTO site_diary_entries (job_id, entry_date, task, outcomes, created_by_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      const hasEntry = db.prepare(`
+        SELECT 1 FROM site_diary_entries
+        WHERE job_id = ? AND outcomes LIKE ? LIMIT 1
+      `);
+
+      let added = 0;
+      for (const t of tasksWithJobs) {
+        const summary = `[${t.creator_name || 'System'}] Task linked to project: "${t.title}"${t.due_date ? ' (due ' + t.due_date + ')' : ''}.`;
+        // Skip if an entry with same outcome already exists for this job
+        const exists = hasEntry.get(t.job_id, '%Task linked to project: "' + t.title + '"%');
+        if (exists) continue;
+        const entryDate = (t.created_at || new Date().toISOString()).split('T')[0].split(' ')[0];
+        try {
+          insertDiary.run(t.job_id, entryDate, 'Plans & Approvals Update', summary, t.created_by || null, t.created_at || new Date().toISOString());
+          added++;
+        } catch (e) { /* skip failures */ }
+      }
+      recordMigration.run(96, `Backfilled ${added} site diary entries for project-linked tasks`);
+      console.log(`Migration 96 applied: ${added} diary entries backfilled`);
+    } catch (e) {
+      console.error('Migration 96 error:', e.message);
+      recordMigration.run(96, 'Backfill skipped: ' + e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

@@ -175,6 +175,17 @@ router.post('/', (req, res) => {
       }
     }
 
+    // Auto-log to site diary when task is linked to a project on creation
+    if (jobId) {
+      try {
+        autoLogDiary(db, {
+          jobId,
+          summary: `[${req.session.user ? req.session.user.full_name : 'System'}] Task linked to project: "${b.title}"${b.owner_id ? ' — assigned to ' + (db.prepare('SELECT full_name FROM users WHERE id = ?').get(b.owner_id) || {}).full_name || '' : ''}${b.due_date ? ' (due ' + b.due_date + ')' : ''}.`,
+          userId: req.session.user ? req.session.user.id : null
+        });
+      } catch (e) { console.error('[Tasks] Diary log error on create:', e.message); }
+    }
+
     req.flash('success', 'Task created.');
     res.redirect(b.return_to || '/tasks');
   } catch (err) {
@@ -340,6 +351,18 @@ router.post('/:id', (req, res) => {
     }
 
     // Auto-log to site diary
+    const jobChanged = String(existingTask.job_id || '') !== String(updateJobId || '');
+    // Case: task newly linked to a project (was unlinked or linked to a different job)
+    if (jobChanged && updateJobId) {
+      try {
+        autoLogDiary(db, {
+          jobId: updateJobId,
+          summary: `[${req.session.user ? req.session.user.full_name : 'System'}] Task linked to project: "${b.title}"${b.due_date ? ' (due ' + b.due_date + ')' : ''}.`,
+          userId: req.session.user ? req.session.user.id : null
+        });
+      } catch (e) { console.error('[Tasks] Diary log error on link:', e.message); }
+    }
+
     if (existingTask.job_id || b.job_id) {
       const changes = [];
       if (existingTask.status !== b.status) changes.push(`Status: ${(existingTask.status || '').replace(/_/g, ' ')} → ${(b.status || '').replace(/_/g, ' ')}`);
