@@ -35,24 +35,38 @@ function parseJson(s, fallback) {
   try { return JSON.parse(s || ''); } catch (e) { return fallback; }
 }
 
+// Coalesce a form value that may be a string or array (happens when the
+// mobile stacked NC view and the desktop NC table both render the
+// same-named inputs — Express body-parser collapses dupes into arrays).
+function firstVal(v) {
+  if (v == null) return '';
+  if (Array.isArray(v)) {
+    for (const x of v) {
+      if (x != null && String(x).trim() !== '') return String(x);
+    }
+    return '';
+  }
+  return String(v);
+}
+function firstTrim(v) { return firstVal(v).trim(); }
+
 // Normalise req.body into responses_json + nonconformances_json
 function buildResponsesFromBody(b) {
   const responses = {};
   for (const section of AUDIT_SECTIONS) {
     section.items.forEach((_, idx) => {
       const key = `${section.key}.${idx + 1}`;
-      const raw = b[`q_${key}_state`];
+      const raw = firstVal(b[`q_${key}_state`]);
       const state = ['yes', 'no', 'na'].includes(raw) ? raw : '';
-      const notes = (b[`q_${key}_notes`] || '').trim();
+      const notes = firstTrim(b[`q_${key}_notes`]);
       if (state || notes) {
         responses[key] = { state, notes };
       }
     });
   }
-  // Section-level comments
   const sectionComments = {};
   for (const section of AUDIT_SECTIONS) {
-    const c = (b[`section_${section.key}_comments`] || '').trim();
+    const c = firstTrim(b[`section_${section.key}_comments`]);
     if (c) sectionComments[section.key] = c;
   }
   return { responses, sectionComments };
@@ -61,14 +75,14 @@ function buildResponsesFromBody(b) {
 function buildNonconformancesFromBody(b) {
   const rows = [];
   for (let i = 1; i <= 10; i++) {
-    const issue = (b[`nc_${i}_issue`] || '').trim();
+    const issue = firstTrim(b[`nc_${i}_issue`]);
     if (!issue) continue;
     rows.push({
       issue,
-      risk: (b[`nc_${i}_risk`] || '').trim(),
-      action: (b[`nc_${i}_action`] || '').trim(),
-      responsible: (b[`nc_${i}_responsible`] || '').trim(),
-      due_date: (b[`nc_${i}_due`] || '').trim(),
+      risk: firstTrim(b[`nc_${i}_risk`]),
+      action: firstTrim(b[`nc_${i}_action`]),
+      responsible: firstTrim(b[`nc_${i}_responsible`]),
+      due_date: firstTrim(b[`nc_${i}_due`]),
       closed: !!b[`nc_${i}_closed`],
     });
   }
