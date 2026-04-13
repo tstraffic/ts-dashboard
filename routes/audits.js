@@ -1,8 +1,35 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { getDb } = require('../db/database');
 const { AUDIT_SECTIONS, SCORE_GROUPS, computeScore } = require('../lib/auditQuestions');
 const { autoLogDiary } = require('../lib/diary');
+
+// ---- Multer storage: data/uploads/audits/{auditId}/ ----
+const auditStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const auditId = req.params.id;
+    const dest = path.join(__dirname, '..', 'data', 'uploads', 'audits', String(auditId));
+    fs.mkdirSync(dest, { recursive: true });
+    cb(null, dest);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    const safe = Date.now() + '-' + Math.round(Math.random() * 1e9) + ext;
+    cb(null, safe);
+  },
+});
+const ALLOWED_MIME = /^(image\/(jpeg|png|gif|webp|heic)|application\/(pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet)|text\/plain)$/i;
+const auditUpload = multer({
+  storage: auditStorage,
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: function (req, file, cb) {
+    if (ALLOWED_MIME.test(file.mimetype)) cb(null, true);
+    else cb(new Error('File type not allowed'));
+  },
+});
 
 function parseJson(s, fallback) {
   try { return JSON.parse(s || ''); } catch (e) { return fallback; }
@@ -14,11 +41,11 @@ function buildResponsesFromBody(b) {
   for (const section of AUDIT_SECTIONS) {
     section.items.forEach((_, idx) => {
       const key = `${section.key}.${idx + 1}`;
-      const checked = !!b[`q_${key}_checked`];
-      const na = !!b[`q_${key}_na`];
+      const raw = b[`q_${key}_state`];
+      const state = ['yes', 'no', 'na'].includes(raw) ? raw : '';
       const notes = (b[`q_${key}_notes`] || '').trim();
-      if (checked || na || notes) {
-        responses[key] = { checked, na, notes };
+      if (state || notes) {
+        responses[key] = { state, notes };
       }
     });
   }
@@ -89,7 +116,7 @@ router.get('/', (req, res) => {
 // GET /new — create form
 router.get('/new', (req, res) => {
   const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, job_name, client, site_address, suburb FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   res.render('audits/form', {
     title: 'New Site Audit',
     audit: null,
@@ -181,11 +208,12 @@ router.get('/:id', (req, res) => {
   const sectionComments = stored.sectionComments || {};
   const nonconformances = parseJson(audit.nonconformances_json, []) || [];
   const score = computeScore(responses);
+  const attachments = db.prepare('SELECT * FROM audit_attachments WHERE audit_id = ? ORDER BY uploaded_at DESC').all(audit.id);
 
   res.render('audits/show', {
     title: 'Audit #' + audit.id,
     audit,
-    responses, sectionComments, nonconformances,
+    responses, sectionComments, nonconformances, attachments,
     sections: AUDIT_SECTIONS, scoreGroups: SCORE_GROUPS, score,
     user: req.session.user,
     currentPage: 'audits',
@@ -206,12 +234,13 @@ router.get('/:id/edit', (req, res) => {
   const responses = stored.responses || stored;
   const sectionComments = stored.sectionComments || {};
   const nonconformances = parseJson(audit.nonconformances_json, []) || [];
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs ORDER BY job_number DESC").all();
+  const jobs = db.prepare("SELECT id, job_number, job_name, client, site_address, suburb FROM jobs ORDER BY job_number DESC").all();
+  const attachments = db.prepare('SELECT * FROM audit_attachments WHERE audit_id = ? ORDER BY uploaded_at DESC').all(audit.id);
 
   res.render('audits/form', {
     title: 'Edit Audit #' + audit.id,
     audit,
-    responses, sectionComments, nonconformances,
+    responses, sectionComments, nonconformances, attachments,
     sections: AUDIT_SECTIONS, scoreGroups: SCORE_GROUPS,
     score: computeScore(responses),
     jobs, user: req.session.user, currentPage: 'audits',
@@ -268,6 +297,50 @@ router.post('/:id', (req, res) => {
     req.flash('error', 'Failed to update audit: ' + err.message);
     res.redirect('/audits/' + req.params.id + '/edit');
   }
+});
+
+// POST /:id/attachments — upload one or more files
+router.post('/:id/attachments', auditUpload.array('files', 20), (req, res) => {
+  try {
+    const db = getDb();
+    const audit = db.prepare('SELECT id FROM site_audits WHERE id = ?').get(req.params.id);
+    if (!audit) { req.flash('error', 'Audit not found.'); return res.redirect('/audits'); }
+    if (!req.files || !req.files.length) { req.flash('error', 'No files uploaded.'); return res.redirect('/audits/' + req.params.id); }
+
+    const context = (req.body.context_key || 'general').trim();
+    const caption = (req.body.caption || '').trim();
+
+    const insert = db.prepare(`
+      INSERT INTO audit_attachments (audit_id, context_key, caption, filename, original_name, file_path, file_size, mime_type, uploaded_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const f of req.files) {
+      const servedPath = `/data/uploads/audits/${req.params.id}/${f.filename}`;
+      insert.run(audit.id, context, caption, f.filename, f.originalname, servedPath, f.size, f.mimetype, req.session.user.id);
+    }
+
+    req.flash('success', `${req.files.length} file(s) uploaded.`);
+    res.redirect(req.body.return_to || ('/audits/' + req.params.id));
+  } catch (err) {
+    console.error('[Audits] Upload error:', err.message);
+    req.flash('error', 'Upload failed: ' + err.message);
+    res.redirect('/audits/' + req.params.id);
+  }
+});
+
+// POST /:id/attachments/:attId/delete — delete an attachment
+router.post('/:id/attachments/:attId/delete', (req, res) => {
+  const db = getDb();
+  const att = db.prepare('SELECT * FROM audit_attachments WHERE id = ? AND audit_id = ?').get(req.params.attId, req.params.id);
+  if (att) {
+    try {
+      const full = path.join(__dirname, '..', 'data', 'uploads', 'audits', String(req.params.id), att.filename);
+      fs.unlinkSync(full);
+    } catch (e) { /* file may already be gone */ }
+    db.prepare('DELETE FROM audit_attachments WHERE id = ?').run(att.id);
+  }
+  req.flash('success', 'Attachment deleted.');
+  res.redirect(req.body.return_to || ('/audits/' + req.params.id));
 });
 
 // POST /:id/sign-off — final sign-off

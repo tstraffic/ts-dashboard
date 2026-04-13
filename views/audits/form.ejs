@@ -1,5 +1,6 @@
 <% const a = audit || {}; %>
 <% function val(k, fallback) { return (a && a[k] != null) ? a[k] : (fallback || ''); } %>
+<% function stateOf(r) { if (!r) return ''; if (r.state) return r.state; if (r.na) return 'na'; if (r.checked) return 'yes'; return ''; } %>
 
 <div class="px-4 lg:px-8 py-6">
   <!-- Sticky header with live score -->
@@ -7,7 +8,7 @@
     <div class="flex items-center justify-between gap-3">
       <div>
         <h1 class="text-lg lg:text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit Audit #' + a.id : 'New Site Audit' %></h1>
-        <p class="text-xs text-gray-500 hidden lg:block">Traffic Control Site Safety Audit — FORM-663</p>
+        <p class="text-xs text-gray-500 hidden lg:block">Traffic Control Site Safety Audit</p>
       </div>
       <div class="flex items-center gap-2">
         <div class="text-right">
@@ -24,46 +25,48 @@
   <form method="POST" action="<%= isEdit ? '/audits/' + a.id : '/audits' %>" id="auditForm" class="space-y-6">
     <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
 
-    <!-- Header fields -->
+    <!-- Header fields: Linked Project FIRST (auto-fills other fields) -->
     <section class="bg-white border border-gray-200 rounded-xl p-5">
       <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">Audit Details</h2>
+
+      <div class="mb-4">
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Linked Project (Job) <span class="text-gray-400 font-normal">— auto-fills client, site & location below</span></label>
+        <select name="job_id" id="job-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+          <option value="">— Not linked —</option>
+          <% jobs.forEach(function(j) { %>
+            <option value="<%= j.id %>"
+              data-job-number="<%= j.job_number || '' %>"
+              data-job-name="<%= j.job_name || '' %>"
+              data-client="<%= j.client || '' %>"
+              data-site="<%= j.site_address || '' %>"
+              data-suburb="<%= j.suburb || '' %>"
+              <%= String(val('job_id')) === String(j.id) ? 'selected' : '' %>>
+              <%= j.job_number %><%= j.job_name ? ' — ' + j.job_name : '' %> — <%= j.client %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">Project / Site</label>
-          <input name="project_site" value="<%= val('project_site') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="e.g. 38 York St">
+          <input id="f-project_site" name="project_site" value="<%= val('project_site') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="e.g. 38 York St">
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">Client</label>
-          <input name="client" value="<%= val('client') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+          <input id="f-client" name="client" value="<%= val('client') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">Location</label>
-          <input name="location" value="<%= val('location') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+          <input id="f-location" name="location" value="<%= val('location') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">Date / Time</label>
           <input type="datetime-local" name="audit_datetime" value="<%= val('audit_datetime') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
         </div>
         <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1">Linked Project (Job)</label>
-          <select name="job_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
-            <option value="">— Not linked —</option>
-            <% jobs.forEach(function(j) { %>
-              <option value="<%= j.id %>" <%= String(val('job_id')) === String(j.id) ? 'selected' : '' %>><%= j.job_number %> — <%= j.client %></option>
-            <% }) %>
-          </select>
-        </div>
-        <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">TGS / TCP / TTM Ref</label>
           <input name="tgs_ref" value="<%= val('tgs_ref') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1">Auditor</label>
-          <input name="auditor_name" value="<%= val('auditor_name') || (user && user.full_name) || '' %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1">Supervisor / STMS / Implementer</label>
-          <input name="supervisor_name" value="<%= val('supervisor_name') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">Shift</label>
@@ -74,6 +77,14 @@
           </select>
         </div>
         <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Auditor</label>
+          <input name="auditor_name" value="<%= val('auditor_name') || (user && user.full_name) || '' %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Supervisor / STMS / Implementer</label>
+          <input name="supervisor_name" value="<%= val('supervisor_name') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div class="md:col-span-2">
           <label class="block text-xs font-semibold text-gray-700 mb-1">Weather / Visibility</label>
           <input name="weather" value="<%= val('weather') %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
         </div>
@@ -91,23 +102,26 @@
           <% section.items.forEach(function(item, idx) {
             const key = section.key + '.' + (idx + 1);
             const r = responses[key] || {};
+            const currentState = stateOf(r);
           %>
-            <div class="p-4 lg:px-5 lg:py-3 flex flex-col sm:flex-row sm:items-start gap-3" data-item="<%= key %>">
-              <div class="flex items-center gap-3 flex-1 min-w-0">
-                <!-- Checkbox -->
-                <label class="flex items-center gap-2 cursor-pointer select-none flex-shrink-0">
-                  <input type="checkbox" name="q_<%= key %>_checked" value="1" <%= r.checked ? 'checked' : '' %>
-                    class="q-check w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
-                </label>
-                <p class="text-sm text-gray-800 flex-1"><span class="font-semibold text-gray-500 mr-1"><%= key %></span><%= item %></p>
-              </div>
-              <div class="flex items-center gap-2 sm:gap-3 sm:flex-shrink-0">
-                <label class="flex items-center gap-1.5 text-xs font-medium text-gray-600 cursor-pointer select-none">
-                  <input type="checkbox" name="q_<%= key %>_na" value="1" <%= r.na ? 'checked' : '' %>
-                    class="q-na w-4 h-4 rounded border-gray-300 text-gray-500 cursor-pointer">
-                  N/A
-                </label>
-                <input name="q_<%= key %>_notes" value="<%= r.notes || '' %>" placeholder="Notes…" class="text-xs px-2 py-1.5 border border-gray-200 rounded-md w-full sm:w-48">
+            <div class="px-4 py-3 lg:px-5 flex flex-col sm:flex-row sm:items-center gap-3" data-item="<%= key %>">
+              <p class="text-sm text-gray-800 flex-1 min-w-0">
+                <span class="font-semibold text-gray-500 mr-1"><%= key %></span><%= item %>
+              </p>
+              <div class="flex items-center gap-2 sm:flex-shrink-0">
+                <!-- Yes / No / N/A pills -->
+                <div class="inline-flex rounded-lg overflow-hidden border border-gray-200 bg-gray-50" role="radiogroup" data-pillgroup="<%= key %>">
+                  <% [['yes','Yes','emerald'],['no','No','red'],['na','N/A','gray']].forEach(function(opt) { %>
+                    <label class="relative cursor-pointer">
+                      <input type="radio" name="q_<%= key %>_state" value="<%= opt[0] %>" <%= currentState === opt[0] ? 'checked' : '' %> class="sr-only peer q-state">
+                      <span class="block px-3 py-1.5 text-xs font-semibold transition
+                        <%= currentState === opt[0] ? (opt[0]==='yes' ? 'bg-emerald-600 text-white' : opt[0]==='no' ? 'bg-red-600 text-white' : 'bg-gray-500 text-white') : 'text-gray-600 hover:bg-gray-100' %>">
+                        <%= opt[1] %>
+                      </span>
+                    </label>
+                  <% }) %>
+                </div>
+                <input name="q_<%= key %>_notes" value="<%= r.notes || '' %>" placeholder="Notes…" class="text-xs px-2 py-1.5 border border-gray-200 rounded-md w-full sm:w-44">
               </div>
             </div>
           <% }) %>
@@ -212,8 +226,8 @@
       </div>
     </section>
 
-    <!-- Actions -->
-    <div class="flex flex-col sm:flex-row gap-3 pb-6">
+    <!-- Actions (main form ends here) -->
+    <div class="flex flex-col sm:flex-row gap-3 pb-2">
       <button type="submit" name="submit" value="0" class="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl transition">
         Save as Draft
       </button>
@@ -223,6 +237,60 @@
       <a href="/audits<%= isEdit ? '/' + a.id : '' %>" class="sm:w-auto px-4 py-3 text-center text-gray-600 hover:text-gray-900 font-medium">Cancel</a>
     </div>
   </form>
+
+  <!-- Attachments (only available after audit is saved) -->
+  <% if (isEdit) { %>
+    <section class="bg-white border border-gray-200 rounded-xl p-5 mt-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Photos & Documents</h2>
+        <span class="text-xs text-gray-500"><%= (typeof attachments !== 'undefined' ? attachments.length : 0) %> file(s)</span>
+      </div>
+
+      <!-- Upload form (separate from main form to avoid nested forms) -->
+      <form method="POST" action="/audits/<%= a.id %>/attachments" enctype="multipart/form-data" class="mb-5 p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <input type="hidden" name="return_to" value="/audits/<%= a.id %>/edit">
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input type="file" name="files" multiple accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx" class="flex-1 text-sm">
+          <input name="caption" placeholder="Caption / which item (optional)" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg">
+          <button class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg">Upload</button>
+        </div>
+        <p class="text-[11px] text-gray-500 mt-2">Max 25MB per file · Images, PDF, Word, Excel</p>
+      </form>
+
+      <!-- Existing attachments -->
+      <% if (typeof attachments !== 'undefined' && attachments.length) { %>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <% attachments.forEach(function(att) { const isImg = (att.mime_type || '').startsWith('image/'); %>
+            <div class="group relative bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+              <% if (isImg) { %>
+                <a href="<%= att.file_path %>" target="_blank">
+                  <img src="<%= att.file_path %>" alt="<%= att.original_name %>" class="w-full h-32 object-cover">
+                </a>
+              <% } else { %>
+                <a href="<%= att.file_path %>" target="_blank" class="flex items-center justify-center h-32 bg-gray-100">
+                  <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </a>
+              <% } %>
+              <div class="p-2">
+                <p class="text-xs font-medium text-gray-800 truncate" title="<%= att.original_name %>"><%= att.original_name %></p>
+                <% if (att.caption) { %><p class="text-[11px] text-gray-500 truncate"><%= att.caption %></p><% } %>
+              </div>
+              <form method="POST" action="/audits/<%= a.id %>/attachments/<%= att.id %>/delete" onsubmit="return confirm('Delete this file?')" class="absolute top-1 right-1">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <input type="hidden" name="return_to" value="/audits/<%= a.id %>/edit">
+                <button class="w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition" title="Delete">×</button>
+              </form>
+            </div>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p class="text-sm text-gray-500 text-center py-4">No photos or documents uploaded yet.</p>
+      <% } %>
+    </section>
+  <% } else { %>
+    <p class="text-xs text-gray-500 italic mt-4">Tip: save as draft first to enable photo / document uploads.</p>
+  <% } %>
 </div>
 
 <!-- Pass section structure to client-side scoring -->
@@ -232,6 +300,11 @@
 </script>
 <script>
 (function() {
+  function getState(key) {
+    const el = document.querySelector('input[name="q_' + key + '_state"]:checked');
+    return el ? el.value : '';
+  }
+
   function recalc() {
     const groups = window.SCORE_GROUPS.map(function(g) {
       let score = 0, max = 0;
@@ -240,16 +313,14 @@
         if (!section) return;
         for (let i = 1; i <= section.itemCount; i++) {
           const key = secKey + '.' + i;
-          const naEl = document.querySelector('input[name="q_' + key + '_na"]');
-          const chEl = document.querySelector('input[name="q_' + key + '_checked"]');
-          if (naEl && naEl.checked) continue;
+          const state = getState(key);
+          if (state === '' || state === 'na') continue;
           max++;
-          if (chEl && chEl.checked) score++;
+          if (state === 'yes') score++;
         }
       });
       return { score: score, max: max, percent: max ? Math.round(score / max * 100) : 0 };
     });
-    // Per-group display
     document.querySelectorAll('#score-summary [data-group]').forEach(function(el) {
       const idx = parseInt(el.getAttribute('data-group'), 10);
       const g = groups[idx] || { score: 0, max: 0, percent: 0 };
@@ -257,43 +328,79 @@
       el.querySelector('[data-g-max]').textContent = g.max;
       el.querySelector('[data-g-percent]').textContent = g.percent + '%';
     });
-    // Overall
     const total = groups.reduce(function(a, g) { return a + g.score; }, 0);
     const max = groups.reduce(function(a, g) { return a + g.max; }, 0);
     const pct = max ? Math.round(total / max * 100) : 0;
     ['live-score', 'live-score-2'].forEach(function(id){ const e = document.getElementById(id); if (e) e.textContent = total; });
     ['live-max', 'live-max-2'].forEach(function(id){ const e = document.getElementById(id); if (e) e.textContent = max; });
-    ['live-percent'].forEach(function(id){ const e = document.getElementById(id); if (e) e.textContent = pct + '%'; });
+    const p1 = document.getElementById('live-percent'); if (p1) p1.textContent = pct + '%';
     const p2 = document.getElementById('live-percent-2'); if (p2) p2.textContent = pct;
-    // Per-section pill (sum items in that section only)
+    // Per-section pill
     window.AUDIT_SECTIONS.forEach(function(s) {
       let sScore = 0, sMax = 0;
       for (let i = 1; i <= s.itemCount; i++) {
         const key = s.key + '.' + i;
-        const naEl = document.querySelector('input[name="q_' + key + '_na"]');
-        const chEl = document.querySelector('input[name="q_' + key + '_checked"]');
-        if (naEl && naEl.checked) continue;
+        const st = getState(key);
+        if (st === '' || st === 'na') continue;
         sMax++;
-        if (chEl && chEl.checked) sScore++;
+        if (st === 'yes') sScore++;
       }
       const pill = document.querySelector('[data-section-score="' + s.key + '"]');
       if (pill) pill.textContent = sScore + '/' + sMax;
     });
   }
 
-  document.addEventListener('change', function(e) {
-    if (e.target.matches('.q-check, .q-na')) {
-      // N/A should disable the check visually
-      if (e.target.matches('.q-na')) {
-        const row = e.target.closest('[data-item]');
-        if (row) {
-          const chk = row.querySelector('.q-check');
-          if (chk && e.target.checked) chk.checked = false;
-        }
+  // Pill visual state on change
+  function paintPill(groupKey) {
+    const group = document.querySelector('[data-pillgroup="' + groupKey + '"]');
+    if (!group) return;
+    group.querySelectorAll('input[type="radio"]').forEach(function(input) {
+      const span = input.nextElementSibling;
+      if (!span) return;
+      span.className = 'block px-3 py-1.5 text-xs font-semibold transition';
+      if (input.checked) {
+        if (input.value === 'yes') span.classList.add('bg-emerald-600', 'text-white');
+        else if (input.value === 'no') span.classList.add('bg-red-600', 'text-white');
+        else span.classList.add('bg-gray-500', 'text-white');
+      } else {
+        span.classList.add('text-gray-600', 'hover:bg-gray-100');
       }
+    });
+  }
+
+  document.addEventListener('change', function(e) {
+    if (e.target.matches('.q-state')) {
+      const name = e.target.name;
+      const match = name.match(/^q_(.+)_state$/);
+      if (match) paintPill(match[1]);
       recalc();
     }
   });
+
+  // Auto-fill project fields when a job is selected
+  const jobSelect = document.getElementById('job-select');
+  if (jobSelect) {
+    jobSelect.addEventListener('change', function() {
+      const opt = this.options[this.selectedIndex];
+      if (!opt || !opt.value) return;
+      const n = opt.getAttribute('data-job-name') || '';
+      const num = opt.getAttribute('data-job-number') || '';
+      const client = opt.getAttribute('data-client') || '';
+      const site = opt.getAttribute('data-site') || '';
+      const suburb = opt.getAttribute('data-suburb') || '';
+      const fields = {
+        'f-project_site': n || (num + (client ? ' — ' + client : '')),
+        'f-client': client,
+        'f-location': [site, suburb].filter(Boolean).join(', '),
+      };
+      Object.keys(fields).forEach(function(id) {
+        const el = document.getElementById(id);
+        // Only overwrite if field is empty
+        if (el && !el.value && fields[id]) el.value = fields[id];
+      });
+    });
+  }
+
   recalc();
 })();
 </script>

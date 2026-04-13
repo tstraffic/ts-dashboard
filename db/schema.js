@@ -4651,6 +4651,30 @@ function runMigrations(db) {
     console.log('Migration 99 applied: site_audits table created');
   }
 
+  // Migration 100: Site audit attachments (images + documents per audit)
+  if (!isMigrationApplied.get(100)) {
+    console.log('Running migration 100: Site audit attachments');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS audit_attachments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        audit_id INTEGER NOT NULL REFERENCES site_audits(id) ON DELETE CASCADE,
+        context_key TEXT DEFAULT 'general',  -- 'general' or section item key (e.g. '4.5') or 'nc_1'
+        caption TEXT DEFAULT '',
+        filename TEXT NOT NULL,              -- stored filename on disk
+        original_name TEXT NOT NULL,         -- user-visible name
+        file_path TEXT NOT NULL,             -- served path e.g. /data/uploads/audits/5/xxx.jpg
+        file_size INTEGER DEFAULT 0,
+        mime_type TEXT DEFAULT '',
+        uploaded_by_id INTEGER REFERENCES users(id),
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_attachments_audit ON audit_attachments(audit_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_attachments_context ON audit_attachments(audit_id, context_key);
+    `);
+    recordMigration.run(100, 'Site audit attachments table');
+    console.log('Migration 100 applied: audit_attachments table created');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

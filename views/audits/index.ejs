@@ -15,7 +15,7 @@
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">Site Audits</h1>
-      <p class="text-sm text-gray-500 mt-1">Traffic Control Site Safety Audits (FORM-663)</p>
+      <p class="text-sm text-gray-500 mt-1">Traffic Control Site Safety Audits</p>
     </div>
     <a href="/audits/new" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-xl shadow-sm transition active:scale-[0.98]">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -76,11 +76,12 @@
             <th class="px-4 py-3">Score</th>
             <th class="px-4 py-3 hidden sm:table-cell">Finding</th>
             <th class="px-4 py-3">Status</th>
+            <th class="px-4 py-3 w-16"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
           <% audits.forEach(function(a) { %>
-            <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='/audits/<%= a.id %>'">
+            <tr class="hover:bg-gray-50 cursor-pointer" onclick="if(!event.target.closest('button,form,a')){window.location.href='/audits/<%= a.id %>'}">
               <td class="px-4 py-3 font-mono text-xs text-gray-500">#<%= a.id %></td>
               <td class="px-4 py-3">
                 <div class="font-medium text-gray-900"><%= a.project_site || '(no site)' %></div>
@@ -98,6 +99,16 @@
               </td>
               <td class="px-4 py-3 hidden sm:table-cell"><%- findingBadge(a.overall_finding) %></td>
               <td class="px-4 py-3"><%- statusBadge(a.status) %></td>
+              <td class="px-4 py-3 text-right">
+                <% if (['admin','management'].includes((user.role || '').toLowerCase())) { %>
+                  <form method="POST" action="/audits/<%= a.id %>/delete" onsubmit="event.stopPropagation(); return confirm('Delete audit #<%= a.id %> permanently?')" class="inline">
+                    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                    <button class="p-1.5 text-gray-300 hover:text-red-600 transition" title="Delete">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></svg>
+                    </button>
+                  </form>
+                <% } %>
+              </td>
             </tr>
           <% }) %>
         </tbody>
