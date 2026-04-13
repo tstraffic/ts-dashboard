@@ -1,6 +1,7 @@
 <% const a = audit; %>
 <% function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleString('en-AU'); } catch(e) { return d; } } %>
 <% function findingLabel(f) { return f === 'pass_with_actions' ? 'Pass with actions' : (f||'—').replace('_',' '); } %>
+<% function stateOf(r) { if (!r) return ''; if (r.state) return r.state; if (r.na) return 'na'; if (r.checked) return 'yes'; return ''; } %>
 
 <div class="px-4 lg:px-8 py-6">
   <!-- Header -->
@@ -10,7 +11,7 @@
         <a href="/audits" class="text-sm text-brand-600 hover:underline">← All audits</a>
       </div>
       <h1 class="text-2xl font-bold text-gray-900">Audit #<%= a.id %>: <%= a.project_site || 'Untitled site' %></h1>
-      <p class="text-sm text-gray-500">FORM-663 · <%= fmtDate(a.audit_datetime || a.created_at) %></p>
+      <p class="text-sm text-gray-500"><%= fmtDate(a.audit_datetime || a.created_at) %></p>
     </div>
     <div class="flex items-center gap-2">
       <% if (a.status !== 'signed_off') { %>
@@ -76,10 +77,12 @@
         <% section.items.forEach(function(item, idx) {
           const key = section.key + '.' + (idx + 1);
           const r = responses[key] || {};
+          const st = stateOf(r);
           let icon, iconClass;
-          if (r.na) { icon = 'N/A'; iconClass = 'bg-gray-100 text-gray-500'; }
-          else if (r.checked) { icon = '✓'; iconClass = 'bg-emerald-100 text-emerald-700'; }
-          else { icon = '✗'; iconClass = 'bg-red-100 text-red-700'; }
+          if (st === 'na') { icon = 'N/A'; iconClass = 'bg-gray-100 text-gray-500'; }
+          else if (st === 'yes') { icon = 'Yes'; iconClass = 'bg-emerald-100 text-emerald-700'; }
+          else if (st === 'no') { icon = 'No'; iconClass = 'bg-red-100 text-red-700'; }
+          else { icon = '—'; iconClass = 'bg-gray-50 text-gray-400'; }
         %>
           <div class="px-5 py-3 flex items-start gap-3">
             <span class="inline-flex items-center justify-center w-8 h-6 rounded text-xs font-bold flex-shrink-0 <%= iconClass %>"><%= icon %></span>
@@ -127,6 +130,55 @@
       </div>
     </section>
   <% } %>
+
+  <!-- Photos & Documents -->
+  <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Photos & Documents</h2>
+      <span class="text-xs text-gray-500"><%= (typeof attachments !== 'undefined' ? attachments.length : 0) %> file(s)</span>
+    </div>
+
+    <!-- Upload form -->
+    <form method="POST" action="/audits/<%= a.id %>/attachments" enctype="multipart/form-data" class="mb-5 p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+      <input type="hidden" name="return_to" value="/audits/<%= a.id %>">
+      <div class="flex flex-col sm:flex-row gap-3">
+        <input type="file" name="files" multiple accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx" class="flex-1 text-sm">
+        <input name="caption" placeholder="Caption / which item (optional)" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg">
+        <button class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg">Upload</button>
+      </div>
+      <p class="text-[11px] text-gray-500 mt-2">Max 25MB per file · Images, PDF, Word, Excel</p>
+    </form>
+
+    <% if (typeof attachments !== 'undefined' && attachments.length) { %>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <% attachments.forEach(function(att) { const isImg = (att.mime_type || '').startsWith('image/'); %>
+          <div class="group relative bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+            <% if (isImg) { %>
+              <a href="<%= att.file_path %>" target="_blank">
+                <img src="<%= att.file_path %>" alt="<%= att.original_name %>" class="w-full h-32 object-cover">
+              </a>
+            <% } else { %>
+              <a href="<%= att.file_path %>" target="_blank" class="flex items-center justify-center h-32 bg-gray-100">
+                <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </a>
+            <% } %>
+            <div class="p-2">
+              <p class="text-xs font-medium text-gray-800 truncate" title="<%= att.original_name %>"><%= att.original_name %></p>
+              <% if (att.caption) { %><p class="text-[11px] text-gray-500 truncate"><%= att.caption %></p><% } %>
+            </div>
+            <form method="POST" action="/audits/<%= a.id %>/attachments/<%= att.id %>/delete" onsubmit="return confirm('Delete this file?')" class="absolute top-1 right-1">
+              <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+              <input type="hidden" name="return_to" value="/audits/<%= a.id %>">
+              <button class="w-7 h-7 bg-red-600 hover:bg-red-700 text-white rounded-full text-sm font-bold opacity-0 group-hover:opacity-100 focus:opacity-100 transition shadow-lg" title="Delete">×</button>
+            </form>
+          </div>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <p class="text-sm text-gray-500 text-center py-4">No photos or documents uploaded yet.</p>
+    <% } %>
+  </section>
 
   <!-- Sign-off info -->
   <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6 text-sm text-gray-700">
