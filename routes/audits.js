@@ -352,11 +352,18 @@ router.post('/:id', (req, res) => {
 
 // POST /:id/attachments — upload one or more files
 router.post('/:id/attachments', auditUpload.array('files', 20), (req, res) => {
+  const wantJson = req.query.json === '1' || (req.headers.accept || '').includes('application/json');
   try {
     const db = getDb();
     const audit = db.prepare('SELECT id FROM site_audits WHERE id = ?').get(req.params.id);
-    if (!audit) { req.flash('error', 'Audit not found.'); return res.redirect('/audits'); }
-    if (!req.files || !req.files.length) { req.flash('error', 'No files uploaded.'); return res.redirect('/audits/' + req.params.id); }
+    if (!audit) {
+      if (wantJson) return res.status(404).json({ ok: false, error: 'Audit not found' });
+      req.flash('error', 'Audit not found.'); return res.redirect('/audits');
+    }
+    if (!req.files || !req.files.length) {
+      if (wantJson) return res.status(400).json({ ok: false, error: 'No files uploaded' });
+      req.flash('error', 'No files uploaded.'); return res.redirect('/audits/' + req.params.id);
+    }
 
     const context = (req.body.context_key || 'general').trim();
     const caption = (req.body.caption || '').trim();
@@ -365,15 +372,25 @@ router.post('/:id/attachments', auditUpload.array('files', 20), (req, res) => {
       INSERT INTO audit_attachments (audit_id, context_key, caption, filename, original_name, file_path, file_size, mime_type, uploaded_by_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const inserted = [];
     for (const f of req.files) {
       const servedPath = `/data/uploads/audits/${req.params.id}/${f.filename}`;
-      insert.run(audit.id, context, caption, f.filename, f.originalname, servedPath, f.size, f.mimetype, req.session.user.id);
+      const r = insert.run(audit.id, context, caption, f.filename, f.originalname, servedPath, f.size, f.mimetype, req.session.user.id);
+      inserted.push({
+        id: r.lastInsertRowid,
+        audit_id: audit.id,
+        context_key: context,
+        caption, filename: f.filename, original_name: f.originalname,
+        file_path: servedPath, file_size: f.size, mime_type: f.mimetype,
+      });
     }
 
+    if (wantJson) return res.json({ ok: true, attachments: inserted });
     req.flash('success', `${req.files.length} file(s) uploaded.`);
     res.redirect(req.body.return_to || ('/audits/' + req.params.id));
   } catch (err) {
     console.error('[Audits] Upload error:', err.message);
+    if (wantJson) return res.status(500).json({ ok: false, error: err.message });
     req.flash('error', 'Upload failed: ' + err.message);
     res.redirect('/audits/' + req.params.id);
   }
@@ -381,6 +398,7 @@ router.post('/:id/attachments', auditUpload.array('files', 20), (req, res) => {
 
 // POST /:id/attachments/:attId/delete — delete an attachment
 router.post('/:id/attachments/:attId/delete', (req, res) => {
+  const wantJson = req.query.json === '1' || (req.headers.accept || '').includes('application/json');
   const db = getDb();
   const att = db.prepare('SELECT * FROM audit_attachments WHERE id = ? AND audit_id = ?').get(req.params.attId, req.params.id);
   if (att) {
@@ -390,6 +408,7 @@ router.post('/:id/attachments/:attId/delete', (req, res) => {
     } catch (e) { /* file may already be gone */ }
     db.prepare('DELETE FROM audit_attachments WHERE id = ?').run(att.id);
   }
+  if (wantJson) return res.json({ ok: true });
   req.flash('success', 'Attachment deleted.');
   res.redirect(req.body.return_to || ('/audits/' + req.params.id));
 });
