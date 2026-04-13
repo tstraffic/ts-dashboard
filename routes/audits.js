@@ -113,6 +113,32 @@ router.get('/', (req, res) => {
   });
 });
 
+// POST /draft — create an empty draft on first field change, return JSON {id}
+// This allows per-section/per-NC/overview uploads to work immediately in the "new" flow.
+router.post('/draft', (req, res) => {
+  try {
+    const db = getDb();
+    const b = req.body || {};
+    const result = db.prepare(`
+      INSERT INTO site_audits (
+        project_site, auditor_id, auditor_name,
+        audit_datetime, shift, status, created_by_id
+      ) VALUES (?, ?, ?, ?, ?, 'draft', ?)
+    `).run(
+      b.project_site || '',
+      req.session.user.id,
+      b.auditor_name || req.session.user.full_name || '',
+      b.audit_datetime || new Date().toISOString().slice(0, 16),
+      b.shift || 'day',
+      req.session.user.id
+    );
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    console.error('[Audits] Draft create error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // GET /new — create form
 router.get('/new', (req, res) => {
   const db = getDb();
@@ -123,6 +149,8 @@ router.get('/new', (req, res) => {
     responses: {},
     sectionComments: {},
     nonconformances: [],
+    attachments: [],
+    attachmentsByContext: {},
     sections: AUDIT_SECTIONS,
     scoreGroups: SCORE_GROUPS,
     score: computeScore({}),
@@ -209,11 +237,17 @@ router.get('/:id', (req, res) => {
   const nonconformances = parseJson(audit.nonconformances_json, []) || [];
   const score = computeScore(responses);
   const attachments = db.prepare('SELECT * FROM audit_attachments WHERE audit_id = ? ORDER BY uploaded_at DESC').all(audit.id);
+  const attachmentsByContext = {};
+  attachments.forEach(att => {
+    const k = att.context_key || 'general';
+    if (!attachmentsByContext[k]) attachmentsByContext[k] = [];
+    attachmentsByContext[k].push(att);
+  });
 
   res.render('audits/show', {
     title: 'Audit #' + audit.id,
     audit,
-    responses, sectionComments, nonconformances, attachments,
+    responses, sectionComments, nonconformances, attachments, attachmentsByContext,
     sections: AUDIT_SECTIONS, scoreGroups: SCORE_GROUPS, score,
     user: req.session.user,
     currentPage: 'audits',
@@ -236,11 +270,17 @@ router.get('/:id/edit', (req, res) => {
   const nonconformances = parseJson(audit.nonconformances_json, []) || [];
   const jobs = db.prepare("SELECT id, job_number, job_name, client, site_address, suburb FROM jobs ORDER BY job_number DESC").all();
   const attachments = db.prepare('SELECT * FROM audit_attachments WHERE audit_id = ? ORDER BY uploaded_at DESC').all(audit.id);
+  const attachmentsByContext = {};
+  attachments.forEach(att => {
+    const k = att.context_key || 'general';
+    if (!attachmentsByContext[k]) attachmentsByContext[k] = [];
+    attachmentsByContext[k].push(att);
+  });
 
   res.render('audits/form', {
     title: 'Edit Audit #' + audit.id,
     audit,
-    responses, sectionComments, nonconformances, attachments,
+    responses, sectionComments, nonconformances, attachments, attachmentsByContext,
     sections: AUDIT_SECTIONS, scoreGroups: SCORE_GROUPS,
     score: computeScore(responses),
     jobs, user: req.session.user, currentPage: 'audits',
@@ -263,6 +303,12 @@ router.post('/:id', (req, res) => {
     const newStatus = b.submit === '1' ? 'submitted' : (existing.status === 'signed_off' ? 'signed_off' : (existing.status || 'draft'));
     const stored = { responses, sectionComments };
 
+    // Signatures: record timestamp when text changes from empty to non-empty
+    const auditorSig = (b.auditor_signature_text || '').trim();
+    const supervisorSig = (b.supervisor_signature_text || '').trim();
+    const auditorSignedAt = auditorSig && !existing.auditor_signature_text ? new Date().toISOString() : existing.auditor_signed_at;
+    const supervisorSignedAt = supervisorSig && !existing.supervisor_signature_text ? new Date().toISOString() : existing.supervisor_signed_at;
+
     db.prepare(`
       UPDATE site_audits SET
         job_id=?, project_site=?, client=?, location=?, audit_datetime=?,
@@ -270,7 +316,10 @@ router.post('/:id', (req, res) => {
         overall_result=?, overall_finding=?,
         responses_json=?, nonconformances_json=?,
         score_total=?, score_max=?, score_percent=?,
-        status=?, follow_up_required=?, follow_up_date=?, updated_at=CURRENT_TIMESTAMP
+        status=?, follow_up_required=?, follow_up_date=?,
+        auditor_signature_text=?, auditor_signed_at=?,
+        supervisor_signature_text=?, supervisor_signed_at=?,
+        updated_at=CURRENT_TIMESTAMP
       WHERE id=?
     `).run(
       b.job_id || null, b.project_site || '', b.client || '', b.location || '', b.audit_datetime || '',
@@ -279,6 +328,8 @@ router.post('/:id', (req, res) => {
       JSON.stringify(stored), JSON.stringify(nonconformances),
       score.total, score.max, score.percent,
       newStatus, b.follow_up_required ? 1 : 0, b.follow_up_date || null,
+      auditorSig, auditorSignedAt,
+      supervisorSig, supervisorSignedAt,
       req.params.id
     );
 
