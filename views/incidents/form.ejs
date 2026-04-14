@@ -32,7 +32,7 @@
             <option value="<%= j.id %>"
               <%= isEdit && incident.job_id == j.id ? 'selected' : '' %>
               <%= !isEdit && preselectedJobId == j.id ? 'selected' : '' %>
-            ><%= j.job_number %> - <%= j.client %></option>
+            ><%= j.job_number %> - <%= j.project_name ? j.project_name + ' (' + j.client + ')' : j.client %></option>
           <% }) %>
         </select>
       </div>

@@ -211,7 +211,7 @@
         <select name="job_id" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
           <option value="">Select job...</option>
           <% jobs.forEach(j => { %>
-            <option value="<%= j.id %>"><%= j.job_number %> - <%= j.client %></option>
+            <option value="<%= j.id %>"><%= j.job_number %> - <%= j.project_name ? j.project_name + ' (' + j.client + ')' : j.client %></option>
           <% }) %>
         </select>
       </div>

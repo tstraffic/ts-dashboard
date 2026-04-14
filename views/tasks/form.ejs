@@ -40,7 +40,7 @@
           <select id="job_id" name="job_id" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
             <option value="">No project</option>
             <% jobs.forEach(function(job) { %>
-              <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.client %></option>
+              <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.project_name ? job.project_name + ' (' + job.client + ')' : job.client %></option>
             <% }) %>
           </select>
         </div>

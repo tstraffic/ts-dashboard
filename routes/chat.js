@@ -580,7 +580,7 @@ router.get('/channel/:id', requireThreadMember, (req, res) => {
 router.get('/new', (req, res) => {
   const db = getDb();
   const canCreateOpsThread = ['admin', 'operations'].includes(req.session.user.role);
-  const jobs = canCreateOpsThread ? db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won','prestart') ORDER BY job_number").all() : [];
+  const jobs = canCreateOpsThread ? db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won','prestart') ORDER BY job_number").all() : [];
   const incidents = canCreateOpsThread ? db.prepare(`
     SELECT i.id, i.incident_number, i.title, j.job_number
     FROM incidents i JOIN jobs j ON i.job_id = j.id

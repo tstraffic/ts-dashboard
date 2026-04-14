@@ -23,7 +23,7 @@ router.get('/', (req, res) => {
   query += ' ORDER BY tp.created_at DESC';
 
   const plans = db.prepare(query).all(...params);
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
 
   const today = new Date().toISOString().split('T')[0];
   res.render('plans/index', { title: 'Traffic Plans', plans, jobs, filters: { status, job_id, plan_type }, user: req.session.user, today });
@@ -32,7 +32,7 @@ router.get('/', (req, res) => {
 // New plan form
 router.get('/new', (req, res) => {
   const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, client, site_address, suburb FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name, site_address, suburb FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('plans/form', { title: 'New Traffic Plan', plan: null, jobs, users, user: req.session.user, preselectedJobId: req.query.job_id || null });
 });
@@ -116,7 +116,7 @@ router.get('/:id/edit', (req, res) => {
   const db = getDb();
   const plan = db.prepare('SELECT * FROM traffic_plans WHERE id = ?').get(req.params.id);
   if (!plan) { req.flash('error', 'Plan not found.'); return res.redirect('/plans'); }
-  const jobs = db.prepare("SELECT id, job_number, client, site_address, suburb FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name, site_address, suburb FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('plans/form', { title: 'Edit Traffic Plan', plan, jobs, users, user: req.session.user, preselectedJobId: null });
 });

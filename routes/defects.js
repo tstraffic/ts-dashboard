@@ -39,7 +39,7 @@ router.get('/', (req, res) => {
     ORDER BY ${orderByCol} ${order}
   `).all(...params);
 
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
 
   // Compute stats
   const allDefects = db.prepare('SELECT severity, status, target_close_date FROM defects').all();
@@ -77,7 +77,7 @@ router.post('/:id/status', (req, res) => {
 // NEW FORM
 router.get('/new', (req, res) => {
   const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('defects/form', {
     title: 'Report Defect',
@@ -144,7 +144,7 @@ router.get('/:id/edit', (req, res) => {
   const db = getDb();
   const defect = db.prepare('SELECT * FROM defects WHERE id = ?').get(req.params.id);
   if (!defect) { req.flash('error', 'Defect not found.'); return res.redirect('/defects'); }
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('defects/form', {
     title: `Edit ${defect.defect_number}`,

@@ -43,7 +43,7 @@ router.get('/', (req, res) => {
     ORDER BY ${orderByCol} ${order}
   `).all(...params);
 
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -84,7 +84,7 @@ router.post('/:id/status', (req, res) => {
 // NEW FORM
 router.get('/new', (req, res) => {
   const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
   const crewMembers = db.prepare("SELECT id, full_name, role FROM crew_members WHERE active = 1 ORDER BY full_name").all();
   res.render('incidents/form', {
     title: 'Report Incident',
@@ -212,7 +212,7 @@ router.get('/:id/edit', (req, res) => {
     req.flash('error', 'Incident not found.');
     return res.redirect('/incidents');
   }
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
   const crewMembers = db.prepare("SELECT id, full_name, role FROM crew_members WHERE active = 1 ORDER BY full_name").all();
   const linkedCrew = db.prepare(`
     SELECT icm.crew_member_id, icm.involvement_type
