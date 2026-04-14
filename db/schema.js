@@ -4960,6 +4960,55 @@ function runMigrations(db) {
     console.log('Migration 109 applied.');
   }
 
+  // ─── Migration 110: Expand notifications type CHECK to include chat_message + weekly_summary ───
+  if (!isMigrationApplied.get(110)) {
+    let needsExpand = true;
+    try {
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='notifications'").get();
+      if (tableInfo && tableInfo.sql && tableInfo.sql.includes("'chat_message'")) needsExpand = false;
+    } catch(e) {}
+
+    if (needsExpand) {
+      db.exec('BEGIN TRANSACTION');
+      try {
+        // Check if email_sent_at column exists
+        const cols = db.prepare("PRAGMA table_info('notifications')").all();
+        const hasEmailSent = cols.some(c => c.name === 'email_sent_at');
+
+        const emailSentCol = hasEmailSent ? 'email_sent_at DATETIME,' : '';
+        const emailSentSelect = hasEmailSent ? ',email_sent_at' : '';
+
+        db.exec(`
+          CREATE TABLE notifications_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type TEXT NOT NULL CHECK(type IN ('overdue_task','expiring_compliance','missing_update','corrective_action_due','follow_up_due','equipment_overdue','critical_defect','rol_pending','ticket_expiry','equipment_inspection_due','induction_overdue','over_budget','deadline_reminder','chat_message','weekly_summary','general')),
+            title TEXT NOT NULL,
+            message TEXT NOT NULL DEFAULT '',
+            link TEXT DEFAULT '',
+            job_id INTEGER REFERENCES jobs(id),
+            is_read INTEGER NOT NULL DEFAULT 0,
+            ${emailSentCol}
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          );
+          INSERT INTO notifications_new (id, user_id, type, title, message, link, job_id, is_read${emailSentSelect}, created_at)
+            SELECT id, user_id, type, title, message, link, job_id, is_read${emailSentSelect}, created_at FROM notifications;
+          DROP TABLE notifications;
+          ALTER TABLE notifications_new RENAME TO notifications;
+          CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+          CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(user_id, is_read);
+          CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+        `);
+        db.exec('COMMIT');
+        console.log('Migration 110: Expanded notifications type CHECK for chat_message + weekly_summary');
+      } catch(e) {
+        try { db.exec('ROLLBACK'); } catch(r) {}
+        console.error('Migration 110 error:', e.message);
+      }
+    }
+    recordMigration.run(110, 'Expand notifications type CHECK for chat_message + weekly_summary');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
