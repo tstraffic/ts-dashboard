@@ -308,7 +308,7 @@ router.post('/api/threads/:threadId/messages', requireThreadMember, (req, res) =
     // Build link
     let chatLink = '/chat';
     if (thread.thread_type === 'dm') chatLink = `/chat/dm/${userId}`;
-    else if (thread.thread_type === 'channel' || thread.thread_type === 'announcement') chatLink = `/chat/channel/${threadId}`;
+    else if (thread.thread_type === 'channel' || thread.thread_type === 'announcement' || thread.thread_type === 'group') chatLink = `/chat/channel/${threadId}`;
     else if (thread.related_entity_type === 'job') chatLink = `/jobs/${thread.related_entity_id}#chat`;
 
     const notifTitle = thread.thread_type === 'dm' ? `Message from ${senderName}` : `${thread.title}`;
@@ -353,7 +353,7 @@ router.post('/api/threads/:threadId/messages', requireThreadMember, (req, res) =
     let pushUrl = '/chat';
     if (thread.thread_type === 'dm') {
       pushUrl = `/chat/dm/${userId}`;
-    } else if (thread.thread_type === 'channel' || thread.thread_type === 'announcement') {
+    } else if (thread.thread_type === 'channel' || thread.thread_type === 'announcement' || thread.thread_type === 'group') {
       pushUrl = `/chat/channel/${threadId}`;
     } else if (thread.related_entity_type === 'job') {
       pushUrl = `/jobs/${thread.related_entity_id}#chat`;
