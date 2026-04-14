@@ -4763,6 +4763,37 @@ function runMigrations(db) {
     console.log('Migration 104 applied: hire equipment + checklists');
   }
 
+  // Migration 105: Checklist templates + items
+  if (!isMigrationApplied.get(105)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS checklist_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        sort_order INTEGER DEFAULT 0,
+        created_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS checklist_template_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        template_id INTEGER NOT NULL REFERENCES checklist_templates(id) ON DELETE CASCADE,
+        item_order INTEGER DEFAULT 0,
+        section TEXT DEFAULT '',
+        question TEXT NOT NULL,
+        response_type TEXT NOT NULL DEFAULT 'yes_no_na',
+        required INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    try { db.exec("CREATE INDEX idx_cti_template ON checklist_template_items(template_id)"); } catch (e) {}
+    recordMigration.run(105, 'Checklist templates + template items tables');
+    console.log('Migration 105 applied: checklist templates');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

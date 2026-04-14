@@ -1,0 +1,201 @@
+<% locals.currentPage = 'checklists' %>
+<%
+  var typeBadges = {
+    yes_no_na: { bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', label: 'Yes / No / N/A' },
+    pass_fail: { bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20', label: 'Pass / Fail' },
+    text: { bg: 'bg-gray-100 text-gray-600', label: 'Text' },
+    number: { bg: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20', label: 'Number' },
+    signature: { bg: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20', label: 'Signature' }
+  };
+%>
+
+<div class="space-y-5">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+    <div>
+      <a href="/checklists" class="text-sm text-gray-500 hover:text-gray-700 mb-1 inline-flex items-center gap-1">&larr; All Templates</a>
+      <h1 class="text-2xl font-bold text-gray-900"><%= template.name %></h1>
+      <% if (template.description) { %><p class="text-sm text-gray-500 mt-1"><%= template.description %></p><% } %>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase
+        <%= template.status === 'active' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : 'bg-gray-100 text-gray-400' %>"><%= template.status %></span>
+      <span class="text-sm text-gray-400"><%= items.length %> question<%= items.length !== 1 ? 's' : '' %></span>
+    </div>
+  </div>
+
+  <!-- Edit Template Details -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <form method="POST" action="/checklists/<%= template.id %>" class="flex flex-col sm:flex-row gap-3">
+      <%- include('../partials/csrf') %>
+      <div class="flex-1">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Name</label>
+        <input type="text" name="name" value="<%= template.name %>" required
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div class="flex-1">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Description</label>
+        <input type="text" name="description" value="<%= template.description || '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div class="flex items-end">
+        <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Questions List -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Questions</h2>
+      <button type="button" onclick="document.getElementById('addItemForm').classList.toggle('hidden')" class="text-xs font-medium text-brand-600 hover:text-brand-700">+ Add Question</button>
+    </div>
+
+    <% if (items.length > 0) { %>
+      <div id="itemsList">
+        <% var currentSection = ''; %>
+        <% items.forEach(function(item, idx) { %>
+          <% if (item.section && item.section !== currentSection) { currentSection = item.section; %>
+            <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+              <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><%= currentSection %></span>
+            </div>
+          <% } %>
+          <div class="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition" data-item-id="<%= item.id %>">
+            <div class="flex items-start gap-3">
+              <span class="text-gray-300 text-sm font-mono mt-0.5 w-6 text-center flex-shrink-0"><%= idx + 1 %></span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p class="text-sm text-gray-900 font-medium"><%= item.question %></p>
+                  <% if (item.required) { %><span class="text-[9px] font-bold text-red-500 uppercase">Required</span><% } %>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                  <% var badge = typeBadges[item.response_type] || typeBadges.text; %>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium <%= badge.bg %>"><%= badge.label %></span>
+                  <% if (item.section) { %><span class="text-[10px] text-gray-400"><%= item.section %></span><% } %>
+                </div>
+              </div>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                <button type="button" onclick="editItem(<%= item.id %>)" class="p-1.5 text-gray-400 hover:text-brand-600 transition" title="Edit">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </button>
+                <form method="POST" action="/checklists/<%= template.id %>/items/<%= item.id %>/delete" class="inline" onsubmit="return confirm('Remove this question?')">
+                  <%- include('../partials/csrf') %>
+                  <button type="submit" class="p-1.5 text-gray-400 hover:text-red-600 transition" title="Delete">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } else { %>
+      <div class="p-8 text-center text-gray-400 text-sm">
+        No questions yet. Click "Add Question" to start building your checklist.
+      </div>
+    <% } %>
+
+    <!-- Add Question Form -->
+    <div id="addItemForm" class="<%= items.length === 0 ? '' : 'hidden' %> p-4 bg-blue-50/50 border-t border-gray-200">
+      <form method="POST" action="/checklists/<%= template.id %>/items" class="space-y-3">
+        <%- include('../partials/csrf') %>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="sm:col-span-2">
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Question <span class="text-red-500">*</span></label>
+            <input type="text" name="question" required placeholder="e.g. Is all PPE worn correctly?"
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Response Type</label>
+            <select name="response_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="yes_no_na">Yes / No / N/A</option>
+              <option value="pass_fail">Pass / Fail</option>
+              <option value="text">Text (free form)</option>
+              <option value="number">Number</option>
+              <option value="signature">Signature</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Section (optional)</label>
+            <input type="text" name="section" placeholder="e.g. Site Setup, Vehicle, PPE..."
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+        </div>
+        <div class="flex items-center justify-between">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="required" value="1" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+            <span class="text-sm text-gray-600">Required</span>
+          </label>
+          <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Add Question</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <% if (items.length > 0) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-200">
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Preview</h2>
+    </div>
+    <div class="p-4 space-y-3">
+      <% var prevSection = ''; %>
+      <% items.forEach(function(item) { %>
+        <% if (item.section && item.section !== prevSection) { prevSection = item.section; %>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest pt-3 pb-1 border-b border-gray-100"><%= prevSection %></p>
+        <% } %>
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <span class="text-sm text-gray-800"><%= item.question %></span>
+            <% if (item.required) { %><span class="text-red-400 text-xs ml-1">*</span><% } %>
+          </div>
+          <div class="flex-shrink-0">
+            <% if (item.response_type === 'yes_no_na') { %>
+              <div class="flex gap-1">
+                <span class="px-2 py-1 text-[10px] font-medium rounded bg-emerald-50 text-emerald-600 border border-emerald-200">Yes</span>
+                <span class="px-2 py-1 text-[10px] font-medium rounded bg-red-50 text-red-600 border border-red-200">No</span>
+                <span class="px-2 py-1 text-[10px] font-medium rounded bg-gray-50 text-gray-400 border border-gray-200">N/A</span>
+              </div>
+            <% } else if (item.response_type === 'pass_fail') { %>
+              <div class="flex gap-1">
+                <span class="px-2 py-1 text-[10px] font-medium rounded bg-emerald-50 text-emerald-600 border border-emerald-200">Pass</span>
+                <span class="px-2 py-1 text-[10px] font-medium rounded bg-red-50 text-red-600 border border-red-200">Fail</span>
+              </div>
+            <% } else if (item.response_type === 'text') { %>
+              <span class="px-2 py-1 text-[10px] font-medium rounded bg-gray-50 text-gray-400 border border-gray-200">Text input</span>
+            <% } else if (item.response_type === 'number') { %>
+              <span class="px-2 py-1 text-[10px] font-medium rounded bg-purple-50 text-purple-500 border border-purple-200"># Number</span>
+            <% } else if (item.response_type === 'signature') { %>
+              <span class="px-2 py-1 text-[10px] font-medium rounded bg-amber-50 text-amber-600 border border-amber-200">Signature</span>
+            <% } %>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<script>
+function editItem(itemId) {
+  // Simple inline edit — toggle a form for this item
+  var row = document.querySelector('[data-item-id="' + itemId + '"]');
+  if (!row) return;
+  var existing = row.querySelector('.edit-form');
+  if (existing) { existing.remove(); return; }
+
+  var form = document.createElement('div');
+  form.className = 'edit-form mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200';
+  form.innerHTML = '<form method="POST" action="/checklists/<%= template.id %>/items/' + itemId + '" class="grid grid-cols-1 sm:grid-cols-2 gap-2">' +
+    '<input type="hidden" name="_csrf" value="<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>">' +
+    '<input type="text" name="question" value="" placeholder="Question text" class="sm:col-span-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">' +
+    '<select name="response_type" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm"><option value="yes_no_na">Yes/No/N/A</option><option value="pass_fail">Pass/Fail</option><option value="text">Text</option><option value="number">Number</option><option value="signature">Signature</option></select>' +
+    '<input type="text" name="section" placeholder="Section" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">' +
+    '<div class="sm:col-span-2 flex items-center justify-between"><label class="flex items-center gap-2 text-sm"><input type="checkbox" name="required" value="1" class="rounded border-gray-300"> Required</label><button type="submit" class="px-3 py-1.5 bg-brand-600 text-white text-sm rounded-lg">Update</button></div></form>';
+
+  row.appendChild(form);
+  // Pre-fill question text
+  var qText = row.querySelector('.text-gray-900.font-medium');
+  if (qText) form.querySelector('input[name="question"]').value = qText.textContent.trim();
+}
+</script>

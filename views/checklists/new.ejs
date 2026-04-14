@@ -1,0 +1,26 @@
+<% locals.currentPage = 'checklists' %>
+
+<div class="max-w-xl mx-auto space-y-5">
+  <div>
+    <a href="/checklists" class="text-sm text-gray-500 hover:text-gray-700 mb-2 inline-flex items-center gap-1">&larr; Back to Templates</a>
+    <h1 class="text-2xl font-bold text-gray-900">New Checklist Template</h1>
+    <p class="text-sm text-gray-500 mt-1">Create a template, then add questions to it</p>
+  </div>
+
+  <form method="POST" action="/checklists" class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 space-y-4">
+    <%- include('../partials/csrf') %>
+    <div>
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Template Name <span class="text-red-500">*</span></label>
+      <input type="text" name="name" required placeholder="e.g. Pre-Start Checklist, Vehicle Inspection..."
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+    </div>
+    <div>
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Description</label>
+      <textarea name="description" rows="3" placeholder="What is this checklist used for?"
+        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y"></textarea>
+    </div>
+    <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">
+      Create Template
+    </button>
+  </form>
+</div>

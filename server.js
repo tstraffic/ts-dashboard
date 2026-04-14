@@ -202,6 +202,7 @@ app.use('/bookings', requireLogin, requirePermission('bookings'), require('./rou
 app.use('/allocations', requireLogin, requirePermission('allocations'), require('./routes/allocations'));
 app.use('/schedule', requireLogin, requirePermission('schedule'), require('./routes/schedule'));
 app.use('/equipment', requireLogin, requirePermission('equipment'), require('./routes/equipment'));
+app.use('/checklists', requireLogin, requirePermission('checklists'), require('./routes/checklists'));
 app.use('/exports', requireLogin, requirePermission('exports'), require('./routes/exports'));
 app.use('/reports', requireLogin, requirePermission('reports'), require('./routes/reports'));
 app.use('/defects', requireLogin, requirePermission('defects'), require('./routes/defects'));

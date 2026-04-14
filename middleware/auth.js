@@ -51,6 +51,9 @@ const PERMISSIONS = {
   // ── Site audits (safety/ops/planning/admin) ──
   audits:        ['admin', 'operations', 'planning', 'management'],
 
+  // ── Checklist templates (admin/planning manage templates, ops can view) ──
+  checklists:    ['admin', 'operations', 'planning'],
+
   // ── Finance / Admin ──
   budgets:       ['admin', 'finance'],
   crm:           ['admin'],
