@@ -234,10 +234,28 @@ router.get('/new', (req, res) => {
   }
 });
 
+// Normalise HH:MM or HHMM or HH:MM:SS input to strict HH:MM
+function normaliseTimeStr(raw) {
+  if (!raw) return '';
+  const digits = String(raw).replace(/\D/g, '');
+  if (!digits) return '';
+  let h, m;
+  if (digits.length >= 4) { h = parseInt(digits.slice(0,2),10); m = parseInt(digits.slice(2,4),10); }
+  else if (digits.length === 3) { h = parseInt(digits.slice(0,1),10); m = parseInt(digits.slice(1,3),10); }
+  else if (digits.length === 2) { h = parseInt(digits,10); m = 0; }
+  else { h = parseInt(digits,10); m = 0; }
+  if (isNaN(h) || h > 23) h = 23;
+  if (isNaN(m) || m > 59) m = 59;
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+
 // POST / — Create booking
 router.post('/', (req, res) => {
   const db = getDb(); const b = req.body;
   if (!b.title || !b.start_date || !b.start_time || !b.end_date || !b.end_time) { req.flash('error', 'Title and schedule are required.'); return res.redirect('/bookings/new'); }
+  // Normalise time fields
+  b.depot_meeting_time = normaliseTimeStr(b.depot_meeting_time);
+  b.straight_to_site_time = normaliseTimeStr(b.straight_to_site_time);
   const bookingNumber = generateBookingNumber(db);
   const siteContacts = Array.isArray(b.site_contacts) ? JSON.stringify(b.site_contacts) : (b.site_contacts ? JSON.stringify([b.site_contacts]) : '[]');
   const bookingTags = b.booking_tags ? JSON.stringify(b.booking_tags.split(',').map(t => t.trim()).filter(Boolean)) : '[]';
@@ -395,6 +413,8 @@ router.post('/:id', (req, res) => {
   if (!existing) { req.flash('error', 'Booking not found.'); return res.redirect('/bookings'); }
   const b = req.body;
   if (!b.title || !b.start_date || !b.start_time || !b.end_date || !b.end_time) { req.flash('error', 'Title and schedule are required.'); return res.redirect('/bookings/' + req.params.id + '/edit'); }
+  b.depot_meeting_time = normaliseTimeStr(b.depot_meeting_time);
+  b.straight_to_site_time = normaliseTimeStr(b.straight_to_site_time);
   const siteContacts = Array.isArray(b.site_contacts) ? JSON.stringify(b.site_contacts) : (b.site_contacts ? JSON.stringify([b.site_contacts]) : '[]');
   const bookingTags = b.booking_tags ? JSON.stringify(b.booking_tags.split(',').map(t => t.trim()).filter(Boolean)) : '[]';
   db.prepare(`UPDATE bookings SET job_id=?, client_id=?, title=?, description=?, status=?, depot=?, start_datetime=?, end_datetime=?, site_address=?, suburb=?, state=?, postcode=?, order_number=?, billing_code=?, client_contact=?, supervisor_id=?, requirements_text=?, is_emergency=?, is_callout=?, billable=?, notes=?,

@@ -1369,11 +1369,11 @@ setInterval(function() {
           <div class="modal-field-grid">
             <div class="modal-field">
               <label>Depot Meeting Time <span class="text-red-500">*</span></label>
-              <input type="time" name="depot_meeting_time" required class="modal-input">
+              <input type="text" name="depot_meeting_time" required class="modal-input" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$" title="24-hour HH:MM, e.g. 07:30" data-time-mask style="font-variant-numeric: tabular-nums;">
             </div>
             <div class="modal-field">
               <label>Straight to Site Time</label>
-              <input type="time" name="straight_to_site_time" class="modal-input">
+              <input type="text" name="straight_to_site_time" class="modal-input" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$" title="24-hour HH:MM, e.g. 07:30" data-time-mask style="font-variant-numeric: tabular-nums;">
             </div>
           </div>
           <div class="modal-field" style="grid-column: span 2">
@@ -2777,4 +2777,53 @@ function exportBookingsCSV() {
   URL.revokeObjectURL(a.href);
   showToast('Exported ' + data.length + ' bookings', 'success');
 }
+
+// ── Time Mask for HH:MM inputs (auto-inserts colon as you type) ──
+function __bkNormaliseTime(raw) {
+  if (!raw) return '';
+  var d = String(raw).replace(/\D/g, '');
+  if (!d) return '';
+  if (d.length >= 6) d = d.slice(0, 4);
+  if (d.length <= 2) return d;
+  if (d.length === 3) return d.slice(0,2) + ':' + d.slice(2);
+  return d.slice(0,2) + ':' + d.slice(2,4);
+}
+function __bkValidateTime(val) {
+  if (!val) return '';
+  var m = val.match(/^(\d{1,2}):?(\d{0,2})$/);
+  if (!m) return val;
+  var h = parseInt(m[1], 10), mm = m[2] === '' ? 0 : parseInt(m[2], 10);
+  if (isNaN(h) || h > 23) h = 23;
+  if (isNaN(mm) || mm > 59) mm = 59;
+  return String(h).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+}
+function __bkBindTimeMask(inp) {
+  if (inp.dataset.timeMaskBound) return;
+  inp.dataset.timeMaskBound = '1';
+  if (inp.value) inp.value = __bkValidateTime(inp.value.slice(0,5));
+  inp.addEventListener('input', function() {
+    var caret = inp.selectionStart;
+    var before = inp.value;
+    var next = __bkNormaliseTime(before);
+    if (next !== before) {
+      inp.value = next;
+      var delta = next.length - before.length;
+      try { inp.setSelectionRange(caret + delta, caret + delta); } catch (e) {}
+    }
+  });
+  inp.addEventListener('blur', function() { if (inp.value) inp.value = __bkValidateTime(inp.value); });
+  inp.addEventListener('paste', function(e) {
+    e.preventDefault();
+    var pasted = (e.clipboardData || window.clipboardData).getData('text');
+    inp.value = __bkValidateTime(pasted);
+  });
+}
+function __bkApplyTimeMasks() {
+  document.querySelectorAll('input[data-time-mask]').forEach(__bkBindTimeMask);
+}
+__bkApplyTimeMasks();
+// Re-apply when modal opens (observers will rebind new inputs)
+document.addEventListener('DOMContentLoaded', __bkApplyTimeMasks);
+var __bkMaskObserver = new MutationObserver(__bkApplyTimeMasks);
+__bkMaskObserver.observe(document.body, { childList: true, subtree: true });
 </script>
