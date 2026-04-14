@@ -44,8 +44,8 @@ const PERMISSIONS = {
   exports:       ['admin', 'operations', 'finance', 'hr', 'sales', 'management', 'accounts'],
 
   // ── Planning only (no operations) ──
-  compliance:    ['admin', 'planning'],
-  plans:         ['admin', 'planning'],
+  compliance:    ['admin', 'planning', 'management', 'operations'],
+  plans:         ['admin', 'planning', 'management', 'operations'],
   updates:       ['admin', 'planning'],
 
   // ── Site audits (safety/ops/planning/admin) ──
