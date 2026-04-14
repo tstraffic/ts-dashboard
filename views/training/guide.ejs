@@ -250,6 +250,181 @@
       border: 1px solid rgba(255,255,255,0.06);
     }
 
+    /* ── Form List (Accessible Forms slide) ── */
+    .form-list { display: grid; gap: 0.55rem; }
+    .form-row {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 150ms ease;
+    }
+    .form-row:hover {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.12);
+    }
+    .form-ico {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      flex-shrink: 0;
+    }
+    .form-label { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.85); }
+
+    /* ── Leave Days (3-point card list) ── */
+    .leave-points { display: grid; gap: 0.75rem; }
+    .leave-point {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 12px;
+      align-items: start;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      padding: 14px 16px;
+      transition: all 150ms ease;
+    }
+    .leave-point:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+    .leave-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: rgba(0,210,190,0.12);
+      border: 1px solid rgba(0,210,190,0.3);
+      color: var(--cyan);
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .leave-body p { margin: 0; }
+    .leave-head { font-weight: 600; font-size: 15px; color: #fff; margin-bottom: 2px; }
+    .leave-desc { font-size: 14px; color: rgba(255,255,255,0.65); line-height: 1.5; }
+
+    /* ── Mobile Phone Policy slide ── */
+    .mp-hero {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 18px 24px;
+      background: rgba(220,38,38,0.10);
+      border: 1px solid rgba(220,38,38,0.3);
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+    }
+    .mp-hero-icon {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: rgba(220,38,38,0.2);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--red);
+      flex-shrink: 0;
+    }
+    .mp-hero-text { text-align: left; }
+    .mp-hero-title { font-size: 18px; font-weight: 700; color: #fff; }
+    .mp-hero-sub { font-size: 13px; color: rgba(255,255,255,0.65); margin-top: 2px; }
+    .mp-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    @media (max-width: 640px) { .mp-grid { grid-template-columns: 1fr; } }
+    .mp-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      padding: 14px 16px;
+      transition: all 150ms ease;
+    }
+    .mp-card:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+    .mp-card-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .mp-card-ico {
+      width: 26px; height: 26px;
+      border-radius: 6px;
+      background: rgba(220,38,38,0.12);
+      color: var(--red);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .mp-card-title { font-weight: 600; font-size: 14px; color: #fff; }
+    .mp-card-desc { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.55; }
+
+    /* ── PPE Grid ── */
+    .ppe-grid {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 2.5rem;
+    }
+    .ppe-item {
+      width: 130px;
+      text-align: center;
+    }
+    .ppe-slot {
+      height: 140px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .ppe-img {
+      max-height: 130px !important;
+      max-width: 110px !important;
+      width: auto !important;
+      height: auto !important;
+      object-fit: contain;
+      filter: drop-shadow(0 6px 16px rgba(0,0,0,0.45));
+      box-shadow: none !important;
+      border: none !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+    }
+    .ppe-label {
+      font-weight: 600;
+      font-size: 15px;
+      color: #fff;
+    }
+    .ppe-sub {
+      font-size: 13px;
+      color: rgba(255,255,255,0.45);
+      margin-top: 2px;
+    }
+
+    /* ── Founders: circular images ── */
+    .founder-circle {
+      width: 130px; height: 130px;
+      border-radius: 50%;
+      overflow: hidden;
+      margin: 0 auto 0.5rem;
+      flex-shrink: 0;
+      box-shadow: none;
+    }
+    .founder-circle.cyan { border: 3px solid var(--cyan); }
+    .founder-circle.orange { border: 3px solid var(--orange); }
+    .founder-circle img {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover;
+      object-position: center 20%;
+      display: block;
+      border-radius: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+
     /* ── Traffio Steps Grid ── */
     .steps-grid {
       display: grid;
