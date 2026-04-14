@@ -1,27 +1,43 @@
 /**
- * Audit PDF export v4 — branded T&S Traffic Control.
- * Clean stacked layout, no overlapping, no blank pages.
+ * Audit PDF export v5 — professional branded T&S Traffic Control report.
+ *
+ * Design: Clean cover page, structured body, proper typography,
+ * no blank pages, professional color scheme.
  */
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
 const { AUDIT_SECTIONS, normaliseState } = require('../lib/auditQuestions');
 
-const BRAND = '#1D6AE5';
-const GREEN = '#059669';
-const RED = '#DC2626';
-const AMBER = '#D97706';
-const GRAY = '#6B7280';
-const GRAY_DARK = '#374151';
-const GRAY_LIGHT = '#F3F4F6';
-const WHITE = '#FFFFFF';
+/* ── Brand palette ── */
+const BRAND     = '#1D6AE5';
+const BRAND_BG  = '#EBF2FF';   // light brand tint
+const GREEN     = '#059669';
+const GREEN_BG  = '#ECFDF5';
+const RED       = '#DC2626';
+const RED_BG    = '#FEF2F2';
+const AMBER     = '#D97706';
+const AMBER_BG  = '#FFFBEB';
+const GRAY      = '#6B7280';
+const GRAY_DARK = '#1F2937';
+const GRAY_MED  = '#4B5563';
+const GRAY_LINE = '#E5E7EB';
+const GRAY_BG   = '#F9FAFB';
+const WHITE     = '#FFFFFF';
+const BLACK     = '#111827';
 
 const LOGO_PATH = path.join(__dirname, '..', 'public', 'images', 'logo-colour.png');
-const ML = 45, MR = 45, MT = 40, MB = 45;
+const ML = 50, MR = 50, MT = 50, MB = 60;
 
+/* ── Helpers ── */
 function fmtDate(d) {
   if (!d) return '—';
-  try { return new Date(d).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }); }
+  try { return new Date(d).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'medium', timeStyle: 'short' }); }
+  catch (e) { return String(d); }
+}
+function fmtDateShort(d) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric' }); }
   catch (e) { return String(d); }
 }
 function findingLabel(f) {
@@ -35,6 +51,14 @@ function findingColor(f) {
   if (f === 'fail') return RED;
   return AMBER;
 }
+function findingBg(f) {
+  if (f === 'pass') return GREEN_BG;
+  if (f === 'fail') return RED_BG;
+  return AMBER_BG;
+}
+function ucFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '—'; }
+
+/* ════════════════════════════════════════════════════════ */
 
 function generateAuditPdf(opts, out) {
   const { audit: a, responses, sectionComments, nonconformances,
@@ -46,233 +70,353 @@ function generateAuditPdf(opts, out) {
     bufferPages: true,
     margins: { top: MT, bottom: MB, left: ML, right: MR },
     info: {
-      Title: `Site Audit #${a.id} — ${a.project_site || 'Untitled'}`,
+      Title: 'Site Audit #' + a.id + ' — ' + (a.project_site || 'Untitled'),
       Author: 'T&S Traffic Control',
     },
   });
   doc.pipe(out);
 
-  const pw = doc.page.width - ML - MR;
-  const pageBot = doc.page.height - MB;
+  const pw = doc.page.width - ML - MR;   // usable width
+  const ph = doc.page.height;
+  const pageBot = ph - MB;
 
-  function Y() { return doc.y; }
+  /* ── Drawing primitives ── */
+  function curY() { return doc.y; }
   function setY(y) { doc.y = y; doc.x = ML; }
   function gap(n) { doc.y += n; }
-  function need(h) { if (doc.y + h > pageBot) doc.addPage(); }
-  function rr(x, y, w, h, r, fill) {
+  function need(h) { if (doc.y + h > pageBot) { doc.addPage(); } }
+
+  function rect(x, y, w, h, fill) {
+    doc.save().rect(x, y, w, h).fill(fill).restore();
+  }
+  function roundRect(x, y, w, h, r, fill) {
     doc.save().roundedRect(x, y, w, h, r).fill(fill).restore();
   }
-  // All text uses lineBreak:false to prevent phantom pages
-  function T(size, color, str, x, y, w, opts2) {
-    doc.fontSize(size).fillColor(color).text(str || '—', x, y,
-      Object.assign({ lineBreak: false, width: w }, opts2 || {}));
+  function line(x1, y1, x2, y2, color, width) {
+    doc.save().moveTo(x1, y1).lineTo(x2, y2).strokeColor(color || GRAY_LINE).lineWidth(width || 0.5).stroke().restore();
   }
 
-  // ==== HEADER ====
-  const logoH = 36;
+  /* Text — ALWAYS lineBreak:false unless explicitly multi-line to prevent blank pages */
+  function txt(str, x, y, opts2) {
+    doc.text(str || '', x, y, Object.assign({ lineBreak: false }, opts2 || {}));
+  }
+
+  function font(name, size, color) {
+    doc.font(name || 'Helvetica').fontSize(size || 9).fillColor(color || BLACK);
+  }
+
+  /* Measure text height for multi-line content */
+  function measureText(str, width, size) {
+    doc.fontSize(size || 7);
+    return doc.heightOfString(str || '', { width: width });
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     PAGE 1: COVER / SUMMARY
+     ═══════════════════════════════════════════════════════════ */
+
+  // Top brand bar
+  rect(0, 0, doc.page.width, 4, BRAND);
+
+  // Logo
+  let logoW = 0;
   if (fs.existsSync(LOGO_PATH)) {
-    try { doc.image(LOGO_PATH, ML, MT, { height: logoH }); } catch (e) {}
+    try { doc.image(LOGO_PATH, ML, MT, { height: 42 }); logoW = 120; } catch (e) {}
   }
-  T(15, BRAND, 'Site Safety Audit Report', ML + 130, MT + 2, pw - 130);
-  T(7.5, GRAY, `Audit #${a.id}  ·  ${fmtDate(a.audit_datetime || a.created_at)}`, ML + 130, MT + 20, pw - 130);
-  T(7.5, GRAY, 'T&S Traffic Control', ML + 130, MT + 30, pw - 130);
 
-  setY(MT + logoH + 6);
-  doc.save().moveTo(ML, Y()).lineTo(ML + pw, Y()).strokeColor(BRAND).lineWidth(1.5).stroke().restore();
-  gap(10);
+  // Title block right of logo
+  font('Helvetica-Bold', 18, BRAND);
+  txt('Site Safety Audit', ML + logoW + 12, MT + 4, { width: pw - logoW - 12 });
+  font('Helvetica', 9, GRAY);
+  txt('T&S Traffic Control  ·  Audit #' + a.id, ML + logoW + 12, MT + 26, { width: pw - logoW - 12 });
 
-  // ==== SCORE ROW — score box left, finding badge right ====
-  const bandY = Y();
-  const sBoxW = 95, sBoxH = 45;
+  setY(MT + 52);
+  line(ML, curY(), ML + pw, curY(), BRAND, 2);
+  gap(16);
 
-  rr(ML, bandY, sBoxW, sBoxH, 5, BRAND);
-  T(6, WHITE, 'OVERALL SCORE', ML + 8, bandY + 4, sBoxW - 16);
-  T(24, WHITE, `${score.percent}%`, ML + 8, bandY + 12, sBoxW - 16);
-  T(6, WHITE, `${score.total}/${score.max} passed`, ML + 8, bandY + 36, sBoxW - 16);
+  // ── Overall Score Card ──
+  const scoreCardY = curY();
+  const scoreCardH = 70;
+  roundRect(ML, scoreCardY, pw, scoreCardH, 6, GRAY_BG);
 
-  const fX = ML + sBoxW + 8;
-  const fW = pw - sBoxW - 8;
-  rr(fX, bandY, fW, 18, 3, findingColor(a.overall_finding));
-  T(9, WHITE, findingLabel(a.overall_finding), fX + 8, bandY + 4, fW - 16);
+  // Score circle area (left)
+  const circleX = ML + 45;
+  const circleY = scoreCardY + 35;
+  const circleR = 26;
+  // Outer ring
+  doc.save().circle(circleX, circleY, circleR).lineWidth(4).strokeColor(BRAND).stroke().restore();
+  // Score text centered
+  font('Helvetica-Bold', 22, BRAND);
+  txt(score.percent + '%', circleX - 20, circleY - 11, { width: 40, align: 'center' });
+  font('Helvetica', 7, GRAY);
+  txt(score.total + '/' + score.max, circleX - 15, circleY + 10, { width: 30, align: 'center' });
 
-  setY(bandY + sBoxH + 6);
+  // Overall finding badge (right of circle)
+  const badgeX = ML + 100;
+  const badgeY = scoreCardY + 12;
+  const badgeW = 150;
+  roundRect(badgeX, badgeY, badgeW, 22, 4, findingColor(a.overall_finding));
+  font('Helvetica-Bold', 10, WHITE);
+  txt(findingLabel(a.overall_finding), badgeX + 10, badgeY + 6, { width: badgeW - 20 });
 
-  // ==== AREA SCORES — own row, full width, 4 columns ====
-  const aY = Y();
-  rr(ML, aY, pw, 24, 3, GRAY_LIGHT);
-  const aCols = 4;
-  const aColW = pw / aCols;
+  // Area scores right side (3 cols)
+  const areaX = badgeX;
+  const areaY = badgeY + 28;
+  const aColW = (pw - 100 + ML - areaX) > 0 ? Math.floor((ML + pw - areaX) / 3) : 100;
   score.groups.forEach(function (g, i) {
-    const col = i % aCols;
-    const row = Math.floor(i / aCols);
-    const ax = ML + col * aColW + 4;
-    const ay = aY + 3 + row * 11;
-    T(5.5, GRAY, g.label, ax, ay, aColW - 50);
-    T(6, GRAY_DARK, `${g.score}/${g.max} (${g.percent}%)`, ax + aColW - 54, ay, 50, { align: 'right' });
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const ax = areaX + col * aColW;
+    const ay = areaY + row * 11;
+    font('Helvetica', 6, GRAY);
+    txt(g.label, ax, ay, { width: aColW - 35 });
+    font('Helvetica-Bold', 6.5, g.percent >= 80 ? GREEN : g.percent >= 50 ? AMBER : RED);
+    txt(g.score + '/' + g.max + ' (' + g.percent + '%)', ax + aColW - 50, ay, { width: 48, align: 'right' });
   });
-  setY(aY + 28);
+
+  setY(scoreCardY + scoreCardH + 14);
+
+  // ── Audit Details Table ──
+  const details = [
+    ['Project / Site',  a.project_site || '—'],
+    ['Client',          a.client || '—'],
+    ['Date',            fmtDate(a.audit_datetime || a.created_at)],
+    ['Job Number',      a.job_number || '—'],
+    ['Location',        a.location || '—'],
+    ['Shift',           ucFirst(a.shift)],
+    ['TGS / TCP Ref',   a.tgs_ref || '—'],
+    ['Weather',         a.weather || '—'],
+    ['Auditor',         a.auditor_name || a.created_by_name || '—'],
+    ['Supervisor',      a.supervisor_name || '—'],
+    ['Status',          (a.status || 'draft').replace(/_/g, ' ').toUpperCase()],
+  ];
+  const labelColW = 90;
+  const valColW = pw / 2 - labelColW;
+  const halfW = pw / 2;
+  const detY = curY();
+  details.forEach(function (d, i) {
+    var col = i % 2;
+    var row = Math.floor(i / 2);
+    var dx = ML + col * halfW;
+    var dy = detY + row * 16;
+    // Alternating row background (spans full width on even indices)
+    if (col === 0 && row % 2 === 0) {
+      rect(ML, dy - 2, pw, 16, GRAY_BG);
+    }
+    font('Helvetica', 7, GRAY);
+    txt(d[0], dx + 4, dy + 1, { width: labelColW - 8 });
+    font('Helvetica-Bold', 7.5, GRAY_DARK);
+    txt(d[1], dx + labelColW, dy + 1, { width: valColW - 4 });
+  });
+  setY(detY + Math.ceil(details.length / 2) * 16 + 4);
+
+  // Follow-up notice
+  if (a.follow_up_required) {
+    need(22);
+    var fuY = curY();
+    roundRect(ML, fuY, pw, 18, 3, AMBER_BG);
+    font('Helvetica-Bold', 7, AMBER);
+    txt('⚠  FOLLOW-UP REQUIRED: ' + (a.follow_up_date ? fmtDateShort(a.follow_up_date) : 'TBC'), ML + 8, fuY + 5, { width: pw - 16 });
+    setY(fuY + 22);
+  }
+
   gap(4);
 
-  // ==== DETAILS — 2-col grid, label left-aligned, value right ====
-  const details = [
-    ['PROJECT / SITE', a.project_site],
-    ['DATE', fmtDate(a.audit_datetime || a.created_at)],
-    ['CLIENT', a.client],
-    ['JOB #', a.job_number || '—'],
-    ['LOCATION', a.location],
-    ['SHIFT', (a.shift || '—').charAt(0).toUpperCase() + (a.shift || '').slice(1)],
-    ['TGS / TCP REF', a.tgs_ref],
-    ['WEATHER', a.weather],
-    ['AUDITOR', a.auditor_name || a.created_by_name],
-    ['SUPERVISOR', a.supervisor_name],
-  ];
-  const dColW = pw / 2;
-  const lblW = 65;
-  const dY = Y();
-  details.forEach(function (d, i) {
-    const col = i % 2;
-    const row = Math.floor(i / 2);
-    const dx = ML + col * dColW;
-    const dy = dY + row * 12;
-    T(5.5, GRAY, d[0], dx, dy, lblW);
-    T(7, GRAY_DARK, d[1], dx + lblW + 2, dy, dColW - lblW - 6);
-  });
-  setY(dY + Math.ceil(details.length / 2) * 12 + 2);
+  // ── Site Overview Evidence ──
+  embedImages(doc, a, ctxMap['overview'], 'Site Overview Photos', pw, pageBot, ML, MT);
 
-  // Status line
-  T(5.5, GRAY, 'STATUS', ML, Y(), lblW);
-  T(7, GRAY_DARK, (a.status || 'draft').replace('_', ' ').toUpperCase(), ML + lblW + 2, Y(), dColW - lblW);
-  gap(10);
-  if (a.follow_up_required) {
-    T(6, AMBER, 'FOLLOW-UP REQUIRED: ' + (a.follow_up_date || 'TBC'), ML, Y(), pw);
-    gap(10);
-  }
-
-  doc.save().moveTo(ML, Y()).lineTo(ML + pw, Y()).strokeColor('#E5E7EB').lineWidth(0.5).stroke().restore();
-  gap(6);
-
-  // ==== Site overview evidence ====
-  embedImages(doc, a, ctxMap['overview'], 'SITE OVERVIEW EVIDENCE', pw, pageBot);
-
-  // ==== CHECKLIST SECTIONS ====
+  /* ═══════════════════════════════════════════════════════════
+     CHECKLIST SECTIONS
+     ═══════════════════════════════════════════════════════════ */
   AUDIT_SECTIONS.forEach(function (section) {
-    need(30);
-    const hY = Y();
-    rr(ML, hY, pw, 16, 3, BRAND);
-    T(8, WHITE, `${section.key}. ${section.title}`, ML + 6, hY + 3, pw - 56);
-    let sYes = 0, sMax = 0;
+    need(40);
+
+    // Section header bar
+    var hY = curY();
+    roundRect(ML, hY, pw, 20, 4, BRAND);
+    font('Helvetica-Bold', 9, WHITE);
+    txt(section.key + '.  ' + section.title, ML + 8, hY + 5, { width: pw - 60 });
+    // Section score
+    var sYes = 0, sMax = 0;
     section.items.forEach(function (_, idx) {
-      const st = normaliseState(responses[section.key + '.' + (idx + 1)]);
+      var st = normaliseState(responses[section.key + '.' + (idx + 1)]);
       if (st === 'yes') { sYes++; sMax++; } else if (st === 'no') { sMax++; }
     });
-    T(7, WHITE, `${sYes}/${sMax}`, ML + pw - 42, hY + 4, 36, { align: 'right' });
-    setY(hY + 19);
+    var sPct = sMax ? Math.round(sYes / sMax * 100) : 0;
+    font('Helvetica-Bold', 8, WHITE);
+    txt(sYes + '/' + sMax + '  (' + sPct + '%)', ML + pw - 80, hY + 6, { width: 72, align: 'right' });
+    setY(hY + 24);
 
+    // Column headers
+    var colHY = curY();
+    rect(ML, colHY, pw, 12, GRAY_BG);
+    font('Helvetica-Bold', 6, GRAY);
+    txt('STATUS', ML + 4, colHY + 3, { width: 35 });
+    txt('REF', ML + 38, colHY + 3, { width: 22 });
+    txt('ITEM', ML + 62, colHY + 3, { width: pw - 66 });
+    setY(colHY + 13);
+
+    // Items
     section.items.forEach(function (item, idx) {
-      const key = section.key + '.' + (idx + 1);
-      const r = responses[key] || {};
-      const st = normaliseState(r);
-      need(11);
+      var key = section.key + '.' + (idx + 1);
+      var r = responses[key] || {};
+      var st = normaliseState(r);
+      var rowH = r.notes ? 20 : 12;
+      need(rowH);
 
-      const iy = Y();
-      if (idx % 2 === 0) doc.save().rect(ML, iy - 1, pw, 10).fill(GRAY_LIGHT).restore();
+      var iy = curY();
+      // Zebra stripe
+      if (idx % 2 === 0) rect(ML, iy, pw, rowH, GRAY_BG);
+      // Subtle bottom line
+      line(ML, iy + rowH, ML + pw, iy + rowH, '#F3F4F6', 0.3);
 
-      let badge, bc;
-      if (st === 'yes') { badge = 'YES'; bc = GREEN; }
-      else if (st === 'no') { badge = 'NO'; bc = RED; }
-      else if (st === 'na') { badge = 'N/A'; bc = GRAY; }
-      else { badge = '—'; bc = '#D1D5DB'; }
-      rr(ML + 1, iy, 21, 8, 2, bc);
-      T(5, WHITE, badge, ML + 2, iy + 1.5, 19, { align: 'center' });
-      T(6.5, GRAY_DARK, `${key}  ${item}`, ML + 25, iy + 1, pw - 28, { height: 8, ellipsis: true });
-      setY(iy + 10);
+      // Status badge
+      var badge, bc, bgc;
+      if (st === 'yes')      { badge = 'YES'; bc = WHITE; bgc = GREEN; }
+      else if (st === 'no')  { badge = 'NO';  bc = WHITE; bgc = RED; }
+      else if (st === 'na')  { badge = 'N/A'; bc = WHITE; bgc = GRAY; }
+      else                   { badge = '—';   bc = GRAY;  bgc = '#E5E7EB'; }
+      roundRect(ML + 4, iy + 2, 28, 9, 2, bgc);
+      font('Helvetica-Bold', 5.5, bc);
+      txt(badge, ML + 5, iy + 3.5, { width: 26, align: 'center' });
 
+      // Ref number
+      font('Helvetica', 6.5, GRAY);
+      txt(key, ML + 38, iy + 3, { width: 22 });
+
+      // Item text
+      font('Helvetica', 7, GRAY_DARK);
+      txt(item, ML + 62, iy + 3, { width: pw - 66, height: 9, ellipsis: true });
+
+      // Notes (if any)
       if (r.notes) {
-        need(10);
-        // Italic note text to distinguish from item text
-        doc.font('Helvetica-Oblique').fontSize(5.5).fillColor('#4B5563')
-          .text(`→ ${r.notes}`, ML + 25, Y(), { width: pw - 28, lineBreak: false, height: 7, ellipsis: true });
-        doc.font('Helvetica');
-        gap(8);
+        font('Helvetica-Oblique', 6, GRAY_MED);
+        txt('↳ ' + r.notes, ML + 62, iy + 12, { width: pw - 66, height: 7, ellipsis: true });
       }
+
+      setY(iy + rowH);
     });
 
-    // Section comments — visible blue box, multi-line
+    // Section comments
     if (sectionComments[section.key]) {
-      const cmtText = sectionComments[section.key];
-      // Measure height needed (approx 7pt font ~= 9px per line, ~80 chars per line at pw-20)
-      const charsPerLine = Math.floor((pw - 20) / 3.5);
-      const lines = Math.max(1, Math.ceil(cmtText.length / charsPerLine));
-      const boxH = 12 + lines * 9;
-      need(boxH + 2);
-      const cy = Y();
-      rr(ML, cy, pw, boxH, 3, '#EFF6FF');
-      doc.save().roundedRect(ML, cy, 3, boxH, 1).fill(BRAND).restore();
-      T(5.5, BRAND, 'COMMENTS', ML + 8, cy + 3, 50);
-      // Use lineBreak:true for multi-line comments
-      doc.fontSize(7).fillColor(GRAY_DARK).text(cmtText, ML + 8, cy + 12, { width: pw - 20, lineBreak: true });
+      var cmtText = sectionComments[section.key];
+      var cmtH = measureText(cmtText, pw - 24, 7);
+      var boxH = Math.min(cmtH + 16, 80); // cap height
+      need(boxH + 4);
+      gap(3);
+      var cy = curY();
+      roundRect(ML, cy, pw, boxH, 4, BRAND_BG);
+      // Left accent bar
+      roundRect(ML, cy, 3, boxH, 1, BRAND);
+      font('Helvetica-Bold', 6, BRAND);
+      txt('COMMENTS', ML + 10, cy + 4, { width: 60 });
+      // Multi-line comment text — use lineBreak:true but constrain height
+      doc.font('Helvetica').fontSize(7).fillColor(GRAY_DARK);
+      doc.text(cmtText, ML + 10, cy + 13, { width: pw - 24, height: boxH - 16, lineBreak: true, ellipsis: true });
       setY(cy + boxH + 2);
     }
 
-    embedImages(doc, a, ctxMap['section_' + section.key], null, pw, pageBot);
-    gap(3);
+    // Section evidence images
+    embedImages(doc, a, ctxMap['section_' + section.key], null, pw, pageBot, ML, MT);
+    gap(6);
   });
 
-  // ==== NON-CONFORMANCE REGISTER ====
+  /* ═══════════════════════════════════════════════════════════
+     NON-CONFORMANCE REGISTER
+     ═══════════════════════════════════════════════════════════ */
   if (nonconformances && nonconformances.length) {
-    need(35);
-    const ncY = Y();
-    rr(ML, ncY, pw, 16, 3, RED);
-    T(8, WHITE, 'Non-Conformance Register', ML + 6, ncY + 3, pw - 16);
-    setY(ncY + 19);
-
-    const ncW = [14, 0, 32, 0, 46, 40, 24];
-    const flex = Math.floor((pw - 14 - 32 - 46 - 40 - 24) / 2);
-    ncW[1] = flex; ncW[3] = flex;
-
-    let cx = ML;
-    ['#', 'Issue', 'Risk', 'Action', 'Resp.', 'Due', 'Done'].forEach(function (h, i) {
-      T(5, GRAY, h, cx, Y(), ncW[i]);
-      cx += ncW[i];
-    });
-    gap(8);
-
-    nonconformances.forEach(function (nc, i) {
-      need(10);
-      const ry = Y();
-      if (i % 2 === 0) doc.save().rect(ML, ry - 1, pw, 9).fill(GRAY_LIGHT).restore();
-      cx = ML;
-      [String(i + 1), nc.issue || '', nc.risk || '—', nc.action || '—', nc.responsible || '—', nc.due_date || '—', nc.closed ? '✓' : '—'].forEach(function (v, vi) {
-        T(5.5, GRAY_DARK, v, cx, ry, ncW[vi], { height: 8, ellipsis: true });
-        cx += ncW[vi];
-      });
-      setY(ry + 9);
-      embedImages(doc, a, ctxMap['nc_' + (i + 1)], null, pw, pageBot);
-    });
+    need(50);
     gap(4);
+    var ncHeaderY = curY();
+    roundRect(ML, ncHeaderY, pw, 20, 4, RED);
+    font('Helvetica-Bold', 9, WHITE);
+    txt('Non-Conformance Register  (' + nonconformances.length + ')', ML + 8, ncHeaderY + 5, { width: pw - 16 });
+    setY(ncHeaderY + 24);
+
+    // Table header
+    var thY = curY();
+    rect(ML, thY, pw, 13, RED_BG);
+    var ncCols = { n: 18, issue: 0, risk: 35, action: 0, resp: 50, due: 45, done: 28 };
+    var ncFlex = Math.floor((pw - ncCols.n - ncCols.risk - ncCols.resp - ncCols.due - ncCols.done) / 2);
+    ncCols.issue = ncFlex;
+    ncCols.action = ncFlex;
+    var headers = [
+      { label: '#', w: ncCols.n },
+      { label: 'Issue', w: ncCols.issue },
+      { label: 'Risk', w: ncCols.risk },
+      { label: 'Action Required', w: ncCols.action },
+      { label: 'Responsible', w: ncCols.resp },
+      { label: 'Due', w: ncCols.due },
+      { label: 'Closed', w: ncCols.done },
+    ];
+    var hx = ML;
+    headers.forEach(function (h) {
+      font('Helvetica-Bold', 5.5, RED);
+      txt(h.label, hx + 2, thY + 4, { width: h.w - 4 });
+      hx += h.w;
+    });
+    setY(thY + 14);
+
+    // NC rows
+    nonconformances.forEach(function (nc, i) {
+      need(14);
+      var ry = curY();
+      if (i % 2 === 0) rect(ML, ry, pw, 12, GRAY_BG);
+      var cx = ML;
+      var vals = [
+        { v: String(i + 1), w: ncCols.n },
+        { v: nc.issue || '—', w: ncCols.issue },
+        { v: nc.risk || '—', w: ncCols.risk },
+        { v: nc.action || '—', w: ncCols.action },
+        { v: nc.responsible || '—', w: ncCols.resp },
+        { v: nc.due_date || '—', w: ncCols.due },
+        { v: nc.closed ? '✓ Yes' : '—', w: ncCols.done },
+      ];
+      vals.forEach(function (cell) {
+        font('Helvetica', 6, GRAY_DARK);
+        txt(cell.v, cx + 2, ry + 3, { width: cell.w - 4, height: 9, ellipsis: true });
+        cx += cell.w;
+      });
+      setY(ry + 12);
+
+      // NC evidence images
+      embedImages(doc, a, ctxMap['nc_' + (i + 1)], null, pw, pageBot, ML, MT);
+    });
+    gap(6);
   }
 
-  // ==== SIGNATURES (styled like the web — large italic like a real signature) ====
+  /* ═══════════════════════════════════════════════════════════
+     SIGNATURES
+     ═══════════════════════════════════════════════════════════ */
   if (a.auditor_signature_text || a.supervisor_signature_text) {
-    need(60);
-    doc.save().moveTo(ML, Y()).lineTo(ML + pw, Y()).strokeColor(BRAND).lineWidth(1).stroke().restore();
-    gap(4);
-    T(8, BRAND, 'Sign-off', ML, Y(), pw);
-    gap(10);
-    const sY = Y();
-    const sW = (pw - 12) / 2;
+    need(80);
+    gap(6);
+    line(ML, curY(), ML + pw, curY(), BRAND, 1);
+    gap(8);
+    font('Helvetica-Bold', 10, BRAND);
+    txt('Sign-off', ML, curY(), { width: pw });
+    gap(16);
+
+    var sigY = curY();
+    var sigW = (pw - 16) / 2;
 
     function drawSigBox(x, label, name, signedAt) {
-      rr(x, sY, sW, 48, 4, GRAY_LIGHT);
-      // Subtle bottom border like the web cards
-      doc.save().moveTo(x, sY + 48).lineTo(x + sW, sY + 48).strokeColor('#D1D5DB').lineWidth(0.5).stroke().restore();
-      T(5.5, GRAY, label, x + 8, sY + 5, sW - 16);
-      // Signature name — large italic (Helvetica-Oblique)
-      doc.font('Helvetica-Oblique').fontSize(18).fillColor(GRAY_DARK)
-        .text(name, x + 8, sY + 16, { width: sW - 16, lineBreak: false });
-      doc.font('Helvetica'); // reset font
+      // Box with brand top border
+      roundRect(x, sigY, sigW, 58, 5, WHITE);
+      rect(x, sigY, sigW, 3, BRAND);
+      // Subtle border
+      doc.save().roundedRect(x, sigY, sigW, 58, 5).strokeColor(GRAY_LINE).lineWidth(0.5).stroke().restore();
+      // Label
+      font('Helvetica-Bold', 6, GRAY);
+      txt(label, x + 10, sigY + 8, { width: sigW - 20 });
+      // Signature name — large italic cursive
+      doc.font('Helvetica-Oblique').fontSize(16).fillColor(GRAY_DARK);
+      txt(name, x + 10, sigY + 20, { width: sigW - 20 });
+      doc.font('Helvetica');
+      // Signed date
       if (signedAt) {
-        T(5.5, GREEN, '✓ Signed ' + fmtDate(signedAt), x + 8, sY + 38, sW - 16);
+        font('Helvetica', 6, GREEN);
+        txt('✓ Signed  ·  ' + fmtDate(signedAt), x + 10, sigY + 43, { width: sigW - 20 });
       }
     }
 
@@ -280,71 +424,120 @@ function generateAuditPdf(opts, out) {
       drawSigBox(ML, 'AUDITOR', a.auditor_signature_text, a.auditor_signed_at);
     }
     if (a.supervisor_signature_text) {
-      drawSigBox(ML + sW + 12, 'SUPERVISOR / STMS', a.supervisor_signature_text, a.supervisor_signed_at);
+      drawSigBox(ML + sigW + 16, 'SUPERVISOR / STMS', a.supervisor_signature_text, a.supervisor_signed_at);
     }
-    setY(sY + 54);
+    setY(sigY + 64);
   }
 
-  // Annotated TGS
-  embedImages(doc, a, ctxMap['annotated_tgs'], 'ANNOTATED TGS / CLOSE-OUT SKETCH', pw, pageBot);
+  // ── Annotated TGS ──
+  embedImages(doc, a, ctxMap['annotated_tgs'], 'Annotated TGS / Close-out Sketch', pw, pageBot, ML, MT);
 
-  // ==== FOOTER INFO — created by, signed off by ====
-  gap(8);
-  doc.save().moveTo(ML, Y()).lineTo(ML + pw, Y()).strokeColor('#E5E7EB').lineWidth(0.5).stroke().restore();
-  gap(4);
-  T(5.5, GRAY, 'Created by ' + (a.created_by_name || '—') + '  ·  ' + fmtDate(a.created_at), ML, Y(), pw);
-  gap(8);
+  /* ═══════════════════════════════════════════════════════════
+     FOOTER — Created by + Internal Sign-off
+     ═══════════════════════════════════════════════════════════ */
+  gap(10);
+  need(50);
+  line(ML, curY(), ML + pw, curY(), GRAY_LINE, 0.5);
+  gap(6);
+
+  // Created by
+  font('Helvetica', 6.5, GRAY);
+  txt('Created by  ' + (a.created_by_name || '—') + '  ·  ' + fmtDate(a.created_at), ML, curY(), { width: pw });
+  gap(10);
+
+  // Internal sign-off
   if (a.signed_off_by_name) {
-    rr(ML, Y(), pw, 16, 3, '#F0FDF4');
-    doc.save().roundedRect(ML, Y(), 3, 16, 1).fill(GREEN).restore();
-    T(5.5, GREEN, 'INTERNALLY SIGNED OFF BY', ML + 8, Y() + 2, 110);
-    T(7, GRAY_DARK, a.signed_off_by_name + '  ·  ' + fmtDate(a.signed_off_at), ML + 120, Y() + 2, pw - 128);
-    gap(20);
+    var soY = curY();
+    var soH = 32;
+    roundRect(ML, soY, pw, soH, 5, GREEN_BG);
+    // Left green accent
+    roundRect(ML, soY, 4, soH, 2, GREEN);
+    // Check icon area
+    roundRect(ML + 14, soY + 8, 16, 16, 8, GREEN);
+    font('Helvetica-Bold', 10, WHITE);
+    txt('✓', ML + 17, soY + 11, { width: 12, align: 'center' });
+    // Text
+    font('Helvetica-Bold', 7, GREEN);
+    txt('INTERNALLY SIGNED OFF', ML + 38, soY + 8, { width: pw - 46 });
+    font('Helvetica', 7.5, GRAY_DARK);
+    txt(a.signed_off_by_name + '  ·  ' + fmtDate(a.signed_off_at), ML + 38, soY + 19, { width: pw - 46 });
+    setY(soY + soH + 4);
   }
 
-  // ==== PAGE NUMBERS ====
-  const range = doc.bufferedPageRange();
-  for (let i = range.start; i < range.start + range.count; i++) {
-    doc.switchToPage(i);
-    T(5, GRAY, `T&S Traffic Control  ·  Site Audit #${a.id}  ·  Page ${i + 1} of ${range.count}`,
-      ML, doc.page.height - 28, pw, { align: 'center' });
+  /* ═══════════════════════════════════════════════════════════
+     PAGE NUMBERS + FOOTER BAR
+     ═══════════════════════════════════════════════════════════ */
+  var range = doc.bufferedPageRange();
+  var totalPages = range.count;
+  for (var p = range.start; p < range.start + totalPages; p++) {
+    doc.switchToPage(p);
+    // Bottom brand line
+    line(ML, ph - MB + 10, ML + pw, ph - MB + 10, GRAY_LINE, 0.3);
+    // Footer text
+    font('Helvetica', 5.5, GRAY);
+    txt('T&S Traffic Control  ·  Site Audit #' + a.id + '  ·  Confidential',
+      ML, ph - MB + 14, { width: pw - 50 });
+    font('Helvetica', 5.5, GRAY);
+    txt('Page ' + (p + 1) + ' of ' + totalPages,
+      ML + pw - 50, ph - MB + 14, { width: 50, align: 'right' });
+    // Top brand bar on every page (except first which already has it)
+    if (p > range.start) {
+      rect(0, 0, doc.page.width, 3, BRAND);
+    }
   }
 
   doc.end();
 }
 
-/**
- * Embed image thumbnails in a grid. Safe page breaks, no blank pages.
- */
-function embedImages(doc, audit, items, label, pw, pageBot) {
+
+/* ════════════════════════════════════════════════════════
+   Image grid — embeds photos in rows, handles page breaks
+   ════════════════════════════════════════════════════════ */
+function embedImages(doc, audit, items, label, pw, pageBot, ml, mt) {
   if (!items || !items.length) return;
-  const images = [];
+
+  var images = [];
   items.forEach(function (att) {
     if (!(att.mime_type || '').startsWith('image/')) return;
-    const fp = path.join(__dirname, '..', 'data', 'uploads', 'audits', String(audit.id), att.filename);
+    var fp = path.join(__dirname, '..', 'data', 'uploads', 'audits', String(audit.id), att.filename);
     if (fs.existsSync(fp)) images.push({ att: att, fp: fp });
   });
   if (!images.length) return;
 
+  // Section label
   if (label) {
-    if (doc.y + 14 > pageBot) doc.addPage();
-    doc.fontSize(5.5).fillColor(GRAY).text(label, ML, doc.y, { lineBreak: false });
-    doc.y += 6;
+    if (doc.y + 18 > pageBot) doc.addPage();
+    doc.y += 4;
+    doc.font('Helvetica-Bold').fontSize(7).fillColor(GRAY);
+    doc.text(label, ml, doc.y, { lineBreak: false });
+    doc.font('Helvetica');
+    doc.y += 10;
   }
 
-  const tw = 85, th = 64, gx = 4, gy = 4;
-  const cols = Math.floor((pw + gx) / (tw + gx));
-  let col = 0, rowY = doc.y;
+  var tw = 90, th = 68, gx = 6, gy = 6;
+  var cols = Math.floor((pw + gx) / (tw + gx));
+  if (cols < 1) cols = 1;
+  var col = 0, rowY = doc.y;
 
   images.forEach(function (img) {
     if (col >= cols) { col = 0; rowY += th + gy; }
     if (col === 0 && rowY + th > pageBot) { doc.addPage(); rowY = doc.y; }
-    try { doc.image(img.fp, ML + col * (tw + gx), rowY, { fit: [tw, th], align: 'center', valign: 'center' }); }
-    catch (e) { /* skip */ }
+    var ix = ml + col * (tw + gx);
+    // Image border/shadow
+    doc.save().roundedRect(ix, rowY, tw, th, 3).strokeColor('#E5E7EB').lineWidth(0.5).stroke().restore();
+    try {
+      doc.image(img.fp, ix + 1, rowY + 1, { fit: [tw - 2, th - 2], align: 'center', valign: 'center' });
+    } catch (e) { /* skip corrupt image */ }
+    // Caption
+    if (img.att.caption) {
+      doc.font('Helvetica').fontSize(5).fillColor(GRAY);
+      doc.text(img.att.caption, ix, rowY + th + 1, { width: tw, lineBreak: false, height: 7, ellipsis: true });
+    }
     col++;
   });
-  doc.y = rowY + th + gy;
-  doc.x = ML;
+  doc.y = rowY + th + (images[images.length - 1] && images[images.length - 1].att.caption ? 10 : gy);
+  doc.x = ml;
 }
+
 
 module.exports = { generateAuditPdf };
