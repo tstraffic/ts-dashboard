@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
-const { logActivity } = require('../lib/activity');
+const { logActivity } = require('../middleware/audit');
 
 // GET / — List all checklist templates
 router.get('/', (req, res) => {
