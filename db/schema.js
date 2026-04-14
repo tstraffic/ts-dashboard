@@ -4727,6 +4727,42 @@ function runMigrations(db) {
     console.log('Migration 103 applied: training_completions table');
   }
 
+  // Migration 104: Hire equipment columns + hire checklists table
+  if (!isMigrationApplied.get(104)) {
+    try { db.exec("ALTER TABLE equipment ADD COLUMN ownership_type TEXT DEFAULT 'owned'"); } catch (e) {}
+    try { db.exec("ALTER TABLE equipment ADD COLUMN hire_supplier TEXT DEFAULT ''"); } catch (e) {}
+    try { db.exec("ALTER TABLE equipment ADD COLUMN hire_daily_rate REAL DEFAULT 0"); } catch (e) {}
+    try { db.exec("ALTER TABLE equipment ADD COLUMN hire_start_date DATE"); } catch (e) {}
+    try { db.exec("ALTER TABLE equipment ADD COLUMN hire_end_date DATE"); } catch (e) {}
+    try { db.exec("ALTER TABLE equipment ADD COLUMN hire_reference TEXT DEFAULT ''"); } catch (e) {}
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS equipment_hire_checklists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        equipment_id INTEGER NOT NULL REFERENCES equipment(id),
+        checklist_type TEXT NOT NULL DEFAULT 'pickup',
+        checked_by TEXT NOT NULL,
+        checked_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        general_condition TEXT DEFAULT 'good',
+        body_exterior TEXT DEFAULT 'pass',
+        lights_indicators TEXT DEFAULT 'pass',
+        safety_features TEXT DEFAULT 'pass',
+        tyres_wheels TEXT DEFAULT 'pass',
+        fluid_levels TEXT DEFAULT 'pass',
+        beacons_signals TEXT DEFAULT 'pass',
+        cleanliness TEXT DEFAULT 'pass',
+        defects_noted TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        odometer_reading TEXT DEFAULT '',
+        fuel_level TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    try { db.exec("CREATE INDEX idx_ehc_equipment ON equipment_hire_checklists(equipment_id)"); } catch (e) {}
+    recordMigration.run(104, 'Hire equipment columns + hire checklists table');
+    console.log('Migration 104 applied: hire equipment + checklists');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

@@ -12,6 +12,7 @@ router.get('/', (req, res) => {
   if (req.query.condition) { where.push('e.current_condition = ?'); params.push(req.query.condition); }
   if (req.query.status) { where.push('e.status = ?'); params.push(req.query.status); }
   if (req.query.search) { where.push("(e.name LIKE ? OR e.asset_number LIKE ? OR e.serial_number LIKE ?)"); const s = `%${req.query.search}%`; params.push(s, s, s); }
+  if (req.query.ownership) { where.push('e.ownership_type = ?'); params.push(req.query.ownership); }
   if (req.query.active === '0') {
     // Show all including inactive
   } else {
@@ -41,13 +42,14 @@ router.get('/', (req, res) => {
   const inspectionsDue = allActive.filter(e => e.next_inspection_date && e.next_inspection_date <= today).length;
   const totalDeployed = db.prepare("SELECT COUNT(DISTINCT equipment_id) as count FROM equipment_assignments WHERE actual_return_date IS NULL").get().count;
   const poorDamaged = allActive.filter(e => ['poor', 'damaged'].includes(e.current_condition)).length;
+  const totalHired = allActive.filter(e => e.ownership_type === 'hired').length;
 
   res.render('equipment/index', {
     title: 'Equipment Register',
     currentPage: 'equipment',
     equipment,
     filters: req.query,
-    stats: { total: equipment.length, inspectionsDue, totalDeployed, poorDamaged },
+    stats: { total: equipment.length, inspectionsDue, totalDeployed, poorDamaged, totalHired },
     today,
     sort,
     order: order.toLowerCase(),
@@ -62,18 +64,20 @@ router.get('/new', (req, res) => {
 // CREATE EQUIPMENT
 router.post('/', (req, res) => {
   const db = getDb();
-  const { asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, status } = req.body;
+  const b = req.body;
 
   const validStatuses = ['available', 'deployed', 'maintenance', 'inspection_due', 'retired'];
-  const equipStatus = validStatuses.includes(status) ? status : 'available';
+  const equipStatus = validStatuses.includes(b.status) ? b.status : 'available';
 
   const result = db.prepare(`
-    INSERT INTO equipment (asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(asset_number, name, category, description || '', serial_number || '', registration || '', location || '', purchase_date || null, parseFloat(purchase_cost) || 0, current_condition || 'good', storage_location || '', next_inspection_date || null, parseInt(inspection_interval_days) || 90, notes || '', equipStatus);
+    INSERT INTO equipment (asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, status,
+      ownership_type, hire_supplier, hire_daily_rate, hire_start_date, hire_end_date, hire_reference)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(b.asset_number, b.name, b.category, b.description || '', b.serial_number || '', b.registration || '', b.location || '', b.purchase_date || null, parseFloat(b.purchase_cost) || 0, b.current_condition || 'good', b.storage_location || '', b.next_inspection_date || null, parseInt(b.inspection_interval_days) || 90, b.notes || '', equipStatus,
+    b.ownership_type === 'hired' ? 'hired' : 'owned', b.hire_supplier || '', parseFloat(b.hire_daily_rate) || 0, b.hire_start_date || null, b.hire_end_date || null, b.hire_reference || '');
 
-  logActivity({ user: req.session.user, action: 'create', entityType: 'equipment', entityId: result.lastInsertRowid, entityLabel: `${asset_number} - ${name}`, ip: req.ip });
-  req.flash('success', `Equipment ${asset_number} added.`);
+  logActivity({ user: req.session.user, action: 'create', entityType: 'equipment', entityId: result.lastInsertRowid, entityLabel: `${b.asset_number} - ${b.name}`, ip: req.ip });
+  req.flash('success', `Equipment ${b.asset_number} added.`);
   res.redirect('/equipment');
 });
 
@@ -126,6 +130,9 @@ router.get('/:id', (req, res) => {
     ORDER BY al.created_at DESC LIMIT 20
   `).all(req.params.id);
 
+  let hireChecklists = [];
+  try { hireChecklists = db.prepare('SELECT * FROM equipment_hire_checklists WHERE equipment_id = ? ORDER BY checked_date DESC').all(req.params.id); } catch (e) {}
+
   res.render('equipment/show', {
     title: `Equipment - ${item.asset_number}`,
     currentPage: 'equipment',
@@ -133,6 +140,7 @@ router.get('/:id', (req, res) => {
     assignments,
     maintenance,
     activities,
+    hireChecklists,
     jobs
   });
 });
@@ -148,16 +156,20 @@ router.get('/:id/edit', (req, res) => {
 // UPDATE EQUIPMENT
 router.post('/:id', (req, res) => {
   const db = getDb();
-  const { asset_number, name, category, description, serial_number, registration, location, purchase_date, purchase_cost, current_condition, storage_location, next_inspection_date, inspection_interval_days, notes, active, status } = req.body;
+  const b = req.body;
 
   const validStatuses = ['available', 'deployed', 'maintenance', 'inspection_due', 'retired'];
-  const equipStatus = validStatuses.includes(status) ? status : 'available';
+  const equipStatus = validStatuses.includes(b.status) ? b.status : 'available';
 
   db.prepare(`
-    UPDATE equipment SET asset_number=?, name=?, category=?, description=?, serial_number=?, registration=?, location=?, purchase_date=?, purchase_cost=?, current_condition=?, storage_location=?, next_inspection_date=?, inspection_interval_days=?, notes=?, active=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
-  `).run(asset_number, name, category, description || '', serial_number || '', registration || '', location || '', purchase_date || null, parseFloat(purchase_cost) || 0, current_condition, storage_location || '', next_inspection_date || null, parseInt(inspection_interval_days) || 90, notes || '', active !== undefined ? (active ? 1 : 0) : 1, equipStatus, req.params.id);
+    UPDATE equipment SET asset_number=?, name=?, category=?, description=?, serial_number=?, registration=?, location=?, purchase_date=?, purchase_cost=?, current_condition=?, storage_location=?, next_inspection_date=?, inspection_interval_days=?, notes=?, active=?, status=?,
+    ownership_type=?, hire_supplier=?, hire_daily_rate=?, hire_start_date=?, hire_end_date=?, hire_reference=?,
+    updated_at=CURRENT_TIMESTAMP WHERE id=?
+  `).run(b.asset_number, b.name, b.category, b.description || '', b.serial_number || '', b.registration || '', b.location || '', b.purchase_date || null, parseFloat(b.purchase_cost) || 0, b.current_condition, b.storage_location || '', b.next_inspection_date || null, parseInt(b.inspection_interval_days) || 90, b.notes || '', b.active !== undefined ? (b.active ? 1 : 0) : 1, equipStatus,
+    b.ownership_type === 'hired' ? 'hired' : 'owned', b.hire_supplier || '', parseFloat(b.hire_daily_rate) || 0, b.hire_start_date || null, b.hire_end_date || null, b.hire_reference || '',
+    req.params.id);
 
-  logActivity({ user: req.session.user, action: 'update', entityType: 'equipment', entityId: parseInt(req.params.id), entityLabel: `${asset_number} - ${name}`, ip: req.ip });
+  logActivity({ user: req.session.user, action: 'update', entityType: 'equipment', entityId: parseInt(req.params.id), entityLabel: `${b.asset_number} - ${b.name}`, ip: req.ip });
   req.flash('success', 'Equipment updated.');
   res.redirect(`/equipment/${req.params.id}`);
 });
@@ -226,6 +238,28 @@ router.post('/:id/maintenance', (req, res) => {
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'equipment_maintenance', details: `${maintenance_type}: ${description.substring(0, 40)}`, ip: req.ip });
   req.flash('success', 'Maintenance record added.');
+  res.redirect(`/equipment/${req.params.id}`);
+});
+
+// POST /:id/hire-checklist — Submit a hire pickup/return checklist
+router.post('/:id/hire-checklist', (req, res) => {
+  const db = getDb();
+  const b = req.body;
+
+  db.prepare(`
+    INSERT INTO equipment_hire_checklists (equipment_id, checklist_type, checked_by, checked_date,
+      general_condition, body_exterior, lights_indicators, safety_features, tyres_wheels, fluid_levels, beacons_signals, cleanliness,
+      defects_noted, notes, odometer_reading, fuel_level)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(req.params.id, b.checklist_type || 'pickup', b.checked_by || req.session.user.full_name,
+    b.checked_date || new Date().toISOString(),
+    b.general_condition || 'good', b.body_exterior || 'pass', b.lights_indicators || 'pass',
+    b.safety_features || 'pass', b.tyres_wheels || 'pass', b.fluid_levels || 'pass',
+    b.beacons_signals || 'pass', b.cleanliness || 'pass',
+    b.defects_noted || '', b.notes || '', b.odometer_reading || '', b.fuel_level || '');
+
+  logActivity({ user: req.session.user, action: 'create', entityType: 'equipment', entityId: parseInt(req.params.id), details: `Hire ${b.checklist_type || 'pickup'} checklist`, ip: req.ip });
+  req.flash('success', `Hire ${b.checklist_type || 'pickup'} checklist saved.`);
   res.redirect(`/equipment/${req.params.id}`);
 });
 

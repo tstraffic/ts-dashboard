@@ -47,6 +47,37 @@
   </div>
 </div>
 
+<% if (item.ownership_type === 'hired') { %>
+<!-- Hire Details Banner -->
+<div class="bg-amber-50 border border-amber-200 rounded-xl shadow-sm p-4 mb-6">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-800 ring-1 ring-amber-600/20">Hired Equipment</span>
+  </div>
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-sm">
+    <div>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Supplier</p>
+      <p class="font-medium text-gray-900"><%= item.hire_supplier || '-' %></p>
+    </div>
+    <div>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reference / PO</p>
+      <p class="font-medium text-gray-900"><%= item.hire_reference || '-' %></p>
+    </div>
+    <div>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Daily Rate</p>
+      <p class="font-medium text-gray-900"><%= item.hire_daily_rate ? '$' + Number(item.hire_daily_rate).toFixed(2) : '-' %></p>
+    </div>
+    <div>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hire Start</p>
+      <p class="font-medium text-gray-900"><%= item.hire_start_date ? new Date(item.hire_start_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></p>
+    </div>
+    <div>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Hire End</p>
+      <p class="font-medium text-gray-900"><%= item.hire_end_date ? new Date(item.hire_end_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></p>
+    </div>
+  </div>
+</div>
+<% } %>
+
 <!-- Info Grid -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
@@ -385,6 +416,139 @@
   </div>
   <% } %>
 </div>
+
+<% if (item.ownership_type === 'hired') { %>
+<!-- Hire Checklist -->
+<div class="mt-6 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+  <div class="p-4 sm:p-5 border-b border-gray-200">
+    <div class="flex items-center justify-between">
+      <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Hire Checklist</h3>
+      <button type="button" onclick="document.getElementById('hireCheckForm').classList.toggle('hidden')" class="text-xs font-medium text-brand-600 hover:text-brand-700">+ Add Checklist</button>
+    </div>
+  </div>
+
+  <!-- Add Checklist Form (hidden by default) -->
+  <div id="hireCheckForm" class="hidden p-4 sm:p-5 bg-gray-50 border-b border-gray-200">
+    <form method="POST" action="/equipment/<%= item.id %>/hire-checklist">
+      <%- include('../partials/csrf') %>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Type</label>
+          <select name="checklist_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="pickup">Pickup</option>
+            <option value="return">Return</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Checked By</label>
+          <input type="text" name="checked_by" value="<%= user.full_name %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Odometer</label>
+          <input type="text" name="odometer_reading" placeholder="e.g. 45230" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Fuel Level</label>
+          <select name="fuel_level" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="full">Full</option>
+            <option value="3/4">3/4</option>
+            <option value="1/2">1/2</option>
+            <option value="1/4">1/4</option>
+            <option value="empty">Empty</option>
+          </select>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Overall Condition</label>
+        <div class="flex gap-3">
+          <% ['good','fair','poor','damaged'].forEach(function(c) { %>
+            <label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+              <input type="radio" name="general_condition" value="<%= c %>" <%= c === 'good' ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500">
+              <span class="capitalize"><%= c %></span>
+            </label>
+          <% }); %>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Inspection Items</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <% ['body_exterior', 'lights_indicators', 'safety_features', 'tyres_wheels', 'fluid_levels', 'beacons_signals', 'cleanliness'].forEach(function(field) {
+            var label = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          %>
+          <div class="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+            <span class="text-sm text-gray-700"><%= label %></span>
+            <div class="flex gap-2">
+              <% ['pass','fail','na'].forEach(function(v) { %>
+                <label class="flex items-center gap-1 text-xs cursor-pointer">
+                  <input type="radio" name="<%= field %>" value="<%= v %>" <%= v === 'pass' ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500">
+                  <span class="<%= v === 'pass' ? 'text-emerald-600' : v === 'fail' ? 'text-red-600' : 'text-gray-400' %> font-medium uppercase"><%= v === 'na' ? 'N/A' : v.charAt(0).toUpperCase() + v.slice(1) %></span>
+                </label>
+              <% }); %>
+            </div>
+          </div>
+          <% }); %>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Defects Noted</label>
+          <textarea name="defects_noted" rows="2" placeholder="List any defects or damage..." class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"></textarea>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Notes</label>
+          <textarea name="notes" rows="2" placeholder="Additional notes..." class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"></textarea>
+        </div>
+      </div>
+      <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Save Checklist</button>
+    </form>
+  </div>
+
+  <!-- Checklist History -->
+  <% if (locals.hireChecklists && hireChecklists.length > 0) { %>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Type</th>
+            <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Checked By</th>
+            <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Condition</th>
+            <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Odometer</th>
+            <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Fuel</th>
+            <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase hidden sm:table-cell">Items</th>
+            <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Date</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% hireChecklists.forEach(function(c) {
+            var items = [c.body_exterior, c.lights_indicators, c.safety_features, c.tyres_wheels, c.fluid_levels, c.beacons_signals, c.cleanliness];
+            var passCount = items.filter(i => i === 'pass').length;
+            var failCount = items.filter(i => i === 'fail').length;
+          %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize <%= c.checklist_type === 'pickup' ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' : 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20' %>"><%= c.checklist_type %></span>
+            </td>
+            <td class="px-4 py-3 text-gray-700"><%= c.checked_by %></td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize <%= c.general_condition === 'good' ? 'bg-emerald-50 text-emerald-700' : c.general_condition === 'fair' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700' %>"><%= c.general_condition %></span>
+            </td>
+            <td class="px-4 py-3 text-gray-600 tabular-nums"><%= c.odometer_reading || '-' %></td>
+            <td class="px-4 py-3 text-gray-600"><%= c.fuel_level || '-' %></td>
+            <td class="px-4 py-3 hidden sm:table-cell">
+              <span class="text-emerald-600 font-medium"><%= passCount %>P</span>
+              <% if (failCount > 0) { %> <span class="text-red-600 font-medium"><%= failCount %>F</span><% } %>
+            </td>
+            <td class="px-4 py-3 text-gray-500 text-xs tabular-nums"><%= c.checked_date ? new Date(c.checked_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %>
+    <div class="p-6 text-center text-gray-400 text-sm">No hire checklists yet</div>
+  <% } %>
+</div>
+<% } %>
 
 <!-- Activity History -->
 <div class="mt-6">
