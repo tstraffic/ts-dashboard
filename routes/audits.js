@@ -6,6 +6,7 @@ const fs = require('fs');
 const { getDb } = require('../db/database');
 const { AUDIT_SECTIONS, SCORE_GROUPS, computeScore } = require('../lib/auditQuestions');
 const { autoLogDiary } = require('../lib/diary');
+const { generateAuditPdf } = require('../services/auditPdf');
 
 // ---- Multer storage: data/uploads/audits/{auditId}/ ----
 const auditStorage = multer.diskStorage({
@@ -225,6 +226,47 @@ router.post('/', (req, res) => {
     console.error('[Audits] Create error:', err.message, err.stack);
     req.flash('error', 'Failed to save audit: ' + err.message);
     res.redirect('/audits/new');
+  }
+});
+
+// GET /:id/pdf — export branded PDF
+router.get('/:id/pdf', (req, res) => {
+  try {
+    const db = getDb();
+    const audit = db.prepare(`
+      SELECT a.*, j.job_number, j.client as job_client,
+             creator.full_name as created_by_name,
+             signer.full_name as signed_off_by_name
+      FROM site_audits a
+      LEFT JOIN jobs j ON a.job_id = j.id
+      LEFT JOIN users creator ON a.created_by_id = creator.id
+      LEFT JOIN users signer ON a.signed_off_by_id = signer.id
+      WHERE a.id = ?
+    `).get(req.params.id);
+    if (!audit) { req.flash('error', 'Audit not found.'); return res.redirect('/audits'); }
+
+    const stored = parseJson(audit.responses_json, {}) || {};
+    const responses = stored.responses || stored;
+    const sectionComments = stored.sectionComments || {};
+    const nonconformances = parseJson(audit.nonconformances_json, []) || [];
+    const score = computeScore(responses);
+    const attachments = db.prepare('SELECT * FROM audit_attachments WHERE audit_id = ? ORDER BY uploaded_at DESC').all(audit.id);
+    const attachmentsByContext = {};
+    attachments.forEach(att => {
+      const k = att.context_key || 'general';
+      if (!attachmentsByContext[k]) attachmentsByContext[k] = [];
+      attachmentsByContext[k].push(att);
+    });
+
+    const safeName = (audit.project_site || 'audit').replace(/[^a-z0-9_-]/gi, '_').slice(0, 40);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Audit_${audit.id}_${safeName}.pdf"`);
+
+    generateAuditPdf({ audit, responses, sectionComments, nonconformances, score, attachments, attachmentsByContext }, res);
+  } catch (err) {
+    console.error('[Audits] PDF export error:', err.message, err.stack);
+    req.flash('error', 'PDF export failed: ' + err.message);
+    res.redirect('/audits/' + req.params.id);
   }
 });
 
