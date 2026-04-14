@@ -14,7 +14,7 @@ router.get('/', (req, res) => {
   const canViewFinance = canViewAccounts(req.session.user);
 
   // Jobs list for Quick Exports tab
-  const jobs = db.prepare(`SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won','completed') ORDER BY job_number`).all();
+  const jobs = db.prepare(`SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won','completed') ORDER BY job_number`).all();
 
   // ── Tab 1: Crew Utilisation ──
   const crewAllocations = db.prepare(`

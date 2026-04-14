@@ -121,7 +121,7 @@ router.get('/:id', (req, res) => {
     SELECT * FROM equipment_maintenance WHERE equipment_id = ? ORDER BY performed_date DESC
   `).all(req.params.id);
 
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
 
   const activities = db.prepare(`
     SELECT al.*, u.full_name as user_name

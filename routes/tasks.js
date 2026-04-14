@@ -115,7 +115,7 @@ router.get('/', (req, res) => {
   `).get(...countParams);
 
   // Reference data
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
 
   res.render('tasks/index', {
@@ -134,7 +134,7 @@ router.get('/', (req, res) => {
 // GET /new — Create form
 router.get('/new', (req, res) => {
   const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('tasks/form', { title: 'New Task', task: null, jobs, users, user: req.session.user, prefillJobId: req.query.job_id || '' });
 });
@@ -266,7 +266,7 @@ router.get('/:id/edit', (req, res) => {
   // Check ownership — non-owners can view but form will be read-only
   const editable = canModifyTask(task, req.session.user);
 
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
 
   // Load subtasks

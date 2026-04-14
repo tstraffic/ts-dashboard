@@ -25,7 +25,7 @@
       <select name="job_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
         <option value="">All Jobs</option>
         <% jobs.forEach(j => { %>
-          <option value="<%= j.id %>" <%= filters.job_id == j.id ? 'selected' : '' %>><%= j.job_number %> - <%= j.client %></option>
+          <option value="<%= j.id %>" <%= filters.job_id == j.id ? 'selected' : '' %>><%= j.job_number %> - <%= j.project_name ? j.project_name + ' (' + j.client + ')' : j.client %></option>
         <% }) %>
       </select>
     </div>

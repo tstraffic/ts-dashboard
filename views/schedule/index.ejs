@@ -93,7 +93,7 @@
       <div class="flex items-center h-10 border-b border-gray-200/50 hover:bg-white/30 group">
         <!-- Job label (fixed width) -->
         <a href="/projects/<%= job.id %>" class="block flex-shrink-0 px-3 text-xs truncate text-brand-600 hover:text-brand-700 font-medium" style="width: <%= labelWidthPx %>px;">
-          <%= job.job_number %> - <%= job.client %>
+          <%= job.job_number %> - <%= job.project_name ? job.project_name + ' (' + job.client + ')' : job.client %>
         </a>
         <!-- Bar area (fills remaining space) -->
         <div class="flex-1 relative h-full">

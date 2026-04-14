@@ -31,7 +31,7 @@ router.get('/', (req, res) => {
     ORDER BY cc.company, cc.full_name
   `).all(...params);
 
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
 
   res.render('contacts/index', {
     title: 'Client Contacts',
@@ -47,7 +47,7 @@ router.get('/', (req, res) => {
 // ============================================
 router.get('/new', (req, res) => {
   const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs ORDER BY job_number DESC").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs ORDER BY job_number DESC").all();
   const companies = db.prepare("SELECT id, company_name, company_type FROM clients WHERE active = 1 ORDER BY company_name").all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('contacts/form', {
@@ -116,7 +116,7 @@ router.get('/comms', (req, res) => {
     LIMIT 100
   `).all(...params);
 
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
 
   res.render('contacts/comms-log', {
     title: 'Communication Log',
@@ -132,7 +132,7 @@ router.get('/comms', (req, res) => {
 // ============================================
 router.get('/comms/new', (req, res) => {
   const db = getDb();
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number").all();
   const contacts = db.prepare('SELECT id, full_name, company FROM client_contacts ORDER BY company, full_name').all();
   res.render('contacts/comms-form', {
     title: 'Log Communication',
@@ -289,7 +289,7 @@ router.get('/:id/edit', (req, res) => {
     req.flash('error', 'Contact not found.');
     return res.redirect('/contacts');
   }
-  const jobs = db.prepare("SELECT id, job_number, client FROM jobs ORDER BY job_number DESC").all();
+  const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs ORDER BY job_number DESC").all();
   const companies = db.prepare("SELECT id, company_name, company_type FROM clients WHERE active = 1 ORDER BY company_name").all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
 

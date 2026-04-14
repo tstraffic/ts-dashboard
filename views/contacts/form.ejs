@@ -114,7 +114,7 @@
           <% jobs.forEach(j => { %>
             <option value="<%= j.id %>"
               <%= (isEdit && contact.job_id == j.id) || (!isEdit && preselectedJobId == j.id) ? 'selected' : '' %>>
-              <%= j.job_number %> - <%= j.client %>
+              <%= j.job_number %> - <%= j.project_name ? j.project_name + ' (' + j.client + ')' : j.client %>
             </option>
           <% }) %>
         </select>

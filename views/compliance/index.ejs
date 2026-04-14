@@ -209,7 +209,7 @@
         <select name="job_id" onchange="document.getElementById('filterForm').submit()" class="bg-white border border-gray-200 text-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
           <option value="">All Projects</option>
           <% jobs.forEach(function(job) { %>
-            <option value="<%= job.id %>" <%= filters.job_id == job.id ? 'selected' : '' %>><%= job.job_number %> – <%= job.client %></option>
+            <option value="<%= job.id %>" <%= filters.job_id == job.id ? 'selected' : '' %>><%= job.job_number %> - <%= job.project_name ? job.project_name + ' (' + job.client + ')' : job.client %></option>
           <% }) %>
         </select>
 

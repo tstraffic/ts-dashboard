@@ -20,7 +20,7 @@ router.get('/', (req, res) => {
   // Clients for quick-create shift modal
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
   // Projects for linking shifts
-  const projects = db.prepare('SELECT id, job_number, client FROM jobs WHERE parent_project_id IS NULL AND status IN (\'active\',\'on_hold\',\'won\') ORDER BY job_number').all();
+  const projects = db.prepare('SELECT id, job_number, client, project_name FROM jobs WHERE parent_project_id IS NULL AND status IN (\'active\',\'on_hold\',\'won\') ORDER BY job_number').all();
 
   if (view === 'month') {
     // Calculate month boundaries
