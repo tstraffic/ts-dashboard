@@ -200,25 +200,31 @@ function generateAuditPdf(opts, out) {
     });
   });
   if (failures.length > 0) {
-    var fsH = 16 + failures.length * 10;
+    var fsH = 14 + Math.min(failures.length, 10) * 9; // cap at 10 items on cover
     need(fsH);
     var fsY = curY();
     roundRect(ML, fsY, pw, 14, 3, RED_LIGHT);
     roundRect(ML, fsY, 3, 14, 1, RED);
     font('Helvetica-Bold', 7, RED);
     txt(failures.length + ' non-conformance' + (failures.length !== 1 ? 's' : '') + ' identified (see details)', ML + 8, fsY + 3, { width: pw - 16 });
-    setY(fsY + 16);
-    failures.forEach(function (f) {
-      need(10);
-      font('Helvetica-Bold', 6, GRAY_DARK);
+    setY(fsY + 14);
+    var showFailures = failures.slice(0, 10); // max 10 on cover
+    showFailures.forEach(function (f) {
+      need(9);
+      font('Helvetica-Bold', 5.5, GRAY_DARK);
       txt(f.key, ML + 8, curY(), { width: 22 });
-      font('Helvetica', 6, GRAY_DARK);
-      txt(f.item, ML + 32, curY(), { width: pw * 0.48 });
-      font('Helvetica', 5.5, GRAY);
-      txt('(' + f.section + ')', ML + 32 + pw * 0.48 + 4, curY(), { width: pw * 0.3 });
-      gap(10);
+      font('Helvetica', 5.5, GRAY_DARK);
+      txt(f.item, ML + 30, curY(), { width: pw * 0.48 });
+      font('Helvetica', 5, GRAY);
+      txt('(' + f.section + ')', ML + 30 + pw * 0.48 + 4, curY(), { width: pw * 0.3 });
+      gap(9);
     });
-    gap(4);
+    if (failures.length > 10) {
+      font('Helvetica', 5, GRAY);
+      txt('... and ' + (failures.length - 10) + ' more (see checklist)', ML + 8, curY(), { width: pw - 16 });
+      gap(8);
+    }
+    gap(2);
   }
 
   // ── Audit Details Table ──
@@ -368,79 +374,96 @@ function generateAuditPdf(opts, out) {
         var hasStructured = !!(obs || risk || corr || resp);
 
         if (hasStructured) {
-          var indent = 20;
+          var indent = 10;
           var bx = ML + indent, bw = pw - indent;
-          var fldH = 12;
-          var obsLines = obs ? Math.max(1, Math.ceil(obs.length / Math.floor(bw / 3.8))) : 0;
-          var actLines = corr ? Math.max(1, Math.ceil(corr.length / Math.floor(bw / 3.8))) : 0;
-          var totalH = 8;
-          if (obs) totalH += 10 + obsLines * 8;
+          var fldH = 10;
+          // Use measureText for accurate height, cap text blocks at 40px
+          var obsH = obs ? Math.min(measureText(obs, bw - 16, 6.5) + 2, 40) : 0;
+          var actH = corr ? Math.min(measureText(corr, bw - 16, 6.5) + 2, 40) : 0;
+          var totalH = 6;
+          if (obs) totalH += 8 + obsH;
           if (risk) totalH += fldH;
-          if (corr) totalH += 10 + actLines * 8;
+          if (corr) totalH += 8 + actH;
           if (resp) totalH += fldH;
           if (rectified !== undefined && rectified !== null && rectified !== '') totalH += fldH;
-          totalH += 6;
+          totalH += 4;
           need(totalH);
           var bY = curY();
           roundRect(bx, bY, bw, totalH, 3, RED_BG);
           roundRect(bx, bY, 3, totalH, 1, RED);
-          doc.save().roundedRect(bx, bY, bw, totalH, 3).strokeColor('#FECACA').lineWidth(0.5).stroke().restore();
-          var cy2 = bY + 6;
+          var cy2 = bY + 4;
           if (obs) {
-            font('Helvetica-Bold', 6, BRAND_DARK);
+            font('Helvetica-Bold', 5.5, BRAND_DARK);
             txt('OBSERVATION', bx + 8, cy2, { width: bw - 16 });
-            cy2 += 9;
-            doc.font('Helvetica').fontSize(7).fillColor(GRAY_DARK);
-            doc.text(obs, bx + 8, cy2, { width: bw - 16, lineBreak: true });
-            cy2 += obsLines * 8 + 4;
+            cy2 += 8;
+            doc.font('Helvetica').fontSize(6.5).fillColor(GRAY_DARK);
+            doc.text(obs, bx + 8, cy2, { width: bw - 16, height: obsH, lineBreak: true, ellipsis: true });
+            cy2 += obsH;
           }
           if (risk) {
-            font('Helvetica-Bold', 6, BRAND_DARK);
-            txt('RISK LEVEL', bx + 8, cy2, { width: 50 });
+            font('Helvetica-Bold', 5.5, BRAND_DARK);
+            txt('RISK', bx + 8, cy2, { width: 22 });
             var rc = risk === 'Critical' ? RED : risk === 'High' ? '#DC2626' : risk === 'Medium' ? AMBER : GREEN;
-            roundRect(bx + 60, cy2 - 1, 50, 9, 2, rc);
-            font('Helvetica-Bold', 5.5, WHITE);
-            txt(risk.toUpperCase(), bx + 62, cy2, { width: 46, align: 'center' });
+            roundRect(bx + 30, cy2 - 1, 45, 8, 2, rc);
+            font('Helvetica-Bold', 5, WHITE);
+            txt(risk.toUpperCase(), bx + 32, cy2, { width: 41, align: 'center' });
+            // Inline responsible + rectified on same line if present
+            var inlineX = bx + 82;
+            if (resp) {
+              font('Helvetica-Bold', 5.5, BRAND_DARK);
+              txt('RESP:', inlineX, cy2, { width: 25 });
+              font('Helvetica', 6, GRAY_DARK);
+              txt(resp, inlineX + 26, cy2, { width: 100 });
+              inlineX += 130;
+            }
+            if (rectified !== undefined && rectified !== null && rectified !== '') {
+              font('Helvetica-Bold', 5.5, BRAND_DARK);
+              txt('RECTIFIED:', inlineX, cy2, { width: 40 });
+              var rtext = rectified ? 'Yes' : 'No';
+              font('Helvetica-Bold', 5.5, rectified ? GREEN : RED);
+              txt(rtext, inlineX + 42, cy2, { width: 30 });
+            }
             cy2 += fldH;
+            resp = ''; rectified = ''; // already rendered inline
           }
           if (corr) {
-            font('Helvetica-Bold', 6, BRAND_DARK);
-            txt('CORRECTIVE ACTION', bx + 8, cy2, { width: bw - 16 });
-            cy2 += 9;
-            doc.font('Helvetica').fontSize(7).fillColor(GRAY_DARK);
-            doc.text(corr, bx + 8, cy2, { width: bw - 16, lineBreak: true });
-            cy2 += actLines * 8 + 4;
+            font('Helvetica-Bold', 5.5, BRAND_DARK);
+            txt('ACTION', bx + 8, cy2, { width: bw - 16 });
+            cy2 += 8;
+            doc.font('Helvetica').fontSize(6.5).fillColor(GRAY_DARK);
+            doc.text(corr, bx + 8, cy2, { width: bw - 16, height: actH, lineBreak: true, ellipsis: true });
+            cy2 += actH;
           }
           if (resp) {
-            font('Helvetica-Bold', 6, BRAND_DARK);
-            txt('RESPONSIBLE', bx + 8, cy2, { width: 55 });
-            font('Helvetica', 7, GRAY_DARK);
-            txt(resp, bx + 65, cy2, { width: bw - 75 });
+            font('Helvetica-Bold', 5.5, BRAND_DARK);
+            txt('RESP:', bx + 8, cy2, { width: 25 });
+            font('Helvetica', 6, GRAY_DARK);
+            txt(resp, bx + 34, cy2, { width: bw - 44 });
             cy2 += fldH;
           }
           if (rectified !== undefined && rectified !== null && rectified !== '') {
-            font('Helvetica-Bold', 6, BRAND_DARK);
-            txt('RECTIFIED ON SITE', bx + 8, cy2, { width: 72 });
-            var rtext = rectified ? 'Yes' : 'No — escalated to HSEQ';
-            font('Helvetica-Bold', 6, rectified ? GREEN : RED);
-            txt(rtext, bx + 82, cy2, { width: bw - 92 });
+            font('Helvetica-Bold', 5.5, BRAND_DARK);
+            txt('RECTIFIED:', bx + 8, cy2, { width: 40 });
+            var rtext2 = rectified ? 'Yes' : 'No — escalated';
+            font('Helvetica-Bold', 5.5, rectified ? GREEN : RED);
+            txt(rtext2, bx + 50, cy2, { width: bw - 60 });
             cy2 += fldH;
           }
-          setY(bY + totalH + 3);
+          setY(bY + totalH + 2);
         } else if (it.r.notes && it.r.notes.trim()) {
           // Legacy fallback — red observation box for old audits
-          var bx3 = ML + 20, bw3 = pw - 20;
-          var nLines = Math.max(1, Math.ceil(it.r.notes.length / Math.floor(bw3 / 3.8)));
-          var bH3 = 14 + nLines * 8;
+          var bx3 = ML + 10, bw3 = pw - 10;
+          var notesH = Math.min(measureText(it.r.notes, bw3 - 16, 6.5) + 2, 40);
+          var bH3 = 12 + notesH;
           need(bH3);
           var bY3 = curY();
           roundRect(bx3, bY3, bw3, bH3, 3, RED_BG);
           roundRect(bx3, bY3, 3, bH3, 1, RED);
-          font('Helvetica-Bold', 6, BRAND_DARK);
-          txt('OBSERVATION', bx3 + 8, bY3 + 4, { width: bw3 - 16 });
-          doc.font('Helvetica').fontSize(7).fillColor(GRAY_DARK);
-          doc.text(it.r.notes, bx3 + 8, bY3 + 14, { width: bw3 - 16, lineBreak: true });
-          setY(bY3 + bH3 + 3);
+          font('Helvetica-Bold', 5.5, BRAND_DARK);
+          txt('OBSERVATION', bx3 + 8, bY3 + 3, { width: bw3 - 16 });
+          doc.font('Helvetica').fontSize(6.5).fillColor(GRAY_DARK);
+          doc.text(it.r.notes, bx3 + 8, bY3 + 11, { width: bw3 - 16, height: notesH, lineBreak: true, ellipsis: true });
+          setY(bY3 + bH3 + 2);
         }
         // Item-specific photos for this NO finding
         embedImages(doc, a, ctxMap['item_' + it.key], null, pw, pageBot, ML, MT);
@@ -474,7 +497,7 @@ function generateAuditPdf(opts, out) {
     if (sectionComments[section.key] && sectionComments[section.key].trim()) {
       var cmtText = sectionComments[section.key];
       var cmtH = measureText(cmtText, pw - 24, 8);
-      var boxH = Math.max(cmtH + 22, 30);
+      var boxH = Math.min(Math.max(cmtH + 22, 30), 80);
       need(boxH + 4);
       gap(3);
       var cmtY = curY();
@@ -486,9 +509,9 @@ function generateAuditPdf(opts, out) {
       // Label: navy bold
       font('Helvetica-Bold', 7, BRAND_DARK);
       txt('COMMENTS', ML + 10, cmtY + 5, { width: 60 });
-      // Comment body: 8pt (≈11pt rendered), #333, regular weight, 12px padding
+      // Comment body: 8pt, #333, regular weight, capped height
       doc.font('Helvetica').fontSize(8).fillColor(GRAY_DARK);
-      doc.text(cmtText, ML + 10, cmtY + 17, { width: pw - 24, lineBreak: true });
+      doc.text(cmtText, ML + 10, cmtY + 17, { width: pw - 24, height: boxH - 20, lineBreak: true, ellipsis: true });
       setY(cmtY + boxH + 2);
     }
 
@@ -667,8 +690,8 @@ function generateAuditPdf(opts, out) {
 
 
 /* ════════════════════════════════════════════════════════
-   FIX 3: Image grid — max 2 per row, min 45% width, captioned
-   Photos are primary evidence and must be viewable.
+   Image grid — compact evidence thumbnails, 3 per row
+   Bigger than tiny postage stamps, but not page-eating monsters.
    ════════════════════════════════════════════════════════ */
 function embedImages(doc, audit, items, label, pw, pageBot, ml, mt) {
   if (!items || !items.length) return;
@@ -691,40 +714,34 @@ function embedImages(doc, audit, items, label, pw, pageBot, ml, mt) {
     doc.y += 10;
   }
 
-  // Max 2 photos per row, min 45% page width each
-  var gutter = 8;
-  var imgW = images.length === 1
-    ? Math.floor(pw * 0.7)
-    : Math.floor((pw - gutter) / 2);
-  var imgH = Math.floor(imgW * 0.65);
-  var captionH = 12;
+  // 3 per row, reasonable size (~155x105), with captions
+  var gutter = 6;
+  var cols = images.length <= 2 ? images.length : 3;
+  var tw = Math.floor((pw - gutter * (cols - 1)) / cols);
+  var th = Math.floor(tw * 0.68);
+  var captionH = 9;
   var col = 0, rowY = doc.y;
 
   images.forEach(function (img) {
-    if (col >= 2) { col = 0; rowY += imgH + captionH + gutter; }
-    if (col === 0 && rowY + imgH + captionH > pageBot) { doc.addPage(); rowY = doc.y; }
+    if (col >= cols) { col = 0; rowY += th + captionH + gutter; }
+    if (col === 0 && rowY + th + captionH > pageBot) { doc.addPage(); rowY = doc.y; }
+    var ix = ml + col * (tw + gutter);
 
-    var ix = images.length === 1
-      ? ml + Math.floor((pw - imgW) / 2)
-      : ml + col * (imgW + gutter);
-
-    // 1px border around photo
-    doc.save().rect(ix - 1, rowY - 1, imgW + 2, imgH + 2)
-      .strokeColor('#CCCCCC').lineWidth(1).stroke().restore();
+    // Light border
+    doc.save().roundedRect(ix, rowY, tw, th, 2).strokeColor('#E5E7EB').lineWidth(0.5).stroke().restore();
 
     try {
-      doc.image(img.fp, ix, rowY, { fit: [imgW, imgH], align: 'center', valign: 'center' });
+      doc.image(img.fp, ix + 1, rowY + 1, { fit: [tw - 2, th - 2], align: 'center', valign: 'center' });
     } catch (e) { /* skip corrupt image */ }
 
-    // Caption below photo
-    var cap = img.att.caption || img.att.original_name || 'Evidence photo';
-    doc.font('Helvetica').fontSize(6).fillColor(GRAY);
-    doc.text(cap, ix, rowY + imgH + 2, { width: imgW, lineBreak: false, align: 'center' });
-
+    // Caption
+    if (img.att.caption) {
+      doc.font('Helvetica').fontSize(5).fillColor(GRAY);
+      doc.text(img.att.caption, ix, rowY + th + 1, { width: tw, lineBreak: false, height: 7, ellipsis: true });
+    }
     col++;
   });
-
-  doc.y = rowY + imgH + captionH + gutter;
+  doc.y = rowY + th + (images[images.length - 1] && images[images.length - 1].att.caption ? captionH : gutter) + gutter;
   doc.x = ml;
 }
 
