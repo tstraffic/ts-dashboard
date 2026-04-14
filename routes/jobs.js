@@ -7,6 +7,7 @@ const { getDb } = require('../db/database');
 const { canViewAccounts } = require('../middleware/auth');
 const { recalculateJobHealth, HEALTH_CALC_SQL } = require('../middleware/jobHealth');
 const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadForEntity } = require('../lib/chat');
+const { generateJobNumber } = require('../lib/jobNumbers');
 
 // Multer for diary attachments
 const diaryStorage = multer.diskStorage({
@@ -94,10 +95,8 @@ router.post('/', (req, res) => {
   const db = getDb();
   const b = req.body;
 
-  // Auto-generate TSJ-XXXX job code
-  const seqResult = db.prepare('UPDATE job_code_sequence SET last_number = last_number + 1 WHERE id = 1').run();
-  const seq = db.prepare('SELECT last_number FROM job_code_sequence WHERE id = 1').get();
-  const jobNumber = 'TSJ-' + String(seq.last_number).padStart(4, '0');
+  // Auto-generate J-XXXX job number
+  const jobNumber = generateJobNumber();
 
   console.log('[Jobs] POST / — creating job:', jobNumber, 'client_id:', b.client_id, 'suburb:', b.suburb);
   // Resolve client name from client_id

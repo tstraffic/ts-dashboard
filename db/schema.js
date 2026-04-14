@@ -4794,6 +4794,29 @@ function runMigrations(db) {
     console.log('Migration 105 applied: checklist templates');
   }
 
+  // Migration 106: Normalise all job numbers to J-XXXX format + reseed sequence
+  if (!isMigrationApplied.get(106)) {
+    // Get all jobs ordered by creation date (oldest first) to assign sequential numbers
+    const allJobs106 = db.prepare('SELECT id, job_number FROM jobs ORDER BY id ASC').all();
+    const updateJobNum106 = db.prepare('UPDATE jobs SET job_number = ?, job_name = REPLACE(job_name, ?, ?) WHERE id = ?');
+
+    let counter106 = 0;
+    for (const job of allJobs106) {
+      counter106++;
+      const newNum = 'J-' + String(counter106).padStart(4, '0');
+      if (job.job_number !== newNum) {
+        updateJobNum106.run(newNum, job.job_number, newNum, job.id);
+        console.log(`  Renumbered: ${job.job_number} → ${newNum}`);
+      }
+    }
+
+    // Reseed the sequence so next auto-gen continues from the highest number
+    db.prepare('UPDATE job_code_sequence SET last_number = ? WHERE id = 1').run(counter106);
+
+    recordMigration.run(106, 'Normalise all job numbers to J-XXXX + reseed sequence');
+    console.log(`Migration 106 applied: renumbered ${allJobs106.length} jobs to J-XXXX format, sequence at ${counter106}`);
+  }
+
   console.log('All migrations checked/applied.');
 }
 
