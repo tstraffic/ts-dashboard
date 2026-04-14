@@ -122,7 +122,7 @@
                 <span class="font-semibold text-gray-500 mr-1"><%= key %></span><%= item %>
               </p>
               <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <!-- Yes / No / N/A pills: LARGER on mobile -->
+                <!-- Yes / No / N/A pills -->
                 <div class="inline-flex rounded-lg overflow-hidden border border-gray-200 bg-gray-50 w-full sm:w-auto" role="radiogroup" data-pillgroup="<%= key %>">
                   <% [['yes','Yes'],['no','No'],['na','N/A']].forEach(function(opt) { %>
                     <label class="relative cursor-pointer flex-1 sm:flex-none">
@@ -134,7 +134,41 @@
                     </label>
                   <% }) %>
                 </div>
-                <input name="q_<%= key %>_notes" value="<%= r.notes || '' %>" placeholder="Notes…" class="text-sm px-3 py-2 border border-gray-200 rounded-md flex-1 min-w-0">
+                <input name="q_<%= key %>_notes" value="<%= r.notes || '' %>" placeholder="Notes…" class="text-sm px-3 py-2 border border-gray-200 rounded-md flex-1 min-w-0 <%= currentState === 'no' ? 'hidden' : '' %>" data-notes-for="<%= key %>">
+              </div>
+              <!-- FIX 4: NO item structured fields — expand when NO selected -->
+              <div class="no-fields mt-1 bg-red-50 border border-red-200 rounded-lg p-3 space-y-3 <%= currentState === 'no' ? '' : 'hidden' %>" data-no-fields="<%= key %>">
+                <div>
+                  <label class="block text-[11px] font-semibold text-red-900 uppercase tracking-wide mb-1">Observation <span class="text-red-500">*</span> <span class="text-[10px] font-normal text-gray-400 normal-case ml-1" data-charcount="q_<%= key %>_observation"></span></label>
+                  <textarea name="q_<%= key %>_observation" rows="2" placeholder="Describe what you found, where, and who was involved..." class="w-full px-3 py-2 text-sm border border-red-200 rounded-md bg-white no-obs" data-minlen="20"><%= r.observation || '' %></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-red-900 uppercase tracking-wide mb-1">Risk Level <span class="text-red-500">*</span></label>
+                    <select name="q_<%= key %>_risk_level" class="w-full px-3 py-2 text-sm border border-red-200 rounded-md bg-white no-risk">
+                      <option value="">— Select —</option>
+                      <% ['Low','Medium','High','Critical'].forEach(function(rl) { %>
+                        <option value="<%= rl %>" <%= (r.risk_level || '') === rl ? 'selected' : '' %>><%= rl %></option>
+                      <% }) %>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-red-900 uppercase tracking-wide mb-1">Rectified on Site <span class="text-red-500">*</span></label>
+                    <select name="q_<%= key %>_rectified" class="w-full px-3 py-2 text-sm border border-red-200 rounded-md bg-white no-rect">
+                      <option value="">— Select —</option>
+                      <option value="yes" <%= r.rectified_on_site === true ? 'selected' : '' %>>Yes</option>
+                      <option value="no" <%= r.rectified_on_site === false ? 'selected' : '' %>>No — escalate</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-red-900 uppercase tracking-wide mb-1">Corrective Action <span class="text-red-500">*</span> <span class="text-[10px] font-normal text-gray-400 normal-case ml-1" data-charcount="q_<%= key %>_corrective_action"></span></label>
+                  <textarea name="q_<%= key %>_corrective_action" rows="2" placeholder="What specific action is required to fix this..." class="w-full px-3 py-2 text-sm border border-red-200 rounded-md bg-white no-action" data-minlen="20"><%= r.corrective_action || '' %></textarea>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-red-900 uppercase tracking-wide mb-1">Responsible Person <span class="text-red-500">*</span></label>
+                  <input name="q_<%= key %>_responsible" value="<%= r.responsible || '' %>" placeholder="Name and role" class="w-full px-3 py-2 text-sm border border-red-200 rounded-md bg-white no-resp">
+                </div>
               </div>
             </div>
           <% }) %>
@@ -455,18 +489,69 @@
     });
   }
 
+  // Toggle NO fields visibility
+  function toggleNoFields(itemKey, state) {
+    var noBlock = document.querySelector('[data-no-fields="' + itemKey + '"]');
+    var notesInput = document.querySelector('[data-notes-for="' + itemKey + '"]');
+    if (noBlock) {
+      if (state === 'no') { noBlock.classList.remove('hidden'); if (notesInput) notesInput.classList.add('hidden'); }
+      else { noBlock.classList.add('hidden'); if (notesInput) notesInput.classList.remove('hidden'); }
+    }
+  }
+  // Character count for min-length fields
+  function updateCharCount(el) {
+    var minLen = parseInt(el.getAttribute('data-minlen') || '0', 10);
+    if (!minLen) return;
+    var counter = document.querySelector('[data-charcount="' + el.name + '"]');
+    if (!counter) return;
+    var len = (el.value || '').length;
+    if (len < minLen) { counter.textContent = (minLen - len) + ' more chars needed'; counter.className = 'text-[10px] font-normal text-red-500 normal-case ml-1'; }
+    else { counter.textContent = len + ' chars'; counter.className = 'text-[10px] font-normal text-gray-400 normal-case ml-1'; }
+  }
+
   document.addEventListener('change', function(e) {
     if (e.target.matches('.q-state')) {
       const name = e.target.name;
       const m = name.match(/^q_(.+)_state$/);
-      if (m) paintPill(m[1]);
+      if (m) { paintPill(m[1]); toggleNoFields(m[1], e.target.value); }
       recalc();
       maybeAutoDraft();
     }
   });
   document.addEventListener('input', function(e) {
     if (e.target.closest && e.target.closest('#auditForm')) maybeAutoDraft();
+    if (e.target.matches('[data-minlen]')) updateCharCount(e.target);
   });
+  // Init char counts
+  document.querySelectorAll('[data-minlen]').forEach(updateCharCount);
+
+  // Form submit validation — block if NO items have incomplete fields
+  var auditForm = document.getElementById('auditForm');
+  if (auditForm) {
+    auditForm.addEventListener('submit', function(e) {
+      var submitBtn = e.submitter;
+      if (submitBtn && submitBtn.value === '0') return; // draft = skip validation
+      var errors = [];
+      document.querySelectorAll('[data-no-fields]').forEach(function(block) {
+        if (block.classList.contains('hidden')) return;
+        var key = block.getAttribute('data-no-fields');
+        var obs = block.querySelector('.no-obs'), risk = block.querySelector('.no-risk');
+        var action = block.querySelector('.no-action'), resp = block.querySelector('.no-resp'), rect = block.querySelector('.no-rect');
+        if (obs && obs.value.trim().length < 20) errors.push(key + ': Observation needs at least 20 characters');
+        if (risk && !risk.value) errors.push(key + ': Risk level required');
+        if (action && action.value.trim().length < 20) errors.push(key + ': Corrective action needs at least 20 characters');
+        if (resp && !resp.value.trim()) errors.push(key + ': Responsible person required');
+        if (rect && !rect.value) errors.push(key + ': Rectified on site required');
+      });
+      if (errors.length) {
+        e.preventDefault();
+        alert('Complete all required fields for NO items:\n\n\u2022 ' + errors.join('\n\u2022 '));
+        var firstKey = errors[0].split(':')[0];
+        var firstBlock = document.querySelector('[data-no-fields="' + firstKey + '"]');
+        if (firstBlock) firstBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }
 
   // Auto-fill project fields when a job is selected
   const jobSelect = document.getElementById('job-select');
