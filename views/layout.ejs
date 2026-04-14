@@ -128,5 +128,72 @@
       });
     }
   </script>
+
+  <!-- Global Lightbox overlay for images & documents -->
+  <div id="lightbox-overlay" class="fixed inset-0 z-[9999] bg-black/90 hidden flex-col items-center justify-center" style="display:none;">
+    <div class="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/60 to-transparent z-10">
+      <span id="lightbox-title" class="text-white text-sm font-medium truncate max-w-[70%]"></span>
+      <div class="flex items-center gap-3">
+        <a id="lightbox-download" href="#" download class="text-white/80 hover:text-white p-2" title="Download">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        </a>
+        <a id="lightbox-newtab" href="#" target="_blank" class="text-white/80 hover:text-white p-2" title="Open in new tab">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </a>
+        <button id="lightbox-close" class="text-white hover:text-red-400 p-2 -mr-2" title="Close">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+    <img id="lightbox-img" src="" alt="" class="hidden max-w-[95vw] max-h-[85vh] object-contain rounded shadow-2xl select-none" draggable="false">
+    <iframe id="lightbox-iframe" src="" class="hidden rounded shadow-2xl bg-white" style="width:90vw;height:85vh;"></iframe>
+  </div>
+  <script>
+  (function(){
+    var overlay = document.getElementById('lightbox-overlay');
+    var img = document.getElementById('lightbox-img');
+    var iframe = document.getElementById('lightbox-iframe');
+    var title = document.getElementById('lightbox-title');
+    var dl = document.getElementById('lightbox-download');
+    var nt = document.getElementById('lightbox-newtab');
+    var closeBtn = document.getElementById('lightbox-close');
+    if (!overlay) return;
+
+    function openLightbox(href, name, isImage) {
+      img.classList.add('hidden'); iframe.classList.add('hidden');
+      if (isImage) { img.src = href; img.classList.remove('hidden'); }
+      else { iframe.src = href; iframe.classList.remove('hidden'); }
+      title.textContent = name || '';
+      dl.href = href; nt.href = href;
+      overlay.style.display = 'flex'; overlay.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox() {
+      overlay.style.display = 'none'; overlay.classList.add('hidden');
+      img.src = ''; iframe.src = '';
+      document.body.style.overflow = '';
+    }
+
+    closeBtn.addEventListener('click', closeLightbox);
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) closeLightbox();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && overlay.style.display === 'flex') closeLightbox();
+    });
+
+    // Delegate clicks on any [data-lightbox] links
+    document.addEventListener('click', function(e) {
+      var link = e.target.closest('[data-lightbox]');
+      if (!link) return;
+      e.preventDefault();
+      var href = link.getAttribute('href') || link.getAttribute('data-lightbox');
+      var name = link.getAttribute('data-lightbox-name') || link.getAttribute('title') || '';
+      var mime = (link.getAttribute('data-lightbox-mime') || '').toLowerCase();
+      var isImage = mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(href);
+      openLightbox(href, name, isImage);
+    });
+  })();
+  </script>
 </body>
 </html>
