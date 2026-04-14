@@ -535,7 +535,7 @@
           <tr class="hover:bg-gray-50">
             <td class="px-4 py-3 text-gray-600 font-medium"><%= task.title %></td>
             <td class="px-4 py-3 text-gray-500"><%= task.division || '-' %></td>
-            <td class="px-4 py-3 text-gray-600"><%= task.owner_name || '-' %></td>
+            <td class="px-4 py-3 text-gray-600"><%= task.owners && task.owners.length > 0 ? task.owners.map(function(o) { return o.full_name; }).join(', ') : '-' %></td>
             <td class="px-4 py-3 text-gray-500 text-xs"><%= task.due_date ? formatDate(task.due_date) : '-' %></td>
             <td class="px-4 py-3">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium

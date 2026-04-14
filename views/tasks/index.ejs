@@ -292,8 +292,17 @@
                   <% } %>
                   <div class="flex items-center justify-between pt-3 border-t border-gray-100">
                     <div class="flex items-center gap-2">
-                      <% if (task.owner_name) { %>
-                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white <%= initialsColor(task.owner_name) %>" title="Assigned to: <%= task.owner_name %>"><%= getInitials(task.owner_name) %></div>
+                      <% if (task.owners && task.owners.length > 0) { %>
+                        <div class="flex -space-x-1.5">
+                          <% task.owners.slice(0, 3).forEach(function(o) { %>
+                            <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-white <%= initialsColor(o.full_name) %>" title="<%= o.full_name %>"><%= getInitials(o.full_name) %></div>
+                          <% }) %>
+                          <% if (task.owners.length > 3) { %>
+                            <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-500 bg-gray-200 ring-2 ring-white">+<%= task.owners.length - 3 %></div>
+                          <% } %>
+                        </div>
+                      <% } else if (task.owner_name) { %>
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white <%= initialsColor(task.owner_name) %>" title="<%= task.owner_name %>"><%= getInitials(task.owner_name) %></div>
                       <% } else { %>
                         <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-400 bg-gray-100">?</div>
                       <% } %>
@@ -367,8 +376,17 @@
                   <% } %>
                   <div class="flex items-center justify-between pt-3 border-t border-gray-100">
                     <div class="flex items-center gap-2">
-                      <% if (task.owner_name) { %>
-                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white <%= initialsColor(task.owner_name) %>" title="Assigned to: <%= task.owner_name %>"><%= getInitials(task.owner_name) %></div>
+                      <% if (task.owners && task.owners.length > 0) { %>
+                        <div class="flex -space-x-1.5">
+                          <% task.owners.slice(0, 3).forEach(function(o) { %>
+                            <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-white <%= initialsColor(o.full_name) %>" title="<%= o.full_name %>"><%= getInitials(o.full_name) %></div>
+                          <% }) %>
+                          <% if (task.owners.length > 3) { %>
+                            <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-500 bg-gray-200 ring-2 ring-white">+<%= task.owners.length - 3 %></div>
+                          <% } %>
+                        </div>
+                      <% } else if (task.owner_name) { %>
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white <%= initialsColor(task.owner_name) %>" title="<%= task.owner_name %>"><%= getInitials(task.owner_name) %></div>
                       <% } else { %>
                         <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-400 bg-gray-100">?</div>
                       <% } %>

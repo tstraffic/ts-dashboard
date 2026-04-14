@@ -4865,6 +4865,37 @@ function runMigrations(db) {
     console.log('Migration 107 applied: reclassified ' + total + ' diary entries');
   }
 
+  // =============================================
+  // Migration 108: task_owners junction table for multi-owner tasks
+  // =============================================
+  if (!isMigrationApplied.get(108)) {
+    console.log('Running migration 108: Create task_owners junction table');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS task_owners (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(task_id, user_id)
+      )
+    `);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_task_owners_task ON task_owners(task_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_task_owners_user ON task_owners(user_id)');
+
+    // Migrate existing owner_id data into task_owners
+    const tasksWithOwner = db.prepare('SELECT id, owner_id FROM tasks WHERE owner_id IS NOT NULL').all();
+    const insertOwner = db.prepare('INSERT OR IGNORE INTO task_owners (task_id, user_id) VALUES (?, ?)');
+    let migratedCount = 0;
+    for (const t of tasksWithOwner) {
+      insertOwner.run(t.id, t.owner_id);
+      migratedCount++;
+    }
+
+    recordMigration.run(108, 'Create task_owners junction table');
+    console.log('Migration 108 applied: task_owners table created, migrated ' + migratedCount + ' existing assignments');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

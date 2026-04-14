@@ -82,19 +82,81 @@
           <textarea id="description" name="description" rows="3" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>" placeholder="Task description..."><%= isEdit && task.description ? task.description : '' %></textarea>
         </div>
 
-        <!-- Owner -->
+        <!-- Owners (multi-select) -->
         <div>
-          <label for="owner_id" class="block text-sm font-medium text-gray-600 mb-1">Owner <span class="text-red-600">*</span></label>
-          <select id="owner_id" name="owner_id" required <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
-            <option value="">Select owner...</option>
-            <% users.forEach(function(u) { %>
-              <option value="<%= u.id %>" <%= isEdit && task.owner_id == u.id ? 'selected' : '' %>><%= u.full_name || u.username %></option>
-            <% }) %>
-          </select>
+          <label class="block text-sm font-medium text-gray-600 mb-1">Owner(s) <span class="text-red-600">*</span></label>
+          <div id="owner-select-wrapper" class="<%= disabled ? 'opacity-60 pointer-events-none' : '' %>">
+            <!-- Selected owners as chips -->
+            <div id="owner-chips" class="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
+              <%
+                const selectedOwners = isEdit && task.owners ? task.owners : [];
+                selectedOwners.forEach(function(o) {
+              %>
+                <span class="owner-chip inline-flex items-center gap-1 px-2.5 py-1 bg-brand-50 text-brand-700 text-xs font-medium rounded-full border border-brand-200" data-id="<%= o.id %>">
+                  <%= o.full_name %>
+                  <button type="button" onclick="removeOwner(<%= o.id %>)" class="hover:text-red-500 transition-colors">&times;</button>
+                </span>
+              <% }) %>
+            </div>
+            <!-- Hidden inputs for form submission -->
+            <div id="owner-hidden-inputs">
+              <% selectedOwners.forEach(function(o) { %>
+                <input type="hidden" name="owner_id" value="<%= o.id %>">
+              <% }) %>
+            </div>
+            <!-- Dropdown to add owners -->
+            <select id="owner-add-select" onchange="addOwner(this)" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm">
+              <option value="">+ Add owner...</option>
+              <% users.forEach(function(u) { %>
+                <option value="<%= u.id %>" data-name="<%= u.full_name || u.username %>"
+                  <% if (selectedOwners.some(function(o) { return String(o.id) === String(u.id); })) { %>disabled class="hidden"<% } %>
+                ><%= u.full_name || u.username %></option>
+              <% }) %>
+            </select>
+          </div>
           <% if (isEdit && task.created_by_name) { %>
             <p class="text-xs text-gray-400 mt-1">Assigned by <span class="font-medium text-gray-500"><%= task.created_by_name %></span></p>
           <% } %>
         </div>
+        <script>
+        function addOwner(sel) {
+          const id = sel.value;
+          if (!id) return;
+          const name = sel.options[sel.selectedIndex].getAttribute('data-name');
+          // Add chip
+          const chip = document.createElement('span');
+          chip.className = 'owner-chip inline-flex items-center gap-1 px-2.5 py-1 bg-brand-50 text-brand-700 text-xs font-medium rounded-full border border-brand-200';
+          chip.dataset.id = id;
+          chip.innerHTML = name + ' <button type="button" onclick="removeOwner(' + id + ')" class="hover:text-red-500 transition-colors">&times;</button>';
+          document.getElementById('owner-chips').appendChild(chip);
+          // Add hidden input
+          const input = document.createElement('input');
+          input.type = 'hidden'; input.name = 'owner_id'; input.value = id;
+          document.getElementById('owner-hidden-inputs').appendChild(input);
+          // Disable option in dropdown
+          sel.options[sel.selectedIndex].disabled = true;
+          sel.value = '';
+        }
+        function removeOwner(id) {
+          // Remove chip
+          document.querySelectorAll('.owner-chip').forEach(c => { if (c.dataset.id == id) c.remove(); });
+          // Remove hidden input
+          document.querySelectorAll('#owner-hidden-inputs input').forEach(i => { if (i.value == id) i.remove(); });
+          // Re-enable option
+          const sel = document.getElementById('owner-add-select');
+          for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value == id) { sel.options[i].disabled = false; break; }
+          }
+        }
+        // Form validation: require at least one owner
+        document.querySelector('form').addEventListener('submit', function(e) {
+          const owners = document.querySelectorAll('#owner-hidden-inputs input');
+          if (owners.length === 0) {
+            e.preventDefault();
+            alert('Please select at least one owner.');
+          }
+        });
+        </script>
 
         <!-- Due Date -->
         <div>

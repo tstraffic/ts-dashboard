@@ -205,6 +205,14 @@ router.get('/:id', (req, res) => {
     LEFT JOIN users u ON t.owner_id = u.id
     WHERE t.job_id = ? ORDER BY CASE t.status WHEN 'blocked' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'not_started' THEN 3 ELSE 4 END, t.due_date ASC
   `).all(job.id);
+  // Enrich tasks with all owners from junction table
+  try {
+    const ownerQuery = db.prepare('SELECT u.id, u.full_name FROM task_owners tow JOIN users u ON tow.user_id = u.id WHERE tow.task_id = ? ORDER BY u.full_name');
+    tasks.forEach(t => {
+      t.owners = ownerQuery.all(t.id);
+      if (t.owners.length === 0 && t.owner_name) t.owners = [{ id: t.owner_id, full_name: t.owner_name }];
+    });
+  } catch(e) { tasks.forEach(t => { t.owners = t.owner_name ? [{ id: t.owner_id, full_name: t.owner_name }] : []; }); }
 
   const complianceItems = db.prepare(`
     SELECT c.*, u.full_name as approver_name FROM compliance c
