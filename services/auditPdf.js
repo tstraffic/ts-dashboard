@@ -1,358 +1,379 @@
 /**
- * Audit PDF export — branded PDF using PDFKit.
- * Includes: header/logo, audit details, per-section checklist with
- * Yes/No/N/A badges, scoring, non-conformances, signatures, and
- * embedded evidence photos.
+ * Audit PDF export — branded T&S Traffic Control PDF using PDFKit.
+ * Compact, professional layout: header/logo, score card, details grid,
+ * 11 checklist sections with badges, NC register, signatures, evidence photos.
  */
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
-const { AUDIT_SECTIONS, SCORE_GROUPS, computeScore, normaliseState } = require('../lib/auditQuestions');
+const { AUDIT_SECTIONS, normaliseState } = require('../lib/auditQuestions');
 
-const BRAND = '#2B7FFF';
-const BRAND_DARK = '#1D6AE5';
+// Brand palette
+const BRAND = '#1D6AE5';
 const GREEN = '#059669';
 const RED = '#DC2626';
+const AMBER = '#D97706';
 const GRAY = '#6B7280';
+const GRAY_DARK = '#374151';
 const GRAY_LIGHT = '#F3F4F6';
 const WHITE = '#FFFFFF';
 
 const LOGO_PATH = path.join(__dirname, '..', 'public', 'images', 'logo-colour.png');
+const ML = 45; // margin left
+const MR = 45; // margin right
+const MT = 40; // margin top
+const MB = 50; // margin bottom
 
 function fmtDate(d) {
   if (!d) return '—';
-  try {
-    return new Date(d).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' });
-  } catch (e) {
-    return d;
-  }
+  try { return new Date(d).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }); }
+  catch (e) { return String(d); }
 }
-
 function findingLabel(f) {
-  if (f === 'pass') return 'Pass';
-  if (f === 'pass_with_actions') return 'Pass with Actions';
-  if (f === 'fail') return 'Fail — Immediate Rectification';
-  return f || '—';
+  if (f === 'pass') return 'PASS';
+  if (f === 'pass_with_actions') return 'PASS WITH ACTIONS';
+  if (f === 'fail') return 'FAIL';
+  return (f || '—').toUpperCase();
 }
-
 function findingColor(f) {
   if (f === 'pass') return GREEN;
   if (f === 'fail') return RED;
-  return '#D97706'; // amber
+  return AMBER;
 }
 
 /**
- * Generate the audit PDF and pipe it to a writable stream (e.g. res).
  * @param {object} opts — { audit, responses, sectionComments, nonconformances,
  *   score, attachments, attachmentsByContext }
- * @param {stream.Writable} out — destination (typically Express res)
+ * @param {stream.Writable} out
  */
 function generateAuditPdf(opts, out) {
   const { audit: a, responses, sectionComments, nonconformances,
-    score, attachments, attachmentsByContext } = opts;
+    score, attachmentsByContext } = opts;
   const ctxMap = attachmentsByContext || {};
 
   const doc = new PDFDocument({
     size: 'A4',
-    margins: { top: 50, bottom: 50, left: 50, right: 50 },
     bufferPages: true,
+    margins: { top: MT, bottom: MB, left: ML, right: MR },
     info: {
       Title: `Site Audit #${a.id} — ${a.project_site || 'Untitled'}`,
       Author: 'T&S Traffic Control',
-      Subject: 'Traffic Control Site Safety Audit',
     },
   });
   doc.pipe(out);
 
-  const pageW = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const pw = doc.page.width - ML - MR; // printable width
 
-  // ---- HELPER: ensure space before adding content, or add page ----
-  function ensureSpace(needed) {
-    const remaining = doc.page.height - doc.page.margins.bottom - doc.y;
-    if (remaining < needed) doc.addPage();
+  // ---- Helpers ----
+  function Y() { return doc.y; }
+  function moveTo(y) { doc.y = y; doc.x = ML; }
+  function space(n) { doc.y += n; }
+  function needSpace(h) {
+    if (doc.y + h > doc.page.height - MB) { doc.addPage(); addFooter(); }
   }
-
-  // ---- HELPER: draw a rounded rect background ----
-  function roundedRect(x, y, w, h, r, fill) {
+  function hr(color, width) {
+    doc.save().moveTo(ML, Y()).lineTo(ML + pw, Y())
+      .strokeColor(color || '#E5E7EB').lineWidth(width || 0.5).stroke().restore();
+    space(1);
+  }
+  function roundRect(x, y, w, h, r, fill) {
     doc.save().roundedRect(x, y, w, h, r).fill(fill).restore();
   }
-
-  // ---- HELPER: embed images from attachments array (only image types) ----
-  function embedImages(items, label) {
-    const images = (items || []).filter(att => (att.mime_type || '').startsWith('image/'));
-    if (!images.length) return;
-    ensureSpace(120);
-    doc.fontSize(8).fillColor(GRAY).text(label, { continued: false });
-    doc.moveDown(0.3);
-    const thumbW = 120;
-    const thumbH = 90;
-    const gap = 8;
-    let x = doc.page.margins.left;
-    let rowY = doc.y;
-    images.forEach(function (att) {
-      const fp = path.join(__dirname, '..', 'data', 'uploads', 'audits', String(a.id), att.filename);
-      if (!fs.existsSync(fp)) return;
-      if (x + thumbW > doc.page.width - doc.page.margins.right) {
-        x = doc.page.margins.left;
-        rowY += thumbH + gap + (att.caption ? 12 : 0);
-      }
-      if (rowY + thumbH + 20 > doc.page.height - doc.page.margins.bottom) {
-        doc.addPage();
-        x = doc.page.margins.left;
-        rowY = doc.y;
-      }
-      try {
-        doc.image(fp, x, rowY, { fit: [thumbW, thumbH], align: 'center', valign: 'center' });
-        if (att.caption) {
-          doc.fontSize(6).fillColor(GRAY).text(att.caption, x, rowY + thumbH + 2, { width: thumbW, align: 'center' });
-        }
-      } catch (e) {
-        // Skip images that can't be embedded (corrupt, unsupported format)
-      }
-      x += thumbW + gap;
-    });
-    doc.y = rowY + thumbH + (images.some(i => i.caption) ? 16 : 8);
-    doc.x = doc.page.margins.left;
+  // Small text helper — writes text and returns new Y
+  function txt(str, x, y, opts2) {
+    doc.text(str || '', x, y, Object.assign({ lineBreak: true }, opts2));
+    return doc.y;
+  }
+  // Footer on current page
+  function addFooter() {
+    // Will be overwritten with page numbers at end
   }
 
   // ============================================================
-  // PAGE 1: HEADER + SCORE + DETAILS
+  // PAGE 1 HEADER
   // ============================================================
-
-  // Logo + title header
+  const logoH = 40;
   if (fs.existsSync(LOGO_PATH)) {
-    doc.image(LOGO_PATH, doc.page.margins.left, doc.page.margins.top, { height: 50 });
+    try { doc.image(LOGO_PATH, ML, MT, { height: logoH }); } catch (e) {}
   }
-  doc.fontSize(18).fillColor(BRAND_DARK).text('Site Safety Audit Report', 170, doc.page.margins.top + 5, { width: pageW - 130 });
-  doc.fontSize(9).fillColor(GRAY).text('T&S Traffic Control — Traffic Control Site Safety Audit', 170, doc.page.margins.top + 28);
-  doc.fontSize(9).fillColor(GRAY).text(`Audit #${a.id} · ${fmtDate(a.audit_datetime || a.created_at)}`, 170, doc.page.margins.top + 40);
+  // Title block right of logo
+  const titleX = ML + 140;
+  doc.fontSize(16).fillColor(BRAND).text('Site Safety Audit', titleX, MT + 2, { width: pw - 140 });
+  doc.fontSize(8).fillColor(GRAY).text(`Audit #${a.id}  ·  ${fmtDate(a.audit_datetime || a.created_at)}`, titleX, MT + 22);
+  doc.fontSize(8).fillColor(GRAY).text('T&S Traffic Control', titleX, MT + 32);
 
-  // Horizontal rule
-  doc.y = doc.page.margins.top + 60;
-  doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).strokeColor(BRAND).lineWidth(2).stroke();
-  doc.y += 15;
+  moveTo(MT + logoH + 8);
+  doc.save().moveTo(ML, Y()).lineTo(ML + pw, Y()).strokeColor(BRAND).lineWidth(1.5).stroke().restore();
+  space(10);
 
-  // Score card
-  const scoreBoxX = doc.page.margins.left;
-  const scoreBoxY = doc.y;
-  const scoreBoxW = 160;
-  const scoreBoxH = 80;
-  roundedRect(scoreBoxX, scoreBoxY, scoreBoxW, scoreBoxH, 6, BRAND_DARK);
-  doc.fontSize(8).fillColor(WHITE).text('OVERALL SCORE', scoreBoxX + 12, scoreBoxY + 10, { width: scoreBoxW - 24 });
-  doc.fontSize(32).fillColor(WHITE).text(`${score.percent}%`, scoreBoxX + 12, scoreBoxY + 22, { width: scoreBoxW - 24 });
-  doc.fontSize(8).fillColor(WHITE).text(`${score.total} / ${score.max} items passed`, scoreBoxX + 12, scoreBoxY + 58, { width: scoreBoxW - 24 });
+  // ---- SCORE CARD (compact: score box + finding + area bars in one row) ----
+  const scoreY = Y();
+  // Blue score box
+  const sBoxW = 110, sBoxH = 60;
+  roundRect(ML, scoreY, sBoxW, sBoxH, 5, BRAND);
+  doc.fontSize(7).fillColor(WHITE).text('OVERALL SCORE', ML + 8, scoreY + 6, { width: sBoxW - 16 });
+  doc.fontSize(28).fillColor(WHITE).text(`${score.percent}%`, ML + 8, scoreY + 16, { width: sBoxW - 16 });
+  doc.fontSize(7).fillColor(WHITE).text(`${score.total}/${score.max} passed`, ML + 8, scoreY + 47, { width: sBoxW - 16 });
 
-  // Finding badge
-  const findX = scoreBoxX + scoreBoxW + 15;
-  const findY = scoreBoxY;
-  const findW = pageW - scoreBoxW - 15;
-  roundedRect(findX, findY, findW, 35, 4, findingColor(a.overall_finding));
-  doc.fontSize(8).fillColor(WHITE).text('FINDING', findX + 10, findY + 6);
-  doc.fontSize(14).fillColor(WHITE).text(findingLabel(a.overall_finding), findX + 10, findY + 17, { width: findW - 20 });
+  // Finding pill
+  const fX = ML + sBoxW + 10;
+  const fW = 120;
+  roundRect(fX, scoreY, fW, 20, 4, findingColor(a.overall_finding));
+  doc.fontSize(8).fillColor(WHITE).text(findingLabel(a.overall_finding), fX + 6, scoreY + 5, { width: fW - 12 });
 
-  // Scoring groups
-  const groupStartY = findY + 42;
-  const groupColW = findW / 2;
-  score.groups.forEach(function (g, i) {
-    const gx = findX + (i % 2) * groupColW;
-    const gy = groupStartY + Math.floor(i / 2) * 14;
-    doc.fontSize(7).fillColor(GRAY).text(g.label, gx + 2, gy, { width: groupColW - 40, continued: false });
-    doc.fontSize(7).fillColor('#111827').text(`${g.score}/${g.max} (${g.percent}%)`, gx + groupColW - 55, gy, { width: 53, align: 'right' });
+  // Per-area scores (compact list)
+  const areaX = fX;
+  let areaY = scoreY + 26;
+  score.groups.forEach(function (g) {
+    doc.fontSize(6.5).fillColor(GRAY).text(g.label, areaX, areaY, { width: 105, continued: false });
+    doc.fontSize(6.5).fillColor(GRAY_DARK).text(`${g.score}/${g.max} (${g.percent}%)`, areaX + 108, areaY, { width: 60 });
+    areaY += 9;
   });
 
-  doc.y = scoreBoxY + scoreBoxH + 20;
+  // Status + follow-up (top-right area)
+  const statusX = ML + sBoxW + fW + 20;
+  if (statusX + 100 < ML + pw) {
+    doc.fontSize(7).fillColor(GRAY).text('STATUS', statusX, scoreY, { width: 100 });
+    doc.fontSize(9).fillColor(GRAY_DARK).text((a.status || 'draft').replace('_', ' ').toUpperCase(), statusX, scoreY + 9);
+    if (a.follow_up_required) {
+      doc.fontSize(7).fillColor(AMBER).text('Follow-up: ' + (a.follow_up_date || 'TBC'), statusX, scoreY + 22);
+    }
+  }
 
-  // Audit details table
-  const detailFields = [
-    ['Client', a.client],
-    ['Project / Site', a.project_site],
-    ['Location', a.location],
-    ['Job #', a.job_number || '—'],
-    ['TGS / TCP Ref', a.tgs_ref],
-    ['Shift', (a.shift || '').charAt(0).toUpperCase() + (a.shift || '').slice(1)],
-    ['Weather', a.weather],
-    ['Auditor', a.auditor_name || a.created_by_name],
-    ['Supervisor / STMS', a.supervisor_name],
-    ['Date / Time', fmtDate(a.audit_datetime || a.created_at)],
+  moveTo(scoreY + sBoxH + 8);
+  hr('#E5E7EB');
+  space(4);
+
+  // ---- AUDIT DETAILS (2-col compact grid) ----
+  const details = [
+    ['Client', a.client], ['Project / Site', a.project_site],
+    ['Location', a.location], ['Job #', a.job_number || '—'],
+    ['TGS / TCP Ref', a.tgs_ref], ['Shift', (a.shift || '—').charAt(0).toUpperCase() + (a.shift || '').slice(1)],
+    ['Weather', a.weather], ['Auditor', a.auditor_name || a.created_by_name],
+    ['Supervisor', a.supervisor_name], ['Date', fmtDate(a.audit_datetime || a.created_at)],
   ];
-  const colW = pageW / 2;
-  detailFields.forEach(function (f, i) {
-    const dx = doc.page.margins.left + (i % 2) * colW;
-    const dy = doc.y + Math.floor(i / 2) * 16;
-    doc.fontSize(7).fillColor(GRAY).text(f[0].toUpperCase(), dx, dy);
-    doc.fontSize(9).fillColor('#111827').text(f[1] || '—', dx, dy + 8, { width: colW - 10 });
+  const colW = pw / 2;
+  const detY = Y();
+  details.forEach(function (d, i) {
+    const dx = ML + (i % 2) * colW;
+    const dy = detY + Math.floor(i / 2) * 14;
+    doc.fontSize(6).fillColor(GRAY).text(d[0].toUpperCase(), dx, dy);
+    doc.fontSize(8).fillColor(GRAY_DARK).text(d[1] || '—', dx + 55, dy, { width: colW - 60 });
   });
-  doc.y += Math.ceil(detailFields.length / 2) * 16 + 10;
-
-  // Divider
-  doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).strokeColor('#E5E7EB').lineWidth(0.5).stroke();
-  doc.y += 10;
+  moveTo(detY + Math.ceil(details.length / 2) * 14 + 6);
+  hr('#E5E7EB');
+  space(4);
 
   // ---- Site overview evidence ----
-  embedImages(ctxMap['overview'], 'SITE OVERVIEW EVIDENCE');
+  embedImageGrid(doc, a, ctxMap['overview'], 'SITE OVERVIEW EVIDENCE', pw);
 
   // ============================================================
   // CHECKLIST SECTIONS
   // ============================================================
   AUDIT_SECTIONS.forEach(function (section) {
-    ensureSpace(60);
-    // Section header bar
-    const barY = doc.y;
-    roundedRect(doc.page.margins.left, barY, pageW, 22, 4, BRAND_DARK);
-    doc.fontSize(10).fillColor(WHITE).text(`${section.key}. ${section.title}`, doc.page.margins.left + 8, barY + 5, { width: pageW - 60 });
-
-    // Per-section score
-    let secYes = 0, secMax = 0;
+    needSpace(40);
+    // Section header
+    const hY = Y();
+    roundRect(ML, hY, pw, 18, 3, BRAND);
+    doc.fontSize(9).fillColor(WHITE).text(`${section.key}. ${section.title}`, ML + 6, hY + 4, { width: pw - 60 });
+    // Section score
+    let sY = 0, sM = 0;
     section.items.forEach(function (_, idx) {
-      const key = section.key + '.' + (idx + 1);
-      const st = normaliseState(responses[key]);
-      if (st === 'yes') { secYes++; secMax++; }
-      else if (st === 'no') { secMax++; }
+      const st = normaliseState(responses[section.key + '.' + (idx + 1)]);
+      if (st === 'yes') { sY++; sM++; } else if (st === 'no') { sM++; }
     });
-    doc.fontSize(8).fillColor(WHITE).text(`${secYes}/${secMax}`, doc.page.margins.left + pageW - 50, barY + 7, { width: 42, align: 'right' });
-    doc.y = barY + 28;
+    doc.fontSize(8).fillColor(WHITE).text(`${sY}/${sM}`, ML + pw - 50, hY + 5, { width: 44, align: 'right' });
+    moveTo(hY + 22);
 
     // Items
     section.items.forEach(function (item, idx) {
       const key = section.key + '.' + (idx + 1);
       const r = responses[key] || {};
       const st = normaliseState(r);
-      ensureSpace(22);
+      needSpace(14);
 
-      const iy = doc.y;
-      // Alternating bg
+      const iy = Y();
+      // Stripe
       if (idx % 2 === 0) {
-        doc.save().rect(doc.page.margins.left, iy - 2, pageW, 16).fill(GRAY_LIGHT).restore();
+        doc.save().rect(ML, iy - 1, pw, 12).fill(GRAY_LIGHT).restore();
       }
-
       // Badge
-      let badge, badgeColor;
-      if (st === 'yes') { badge = 'YES'; badgeColor = GREEN; }
-      else if (st === 'no') { badge = 'NO'; badgeColor = RED; }
-      else if (st === 'na') { badge = 'N/A'; badgeColor = GRAY; }
-      else { badge = '—'; badgeColor = '#D1D5DB'; }
+      let badge, bc;
+      if (st === 'yes') { badge = 'YES'; bc = GREEN; }
+      else if (st === 'no') { badge = 'NO'; bc = RED; }
+      else if (st === 'na') { badge = 'N/A'; bc = GRAY; }
+      else { badge = '—'; bc = '#D1D5DB'; }
+      roundRect(ML + 1, iy, 24, 10, 2, bc);
+      doc.fontSize(6).fillColor(WHITE).text(badge, ML + 2, iy + 2, { width: 22, align: 'center' });
 
-      roundedRect(doc.page.margins.left + 2, iy - 1, 28, 14, 3, badgeColor);
-      doc.fontSize(7).fillColor(WHITE).text(badge, doc.page.margins.left + 4, iy + 1, { width: 24, align: 'center' });
+      // Item text (single line, truncate if needed)
+      const maxTextW = pw - 32;
+      doc.fontSize(7).fillColor(GRAY_DARK).text(`${key}  ${item}`, ML + 28, iy + 1, { width: maxTextW, height: 10, ellipsis: true });
+      moveTo(iy + 12);
 
-      // Item text
-      doc.fontSize(8).fillColor('#374151').text(`${key}  ${item}`, doc.page.margins.left + 35, iy, { width: pageW - 40 });
-      doc.y = Math.max(doc.y, iy + 14);
-
-      // Notes
+      // Notes on next line if present
       if (r.notes) {
-        doc.fontSize(7).fillColor(GRAY).text(`  → ${r.notes}`, doc.page.margins.left + 35, doc.y, { width: pageW - 40 });
-        doc.y += 2;
+        needSpace(10);
+        doc.fontSize(6).fillColor(GRAY).text(`→ ${r.notes}`, ML + 28, Y(), { width: maxTextW });
+        space(2);
       }
     });
 
     // Section comments
     if (sectionComments[section.key]) {
-      ensureSpace(25);
-      doc.fontSize(7).fillColor(GRAY).text('COMMENTS:', doc.page.margins.left + 4, doc.y + 2);
-      doc.fontSize(8).fillColor('#374151').text(sectionComments[section.key], doc.page.margins.left + 55, doc.y + 2, { width: pageW - 60 });
-      doc.y += 6;
+      needSpace(16);
+      doc.fontSize(6).fillColor(GRAY).text('COMMENTS: ', ML + 2, Y(), { continued: true });
+      doc.fontSize(7).fillColor(GRAY_DARK).text(sectionComments[section.key]);
+      space(2);
     }
 
-    // Per-section evidence images
-    embedImages(ctxMap['section_' + section.key], `SECTION ${section.key} EVIDENCE`);
-
-    doc.y += 6;
+    // Per-section evidence
+    embedImageGrid(doc, a, ctxMap['section_' + section.key], `SECTION ${section.key} EVIDENCE`, pw);
+    space(4);
   });
 
   // ============================================================
   // NON-CONFORMANCE REGISTER
   // ============================================================
   if (nonconformances && nonconformances.length) {
-    ensureSpace(60);
-    roundedRect(doc.page.margins.left, doc.y, pageW, 22, 4, RED);
-    doc.fontSize(10).fillColor(WHITE).text('Non-Conformance Register', doc.page.margins.left + 8, doc.y + 5);
-    doc.y += 28;
+    needSpace(50);
+    const ncY = Y();
+    roundRect(ML, ncY, pw, 18, 3, RED);
+    doc.fontSize(9).fillColor(WHITE).text('Non-Conformance Register', ML + 6, ncY + 4);
+    moveTo(ncY + 22);
 
-    // Table header
-    const ncCols = [30, 0, 50, 0, 65, 55, 40]; // # , Issue, Risk, Action, Responsible, Due, Closed
-    const issueFlex = Math.floor((pageW - 30 - 50 - 65 - 55 - 40) / 2);
-    ncCols[1] = issueFlex;
-    ncCols[3] = issueFlex;
-    const ncHeaders = ['#', 'Issue', 'Risk', 'Action Required', 'Responsible', 'Due', 'Closed'];
-    let cx = doc.page.margins.left;
-    ncHeaders.forEach(function (h, i) {
-      doc.fontSize(7).fillColor(GRAY).text(h.toUpperCase(), cx, doc.y, { width: ncCols[i] });
-      cx += ncCols[i];
+    // Column widths
+    const ncW = [18, 0, 40, 0, 55, 48, 30];
+    const flex = Math.floor((pw - 18 - 40 - 55 - 48 - 30) / 2);
+    ncW[1] = flex; ncW[3] = flex;
+    const ncH = ['#', 'Issue', 'Risk', 'Action', 'Resp.', 'Due', 'Done'];
+
+    // Header row
+    let cx = ML;
+    ncH.forEach(function (h, i) {
+      doc.fontSize(6).fillColor(GRAY).text(h, cx, Y(), { width: ncW[i] });
+      cx += ncW[i];
     });
-    doc.y += 14;
+    space(10);
 
     nonconformances.forEach(function (nc, i) {
-      ensureSpace(25);
-      const ry = doc.y;
-      if (i % 2 === 0) {
-        doc.save().rect(doc.page.margins.left, ry - 2, pageW, 14).fill(GRAY_LIGHT).restore();
-      }
-      cx = doc.page.margins.left;
-      const vals = [String(i + 1), nc.issue, nc.risk || '—', nc.action || '—', nc.responsible || '—', nc.due_date || '—', nc.closed ? '✓' : '—'];
+      needSpace(14);
+      const ry = Y();
+      if (i % 2 === 0) doc.save().rect(ML, ry - 1, pw, 12).fill(GRAY_LIGHT).restore();
+      cx = ML;
+      const vals = [String(i + 1), nc.issue || '', nc.risk || '—', nc.action || '—', nc.responsible || '—', nc.due_date || '—', nc.closed ? '✓' : '—'];
       vals.forEach(function (v, vi) {
-        doc.fontSize(7).fillColor('#374151').text(v, cx, ry, { width: ncCols[vi] });
-        cx += ncCols[vi];
+        doc.fontSize(6.5).fillColor(GRAY_DARK).text(v, cx, ry + 1, { width: ncW[vi], height: 10, ellipsis: true });
+        cx += ncW[vi];
       });
-      doc.y = ry + 14;
+      moveTo(ry + 12);
 
       // Per-NC evidence
-      embedImages(ctxMap['nc_' + (i + 1)], `NC #${i + 1} EVIDENCE`);
+      embedImageGrid(doc, a, ctxMap['nc_' + (i + 1)], null, pw);
     });
-    doc.y += 10;
+    space(6);
   }
 
   // ============================================================
   // SIGNATURES
   // ============================================================
   if (a.auditor_signature_text || a.supervisor_signature_text) {
-    ensureSpace(80);
-    doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).strokeColor('#E5E7EB').lineWidth(0.5).stroke();
-    doc.y += 12;
-    doc.fontSize(10).fillColor(BRAND_DARK).text('Sign-off', doc.page.margins.left, doc.y);
-    doc.y += 16;
+    needSpace(55);
+    hr(BRAND, 1);
+    space(4);
+    doc.fontSize(9).fillColor(BRAND).text('Sign-off', ML, Y());
+    space(8);
+    const sigY = Y();
+    const sigW = (pw - 10) / 2;
 
-    const sigColW = pageW / 2;
-    const sigY = doc.y;
     if (a.auditor_signature_text) {
-      roundedRect(doc.page.margins.left, sigY, sigColW - 10, 50, 4, GRAY_LIGHT);
-      doc.fontSize(7).fillColor(GRAY).text('AUDITOR', doc.page.margins.left + 8, sigY + 6);
-      doc.fontSize(16).fillColor('#111827').text(a.auditor_signature_text, doc.page.margins.left + 8, sigY + 18, { width: sigColW - 26 });
+      roundRect(ML, sigY, sigW, 40, 3, GRAY_LIGHT);
+      doc.fontSize(6).fillColor(GRAY).text('AUDITOR', ML + 6, sigY + 4);
+      doc.fontSize(14).fillColor(GRAY_DARK).text(a.auditor_signature_text, ML + 6, sigY + 14, { width: sigW - 12 });
       if (a.auditor_signed_at) {
-        doc.fontSize(6).fillColor(GREEN).text(`Signed ${fmtDate(a.auditor_signed_at)}`, doc.page.margins.left + 8, sigY + 38);
+        doc.fontSize(5.5).fillColor(GREEN).text('Signed ' + fmtDate(a.auditor_signed_at), ML + 6, sigY + 32);
       }
     }
     if (a.supervisor_signature_text) {
-      const sx = doc.page.margins.left + sigColW;
-      roundedRect(sx, sigY, sigColW - 10, 50, 4, GRAY_LIGHT);
-      doc.fontSize(7).fillColor(GRAY).text('SUPERVISOR / STMS', sx + 8, sigY + 6);
-      doc.fontSize(16).fillColor('#111827').text(a.supervisor_signature_text, sx + 8, sigY + 18, { width: sigColW - 26 });
+      const sx = ML + sigW + 10;
+      roundRect(sx, sigY, sigW, 40, 3, GRAY_LIGHT);
+      doc.fontSize(6).fillColor(GRAY).text('SUPERVISOR / STMS', sx + 6, sigY + 4);
+      doc.fontSize(14).fillColor(GRAY_DARK).text(a.supervisor_signature_text, sx + 6, sigY + 14, { width: sigW - 12 });
       if (a.supervisor_signed_at) {
-        doc.fontSize(6).fillColor(GREEN).text(`Signed ${fmtDate(a.supervisor_signed_at)}`, sx + 8, sigY + 38);
+        doc.fontSize(5.5).fillColor(GREEN).text('Signed ' + fmtDate(a.supervisor_signed_at), sx + 6, sigY + 32);
       }
     }
-    doc.y = sigY + 58;
+    moveTo(sigY + 46);
   }
 
   // Annotated TGS
-  embedImages(ctxMap['annotated_tgs'], 'ANNOTATED TGS / CLOSE-OUT SKETCH');
+  embedImageGrid(doc, a, ctxMap['annotated_tgs'], 'ANNOTATED TGS / CLOSE-OUT SKETCH', pw);
+
+  // ---- Sign-off metadata ----
+  needSpace(30);
+  space(4);
+  hr('#E5E7EB');
+  space(4);
+  doc.fontSize(6).fillColor(GRAY).text(`Created by ${a.created_by_name || '—'} · ${fmtDate(a.created_at)}`, ML, Y());
+  if (a.signed_off_by_name) {
+    doc.fontSize(6).fillColor(GRAY).text(`Signed off by ${a.signed_off_by_name} · ${fmtDate(a.signed_off_at)}`);
+  }
 
   // ============================================================
-  // FOOTER: page numbers
+  // PAGE NUMBERS (iterate all pages)
   // ============================================================
-  const pages = doc.bufferedPageRange();
-  for (let i = pages.start; i < pages.start + pages.count; i++) {
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i);
-    doc.fontSize(7).fillColor(GRAY).text(
-      `T&S Traffic Control — Site Audit #${a.id} — Page ${i + 1} of ${pages.count}`,
-      doc.page.margins.left,
-      doc.page.height - 35,
-      { width: pageW, align: 'center' }
+    doc.fontSize(6).fillColor(GRAY).text(
+      `T&S Traffic Control  ·  Site Audit #${a.id}  ·  Page ${i + 1} of ${range.count}`,
+      ML, doc.page.height - 30,
+      { width: pw, align: 'center' }
     );
   }
 
   doc.end();
-  return doc;
+}
+
+/**
+ * Embed a grid of image thumbnails from an attachments array.
+ * Only embeds actual image files (skips PDFs, docs, missing files).
+ * Carefully manages page breaks to avoid blank pages.
+ */
+function embedImageGrid(doc, audit, items, label, pw) {
+  if (!items || !items.length) return;
+  const images = items.filter(function (att) {
+    if (!(att.mime_type || '').startsWith('image/')) return false;
+    const fp = path.join(__dirname, '..', 'data', 'uploads', 'audits', String(audit.id), att.filename);
+    return fs.existsSync(fp);
+  });
+  if (!images.length) return;
+
+  if (label) {
+    if (doc.y + 20 > doc.page.height - MB) doc.addPage();
+    doc.fontSize(6).fillColor(GRAY).text(label, ML, doc.y);
+    doc.y += 2;
+  }
+
+  const thumbW = 100, thumbH = 75, gap = 6;
+  const cols = Math.floor((pw + gap) / (thumbW + gap));
+
+  images.forEach(function (att, i) {
+    const col = i % cols;
+    if (col === 0 && i > 0) doc.y += thumbH + gap; // next row
+    if (col === 0 && doc.y + thumbH + gap > doc.page.height - MB) doc.addPage();
+
+    const x = ML + col * (thumbW + gap);
+    const y = doc.y;
+    const fp = path.join(__dirname, '..', 'data', 'uploads', 'audits', String(audit.id), att.filename);
+    try {
+      doc.image(fp, x, y, { fit: [thumbW, thumbH], align: 'center', valign: 'center' });
+    } catch (e) { /* skip corrupt/unsupported */ }
+  });
+
+  // Move past the last row
+  doc.y += thumbH + gap;
+  doc.x = ML;
 }
 
 module.exports = { generateAuditPdf };
