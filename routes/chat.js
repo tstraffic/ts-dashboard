@@ -298,6 +298,38 @@ router.post('/api/threads/:threadId/messages', requireThreadMember, (req, res) =
   // Update thread timestamp
   db.prepare('UPDATE chat_threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(threadId);
 
+  // In-app notifications for all thread members (so bell icon shows new messages)
+  try {
+    const thread = db.prepare('SELECT title, thread_type, related_entity_type, related_entity_id, channel_slug FROM chat_threads WHERE id = ?').get(threadId);
+    const members = db.prepare('SELECT user_id FROM chat_thread_members WHERE thread_id = ? AND user_id != ? AND muted_at IS NULL').all(threadId, userId);
+    const senderName = req.session.user ? req.session.user.full_name : (req.session.worker ? req.session.worker.full_name : 'Someone');
+    const preview = body ? (body.length > 80 ? body.substring(0, 80) + '...' : body) : (type === 'image' ? 'Sent an image' : 'Sent a file');
+
+    // Build link
+    let chatLink = '/chat';
+    if (thread.thread_type === 'dm') chatLink = `/chat/dm/${userId}`;
+    else if (thread.thread_type === 'channel' || thread.thread_type === 'announcement') chatLink = `/chat/channel/${threadId}`;
+    else if (thread.related_entity_type === 'job') chatLink = `/jobs/${thread.related_entity_id}#chat`;
+
+    const notifTitle = thread.thread_type === 'dm' ? `Message from ${senderName}` : `${thread.title}`;
+    const notifMessage = thread.thread_type === 'dm' ? preview : `${senderName}: ${preview}`;
+
+    // Skip already-mentioned users (they got a notification above)
+    const mentionedSet = new Set((mentioned_user_ids || []).map(Number));
+
+    const insertNotif = db.prepare(`
+      INSERT INTO notifications (user_id, type, title, message, link)
+      SELECT ?, 'chat_message', ?, ?, ?
+      WHERE NOT EXISTS (
+        SELECT 1 FROM notifications WHERE user_id = ? AND type = 'chat_message' AND title = ? AND created_at > datetime('now', '-2 minutes')
+      )
+    `);
+    for (const member of members) {
+      if (mentionedSet.has(member.user_id)) continue;
+      try { insertNotif.run(member.user_id, notifTitle, notifMessage, chatLink, member.user_id, notifTitle); } catch(e) {}
+    }
+  } catch(e) { /* notifications are best-effort */ }
+
   // Audit log
   logActivity({
     user: req.session.user,
