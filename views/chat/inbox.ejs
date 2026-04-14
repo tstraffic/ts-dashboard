@@ -89,7 +89,7 @@
           let link = '/chat';
           if (thread.thread_type === 'dm' && thread.dm_user) {
             link = '/chat/dm/' + thread.dm_user.id;
-          } else if (thread.thread_type === 'channel' || thread.thread_type === 'announcement') {
+          } else if (thread.thread_type === 'group' || thread.thread_type === 'channel' || thread.thread_type === 'announcement') {
             link = '/chat/channel/' + thread.id;
           } else if (thread.related_entity_type === 'job') {
             link = '/jobs/' + thread.related_entity_id + '#chat';
@@ -101,6 +101,7 @@
 
           let typeLabel = '', typeColor = '', typeBg = '';
           if (thread.thread_type === 'dm') { typeLabel = 'DM'; typeColor = 'text-blue-700'; typeBg = 'bg-blue-50'; }
+          else if (thread.thread_type === 'group') { typeLabel = 'Group'; typeColor = 'text-purple-700'; typeBg = 'bg-purple-50'; }
           else if (thread.thread_type === 'job') { typeLabel = 'Job'; typeColor = 'text-emerald-700'; typeBg = 'bg-emerald-50'; }
           else if (thread.thread_type === 'incident') { typeLabel = 'Incident'; typeColor = 'text-red-700'; typeBg = 'bg-red-50'; }
           else if (thread.thread_type === 'compliance') { typeLabel = 'Plan'; typeColor = 'text-teal-700'; typeBg = 'bg-teal-50'; }

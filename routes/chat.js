@@ -48,7 +48,7 @@ router.get('/', (req, res) => {
   const userId = req.session.user.id;
   const userRole = req.session.user.role;
   const isAdmin = ['admin', 'management'].includes(userRole);
-  const canStartThread = ['admin', 'operations'].includes(userRole);
+  const canStartThread = true; // Everyone can create DMs, groups, channels
 
   // Filters
   const tab = req.query.tab || 'all';
@@ -89,7 +89,7 @@ router.get('/', (req, res) => {
 
   // Apply tab filter
   if (tab === 'direct') {
-    baseQuery += ` AND ct.thread_type = 'dm'`;
+    baseQuery += ` AND ct.thread_type IN ('dm','group')`;
   } else if (tab === 'threads') {
     baseQuery += ` AND ct.thread_type IN ('job','incident','compliance')`;
   } else if (tab === 'channels') {
@@ -132,7 +132,7 @@ router.get('/', (req, res) => {
 
   const stats = {
     unread: allThreads.filter(t => t.unread_count > 0).length,
-    dms: allThreads.filter(t => t.thread_type === 'dm').length,
+    dms: allThreads.filter(t => t.thread_type === 'dm' || t.thread_type === 'group').length,
     threads: allThreads.filter(t => ['job','incident','compliance'].includes(t.thread_type)).length,
     channels: allThreads.filter(t => ['channel','announcement'].includes(t.thread_type)).length,
     total: allThreads.length,
@@ -587,7 +587,7 @@ router.get('/new', (req, res) => {
     WHERE i.investigation_status IN ('reported','investigating')
     ORDER BY i.incident_date DESC
   `).all() : [];
-  const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 AND id != ? ORDER BY full_name').all(req.session.user.id);
+  const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND id != ? AND username != 'admin' ORDER BY full_name").all(req.session.user.id);
   res.render('chat/new', {
     title: 'New Message',
     currentPage: 'chat',
@@ -613,6 +613,78 @@ router.post('/new', (req, res) => {
       db.prepare('UPDATE chat_threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(threadId);
     }
     return res.redirect(`/chat/dm/${dm_user_id}`);
+  }
+
+  // Group chat creation — any user can do this
+  if (thread_type === 'group') {
+    const groupName = (req.body.group_name || '').trim();
+    let memberIds = req.body.group_members || [];
+    if (!Array.isArray(memberIds)) memberIds = [memberIds];
+    memberIds = memberIds.map(Number).filter(Boolean);
+
+    if (!groupName) { req.flash('error', 'Please enter a group name.'); return res.redirect('/chat/new'); }
+    if (memberIds.length === 0) { req.flash('error', 'Please select at least one member.'); return res.redirect('/chat/new'); }
+
+    // Always include the creator
+    if (!memberIds.includes(req.session.user.id)) memberIds.push(req.session.user.id);
+
+    const result = db.prepare("INSERT INTO chat_threads (thread_type, title, created_by, status) VALUES ('group', ?, ?, 'active')").run(groupName, req.session.user.id);
+    const threadId = Number(result.lastInsertRowid);
+
+    const addMemberStmt = db.prepare('INSERT OR IGNORE INTO chat_thread_members (thread_id, user_id, role_in_thread) VALUES (?, ?, ?)');
+    addMemberStmt.run(threadId, req.session.user.id, 'admin');
+    for (const uid of memberIds) {
+      if (uid !== req.session.user.id) addMemberStmt.run(threadId, uid, 'member');
+    }
+
+    if (initial_message && initial_message.trim()) {
+      db.prepare('INSERT INTO messages (thread_id, sender_id, body, message_type) VALUES (?, ?, ?, ?)').run(threadId, req.session.user.id, initial_message.trim(), 'text');
+    } else {
+      postSystemMessage(threadId, `Group created by ${req.session.user.full_name}`);
+    }
+    db.prepare('UPDATE chat_threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(threadId);
+
+    req.flash('success', `Group "${groupName}" created.`);
+    return res.redirect(`/chat/channel/${threadId}`);
+  }
+
+  // Channel creation — any user can do this
+  if (thread_type === 'channel') {
+    const channelName = (req.body.channel_name || '').trim();
+    let memberIds = req.body.channel_members || [];
+    if (!Array.isArray(memberIds)) memberIds = [memberIds];
+    memberIds = memberIds.map(Number).filter(Boolean);
+
+    if (!channelName) { req.flash('error', 'Please enter a channel name.'); return res.redirect('/chat/new'); }
+
+    // Generate slug from name
+    const slug = channelName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+    // Check for duplicate slug
+    const existing = db.prepare('SELECT id FROM chat_threads WHERE channel_slug = ?').get(slug);
+    if (existing) { req.flash('error', 'A channel with that name already exists.'); return res.redirect('/chat/new'); }
+
+    // Always include the creator
+    if (!memberIds.includes(req.session.user.id)) memberIds.push(req.session.user.id);
+
+    const result = db.prepare("INSERT INTO chat_threads (thread_type, title, channel_slug, created_by, status) VALUES ('channel', ?, ?, ?, 'active')").run(channelName, slug, req.session.user.id);
+    const threadId = Number(result.lastInsertRowid);
+
+    const addMemberStmt = db.prepare('INSERT OR IGNORE INTO chat_thread_members (thread_id, user_id, role_in_thread) VALUES (?, ?, ?)');
+    addMemberStmt.run(threadId, req.session.user.id, 'admin');
+    for (const uid of memberIds) {
+      if (uid !== req.session.user.id) addMemberStmt.run(threadId, uid, 'member');
+    }
+
+    if (initial_message && initial_message.trim()) {
+      db.prepare('INSERT INTO messages (thread_id, sender_id, body, message_type) VALUES (?, ?, ?, ?)').run(threadId, req.session.user.id, initial_message.trim(), 'text');
+    } else {
+      postSystemMessage(threadId, `Channel created by ${req.session.user.full_name}`);
+    }
+    db.prepare('UPDATE chat_threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(threadId);
+
+    req.flash('success', `Channel "#${channelName}" created.`);
+    return res.redirect(`/chat/channel/${threadId}`);
   }
 
   // Operational threads — admin/operations only
