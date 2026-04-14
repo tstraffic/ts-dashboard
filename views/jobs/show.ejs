@@ -197,26 +197,11 @@
   </div>
 </div>
 
-<!-- View Mode Toggle (Admin/Manager only) -->
 <% const isAdmin = canAccess(user, 'admin'); %>
-<% if (isAdmin) { %>
-<div class="flex items-center gap-2 mb-4">
-  <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">View as:</span>
-  <a href="?view=planning" class="px-3 py-1 text-xs font-medium rounded-full transition-colors
-    <%= (typeof viewMode !== 'undefined' && viewMode === 'planning') || (!viewMode && canAccess(user, 'planning_plans')) ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">Planning</a>
-  <a href="?view=operations" class="px-3 py-1 text-xs font-medium rounded-full transition-colors
-    <%= (typeof viewMode !== 'undefined' && viewMode === 'operations') ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">Operations</a>
-  <a href="?view=all" class="px-3 py-1 text-xs font-medium rounded-full transition-colors
-    <%= (typeof viewMode !== 'undefined' && viewMode === 'all') ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">All</a>
-</div>
-<% } %>
-
 <%
-  // Determine effective view mode
-  const effectiveView = (typeof viewMode !== 'undefined' && viewMode) ? viewMode
-    : (isAdmin ? 'all' : (canAccess(user, 'planning_plans') ? 'planning' : 'operations'));
-  const showPlanning = effectiveView === 'planning' || effectiveView === 'all';
-  const showOps = effectiveView === 'operations' || effectiveView === 'all';
+  // Always show all tabs — no more Planning/Operations split
+  const showPlanning = true;
+  const showOps = true;
 %>
 
 <!-- Tab Navigation -->
@@ -226,48 +211,39 @@
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Overview</a>
 
-    <% /* ── PLANNING TABS ── */ %>
-    <% if (showPlanning) { %>
     <a href="#diary" data-tab="diary" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Site Diary</a>
-    <a href="#plans" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
-      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
-      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Traffic Plans</a>
-    <a href="#chat" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
-      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
-      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Chat</a>
-    <% } %>
-
-    <% /* ── OPERATIONS TABS ── */ %>
-    <% if (showOps) { %>
-    <a href="#diary" data-tab="diary" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
-      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
-      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Site Diary</a>
-    <a href="#final-plans" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
-      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
-      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Final Plans</a>
     <a href="#tasks" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Tasks</a>
+    <a href="#plans" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
+      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Traffic Plans</a>
+    <a href="#final-plans" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
+      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Final Plans</a>
+    <a href="#compliance" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
+      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Compliance</a>
     <a href="#timesheets" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Timesheets</a>
     <a href="#incidents" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Incidents</a>
-    <a href="#compliance" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
-      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
-      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Compliance</a>
-    <a href="#contacts" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
-      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
-      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Contacts</a>
     <a href="#equipment" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Equipment</a>
     <a href="#defects" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Defects</a>
+    <a href="#contacts" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
+      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Contacts</a>
+    <a href="#chat" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
+      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Chat</a>
     <% if (canViewAccounts) { %>
     <a href="#budget" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
@@ -275,7 +251,6 @@
     <a href="#accounts" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Accounts</a>
-    <% } %>
     <% } %>
   </nav>
 </div>
