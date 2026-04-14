@@ -178,9 +178,11 @@ router.post('/', (req, res) => {
     // Auto-log to site diary when task is linked to a project on creation
     if (jobId) {
       try {
+        const ownerName = b.owner_id ? (db.prepare('SELECT full_name FROM users WHERE id = ?').get(b.owner_id) || {}).full_name || '' : '';
         autoLogDiary(db, {
           jobId,
-          summary: `[${req.session.user ? req.session.user.full_name : 'System'}] Task linked to project: "${b.title}"${b.owner_id ? ' — assigned to ' + (db.prepare('SELECT full_name FROM users WHERE id = ?').get(b.owner_id) || {}).full_name || '' : ''}${b.due_date ? ' (due ' + b.due_date + ')' : ''}.`,
+          category: 'Task Created',
+          summary: `[${req.session.user ? req.session.user.full_name : 'System'}] New task created: "${b.title}"${ownerName ? ' — assigned to ' + ownerName : ''}${b.due_date ? ' (due ' + b.due_date + ')' : ''} [${(b.priority || 'medium').toUpperCase()}].`,
           userId: req.session.user ? req.session.user.id : null
         });
       } catch (e) { console.error('[Tasks] Diary log error on create:', e.message); }
@@ -216,11 +218,36 @@ router.post('/bulk', (req, res) => {
 
   if (action === 'complete') {
     const stmt = db.prepare("UPDATE tasks SET status = 'complete', completed_date = date('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-    allowedIds.forEach(id => stmt.run(id));
+    allowedIds.forEach(id => {
+      const t = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+      stmt.run(id);
+      // Auto-log to site diary
+      if (t && t.job_id) {
+        logStatusChange(db, {
+          jobId: t.job_id, entityType: 'task',
+          entityLabel: `Task: ${t.title}`,
+          oldStatus: t.status || 'not_started', newStatus: 'complete',
+          userId: req.session.user ? req.session.user.id : null,
+          userName: req.session.user ? req.session.user.full_name : 'System'
+        });
+      }
+    });
     req.flash('success', allowedIds.length + ' task(s) marked complete.');
   } else if (action === 'delete') {
-    const stmt = db.prepare('DELETE FROM tasks WHERE id = ?');
-    allowedIds.forEach(id => stmt.run(id));
+    const delStmt = db.prepare('DELETE FROM tasks WHERE id = ?');
+    allowedIds.forEach(id => {
+      const t = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+      delStmt.run(id);
+      // Auto-log to site diary
+      if (t && t.job_id) {
+        autoLogDiary(db, {
+          jobId: t.job_id,
+          category: 'Task Deleted',
+          summary: `[${req.session.user ? req.session.user.full_name : 'System'}] Task deleted: "${t.title}".`,
+          userId: req.session.user ? req.session.user.id : null
+        });
+      }
+    });
     req.flash('success', allowedIds.length + ' task(s) deleted.');
   }
   res.redirect('/tasks');
@@ -357,6 +384,7 @@ router.post('/:id', (req, res) => {
       try {
         autoLogDiary(db, {
           jobId: updateJobId,
+          category: 'Task Updated',
           summary: `[${req.session.user ? req.session.user.full_name : 'System'}] Task linked to project: "${b.title}"${b.due_date ? ' (due ' + b.due_date + ')' : ''}.`,
           userId: req.session.user ? req.session.user.id : null
         });
@@ -371,9 +399,12 @@ router.post('/:id', (req, res) => {
         changes.push(`Reassigned to ${newOwner ? newOwner.full_name : 'unassigned'}`);
       }
       if (existingTask.priority !== b.priority) changes.push(`Priority: ${b.priority}`);
+      if (existingTask.title !== b.title) changes.push(`Title renamed to "${b.title}"`);
+      if (existingTask.due_date !== b.due_date) changes.push(`Due date: ${b.due_date || 'removed'}`);
       if (changes.length > 0) {
         autoLogDiary(db, {
           jobId: b.job_id || existingTask.job_id,
+          category: 'Task Updated',
           summary: `[${req.session.user ? req.session.user.full_name : 'System'}] Task updated: ${b.title}. ${changes.join('. ')}.`,
           userId: req.session.user ? req.session.user.id : null
         });
@@ -491,6 +522,17 @@ router.post('/:id/delete', (req, res) => {
     return res.redirect(req.body.return_to || '/tasks');
   }
   db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
+
+  // Auto-log to site diary
+  if (task && task.job_id) {
+    autoLogDiary(db, {
+      jobId: task.job_id,
+      category: 'Task Deleted',
+      summary: `[${req.session.user ? req.session.user.full_name : 'System'}] Task deleted: "${task.title}".`,
+      userId: req.session.user ? req.session.user.id : null
+    });
+  }
+
   req.flash('success', 'Task deleted.');
   res.redirect(req.body.return_to || '/tasks');
 });
