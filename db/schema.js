@@ -4699,6 +4699,13 @@ function runMigrations(db) {
     }
   }
 
+  // Migration 102: Add deleted_at column for soft-delete on employees
+  if (!isMigrationApplied.get(102)) {
+    try { db.exec("ALTER TABLE employees ADD COLUMN deleted_at DATETIME"); } catch (e) { /* column may exist */ }
+    recordMigration.run(102, 'employees_soft_delete');
+    console.log('Migration 102 applied: employees soft delete column');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

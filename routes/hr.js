@@ -169,9 +169,10 @@ router.get('/', requirePermission('hr_dashboard'), (req, res) => {
 // ============================================
 router.get('/roster', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
-  const { employment_type, status, level, search, sort, order, payment_type } = req.query;
+  const { employment_type, status, level, search, sort, order, payment_type, view } = req.query;
+  const showDeleted = view === 'deleted';
 
-  let where = '1=1';
+  let where = showDeleted ? 'e.deleted_at IS NOT NULL' : 'e.deleted_at IS NULL';
   const params = [];
   if (payment_type) { where += ' AND e.payment_type = ?'; params.push(payment_type); }
   if (employment_type) { where += ' AND e.employment_type = ?'; params.push(employment_type); }
@@ -179,8 +180,8 @@ router.get('/roster', requirePermission('hr_employees'), (req, res) => {
   if (level) { where += ' AND (e.traffic_role_level = ? OR e.role_title = ?)'; params.push(level, level); }
   if (search) { where += ' AND (e.full_name LIKE ? OR e.employee_code LIKE ? OR e.email LIKE ? OR e.phone LIKE ?)'; const s = `%${search}%`; params.push(s, s, s, s); }
 
-  const sortCol = { full_name: 'e.full_name', employee_code: 'e.employee_code', start_date: 'e.start_date', status: 'e.employment_status' }[sort] || 'e.full_name';
-  const sortOrder = order === 'desc' ? 'DESC' : 'ASC';
+  const sortCol = { full_name: 'e.full_name', employee_code: 'e.employee_code', start_date: 'e.start_date', status: 'e.employment_status', deleted_at: 'e.deleted_at' }[sort] || (showDeleted ? 'e.deleted_at' : 'e.full_name');
+  const sortOrder = order === 'desc' ? 'DESC' : (showDeleted && !sort ? 'DESC' : 'ASC');
 
   const employees = db.prepare(`
     SELECT e.*, m.full_name as manager_name,
@@ -197,27 +198,30 @@ router.get('/roster', requirePermission('hr_employees'), (req, res) => {
     emp.readiness = computeReadiness(emp, comps, docs);
   });
 
-  // Stats
-  const totalActive = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'active'").get().c;
-  const totalDeactivated = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status IN ('inactive', 'deactivated')").get().c;
-  const totalOnLeave = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'on_leave'").get().c;
-  const totalTerminated = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status IN ('terminated', 'offboarded')").get().c;
-  const totalCash = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'cash' AND active = 1").get().c;
-  const totalTfn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'tfn' AND active = 1").get().c;
-  const totalAbn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'abn' AND active = 1").get().c;
+  // Stats (all exclude deleted except totalDeleted)
+  const totalActive = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'active' AND deleted_at IS NULL").get().c;
+  const totalDeactivated = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status IN ('inactive', 'deactivated') AND deleted_at IS NULL").get().c;
+  const totalOnLeave = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'on_leave' AND deleted_at IS NULL").get().c;
+  const totalTerminated = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status IN ('terminated', 'offboarded') AND deleted_at IS NULL").get().c;
+  const totalCash = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'cash' AND active = 1 AND deleted_at IS NULL").get().c;
+  const totalTfn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'tfn' AND active = 1 AND deleted_at IS NULL").get().c;
+  const totalAbn = db.prepare("SELECT COUNT(*) as c FROM employees WHERE payment_type = 'abn' AND active = 1 AND deleted_at IS NULL").get().c;
+  const totalActiveAll = db.prepare("SELECT COUNT(*) as c FROM employees WHERE deleted_at IS NULL").get().c;
+  const totalDeleted = db.prepare("SELECT COUNT(*) as c FROM employees WHERE deleted_at IS NOT NULL").get().c;
 
   res.render('hr/roster', {
     title: 'Roster',
     currentPage: 'hr-roster',
     employees,
-    stats: { totalActive, totalDeactivated, totalOnLeave, totalTerminated, totalCash, totalTfn, totalAbn },
-    filters: { employment_type, status, level, search, sort, order, payment_type },
+    stats: { totalActive, totalDeactivated, totalOnLeave, totalTerminated, totalCash, totalTfn, totalAbn, totalActiveAll, totalDeleted },
+    filters: { employment_type, status, level, search, sort, order, payment_type, view },
+    showDeleted,
     user: req.session.user
   });
 });
 
 // ============================================
-// ROSTER BULK DELETE
+// ROSTER BULK SOFT-DELETE (move to Deleted tab)
 // ============================================
 router.post('/roster/delete', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
@@ -229,23 +233,51 @@ router.post('/roster/delete', requirePermission('hr_employees'), (req, res) => {
 
   const placeholders = ids.map(() => '?').join(',');
   try {
-    const docs = db.prepare(`SELECT file_path FROM employee_documents WHERE employee_id IN (${placeholders})`).all(...ids);
-    for (const doc of docs) { if (doc.file_path) { try { fs.unlinkSync(doc.file_path); } catch (e) { /* ignore */ } } }
-    db.prepare(`DELETE FROM employee_competencies WHERE employee_id IN (${placeholders})`).run(...ids);
-    db.prepare(`DELETE FROM employee_documents WHERE employee_id IN (${placeholders})`).run(...ids);
-    db.prepare(`DELETE FROM employee_leave WHERE employee_id IN (${placeholders})`).run(...ids);
-    db.prepare(`UPDATE employees SET manager_id = NULL WHERE manager_id IN (${placeholders})`).run(...ids);
-    db.prepare(`DELETE FROM employees WHERE id IN (${placeholders})`).run(...ids);
-    for (const id of ids) {
-      const dir = path.join(UPLOAD_BASE, `emp_${id}`);
-      if (fs.existsSync(dir)) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* ignore */ } }
+    // Deactivate linked login users BEFORE soft-deleting the employees
+    const linkedUsers = db.prepare(`SELECT linked_user_id FROM employees WHERE id IN (${placeholders}) AND linked_user_id IS NOT NULL`).all(...ids);
+    const userIds = linkedUsers.map(r => r.linked_user_id).filter(Boolean);
+    if (userIds.length > 0) {
+      const userPlaceholders = userIds.map(() => '?').join(',');
+      db.prepare(`UPDATE users SET active = 0 WHERE id IN (${userPlaceholders})`).run(...userIds);
     }
-    req.flash('success', `${ids.length} employee(s) deleted.`);
+    // Soft-delete employees — preserve all related records for restore
+    db.prepare(`UPDATE employees SET deleted_at = CURRENT_TIMESTAMP, active = 0, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`).run(...ids);
+    req.flash('success', `${ids.length} employee(s) moved to Deleted.`);
   } catch (err) {
-    console.error('Roster bulk delete error:', err);
+    console.error('Roster bulk soft-delete error:', err);
     req.flash('error', 'Error deleting employees: ' + err.message);
   }
   res.redirect('/hr/roster');
+});
+
+// ============================================
+// ROSTER BULK RESTORE (from Deleted tab)
+// ============================================
+router.post('/roster/restore', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  let ids = req.body.ids;
+  if (!ids) { req.flash('error', 'No employees selected.'); return res.redirect('/hr/roster?view=deleted'); }
+  if (!Array.isArray(ids)) ids = [ids];
+  ids = ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+  if (ids.length === 0) { req.flash('error', 'No valid employees selected.'); return res.redirect('/hr/roster?view=deleted'); }
+
+  const placeholders = ids.map(() => '?').join(',');
+  try {
+    // Reactivate linked login users
+    const linkedUsers = db.prepare(`SELECT linked_user_id FROM employees WHERE id IN (${placeholders}) AND linked_user_id IS NOT NULL`).all(...ids);
+    const userIds = linkedUsers.map(r => r.linked_user_id).filter(Boolean);
+    if (userIds.length > 0) {
+      const userPlaceholders = userIds.map(() => '?').join(',');
+      db.prepare(`UPDATE users SET active = 1 WHERE id IN (${userPlaceholders})`).run(...userIds);
+    }
+    // Restore employees — clear deleted_at, reactivate, set status back to active
+    db.prepare(`UPDATE employees SET deleted_at = NULL, active = 1, employment_status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`).run(...ids);
+    req.flash('success', `${ids.length} employee(s) restored.`);
+  } catch (err) {
+    console.error('Roster bulk restore error:', err);
+    req.flash('error', 'Error restoring employees: ' + err.message);
+  }
+  res.redirect('/hr/roster?view=deleted');
 });
 
 // ============================================
