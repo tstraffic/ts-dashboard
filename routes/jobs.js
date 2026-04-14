@@ -337,9 +337,10 @@ router.get('/:id', (req, res) => {
   let chatMembers = [];
   try { chatMembers = db.prepare('SELECT u.id, u.full_name, u.role FROM chat_thread_members ctm JOIN users u ON ctm.user_id = u.id WHERE ctm.thread_id = ? AND u.active = 1 ORDER BY u.full_name').all(chatThreadId); } catch(e) {}
 
-  // Final plans = approved compliance items with their uploaded documents (for operations view)
+  // Final plans = approved compliance items + traffic_plans marked as final (for operations view)
   let finalPlans = [];
   let finalPlanDocs = [];
+  let finalTrafficPlans = [];
   try {
     finalPlans = db.prepare(`
       SELECT c.*, u.full_name as approver_name, d.full_name as designer_name
@@ -358,6 +359,15 @@ router.get('/:id', (req, res) => {
         ORDER BY cd.created_at DESC
       `).all(job.id);
     }
+    // Also include traffic_plans marked as final
+    finalTrafficPlans = db.prepare(`
+      SELECT tp.*, u.full_name as created_by_name, mf.full_name as marked_final_by_name
+      FROM traffic_plans tp
+      LEFT JOIN users u ON tp.created_by_id = u.id
+      LEFT JOIN users mf ON tp.marked_final_by = mf.id
+      WHERE tp.job_id = ? AND tp.is_final = 1
+      ORDER BY tp.marked_final_at DESC
+    `).all(job.id);
   } catch(e) {}
 
   // Plan flags for this job
@@ -378,7 +388,7 @@ router.get('/:id', (req, res) => {
     complianceCosts, equipmentCosts,
     equipmentAssignments, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
     complianceTgsItems, allUsers, diaryAttachments, chatMembers,
-    finalPlans, finalPlanDocs, planFlags, planRevisions, viewMode,
+    finalPlans, finalPlanDocs, finalTrafficPlans, planFlags, planRevisions, viewMode,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });

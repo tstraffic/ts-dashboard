@@ -117,6 +117,7 @@ router.post('/quick-upload', upload.single('plan_file'), (req, res) => {
   const b = req.body;
   const jobId = b.job_id;
   const markFinal = b.mark_final === '1';
+  const isClientProvided = b.client_provided === '1';
 
   if (!jobId) {
     return res.status(400).json({ error: 'Job ID is required.' });
@@ -149,29 +150,32 @@ router.post('/quick-upload', upload.single('plan_file'), (req, res) => {
 
     const filePath = req.file.path.replace(/\\/g, '/');
     const fileOriginalName = req.file.originalname;
+    // Use filename (without extension) as the plan title
+    const fileTitle = req.file.originalname.replace(/\.[^.]+$/, '');
     const status = markFinal ? 'approved' : 'draft';
+    const designer = isClientProvided ? 'Client Provided' : '';
 
     const result = db.prepare(`
       INSERT INTO traffic_plans (job_id, plan_number, plan_type, plan_types, designer, status, file_path, file_original_name, is_final, marked_final_at, marked_final_by, notes, created_by_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      jobId, planNumber, planType, planType, '',
+      jobId, planNumber, planType, planType, designer,
       status, filePath, fileOriginalName,
       markFinal ? 1 : 0,
       markFinal ? new Date().toISOString() : null,
       markFinal ? req.session.user.id : null,
-      b.notes || `Uploaded: ${fileOriginalName}`,
+      fileTitle,
       req.session.user.id
     );
 
     autoLogDiary(db, {
       jobId,
       category: markFinal ? 'Final Plan Uploaded' : 'Traffic Plan Uploaded',
-      summary: `[${req.session.user.full_name}] Uploaded ${planType}: ${fileOriginalName} → ${planNumber}${markFinal ? ' (marked FINAL)' : ''}.`,
+      summary: `[${req.session.user.full_name}] Uploaded ${planType}: ${fileOriginalName}${isClientProvided ? ' (client provided)' : ''}${markFinal ? ' → FINAL' : ''}.`,
       userId: req.session.user.id
     });
 
-    res.json({ success: true, planNumber, planId: result.lastInsertRowid, isFinal: markFinal });
+    res.json({ success: true, planNumber, planId: result.lastInsertRowid, isFinal: markFinal, title: fileTitle });
   } catch (err) {
     console.error('[Plans] Quick upload error:', err.message);
     res.status(500).json({ error: 'Upload failed: ' + err.message });
