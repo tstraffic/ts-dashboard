@@ -326,9 +326,13 @@ router.post('/api/threads/:threadId/messages', requireThreadMember, (req, res) =
     `);
     for (const member of members) {
       if (mentionedSet.has(member.user_id)) continue;
-      try { insertNotif.run(member.user_id, notifTitle, notifMessage, chatLink, member.user_id, notifTitle); } catch(e) {}
+      try { insertNotif.run(member.user_id, notifTitle, notifMessage, chatLink, member.user_id, notifTitle); } catch(e) {
+        console.error('[Chat Notif] Error inserting notification for user', member.user_id, ':', e.message);
+      }
     }
-  } catch(e) { /* notifications are best-effort */ }
+  } catch(e) {
+    console.error('[Chat Notif] Error in notification block:', e.message || e);
+  }
 
   // Audit log
   logActivity({
@@ -375,10 +379,12 @@ router.post('/api/threads/:threadId/messages', requireThreadMember, (req, res) =
         body: thread.thread_type === 'dm' ? preview : `${senderName}: ${preview}`,
         url: pushUrl,
         type: 'chat'
-      }).catch(() => {}); // Silently ignore push errors
+      }).catch(err => {
+        console.error('[Chat Push] Error sending to user', member.user_id, ':', err.message || err);
+      });
     }
   } catch (e) {
-    // Push is best-effort, don't fail the message send
+    console.error('[Chat Push] Error in push notification block:', e.message || e);
   }
 
   // Return the created message with sender info
