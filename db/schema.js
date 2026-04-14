@@ -4828,6 +4828,43 @@ function runMigrations(db) {
     console.log('Migration 106 applied: renumbered ' + allJobs106.length + ' jobs to J-XXXX format, sequence at ' + idx106);
   }
 
+  // =============================================
+  // Migration 107: Fix old diary categories — reclassify task entries
+  // =============================================
+  if (!isMigrationApplied.get(107)) {
+    console.log('Running migration 107: Fix old diary entry categories');
+
+    // Reclassify entries that say "Plans & Approvals Update" but are clearly task-related
+    // Pattern: outcomes starts with "Task:" (from logStatusChange) or contains "Task linked" / "Task created" / "Task updated" / "Task deleted"
+    const taskStatusEntries = db.prepare(`
+      UPDATE site_diary_entries SET task = 'Task Status Change'
+      WHERE task = 'Plans & Approvals Update'
+        AND (outcomes LIKE 'Task:%' OR outcomes LIKE '%Task:%→%')
+    `).run();
+
+    const taskLinkedEntries = db.prepare(`
+      UPDATE site_diary_entries SET task = 'Task Created'
+      WHERE task = 'Plans & Approvals Update'
+        AND (outcomes LIKE '%Task linked to project%' OR outcomes LIKE '%New task created%')
+    `).run();
+
+    const taskUpdatedEntries = db.prepare(`
+      UPDATE site_diary_entries SET task = 'Task Updated'
+      WHERE task = 'Plans & Approvals Update'
+        AND outcomes LIKE '%Task updated:%'
+    `).run();
+
+    const taskDeletedEntries = db.prepare(`
+      UPDATE site_diary_entries SET task = 'Task Deleted'
+      WHERE task = 'Plans & Approvals Update'
+        AND outcomes LIKE '%Task deleted:%'
+    `).run();
+
+    const total = taskStatusEntries.changes + taskLinkedEntries.changes + taskUpdatedEntries.changes + taskDeletedEntries.changes;
+    recordMigration.run(107, 'Fix old diary categories for task entries');
+    console.log('Migration 107 applied: reclassified ' + total + ' diary entries');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
