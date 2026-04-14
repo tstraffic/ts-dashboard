@@ -111,6 +111,73 @@ router.post('/', upload.single('plan_file'), (req, res) => {
   }
 });
 
+// ─── QUICK UPLOAD (drag-drop from job page) ─────
+router.post('/quick-upload', upload.single('plan_file'), (req, res) => {
+  const db = getDb();
+  const b = req.body;
+  const jobId = b.job_id;
+  const markFinal = b.mark_final === '1';
+
+  if (!jobId) {
+    return res.status(400).json({ error: 'Job ID is required.' });
+  }
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded.' });
+  }
+
+  try {
+    // Get job info for plan number generation
+    const job = db.prepare('SELECT job_number FROM jobs WHERE id = ?').get(jobId);
+    let jobSeq = '0000';
+    if (job && job.job_number) {
+      const seqMatch = job.job_number.match(/J-(\d+)/);
+      if (seqMatch) jobSeq = seqMatch[1];
+      else jobSeq = job.job_number.replace(/[^0-9]/g, '').padStart(4, '0').slice(-4);
+    }
+
+    // Determine type from filename or default to TGS
+    const fileName = req.file.originalname.toLowerCase();
+    let planType = 'TGS';
+    if (fileName.includes('tmp')) planType = 'TMP';
+    else if (fileName.includes('tcp')) planType = 'TCP';
+    else if (fileName.includes('rol')) planType = 'ROL';
+
+    const codePrefix = planType === 'TMP' ? 'TSTMP' : 'TSTGS';
+    const existingCount = db.prepare('SELECT COUNT(*) as cnt FROM traffic_plans WHERE job_id = ? AND plan_number LIKE ?')
+      .get(jobId, `${codePrefix}-${jobSeq}-%`).cnt;
+    const planNumber = `${codePrefix}-${jobSeq}-${String(existingCount + 1).padStart(2, '0')}`;
+
+    const filePath = req.file.path.replace(/\\/g, '/');
+    const fileOriginalName = req.file.originalname;
+    const status = markFinal ? 'approved' : 'draft';
+
+    const result = db.prepare(`
+      INSERT INTO traffic_plans (job_id, plan_number, plan_type, plan_types, designer, status, file_path, file_original_name, is_final, marked_final_at, marked_final_by, notes, created_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      jobId, planNumber, planType, planType, '',
+      status, filePath, fileOriginalName,
+      markFinal ? 1 : 0,
+      markFinal ? new Date().toISOString() : null,
+      markFinal ? req.session.user.id : null,
+      b.notes || `Uploaded: ${fileOriginalName}`,
+      req.session.user.id
+    );
+
+    autoLogDiary(db, {
+      jobId,
+      category: markFinal ? 'Final Plan Uploaded' : 'Traffic Plan Uploaded',
+      summary: `[${req.session.user.full_name}] Uploaded ${planType}: ${fileOriginalName} → ${planNumber}${markFinal ? ' (marked FINAL)' : ''}.`,
+      userId: req.session.user.id
+    });
+
+    res.json({ success: true, planNumber, planId: result.lastInsertRowid, isFinal: markFinal });
+  } catch (err) {
+    console.error('[Plans] Quick upload error:', err.message);
+    res.status(500).json({ error: 'Upload failed: ' + err.message });
+  }
+});
+
 // Edit plan form
 router.get('/:id/edit', (req, res) => {
   const db = getDb();
