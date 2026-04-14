@@ -50,7 +50,7 @@ router.get('/', (req, res) => {
   if (urgency.overdueTasks > 0) actionItems.push({ icon: 'task', color: 'red', text: `${urgency.overdueTasks} overdue task${urgency.overdueTasks !== 1 ? 's' : ''}`, link: '/tasks' });
   if (urgency.overdueCompliance > 0) actionItems.push({ icon: 'shield', color: 'red', text: `${urgency.overdueCompliance} overdue compliance item${urgency.overdueCompliance !== 1 ? 's' : ''}`, link: '/compliance' });
   if (urgency.openIncidents > 0) actionItems.push({ icon: 'alert', color: 'red', text: `${urgency.openIncidents} open incident${urgency.openIncidents !== 1 ? 's' : ''}`, link: '/incidents' });
-  if (urgency.missingUpdates > 0) actionItems.push({ icon: 'update', color: 'orange', text: `${urgency.missingUpdates} job${urgency.missingUpdates !== 1 ? 's' : ''} missing weekly update`, link: '/updates' });
+  if (urgency.missingUpdates > 0) actionItems.push({ icon: 'update', color: 'orange', text: `${urgency.missingUpdates} job${urgency.missingUpdates !== 1 ? 's' : ''} missing weekly update`, link: '/jobs?status=active' });
   if (urgency.unconfirmedAllocations > 0) actionItems.push({ icon: 'crew', color: 'orange', text: `${urgency.unconfirmedAllocations} unconfirmed allocation${urgency.unconfirmedAllocations !== 1 ? 's' : ''} today`, link: '/allocations' });
   if (urgency.ticketsExpiring > 0) actionItems.push({ icon: 'ticket', color: 'orange', text: `${urgency.ticketsExpiring} crew ticket${urgency.ticketsExpiring !== 1 ? 's' : ''} expiring soon`, link: '/crew' });
   if (urgency.openDefects > 0) actionItems.push({ icon: 'defect', color: 'orange', text: `${urgency.openDefects} open defect${urgency.openDefects !== 1 ? 's' : ''}`, link: '/defects' });
