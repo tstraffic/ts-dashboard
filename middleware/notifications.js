@@ -111,7 +111,7 @@ function generateNotifications() {
 
     for (const j of missingUpdates) {
       const title = 'Missing Update: ' + j.job_number;
-      insertAndTrack(j.project_manager_id, 'missing_update', title, j.job_number + ' has no update in the last 7 days.', '/updates/new?job_id=' + j.id, j.id);
+      insertAndTrack(j.project_manager_id, 'missing_update', title, j.job_number + ' has no update in the last 7 days.', '/jobs/' + j.id + '#diary', j.id);
     }
 
     // 4. Overdue corrective actions
@@ -363,4 +363,109 @@ function sendDailyDigests() {
   }
 }
 
-module.exports = { notificationCountMiddleware, generateNotifications, sendDailyDigests };
+/**
+ * Generate weekly job summaries from site diary entries.
+ * Runs once per week (Monday 7:15-7:29 AM window).
+ * For each active job with diary entries in the past 7 days, creates a summary
+ * and notifies Taj and Saadat.
+ */
+function generateWeeklySummaries() {
+  try {
+    const db = getDb();
+    const today = new Date().toISOString().split('T')[0];
+    const last7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+
+    // Check if we already ran this week (prevent duplicate runs)
+    const lastRun = db.prepare("SELECT value FROM system_config WHERE key = 'last_weekly_summary_date'").get();
+    if (lastRun && lastRun.value === today) return;
+
+    // Get all active jobs with diary entries in the past 7 days
+    const jobsWithEntries = db.prepare(`
+      SELECT j.id, j.job_number, j.client, j.project_name, j.site_address, j.suburb,
+        u_pm.full_name as pm_name
+      FROM jobs j
+      LEFT JOIN users u_pm ON j.project_manager_id = u_pm.id
+      WHERE j.status = 'active'
+      AND j.id IN (SELECT DISTINCT job_id FROM site_diary_entries WHERE entry_date >= ?)
+      ORDER BY j.job_number
+    `).all(last7);
+
+    if (jobsWithEntries.length === 0) {
+      // Mark as run even if no entries
+      db.prepare("INSERT OR REPLACE INTO system_config (key, value) VALUES ('last_weekly_summary_date', ?)").run(today);
+      return;
+    }
+
+    // Build summary for each job
+    const summaries = [];
+    for (const job of jobsWithEntries) {
+      const entries = db.prepare(`
+        SELECT sd.entry_date, sd.task, sd.outcomes, sd.issues, sd.comments,
+          u.full_name as created_by_name
+        FROM site_diary_entries sd
+        LEFT JOIN users u ON sd.created_by_id = u.id
+        WHERE sd.job_id = ? AND sd.entry_date >= ?
+        ORDER BY sd.entry_date DESC
+      `).all(job.id, last7);
+
+      const entryCount = entries.length;
+      const categories = [...new Set(entries.map(e => e.task).filter(Boolean))];
+      const issues = entries.map(e => e.issues).filter(Boolean);
+      const outcomes = entries.map(e => e.outcomes).filter(Boolean);
+
+      // Build a concise summary
+      let summary = `${job.job_number} — ${job.project_name || job.client}`;
+      summary += ` | ${entryCount} diary entr${entryCount === 1 ? 'y' : 'ies'} this week`;
+      if (categories.length > 0) summary += ` | Categories: ${categories.slice(0, 5).join(', ')}`;
+      if (issues.length > 0) summary += ` | ⚠ ${issues.length} issue${issues.length !== 1 ? 's' : ''} reported`;
+
+      summaries.push({ job, entryCount, categories, issues, outcomes, summary });
+    }
+
+    // Build the combined notification message
+    const totalEntries = summaries.reduce((sum, s) => sum + s.entryCount, 0);
+    const jobsWithIssues = summaries.filter(s => s.issues.length > 0);
+
+    const title = `Weekly Summary: ${summaries.length} job${summaries.length !== 1 ? 's' : ''} active this week`;
+
+    let message = `${totalEntries} diary entries across ${summaries.length} jobs.`;
+    if (jobsWithIssues.length > 0) {
+      message += ` Issues flagged on: ${jobsWithIssues.map(s => s.job.job_number).join(', ')}.`;
+    }
+    // Add per-job summary lines (max 10)
+    message += '\n\n' + summaries.slice(0, 10).map(s => s.summary).join('\n');
+    if (summaries.length > 10) message += `\n... and ${summaries.length - 10} more jobs`;
+
+    // Notify Taj and Saadat specifically (by username)
+    const notifyUsers = db.prepare("SELECT id, full_name, email FROM users WHERE username IN ('taj', 'saadat') AND active = 1").all();
+
+    const insertNotif = db.prepare(`
+      INSERT INTO notifications (user_id, type, title, message, link, job_id)
+      VALUES (?, 'weekly_summary', ?, ?, '/dashboard', NULL)
+    `);
+
+    for (const user of notifyUsers) {
+      try {
+        insertNotif.run(user.id, title, message);
+        // Send email immediately
+        if (user.email) {
+          const html = notificationEmail(user.full_name, title, message.replace(/\n/g, '<br>'), '/dashboard');
+          sendEmail(user.email, title, html).catch(() => {});
+        }
+        // Send push notification
+        sendPushForNotifications(db, [{ userId: user.id, title, message: message.split('\n')[0], link: '/dashboard' }]);
+      } catch (e) {
+        console.error(`[WeeklySummary] Error notifying ${user.full_name}:`, e.message);
+      }
+    }
+
+    // Mark as run
+    db.prepare("INSERT OR REPLACE INTO system_config (key, value) VALUES ('last_weekly_summary_date', ?)").run(today);
+
+    console.log(`[WeeklySummary] Generated for ${summaries.length} jobs, notified ${notifyUsers.length} users.`);
+  } catch (err) {
+    console.error('[WeeklySummary] Error:', err.message);
+  }
+}
+
+module.exports = { notificationCountMiddleware, generateNotifications, sendDailyDigests, generateWeeklySummaries };

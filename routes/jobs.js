@@ -614,6 +614,8 @@ router.post('/:id/diary', diaryUpload.array('attachments', 5), (req, res) => {
     if (b.sharepoint_link && b.sharepoint_link.trim()) {
       db.prepare('INSERT INTO site_diary_attachments (diary_entry_id, sharepoint_link) VALUES (?, ?)').run(entryId, b.sharepoint_link.trim());
     }
+    // Update job's last_update_date so "missing weekly update" stays accurate
+    try { db.prepare('UPDATE jobs SET last_update_date = ? WHERE id = ?').run(new Date().toISOString().split('T')[0], req.params.id); } catch (e) { /* ignore */ }
     req.flash('success', 'Diary entry added.');
   } catch (err) {
     console.error('[Diary] CREATE ERROR:', err.message);

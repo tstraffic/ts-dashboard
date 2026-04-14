@@ -9,7 +9,7 @@ const path = require('path');
 const { initializeDatabase } = require('./db/schema');
 const { requireLogin, requirePermission, canAccess } = require('./middleware/auth');
 const { requireWorker, blockWorkerFromAdmin, workerLocals } = require('./middleware/workerAuth');
-const { notificationCountMiddleware, generateNotifications, sendDailyDigests } = require('./middleware/notifications');
+const { notificationCountMiddleware, generateNotifications, sendDailyDigests, generateWeeklySummaries } = require('./middleware/notifications');
 const { settingsMiddleware } = require('./middleware/settings');
 const { sidebarBadges } = require('./middleware/sidebarBadges');
 const { chatUnreadCountMiddleware } = require('./middleware/chat');
@@ -297,6 +297,15 @@ app.listen(PORT, () => {
     if (now.getHours() === 7 && now.getMinutes() < 15) {
       console.log('Sending daily digest emails...');
       sendDailyDigests();
+    }
+  }, 15 * 60 * 1000);
+
+  // Weekly job summaries — Monday 7:15-7:29 AM, summarise diary entries and notify Taj + Saadat
+  setInterval(() => {
+    const now = new Date();
+    if (now.getDay() === 1 && now.getHours() === 7 && now.getMinutes() >= 15 && now.getMinutes() < 30) {
+      console.log('Generating weekly job summaries...');
+      generateWeeklySummaries();
     }
   }, 15 * 60 * 1000);
 });
