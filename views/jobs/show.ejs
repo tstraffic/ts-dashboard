@@ -675,6 +675,129 @@
         </div>
       </form>
     </div>
+    <!-- Drag & Drop Upload Zone -->
+    <div id="plan-drop-zone" class="relative border-2 border-dashed border-gray-300 rounded-xl p-6 mb-4 text-center transition-all duration-200 hover:border-brand-400 hover:bg-brand-50/30 cursor-pointer"
+      ondragover="event.preventDefault(); this.classList.add('border-brand-500','bg-brand-50')"
+      ondragleave="this.classList.remove('border-brand-500','bg-brand-50')"
+      ondrop="handlePlanDrop(event, this)"
+      onclick="document.getElementById('plan-file-input').click()">
+      <input type="file" id="plan-file-input" accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg" class="hidden" onchange="handlePlanFileSelect(this)">
+      <div id="plan-drop-idle">
+        <svg class="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        <p class="text-sm font-medium text-gray-600">Drop TGS / TMP files here</p>
+        <p class="text-xs text-gray-400 mt-0.5">or click to browse — PDF, DWG, images accepted</p>
+      </div>
+      <div id="plan-drop-uploading" class="hidden">
+        <svg class="w-8 h-8 mx-auto mb-2 text-brand-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        <p class="text-sm font-medium text-brand-600">Uploading...</p>
+      </div>
+    </div>
+    <!-- Upload options (shown after file selected, before upload) -->
+    <div id="plan-upload-confirm" class="hidden bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
+      <div class="flex items-center gap-3 mb-3">
+        <svg class="w-8 h-8 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        <div class="flex-1 min-w-0">
+          <p id="plan-upload-filename" class="text-sm font-medium text-gray-900 truncate"></p>
+          <p id="plan-upload-filesize" class="text-xs text-gray-400"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" id="plan-mark-final" class="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500">
+          <span class="text-sm font-medium text-gray-700">Push to Final Plans</span>
+          <span class="text-xs text-gray-400">(visible to ops)</span>
+        </label>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="cancelPlanUpload()" class="px-3 py-1.5 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>
+          <button type="button" onclick="confirmPlanUpload()" class="px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Upload</button>
+        </div>
+      </div>
+    </div>
+    <script>
+    (function() {
+      let pendingFile = null;
+      const jobId = '<%= job.id %>';
+      const dropZone = document.getElementById('plan-drop-zone');
+      const confirmBox = document.getElementById('plan-upload-confirm');
+      const idleState = document.getElementById('plan-drop-idle');
+      const uploadingState = document.getElementById('plan-drop-uploading');
+
+      window.handlePlanDrop = function(e, el) {
+        e.preventDefault();
+        el.classList.remove('border-brand-500', 'bg-brand-50');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) showConfirm(files[0]);
+      };
+
+      window.handlePlanFileSelect = function(input) {
+        if (input.files.length > 0) showConfirm(input.files[0]);
+        input.value = '';
+      };
+
+      function showConfirm(file) {
+        pendingFile = file;
+        document.getElementById('plan-upload-filename').textContent = file.name;
+        const sizeKB = (file.size / 1024).toFixed(0);
+        document.getElementById('plan-upload-filesize').textContent = sizeKB > 1024 ? (file.size / 1048576).toFixed(1) + ' MB' : sizeKB + ' KB';
+        // Auto-check "Push to Final" if filename contains "final" or "approved"
+        const lname = file.name.toLowerCase();
+        document.getElementById('plan-mark-final').checked = lname.includes('final') || lname.includes('approved');
+        confirmBox.classList.remove('hidden');
+        dropZone.classList.add('hidden');
+      }
+
+      window.cancelPlanUpload = function() {
+        pendingFile = null;
+        confirmBox.classList.add('hidden');
+        dropZone.classList.remove('hidden');
+      };
+
+      window.confirmPlanUpload = function() {
+        if (!pendingFile) return;
+        const markFinal = document.getElementById('plan-mark-final').checked;
+
+        // Show uploading state
+        confirmBox.classList.add('hidden');
+        dropZone.classList.remove('hidden');
+        idleState.classList.add('hidden');
+        uploadingState.classList.remove('hidden');
+
+        const formData = new FormData();
+        formData.append('plan_file', pendingFile);
+        formData.append('job_id', jobId);
+        formData.append('mark_final', markFinal ? '1' : '0');
+
+        fetch('/plans/quick-upload', { method: 'POST', body: formData })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              // Show success toast
+              const toast = document.createElement('div');
+              toast.className = 'fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 text-sm font-medium';
+              toast.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>' +
+                data.planNumber + ' uploaded' + (data.isFinal ? ' → Final Plans' : '');
+              document.body.appendChild(toast);
+              setTimeout(() => toast.remove(), 3000);
+              // Reload to show new plan
+              setTimeout(() => window.location.reload(), 800);
+            } else {
+              alert('Upload failed: ' + (data.error || 'Unknown error'));
+              resetDropZone();
+            }
+          })
+          .catch(err => {
+            alert('Upload failed: ' + err.message);
+            resetDropZone();
+          });
+      };
+
+      function resetDropZone() {
+        pendingFile = null;
+        idleState.classList.remove('hidden');
+        uploadingState.classList.add('hidden');
+      }
+    })();
+    </script>
     <%
       // Combine traffic_plans + compliance items with plan-related types for this tab
       const planTypes = ['traffic_guidance','tmp_approval','spa','rol'];
