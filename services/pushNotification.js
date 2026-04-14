@@ -101,33 +101,48 @@ function removeSubscription(endpoint) {
 /**
  * Send a push notification to a specific user (all their subscribed devices)
  */
-function sendPushToUser(userId, payload) {
-  if (!vapidConfigured) return;
+async function sendPushToUser(userId, payload) {
+  if (!vapidConfigured) {
+    console.log('[Push] VAPID not configured, skipping push for user', userId);
+    return;
+  }
 
   const db = getDb();
   const subscriptions = db.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').all(userId);
 
-  if (subscriptions.length === 0) return;
+  if (subscriptions.length === 0) {
+    console.log('[Push] No subscriptions for user', userId);
+    return;
+  }
 
   const payloadStr = JSON.stringify(payload);
+  console.log('[Push] Sending to user', userId, '(' + subscriptions.length + ' device(s)):', payload.title);
 
+  const results = [];
   for (const sub of subscriptions) {
     const pushSub = {
       endpoint: sub.endpoint,
       keys: { p256dh: sub.p256dh, auth: sub.auth }
     };
 
-    webpush.sendNotification(pushSub, payloadStr)
-      .catch(err => {
-        // 410 Gone or 404 = subscription expired, remove it
-        if (err.statusCode === 410 || err.statusCode === 404) {
-          console.log('[Push] Removing expired subscription:', sub.endpoint.substring(0, 50));
-          removeSubscription(sub.endpoint);
-        } else {
-          console.error('[Push] Send error:', err.statusCode || err.message);
-        }
-      });
+    results.push(
+      webpush.sendNotification(pushSub, payloadStr)
+        .then(() => {
+          console.log('[Push] Sent to user', userId, 'device:', sub.endpoint.substring(0, 50));
+        })
+        .catch(err => {
+          // 410 Gone or 404 = subscription expired, remove it
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            console.log('[Push] Removing expired subscription:', sub.endpoint.substring(0, 50));
+            removeSubscription(sub.endpoint);
+          } else {
+            console.error('[Push] Send error for user', userId, ':', err.statusCode || err.message);
+          }
+        })
+    );
   }
+
+  return Promise.allSettled(results);
 }
 
 /**
