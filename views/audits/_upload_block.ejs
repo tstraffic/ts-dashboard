@@ -33,11 +33,11 @@ const useCapture = accept && accept.indexOf('pdf') === -1 && accept.indexOf('doc
     <% _items.forEach(function(att) { const isImg = (att.mime_type || '').startsWith('image/'); %>
       <div class="group relative bg-gray-50 border border-gray-200 rounded-lg overflow-hidden" data-att-id="<%= att.id %>">
         <% if (isImg) { %>
-          <a href="<%= att.file_path %>" target="_blank">
+          <a href="<%= att.file_path %>" data-lightbox data-lightbox-name="<%= att.original_name %>" data-lightbox-mime="<%= att.mime_type %>">
             <img src="<%= att.file_path %>" alt="<%= att.original_name %>" class="w-full h-20 sm:h-24 object-cover">
           </a>
         <% } else { %>
-          <a href="<%= att.file_path %>" target="_blank" class="flex items-center justify-center h-20 sm:h-24 bg-gray-100 text-xs text-gray-500 px-2 text-center break-words"><%= att.original_name %></a>
+          <a href="<%= att.file_path %>" data-lightbox data-lightbox-name="<%= att.original_name %>" data-lightbox-mime="<%= att.mime_type %>" class="flex items-center justify-center h-20 sm:h-24 bg-gray-100 text-xs text-gray-500 px-2 text-center break-words"><%= att.original_name %></a>
         <% } %>
         <% if (att.caption) { %><p class="text-[10px] text-gray-600 truncate px-1.5 py-1 bg-white border-t border-gray-100"><%= att.caption %></p><% } %>
         <button type="button" class="upl-delete absolute top-1 right-1 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-bold opacity-80 sm:opacity-0 group-hover:opacity-100 focus:opacity-100 transition" title="Delete" data-att-id="<%= att.id %>">×</button>

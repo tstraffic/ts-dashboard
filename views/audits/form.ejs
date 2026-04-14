@@ -541,9 +541,11 @@
     const div = document.createElement('div');
     div.className = 'group relative bg-gray-50 border border-gray-200 rounded-lg overflow-hidden';
     div.setAttribute('data-att-id', att.id);
+    const eName = (att.original_name || 'file').replace(/"/g, '&quot;');
+    const eMime = (att.mime_type || '').replace(/"/g, '&quot;');
     const thumb = isImg
-      ? '<a href="' + att.file_path + '" target="_blank"><img src="' + att.file_path + '" class="w-full h-20 sm:h-24 object-cover"></a>'
-      : '<a href="' + att.file_path + '" target="_blank" class="flex items-center justify-center h-20 sm:h-24 bg-gray-100 text-xs text-gray-500 px-2 text-center break-words">' + (att.original_name || 'file') + '</a>';
+      ? '<a href="' + att.file_path + '" data-lightbox data-lightbox-name="' + eName + '" data-lightbox-mime="' + eMime + '"><img src="' + att.file_path + '" class="w-full h-20 sm:h-24 object-cover"></a>'
+      : '<a href="' + att.file_path + '" data-lightbox data-lightbox-name="' + eName + '" data-lightbox-mime="' + eMime + '" class="flex items-center justify-center h-20 sm:h-24 bg-gray-100 text-xs text-gray-500 px-2 text-center break-words">' + (att.original_name || 'file') + '</a>';
     const caption = att.caption ? '<p class="text-[10px] text-gray-600 truncate px-1.5 py-1 bg-white border-t border-gray-100">' + att.caption + '</p>' : '';
     div.innerHTML = thumb + caption + '<button type="button" class="upl-delete absolute top-1 right-1 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-bold opacity-80 sm:opacity-0 group-hover:opacity-100 focus:opacity-100 transition" title="Delete" data-att-id="' + att.id + '">×</button>';
     return div;

@@ -8,11 +8,12 @@
   let html = '<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 mt-2">';
   items.forEach(function(att) {
     const isImg = (att.mime_type || '').startsWith('image/');
+    const esc = function(s) { return (s||'').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
     html += '<div class="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">';
     if (isImg) {
-      html += '<a href="' + att.file_path + '" target="_blank"><img src="' + att.file_path + '" alt="' + att.original_name + '" class="w-full h-20 sm:h-24 object-cover"></a>';
+      html += '<a href="' + att.file_path + '" data-lightbox data-lightbox-name="' + esc(att.original_name) + '" data-lightbox-mime="' + esc(att.mime_type) + '"><img src="' + att.file_path + '" alt="' + esc(att.original_name) + '" class="w-full h-20 sm:h-24 object-cover"></a>';
     } else {
-      html += '<a href="' + att.file_path + '" target="_blank" class="flex items-center justify-center h-20 sm:h-24 bg-gray-100 text-gray-400">📄</a>';
+      html += '<a href="' + att.file_path + '" data-lightbox data-lightbox-name="' + esc(att.original_name) + '" data-lightbox-mime="' + esc(att.mime_type) + '" class="flex items-center justify-center h-20 sm:h-24 bg-gray-100 text-gray-400">📄</a>';
     }
     if (att.caption) html += '<p class="text-[10px] text-gray-600 truncate px-1.5 py-1">' + att.caption + '</p>';
     html += '</div>';
@@ -198,11 +199,11 @@
         <% _generalAtts.forEach(function(att) { const isImg = (att.mime_type || '').startsWith('image/'); %>
           <div class="group relative bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
             <% if (isImg) { %>
-              <a href="<%= att.file_path %>" target="_blank">
+              <a href="<%= att.file_path %>" data-lightbox data-lightbox-name="<%= att.original_name %>" data-lightbox-mime="<%= att.mime_type %>">
                 <img src="<%= att.file_path %>" alt="<%= att.original_name %>" class="w-full h-32 object-cover">
               </a>
             <% } else { %>
-              <a href="<%= att.file_path %>" target="_blank" class="flex items-center justify-center h-32 bg-gray-100">
+              <a href="<%= att.file_path %>" data-lightbox data-lightbox-name="<%= att.original_name %>" data-lightbox-mime="<%= att.mime_type %>" class="flex items-center justify-center h-32 bg-gray-100">
                 <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
               </a>
             <% } %>
