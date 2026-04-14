@@ -822,7 +822,14 @@
               document.body.appendChild(toast);
               setTimeout(() => toast.remove(), 3000);
               // Reload to show new plan
-              setTimeout(() => window.location.reload(), 800);
+              setTimeout(() => {
+                if (data.isFinal) {
+                  window.location.href = window.location.pathname + '#final-plans';
+                  window.location.reload();
+                } else {
+                  window.location.reload();
+                }
+              }, 800);
             } else {
               alert('Upload failed: ' + (data.error || 'Unknown error'));
               resetDropZone();

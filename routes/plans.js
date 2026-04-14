@@ -178,6 +178,12 @@ router.post('/quick-upload', upload.single('plan_file'), (req, res) => {
       req.session.user.id
     );
 
+    // Explicitly set is_final after insert (safety net — some SQLite versions may not persist default column values on INSERT)
+    if (markFinal && result.lastInsertRowid) {
+      db.prepare('UPDATE traffic_plans SET is_final = 1, marked_final_at = ?, marked_final_by = ?, status = ? WHERE id = ?')
+        .run(new Date().toISOString(), req.session.user.id, 'approved', result.lastInsertRowid);
+    }
+
     autoLogDiary(db, {
       jobId,
       category: markFinal ? 'Final Plan Uploaded' : 'Traffic Plan Uploaded',

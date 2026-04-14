@@ -4896,6 +4896,70 @@ function runMigrations(db) {
     console.log('Migration 108 applied: task_owners table created, migrated ' + migratedCount + ' existing assignments');
   }
 
+  // ─── Migration 109: Generate initial weekly summaries for all jobs with diary entries ───
+  if (!isMigrationApplied.get(109)) {
+    try {
+      // Get all active jobs that have ANY diary entries up to 12/04/2026
+      const jobsWithDiary = db.prepare(`
+        SELECT j.id, j.job_number, j.client, j.project_name,
+          COUNT(sd.id) as entry_count,
+          GROUP_CONCAT(DISTINCT sd.task) as categories,
+          SUM(CASE WHEN sd.issues IS NOT NULL AND sd.issues != '' THEN 1 ELSE 0 END) as issue_count
+        FROM jobs j
+        JOIN site_diary_entries sd ON sd.job_id = j.id
+        WHERE j.status IN ('active','on_hold','won','prestart')
+        AND sd.entry_date <= '2026-04-12'
+        GROUP BY j.id
+        ORDER BY j.job_number
+      `).all();
+
+      if (jobsWithDiary.length > 0) {
+        // Build summary message
+        const totalEntries = jobsWithDiary.reduce((sum, j) => sum + j.entry_count, 0);
+        const jobsWithIssues = jobsWithDiary.filter(j => j.issue_count > 0);
+
+        const title = `Weekly Summary: ${jobsWithDiary.length} job${jobsWithDiary.length !== 1 ? 's' : ''} — All diary entries to date`;
+        let message = `${totalEntries} diary entries across ${jobsWithDiary.length} jobs.`;
+        if (jobsWithIssues.length > 0) {
+          message += ` Issues flagged on: ${jobsWithIssues.map(j => j.job_number).join(', ')}.`;
+        }
+        message += '\n\n';
+        message += jobsWithDiary.map(j => {
+          let line = `${j.job_number} — ${j.project_name || j.client}`;
+          line += ` | ${j.entry_count} diary entr${j.entry_count === 1 ? 'y' : 'ies'}`;
+          if (j.categories) {
+            const cats = j.categories.split(',').filter(Boolean).slice(0, 5);
+            if (cats.length > 0) line += ` | Categories: ${cats.join(', ')}`;
+          }
+          if (j.issue_count > 0) line += ` | ⚠ ${j.issue_count} issue${j.issue_count !== 1 ? 's' : ''}`;
+          return line;
+        }).join('\n');
+
+        // Notify Taj and Saadat
+        const notifyUsers = db.prepare("SELECT id FROM users WHERE username IN ('taj', 'saadat') AND active = 1").all();
+        const insertNotif = db.prepare(`
+          INSERT INTO notifications (user_id, type, title, message, link, job_id)
+          VALUES (?, 'weekly_summary', ?, ?, '/dashboard', NULL)
+        `);
+        for (const u of notifyUsers) {
+          try { insertNotif.run(u.id, title, message); } catch(e) {}
+        }
+        console.log(`Migration 109: Generated initial summary for ${jobsWithDiary.length} jobs, notified ${notifyUsers.length} users`);
+      }
+
+      // Also update last_update_date on all jobs that have diary entries
+      db.prepare(`
+        UPDATE jobs SET last_update_date = (
+          SELECT MAX(entry_date) FROM site_diary_entries WHERE job_id = jobs.id
+        )
+        WHERE id IN (SELECT DISTINCT job_id FROM site_diary_entries)
+      `).run();
+
+    } catch(e) { console.error('Migration 109 error:', e.message); }
+    recordMigration.run(109, 'Generate initial weekly summaries + backfill last_update_date from diary');
+    console.log('Migration 109 applied.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
