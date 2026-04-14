@@ -60,8 +60,27 @@ function buildResponsesFromBody(b) {
       const raw = firstVal(b[`q_${key}_state`]);
       const state = ['yes', 'no', 'na'].includes(raw) ? raw : '';
       const notes = firstTrim(b[`q_${key}_notes`]);
-      if (state || notes) {
-        responses[key] = { state, notes };
+      const entry = {};
+      if (state) entry.state = state;
+      if (notes) entry.notes = notes;
+
+      // Structured NO item fields (Fix 4)
+      if (state === 'no') {
+        const obs = firstTrim(b[`q_${key}_observation`]);
+        const risk = firstTrim(b[`q_${key}_risk_level`]);
+        const corr = firstTrim(b[`q_${key}_corrective_action`]);
+        const resp = firstTrim(b[`q_${key}_responsible`]);
+        const rect = firstVal(b[`q_${key}_rectified`]);
+        if (obs) entry.observation = obs;
+        if (risk) entry.risk_level = risk;
+        if (corr) entry.corrective_action = corr;
+        if (resp) entry.responsible = resp;
+        if (rect === 'yes') entry.rectified_on_site = true;
+        else if (rect === 'no') entry.rectified_on_site = false;
+      }
+
+      if (Object.keys(entry).length > 0) {
+        responses[key] = entry;
       }
     });
   }

@@ -40,11 +40,22 @@ function fmtDateShort(d) {
   try { return new Date(d).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric' }); }
   catch (e) { return String(d); }
 }
+const RED_BADGE = '#C00000';
+const RED_LIGHT = '#FCE4E4';
+const COMMENT_BG = '#F5F5F5';
+const COMMENT_BORDER = '#DDDDDD';
+const BRAND_DARK = '#0F4C99';
+
 function findingLabel(f) {
   if (f === 'pass') return 'PASS';
   if (f === 'pass_with_actions') return 'PASS WITH ACTIONS';
-  if (f === 'fail') return 'FAIL';
+  if (f === 'fail') return 'FAIL — IMMEDIATE RECTIFICATION';
   return (f || '—').toUpperCase();
+}
+function scoreColor(pct) {
+  if (pct >= 90) return GREEN;
+  if (pct >= 70) return AMBER;
+  return RED;
 }
 function findingColor(f) {
   if (f === 'pass') return GREEN;
@@ -176,6 +187,40 @@ function generateAuditPdf(opts, out) {
 
   setY(scoreCardY + scoreCardH + 14);
 
+  // ── FIX 7: Findings Summary on cover page ──
+  var failures = [];
+  AUDIT_SECTIONS.forEach(function (sec) {
+    sec.items.forEach(function (item, idx) {
+      var key = sec.key + '.' + (idx + 1);
+      var r = responses[key] || {};
+      if (normaliseState(r) === 'no') {
+        var short = item.length > 55 ? item.substring(0, 52) + '...' : item;
+        failures.push({ key: key, item: short, section: sec.title });
+      }
+    });
+  });
+  if (failures.length > 0) {
+    var fsH = 16 + failures.length * 10;
+    need(fsH);
+    var fsY = curY();
+    roundRect(ML, fsY, pw, 14, 3, RED_LIGHT);
+    roundRect(ML, fsY, 3, 14, 1, RED);
+    font('Helvetica-Bold', 7, RED);
+    txt(failures.length + ' non-conformance' + (failures.length !== 1 ? 's' : '') + ' identified (see details)', ML + 8, fsY + 3, { width: pw - 16 });
+    setY(fsY + 16);
+    failures.forEach(function (f) {
+      need(10);
+      font('Helvetica-Bold', 6, GRAY_DARK);
+      txt(f.key, ML + 8, curY(), { width: 22 });
+      font('Helvetica', 6, GRAY_DARK);
+      txt(f.item, ML + 32, curY(), { width: pw * 0.48 });
+      font('Helvetica', 5.5, GRAY);
+      txt('(' + f.section + ')', ML + 32 + pw * 0.48 + 4, curY(), { width: pw * 0.3 });
+      gap(10);
+    });
+    gap(4);
+  }
+
   // ── Audit Details Table ──
   const details = [
     ['Project / Site',  a.project_site || '—'],
@@ -256,64 +301,195 @@ function generateAuditPdf(opts, out) {
     txt('ITEM', ML + 62, colHY + 3, { width: pw - 66 });
     setY(colHY + 13);
 
-    // Items
-    section.items.forEach(function (item, idx) {
+    // Collect items with state for N/A collapsing (Fix 5)
+    var items = section.items.map(function (item, idx) {
       var key = section.key + '.' + (idx + 1);
       var r = responses[key] || {};
-      var st = normaliseState(r);
-      var rowH = r.notes ? 20 : 12;
-      need(rowH);
-
-      var iy = curY();
-      // Zebra stripe
-      if (idx % 2 === 0) rect(ML, iy, pw, rowH, GRAY_BG);
-      // Subtle bottom line
-      line(ML, iy + rowH, ML + pw, iy + rowH, '#F3F4F6', 0.3);
-
-      // Status badge
-      var badge, bc, bgc;
-      if (st === 'yes')      { badge = 'YES'; bc = WHITE; bgc = GREEN; }
-      else if (st === 'no')  { badge = 'NO';  bc = WHITE; bgc = RED; }
-      else if (st === 'na')  { badge = 'N/A'; bc = WHITE; bgc = GRAY; }
-      else                   { badge = '—';   bc = GRAY;  bgc = '#E5E7EB'; }
-      roundRect(ML + 4, iy + 2, 28, 9, 2, bgc);
-      font('Helvetica-Bold', 5.5, bc);
-      txt(badge, ML + 5, iy + 3.5, { width: 26, align: 'center' });
-
-      // Ref number
-      font('Helvetica', 6.5, GRAY);
-      txt(key, ML + 38, iy + 3, { width: 22 });
-
-      // Item text
-      font('Helvetica', 7, GRAY_DARK);
-      txt(item, ML + 62, iy + 3, { width: pw - 66, height: 9, ellipsis: true });
-
-      // Notes (if any)
-      if (r.notes) {
-        font('Helvetica-Oblique', 6, GRAY_MED);
-        txt('↳ ' + r.notes, ML + 62, iy + 12, { width: pw - 66, height: 7, ellipsis: true });
-      }
-
-      setY(iy + rowH);
+      return { key: key, item: item, r: r, state: normaliseState(r) };
     });
 
-    // Section comments
-    if (sectionComments[section.key]) {
+    var ii = 0;
+    while (ii < items.length) {
+      var it = items[ii];
+
+      // ── FIX 5: Collapse 3+ consecutive N/A items ──
+      if (it.state === 'na') {
+        var naRun = [it];
+        var jj = ii + 1;
+        while (jj < items.length && normaliseState(items[jj].r) === 'na') {
+          naRun.push(items[jj]); jj++;
+        }
+        if (naRun.length >= 3) {
+          need(12);
+          var naY = curY();
+          var keyList = naRun.map(function (n) { return n.key; }).join(', ');
+          font('Helvetica', 7, '#999999');
+          txt('Items ' + keyList + ' — not applicable to this site', ML + 4, naY + 2, { width: pw - 8 });
+          setY(naY + 12);
+          ii = jj; continue;
+        }
+        // < 3 consecutive: render individually but de-emphasised
+        for (var nk = 0; nk < naRun.length; nk++) {
+          need(10);
+          var niy = curY();
+          roundRect(ML + 4, niy + 2, 28, 8, 2, '#E0E0E0');
+          font('Helvetica', 5, '#777777');
+          txt('N/A', ML + 5, niy + 3, { width: 26, align: 'center' });
+          font('Helvetica', 6, '#999999');
+          txt(naRun[nk].key, ML + 38, niy + 3, { width: 22 });
+          txt(naRun[nk].item, ML + 62, niy + 3, { width: pw - 66, height: 7, ellipsis: true });
+          setY(niy + 10);
+        }
+        ii = jj; continue;
+      }
+
+      // ── FIX 1: NO items — structured observation block ──
+      if (it.state === 'no') {
+        need(14);
+        var noy = curY();
+        // Full-width light red background
+        rect(ML, noy, pw, 13, RED_LIGHT);
+        // NO badge — larger, bold, white on dark red
+        roundRect(ML + 4, noy + 1, 28, 10, 2, RED_BADGE);
+        font('Helvetica-Bold', 6, WHITE);
+        txt('NO', ML + 5, noy + 3, { width: 26, align: 'center' });
+        font('Helvetica', 6.5, GRAY);
+        txt(it.key, ML + 38, noy + 3, { width: 22 });
+        font('Helvetica-Bold', 7, GRAY_DARK);
+        txt(it.item, ML + 62, noy + 3, { width: pw - 66, height: 9, ellipsis: true });
+        setY(noy + 14);
+
+        // Observation block (structured fields or legacy fallback)
+        var obs  = it.r.observation || '';
+        var risk = it.r.risk_level || '';
+        var corr = it.r.corrective_action || '';
+        var resp = it.r.responsible || '';
+        var rectified = it.r.rectified_on_site;
+        var hasStructured = !!(obs || risk || corr || resp);
+
+        if (hasStructured) {
+          var indent = 20;
+          var bx = ML + indent, bw = pw - indent;
+          var fldH = 12;
+          var obsLines = obs ? Math.max(1, Math.ceil(obs.length / Math.floor(bw / 3.8))) : 0;
+          var actLines = corr ? Math.max(1, Math.ceil(corr.length / Math.floor(bw / 3.8))) : 0;
+          var totalH = 8;
+          if (obs) totalH += 10 + obsLines * 8;
+          if (risk) totalH += fldH;
+          if (corr) totalH += 10 + actLines * 8;
+          if (resp) totalH += fldH;
+          if (rectified !== undefined && rectified !== null && rectified !== '') totalH += fldH;
+          totalH += 6;
+          need(totalH);
+          var bY = curY();
+          roundRect(bx, bY, bw, totalH, 3, RED_BG);
+          roundRect(bx, bY, 3, totalH, 1, RED);
+          doc.save().roundedRect(bx, bY, bw, totalH, 3).strokeColor('#FECACA').lineWidth(0.5).stroke().restore();
+          var cy2 = bY + 6;
+          if (obs) {
+            font('Helvetica-Bold', 6, BRAND_DARK);
+            txt('OBSERVATION', bx + 8, cy2, { width: bw - 16 });
+            cy2 += 9;
+            doc.font('Helvetica').fontSize(7).fillColor(GRAY_DARK);
+            doc.text(obs, bx + 8, cy2, { width: bw - 16, lineBreak: true });
+            cy2 += obsLines * 8 + 4;
+          }
+          if (risk) {
+            font('Helvetica-Bold', 6, BRAND_DARK);
+            txt('RISK LEVEL', bx + 8, cy2, { width: 50 });
+            var rc = risk === 'Critical' ? RED : risk === 'High' ? '#DC2626' : risk === 'Medium' ? AMBER : GREEN;
+            roundRect(bx + 60, cy2 - 1, 50, 9, 2, rc);
+            font('Helvetica-Bold', 5.5, WHITE);
+            txt(risk.toUpperCase(), bx + 62, cy2, { width: 46, align: 'center' });
+            cy2 += fldH;
+          }
+          if (corr) {
+            font('Helvetica-Bold', 6, BRAND_DARK);
+            txt('CORRECTIVE ACTION', bx + 8, cy2, { width: bw - 16 });
+            cy2 += 9;
+            doc.font('Helvetica').fontSize(7).fillColor(GRAY_DARK);
+            doc.text(corr, bx + 8, cy2, { width: bw - 16, lineBreak: true });
+            cy2 += actLines * 8 + 4;
+          }
+          if (resp) {
+            font('Helvetica-Bold', 6, BRAND_DARK);
+            txt('RESPONSIBLE', bx + 8, cy2, { width: 55 });
+            font('Helvetica', 7, GRAY_DARK);
+            txt(resp, bx + 65, cy2, { width: bw - 75 });
+            cy2 += fldH;
+          }
+          if (rectified !== undefined && rectified !== null && rectified !== '') {
+            font('Helvetica-Bold', 6, BRAND_DARK);
+            txt('RECTIFIED ON SITE', bx + 8, cy2, { width: 72 });
+            var rtext = rectified ? 'Yes' : 'No — escalated to HSEQ';
+            font('Helvetica-Bold', 6, rectified ? GREEN : RED);
+            txt(rtext, bx + 82, cy2, { width: bw - 92 });
+            cy2 += fldH;
+          }
+          setY(bY + totalH + 3);
+        } else if (it.r.notes && it.r.notes.trim()) {
+          // Legacy fallback — red observation box for old audits
+          var bx3 = ML + 20, bw3 = pw - 20;
+          var nLines = Math.max(1, Math.ceil(it.r.notes.length / Math.floor(bw3 / 3.8)));
+          var bH3 = 14 + nLines * 8;
+          need(bH3);
+          var bY3 = curY();
+          roundRect(bx3, bY3, bw3, bH3, 3, RED_BG);
+          roundRect(bx3, bY3, 3, bH3, 1, RED);
+          font('Helvetica-Bold', 6, BRAND_DARK);
+          txt('OBSERVATION', bx3 + 8, bY3 + 4, { width: bw3 - 16 });
+          doc.font('Helvetica').fontSize(7).fillColor(GRAY_DARK);
+          doc.text(it.r.notes, bx3 + 8, bY3 + 14, { width: bw3 - 16, lineBreak: true });
+          setY(bY3 + bH3 + 3);
+        }
+        // Item-specific photos for this NO finding
+        embedImages(doc, a, ctxMap['item_' + it.key], null, pw, pageBot, ML, MT);
+        ii++; continue;
+      }
+
+      // ── YES items — standard row ──
+      var rowH = (it.r.notes && it.r.notes.trim()) ? 20 : 12;
+      need(rowH);
+      var iy = curY();
+      if (ii % 2 === 0) rect(ML, iy, pw, rowH, GRAY_BG);
+      line(ML, iy + rowH, ML + pw, iy + rowH, '#F3F4F6', 0.3);
+      roundRect(ML + 4, iy + 2, 28, 9, 2, GREEN);
+      font('Helvetica-Bold', 5.5, WHITE);
+      txt('YES', ML + 5, iy + 3.5, { width: 26, align: 'center' });
+      font('Helvetica', 6.5, GRAY);
+      txt(it.key, ML + 38, iy + 3, { width: 22 });
+      font('Helvetica', 7, GRAY_DARK);
+      txt(it.item, ML + 62, iy + 3, { width: pw - 66, height: 9, ellipsis: true });
+      // Notes only if non-empty (don't render empty boxes)
+      if (it.r.notes && it.r.notes.trim()) {
+        font('Helvetica-Oblique', 6, GRAY_MED);
+        txt('↳ ' + it.r.notes, ML + 62, iy + 12, { width: pw - 66, height: 7, ellipsis: true });
+      }
+      setY(iy + rowH);
+      ii++;
+    }
+
+    // ── FIX 2: Section comments — bordered box, readable, navy label ──
+    // Only render if there's actual comment text (don't render empty boxes)
+    if (sectionComments[section.key] && sectionComments[section.key].trim()) {
       var cmtText = sectionComments[section.key];
-      var cmtH = measureText(cmtText, pw - 24, 7);
-      var boxH = Math.min(cmtH + 16, 80); // cap height
+      var cmtH = measureText(cmtText, pw - 24, 8);
+      var boxH = Math.max(cmtH + 22, 30);
       need(boxH + 4);
       gap(3);
-      var cy = curY();
-      roundRect(ML, cy, pw, boxH, 4, BRAND_BG);
+      var cmtY = curY();
+      // Bordered box with light grey fill
+      roundRect(ML, cmtY, pw, boxH, 4, COMMENT_BG);
+      doc.save().roundedRect(ML, cmtY, pw, boxH, 4).strokeColor(COMMENT_BORDER).lineWidth(1).stroke().restore();
       // Left accent bar
-      roundRect(ML, cy, 3, boxH, 1, BRAND);
-      font('Helvetica-Bold', 6, BRAND);
-      txt('COMMENTS', ML + 10, cy + 4, { width: 60 });
-      // Multi-line comment text — use lineBreak:true but constrain height
-      doc.font('Helvetica').fontSize(7).fillColor(GRAY_DARK);
-      doc.text(cmtText, ML + 10, cy + 13, { width: pw - 24, height: boxH - 16, lineBreak: true, ellipsis: true });
-      setY(cy + boxH + 2);
+      roundRect(ML, cmtY, 3, boxH, 1, BRAND);
+      // Label: navy bold
+      font('Helvetica-Bold', 7, BRAND_DARK);
+      txt('COMMENTS', ML + 10, cmtY + 5, { width: 60 });
+      // Comment body: 8pt (≈11pt rendered), #333, regular weight, 12px padding
+      doc.font('Helvetica').fontSize(8).fillColor(GRAY_DARK);
+      doc.text(cmtText, ML + 10, cmtY + 17, { width: pw - 24, lineBreak: true });
+      setY(cmtY + boxH + 2);
     }
 
     // Section evidence images
@@ -491,7 +667,8 @@ function generateAuditPdf(opts, out) {
 
 
 /* ════════════════════════════════════════════════════════
-   Image grid — embeds photos in rows, handles page breaks
+   FIX 3: Image grid — max 2 per row, min 45% width, captioned
+   Photos are primary evidence and must be viewable.
    ════════════════════════════════════════════════════════ */
 function embedImages(doc, audit, items, label, pw, pageBot, ml, mt) {
   if (!items || !items.length) return;
@@ -514,28 +691,40 @@ function embedImages(doc, audit, items, label, pw, pageBot, ml, mt) {
     doc.y += 10;
   }
 
-  var tw = 90, th = 68, gx = 6, gy = 6;
-  var cols = Math.floor((pw + gx) / (tw + gx));
-  if (cols < 1) cols = 1;
+  // Max 2 photos per row, min 45% page width each
+  var gutter = 8;
+  var imgW = images.length === 1
+    ? Math.floor(pw * 0.7)
+    : Math.floor((pw - gutter) / 2);
+  var imgH = Math.floor(imgW * 0.65);
+  var captionH = 12;
   var col = 0, rowY = doc.y;
 
   images.forEach(function (img) {
-    if (col >= cols) { col = 0; rowY += th + gy; }
-    if (col === 0 && rowY + th > pageBot) { doc.addPage(); rowY = doc.y; }
-    var ix = ml + col * (tw + gx);
-    // Image border/shadow
-    doc.save().roundedRect(ix, rowY, tw, th, 3).strokeColor('#E5E7EB').lineWidth(0.5).stroke().restore();
+    if (col >= 2) { col = 0; rowY += imgH + captionH + gutter; }
+    if (col === 0 && rowY + imgH + captionH > pageBot) { doc.addPage(); rowY = doc.y; }
+
+    var ix = images.length === 1
+      ? ml + Math.floor((pw - imgW) / 2)
+      : ml + col * (imgW + gutter);
+
+    // 1px border around photo
+    doc.save().rect(ix - 1, rowY - 1, imgW + 2, imgH + 2)
+      .strokeColor('#CCCCCC').lineWidth(1).stroke().restore();
+
     try {
-      doc.image(img.fp, ix + 1, rowY + 1, { fit: [tw - 2, th - 2], align: 'center', valign: 'center' });
+      doc.image(img.fp, ix, rowY, { fit: [imgW, imgH], align: 'center', valign: 'center' });
     } catch (e) { /* skip corrupt image */ }
-    // Caption
-    if (img.att.caption) {
-      doc.font('Helvetica').fontSize(5).fillColor(GRAY);
-      doc.text(img.att.caption, ix, rowY + th + 1, { width: tw, lineBreak: false, height: 7, ellipsis: true });
-    }
+
+    // Caption below photo
+    var cap = img.att.caption || img.att.original_name || 'Evidence photo';
+    doc.font('Helvetica').fontSize(6).fillColor(GRAY);
+    doc.text(cap, ix, rowY + imgH + 2, { width: imgW, lineBreak: false, align: 'center' });
+
     col++;
   });
-  doc.y = rowY + th + (images[images.length - 1] && images[images.length - 1].att.caption ? 10 : gy);
+
+  doc.y = rowY + imgH + captionH + gutter;
   doc.x = ml;
 }
 
