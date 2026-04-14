@@ -58,12 +58,17 @@ router.post('/', upload.single('plan_file'), (req, res) => {
   const primaryType = (Array.isArray(b.plan_types) ? b.plan_types[0] : b.plan_types || b.plan_type || 'TGS').toUpperCase();
   const codePrefix = primaryType === 'TMP' ? 'TSTMP' : 'TSTGS';
 
-  // Count existing plans of this type for this job to get next suffix
-  const existingCount = b.job_id
-    ? db.prepare(`SELECT COUNT(*) as cnt FROM traffic_plans WHERE job_id = ? AND plan_number LIKE ?`).get(b.job_id, `${codePrefix}-${jobSeq}-%`).cnt
-    : 0;
-  const planSuffix = String(existingCount + 1).padStart(2, '0');
-  const planNumber = `${codePrefix}-${jobSeq}-${planSuffix}`;
+  // Find the highest existing suffix for this job/prefix to avoid UNIQUE conflicts after deletions
+  let nextSuffix = 1;
+  if (b.job_id) {
+    const maxRow = db.prepare(`SELECT plan_number FROM traffic_plans WHERE job_id = ? AND plan_number LIKE ? ORDER BY plan_number DESC LIMIT 1`).get(b.job_id, `${codePrefix}-${jobSeq}-%`);
+    if (maxRow) {
+      const lastPart = maxRow.plan_number.split('-').pop();
+      const lastNum = parseInt(lastPart, 10);
+      if (!isNaN(lastNum)) nextSuffix = lastNum + 1;
+    }
+  }
+  const planNumber = `${codePrefix}-${jobSeq}-${String(nextSuffix).padStart(2, '0')}`;
 
   // Handle multi-select plan types
   let planTypes = '';
@@ -144,9 +149,14 @@ router.post('/quick-upload', upload.single('plan_file'), (req, res) => {
     else if (fileName.includes('rol')) planType = 'ROL';
 
     const codePrefix = planType === 'TMP' ? 'TSTMP' : 'TSTGS';
-    const existingCount = db.prepare('SELECT COUNT(*) as cnt FROM traffic_plans WHERE job_id = ? AND plan_number LIKE ?')
-      .get(jobId, `${codePrefix}-${jobSeq}-%`).cnt;
-    const planNumber = `${codePrefix}-${jobSeq}-${String(existingCount + 1).padStart(2, '0')}`;
+    let nextSuffix = 1;
+    const maxRow = db.prepare('SELECT plan_number FROM traffic_plans WHERE job_id = ? AND plan_number LIKE ? ORDER BY plan_number DESC LIMIT 1')
+      .get(jobId, `${codePrefix}-${jobSeq}-%`);
+    if (maxRow) {
+      const lastNum = parseInt(maxRow.plan_number.split('-').pop(), 10);
+      if (!isNaN(lastNum)) nextSuffix = lastNum + 1;
+    }
+    const planNumber = `${codePrefix}-${jobSeq}-${String(nextSuffix).padStart(2, '0')}`;
 
     const filePath = req.file.path.replace(/\\/g, '/');
     const fileOriginalName = req.file.originalname;
