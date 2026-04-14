@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { logActivity } = require('../middleware/audit');
+const { generateJobNumber } = require('../lib/jobNumbers');
 
 // JSON API - search opportunities (for autocomplete/dropdowns) — MUST be before /:id
 router.get('/api/search.json', (req, res) => {
@@ -583,19 +584,8 @@ router.post('/:id/convert', (req, res) => {
       `).run(opportunity.id);
     }
 
-    // Auto-generate job_number: JOB-001, JOB-002, etc.
-    const maxJobRow = db.prepare(`
-      SELECT job_number FROM jobs
-      WHERE job_number LIKE 'JOB-%'
-      ORDER BY CAST(SUBSTR(job_number, 5) AS INTEGER) DESC
-      LIMIT 1
-    `).get();
-    let nextJobNum = 1;
-    if (maxJobRow && maxJobRow.job_number) {
-      const parsed = parseInt(maxJobRow.job_number.replace('JOB-', ''), 10);
-      if (!isNaN(parsed)) nextJobNum = parsed + 1;
-    }
-    const jobNumber = 'JOB-' + String(nextJobNum).padStart(3, '0');
+    // Auto-generate J-XXXX job number via shared sequence
+    const jobNumber = generateJobNumber();
 
     const clientName = opportunity.client_name || '';
     const today = new Date().toISOString().split('T')[0];
