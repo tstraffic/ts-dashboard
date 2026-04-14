@@ -1,6 +1,6 @@
 /**
- * Audit PDF export — branded T&S Traffic Control PDF using PDFKit.
- * Clean stacked layout: header → score → details → checklist → NC → signatures.
+ * Audit PDF export v4 — branded T&S Traffic Control.
+ * Clean stacked layout, no overlapping, no blank pages.
  */
 const PDFDocument = require('pdfkit');
 const path = require('path');
@@ -53,301 +53,297 @@ function generateAuditPdf(opts, out) {
   doc.pipe(out);
 
   const pw = doc.page.width - ML - MR;
-  const pageBottom = doc.page.height - MB;
+  const pageBot = doc.page.height - MB;
 
-  // helpers
   function Y() { return doc.y; }
   function setY(y) { doc.y = y; doc.x = ML; }
   function gap(n) { doc.y += n; }
-  function needSpace(h) { if (doc.y + h > pageBottom) doc.addPage(); }
-  function hr(c, w) {
-    doc.save().moveTo(ML, Y()).lineTo(ML + pw, Y()).strokeColor(c || '#E5E7EB').lineWidth(w || 0.5).stroke().restore();
-    gap(1);
-  }
+  function need(h) { if (doc.y + h > pageBot) doc.addPage(); }
   function rr(x, y, w, h, r, fill) {
     doc.save().roundedRect(x, y, w, h, r).fill(fill).restore();
   }
+  // All text uses lineBreak:false to prevent phantom pages
+  function T(size, color, str, x, y, w, opts2) {
+    doc.fontSize(size).fillColor(color).text(str || '—', x, y,
+      Object.assign({ lineBreak: false, width: w }, opts2 || {}));
+  }
 
-  // ============================================================
-  // HEADER — logo left, title right
-  // ============================================================
+  // ==== HEADER ====
   const logoH = 36;
   if (fs.existsSync(LOGO_PATH)) {
     try { doc.image(LOGO_PATH, ML, MT, { height: logoH }); } catch (e) {}
   }
-  doc.fontSize(15).fillColor(BRAND).text('Site Safety Audit Report', ML + 130, MT + 2, { width: pw - 130, lineBreak: false });
-  doc.fontSize(7.5).fillColor(GRAY).text(`Audit #${a.id}  ·  ${fmtDate(a.audit_datetime || a.created_at)}`, ML + 130, MT + 20, { lineBreak: false });
-  doc.fontSize(7.5).fillColor(GRAY).text('T&S Traffic Control', ML + 130, MT + 30, { lineBreak: false });
+  T(15, BRAND, 'Site Safety Audit Report', ML + 130, MT + 2, pw - 130);
+  T(7.5, GRAY, `Audit #${a.id}  ·  ${fmtDate(a.audit_datetime || a.created_at)}`, ML + 130, MT + 20, pw - 130);
+  T(7.5, GRAY, 'T&S Traffic Control', ML + 130, MT + 30, pw - 130);
 
   setY(MT + logoH + 6);
   doc.save().moveTo(ML, Y()).lineTo(ML + pw, Y()).strokeColor(BRAND).lineWidth(1.5).stroke().restore();
   gap(10);
 
-  // ============================================================
-  // SCORE BAND — score box left, finding right (one row, clean)
-  // ============================================================
+  // ==== SCORE ROW — score box left, finding badge right ====
   const bandY = Y();
-  const sBoxW = 100, sBoxH = 50;
+  const sBoxW = 95, sBoxH = 45;
 
-  // Blue score box
   rr(ML, bandY, sBoxW, sBoxH, 5, BRAND);
-  doc.fontSize(6.5).fillColor(WHITE).text('OVERALL SCORE', ML + 8, bandY + 5, { width: sBoxW - 16, lineBreak: false });
-  doc.fontSize(26).fillColor(WHITE).text(`${score.percent}%`, ML + 8, bandY + 14, { width: sBoxW - 16, lineBreak: false });
-  doc.fontSize(6.5).fillColor(WHITE).text(`${score.total}/${score.max} passed`, ML + 8, bandY + 40, { width: sBoxW - 16, lineBreak: false });
+  T(6, WHITE, 'OVERALL SCORE', ML + 8, bandY + 4, sBoxW - 16);
+  T(24, WHITE, `${score.percent}%`, ML + 8, bandY + 12, sBoxW - 16);
+  T(6, WHITE, `${score.total}/${score.max} passed`, ML + 8, bandY + 36, sBoxW - 16);
 
-  // Finding badge
-  const fX = ML + sBoxW + 10;
-  const fW = pw - sBoxW - 10;
+  const fX = ML + sBoxW + 8;
+  const fW = pw - sBoxW - 8;
   rr(fX, bandY, fW, 18, 3, findingColor(a.overall_finding));
-  doc.fontSize(9).fillColor(WHITE).text(findingLabel(a.overall_finding), fX + 8, bandY + 4, { width: fW - 16, lineBreak: false });
+  T(9, WHITE, findingLabel(a.overall_finding), fX + 8, bandY + 4, fW - 16);
 
-  // Area scores — in a clean 2-col grid below the finding badge
-  let aY = bandY + 24;
-  const aColW = fW / 2;
+  setY(bandY + sBoxH + 6);
+
+  // ==== AREA SCORES — own row, full width, 4 columns ====
+  const aY = Y();
+  rr(ML, aY, pw, 24, 3, GRAY_LIGHT);
+  const aCols = 4;
+  const aColW = pw / aCols;
   score.groups.forEach(function (g, i) {
-    const ax = fX + (i % 2) * aColW;
-    const ay = aY + Math.floor(i / 2) * 10;
-    doc.fontSize(6).fillColor(GRAY).text(g.label, ax, ay, { width: aColW - 45, lineBreak: false });
-    doc.fontSize(6).fillColor(GRAY_DARK).text(`${g.score}/${g.max} (${g.percent}%)`, ax + aColW - 52, ay, { width: 50, align: 'right', lineBreak: false });
+    const col = i % aCols;
+    const row = Math.floor(i / aCols);
+    const ax = ML + col * aColW + 4;
+    const ay = aY + 3 + row * 11;
+    T(5.5, GRAY, g.label, ax, ay, aColW - 50);
+    T(6, GRAY_DARK, `${g.score}/${g.max} (${g.percent}%)`, ax + aColW - 54, ay, 50, { align: 'right' });
   });
-
-  setY(bandY + sBoxH + 8);
-  hr('#E5E7EB');
+  setY(aY + 28);
   gap(4);
 
-  // ============================================================
-  // AUDIT DETAILS — clean 2-col label : value
-  // ============================================================
+  // ==== DETAILS — 2-col grid, label left-aligned, value right ====
   const details = [
-    ['Project / Site', a.project_site],
-    ['Date', fmtDate(a.audit_datetime || a.created_at)],
-    ['Client', a.client],
-    ['Job #', a.job_number || '—'],
-    ['Location', a.location],
-    ['Shift', (a.shift || '—').charAt(0).toUpperCase() + (a.shift || '').slice(1)],
-    ['TGS / TCP Ref', a.tgs_ref],
-    ['Weather', a.weather],
-    ['Auditor', a.auditor_name || a.created_by_name],
-    ['Supervisor', a.supervisor_name],
+    ['PROJECT / SITE', a.project_site],
+    ['DATE', fmtDate(a.audit_datetime || a.created_at)],
+    ['CLIENT', a.client],
+    ['JOB #', a.job_number || '—'],
+    ['LOCATION', a.location],
+    ['SHIFT', (a.shift || '—').charAt(0).toUpperCase() + (a.shift || '').slice(1)],
+    ['TGS / TCP REF', a.tgs_ref],
+    ['WEATHER', a.weather],
+    ['AUDITOR', a.auditor_name || a.created_by_name],
+    ['SUPERVISOR', a.supervisor_name],
   ];
   const dColW = pw / 2;
-  const dStartY = Y();
+  const lblW = 65;
+  const dY = Y();
   details.forEach(function (d, i) {
     const col = i % 2;
     const row = Math.floor(i / 2);
     const dx = ML + col * dColW;
-    const dy = dStartY + row * 13;
-    doc.fontSize(6).fillColor(GRAY).text(d[0].toUpperCase(), dx, dy, { lineBreak: false });
-    doc.fontSize(7.5).fillColor(GRAY_DARK).text(d[1] || '—', dx + 62, dy, { width: dColW - 66, lineBreak: false });
+    const dy = dY + row * 12;
+    T(5.5, GRAY, d[0], dx, dy, lblW);
+    T(7, GRAY_DARK, d[1], dx + lblW + 2, dy, dColW - lblW - 6);
   });
-  setY(dStartY + Math.ceil(details.length / 2) * 13 + 4);
+  setY(dY + Math.ceil(details.length / 2) * 12 + 2);
 
-  // Status + created / signed-off
-  doc.fontSize(6).fillColor(GRAY).text('STATUS', ML, Y(), { lineBreak: false });
-  doc.fontSize(7.5).fillColor(GRAY_DARK).text((a.status || 'draft').replace('_', ' ').toUpperCase(), ML + 62, Y(), { lineBreak: false });
-  gap(11);
+  // Status line
+  T(5.5, GRAY, 'STATUS', ML, Y(), lblW);
+  T(7, GRAY_DARK, (a.status || 'draft').replace('_', ' ').toUpperCase(), ML + lblW + 2, Y(), dColW - lblW);
+  gap(10);
   if (a.follow_up_required) {
-    doc.fontSize(6).fillColor(AMBER).text('FOLLOW-UP REQUIRED: ' + (a.follow_up_date || 'TBC'), ML, Y(), { lineBreak: false });
+    T(6, AMBER, 'FOLLOW-UP REQUIRED: ' + (a.follow_up_date || 'TBC'), ML, Y(), pw);
     gap(10);
   }
 
-  hr('#E5E7EB');
-  gap(4);
+  doc.save().moveTo(ML, Y()).lineTo(ML + pw, Y()).strokeColor('#E5E7EB').lineWidth(0.5).stroke().restore();
+  gap(6);
 
-  // ---- Site overview evidence ----
-  embedImageGrid(doc, a, ctxMap['overview'], 'SITE OVERVIEW EVIDENCE', pw, pageBottom);
+  // ==== Site overview evidence ====
+  embedImages(doc, a, ctxMap['overview'], 'SITE OVERVIEW EVIDENCE', pw, pageBot);
 
-  // ============================================================
-  // CHECKLIST SECTIONS
-  // ============================================================
+  // ==== CHECKLIST SECTIONS ====
   AUDIT_SECTIONS.forEach(function (section) {
-    needSpace(36);
-    // Section header bar
+    need(30);
     const hY = Y();
     rr(ML, hY, pw, 16, 3, BRAND);
-    doc.fontSize(8.5).fillColor(WHITE).text(`${section.key}. ${section.title}`, ML + 6, hY + 3, { width: pw - 56, lineBreak: false });
+    T(8, WHITE, `${section.key}. ${section.title}`, ML + 6, hY + 3, pw - 56);
     let sYes = 0, sMax = 0;
     section.items.forEach(function (_, idx) {
       const st = normaliseState(responses[section.key + '.' + (idx + 1)]);
       if (st === 'yes') { sYes++; sMax++; } else if (st === 'no') { sMax++; }
     });
-    doc.fontSize(7).fillColor(WHITE).text(`${sYes}/${sMax}`, ML + pw - 44, hY + 4, { width: 38, align: 'right', lineBreak: false });
+    T(7, WHITE, `${sYes}/${sMax}`, ML + pw - 42, hY + 4, 36, { align: 'right' });
     setY(hY + 19);
 
-    // Items
     section.items.forEach(function (item, idx) {
       const key = section.key + '.' + (idx + 1);
       const r = responses[key] || {};
       const st = normaliseState(r);
-      needSpace(12);
+      need(11);
 
       const iy = Y();
-      if (idx % 2 === 0) doc.save().rect(ML, iy - 1, pw, 11).fill(GRAY_LIGHT).restore();
+      if (idx % 2 === 0) doc.save().rect(ML, iy - 1, pw, 10).fill(GRAY_LIGHT).restore();
 
-      // Badge
       let badge, bc;
       if (st === 'yes') { badge = 'YES'; bc = GREEN; }
       else if (st === 'no') { badge = 'NO'; bc = RED; }
       else if (st === 'na') { badge = 'N/A'; bc = GRAY; }
       else { badge = '—'; bc = '#D1D5DB'; }
-      rr(ML + 1, iy, 22, 9, 2, bc);
-      doc.fontSize(5.5).fillColor(WHITE).text(badge, ML + 2, iy + 2, { width: 20, align: 'center', lineBreak: false });
-
-      // Item text
-      doc.fontSize(6.5).fillColor(GRAY_DARK).text(`${key}  ${item}`, ML + 26, iy + 1, { width: pw - 30, height: 9, ellipsis: true, lineBreak: false });
-      setY(iy + 11);
+      rr(ML + 1, iy, 21, 8, 2, bc);
+      T(5, WHITE, badge, ML + 2, iy + 1.5, 19, { align: 'center' });
+      T(6.5, GRAY_DARK, `${key}  ${item}`, ML + 25, iy + 1, pw - 28, { height: 8, ellipsis: true });
+      setY(iy + 10);
 
       if (r.notes) {
-        needSpace(9);
-        doc.fontSize(5.5).fillColor(GRAY).text(`→ ${r.notes}`, ML + 26, Y(), { width: pw - 30, height: 8, ellipsis: true, lineBreak: false });
-        gap(9);
+        need(10);
+        // Italic note text to distinguish from item text
+        doc.font('Helvetica-Oblique').fontSize(5.5).fillColor('#4B5563')
+          .text(`→ ${r.notes}`, ML + 25, Y(), { width: pw - 28, lineBreak: false, height: 7, ellipsis: true });
+        doc.font('Helvetica');
+        gap(8);
       }
     });
 
+    // Section comments — visible blue box, multi-line
     if (sectionComments[section.key]) {
-      needSpace(18);
-      const cmtY = Y();
-      // Light blue background to make comments stand out
       const cmtText = sectionComments[section.key];
-      const cmtH = 16;
-      rr(ML, cmtY, pw, cmtH, 3, '#EFF6FF');
-      doc.save().roundedRect(ML, cmtY, 3, cmtH, 1).fill(BRAND).restore(); // left accent bar
-      doc.fontSize(5.5).fillColor(BRAND).text('COMMENTS', ML + 8, cmtY + 2, { lineBreak: false });
-      doc.fontSize(7).fillColor(GRAY_DARK).text(cmtText, ML + 8, cmtY + 8, { width: pw - 16, height: 8, ellipsis: true, lineBreak: false });
-      setY(cmtY + cmtH + 2);
+      // Measure height needed (approx 7pt font ~= 9px per line, ~80 chars per line at pw-20)
+      const charsPerLine = Math.floor((pw - 20) / 3.5);
+      const lines = Math.max(1, Math.ceil(cmtText.length / charsPerLine));
+      const boxH = 12 + lines * 9;
+      need(boxH + 2);
+      const cy = Y();
+      rr(ML, cy, pw, boxH, 3, '#EFF6FF');
+      doc.save().roundedRect(ML, cy, 3, boxH, 1).fill(BRAND).restore();
+      T(5.5, BRAND, 'COMMENTS', ML + 8, cy + 3, 50);
+      // Use lineBreak:true for multi-line comments
+      doc.fontSize(7).fillColor(GRAY_DARK).text(cmtText, ML + 8, cy + 12, { width: pw - 20, lineBreak: true });
+      setY(cy + boxH + 2);
     }
 
-    embedImageGrid(doc, a, ctxMap['section_' + section.key], null, pw, pageBottom);
+    embedImages(doc, a, ctxMap['section_' + section.key], null, pw, pageBot);
     gap(3);
   });
 
-  // ============================================================
-  // NON-CONFORMANCE REGISTER
-  // ============================================================
+  // ==== NON-CONFORMANCE REGISTER ====
   if (nonconformances && nonconformances.length) {
-    needSpace(40);
+    need(35);
     const ncY = Y();
     rr(ML, ncY, pw, 16, 3, RED);
-    doc.fontSize(8.5).fillColor(WHITE).text('Non-Conformance Register', ML + 6, ncY + 3, { lineBreak: false });
-    setY(ncY + 20);
+    T(8, WHITE, 'Non-Conformance Register', ML + 6, ncY + 3, pw - 16);
+    setY(ncY + 19);
 
-    const ncW = [16, 0, 36, 0, 50, 44, 26];
-    const flex = Math.floor((pw - 16 - 36 - 50 - 44 - 26) / 2);
+    const ncW = [14, 0, 32, 0, 46, 40, 24];
+    const flex = Math.floor((pw - 14 - 32 - 46 - 40 - 24) / 2);
     ncW[1] = flex; ncW[3] = flex;
-    const ncH = ['#', 'Issue', 'Risk', 'Action', 'Resp.', 'Due', 'Done'];
 
     let cx = ML;
-    ncH.forEach(function (h, i) {
-      doc.fontSize(5.5).fillColor(GRAY).text(h, cx, Y(), { width: ncW[i], lineBreak: false });
+    ['#', 'Issue', 'Risk', 'Action', 'Resp.', 'Due', 'Done'].forEach(function (h, i) {
+      T(5, GRAY, h, cx, Y(), ncW[i]);
       cx += ncW[i];
     });
-    gap(9);
+    gap(8);
 
     nonconformances.forEach(function (nc, i) {
-      needSpace(11);
+      need(10);
       const ry = Y();
-      if (i % 2 === 0) doc.save().rect(ML, ry - 1, pw, 10).fill(GRAY_LIGHT).restore();
+      if (i % 2 === 0) doc.save().rect(ML, ry - 1, pw, 9).fill(GRAY_LIGHT).restore();
       cx = ML;
       [String(i + 1), nc.issue || '', nc.risk || '—', nc.action || '—', nc.responsible || '—', nc.due_date || '—', nc.closed ? '✓' : '—'].forEach(function (v, vi) {
-        doc.fontSize(6).fillColor(GRAY_DARK).text(v, cx, ry, { width: ncW[vi], height: 9, ellipsis: true, lineBreak: false });
+        T(5.5, GRAY_DARK, v, cx, ry, ncW[vi], { height: 8, ellipsis: true });
         cx += ncW[vi];
       });
-      setY(ry + 10);
-      embedImageGrid(doc, a, ctxMap['nc_' + (i + 1)], null, pw, pageBottom);
+      setY(ry + 9);
+      embedImages(doc, a, ctxMap['nc_' + (i + 1)], null, pw, pageBot);
     });
     gap(4);
   }
 
-  // ============================================================
-  // SIGNATURES
-  // ============================================================
+  // ==== SIGNATURES (styled like the web — large italic like a real signature) ====
   if (a.auditor_signature_text || a.supervisor_signature_text) {
-    needSpace(50);
-    hr(BRAND, 1);
-    gap(3);
-    doc.fontSize(8).fillColor(BRAND).text('Sign-off', ML, Y(), { lineBreak: false });
-    gap(12);
-    const sigY = Y();
-    const sigW = (pw - 10) / 2;
+    need(60);
+    doc.save().moveTo(ML, Y()).lineTo(ML + pw, Y()).strokeColor(BRAND).lineWidth(1).stroke().restore();
+    gap(4);
+    T(8, BRAND, 'Sign-off', ML, Y(), pw);
+    gap(10);
+    const sY = Y();
+    const sW = (pw - 12) / 2;
+
+    function drawSigBox(x, label, name, signedAt) {
+      rr(x, sY, sW, 48, 4, GRAY_LIGHT);
+      // Subtle bottom border like the web cards
+      doc.save().moveTo(x, sY + 48).lineTo(x + sW, sY + 48).strokeColor('#D1D5DB').lineWidth(0.5).stroke().restore();
+      T(5.5, GRAY, label, x + 8, sY + 5, sW - 16);
+      // Signature name — large italic (Helvetica-Oblique)
+      doc.font('Helvetica-Oblique').fontSize(18).fillColor(GRAY_DARK)
+        .text(name, x + 8, sY + 16, { width: sW - 16, lineBreak: false });
+      doc.font('Helvetica'); // reset font
+      if (signedAt) {
+        T(5.5, GREEN, '✓ Signed ' + fmtDate(signedAt), x + 8, sY + 38, sW - 16);
+      }
+    }
 
     if (a.auditor_signature_text) {
-      rr(ML, sigY, sigW, 36, 3, GRAY_LIGHT);
-      doc.fontSize(5.5).fillColor(GRAY).text('AUDITOR', ML + 6, sigY + 3, { lineBreak: false });
-      doc.fontSize(13).fillColor(GRAY_DARK).text(a.auditor_signature_text, ML + 6, sigY + 12, { width: sigW - 12, lineBreak: false });
-      if (a.auditor_signed_at) doc.fontSize(5).fillColor(GREEN).text('Signed ' + fmtDate(a.auditor_signed_at), ML + 6, sigY + 28, { lineBreak: false });
+      drawSigBox(ML, 'AUDITOR', a.auditor_signature_text, a.auditor_signed_at);
     }
     if (a.supervisor_signature_text) {
-      const sx = ML + sigW + 10;
-      rr(sx, sigY, sigW, 36, 3, GRAY_LIGHT);
-      doc.fontSize(5.5).fillColor(GRAY).text('SUPERVISOR / STMS', sx + 6, sigY + 3, { lineBreak: false });
-      doc.fontSize(13).fillColor(GRAY_DARK).text(a.supervisor_signature_text, sx + 6, sigY + 12, { width: sigW - 12, lineBreak: false });
-      if (a.supervisor_signed_at) doc.fontSize(5).fillColor(GREEN).text('Signed ' + fmtDate(a.supervisor_signed_at), sx + 6, sigY + 28, { lineBreak: false });
+      drawSigBox(ML + sW + 12, 'SUPERVISOR / STMS', a.supervisor_signature_text, a.supervisor_signed_at);
     }
-    setY(sigY + 40);
+    setY(sY + 54);
   }
 
   // Annotated TGS
-  embedImageGrid(doc, a, ctxMap['annotated_tgs'], 'ANNOTATED TGS / CLOSE-OUT SKETCH', pw, pageBottom);
+  embedImages(doc, a, ctxMap['annotated_tgs'], 'ANNOTATED TGS / CLOSE-OUT SKETCH', pw, pageBot);
 
-  // ---- Metadata footer line ----
-  gap(6);
-  const metaText = ['Created by ' + (a.created_by_name || '—') + ' · ' + fmtDate(a.created_at)];
-  if (a.signed_off_by_name) metaText.push('Signed off by ' + a.signed_off_by_name + ' · ' + fmtDate(a.signed_off_at));
-  doc.fontSize(5.5).fillColor(GRAY).text(metaText.join('    |    '), ML, Y(), { width: pw, lineBreak: false });
+  // ==== FOOTER INFO — created by, signed off by ====
+  gap(8);
+  doc.save().moveTo(ML, Y()).lineTo(ML + pw, Y()).strokeColor('#E5E7EB').lineWidth(0.5).stroke().restore();
+  gap(4);
+  T(5.5, GRAY, 'Created by ' + (a.created_by_name || '—') + '  ·  ' + fmtDate(a.created_at), ML, Y(), pw);
+  gap(8);
+  if (a.signed_off_by_name) {
+    rr(ML, Y(), pw, 16, 3, '#F0FDF4');
+    doc.save().roundedRect(ML, Y(), 3, 16, 1).fill(GREEN).restore();
+    T(5.5, GREEN, 'INTERNALLY SIGNED OFF BY', ML + 8, Y() + 2, 110);
+    T(7, GRAY_DARK, a.signed_off_by_name + '  ·  ' + fmtDate(a.signed_off_at), ML + 120, Y() + 2, pw - 128);
+    gap(20);
+  }
 
-  // ============================================================
-  // PAGE NUMBERS — write into footer of each buffered page
-  // ============================================================
+  // ==== PAGE NUMBERS ====
   const range = doc.bufferedPageRange();
-  const totalPages = range.count;
-  for (let i = range.start; i < range.start + totalPages; i++) {
+  for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i);
-    doc.fontSize(5.5).fillColor(GRAY).text(
-      `T&S Traffic Control  ·  Site Audit #${a.id}  ·  Page ${i + 1} of ${totalPages}`,
-      ML, doc.page.height - 28,
-      { width: pw, align: 'center', lineBreak: false }
-    );
+    T(5, GRAY, `T&S Traffic Control  ·  Site Audit #${a.id}  ·  Page ${i + 1} of ${range.count}`,
+      ML, doc.page.height - 28, pw, { align: 'center' });
   }
 
   doc.end();
 }
 
 /**
- * Embed image thumbnails in a grid. Skips non-images and missing files.
- * Uses lineBreak:false everywhere to prevent PDFKit creating extra pages.
+ * Embed image thumbnails in a grid. Safe page breaks, no blank pages.
  */
-function embedImageGrid(doc, audit, items, label, pw, pageBottom) {
+function embedImages(doc, audit, items, label, pw, pageBot) {
   if (!items || !items.length) return;
-  const images = items.filter(function (att) {
-    if (!(att.mime_type || '').startsWith('image/')) return false;
+  const images = [];
+  items.forEach(function (att) {
+    if (!(att.mime_type || '').startsWith('image/')) return;
     const fp = path.join(__dirname, '..', 'data', 'uploads', 'audits', String(audit.id), att.filename);
-    return fs.existsSync(fp);
+    if (fs.existsSync(fp)) images.push({ att: att, fp: fp });
   });
   if (!images.length) return;
 
   if (label) {
-    if (doc.y + 16 > pageBottom) doc.addPage();
+    if (doc.y + 14 > pageBot) doc.addPage();
     doc.fontSize(5.5).fillColor(GRAY).text(label, ML, doc.y, { lineBreak: false });
-    doc.y += 8;
+    doc.y += 6;
   }
 
-  const thumbW = 90, thumbH = 68, gapX = 5, gapY = 5;
-  const cols = Math.floor((pw + gapX) / (thumbW + gapX));
-  let col = 0;
-  let rowY = doc.y;
+  const tw = 85, th = 64, gx = 4, gy = 4;
+  const cols = Math.floor((pw + gx) / (tw + gx));
+  let col = 0, rowY = doc.y;
 
-  images.forEach(function (att) {
-    if (col >= cols) { col = 0; rowY += thumbH + gapY; }
-    if (col === 0 && rowY + thumbH > pageBottom) { doc.addPage(); rowY = doc.y; }
-
-    const x = ML + col * (thumbW + gapX);
-    const fp = path.join(__dirname, '..', 'data', 'uploads', 'audits', String(audit.id), att.filename);
-    try { doc.image(fp, x, rowY, { fit: [thumbW, thumbH], align: 'center', valign: 'center' }); }
+  images.forEach(function (img) {
+    if (col >= cols) { col = 0; rowY += th + gy; }
+    if (col === 0 && rowY + th > pageBot) { doc.addPage(); rowY = doc.y; }
+    try { doc.image(img.fp, ML + col * (tw + gx), rowY, { fit: [tw, th], align: 'center', valign: 'center' }); }
     catch (e) { /* skip */ }
     col++;
   });
-
-  doc.y = rowY + thumbH + gapY;
+  doc.y = rowY + th + gy;
   doc.x = ML;
 }
 
