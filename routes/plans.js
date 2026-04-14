@@ -34,7 +34,7 @@ router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client, project_name, site_address, suburb FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
-  res.render('plans/form', { title: 'New Traffic Plan', plan: null, jobs, users, user: req.session.user, preselectedJobId: req.query.job_id || null });
+  res.render('plans/form', { title: 'New Traffic Plan', plan: null, jobs, users, user: req.session.user, preselectedJobId: req.query.job_id || null, query: req.query });
 });
 
 // Create plan
@@ -189,7 +189,7 @@ router.get('/:id/edit', (req, res) => {
   if (!plan) { req.flash('error', 'Plan not found.'); return res.redirect('/plans'); }
   const jobs = db.prepare("SELECT id, job_number, client, project_name, site_address, suburb FROM jobs WHERE status IN ('active','on_hold','won','prestart','tender') ORDER BY job_number DESC").all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
-  res.render('plans/form', { title: 'Edit Traffic Plan', plan, jobs, users, user: req.session.user, preselectedJobId: null });
+  res.render('plans/form', { title: 'Edit Traffic Plan', plan, jobs, users, user: req.session.user, preselectedJobId: null, query: req.query });
 });
 
 // Update plan
@@ -260,24 +260,41 @@ router.post('/:id', upload.single('plan_file'), (req, res) => {
 
 // Delete plan
 router.post('/:id/delete', (req, res) => {
+  const returnTo = req.body.return_to || '/plans';
   try {
     const db = getDb();
-    const plan = db.prepare('SELECT id, plan_number FROM traffic_plans WHERE id = ?').get(req.params.id);
+    const plan = db.prepare('SELECT id, plan_number, job_id, file_path, file_original_name FROM traffic_plans WHERE id = ?').get(req.params.id);
     if (!plan) {
       req.flash('error', 'Plan not found.');
-      return res.redirect('/plans');
+      return res.redirect(returnTo);
     }
+
+    // Delete physical file if exists
+    if (plan.file_path) {
+      const fullPath = require('path').join(__dirname, '..', plan.file_path);
+      try { require('fs').unlinkSync(fullPath); } catch (e) { /* file may not exist */ }
+    }
+
+    // Delete any revisions
+    try { db.prepare('DELETE FROM plan_revisions WHERE plan_id = ?').run(plan.id); } catch (e) { /* table may not exist */ }
+
     const result = db.prepare('DELETE FROM traffic_plans WHERE id = ?').run(req.params.id);
     if (result.changes === 0) {
       req.flash('error', 'Failed to delete plan — no rows affected.');
     } else {
+      autoLogDiary(db, {
+        jobId: plan.job_id,
+        category: 'Traffic Plan Deleted',
+        summary: `[${req.session.user.full_name}] Deleted traffic plan ${plan.plan_number}${plan.file_original_name ? ': ' + plan.file_original_name : ''}.`,
+        userId: req.session.user.id
+      });
       req.flash('success', `Traffic plan ${plan.plan_number} deleted.`);
     }
-    res.redirect('/plans');
+    res.redirect(returnTo);
   } catch (err) {
     console.error('[Plans] Delete error:', err.message, err.stack);
     req.flash('error', 'Failed to delete plan: ' + err.message);
-    res.redirect('/plans');
+    res.redirect(returnTo);
   }
 });
 

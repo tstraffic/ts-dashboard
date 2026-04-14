@@ -6,7 +6,7 @@
   const selectedJobId = (isEdit && plan.job_id) ? plan.job_id : (preselectedJobId || '');
   const statusOptions = (settingsOptions.plan_status || []).map(opt => ({ value: opt.key, label: opt.label }));
   const selectedTypes = isEdit && plan.plan_types ? plan.plan_types.split(',') : [];
-  const returnTo = isEdit && plan.job_id ? '/projects/' + plan.job_id + '#plans' : '/plans';
+  const returnTo = (typeof query !== 'undefined' && query.return_to) ? query.return_to : (isEdit && plan.job_id ? '/jobs/' + plan.job_id + '#plans' : '/plans');
 %>
 
 <!-- Breadcrumb -->
