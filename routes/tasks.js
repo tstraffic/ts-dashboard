@@ -160,7 +160,7 @@ router.get('/', (req, res) => {
 
   // Reference data
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
-  const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND role != 'admin' ORDER BY full_name").all();
+  const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND username != 'admin' ORDER BY full_name").all();
 
   res.render('tasks/index', {
     title: 'Tasks & Actions',
@@ -179,7 +179,7 @@ router.get('/', (req, res) => {
 router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
-  const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND role != 'admin' ORDER BY full_name").all();
+  const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND username != 'admin' ORDER BY full_name").all();
   res.render('tasks/form', { title: 'New Task', task: null, jobs, users, user: req.session.user, prefillJobId: req.query.job_id || '' });
 });
 
@@ -318,7 +318,7 @@ router.get('/:id/edit', (req, res) => {
   const editable = canModifyTask(task, req.session.user);
 
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
-  const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND role != 'admin' ORDER BY full_name").all();
+  const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND username != 'admin' ORDER BY full_name").all();
 
   // Load subtasks
   let subtasks = [];
