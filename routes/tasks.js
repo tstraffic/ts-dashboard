@@ -7,16 +7,38 @@ const { autoLogDiary, logStatusChange } = require('../lib/diary');
 
 /**
  * Check if current user can modify a task.
- * Allowed: task owner, admin role, management role, or the user who created/assigned it.
+ * Allowed: any task owner (via task_owners table), admin role, management role.
  */
 function canModifyTask(task, user) {
   if (!user) return false;
   const role = (user.role || '').toLowerCase();
   // Admin and management can always modify
   if (role === 'admin' || role === 'management') return true;
-  // Task owner can modify their own tasks
+  // Primary owner
   if (task.owner_id && String(task.owner_id) === String(user.id)) return true;
+  // Check task_owners junction table
+  try {
+    const db = getDb();
+    const isOwner = db.prepare('SELECT 1 FROM task_owners WHERE task_id = ? AND user_id = ?').get(task.id, user.id);
+    if (isOwner) return true;
+  } catch (e) { /* table may not exist yet */ }
   return false;
+}
+
+/** Helper: sync task_owners junction table for a task */
+function syncTaskOwners(db, taskId, ownerIds) {
+  db.prepare('DELETE FROM task_owners WHERE task_id = ?').run(taskId);
+  const ins = db.prepare('INSERT OR IGNORE INTO task_owners (task_id, user_id) VALUES (?, ?)');
+  for (const uid of ownerIds) {
+    if (uid) ins.run(taskId, uid);
+  }
+}
+
+/** Helper: get all owner names for a task */
+function getTaskOwnerNames(db, taskId) {
+  try {
+    return db.prepare('SELECT u.id, u.full_name FROM task_owners tow JOIN users u ON tow.user_id = u.id WHERE tow.task_id = ? ORDER BY u.full_name').all(taskId);
+  } catch (e) { return []; }
 }
 
 // GET / — Main tasks view with tabs, counts, and filters
@@ -57,11 +79,17 @@ router.get('/', (req, res) => {
   if (owner === 'all' || (!owner && isAdminRole)) { /* show all tasks */ }
   else if (!owner && isPlanningRole) {
     // Planning sees: their own tasks + planning division tasks + compliance-linked tasks
-    baseWhere += " AND (t.owner_id = ? OR t.division = 'planning' OR t.compliance_id IS NOT NULL)";
-    params.push(req.session.user.id);
+    baseWhere += " AND (t.owner_id = ? OR t.id IN (SELECT task_id FROM task_owners WHERE user_id = ?) OR t.division = 'planning' OR t.compliance_id IS NOT NULL)";
+    params.push(req.session.user.id, req.session.user.id);
   }
-  else if (owner === 'me' || (!owner && !isAdminRole)) { baseWhere += ' AND t.owner_id = ?'; params.push(req.session.user.id); }
-  else if (owner) { baseWhere += ' AND t.owner_id = ?'; params.push(owner); }
+  else if (owner === 'me' || (!owner && !isAdminRole)) {
+    baseWhere += ' AND (t.owner_id = ? OR t.id IN (SELECT task_id FROM task_owners WHERE user_id = ?))';
+    params.push(req.session.user.id, req.session.user.id);
+  }
+  else if (owner) {
+    baseWhere += ' AND (t.owner_id = ? OR t.id IN (SELECT task_id FROM task_owners WHERE user_id = ?))';
+    params.push(owner, owner);
+  }
   if (priority && priority !== 'all') { baseWhere += ' AND t.priority = ?'; params.push(priority); }
   if (division && division !== 'all') { baseWhere += ' AND t.division = ?'; params.push(division); }
   if (job_id) { baseWhere += ' AND t.job_id = ?'; params.push(job_id); }
@@ -81,6 +109,16 @@ router.get('/', (req, res) => {
       CASE t.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END
   `).all(...params, today);
 
+  // Enrich each task with all owner names from task_owners
+  const ownerQuery = db.prepare('SELECT u.id, u.full_name FROM task_owners tow JOIN users u ON tow.user_id = u.id WHERE tow.task_id = ? ORDER BY u.full_name');
+  tasks.forEach(t => {
+    t.owners = ownerQuery.all(t.id);
+    // Fallback: if no task_owners rows but owner_id exists, use the JOIN'd owner_name
+    if (t.owners.length === 0 && t.owner_name) {
+      t.owners = [{ id: t.owner_id, full_name: t.owner_name }];
+    }
+  });
+
   // Status counts (ignoring tab filter but respecting view + other filters)
   let countWhere = '1=1';
   const countParams = [];
@@ -96,8 +134,14 @@ router.get('/', (req, res) => {
     countParams.push(mon2.toISOString().split('T')[0], sun2.toISOString().split('T')[0]);
   }
   if (owner === 'all' || (!owner && isAdminRole)) { /* count all */ }
-  else if (owner === 'me' || (!owner && !isAdminRole)) { countWhere += ' AND t.owner_id = ?'; countParams.push(req.session.user.id); }
-  else if (owner) { countWhere += ' AND t.owner_id = ?'; countParams.push(owner); }
+  else if (owner === 'me' || (!owner && !isAdminRole)) {
+    countWhere += ' AND (t.owner_id = ? OR t.id IN (SELECT task_id FROM task_owners WHERE user_id = ?))';
+    countParams.push(req.session.user.id, req.session.user.id);
+  }
+  else if (owner) {
+    countWhere += ' AND (t.owner_id = ? OR t.id IN (SELECT task_id FROM task_owners WHERE user_id = ?))';
+    countParams.push(owner, owner);
+  }
   if (priority && priority !== 'all') { countWhere += ' AND t.priority = ?'; countParams.push(priority); }
   if (division && division !== 'all') { countWhere += ' AND t.division = ?'; countParams.push(division); }
   if (job_id) { countWhere += ' AND t.job_id = ?'; countParams.push(job_id); }
@@ -116,7 +160,7 @@ router.get('/', (req, res) => {
 
   // Reference data
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
-  const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
+  const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND role != 'admin' ORDER BY full_name").all();
 
   res.render('tasks/index', {
     title: 'Tasks & Actions',
@@ -135,7 +179,7 @@ router.get('/', (req, res) => {
 router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
-  const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
+  const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND role != 'admin' ORDER BY full_name").all();
   res.render('tasks/form', { title: 'New Task', task: null, jobs, users, user: req.session.user, prefillJobId: req.query.job_id || '' });
 });
 
@@ -146,25 +190,32 @@ router.post('/', (req, res) => {
     const b = req.body;
     const jobId = b.job_id || null;
     const division = b.division || 'ops';
+    // Handle multiple owners: owner_id can be string or array
+    const ownerIds = Array.isArray(b.owner_id) ? b.owner_id.filter(Boolean) : (b.owner_id ? [b.owner_id] : []);
+    const primaryOwnerId = ownerIds[0] || null;
+
     const result = db.prepare(`
       INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority, task_type, notes, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(jobId, division, b.title, b.description || '', b.owner_id, b.due_date,
+    `).run(jobId, division, b.title, b.description || '', primaryOwnerId, b.due_date,
       b.status || 'not_started', b.priority || 'medium', b.task_type || 'one_off', b.notes || '', req.session.user.id);
 
-    // Send email notification to assigned owner (fire-and-forget)
-    if (b.owner_id) {
+    const newTaskId = result.lastInsertRowid;
+
+    // Sync all owners to task_owners table
+    syncTaskOwners(db, newTaskId, ownerIds);
+
+    // Send email/push notification to all assigned owners (fire-and-forget)
+    const assignedByName = req.session.user ? req.session.user.full_name : '';
+    const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const job = jobId ? db.prepare('SELECT job_number, client FROM jobs WHERE id = ?').get(jobId) : null;
+    const jobLabel = job ? `${job.job_number} - ${job.client}` : 'General';
+    ownerIds.forEach(oid => {
       try {
-        const newTaskId = result.lastInsertRowid;
-        const ownerUser = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(b.owner_id);
-        const job = jobId ? db.prepare('SELECT job_number, client FROM jobs WHERE id = ?').get(jobId) : null;
-        const jobLabel = job ? `${job.job_number} - ${job.client}` : 'General';
-        const assignedByName = req.session.user ? req.session.user.full_name : '';
-        const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const ownerUser = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(oid);
         const taskData = { id: newTaskId, title: b.title, description: b.description || '', due_date: b.due_date, priority: b.priority || 'medium', task_type: b.task_type || 'one_off' };
         sendTaskAssignmentEmail(taskData, ownerUser, jobLabel, assignedByName, baseUrl).catch(e => console.error('[Tasks] Email async error:', e.message));
-        // Push notification to assigned user's devices
-        sendPushToUser(b.owner_id, {
+        sendPushToUser(oid, {
           title: 'New Task Assigned',
           body: `${b.title} — assigned by ${assignedByName}`,
           url: '/tasks/' + newTaskId + '/edit',
@@ -173,16 +224,16 @@ router.post('/', (req, res) => {
       } catch (emailErr) {
         console.error('[Tasks] Email send error on create:', emailErr.message);
       }
-    }
+    });
 
     // Auto-log to site diary when task is linked to a project on creation
     if (jobId) {
       try {
-        const ownerName = b.owner_id ? (db.prepare('SELECT full_name FROM users WHERE id = ?').get(b.owner_id) || {}).full_name || '' : '';
+        const ownerNames = ownerIds.map(oid => (db.prepare('SELECT full_name FROM users WHERE id = ?').get(oid) || {}).full_name).filter(Boolean);
         autoLogDiary(db, {
           jobId,
           category: 'Task Created',
-          summary: `[${req.session.user ? req.session.user.full_name : 'System'}] New task created: "${b.title}"${ownerName ? ' — assigned to ' + ownerName : ''}${b.due_date ? ' (due ' + b.due_date + ')' : ''} [${(b.priority || 'medium').toUpperCase()}].`,
+          summary: `[${req.session.user ? req.session.user.full_name : 'System'}] New task created: "${b.title}"${ownerNames.length ? ' — assigned to ' + ownerNames.join(', ') : ''}${b.due_date ? ' (due ' + b.due_date + ')' : ''} [${(b.priority || 'medium').toUpperCase()}].`,
           userId: req.session.user ? req.session.user.id : null
         });
       } catch (e) { console.error('[Tasks] Diary log error on create:', e.message); }
@@ -267,7 +318,7 @@ router.get('/:id/edit', (req, res) => {
   const editable = canModifyTask(task, req.session.user);
 
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
-  const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
+  const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND role != 'admin' ORDER BY full_name").all();
 
   // Load subtasks
   let subtasks = [];
@@ -324,6 +375,15 @@ router.get('/:id/edit', (req, res) => {
     }
   } catch (e) { /* compliance_id column may not exist yet */ }
 
+  // Load task owners from junction table
+  const taskOwners = getTaskOwnerNames(db, req.params.id);
+  // Fallback: if no task_owners rows, use primary owner_id
+  if (taskOwners.length === 0 && task.owner_id) {
+    const primaryOwner = db.prepare('SELECT id, full_name FROM users WHERE id = ?').get(task.owner_id);
+    if (primaryOwner) taskOwners.push(primaryOwner);
+  }
+  task.owners = taskOwners;
+
   res.render('tasks/form', { title: 'Edit Task', task, jobs, users, user: req.session.user, prefillJobId: '', editable, subtasks, comments, dependencies, dependents, allTasks, activityLog, linkedCompliance });
 });
 
@@ -344,7 +404,11 @@ router.post('/:id', (req, res) => {
       return res.redirect('/tasks/' + req.params.id + '/edit');
     }
 
-    const ownerChanged = String(existingTask.owner_id) !== String(b.owner_id);
+    // Handle multiple owners
+    const newOwnerIds = Array.isArray(b.owner_id) ? b.owner_id.filter(Boolean) : (b.owner_id ? [b.owner_id] : []);
+    const primaryOwnerId = newOwnerIds[0] || null;
+    const oldOwnerIds = getTaskOwnerNames(db, req.params.id).map(o => String(o.id));
+    const ownersChanged = JSON.stringify(newOwnerIds.sort()) !== JSON.stringify(oldOwnerIds.sort());
 
     const updateJobId = b.job_id || null;
     const division = b.division || 'ops';
@@ -352,30 +416,36 @@ router.post('/:id', (req, res) => {
     db.prepare(`
       UPDATE tasks SET job_id=?, division=?, title=?, description=?, owner_id=?, due_date=?,
       status=?, priority=?, task_type=?, notes=?, completed_date=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
-    `).run(updateJobId, division, b.title, b.description || '', b.owner_id, b.due_date,
+    `).run(updateJobId, division, b.title, b.description || '', primaryOwnerId, b.due_date,
       b.status, b.priority, b.task_type || 'one_off', b.notes || '', completedDate, req.params.id);
 
-    // Send email to new owner if reassigned (fire-and-forget)
-    if (ownerChanged && b.owner_id) {
-      try {
-        const ownerUser = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(b.owner_id);
-        const job = updateJobId ? db.prepare('SELECT job_number, client FROM jobs WHERE id = ?').get(updateJobId) : null;
-        const jobLabel = job ? `${job.job_number} - ${job.client}` : 'General';
-        const assignedByName = req.session.user ? req.session.user.full_name : '';
-        const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
-        const taskData = { id: req.params.id, title: b.title, description: b.description || '', due_date: b.due_date, priority: b.priority || 'medium', task_type: b.task_type || 'one_off' };
-        sendTaskAssignmentEmail(taskData, ownerUser, jobLabel, assignedByName, baseUrl).catch(e => console.error('[Tasks] Email async error:', e.message));
-        // Push notification for reassignment
-        sendPushToUser(b.owner_id, {
-          title: 'Task Reassigned to You',
-          body: `${b.title} — assigned by ${assignedByName}`,
-          url: '/tasks/' + req.params.id + '/edit',
-          type: 'task_assignment'
-        });
-      } catch (emailErr) {
-        console.error('[Tasks] Email send error on reassign:', emailErr.message);
-      }
+    // Sync task_owners junction table
+    syncTaskOwners(db, parseInt(req.params.id), newOwnerIds);
+
+    // Notify newly added owners (fire-and-forget)
+    if (ownersChanged) {
+      const addedOwnerIds = newOwnerIds.filter(id => !oldOwnerIds.includes(String(id)));
+      const assignedByName = req.session.user ? req.session.user.full_name : '';
+      const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+      const job = updateJobId ? db.prepare('SELECT job_number, client FROM jobs WHERE id = ?').get(updateJobId) : null;
+      const jobLabel = job ? `${job.job_number} - ${job.client}` : 'General';
+      addedOwnerIds.forEach(oid => {
+        try {
+          const ownerUser = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(oid);
+          const taskData = { id: req.params.id, title: b.title, description: b.description || '', due_date: b.due_date, priority: b.priority || 'medium', task_type: b.task_type || 'one_off' };
+          sendTaskAssignmentEmail(taskData, ownerUser, jobLabel, assignedByName, baseUrl).catch(e => console.error('[Tasks] Email async error:', e.message));
+          sendPushToUser(oid, {
+            title: 'Task Assigned to You',
+            body: `${b.title} — assigned by ${assignedByName}`,
+            url: '/tasks/' + req.params.id + '/edit',
+            type: 'task_assignment'
+          });
+        } catch (emailErr) {
+          console.error('[Tasks] Email send error on reassign:', emailErr.message);
+        }
+      });
     }
+    const ownerChanged = ownersChanged;
 
     // Auto-log to site diary
     const jobChanged = String(existingTask.job_id || '') !== String(updateJobId || '');
@@ -395,8 +465,8 @@ router.post('/:id', (req, res) => {
       const changes = [];
       if (existingTask.status !== b.status) changes.push(`Status: ${(existingTask.status || '').replace(/_/g, ' ')} → ${(b.status || '').replace(/_/g, ' ')}`);
       if (ownerChanged) {
-        const newOwner = b.owner_id ? db.prepare('SELECT full_name FROM users WHERE id = ?').get(b.owner_id) : null;
-        changes.push(`Reassigned to ${newOwner ? newOwner.full_name : 'unassigned'}`);
+        const newOwnerNames = newOwnerIds.map(oid => (db.prepare('SELECT full_name FROM users WHERE id = ?').get(oid) || {}).full_name).filter(Boolean);
+        changes.push(`Owners: ${newOwnerNames.length ? newOwnerNames.join(', ') : 'unassigned'}`);
       }
       if (existingTask.priority !== b.priority) changes.push(`Priority: ${b.priority}`);
       if (existingTask.title !== b.title) changes.push(`Title renamed to "${b.title}"`);
