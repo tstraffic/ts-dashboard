@@ -1,5 +1,5 @@
 <% const a = audit; %>
-<% function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleString('en-AU'); } catch(e) { return d; } } %>
+<% function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }); } catch(e) { return d; } } %>
 <% function findingLabel(f) { return f === 'pass_with_actions' ? 'Pass with actions' : (f||'—').replace('_',' '); } %>
 <% function stateOf(r) { if (!r) return ''; if (r.state) return r.state; if (r.na) return 'na'; if (r.checked) return 'yes'; return ''; } %>
 <% const ctxMap = (typeof attachmentsByContext !== 'undefined') ? (attachmentsByContext || {}) : {}; %>
