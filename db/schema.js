@@ -4706,6 +4706,27 @@ function runMigrations(db) {
     console.log('Migration 102 applied: employees soft delete column');
   }
 
+  // Migration 103: Training completions table
+  if (!isMigrationApplied.get(103)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS training_completions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER REFERENCES employees(id),
+        module TEXT NOT NULL,
+        full_name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        score INTEGER NOT NULL,
+        total INTEGER NOT NULL,
+        passed INTEGER NOT NULL DEFAULT 0,
+        completed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    try { db.exec("CREATE INDEX idx_tc_employee ON training_completions(employee_id)"); } catch (e) {}
+    try { db.exec("CREATE INDEX idx_tc_email ON training_completions(email)"); } catch (e) {}
+    recordMigration.run(103, 'training_completions table');
+    console.log('Migration 103 applied: training_completions table');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

@@ -873,7 +873,16 @@
       document.getElementById('progressFill').style.width = pct + '%';
       if (panels[idx].id === 'resultsSlide') renderResults();
     }
-    function nextSlide() { if (current < total - 1) showSlide(current + 1); }
+    function nextSlide() {
+      // Validate name/email before entering quiz
+      var nameInput = document.getElementById('trainee-name');
+      var emailInput = document.getElementById('trainee-email');
+      if (nameInput && emailInput && panels[current].querySelector('#trainee-name')) {
+        if (!nameInput.value.trim()) { nameInput.style.borderColor = 'var(--red)'; nameInput.focus(); return; }
+        if (!emailInput.value.trim() || !emailInput.value.includes('@')) { emailInput.style.borderColor = 'var(--red)'; emailInput.focus(); return; }
+      }
+      if (current < total - 1) showSlide(current + 1);
+    }
     function prevSlide() { if (current > 0) showSlide(current - 1); }
 
     // ── Quiz ──
@@ -901,18 +910,43 @@
       });
       var pct = Math.round((correct / quizData.length) * 100);
       var passed = pct >= 90;
+      var traineeName = (document.getElementById('trainee-name') || {}).value || '';
+      var traineeEmail = (document.getElementById('trainee-email') || {}).value || '';
+
       document.getElementById('resultsCard').innerHTML =
         '<div class="score-big ' + (passed ? 'pass' : 'fail') + '">' + correct + ' / ' + quizData.length + '</div>' +
         '<div style="font-size:1.1rem;font-weight:600;color:rgba(255,255,255,0.55);">' + pct + '%</div>' +
         '<div class="result-badge ' + (passed ? 'pass' : 'fail') + '">' + (passed ? '\u2713 PASSED' : '\u2717 NOT YET PASSED') + '</div>' +
-        '<div style="color:rgba(255,255,255,0.55);margin-bottom:1rem;font-size:15px;">' +
-          (passed ? 'Congratulations! You have successfully completed the T&S Employee Guide \u2014 Module 1.' : 'You need 90% or higher to pass. Please review the material and try again.') +
+        '<div style="color:rgba(255,255,255,0.55);margin-bottom:1rem;font-size:15px;" id="resultMsg">' +
+          (passed ? 'Recording your completion...' : 'You need 90% or higher to pass. Please review the material and try again.') +
         '</div>' +
         '<div class="breakdown"><div style="font-weight:600;margin-bottom:0.5rem;font-size:14px;">Question Breakdown</div>' + rows + '</div>' +
-        '<div style="margin-top:1.5rem;">' +
-          (passed ? '<button class="btn btn-green" onclick="window.location.href=\'/training/employee-guide\'">&#10003; Done</button>' : '<button class="btn btn-red" onclick="retryQuiz()">&#8634; Retry Quiz</button>') +
+        '<div style="margin-top:1.5rem;" id="resultActions">' +
+          (passed ? '' : '<button class="btn btn-red" onclick="retryQuiz()">&#8634; Retry Quiz</button>') +
         '</div>';
-      if (passed) spawnConfetti();
+
+      if (passed) {
+        spawnConfetti();
+        // POST completion to server
+        fetch('/training/employee-guide/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ full_name: traineeName, email: traineeEmail, score: correct, total: quizData.length })
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          var msg = document.getElementById('resultMsg');
+          var actions = document.getElementById('resultActions');
+          if (data.success) {
+            msg.innerHTML = 'Congratulations, <strong style="color:white;">' + (traineeName || 'trainee') + '</strong>! Your completion has been recorded.' +
+              (data.linked ? '<br><span style="color:var(--cyan);font-size:13px;">Linked to your employee profile.</span>' : '');
+          } else {
+            msg.textContent = 'Congratulations! You passed, but we couldn\u2019t save the record. Please let admin know.';
+          }
+          actions.innerHTML = '<button class="btn btn-green" onclick="window.location.href=\'/training/employee-guide\'">&#10003; Done</button>';
+        }).catch(function() {
+          document.getElementById('resultMsg').textContent = 'Congratulations! You passed. (Could not reach server to save \u2014 let admin know.)';
+          document.getElementById('resultActions').innerHTML = '<button class="btn btn-green" onclick="window.location.href=\'/training/employee-guide\'">&#10003; Done</button>';
+        });
+      }
     }
 
     function retryQuiz() {

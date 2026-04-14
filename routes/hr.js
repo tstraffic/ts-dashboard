@@ -508,6 +508,10 @@ router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
 
   const settingsOptions = res.locals.settingsOptions || {};
 
+  // Training completions
+  let training = [];
+  try { training = db.prepare('SELECT * FROM training_completions WHERE employee_id = ? ORDER BY completed_at DESC').all(employee.id); } catch (e) {}
+
   res.render('hr/employee-show', {
     title: employee.full_name,
     currentPage: 'hr-employees',
@@ -519,6 +523,7 @@ router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
     crewMember,
     upcomingShifts,
     recentTimesheets,
+    training,
     settingsOptions,
     canViewSensitive: canViewSensitiveHR(req.session.user),
     showRates: canViewRates(req.session.user),
