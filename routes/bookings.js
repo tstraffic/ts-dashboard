@@ -138,13 +138,21 @@ function loadBookingDetail(db, bookingId) {
   try { equipmentList = db.prepare("SELECT be.*, e.name as asset_name, e.category as eq_category FROM booking_equipment be LEFT JOIN equipment e ON e.id = be.equipment_id WHERE be.booking_id = ? ORDER BY be.created_at").all(bookingId); } catch(e) {}
 
   // Compute requirement fulfillment
+  const totalCrewAssigned = crew.length;
   requirements.forEach(r => {
-    const assigned = crew.filter(c => {
-      const role = (c.role_on_site || c.crew_role || '').toLowerCase().replace(/_/g, ' ');
-      return role.includes(r.resource_type.toLowerCase().replace(/_/g, ' '));
-    }).length;
-    r.quantity_assigned = assigned;
-    r.status = assigned >= r.quantity_required ? 'fulfilled' : assigned > 0 ? 'partial' : 'unfulfilled';
+    const resType = r.resource_type.toLowerCase().replace(/_/g, ' ');
+    // For TC Crew requirements, count all assigned crew members
+    if (resType.includes('tc crew') || resType.includes('traffic controller') || resType.includes('hoist') || resType.includes('ip')) {
+      r.quantity_assigned = totalCrewAssigned;
+    } else {
+      // For equipment/vehicle requirements, try to match by type
+      const assigned = crew.filter(c => {
+        const role = (c.role_on_site || c.crew_role || '').toLowerCase().replace(/_/g, ' ');
+        return role.includes(resType);
+      }).length;
+      r.quantity_assigned = assigned;
+    }
+    r.status = r.quantity_assigned >= r.quantity_required ? 'fulfilled' : r.quantity_assigned > 0 ? 'partial' : 'unfulfilled';
   });
 
   return { ...row, supervisor_name: supervisorName, internal_notes: row.notes || '', crew, notes, vehicles, dockets, documents, activity, requirements, equipment: equipmentList, job: jobInfo, client: clientInfo };

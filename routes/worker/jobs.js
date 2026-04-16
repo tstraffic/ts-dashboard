@@ -244,7 +244,7 @@ router.post('/jobs/:id/respond', (req, res) => {
       const confirmedCrew = db.prepare("SELECT COUNT(*) as c FROM booking_crew WHERE booking_id = ? AND status = 'confirmed'").get(fullAlloc.booking_id);
       if (totalCrew && confirmedCrew && totalCrew.c > 0 && confirmedCrew.c >= totalCrew.c) {
         const booking = db.prepare("SELECT status FROM bookings WHERE id = ?").get(fullAlloc.booking_id);
-        if (booking && booking.status === 'confirmed') {
+        if (booking && booking && (booking.status === 'confirmed' || booking.status === 'unconfirmed')) {
           db.prepare("UPDATE bookings SET status = 'gtg', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(fullAlloc.booking_id);
         }
       }
@@ -341,7 +341,7 @@ router.post('/bookings/:id/respond', (req, res) => {
     const conf = db.prepare("SELECT COUNT(*) as c FROM booking_crew WHERE booking_id = ? AND status = 'confirmed'").get(req.params.id);
     if (total && conf && total.c > 0 && conf.c >= total.c) {
       const booking = db.prepare("SELECT status FROM bookings WHERE id = ?").get(req.params.id);
-      if (booking && booking.status === 'confirmed') {
+      if (booking && booking && (booking.status === 'confirmed' || booking.status === 'unconfirmed')) {
         db.prepare("UPDATE bookings SET status = 'gtg', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
       }
     }
