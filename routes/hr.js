@@ -616,8 +616,8 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
       date_of_birth = ?, payroll_reference = ?, internal_notes = ?,
       linked_crew_member_id = ?, linked_user_id = ?,
       white_card_number = ?, tc_licence_number = ?, tc_licence_state = ?, tc_licence_date_of_issue = ?, drivers_licence_number = ?
-      ${rateSet},
-      updated_at = CURRENT_TIMESTAMP
+      ${rateSet}
+      , updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
     ...baseParams, ...rateParams,
