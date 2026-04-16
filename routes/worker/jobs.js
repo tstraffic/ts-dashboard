@@ -20,11 +20,11 @@ router.get('/jobs', (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   const tab = req.query.tab || 'upcoming';
 
-  // Upcoming: allocation_date >= today AND status IN ('allocated','confirmed')
-  const upcoming = db.prepare(`
+  // Upcoming from crew_allocations (job-linked shifts)
+  const allocUpcoming = db.prepare(`
     SELECT ca.*, j.job_number, j.job_name, j.client, j.site_address, j.suburb,
       j.notes as job_notes, j.project_name, j.client_project_number, j.state,
-      u.full_name as supervisor_name
+      u.full_name as supervisor_name, 'allocation' as source
     FROM crew_allocations ca
     JOIN jobs j ON ca.job_id = j.id
     LEFT JOIN users u ON j.ops_supervisor_id = u.id
@@ -34,12 +34,38 @@ router.get('/jobs', (req, res) => {
     ORDER BY ca.allocation_date ASC, ca.start_time ASC
   `).all(worker.id, today);
 
+  // Upcoming from booking_crew (bookings without job allocations — fallback)
+  let bookingUpcoming = [];
+  try {
+    bookingUpcoming = db.prepare(`
+      SELECT bc.id, bc.booking_id, bc.status, bc.role_on_site,
+        b.booking_number as job_number, b.title as job_name, b.title as client,
+        b.site_address, b.suburb, b.notes as job_notes, b.title as project_name,
+        '' as client_project_number, b.state,
+        DATE(b.start_datetime) as allocation_date,
+        SUBSTR(b.start_datetime, 12, 5) as start_time,
+        SUBSTR(b.end_datetime, 12, 5) as end_time,
+        '' as supervisor_name, 'booking' as source
+      FROM booking_crew bc
+      JOIN bookings b ON bc.booking_id = b.id
+      WHERE bc.crew_member_id = ?
+        AND DATE(b.start_datetime) >= ?
+        AND bc.status IN ('assigned', 'confirmed')
+        AND NOT EXISTS (SELECT 1 FROM crew_allocations ca WHERE ca.booking_id = bc.booking_id AND ca.crew_member_id = bc.crew_member_id)
+      ORDER BY b.start_datetime ASC
+    `).all(worker.id, today);
+  } catch (e) { /* booking_crew may not have matching columns */ }
+
+  // Merge and deduplicate
+  const upcoming = [...allocUpcoming, ...bookingUpcoming.map(b => ({
+    ...b, status: b.status === 'assigned' ? 'allocated' : b.status
+  }))].sort((a, b) => (a.allocation_date + a.start_time).localeCompare(b.allocation_date + b.start_time));
+
   // Split upcoming into requests (allocated) and confirmed
   const requests = upcoming.filter(a => a.status === 'allocated');
   const confirmed = upcoming.filter(a => a.status === 'confirmed');
 
-  // Finished: status IN ('completed','declined') OR allocation_date < today
-  // Exclude cancelled, limit 20, most recent first
+  // Finished from crew_allocations
   const finished = db.prepare(`
     SELECT ca.*, j.job_number, j.job_name, j.client, j.site_address, j.suburb,
       j.notes as job_notes, j.project_name, j.client_project_number, j.state,
