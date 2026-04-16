@@ -1,84 +1,139 @@
-/* Worker Portal — Mobile-First Styles */
+/* Worker Portal — Mobile-First Dark Theme */
 
-/* Safe area padding for notch phones (iPhone X+) */
-.safe-area-top {
-  padding-top: env(safe-area-inset-top, 0px);
-}
+/* ── Safe Area ── */
+.safe-area-top { padding-top: env(safe-area-inset-top, 0px); }
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+nav.fixed { padding-bottom: env(safe-area-inset-bottom, 0px); }
+main { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px) + 0.5rem); }
 
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
+/* ── Touch Targets ── */
+a, button { min-height: 44px; }
+nav a { -webkit-tap-highlight-color: transparent; user-select: none; min-height: auto; }
 
-/* Bottom tab nav — fixed with safe area */
-nav.fixed {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
+/* ── Scrolling ── */
+html { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
 
-/* Main content — bottom padding to clear tab bar */
-main {
-  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px) + 1rem);
-}
-
-/* Large touch targets — minimum 44px */
-a, button {
-  min-height: 44px;
-}
-
-/* Prevent text selection on nav */
-nav a {
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-}
-
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Remove default input zoom on iOS */
-input[type="text"],
-input[type="password"],
-input[type="email"],
-input[type="tel"],
-input[type="number"],
-select,
-textarea {
+/* ── Input Zoom Prevention (iOS) ── */
+input[type="text"], input[type="password"], input[type="email"],
+input[type="tel"], input[type="number"], select, textarea {
   font-size: 16px;
 }
 
-/* Active press effect for cards */
-a.active\:bg-gray-50:active {
-  background-color: rgb(249 250 251);
-}
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
 
-/* Custom scrollbar (minimal for mobile) */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 4px;
-}
-
-/* Standalone PWA — hide browser chrome padding */
+/* ── PWA Standalone ── */
 @media all and (display-mode: standalone) {
-  body {
-    padding-top: env(safe-area-inset-top, 0px);
-  }
+  body { padding-top: env(safe-area-inset-top, 0px); }
 }
 
-/* Shift card transition */
-.shift-card {
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+/* ── Card Effects ── */
+.shift-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.shift-card:active { transform: scale(0.98); }
+
+/* ══════════════════════════════════════════════
+   DARK THEME OVERRIDES
+   Transform light Tailwind classes to dark theme
+   matching T&S admin dashboard aesthetic
+   ══════════════════════════════════════════════ */
+
+/* ── Background overrides ── */
+.bg-white { background: rgba(255,255,255,0.05) !important; }
+.bg-gray-50 { background: rgba(255,255,255,0.03) !important; }
+.bg-gray-100 { background: rgba(255,255,255,0.06) !important; }
+.bg-gray-200 { background: rgba(255,255,255,0.08) !important; }
+
+/* ── Border overrides ── */
+.border-gray-100, .border-gray-200, .border-gray-300 {
+  border-color: rgba(255,255,255,0.08) !important;
+}
+.divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+.divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(255,255,255,0.06) !important;
 }
 
-.shift-card:active {
-  transform: scale(0.98);
+/* ── Text overrides ── */
+.text-gray-900 { color: rgba(255,255,255,0.92) !important; }
+.text-gray-800 { color: rgba(255,255,255,0.85) !important; }
+.text-gray-700 { color: rgba(255,255,255,0.72) !important; }
+.text-gray-600 { color: rgba(255,255,255,0.6) !important; }
+.text-gray-500 { color: rgba(255,255,255,0.45) !important; }
+.text-gray-400 { color: rgba(255,255,255,0.35) !important; }
+.text-gray-300 { color: rgba(255,255,255,0.25) !important; }
+
+/* ── Brand color → T&S Cyan ── */
+.text-brand-600, .text-brand-500 { color: #00D2BE !important; }
+.text-brand-400 { color: #00D2BE !important; }
+.bg-brand-600 { background: #00D2BE !important; color: #020817 !important; }
+.bg-brand-500 { background: #22e8d2 !important; color: #020817 !important; }
+.bg-brand-50 { background: rgba(0,210,190,0.1) !important; }
+.bg-brand-100 { background: rgba(0,210,190,0.15) !important; }
+.border-brand-600, .border-brand-500 { border-color: #00D2BE !important; }
+.ring-brand-500 { --tw-ring-color: rgba(0,210,190,0.4) !important; }
+
+/* ── Status badge backgrounds (keep legible on dark) ── */
+.bg-emerald-50 { background: rgba(16,185,129,0.12) !important; }
+.bg-amber-50 { background: rgba(245,158,11,0.12) !important; }
+.bg-red-50 { background: rgba(239,68,68,0.12) !important; }
+.bg-blue-50 { background: rgba(59,130,246,0.12) !important; }
+.bg-purple-50 { background: rgba(139,92,246,0.12) !important; }
+
+/* ── Ring overrides for badges ── */
+.ring-emerald-500\/20 { --tw-ring-color: rgba(16,185,129,0.2) !important; }
+.ring-amber-500\/20 { --tw-ring-color: rgba(245,158,11,0.2) !important; }
+.ring-red-500\/20 { --tw-ring-color: rgba(239,68,68,0.2) !important; }
+
+/* ── Card left borders (shift status) ── */
+a[style*="border-left: 4px solid #f59e0b"] { border-left-color: #f59e0b !important; }
+a[style*="border-left: 4px solid #10b981"] { border-left-color: #10b981 !important; }
+
+/* ── Active states (dark) ── */
+a.active\:bg-gray-50:active, .active\:bg-gray-50:active {
+  background: rgba(255,255,255,0.08) !important;
+}
+.hover\:bg-gray-50:hover {
+  background: rgba(255,255,255,0.06) !important;
+}
+.hover\:bg-gray-100:hover {
+  background: rgba(255,255,255,0.08) !important;
+}
+
+/* ── Form inputs (dark) ── */
+.bg-white.border.rounded-lg,
+input.bg-white, select.bg-white, textarea.bg-white {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: rgba(255,255,255,0.92) !important;
+}
+input::placeholder, textarea::placeholder {
+  color: rgba(255,255,255,0.3) !important;
+}
+.placeholder-gray-400::placeholder, .placeholder-gray-500::placeholder {
+  color: rgba(255,255,255,0.3) !important;
+}
+
+/* ── Rounded card containers ── */
+.rounded-xl.border.border-gray-200,
+.rounded-lg.border.border-gray-200,
+.border.border-gray-200.rounded-xl,
+.border.border-gray-200.rounded-lg {
+  border-color: rgba(255,255,255,0.08) !important;
+}
+
+/* ── Tab bar (light → dark) ── */
+.border-b.border-gray-200 {
+  border-color: rgba(255,255,255,0.08) !important;
+}
+
+/* ── Shadow overrides (subtle glow on dark) ── */
+.shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important; }
+.shadow-lg { box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important; }
+
+/* ── Search input on forms page ── */
+input[type="search"], input[type="text"].bg-white {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+  color: white !important;
 }
