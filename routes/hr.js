@@ -690,7 +690,8 @@ function loadEmployeeWithCrew(req, res, opts = {}) {
       // Check if a crew member with this email already exists
       const existingByEmail = db.prepare('SELECT id FROM crew_members WHERE LOWER(email) = LOWER(?)').get(employee.email);
       if (existingByEmail) {
-        // Link to existing crew member instead of creating a new one
+        // Link to existing crew member and ensure they're active
+        db.prepare('UPDATE crew_members SET active = 1, full_name = ? WHERE id = ?').run(employee.full_name, existingByEmail.id);
         db.prepare('UPDATE employees SET linked_crew_member_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(existingByEmail.id, employee.id);
         employee.linked_crew_member_id = existingByEmail.id;
         crewMember = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(existingByEmail.id);
@@ -727,10 +728,13 @@ function loadEmployeeWithCrew(req, res, opts = {}) {
   return { employee, crewMember };
 }
 
-// POST /employees/:id/enable-portal — Auto-create crew member + link
+// POST /employees/:id/enable-portal — Auto-create crew member + link + activate
 router.post('/employees/:id/enable-portal', requirePermission('hr_employees'), (req, res) => {
   const data = loadEmployeeWithCrew(req, res, { autoCreate: true });
   if (!data) return res.redirect(`/hr/employees/${req.params.id}`);
+  // Ensure the crew member is active for portal login
+  const db = getDb();
+  db.prepare('UPDATE crew_members SET active = 1 WHERE id = ?').run(data.crewMember.id);
   req.flash('success', `Portal access enabled for ${data.employee.full_name}. You can now set a PIN or send an invite.`);
   res.redirect(`/hr/employees/${req.params.id}#workforce`);
 });
