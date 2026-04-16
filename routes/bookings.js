@@ -520,10 +520,46 @@ router.post('/:id/crew', (req, res) => {
   }
 
   db.prepare("INSERT INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'assigned')").run(req.params.id, crew_member_id, role_on_site || '');
-  req.flash('success', 'Crew member added.'); res.redirect('/bookings/' + req.params.id);
+
+  // Auto-create crew_allocation so the worker sees this in their portal
+  if (thisBooking && thisBooking.start_datetime) {
+    const allocDate = thisBooking.start_datetime.substring(0, 10);
+    const startTime = thisBooking.start_datetime.substring(11, 16) || '06:00';
+    const endTime = thisBooking.end_datetime ? thisBooking.end_datetime.substring(11, 16) : '15:00';
+    const booking = db.prepare("SELECT job_id FROM bookings WHERE id=?").get(req.params.id);
+    if (booking && booking.job_id) {
+      // Check if allocation already exists
+      const existing = db.prepare("SELECT id FROM crew_allocations WHERE booking_id=? AND crew_member_id=?").get(req.params.id, crew_member_id);
+      if (!existing) {
+        try {
+          db.prepare(`INSERT INTO crew_allocations (job_id, crew_member_id, allocation_date, start_time, end_time, role_on_site, status, booking_id, allocated_by_id)
+            VALUES (?, ?, ?, ?, ?, ?, 'allocated', ?, ?)`).run(
+            booking.job_id, crew_member_id, allocDate, startTime, endTime, role_on_site || '', req.params.id, req.session.user.id);
+        } catch (e) { console.error('Auto-create allocation error:', e.message); }
+      }
+    }
+  }
+
+  req.flash('success', 'Crew member added — they can now see this shift in their portal.'); res.redirect('/bookings/' + req.params.id);
 });
-router.post('/:id/crew/:crewId/remove', (req, res) => { getDb().prepare("DELETE FROM booking_crew WHERE booking_id=? AND crew_member_id=?").run(req.params.id, req.params.crewId); req.flash('success', 'Removed.'); res.redirect('/bookings/' + req.params.id); });
-router.post('/:id/crew/:crewId/confirm', (req, res) => { getDb().prepare("UPDATE booking_crew SET status='confirmed', confirmed_at=CURRENT_TIMESTAMP WHERE booking_id=? AND crew_member_id=?").run(req.params.id, req.params.crewId); req.flash('success', 'Confirmed.'); res.redirect('/bookings/' + req.params.id); });
+
+// Remove crew from booking + delete matching allocation
+router.post('/:id/crew/:crewId/remove', (req, res) => {
+  const db = getDb();
+  db.prepare("DELETE FROM booking_crew WHERE booking_id=? AND crew_member_id=?").run(req.params.id, req.params.crewId);
+  db.prepare("DELETE FROM crew_allocations WHERE booking_id=? AND crew_member_id=?").run(req.params.id, req.params.crewId);
+  req.flash('success', 'Removed from booking and worker portal.');
+  res.redirect('/bookings/' + req.params.id);
+});
+
+// Confirm crew assignment
+router.post('/:id/crew/:crewId/confirm', (req, res) => {
+  const db = getDb();
+  db.prepare("UPDATE booking_crew SET status='confirmed', confirmed_at=CURRENT_TIMESTAMP WHERE booking_id=? AND crew_member_id=?").run(req.params.id, req.params.crewId);
+  db.prepare("UPDATE crew_allocations SET status='confirmed', confirmed_at=CURRENT_TIMESTAMP WHERE booking_id=? AND crew_member_id=?").run(req.params.id, req.params.crewId);
+  req.flash('success', 'Confirmed.');
+  res.redirect('/bookings/' + req.params.id);
+});
 
 // Notes
 router.post('/:id/notes', (req, res) => {

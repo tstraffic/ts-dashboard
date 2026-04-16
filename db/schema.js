@@ -5021,6 +5021,14 @@ function runMigrations(db) {
     console.log('Migration 111 applied: rate columns + pin_plain');
   }
 
+  // Migration 112: Add booking_id to crew_allocations to bridge bookings → worker portal
+  if (!isMigrationApplied.get(112)) {
+    try { db.exec("ALTER TABLE crew_allocations ADD COLUMN booking_id INTEGER REFERENCES bookings(id)"); } catch (e) { /* column may exist */ }
+    try { db.exec("CREATE INDEX idx_crew_alloc_booking ON crew_allocations(booking_id)"); } catch (e) {}
+    recordMigration.run(112, 'Add booking_id to crew_allocations');
+    console.log('Migration 112 applied: booking_id on crew_allocations');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
