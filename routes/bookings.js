@@ -286,13 +286,21 @@ router.post('/', (req, res) => {
     }
   }
 
-  // Assign crew from form crew selector
+  // Assign crew from form crew selector + auto-create allocations for worker portal
   const crewIds = Array.isArray(b.crew_ids) ? b.crew_ids : (b.crew_ids ? [b.crew_ids] : []);
-  const insertCrew = db.prepare("INSERT OR IGNORE INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'unconfirmed')");
+  const insertCrew = db.prepare("INSERT OR IGNORE INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'assigned')");
+  const insertAlloc = db.prepare("INSERT OR IGNORE INTO crew_allocations (job_id, crew_member_id, allocation_date, start_time, end_time, role_on_site, status, booking_id, allocated_by_id) VALUES (?, ?, ?, ?, ?, ?, 'allocated', ?, ?)");
+  const allocDate = (b.start_date + 'T' + b.start_time + ':00').substring(0, 10);
+  const allocStart = b.start_time || '06:00';
+  const allocEnd = b.end_time || '15:00';
   crewIds.forEach(cid => {
     if (cid) {
       const member = db.prepare("SELECT role FROM crew_members WHERE id = ?").get(cid);
-      insertCrew.run(bookingId, cid, member ? member.role : '');
+      const role = member ? member.role : '';
+      insertCrew.run(bookingId, cid, role);
+      if (b.job_id) {
+        try { insertAlloc.run(b.job_id, cid, allocDate, allocStart, allocEnd, role, bookingId, req.session.user.id); } catch (e) {}
+      }
     }
   });
 
@@ -440,15 +448,24 @@ router.post('/:id', (req, res) => {
     }
   }
 
-  // Update crew assignments if crew_ids provided
+  // Update crew assignments if crew_ids provided + auto-create allocations
   const crewIds = Array.isArray(b.crew_ids) ? b.crew_ids : (b.crew_ids ? [b.crew_ids] : []);
   if (crewIds.length > 0) {
     db.prepare("DELETE FROM booking_crew WHERE booking_id = ?").run(req.params.id);
-    const insertCrew = db.prepare("INSERT OR IGNORE INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'unconfirmed')");
+    db.prepare("DELETE FROM crew_allocations WHERE booking_id = ?").run(req.params.id);
+    const insertCrew = db.prepare("INSERT OR IGNORE INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'assigned')");
+    const insertAlloc = db.prepare("INSERT OR IGNORE INTO crew_allocations (job_id, crew_member_id, allocation_date, start_time, end_time, role_on_site, status, booking_id, allocated_by_id) VALUES (?, ?, ?, ?, ?, ?, 'allocated', ?, ?)");
+    const updAllocDate = (b.start_date + 'T' + b.start_time + ':00').substring(0, 10);
+    const updAllocStart = b.start_time || '06:00';
+    const updAllocEnd = b.end_time || '15:00';
     crewIds.forEach(cid => {
       if (cid) {
         const member = db.prepare("SELECT role FROM crew_members WHERE id = ?").get(cid);
-        insertCrew.run(req.params.id, cid, member ? member.role : '');
+        const role = member ? member.role : '';
+        insertCrew.run(req.params.id, cid, role);
+        if (b.job_id) {
+          try { insertAlloc.run(b.job_id, cid, updAllocDate, updAllocStart, updAllocEnd, role, req.params.id, req.session.user.id); } catch (e) {}
+        }
       }
     });
   }
