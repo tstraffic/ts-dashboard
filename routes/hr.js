@@ -569,65 +569,81 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
   const b = req.body;
   const fullName = [(b.first_name || '').trim(), (b.middle_name || '').trim(), (b.last_name || '').trim()].filter(Boolean).join(' ');
 
-  // Build rate SET clause only if user has permission
-  const rateSet = canViewRates(req.session.user)
-    ? ', rate_day = ?, rate_ot = ?, rate_dt = ?, rate_night = ?, rate_night_ot = ?, rate_night_dt = ?, rate_travel = ?, rate_meal = ?, rate_weekend = ?'
-    : '';
+  // Build SET pairs and params array dynamically
+  const sets = [];
+  const params = [];
 
-  const baseParams = [
-    b.employee_code || null, b.first_name, b.middle_name || '', b.last_name, fullName, b.preferred_name || '',
-    b.company || '', b.division || '', b.role_title || '',
-    b.employment_type || 'full_time', b.employment_status || 'active', b.payment_type || '',
-    b.start_date || null, b.end_date || null, b.probation_end_date || null, b.manager_id || null,
-    b.email || '', b.phone || '', b.address || '', b.suburb || '', b.state || '', b.postcode || '',
-    b.traffic_role_level || '', b.ticket_classification || '',
-    b.white_card_required ? 1 : 0, b.medical_required ? 1 : 0,
-    b.allocatable ? 1 : 0, b.blocked_from_allocation ? 1 : 0, b.block_reason || '',
-    b.induction_status || 'pending',
-    b.ppe_issued_status || 'not_issued', b.uniform_issued_status || 'not_issued',
-    b.company_vehicle_assigned || '',
-    b.primary_work_region || '', b.base_location || '',
-    b.emergency_contact_name || '', b.emergency_contact_phone || '', b.emergency_contact_relationship || '',
-    b.date_of_birth || null, b.payroll_reference || '', b.internal_notes || '',
-    b.linked_crew_member_id || null, b.linked_user_id || null,
-    b.white_card_number || '', b.tc_licence_number || '', b.tc_licence_state || '', b.tc_licence_date_of_issue || '', b.drivers_licence_number || '',
-  ];
+  function set(col, val) { sets.push(col + ' = ?'); params.push(val); }
 
-  const rateParams = canViewRates(req.session.user)
-    ? [parseFloat(b.rate_day) || 0, parseFloat(b.rate_ot) || 0, parseFloat(b.rate_dt) || 0,
-       parseFloat(b.rate_night) || 0, parseFloat(b.rate_night_ot) || 0, parseFloat(b.rate_night_dt) || 0,
-       parseFloat(b.rate_travel) || 0, parseFloat(b.rate_meal) || 0, parseFloat(b.rate_weekend) || 0]
-    : [];
+  set('employee_code', b.employee_code || null);
+  set('first_name', b.first_name || '');
+  set('middle_name', b.middle_name || '');
+  set('last_name', b.last_name || '');
+  set('full_name', fullName);
+  set('preferred_name', b.preferred_name || '');
+  set('company', b.company || '');
+  set('division', b.division || '');
+  set('role_title', b.role_title || '');
+  set('employment_type', b.employment_type || 'full_time');
+  set('employment_status', b.employment_status || 'active');
+  set('payment_type', b.payment_type || '');
+  set('start_date', b.start_date || null);
+  set('end_date', b.end_date || null);
+  set('probation_end_date', b.probation_end_date || null);
+  set('manager_id', b.manager_id || null);
+  set('email', b.email || '');
+  set('phone', b.phone || '');
+  set('address', b.address || '');
+  set('suburb', b.suburb || '');
+  set('state', b.state || '');
+  set('postcode', b.postcode || '');
+  set('traffic_role_level', b.traffic_role_level || '');
+  set('ticket_classification', b.ticket_classification || '');
+  set('white_card_required', b.white_card_required ? 1 : 0);
+  set('medical_required', b.medical_required ? 1 : 0);
+  set('allocatable', b.allocatable ? 1 : 0);
+  set('blocked_from_allocation', b.blocked_from_allocation ? 1 : 0);
+  set('block_reason', b.block_reason || '');
+  set('induction_status', b.induction_status || 'pending');
+  set('ppe_issued_status', b.ppe_issued_status || 'not_issued');
+  set('uniform_issued_status', b.uniform_issued_status || 'not_issued');
+  set('company_vehicle_assigned', b.company_vehicle_assigned || '');
+  set('primary_work_region', b.primary_work_region || '');
+  set('base_location', b.base_location || '');
+  set('emergency_contact_name', b.emergency_contact_name || '');
+  set('emergency_contact_phone', b.emergency_contact_phone || '');
+  set('emergency_contact_relationship', b.emergency_contact_relationship || '');
+  set('date_of_birth', b.date_of_birth || null);
+  set('payroll_reference', b.payroll_reference || '');
+  set('internal_notes', b.internal_notes || '');
+  set('linked_crew_member_id', b.linked_crew_member_id || null);
+  set('linked_user_id', b.linked_user_id || null);
+  set('white_card_number', b.white_card_number || '');
+  set('tc_licence_number', b.tc_licence_number || '');
+  set('tc_licence_state', b.tc_licence_state || '');
+  set('tc_licence_date_of_issue', b.tc_licence_date_of_issue || '');
+  set('drivers_licence_number', b.drivers_licence_number || '');
+
+  if (canViewRates(req.session.user)) {
+    set('rate_day', parseFloat(b.rate_day) || 0);
+    set('rate_ot', parseFloat(b.rate_ot) || 0);
+    set('rate_dt', parseFloat(b.rate_dt) || 0);
+    set('rate_night', parseFloat(b.rate_night) || 0);
+    set('rate_night_ot', parseFloat(b.rate_night_ot) || 0);
+    set('rate_night_dt', parseFloat(b.rate_night_dt) || 0);
+    set('rate_travel', parseFloat(b.rate_travel) || 0);
+    set('rate_meal', parseFloat(b.rate_meal) || 0);
+    set('rate_weekend', parseFloat(b.rate_weekend) || 0);
+  }
+
+  sets.push('updated_at = CURRENT_TIMESTAMP');
+  params.push(req.params.id);
 
   try {
-    db.prepare(`
-      UPDATE employees SET
-        employee_code = ?, first_name = ?, middle_name = ?, last_name = ?, full_name = ?, preferred_name = ?,
-        company = ?, division = ?, role_title = ?,
-        employment_type = ?, employment_status = ?, payment_type = ?,
-        start_date = ?, end_date = ?, probation_end_date = ?, manager_id = ?,
-        email = ?, phone = ?, address = ?, suburb = ?, state = ?, postcode = ?,
-        traffic_role_level = ?, ticket_classification = ?,
-        white_card_required = ?, medical_required = ?,
-        allocatable = ?, blocked_from_allocation = ?, block_reason = ?,
-        induction_status = ?,
-        ppe_issued_status = ?, uniform_issued_status = ?, company_vehicle_assigned = ?,
-        primary_work_region = ?, base_location = ?,
-        emergency_contact_name = ?, emergency_contact_phone = ?, emergency_contact_relationship = ?,
-        date_of_birth = ?, payroll_reference = ?, internal_notes = ?,
-        linked_crew_member_id = ?, linked_user_id = ?,
-        white_card_number = ?, tc_licence_number = ?, tc_licence_state = ?, tc_licence_date_of_issue = ?, drivers_licence_number = ?
-        ${rateSet}
-        , updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
-      ...baseParams, ...rateParams,
-      req.params.id
-    );
-
+    db.prepare('UPDATE employees SET ' + sets.join(', ') + ' WHERE id = ?').run(...params);
     req.flash('success', 'Employee updated successfully.');
   } catch (err) {
-    console.error('UPDATE employee error:', err.message, { id: req.params.id, rateSet: rateSet ? 'included' : 'excluded', baseParamCount: baseParams.length, rateParamCount: rateParams.length });
+    console.error('UPDATE employee error:', err.message, { id: req.params.id, setCount: sets.length, paramCount: params.length });
     req.flash('error', 'Error updating employee: ' + err.message);
   }
   res.redirect(`/hr/employees/${req.params.id}`);
