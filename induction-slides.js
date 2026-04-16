@@ -258,7 +258,7 @@ const employeeGuideSlides = [
   {
     title: 'Module 1 Quiz',
     subtitle: '',
-    content: '<div style="max-width:40rem;margin:0 auto;text-align:center;"><p style="font-size:15px;color:rgba(255,255,255,0.65);margin-bottom:1.25rem;">You are about to take a <strong>10-question quiz</strong> based on everything covered in this module. You need <strong>90% or higher</strong> to pass.</p><div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:20px;margin-bottom:1.25rem;text-align:left;"><p style="font-weight:600;font-size:14px;color:white;margin-bottom:12px;">Enter your details to record your completion</p><div style="display:grid;gap:10px;"><input type="text" id="trainee-name" placeholder="Full Name" required style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:white;font-size:14px;font-family:Inter,sans-serif;outline:none;" onfocus="this.style.borderColor=\'rgba(0,210,190,0.5)\'" onblur="this.style.borderColor=\'rgba(255,255,255,0.12)\'"><input type="email" id="trainee-email" placeholder="Email Address" required style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:white;font-size:14px;font-family:Inter,sans-serif;outline:none;" onfocus="this.style.borderColor=\'rgba(0,210,190,0.5)\'" onblur="this.style.borderColor=\'rgba(255,255,255,0.12)\'"></div><p style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:8px;">Use the same email as your T&S employee account for automatic linking.</p></div><p style="color:rgba(255,255,255,0.55);font-size:13px;">Select one answer per question, then advance to the next. Your results will be shown at the end.</p></div>',
+    content: '<div style="max-width:40rem;margin:0 auto;text-align:center;"><p style="font-size:15px;color:rgba(255,255,255,0.65);margin-bottom:1.25rem;">You are about to take a <strong>12-question quiz</strong> based on everything covered in this module. You need <strong>90% or higher</strong> to pass.</p><div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:20px;margin-bottom:1.25rem;text-align:left;"><p style="font-weight:600;font-size:14px;color:white;margin-bottom:12px;">Enter your details to record your completion</p><div style="display:grid;gap:10px;"><input type="text" id="trainee-name" placeholder="Full Name" required style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:white;font-size:14px;font-family:Inter,sans-serif;outline:none;" onfocus="this.style.borderColor=\'rgba(0,210,190,0.5)\'" onblur="this.style.borderColor=\'rgba(255,255,255,0.12)\'"><input type="email" id="trainee-email" placeholder="Email Address" required style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:white;font-size:14px;font-family:Inter,sans-serif;outline:none;" onfocus="this.style.borderColor=\'rgba(0,210,190,0.5)\'" onblur="this.style.borderColor=\'rgba(255,255,255,0.12)\'"></div><p style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:8px;">Use the same email as your T&S employee account for automatic linking.</p></div><p style="color:rgba(255,255,255,0.55);font-size:13px;">Select one answer per question, then advance to the next. Your results will be shown at the end.</p></div>',
     layout: 'highlight',
     icon: ''
   },
@@ -410,6 +410,36 @@ const employeeGuideSlides = [
         { id: 'd', text: 'Approach' }
       ],
       correctAnswer: 'b'
+    }
+  },
+  // ── Quiz Q11: Payday ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 11,
+      question: 'When do you get paid for your work at T&S?',
+      options: [
+        { id: 'a', text: 'Every Friday for the current week' },
+        { id: 'b', text: 'Every Thursday for the previous week (Mon–Sun)' },
+        { id: 'c', text: 'Fortnightly on Wednesdays' },
+        { id: 'd', text: 'At the end of each month' }
+      ],
+      correctAnswer: 'b'
+    }
+  },
+  // ── Quiz Q12: Lockbox PIN ──
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 12,
+      question: 'What is the PIN for a T&S ute\'s lockbox and fuel card?',
+      options: [
+        { id: 'a', text: 'The last 4 digits of the ute\'s registration' },
+        { id: 'b', text: '0000 for all utes' },
+        { id: 'c', text: 'The ute\'s designated number — e.g. ute 004 = PIN 0004' },
+        { id: 'd', text: 'Each driver sets their own PIN' }
+      ],
+      correctAnswer: 'c'
     }
   },
   // ── Quiz Results ──

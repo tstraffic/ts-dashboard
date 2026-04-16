@@ -281,6 +281,78 @@
         </div>
         <% } %>
 
+        <!-- Super & Bank Details (from induction submission) -->
+        <% if (locals.induction) { %>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+          <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Superannuation & Bank Details</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
+            <% if (induction.super_fund_name) { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Super Fund</p>
+              <p class="text-sm font-medium text-gray-900"><%= induction.super_fund_name %></p>
+            </div>
+            <% } %>
+            <% if (induction.super_fund_abn) { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Super ABN</p>
+              <p class="text-sm text-gray-700 font-mono"><%= induction.super_fund_abn %></p>
+            </div>
+            <% } %>
+            <% if (induction.super_usi) { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">USI</p>
+              <p class="text-sm text-gray-700 font-mono"><%= induction.super_usi %></p>
+            </div>
+            <% } %>
+            <% if (induction.super_member_number) { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Member Number</p>
+              <p class="text-sm text-gray-700 font-mono"><%= induction.super_member_number %></p>
+            </div>
+            <% } %>
+            <% if (induction.bank_name) { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bank</p>
+              <p class="text-sm font-medium text-gray-900"><%= induction.bank_name %></p>
+            </div>
+            <% } %>
+            <% if (induction.bank_account_name) { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Name</p>
+              <p class="text-sm text-gray-700"><%= induction.bank_account_name %></p>
+            </div>
+            <% } %>
+            <% if (induction.bank_bsb) { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">BSB</p>
+              <p class="text-sm text-gray-700 font-mono"><%= induction.bank_bsb %></p>
+            </div>
+            <% } %>
+            <% if (induction.bank_account_number) { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Number</p>
+              <p class="text-sm text-gray-700 font-mono"><%= induction.bank_account_number %></p>
+            </div>
+            <% } %>
+            <% if (induction.tax_file_number) { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">TFN</p>
+              <p class="text-sm text-gray-700 font-mono"><%= induction.tax_file_number %></p>
+            </div>
+            <% } %>
+            <% if (induction.abn_number) { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">ABN</p>
+              <p class="text-sm text-gray-700 font-mono"><%= induction.abn_number %></p>
+            </div>
+            <% } %>
+          </div>
+          <% if (!induction.super_fund_name && !induction.bank_bsb && !induction.tax_file_number && !induction.abn_number) { %>
+            <p class="text-sm text-gray-400">No super or bank details submitted yet.</p>
+          <% } %>
+        </div>
+        <% } %>
+
         <!-- Internal Notes -->
         <% if (employee.internal_notes) { %>
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">

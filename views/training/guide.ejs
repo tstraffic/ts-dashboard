@@ -747,7 +747,7 @@
       <% } else if (slide.layout === 'interactive-quiz' && slide.quizData) { %>
         <section class="slide-panel" data-idx="<%= idx %>" data-quiz="<%= slide.quizData.questionNumber %>">
           <div style="text-align:center;flex:1;display:flex;flex-direction:column;justify-content:center;">
-            <div class="badge badge-blue">Question <%= slide.quizData.questionNumber %> of 10</div>
+            <div class="badge badge-blue">Question <%= slide.quizData.questionNumber %> of 12</div>
             <h2 style="max-width:600px;margin:0 auto;"><%= slide.quizData.question %></h2>
             <div class="quiz-options" id="qopts-<%= slide.quizData.questionNumber %>">
               <% slide.quizData.options.forEach(function(opt) { %>

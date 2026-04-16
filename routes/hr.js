@@ -515,6 +515,15 @@ router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
   let training = [];
   try { training = db.prepare('SELECT * FROM training_completions WHERE employee_id = ? ORDER BY completed_at DESC').all(employee.id); } catch (e) {}
 
+  // Induction submission (for super/bank details) — linked via crew member
+  let induction = null;
+  if (employee.linked_crew_member_id) {
+    try { induction = db.prepare("SELECT * FROM induction_submissions WHERE linked_crew_member_id = ? AND status IN ('submitted','approved') ORDER BY submitted_at DESC LIMIT 1").get(employee.linked_crew_member_id); } catch (e) {}
+  }
+  if (!induction && employee.email) {
+    try { induction = db.prepare("SELECT * FROM induction_submissions WHERE email = ? AND status IN ('submitted','approved') ORDER BY submitted_at DESC LIMIT 1").get(employee.email); } catch (e) {}
+  }
+
   res.render('hr/employee-show', {
     title: employee.full_name,
     currentPage: 'hr-employees',
@@ -527,6 +536,7 @@ router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
     upcomingShifts,
     recentTimesheets,
     training,
+    induction,
     settingsOptions,
     canViewSensitive: canViewSensitiveHR(req.session.user),
     showRates: canViewRates(req.session.user),
