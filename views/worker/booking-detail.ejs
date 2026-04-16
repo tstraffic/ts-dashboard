@@ -1,0 +1,149 @@
+<div class="px-4 pt-3 pb-4 space-y-4">
+  <!-- Back + Title -->
+  <div class="flex items-center gap-3">
+    <a href="/w/jobs" class="text-sm font-medium" style="color:#00D2BE;">&larr; Jobs</a>
+    <span class="text-sm text-gray-400">|</span>
+    <span class="text-sm font-semibold"><%= booking.booking_number %></span>
+  </div>
+
+  <!-- Accept / Decline (if pending) -->
+  <% if (myStatus === 'assigned' || myStatus === 'allocated') { %>
+  <div class="flex gap-3">
+    <form method="POST" action="/w/bookings/<%= booking.id %>/respond" class="flex-1">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="action" value="accept">
+      <button type="submit" class="w-full py-3 rounded-xl text-sm font-bold transition" style="background:#16a34a;color:white;">
+        &#10003; Accept
+      </button>
+    </form>
+    <form method="POST" action="/w/bookings/<%= booking.id %>/respond" class="flex-1">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="action" value="decline">
+      <button type="submit" class="w-full py-3 rounded-xl text-sm font-bold transition" style="background:#dc2626;color:white;">
+        &#10007; Decline
+      </button>
+    </form>
+  </div>
+  <% } else if (myStatus === 'confirmed') { %>
+  <div class="p-3 rounded-xl text-center text-sm font-medium" style="background:rgba(22,163,74,0.12);color:#4ade80;border:1px solid rgba(22,163,74,0.25);">
+    &#10003; You have accepted this shift
+  </div>
+  <% } %>
+
+  <!-- Location -->
+  <div>
+    <p class="text-base font-semibold"><%= booking.site_address || booking.suburb || 'Location TBC' %><%= booking.suburb && booking.state ? ', ' + booking.state : '' %></p>
+    <p class="text-sm text-gray-400 mt-1">
+      Your shift: <%= startDay %>, <%= startDate %> at
+      <% if (booking.depot_meeting_time) { %>Depot <%= booking.depot_meeting_time %><% } else { %><%= startTime %><% } %>
+      <% if (endTime) { %> – <%= endTime %> (approx)<% } %>
+    </p>
+  </div>
+
+  <!-- Tabs: DETAILS / DOCS / FORMS -->
+  <div class="flex border-b" style="border-color:rgba(255,255,255,0.08);">
+    <a href="?tab=details" class="px-4 py-2.5 text-sm font-semibold transition-colors <%= tab === 'details' ? 'border-b-2' : '' %>"
+      style="<%= tab === 'details' ? 'color:#00D2BE;border-color:#00D2BE;' : 'color:rgba(255,255,255,0.45);' %>">DETAILS</a>
+    <a href="?tab=docs" class="px-4 py-2.5 text-sm font-semibold transition-colors <%= tab === 'docs' ? 'border-b-2' : '' %>"
+      style="<%= tab === 'docs' ? 'color:#00D2BE;border-color:#00D2BE;' : 'color:rgba(255,255,255,0.45);' %>">DOCS</a>
+    <a href="?tab=forms" class="px-4 py-2.5 text-sm font-semibold transition-colors <%= tab === 'forms' ? 'border-b-2' : '' %>"
+      style="<%= tab === 'forms' ? 'color:#00D2BE;border-color:#00D2BE;' : 'color:rgba(255,255,255,0.45);' %>">FORMS</a>
+  </div>
+
+  <!-- DETAILS TAB -->
+  <% if (tab === 'details') { %>
+  <div class="space-y-3">
+    <h3 class="text-xs font-bold uppercase tracking-wider" style="color:#00D2BE;">Details</h3>
+    <div class="space-y-2">
+      <% var details = [
+        ['Booking', (startTime || '') + ' – ' + (endTime || '') + ' (approx)'],
+        ['Booking #', booking.booking_number],
+        ['Depot', booking.depot || '-'],
+        ['Depot Meeting', booking.depot_meeting_time || '-'],
+        ['Client', booking.client_name || '-'],
+        ['Site Address', (booking.site_address || '-') + (booking.suburb ? ', ' + booking.suburb : '')],
+        ['Order #', booking.order_number || '-'],
+        ['Billing Code', booking.billing_code || '-'],
+        ['Status', booking.status],
+      ]; %>
+      <% details.forEach(function(d) { %>
+        <div class="flex items-start justify-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+          <span class="text-xs text-gray-400 w-28 shrink-0"><%= d[0] %></span>
+          <span class="text-sm text-right flex-1"><%= d[1] %></span>
+        </div>
+      <% }); %>
+    </div>
+
+    <% if (booking.notes || booking.requirements_text) { %>
+    <div class="mt-3">
+      <h3 class="text-xs font-bold uppercase tracking-wider mb-2" style="color:#00D2BE;">Description</h3>
+      <p class="text-sm text-gray-400 whitespace-pre-wrap"><%= booking.requirements_text || booking.notes || '' %></p>
+    </div>
+    <% } %>
+
+    <!-- Crew and Resources -->
+    <div class="mt-3">
+      <h3 class="text-xs font-bold uppercase tracking-wider mb-2" style="color:#00D2BE;">Crew and resources</h3>
+      <% if (crew.length > 0) { %>
+        <div class="space-y-2">
+          <% crew.forEach(function(c) { %>
+          <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);">
+              <%= c.full_name.split(' ').map(n => n[0]).join('').slice(0,2) %>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-medium"><%= c.full_name %></p>
+              <p class="text-xs text-gray-500"><%= c.role || c.role_on_site || 'Traffic Controller' %></p>
+            </div>
+            <span class="text-[10px] font-medium px-2 py-0.5 rounded-full <%= c.status === 'confirmed' ? 'bg-emerald-500/20 text-emerald-400' : c.status === 'declined' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400' %>">
+              <%= c.status === 'confirmed' ? 'Accepted' : c.status === 'declined' ? 'Declined' : 'Pending' %>
+            </span>
+          </div>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <p class="text-sm text-gray-500">No crew assigned yet.</p>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- DOCS TAB -->
+  <% if (tab === 'docs') { %>
+  <div class="py-4 text-center">
+    <p class="text-sm text-gray-500">No documents attached to this booking yet.</p>
+    <p class="text-xs text-gray-600 mt-1">Site documents will appear here when uploaded by admin.</p>
+  </div>
+  <% } %>
+
+  <!-- FORMS TAB -->
+  <% if (tab === 'forms') { %>
+  <div class="space-y-3">
+    <p class="text-xs text-gray-500">Shift-specific checklists and timesheets for this booking.</p>
+
+    <!-- Dockets -->
+    <div class="flex items-center justify-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+      <span class="text-sm font-semibold" style="color:#00D2BE;">Dockets</span>
+      <span class="text-xs text-gray-500">Coming soon</span>
+    </div>
+
+    <!-- Pre-Start Checklist -->
+    <div class="flex items-center justify-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+      <span class="text-sm font-semibold" style="color:#00D2BE;">Pre-Start Checklist</span>
+      <span class="text-xs text-gray-500">Coming soon</span>
+    </div>
+
+    <!-- Team Leader Checklist -->
+    <div class="flex items-center justify-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+      <span class="text-sm font-semibold" style="color:#00D2BE;">Team Leader Checklist</span>
+      <span class="text-xs text-gray-500">Coming soon</span>
+    </div>
+
+    <!-- Vehicle Checklist -->
+    <div class="flex items-center justify-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+      <span class="text-sm font-semibold" style="color:#00D2BE;">Vehicle Checklist</span>
+      <span class="text-xs text-gray-500">Coming soon</span>
+    </div>
+  </div>
+  <% } %>
+</div>

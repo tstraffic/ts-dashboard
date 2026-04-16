@@ -269,6 +269,54 @@ router.post('/jobs/:id/respond', (req, res) => {
   res.redirect('/w/jobs/' + req.params.id);
 });
 
+// GET /w/booking-shift/:bookingId — Booking detail (for booking_crew-based shifts)
+router.get('/booking-shift/:bookingId', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const tab = req.query.tab || 'details';
+
+  // Get booking details
+  const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(req.params.bookingId);
+  if (!booking) { req.flash('error', 'Booking not found.'); return res.redirect('/w/jobs'); }
+
+  // Verify this worker is assigned to this booking
+  const myAssignment = db.prepare('SELECT * FROM booking_crew WHERE booking_id = ? AND crew_member_id = ?').get(booking.id, worker.id);
+  if (!myAssignment) { req.flash('error', 'You are not assigned to this booking.'); return res.redirect('/w/jobs'); }
+
+  // Get all crew on this booking
+  const crew = db.prepare(`
+    SELECT bc.*, cm.full_name, cm.phone, cm.role
+    FROM booking_crew bc
+    JOIN crew_members cm ON bc.crew_member_id = cm.id
+    WHERE bc.booking_id = ?
+    ORDER BY cm.full_name
+  `).all(booking.id);
+
+  // Get client name from client_id if available
+  let clientName = '';
+  if (booking.client_id) {
+    try { const client = db.prepare('SELECT company_name FROM clients WHERE id = ?').get(booking.client_id); if (client) clientName = client.company_name; } catch (e) {}
+  }
+  booking.client_name = clientName || booking.client_contact || '';
+
+  // Format dates
+  const startDt = booking.start_datetime ? new Date(booking.start_datetime) : new Date();
+  const startDay = startDt.toLocaleDateString('en-AU', { weekday: 'long' });
+  const startDate = startDt.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+  const startTime = booking.start_datetime ? booking.start_datetime.substring(11, 16) : '';
+  const endTime = booking.end_datetime ? booking.end_datetime.substring(11, 16) : '';
+
+  res.render('worker/booking-detail', {
+    title: booking.title || booking.booking_number,
+    currentPage: 'shifts',
+    tab,
+    booking,
+    crew,
+    myStatus: myAssignment.status,
+    startDay, startDate, startTime, endTime,
+  });
+});
+
 // POST /w/bookings/:id/respond — Accept or decline a booking_crew assignment (no allocation)
 router.post('/bookings/:id/respond', (req, res) => {
   const db = getDb();
