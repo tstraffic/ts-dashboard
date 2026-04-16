@@ -566,7 +566,12 @@ router.get('/employees/:id/edit', requirePermission('hr_employees'), (req, res) 
 // ============================================
 router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
-  const b = req.body;
+  // Deduplicate: form has some fields appearing twice (noscript fallback + wizard panels).
+  // Express parses duplicates as arrays — take the last value (most recent panel's input).
+  const b = {};
+  for (const [key, val] of Object.entries(req.body)) {
+    b[key] = Array.isArray(val) ? val[val.length - 1] : val;
+  }
   const fullName = [(b.first_name || '').trim(), (b.middle_name || '').trim(), (b.last_name || '').trim()].filter(Boolean).join(' ');
 
   // Build SET pairs and params array dynamically
