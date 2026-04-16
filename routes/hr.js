@@ -496,17 +496,21 @@ router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
   let recentTimesheets = [];
   if (employee.linked_crew_member_id) {
     crewMember = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(employee.linked_crew_member_id);
-    upcomingShifts = db.prepare(`
-      SELECT ca.*, j.job_number, j.client FROM crew_allocations ca
-      JOIN jobs j ON ca.job_id = j.id
-      WHERE ca.crew_member_id = ? AND ca.allocation_date >= DATE('now') AND ca.status != 'cancelled'
-      ORDER BY ca.allocation_date ASC LIMIT 10
-    `).all(employee.linked_crew_member_id);
-    recentTimesheets = db.prepare(`
-      SELECT t.*, j.job_number, j.client FROM timesheets t
-      JOIN jobs j ON t.job_id = j.id
-      WHERE t.crew_member_id = ? ORDER BY t.work_date DESC LIMIT 10
-    `).all(employee.linked_crew_member_id);
+    try {
+      upcomingShifts = db.prepare(`
+        SELECT ca.*, j.job_number, j.client FROM crew_allocations ca
+        JOIN jobs j ON ca.job_id = j.id
+        WHERE ca.crew_member_id = ? AND ca.allocation_date >= DATE('now') AND ca.status != 'cancelled'
+        ORDER BY ca.allocation_date ASC LIMIT 10
+      `).all(employee.linked_crew_member_id);
+    } catch (e) { upcomingShifts = []; }
+    try {
+      recentTimesheets = db.prepare(`
+        SELECT t.*, j.job_number, j.client FROM timesheets t
+        JOIN jobs j ON t.job_id = j.id
+        WHERE t.crew_member_id = ? ORDER BY t.work_date DESC LIMIT 10
+      `).all(employee.linked_crew_member_id);
+    } catch (e) { recentTimesheets = []; }
   }
 
   const settingsOptions = res.locals.settingsOptions || {};
@@ -682,25 +686,40 @@ function loadEmployeeWithCrew(req, res, opts = {}) {
   // Auto-create crew member if not linked and auto-create is requested
   if (!crewMember && opts.autoCreate) {
     if (!employee.email) { req.flash('error', 'Employee needs an email address before enabling portal access.'); return null; }
-    // Generate employee_id for crew member
-    const lastCrew = db.prepare("SELECT employee_id FROM crew_members WHERE employee_id LIKE 'EMP-%' ORDER BY CAST(REPLACE(employee_id, 'EMP-', '') AS INTEGER) DESC LIMIT 1").get();
-    let nextNum = 1;
-    if (lastCrew && lastCrew.employee_id) { const n = parseInt(lastCrew.employee_id.replace('EMP-', ''), 10); if (!isNaN(n)) nextNum = n + 1; }
-    const crewEmpId = employee.employee_code || ('EMP-' + String(nextNum).padStart(6, '0'));
+    try {
+      // Check if a crew member with this email already exists
+      const existingByEmail = db.prepare('SELECT id FROM crew_members WHERE LOWER(email) = LOWER(?)').get(employee.email);
+      if (existingByEmail) {
+        // Link to existing crew member instead of creating a new one
+        db.prepare('UPDATE employees SET linked_crew_member_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(existingByEmail.id, employee.id);
+        employee.linked_crew_member_id = existingByEmail.id;
+        crewMember = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(existingByEmail.id);
+      } else {
+        // Generate employee_id for crew member
+        const lastCrew = db.prepare("SELECT employee_id FROM crew_members WHERE employee_id LIKE 'EMP-%' ORDER BY CAST(REPLACE(employee_id, 'EMP-', '') AS INTEGER) DESC LIMIT 1").get();
+        let nextNum = 1;
+        if (lastCrew && lastCrew.employee_id) { const n = parseInt(lastCrew.employee_id.replace('EMP-', ''), 10); if (!isNaN(n)) nextNum = n + 1; }
+        const crewEmpId = employee.employee_code || ('EMP-' + String(nextNum).padStart(6, '0'));
 
-    const result = db.prepare(`
-      INSERT INTO crew_members (full_name, employee_id, role, phone, email, company, employment_type, active, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'available')
-    `).run(employee.full_name, crewEmpId, employee.traffic_role_level || employee.role_title || 'Traffic Controller',
-      employee.phone || '', employee.email, employee.company || 'T&S Traffic Control',
-      employee.employment_type || 'casual');
+        const result = db.prepare(`
+          INSERT INTO crew_members (full_name, employee_id, role, phone, email, company, employment_type, active, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'available')
+        `).run(employee.full_name, crewEmpId, employee.traffic_role_level || employee.role_title || 'Traffic Controller',
+          employee.phone || '', employee.email, employee.company || 'T&S Traffic Control',
+          employee.employment_type || 'casual');
 
-    const crewId = result.lastInsertRowid;
-    db.prepare('UPDATE employees SET linked_crew_member_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(crewId, employee.id);
-    employee.linked_crew_member_id = crewId;
-    crewMember = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(crewId);
-    if (req.session && req.session.user) {
-      logActivity({ user: req.session.user, action: 'create', entityType: 'crew_member', entityId: crewId, entityLabel: employee.full_name, details: 'Auto-created crew member from employee profile', ip: req.ip });
+        const crewId = result.lastInsertRowid;
+        db.prepare('UPDATE employees SET linked_crew_member_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(crewId, employee.id);
+        employee.linked_crew_member_id = crewId;
+        crewMember = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(crewId);
+        if (req.session && req.session.user) {
+          logActivity({ user: req.session.user, action: 'create', entityType: 'crew_member', entityId: crewId, entityLabel: employee.full_name, details: 'Auto-created crew member from employee profile', ip: req.ip });
+        }
+      }
+    } catch (err) {
+      console.error('Auto-create crew member error:', err.message, { employeeId: employee.id, email: employee.email });
+      req.flash('error', 'Error creating portal access: ' + err.message);
+      return null;
     }
   }
 
