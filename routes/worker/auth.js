@@ -19,22 +19,29 @@ router.get('/login', (req, res) => {
   });
 });
 
-// POST /w/login — Authenticate worker
+// POST /w/login — Authenticate worker (accepts email OR employee_id)
 router.post('/login', (req, res) => {
   const { employee_id, pin } = req.body;
+  const loginId = (employee_id || '').trim();
 
-  if (!employee_id || !pin) {
-    req.flash('error', 'Please enter your Employee ID and PIN.');
+  if (!loginId || !pin) {
+    req.flash('error', 'Please enter your Email or Employee ID and PIN.');
     return res.redirect('/w/login');
   }
 
   const db = getDb();
-  const member = db.prepare(
-    'SELECT id, full_name, employee_id, role, phone, email, pin_hash, active FROM crew_members WHERE employee_id = ?'
-  ).get(employee_id.trim());
+  // Try email first, then employee_id
+  let member = db.prepare(
+    'SELECT id, full_name, employee_id, role, phone, email, pin_hash, active FROM crew_members WHERE LOWER(email) = LOWER(?)'
+  ).get(loginId);
+  if (!member) {
+    member = db.prepare(
+      'SELECT id, full_name, employee_id, role, phone, email, pin_hash, active FROM crew_members WHERE employee_id = ?'
+    ).get(loginId);
+  }
 
   if (!member) {
-    req.flash('error', 'Invalid Employee ID or PIN.');
+    req.flash('error', 'Invalid credentials. Try your email address or Employee ID.');
     return res.redirect('/w/login');
   }
 

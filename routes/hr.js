@@ -668,20 +668,57 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
 // WORKER PORTAL PIN MANAGEMENT
 // ============================================
 
-// Helper: load employee + linked crew member, or flash error
-function loadEmployeeWithCrew(req, res) {
+// Helper: load employee + linked crew member. Auto-creates crew member if missing.
+function loadEmployeeWithCrew(req, res, opts = {}) {
   const db = getDb();
   const employee = db.prepare('SELECT * FROM employees WHERE id = ?').get(req.params.id);
   if (!employee) { req.flash('error', 'Employee not found.'); return null; }
-  if (!employee.linked_crew_member_id) { req.flash('error', 'Employee is not linked to a crew member.'); return null; }
-  const crewMember = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(employee.linked_crew_member_id);
-  if (!crewMember) { req.flash('error', 'Linked crew member not found.'); return null; }
+
+  let crewMember = null;
+  if (employee.linked_crew_member_id) {
+    crewMember = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(employee.linked_crew_member_id);
+  }
+
+  // Auto-create crew member if not linked and auto-create is requested
+  if (!crewMember && opts.autoCreate) {
+    if (!employee.email) { req.flash('error', 'Employee needs an email address before enabling portal access.'); return null; }
+    // Generate employee_id for crew member
+    const lastCrew = db.prepare("SELECT employee_id FROM crew_members WHERE employee_id LIKE 'EMP-%' ORDER BY CAST(REPLACE(employee_id, 'EMP-', '') AS INTEGER) DESC LIMIT 1").get();
+    let nextNum = 1;
+    if (lastCrew && lastCrew.employee_id) { const n = parseInt(lastCrew.employee_id.replace('EMP-', ''), 10); if (!isNaN(n)) nextNum = n + 1; }
+    const crewEmpId = employee.employee_code || ('EMP-' + String(nextNum).padStart(6, '0'));
+
+    const result = db.prepare(`
+      INSERT INTO crew_members (full_name, employee_id, role, phone, email, company, employment_type, active, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'available')
+    `).run(employee.full_name, crewEmpId, employee.traffic_role_level || employee.role_title || 'Traffic Controller',
+      employee.phone || '', employee.email, employee.company || 'T&S Traffic Control',
+      employee.employment_type || 'casual');
+
+    const crewId = result.lastInsertRowid;
+    db.prepare('UPDATE employees SET linked_crew_member_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(crewId, employee.id);
+    employee.linked_crew_member_id = crewId;
+    crewMember = db.prepare('SELECT * FROM crew_members WHERE id = ?').get(crewId);
+    if (req.session && req.session.user) {
+      logActivity({ user: req.session.user, action: 'create', entityType: 'crew_member', entityId: crewId, entityLabel: employee.full_name, details: 'Auto-created crew member from employee profile', ip: req.ip });
+    }
+  }
+
+  if (!crewMember) { req.flash('error', 'Employee is not linked to a crew member. Click "Enable Portal Access" first.'); return null; }
   return { employee, crewMember };
 }
 
+// POST /employees/:id/enable-portal — Auto-create crew member + link
+router.post('/employees/:id/enable-portal', requirePermission('hr_employees'), (req, res) => {
+  const data = loadEmployeeWithCrew(req, res, { autoCreate: true });
+  if (!data) return res.redirect(`/hr/employees/${req.params.id}`);
+  req.flash('success', `Portal access enabled for ${data.employee.full_name}. You can now set a PIN or send an invite.`);
+  res.redirect(`/hr/employees/${req.params.id}#workforce`);
+});
+
 // POST /employees/:id/set-pin — Set or reset worker portal PIN
 router.post('/employees/:id/set-pin', requirePermission('hr_employees'), (req, res) => {
-  const data = loadEmployeeWithCrew(req, res);
+  const data = loadEmployeeWithCrew(req, res, { autoCreate: true });
   if (!data) return res.redirect(`/hr/employees/${req.params.id}#workforce`);
   const { employee, crewMember } = data;
 
@@ -716,12 +753,18 @@ router.post('/employees/:id/clear-pin', requirePermission('hr_employees'), (req,
 
 // POST /employees/:id/send-invite — Send email invitation for worker portal
 router.post('/employees/:id/send-invite', requirePermission('hr_employees'), async (req, res) => {
-  const data = loadEmployeeWithCrew(req, res);
+  const data = loadEmployeeWithCrew(req, res, { autoCreate: true });
   if (!data) return res.redirect(`/hr/employees/${req.params.id}#workforce`);
   const { employee, crewMember } = data;
 
-  if (!crewMember.email || !crewMember.employee_id) {
-    req.flash('error', 'Crew member needs both an email and Employee ID to receive an invite.');
+  // Only send invite emails for active employees
+  if (employee.employment_status !== 'active') {
+    req.flash('error', 'Employee must be set to Active before sending an invite email.');
+    return res.redirect(`/hr/employees/${employee.id}#workforce`);
+  }
+
+  if (!crewMember.email) {
+    req.flash('error', 'Crew member needs an email address to receive an invite.');
     return res.redirect(`/hr/employees/${employee.id}#workforce`);
   }
 

@@ -55,7 +55,7 @@ function workerInviteEmail(fullName, setupUrl, expiresHours) {
     <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 8px;">Hi ${fullName},</p>
     <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">You've been set up on the <strong>T&S Worker Portal</strong>. Tap the button below to create your sign-in PIN.</p>
     ${buttonHtml('Set Your PIN', setupUrl)}
-    <p style="color:#6B7280;font-size:13px;margin:0;">This link expires in ${expiresHours} hours. You'll use your Employee ID and PIN to sign in on your phone.</p>
+    <p style="color:#6B7280;font-size:13px;margin:0;">This link expires in ${expiresHours} hours. You'll use your email and PIN to sign in at the T&S Employee Portal.</p>
   `);
 }
 
