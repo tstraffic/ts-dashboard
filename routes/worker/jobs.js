@@ -21,6 +21,7 @@ router.get('/jobs', (req, res) => {
   const tab = req.query.tab || 'upcoming';
 
   // Upcoming from crew_allocations (job-linked shifts)
+  // Exclude allocations linked to cancelled/deleted/unconfirmed bookings
   const allocUpcoming = db.prepare(`
     SELECT ca.*, j.job_number, j.job_name, j.client, j.site_address, j.suburb,
       j.notes as job_notes, j.project_name, j.client_project_number, j.state,
@@ -28,9 +29,11 @@ router.get('/jobs', (req, res) => {
     FROM crew_allocations ca
     JOIN jobs j ON ca.job_id = j.id
     LEFT JOIN users u ON j.ops_supervisor_id = u.id
+    LEFT JOIN bookings b ON ca.booking_id = b.id
     WHERE ca.crew_member_id = ?
       AND ca.allocation_date >= ?
       AND ca.status IN ('allocated', 'confirmed')
+      AND (ca.booking_id IS NULL OR (b.status IN ('confirmed', 'gtg', 'complete') AND b.deleted_at IS NULL))
     ORDER BY ca.allocation_date ASC, ca.start_time ASC
   `).all(worker.id, today);
 
@@ -51,6 +54,9 @@ router.get('/jobs', (req, res) => {
       WHERE bc.crew_member_id = ?
         AND DATE(b.start_datetime) >= ?
         AND bc.status IN ('assigned', 'confirmed')
+        AND b.status NOT IN ('cancelled', 'late_cancellation', 'deleted')
+        AND b.deleted_at IS NULL
+        AND b.status IN ('confirmed', 'gtg', 'complete')
         AND NOT EXISTS (SELECT 1 FROM crew_allocations ca WHERE ca.booking_id = bc.booking_id AND ca.crew_member_id = bc.crew_member_id)
       ORDER BY b.start_datetime ASC
     `).all(worker.id, today);
@@ -219,21 +225,85 @@ router.post('/jobs/:id/respond', (req, res) => {
     return res.redirect('/w/jobs/' + req.params.id);
   }
 
+  // Get full allocation details for booking sync
+  const fullAlloc = db.prepare('SELECT * FROM crew_allocations WHERE id = ?').get(allocation.id);
+
   if (action === 'accept') {
     db.prepare(`
       UPDATE crew_allocations SET status = 'confirmed', confirmed_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(allocation.id);
-    req.flash('success', 'Shift accepted successfully.');
+
+    // Sync to booking_crew if linked
+    if (fullAlloc && fullAlloc.booking_id) {
+      db.prepare("UPDATE booking_crew SET status = 'confirmed', confirmed_at = CURRENT_TIMESTAMP WHERE booking_id = ? AND crew_member_id = ?")
+        .run(fullAlloc.booking_id, worker.id);
+
+      // Check if ALL crew on this booking are now confirmed → auto-set booking to GTG
+      const totalCrew = db.prepare("SELECT COUNT(*) as c FROM booking_crew WHERE booking_id = ?").get(fullAlloc.booking_id);
+      const confirmedCrew = db.prepare("SELECT COUNT(*) as c FROM booking_crew WHERE booking_id = ? AND status = 'confirmed'").get(fullAlloc.booking_id);
+      if (totalCrew && confirmedCrew && totalCrew.c > 0 && confirmedCrew.c >= totalCrew.c) {
+        const booking = db.prepare("SELECT status FROM bookings WHERE id = ?").get(fullAlloc.booking_id);
+        if (booking && booking.status === 'confirmed') {
+          db.prepare("UPDATE bookings SET status = 'gtg', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(fullAlloc.booking_id);
+        }
+      }
+    }
+
+    req.flash('success', 'Shift accepted!');
   } else {
     db.prepare(`
       UPDATE crew_allocations SET status = 'declined'
       WHERE id = ?
     `).run(allocation.id);
+
+    // Sync to booking_crew if linked
+    if (fullAlloc && fullAlloc.booking_id) {
+      db.prepare("UPDATE booking_crew SET status = 'declined' WHERE booking_id = ? AND crew_member_id = ?")
+        .run(fullAlloc.booking_id, worker.id);
+    }
+
     req.flash('success', 'Shift declined.');
   }
 
   res.redirect('/w/jobs/' + req.params.id);
+});
+
+// POST /w/bookings/:id/respond — Accept or decline a booking_crew assignment (no allocation)
+router.post('/bookings/:id/respond', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const { action } = req.body;
+
+  if (!action || !['accept', 'decline'].includes(action)) {
+    req.flash('error', 'Invalid action.');
+    return res.redirect('/w/jobs');
+  }
+
+  const bc = db.prepare("SELECT * FROM booking_crew WHERE booking_id = ? AND crew_member_id = ?").get(req.params.id, worker.id);
+  if (!bc) { req.flash('error', 'Assignment not found.'); return res.redirect('/w/jobs'); }
+
+  if (action === 'accept') {
+    db.prepare("UPDATE booking_crew SET status = 'confirmed', confirmed_at = CURRENT_TIMESTAMP WHERE booking_id = ? AND crew_member_id = ?")
+      .run(req.params.id, worker.id);
+
+    // Check if ALL crew confirmed → auto-GTG
+    const total = db.prepare("SELECT COUNT(*) as c FROM booking_crew WHERE booking_id = ?").get(req.params.id);
+    const conf = db.prepare("SELECT COUNT(*) as c FROM booking_crew WHERE booking_id = ? AND status = 'confirmed'").get(req.params.id);
+    if (total && conf && total.c > 0 && conf.c >= total.c) {
+      const booking = db.prepare("SELECT status FROM bookings WHERE id = ?").get(req.params.id);
+      if (booking && booking.status === 'confirmed') {
+        db.prepare("UPDATE bookings SET status = 'gtg', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+      }
+    }
+    req.flash('success', 'Shift accepted!');
+  } else {
+    db.prepare("UPDATE booking_crew SET status = 'declined' WHERE booking_id = ? AND crew_member_id = ?")
+      .run(req.params.id, worker.id);
+    req.flash('success', 'Shift declined.');
+  }
+
+  res.redirect('/w/jobs');
 });
 
 module.exports = router;
