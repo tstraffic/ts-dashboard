@@ -741,19 +741,20 @@
     </div>
   </div>
 
-  <!-- Wizard Navigation Buttons -->
-  <div class="flex items-center justify-between mt-5" id="wizard-nav-buttons">
-    <button type="button" id="wizard-prev" class="hidden px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition inline-flex items-center gap-2">
+  <!-- Wizard Navigation Buttons (sticky at bottom) -->
+  <div class="sticky bottom-0 z-20 bg-white/90 backdrop-blur-sm border-t border-gray-200 rounded-b-xl px-5 py-3 -mx-0 flex items-center justify-between" id="wizard-nav-buttons">
+    <button type="button" id="wizard-prev" class="hidden px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition inline-flex items-center gap-2">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
       Previous
     </button>
     <div class="flex items-center gap-3 ml-auto">
-      <a href="<%= isEdit ? '/hr/employees/' + employee.id : '/hr/employees' %>" class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700">Cancel</a>
-      <button type="button" id="wizard-next" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition inline-flex items-center gap-2">
+      <span id="wizard-progress-text2" class="text-xs text-gray-400 hidden sm:inline">Step 1 of <%= totalSteps %></span>
+      <a href="<%= isEdit ? '/hr/employees/' + employee.id : '/hr/employees' %>" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+      <button type="button" id="wizard-next" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition inline-flex items-center gap-2">
         Next
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
       </button>
-      <button type="submit" id="wizard-submit" class="hidden px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition inline-flex items-center gap-2">
+      <button type="submit" id="wizard-submit" class="hidden px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition inline-flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
         <%= isEdit ? 'Update' : 'Add' %> Employee
       </button>
@@ -843,6 +844,8 @@
     var pct = ((currentStep + 1) / totalSteps * 100).toFixed(1);
     progressBar.style.width = pct + '%';
     progressText.textContent = 'Step ' + (currentStep + 1) + ' of ' + totalSteps;
+    var pt2 = document.getElementById('wizard-progress-text2');
+    if (pt2) pt2.textContent = 'Step ' + (currentStep + 1) + ' of ' + totalSteps;
 
     // Scroll to top of form
     document.getElementById('wizard-steps-nav').scrollIntoView({ behavior: 'smooth', block: 'start' });
