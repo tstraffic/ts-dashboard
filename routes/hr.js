@@ -599,32 +599,37 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
        parseFloat(b.rate_travel) || 0, parseFloat(b.rate_meal) || 0, parseFloat(b.rate_weekend) || 0]
     : [];
 
-  db.prepare(`
-    UPDATE employees SET
-      employee_code = ?, first_name = ?, middle_name = ?, last_name = ?, full_name = ?, preferred_name = ?,
-      company = ?, division = ?, role_title = ?,
-      employment_type = ?, employment_status = ?, payment_type = ?,
-      start_date = ?, end_date = ?, probation_end_date = ?, manager_id = ?,
-      email = ?, phone = ?, address = ?, suburb = ?, state = ?, postcode = ?,
-      traffic_role_level = ?, ticket_classification = ?,
-      white_card_required = ?, medical_required = ?,
-      allocatable = ?, blocked_from_allocation = ?, block_reason = ?,
-      induction_status = ?,
-      ppe_issued_status = ?, uniform_issued_status = ?, company_vehicle_assigned = ?,
-      primary_work_region = ?, base_location = ?,
-      emergency_contact_name = ?, emergency_contact_phone = ?, emergency_contact_relationship = ?,
-      date_of_birth = ?, payroll_reference = ?, internal_notes = ?,
-      linked_crew_member_id = ?, linked_user_id = ?,
-      white_card_number = ?, tc_licence_number = ?, tc_licence_state = ?, tc_licence_date_of_issue = ?, drivers_licence_number = ?
-      ${rateSet}
-      , updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(
-    ...baseParams, ...rateParams,
-    req.params.id
-  );
+  try {
+    db.prepare(`
+      UPDATE employees SET
+        employee_code = ?, first_name = ?, middle_name = ?, last_name = ?, full_name = ?, preferred_name = ?,
+        company = ?, division = ?, role_title = ?,
+        employment_type = ?, employment_status = ?, payment_type = ?,
+        start_date = ?, end_date = ?, probation_end_date = ?, manager_id = ?,
+        email = ?, phone = ?, address = ?, suburb = ?, state = ?, postcode = ?,
+        traffic_role_level = ?, ticket_classification = ?,
+        white_card_required = ?, medical_required = ?,
+        allocatable = ?, blocked_from_allocation = ?, block_reason = ?,
+        induction_status = ?,
+        ppe_issued_status = ?, uniform_issued_status = ?, company_vehicle_assigned = ?,
+        primary_work_region = ?, base_location = ?,
+        emergency_contact_name = ?, emergency_contact_phone = ?, emergency_contact_relationship = ?,
+        date_of_birth = ?, payroll_reference = ?, internal_notes = ?,
+        linked_crew_member_id = ?, linked_user_id = ?,
+        white_card_number = ?, tc_licence_number = ?, tc_licence_state = ?, tc_licence_date_of_issue = ?, drivers_licence_number = ?
+        ${rateSet}
+        , updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      ...baseParams, ...rateParams,
+      req.params.id
+    );
 
-  req.flash('success', 'Employee updated successfully.');
+    req.flash('success', 'Employee updated successfully.');
+  } catch (err) {
+    console.error('UPDATE employee error:', err.message, { id: req.params.id, rateSet: rateSet ? 'included' : 'excluded', baseParamCount: baseParams.length, rateParamCount: rateParams.length });
+    req.flash('error', 'Error updating employee: ' + err.message);
+  }
   res.redirect(`/hr/employees/${req.params.id}`);
 });
 
