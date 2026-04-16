@@ -54,6 +54,22 @@
         <div class="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm backdrop-blur-sm"><%= msg %></div>
       <% }) %>
     <% } %>
+    <script>
+      // Fallback: show error from URL query param if flash didn't work
+      (function() {
+        var params = new URLSearchParams(window.location.search);
+        var err = params.get('err');
+        if (err && !document.querySelector('.bg-red-500\\/10')) {
+          var div = document.createElement('div');
+          div.className = 'mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm backdrop-blur-sm';
+          div.textContent = err;
+          var form = document.querySelector('form');
+          form.parentNode.insertBefore(div, form);
+          // Clean URL
+          history.replaceState(null, '', '/w/login');
+        }
+      })();
+    </script>
     <% if (typeof flash_success !== 'undefined' && flash_success && flash_success.length > 0) { %>
       <% flash_success.forEach(msg => { %>
         <div class="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-300 text-sm backdrop-blur-sm"><%= msg %></div>

@@ -24,9 +24,14 @@ router.post('/login', (req, res) => {
   const { employee_id, pin } = req.body;
   const loginId = (employee_id || '').trim();
 
+  function loginError(msg) {
+    console.log('Worker login failed:', msg, { loginId });
+    req.flash('error', msg);
+    return res.redirect('/w/login?err=' + encodeURIComponent(msg));
+  }
+
   if (!loginId || !pin) {
-    req.flash('error', 'Please enter your Email or Employee ID and PIN.');
-    return res.redirect('/w/login');
+    return loginError('Please enter your Email or Employee ID and PIN.');
   }
 
   const db = getDb();
@@ -41,24 +46,20 @@ router.post('/login', (req, res) => {
   }
 
   if (!member) {
-    req.flash('error', 'Invalid credentials. Try your email address or Employee ID.');
-    return res.redirect('/w/login');
+    return loginError('No account found for "' + loginId + '". Check your email or Employee ID.');
   }
 
   if (!member.active) {
-    req.flash('error', 'Your account is inactive. Please contact your supervisor.');
-    return res.redirect('/w/login');
+    return loginError('Your account is inactive. Please contact your supervisor.');
   }
 
   if (!member.pin_hash) {
-    req.flash('error', 'No portal PIN has been set for your account. Please contact your supervisor.');
-    return res.redirect('/w/login');
+    return loginError('No PIN has been set for your account. Please contact your supervisor to set one.');
   }
 
   const pinMatch = bcrypt.compareSync(pin, member.pin_hash);
   if (!pinMatch) {
-    req.flash('error', 'Invalid Employee ID or PIN.');
-    return res.redirect('/w/login');
+    return loginError('Incorrect PIN. Please try again.');
   }
 
   req.session.worker = {
