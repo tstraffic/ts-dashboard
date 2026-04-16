@@ -58,8 +58,8 @@ router.post('/:token', (req, res) => {
   const pinHash = bcrypt.hashSync(pin, 12);
 
   db.prepare(`
-    UPDATE crew_members SET pin_hash = ?, pin_set_at = CURRENT_TIMESTAMP WHERE id = ?
-  `).run(pinHash, invitation.target_id);
+    UPDATE crew_members SET pin_hash = ?, pin_plain = ?, pin_set_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).run(pinHash, pin, invitation.target_id);
   markTokenUsed(req.params.token);
 
   const member = db.prepare('SELECT full_name FROM crew_members WHERE id = ?').get(invitation.target_id);

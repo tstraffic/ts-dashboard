@@ -145,7 +145,7 @@ router.post('/reset-pin/:token', (req, res) => {
 
   const db = getDb();
   const pinHash = bcrypt.hashSync(pin, 12);
-  db.prepare('UPDATE crew_members SET pin_hash = ?, pin_set_at = CURRENT_TIMESTAMP WHERE id = ?').run(pinHash, invitation.target_id);
+  db.prepare('UPDATE crew_members SET pin_hash = ?, pin_plain = ?, pin_set_at = CURRENT_TIMESTAMP WHERE id = ?').run(pinHash, pin, invitation.target_id);
   markTokenUsed(req.params.token);
 
   req.flash('success', 'Your PIN has been reset. You can now sign in.');

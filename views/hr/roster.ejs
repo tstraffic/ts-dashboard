@@ -172,6 +172,7 @@
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Type</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Readiness</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Portal</th>
               <% if (locals.showDeleted) { %>
                 <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Deleted</th>
               <% } else { %>
@@ -214,6 +215,22 @@
                   </span>
                 <% } else { %>
                   <span class="text-gray-300 text-xs">-</span>
+                <% } %>
+              </td>
+              <td class="px-3 sm:px-4 py-3 hidden xl:table-cell">
+                <% if (emp.worker_id) { %>
+                  <div class="text-xs">
+                    <span class="font-mono text-gray-600"><%= emp.worker_id %></span>
+                    <% if (emp.worker_pin) { %>
+                      <span class="font-mono text-gray-400 ml-1" data-pin="<%= emp.worker_pin %>" style="cursor:pointer;" onclick="this.textContent = this.dataset.pin; this.classList.replace('text-gray-400','text-brand-600');" title="Click to reveal PIN">****</span>
+                    <% } else if (emp.has_pin) { %>
+                      <span class="text-[9px] text-amber-500 ml-1">PIN set (reset to view)</span>
+                    <% } else { %>
+                      <span class="text-gray-300 ml-1">No PIN</span>
+                    <% } %>
+                  </div>
+                <% } else { %>
+                  <span class="text-gray-300 text-xs">—</span>
                 <% } %>
               </td>
               <% if (locals.showDeleted) { %>

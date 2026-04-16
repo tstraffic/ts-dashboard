@@ -5009,6 +5009,18 @@ function runMigrations(db) {
     recordMigration.run(110, 'Expand notifications type CHECK for chat_message + weekly_summary');
   }
 
+  // Migration 111: Add missing rate_* columns to employees (fixes Update Employee crash)
+  // + pin_plain to crew_members (admins can read back the portal PIN)
+  if (!isMigrationApplied.get(111)) {
+    const rateCols = ['rate_day','rate_ot','rate_dt','rate_night','rate_night_ot','rate_night_dt','rate_travel','rate_meal','rate_weekend'];
+    rateCols.forEach(col => {
+      try { db.exec(`ALTER TABLE employees ADD COLUMN ${col} REAL DEFAULT 0`); } catch (e) { /* column may exist */ }
+    });
+    try { db.exec("ALTER TABLE crew_members ADD COLUMN pin_plain TEXT DEFAULT NULL"); } catch (e) { /* column may exist */ }
+    recordMigration.run(111, 'Employee rate columns + crew_members.pin_plain');
+    console.log('Migration 111 applied: rate columns + pin_plain');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

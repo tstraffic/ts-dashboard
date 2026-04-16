@@ -185,9 +185,12 @@ router.get('/roster', requirePermission('hr_employees'), (req, res) => {
 
   const employees = db.prepare(`
     SELECT e.*, m.full_name as manager_name,
+      cm.employee_id as worker_id, cm.pin_plain as worker_pin,
+      CASE WHEN cm.pin_hash IS NOT NULL THEN 1 ELSE 0 END as has_pin,
       (SELECT MIN(ec.expiry_date) FROM employee_competencies ec WHERE ec.employee_id = e.id AND ec.expiry_date IS NOT NULL AND ec.expiry_date >= DATE('now')) as next_expiry
     FROM employees e
     LEFT JOIN employees m ON e.manager_id = m.id
+    LEFT JOIN crew_members cm ON e.linked_crew_member_id = cm.id
     WHERE ${where}
     ORDER BY ${sortCol} ${sortOrder}
   `).all(...params);
@@ -653,8 +656,8 @@ router.post('/employees/:id/set-pin', requirePermission('hr_employees'), (req, r
   }
 
   const pinHash = bcrypt.hashSync(pin, 12);
-  getDb().prepare('UPDATE crew_members SET pin_hash = ?, pin_set_at = CURRENT_TIMESTAMP, pin_set_by_id = ? WHERE id = ?')
-    .run(pinHash, req.session.user.id, crewMember.id);
+  getDb().prepare('UPDATE crew_members SET pin_hash = ?, pin_plain = ?, pin_set_at = CURRENT_TIMESTAMP, pin_set_by_id = ? WHERE id = ?')
+    .run(pinHash, pin, req.session.user.id, crewMember.id);
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'crew_member', entityId: crewMember.id, entityLabel: crewMember.full_name, details: 'Set worker portal PIN (from HR)', ip: req.ip });
   req.flash('success', 'Portal PIN set for ' + crewMember.full_name);
@@ -667,7 +670,7 @@ router.post('/employees/:id/clear-pin', requirePermission('hr_employees'), (req,
   if (!data) return res.redirect(`/hr/employees/${req.params.id}#workforce`);
   const { employee, crewMember } = data;
 
-  getDb().prepare('UPDATE crew_members SET pin_hash = NULL, pin_set_at = NULL, pin_set_by_id = NULL WHERE id = ?')
+  getDb().prepare('UPDATE crew_members SET pin_hash = NULL, pin_plain = NULL, pin_set_at = NULL, pin_set_by_id = NULL WHERE id = ?')
     .run(crewMember.id);
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'crew_member', entityId: crewMember.id, entityLabel: crewMember.full_name, details: 'Cleared worker portal PIN (from HR)', ip: req.ip });

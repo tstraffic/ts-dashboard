@@ -682,7 +682,11 @@
           <div class="flex items-center justify-between mb-3">
             <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Portal Access</h2>
             <% if (crewMember.pin_hash) { %>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">PIN Set</span>
+              <% if (crewMember.pin_plain) { %>
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">PIN: <span class="font-mono font-bold"><%= crewMember.pin_plain %></span></span>
+              <% } else { %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">PIN Set <span class="text-[8px] text-amber-600 ml-1">(reset to view)</span></span>
+              <% } %>
             <% } else { %>
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-500">No Access</span>
             <% } %>
