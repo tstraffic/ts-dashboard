@@ -319,13 +319,14 @@ router.get('/booking-shift/:bookingId', (req, res) => {
 
 // POST /w/bookings/:id/respond — Accept or decline a booking_crew assignment (no allocation)
 router.post('/bookings/:id/respond', (req, res) => {
+  try {
   const db = getDb();
   const worker = req.session.worker;
   const { action } = req.body;
 
   if (!action || !['accept', 'decline'].includes(action)) {
     req.flash('error', 'Invalid action.');
-    return res.redirect('/w/jobs');
+    return res.redirect('/w/booking-shift/' + req.params.id);
   }
 
   const bc = db.prepare("SELECT * FROM booking_crew WHERE booking_id = ? AND crew_member_id = ?").get(req.params.id, worker.id);
@@ -351,7 +352,12 @@ router.post('/bookings/:id/respond', (req, res) => {
     req.flash('success', 'Shift declined.');
   }
 
-  res.redirect('/w/jobs');
+  res.redirect('/w/booking-shift/' + req.params.id);
+  } catch (err) {
+    console.error('Booking respond error:', err.message);
+    req.flash('error', 'Error: ' + err.message);
+    res.redirect('/w/jobs');
+  }
 });
 
 module.exports = router;
