@@ -100,11 +100,16 @@ function transformBooking(db, row) {
       try {
         const reqs = db.prepare("SELECT resource_type, quantity_required FROM booking_requirements WHERE booking_id = ?").all(row.id);
         const unfilled = [];
+        const totalCrewCount = crew.length;
         for (const r of reqs) {
-          const assignedCount = crew.filter(c => {
-            const role = (c.role_on_site || c.crew_role || '').toLowerCase().replace(/_/g, ' ');
-            return role === r.resource_type.toLowerCase().replace(/_/g, ' ');
-          }).length;
+          const resType = r.resource_type.toLowerCase().replace(/_/g, ' ');
+          // TC Crew requirements count all assigned crew
+          const assignedCount = (resType.includes('tc crew') || resType.includes('traffic controller') || resType.includes('hoist') || resType.includes('ip'))
+            ? totalCrewCount
+            : crew.filter(c => {
+                const role = (c.role_on_site || c.crew_role || '').toLowerCase().replace(/_/g, ' ');
+                return role.includes(resType);
+              }).length;
           const remaining = r.quantity_required - assignedCount;
           if (remaining > 0) {
             const label = r.resource_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());

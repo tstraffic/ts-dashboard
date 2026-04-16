@@ -237,25 +237,28 @@
         <p class="text-sm text-gray-400 mb-4">No crew assigned yet.</p>
       <% } %>
 
-      <!-- Add crew — searchable -->
+      <!-- Add crew — searchable with confirm -->
       <form method="POST" action="/bookings/<%= b.id %>/crew" id="addCrewForm">
         <%- include('../partials/csrf') %>
         <input type="hidden" name="crew_member_id" id="selectedCrewId">
         <input type="hidden" name="role_on_site" id="selectedCrewRole">
-        <div class="relative">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Add Crew Member</label>
-          <input type="text" id="crewSearch" placeholder="Search by name..." autocomplete="off"
-            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          <div id="crewDropdown" class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-20 hidden">
-            <% if (typeof allCrew !== 'undefined') { allCrew.forEach(c => { %>
-              <div class="crew-option px-3 py-2 text-sm cursor-pointer hover:bg-brand-50 flex items-center justify-between border-b border-gray-100 last:border-0"
-                data-id="<%= c.id %>" data-name="<%= c.full_name %>" data-role="<%= c.role %>"
-                onclick="selectCrew(this)">
-                <span><%= c.full_name %></span>
-                <span class="text-xs text-gray-400"><%= c.role %></span>
-              </div>
-            <% }); } %>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Add Crew Member</label>
+        <div class="flex items-center gap-2">
+          <div class="relative flex-1">
+            <input type="text" id="crewSearch" placeholder="Search by name..." autocomplete="off"
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <div id="crewDropdown" class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-20 hidden">
+              <% if (typeof allCrew !== 'undefined') { allCrew.forEach(c => { %>
+                <div class="crew-option px-3 py-2 text-sm cursor-pointer hover:bg-brand-50 flex items-center justify-between border-b border-gray-100 last:border-0"
+                  data-id="<%= c.id %>" data-name="<%= c.full_name %>" data-role="<%= c.role %>"
+                  onclick="pickCrew(this)">
+                  <span><%= c.full_name %></span>
+                  <span class="text-xs text-gray-400"><%= c.role %></span>
+                </div>
+              <% }); } %>
+            </div>
           </div>
+          <button type="submit" id="addCrewBtn" disabled class="px-4 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition">Add</button>
         </div>
       </form>
       <script>
@@ -263,9 +266,10 @@
         var search = document.getElementById('crewSearch');
         var dropdown = document.getElementById('crewDropdown');
         var options = dropdown.querySelectorAll('.crew-option');
+        var addBtn = document.getElementById('addCrewBtn');
 
         search.addEventListener('focus', function() { dropdown.classList.remove('hidden'); filterCrew(); });
-        search.addEventListener('input', filterCrew);
+        search.addEventListener('input', function() { filterCrew(); addBtn.disabled = true; document.getElementById('selectedCrewId').value = ''; });
         document.addEventListener('click', function(e) {
           if (!e.target.closest('#addCrewForm')) dropdown.classList.add('hidden');
         });
@@ -278,13 +282,13 @@
           dropdown.classList.remove('hidden');
         }
 
-        window.selectCrew = function(el) {
+        window.pickCrew = function(el) {
           document.getElementById('selectedCrewId').value = el.dataset.id;
           document.getElementById('selectedCrewRole').value = el.dataset.role;
           search.value = el.dataset.name;
           dropdown.classList.add('hidden');
-          // Auto-submit
-          document.getElementById('addCrewForm').submit();
+          addBtn.disabled = false;
+          addBtn.focus();
         };
       })();
       </script>
