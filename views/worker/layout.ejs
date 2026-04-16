@@ -11,7 +11,6 @@
   <link rel="manifest" href="/manifest.json">
   <title><%= typeof title !== 'undefined' ? title + ' | ' : '' %>T&S Employee Portal</title>
 
-  <!-- Inter Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -21,15 +20,14 @@
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: {
-            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-          },
+          fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'] },
           colors: {
             brand: {
               50: '#EFF6FF', 100: '#DBEAFE', 200: '#BFDBFE', 300: '#93C5FD',
               400: '#60A5FA', 500: '#2B7FFF', 600: '#1D6AE5', 700: '#1555C0',
               800: '#0F3F8E', 900: '#0A2D66', 950: '#051B3F',
-            }
+            },
+            ts: { cyan: '#00D2BE', navy: '#0A1628' }
           }
         }
       }
@@ -39,97 +37,97 @@
   <link rel="stylesheet" href="/css/worker.css">
   <link rel="stylesheet" href="/css/chat.css?v=3">
 </head>
-<body class="h-full font-sans antialiased dark-glass flex flex-col">
+<body class="h-full font-sans antialiased flex flex-col" style="background: linear-gradient(180deg, #020817, #0A1628); color: rgba(255,255,255,0.92);">
 
-  <!-- Top Header -->
-  <header class="px-4 py-3 flex items-center justify-between shrink-0 safe-area-top" style="background: rgba(10,22,40,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.08);">
-    <div class="flex items-center gap-3">
-      <img src="/images/logo-colour.jpg" alt="T&S" class="h-8 w-8 rounded-md">
-      <span class="font-semibold text-sm text-white">T&S Employee Portal</span>
-    </div>
-    <div class="flex items-center gap-3">
+  <!-- Top Header (Traffio-style: initials + title + refresh) -->
+  <header class="shrink-0 safe-area-top" style="background: rgba(10,22,40,0.95); border-bottom: 1px solid rgba(255,255,255,0.06);">
+    <div class="flex items-center justify-between px-4 h-12">
       <% if (typeof worker !== 'undefined' && worker) { %>
-        <div class="w-8 h-8 rounded-full bg-brand-600/30 border border-brand-500/30 flex items-center justify-center text-brand-300 text-xs font-bold">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style="background: rgba(0,210,190,0.15); color: #00D2BE; border: 1px solid rgba(0,210,190,0.3);">
           <%= worker.full_name.split(' ').map(n => n[0]).join('').slice(0,2) %>
         </div>
+      <% } else { %>
+        <div class="w-8"></div>
       <% } %>
+      <div class="text-center">
+        <p class="text-sm font-semibold text-white"><%= typeof title !== 'undefined' ? title : 'Home' %></p>
+        <% if (typeof worker !== 'undefined' && worker) { %>
+          <p class="text-[10px] text-gray-500 truncate max-w-[200px]"><%= worker.full_name %> - T&S Traffic Control PTY...</p>
+        <% } %>
+      </div>
+      <button onclick="location.reload()" class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      </button>
     </div>
   </header>
 
   <!-- Flash Messages -->
-  <div class="px-4">
-    <% if (typeof flash_success !== 'undefined' && flash_success && flash_success.length > 0) { %>
-      <% flash_success.forEach(msg => { %>
-        <div class="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-300 text-sm flex items-center justify-between backdrop-blur-sm">
-          <div class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-            <span><%= msg %></span>
-          </div>
-          <button onclick="this.parentElement.remove()" class="text-emerald-400/60 hover:text-emerald-300 ml-2">&times;</button>
-        </div>
-      <% }) %>
-    <% } %>
-    <% if (typeof flash_error !== 'undefined' && flash_error && flash_error.length > 0) { %>
-      <% flash_error.forEach(msg => { %>
-        <div class="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm flex items-center justify-between backdrop-blur-sm">
-          <div class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg>
-            <span><%= msg %></span>
-          </div>
-          <button onclick="this.parentElement.remove()" class="text-red-400/60 hover:text-red-300 ml-2">&times;</button>
-        </div>
-      <% }) %>
-    <% } %>
+  <% if ((typeof flash_success !== 'undefined' && flash_success && flash_success.length > 0) || (typeof flash_error !== 'undefined' && flash_error && flash_error.length > 0)) { %>
+  <div class="px-4 pt-2">
+    <% if (typeof flash_success !== 'undefined' && flash_success) { flash_success.forEach(msg => { %>
+      <div class="mb-2 p-3 rounded-lg text-sm flex items-center justify-between" style="background: rgba(22,163,74,0.12); border: 1px solid rgba(22,163,74,0.25); color: #4ade80;">
+        <span><%= msg %></span>
+        <button onclick="this.parentElement.remove()" class="ml-2 opacity-60">&times;</button>
+      </div>
+    <% }) } %>
+    <% if (typeof flash_error !== 'undefined' && flash_error) { flash_error.forEach(msg => { %>
+      <div class="mb-2 p-3 rounded-lg text-sm flex items-center justify-between" style="background: rgba(220,38,38,0.12); border: 1px solid rgba(220,38,38,0.25); color: #f87171;">
+        <span><%= msg %></span>
+        <button onclick="this.parentElement.remove()" class="ml-2 opacity-60">&times;</button>
+      </div>
+    <% }) } %>
   </div>
+  <% } %>
 
   <!-- Main Content -->
-  <main class="flex-1 overflow-auto px-4 py-4 pb-20">
+  <main class="flex-1 overflow-auto" style="padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));">
     <%- body %>
   </main>
 
-  <!-- Bottom Tab Navigation -->
-  <nav class="fixed bottom-0 left-0 right-0 safe-area-bottom z-50" style="background: rgba(10,22,40,0.92); backdrop-filter: blur(16px); border-top: 1px solid rgba(255,255,255,0.08);">
+  <!-- Bottom Tab Navigation (Traffio-style: Jobs, Forms, Wallet, Leave, Settings) -->
+  <nav class="fixed bottom-0 left-0 right-0 safe-area-bottom z-50" style="background: rgba(10,22,40,0.96); border-top: 1px solid rgba(255,255,255,0.06);">
     <div class="flex items-center justify-around h-16">
-      <% const currentPath = typeof currentPage !== 'undefined' ? currentPage : ''; %>
+      <% const cp = typeof currentPage !== 'undefined' ? currentPage : ''; %>
 
-      <!-- Home -->
-      <a href="/w/home" class="flex flex-col items-center justify-center gap-0.5 w-16 py-1 <%= currentPath === 'home' ? 'text-brand-400' : 'text-gray-500' %>">
-        <svg class="w-6 h-6" fill="<%= currentPath === 'home' ? 'currentColor' : 'none' %>" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="<%= currentPath === 'home' ? '0' : '1.5' %>" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/>
+      <!-- Jobs -->
+      <a href="/w/jobs" class="flex flex-col items-center justify-center gap-0.5 w-16 py-1.5 transition-colors <%= cp === 'home' || cp === 'jobs' || cp === 'shifts' ? 'text-[#00D2BE]' : 'text-gray-500' %>">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
-        <span class="text-[10px] font-medium">Home</span>
-      </a>
-
-      <!-- Shifts -->
-      <a href="/w/shifts" class="flex flex-col items-center justify-center gap-0.5 w-16 py-1 <%= currentPath === 'shifts' || currentPath === 'jobs' ? 'text-brand-400' : 'text-gray-500' %>">
-        <svg class="w-6 h-6" fill="<%= currentPath === 'shifts' || currentPath === 'jobs' ? 'currentColor' : 'none' %>" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="<%= currentPath === 'shifts' || currentPath === 'jobs' ? '0' : '1.5' %>" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-        </svg>
-        <span class="text-[10px] font-medium">Shifts</span>
-      </a>
-
-      <!-- Chat -->
-      <a href="/w/chat" class="relative flex flex-col items-center justify-center gap-0.5 w-16 py-1 <%= currentPath === 'chat' ? 'text-brand-400' : 'text-gray-500' %>">
-        <svg class="w-6 h-6" fill="<%= currentPath === 'chat' ? 'currentColor' : 'none' %>" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="<%= currentPath === 'chat' ? '0' : '1.5' %>" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-        </svg>
-        <span class="text-[10px] font-medium">Chat</span>
+        <span class="text-[10px] font-medium">Jobs</span>
       </a>
 
       <!-- Forms -->
-      <a href="/w/forms" class="flex flex-col items-center justify-center gap-0.5 w-16 py-1 <%= currentPath === 'forms' ? 'text-brand-400' : 'text-gray-500' %>">
-        <svg class="w-6 h-6" fill="<%= currentPath === 'forms' ? 'currentColor' : 'none' %>" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="<%= currentPath === 'forms' ? '0' : '1.5' %>" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+      <a href="/w/forms" class="flex flex-col items-center justify-center gap-0.5 w-16 py-1.5 transition-colors <%= cp === 'forms' ? 'text-[#00D2BE]' : 'text-gray-500' %>">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>
         <span class="text-[10px] font-medium">Forms</span>
       </a>
 
-      <!-- More -->
-      <a href="/w/more" class="flex flex-col items-center justify-center gap-0.5 w-16 py-1 <%= currentPath === 'more' || currentPath === 'profile' ? 'text-brand-400' : 'text-gray-500' %>">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/>
+      <!-- Wallet -->
+      <a href="/w/hr" class="flex flex-col items-center justify-center gap-0.5 w-16 py-1.5 transition-colors <%= cp === 'hr' || cp === 'wallet' ? 'text-[#00D2BE]' : 'text-gray-500' %>">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm-3 5.625h3a1.5 1.5 0 001.5-1.5 3 3 0 00-6 0 1.5 1.5 0 001.5 1.5z"/>
         </svg>
-        <span class="text-[10px] font-medium">More</span>
+        <span class="text-[10px] font-medium">Wallet</span>
+      </a>
+
+      <!-- Leave -->
+      <a href="/w/hr/leave" class="flex flex-col items-center justify-center gap-0.5 w-16 py-1.5 transition-colors <%= cp === 'leave' ? 'text-[#00D2BE]' : 'text-gray-500' %>">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 110-2 1 1 0 010 2z"/>
+        </svg>
+        <span class="text-[10px] font-medium">Leave</span>
+      </a>
+
+      <!-- Settings -->
+      <a href="/w/more" class="flex flex-col items-center justify-center gap-0.5 w-16 py-1.5 transition-colors <%= cp === 'more' || cp === 'profile' || cp === 'chat' ? 'text-[#00D2BE]' : 'text-gray-500' %>">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.204-.107-.397.165-.71.505-.78.929l-.15.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span class="text-[10px] font-medium">Settings</span>
       </a>
     </div>
   </nav>
