@@ -5,6 +5,27 @@ const fs = require('fs');
 const { getDb } = require('../db/database');
 const { employeeGuideSlides, tcTrainingSlides } = require('../induction-slides');
 
+// Allocate a unique EMP-XXX code based on the largest numeric suffix actually
+// in crew_members (ignoring non-numeric codes like EMP-TEST) and verify
+// it isn't already taken. Returns a string like "EMP-001".
+function allocateEmployeeId(db) {
+  const rows = db.prepare("SELECT employee_id FROM crew_members WHERE employee_id LIKE 'EMP-%'").all();
+  let maxNum = 0;
+  for (const r of rows) {
+    const suffix = (r.employee_id || '').replace(/^EMP-/, '');
+    if (/^\d+$/.test(suffix)) {
+      const n = parseInt(suffix, 10);
+      if (n > maxNum) maxNum = n;
+    }
+  }
+  const check = db.prepare('SELECT 1 FROM crew_members WHERE employee_id = ?');
+  for (let tries = 0; tries < 1000; tries++) {
+    const candidate = `EMP-${String(maxNum + 1 + tries).padStart(3, '0')}`;
+    if (!check.get(candidate)) return candidate;
+  }
+  throw new Error('Could not allocate a free employee_id after 1000 attempts');
+}
+
 // GET /induction/admin/submissions — list all submissions with filtering
 router.get('/submissions', (req, res) => {
   const { status, payment_type, search, date_from, date_to } = req.query;
@@ -101,14 +122,9 @@ router.post('/submissions/:id/status', (req, res) => {
   // If approved, auto-create Crew Member + Employee records
   if (status === 'approved') {
     try {
-      // Generate next employee ID (EMP-001, EMP-002, etc.)
-      const lastCrew = db.prepare("SELECT employee_id FROM crew_members WHERE employee_id LIKE 'EMP-%' ORDER BY employee_id DESC LIMIT 1").get();
-      let nextNum = 1;
-      if (lastCrew && lastCrew.employee_id) {
-        const num = parseInt(lastCrew.employee_id.replace('EMP-', ''), 10);
-        if (!isNaN(num)) nextNum = num + 1;
-      }
-      const employeeId = `EMP-${String(nextNum).padStart(3, '0')}`;
+      // Allocate next EMP-XXX — ignores non-numeric codes (e.g. EMP-TEST) and
+      // retries if the allocated code is already in use.
+      const employeeId = allocateEmployeeId(db);
 
       // Use split name fields (fall back to splitting full_name for old submissions)
       let firstName = (s.first_name || '').trim();
@@ -236,10 +252,7 @@ router.post('/submissions/:id/convert', (req, res) => {
   if (s.linked_crew_member_id) { req.flash('error', 'Already converted to employee.'); return res.redirect(`/induction/admin/submissions/${req.params.id}`); }
 
   try {
-    const lastCrew = db.prepare("SELECT employee_id FROM crew_members WHERE employee_id LIKE 'EMP-%' ORDER BY employee_id DESC LIMIT 1").get();
-    let nextNum = 1;
-    if (lastCrew && lastCrew.employee_id) { const num = parseInt(lastCrew.employee_id.replace('EMP-', ''), 10); if (!isNaN(num)) nextNum = num + 1; }
-    const employeeId = `EMP-${String(nextNum).padStart(3, '0')}`;
+    const employeeId = allocateEmployeeId(db);
 
     let firstName = (s.first_name || '').trim();
     let middleName = (s.middle_name || '').trim();
