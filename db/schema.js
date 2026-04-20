@@ -5133,6 +5133,31 @@ function runMigrations(db) {
     console.log('Migration 116 applied: shift_period on employee_leave');
   }
 
+  // Migration 117: My Profile — profile_photo_url, address_line1/2 on employees + emergency_contacts table
+  if (!isMigrationApplied.get(117)) {
+    try { db.exec("ALTER TABLE employees ADD COLUMN profile_photo_url TEXT"); } catch (e) { /* exists */ }
+    try { db.exec("ALTER TABLE employees ADD COLUMN address_line1 TEXT DEFAULT ''"); } catch (e) { /* exists */ }
+    try { db.exec("ALTER TABLE employees ADD COLUMN address_line2 TEXT DEFAULT ''"); } catch (e) { /* exists */ }
+    // Backfill address_line1 from legacy single-line address if present
+    try { db.exec("UPDATE employees SET address_line1 = COALESCE(address,'') WHERE COALESCE(address_line1,'') = '' AND COALESCE(address,'') != ''"); } catch (e) { /* ignore */ }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS emergency_contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        relationship TEXT DEFAULT '',
+        phone TEXT NOT NULL,
+        alt_phone TEXT DEFAULT '',
+        is_primary INTEGER NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT (datetime('now')),
+        updated_at DATETIME DEFAULT (datetime('now'))
+      );
+    `);
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_emergency_contacts_emp ON emergency_contacts(employee_id)"); } catch (e) { /* exists */ }
+    recordMigration.run(117, 'My Profile: address_line1/2, profile_photo_url, emergency_contacts');
+    console.log('Migration 117 applied: profile + emergency contacts schema');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
