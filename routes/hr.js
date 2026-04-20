@@ -223,6 +223,35 @@ router.get('/roster', requirePermission('hr_employees'), (req, res) => {
   });
 });
 
+// WORKER PORTAL PREVIEW — log in as test dummy account
+// ============================================
+router.post('/roster/preview-worker', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const member = db.prepare(
+    "SELECT id, full_name, employee_id, role, phone, email, active, pin_hash FROM crew_members WHERE employee_id = 'EMP-TEST'"
+  ).get();
+
+  if (!member || !member.active || !member.pin_hash) {
+    req.flash('error', 'Test worker account not ready. Run migrations and retry.');
+    return res.redirect('/hr/roster');
+  }
+
+  req.session.worker = {
+    id: member.id,
+    full_name: member.full_name,
+    employee_id: member.employee_id,
+    role: member.role,
+    phone: member.phone,
+    email: member.email,
+  };
+
+  try {
+    db.prepare("UPDATE crew_members SET last_worker_login = CURRENT_TIMESTAMP, worker_login_count = COALESCE(worker_login_count, 0) + 1 WHERE id = ?").run(member.id);
+  } catch (e) { /* column may not exist */ }
+
+  res.redirect('/w/home');
+});
+
 // ============================================
 // ROSTER BULK SOFT-DELETE (move to Deleted tab)
 // ============================================

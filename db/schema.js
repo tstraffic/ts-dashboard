@@ -5040,6 +5040,37 @@ function runMigrations(db) {
     console.log('Migration 113 applied');
   }
 
+  // Migration 114: Seed test dummy worker account for Worker Portal Preview
+  if (!isMigrationApplied.get(114)) {
+    try {
+      const pinHash = bcrypt.hashSync('1234', 12);
+      const existing = db.prepare("SELECT id FROM crew_members WHERE employee_id = 'EMP-TEST'").get();
+      let crewId;
+      if (existing) {
+        db.prepare("UPDATE crew_members SET pin_hash = ?, active = 1 WHERE id = ?").run(pinHash, existing.id);
+        crewId = existing.id;
+      } else {
+        const result = db.prepare(`
+          INSERT INTO crew_members (full_name, employee_id, role, phone, email, active, pin_hash)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run('Test Dummy', 'EMP-TEST', 'traffic_controller', '0400000000', 'test@tstc.com.au', 1, pinHash);
+        crewId = result.lastInsertRowid;
+      }
+      // Matching employees row so it appears in the Roster
+      const empExists = db.prepare("SELECT id FROM employees WHERE employee_code = 'EMP-TEST'").get();
+      if (!empExists) {
+        db.prepare(`
+          INSERT INTO employees (employee_code, first_name, last_name, full_name, role_title, employment_type, employment_status, email, phone, active, linked_crew_member_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run('EMP-TEST', 'Test', 'Dummy', 'Test Dummy', 'Traffic Controller', 'casual', 'active', 'test@tstc.com.au', '0400000000', 1, crewId);
+      } else {
+        db.prepare("UPDATE employees SET linked_crew_member_id = ?, employment_status = 'active', active = 1 WHERE id = ?").run(crewId, empExists.id);
+      }
+    } catch (e) { console.log('Migration 114 error (non-fatal):', e.message); }
+    recordMigration.run(114, 'Seed test dummy worker (EMP-TEST / PIN 1234) for portal preview');
+    console.log('Migration 114 applied: test dummy worker seeded');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
