@@ -5133,6 +5133,116 @@ function runMigrations(db) {
     console.log('Migration 116 applied: shift_period on employee_leave');
   }
 
+  // Migration 124: Merge MGR-XXX duplicate crew rows into existing canonical rows.
+  // Migration 123 created fresh crew_member rows for every known manager, but most of
+  // them already worked shifts and had a crew profile. This merge preserves the real
+  // employee history and moves the is_manager flag + linked_user_id across.
+  if (!isMigrationApplied.get(124)) {
+    console.log('Migration 124: merging MGR-XXX manager duplicates into canonical crew rows');
+    const managerUsers = db.prepare("SELECT id, username, full_name FROM users WHERE username IN ('taj','saadat','suhail.a','savanah')").all();
+
+    // All child tables that reference crew_members.id — updated with OR IGNORE then
+    // leftovers deleted in case a UNIQUE constraint prevents the move.
+    const fkTables = [
+      ['crew_allocations', 'crew_member_id'],
+      ['timesheets', 'crew_member_id'],
+      ['clock_events', 'crew_member_id'],
+      ['employee_leave', 'crew_member_id'],
+      ['worker_availability', 'crew_member_id'],
+      ['crew_availability', 'crew_member_id'],
+      ['kudos', 'sender_crew_id'],
+      ['kudos_recipients', 'recipient_crew_id'],
+      ['kudos_reactions', 'crew_member_id'],
+      ['kudos_comments', 'crew_member_id'],
+      ['kudos_reports', 'reporter_crew_id'],
+      ['kudos_blocks', 'blocker_crew_id'],
+      ['kudos_blocks', 'blocked_crew_id'],
+      ['kudos_milestones', 'crew_member_id'],
+      ['leaderboard_optouts', 'crew_member_id'],
+      ['home_cards', 'crew_member_id'],
+      ['home_preferences', 'crew_member_id'],
+      ['streaks', 'crew_member_id'],
+    ];
+
+    for (const u of managerUsers) {
+      try {
+        // The row migration 123 minted — always has employee_id LIKE 'MGR-%'
+        const mgr = db.prepare(`SELECT * FROM crew_members WHERE employee_id LIKE 'MGR-%' AND LOWER(full_name) = LOWER(?)`).get(u.full_name);
+        if (!mgr) continue;
+
+        // Find a canonical row: same name, not the MGR row, prefer one with actual
+        // history (more timesheets / allocations / clock events wins).
+        const candidates = db.prepare(`
+          SELECT cm.*,
+            (SELECT COUNT(*) FROM timesheets t WHERE t.crew_member_id = cm.id) +
+            (SELECT COUNT(*) FROM crew_allocations a WHERE a.crew_member_id = cm.id) +
+            (SELECT COUNT(*) FROM clock_events ce WHERE ce.crew_member_id = cm.id) AS activity
+          FROM crew_members cm
+          WHERE cm.id != ? AND LOWER(cm.full_name) = LOWER(?)
+          ORDER BY activity DESC, cm.id ASC
+        `).all(mgr.id, u.full_name);
+        const canonical = candidates[0];
+
+        if (!canonical) {
+          console.log(`[mig 124] ${mgr.employee_id} kept as-is — no existing crew row matched "${u.full_name}"`);
+          continue;
+        }
+
+        console.log(`[mig 124] Merging ${mgr.employee_id} → ${canonical.employee_id} (${u.full_name})`);
+
+        // Mark the canonical row as manager and carry PIN if canonical didn't have one
+        db.prepare('UPDATE crew_members SET is_manager = 1 WHERE id = ?').run(canonical.id);
+        if (!canonical.pin_hash && mgr.pin_hash) {
+          try { db.prepare('UPDATE crew_members SET pin_hash = ?, pin_set_at = ? WHERE id = ?').run(mgr.pin_hash, mgr.pin_set_at, canonical.id); } catch (e) {}
+        }
+
+        // Consolidate employees rows. MGR always has one (we inserted it in 123). Canonical
+        // may or may not — handle both.
+        const canonicalEmp = db.prepare('SELECT * FROM employees WHERE linked_crew_member_id = ? LIMIT 1').get(canonical.id);
+        const mgrEmp = db.prepare('SELECT * FROM employees WHERE linked_crew_member_id = ? LIMIT 1').get(mgr.id);
+        if (canonicalEmp && mgrEmp && canonicalEmp.id !== mgrEmp.id) {
+          // Keep canonical, carry linked_user_id across if missing
+          if (!canonicalEmp.linked_user_id && mgrEmp.linked_user_id) {
+            db.prepare('UPDATE employees SET linked_user_id = ? WHERE id = ?').run(mgrEmp.linked_user_id, canonicalEmp.id);
+          }
+          // Move all employee_id-keyed children from mgrEmp to canonicalEmp before deleting it
+          const empFkTables = [
+            'emergency_contacts','employee_competencies','employee_documents','employee_leave',
+            'bank_accounts','super_funds','tfn_declarations',
+          ];
+          for (const t of empFkTables) {
+            try { db.prepare(`UPDATE OR IGNORE ${t} SET employee_id = ? WHERE employee_id = ?`).run(canonicalEmp.id, mgrEmp.id); } catch (e) {}
+            try { db.prepare(`DELETE FROM ${t} WHERE employee_id = ?`).run(mgrEmp.id); } catch (e) {}
+          }
+          // Drop the duplicate employees row
+          try { db.prepare('DELETE FROM employees WHERE id = ?').run(mgrEmp.id); } catch (e) { console.log('[mig 124] could not delete duplicate employees row:', e.message); }
+        } else if (mgrEmp && !canonicalEmp) {
+          // Canonical had no employees record yet — just repoint MGR's to canonical
+          db.prepare('UPDATE employees SET linked_crew_member_id = ? WHERE id = ?').run(canonical.id, mgrEmp.id);
+        }
+
+        // Repoint crew_members child rows. Unique-constraint conflicts fall through to
+        // DELETE which keeps the canonical row's existing record.
+        for (const [table, col] of fkTables) {
+          try { db.prepare(`UPDATE OR IGNORE ${table} SET ${col} = ? WHERE ${col} = ?`).run(canonical.id, mgr.id); } catch (e) { /* table may not exist yet */ }
+          try { db.prepare(`DELETE FROM ${table} WHERE ${col} = ?`).run(mgr.id); } catch (e) { /* table may not exist yet */ }
+        }
+
+        // Activity log references crew_members.id through entity_id for some rows — update those too
+        try { db.prepare(`UPDATE activity_log SET entity_id = ? WHERE entity_type = 'crew_member' AND entity_id = ?`).run(canonical.id, mgr.id); } catch (e) {}
+
+        // Finally drop the MGR crew_member row
+        db.prepare('DELETE FROM crew_members WHERE id = ?').run(mgr.id);
+        console.log(`[mig 124] ${mgr.employee_id} merged into ${canonical.employee_id} and deleted`);
+      } catch (e) {
+        console.error(`[mig 124] Merge failed for ${u.username}:`, e.message);
+      }
+    }
+
+    recordMigration.run(124, 'Merge MGR-XXX manager duplicates into canonical crew rows');
+    console.log('Migration 124 applied: manager duplicates consolidated');
+  }
+
   // Migration 123: Manager portal access — is_manager flag + provision rows for known managers
   if (!isMigrationApplied.get(123)) {
     try { db.exec("ALTER TABLE crew_members ADD COLUMN is_manager INTEGER NOT NULL DEFAULT 0"); } catch (e) { /* exists */ }
