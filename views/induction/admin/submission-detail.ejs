@@ -406,6 +406,62 @@
     </div>
   </div>
 
+  <!-- Signature & Consent -->
+  <% if (s.signature_url || s.consent_signed_at) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <div class="flex items-start justify-between gap-3 mb-4">
+      <div>
+        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Signature &amp; Consent</h2>
+        <p class="text-xs text-gray-500 mt-0.5">Electronic signature captured at submission (Electronic Transactions Act 1999).</p>
+      </div>
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        Signed
+      </span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-3 mb-4">
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Legal name</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5"><%= s.consent_full_name || s.full_name %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Signed at</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5 tabular-nums"><%= s.consent_signed_at ? formatDate(s.consent_signed_at) : '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Consent version</p>
+        <p class="text-sm text-gray-900 font-medium mt-0.5 font-mono text-xs"><%= s.consent_version || '—' %></p>
+      </div>
+      <% if (s.signed_ip) { %>
+      <div class="sm:col-span-3">
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Signed from IP</p>
+        <p class="text-sm text-gray-700 font-mono text-xs mt-0.5"><%= s.signed_ip %></p>
+      </div>
+      <% } %>
+    </div>
+
+    <% if (s.signature_url) { %>
+      <div class="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
+        <div class="px-3 py-2 bg-white border-b border-gray-200 flex items-center justify-between">
+          <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Signature</span>
+          <a href="<%= s.signature_url %>" target="_blank" class="text-xs font-medium text-brand-600 hover:text-brand-700">Open image ↗</a>
+        </div>
+        <div class="p-4 flex items-center justify-center" style="background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 23px, rgba(0,0,0,0.04) 23px, rgba(0,0,0,0.04) 24px); min-height: 140px;">
+          <img src="<%= s.signature_url %>" alt="Signature of <%= s.consent_full_name || s.full_name %>" class="max-h-[120px] max-w-full object-contain mix-blend-multiply" />
+        </div>
+        <div class="px-3 py-2 bg-white border-t border-gray-200 text-[11px] text-gray-500">
+          Signed electronically by <span class="font-semibold text-gray-700"><%= s.consent_full_name || s.full_name %></span> on <%= s.consent_signed_at ? formatDate(s.consent_signed_at) : '—' %>.
+        </div>
+      </div>
+    <% } else { %>
+      <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        Consent was acknowledged but no signature image is stored for this submission.
+      </div>
+    <% } %>
+  </div>
+  <% } %>
+
   <!-- Review Details -->
   <% if (s.reviewed_at) { %>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
