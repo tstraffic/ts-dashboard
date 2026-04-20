@@ -62,7 +62,7 @@
     <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 1rem; margin-bottom: 0.75rem;">
       <p style="font-size: 0.68rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">Who can see this?</p>
       <div style="display: flex; gap: 6px;">
-        <% [['public','Everyone','🌏'],['team','My team','👥'],['private','Private','🔒']].forEach(function (opt) { %>
+        <% [['public','Everyone','🌏'],['team','My team','👥']].forEach(function (opt) { %>
           <label style="flex: 1; cursor: pointer;">
             <input type="radio" name="visibility" value="<%= opt[0] %>" <%= opt[0] === 'public' ? 'checked' : '' %> style="display: none;" class="kd-vis">
             <span style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.1);">

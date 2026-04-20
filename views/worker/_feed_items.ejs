@@ -20,7 +20,7 @@
           <% (k.recipients || []).forEach(function (r, i) { %><strong><%= r.name %></strong><%= i < k.recipients.length - 1 ? ', ' : '' %><% }); %>
           <% if (k.is_leadership) { %><span class="kd-leadership-badge">★ Leadership</span><% } %>
         </p>
-        <p class="kd-top-time"><%= timeAgo(k.created_at) %><% if (k.visibility === 'private') { %> · 🔒 Private<% } else if (k.visibility === 'team') { %> · Team<% } %></p>
+        <p class="kd-top-time"><%= timeAgo(k.created_at) %><% if (k.visibility === 'team') { %> · Team<% } %></p>
       </div>
       <div class="kd-action-menu">
         <button type="button" class="kd-action" aria-label="More" onclick="kdToggleMenu(this)">

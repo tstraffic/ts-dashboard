@@ -37,7 +37,9 @@ function sendKudos({ senderCrewId, recipientCrewIds, valueId, message, photoUrl,
   if (msg.length > 280) throw new Error('Message must be 280 characters or less');
   if (!allowProfanity && containsProfanity(msg)) throw new Error('PROFANITY');
 
-  if (!['public', 'team', 'private'].includes(visibility)) visibility = 'public';
+  // Public + team only — kudos is a reward system, not a DM. Legacy 'private' rows
+  // still exist in DB but nothing new can be created that way.
+  if (!['public', 'team'].includes(visibility)) visibility = 'public';
 
   // Rate limit
   const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
