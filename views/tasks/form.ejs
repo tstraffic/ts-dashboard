@@ -9,205 +9,402 @@
   const disabled = canEdit ? '' : 'disabled';
 %>
 
-<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-  <!-- Header -->
-  <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900"><%= pageTitle %></h1>
-    <% if (isEdit && !canEdit) { %>
-      <p class="mt-1 text-sm text-amber-600">
-        <svg class="w-4 h-4 inline -mt-0.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-        Read-only — this task is assigned to someone else. Only the task owner or an admin can edit it.
-      </p>
-    <% } %>
+<style>
+  /* Custom select styling with chevron background */
+  .tf-select, .tf-input, .tf-textarea {
+    width: 100%;
+    background-color: #fff;
+    border: 1px solid #E5E7EB;
+    color: #111827;
+    border-radius: 10px;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    transition: all 0.15s ease;
+  }
+  .tf-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding-right: 2.5rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1.25rem;
+    cursor: pointer;
+  }
+  .tf-select:hover, .tf-input:hover, .tf-textarea:hover { border-color: #CBD5E1; }
+  .tf-select:focus, .tf-input:focus, .tf-textarea:focus {
+    outline: none;
+    border-color: #2B7FFF;
+    box-shadow: 0 0 0 3px rgba(43,127,255,0.15);
+  }
+  .tf-textarea { resize: vertical; min-height: 84px; }
+  .dark-glass .tf-select, .dark-glass .tf-input, .dark-glass .tf-textarea {
+    background-color: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.92);
+  }
+  .dark-glass .tf-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='rgba(255,255,255,0.55)' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  }
+  .dark-glass .tf-select option { background-color: #0F172A; color: #fff; }
+
+  /* Field label */
+  .tf-label {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6B7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+  .dark-glass .tf-label { color: rgba(255,255,255,0.55); }
+
+  /* Section */
+  .tf-section + .tf-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #F1F5F9;
+  }
+  .dark-glass .tf-section + .tf-section { border-top-color: rgba(255,255,255,0.06); }
+  .tf-section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 1rem;
+  }
+
+  /* Segmented (priority/status) */
+  .tf-seg {
+    display: inline-flex;
+    padding: 3px;
+    background: #F1F5F9;
+    border-radius: 10px;
+    gap: 2px;
+    width: 100%;
+  }
+  .dark-glass .tf-seg { background: rgba(255,255,255,0.05); }
+  .tf-seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .tf-seg label {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #64748B;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .dark-glass .tf-seg label { color: rgba(255,255,255,0.6); }
+  .tf-seg label:hover { color: #334155; }
+  .dark-glass .tf-seg label:hover { color: rgba(255,255,255,0.85); }
+  .tf-seg input:checked + label {
+    background: #fff;
+    color: #0F172A;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .dark-glass .tf-seg input:checked + label {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  /* Priority colour accents when active */
+  .tf-seg input.p-low:checked + label    { color: #047857; }
+  .tf-seg input.p-medium:checked + label { color: #B45309; }
+  .tf-seg input.p-high:checked + label   { color: #B91C1C; }
+  .dark-glass .tf-seg input.p-low:checked + label    { color: #34D399; }
+  .dark-glass .tf-seg input.p-medium:checked + label { color: #FBBF24; }
+  .dark-glass .tf-seg input.p-high:checked + label   { color: #F87171; }
+
+  /* Chips */
+  .owner-chip {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    padding: 0.25rem 0.625rem 0.25rem 0.75rem;
+    background: #EFF6FF; color: #1D6AE5;
+    font-size: 0.75rem; font-weight: 600;
+    border-radius: 9999px;
+    border: 1px solid rgba(43,127,255,0.2);
+  }
+  .dark-glass .owner-chip {
+    background: rgba(43,127,255,0.15);
+    color: #93C5FD;
+    border-color: rgba(43,127,255,0.3);
+  }
+  .owner-chip button {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; border-radius: 9999px;
+    background: rgba(43,127,255,0.15); color: inherit;
+    font-size: 10px; line-height: 1;
+  }
+  .owner-chip button:hover { background: #EF4444; color: #fff; }
+
+  /* Action bar */
+  .tf-actionbar {
+    position: sticky;
+    bottom: 0;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid #E5E7EB;
+    margin: 1.5rem -1.5rem -1.5rem;
+    padding: 1rem 1.5rem;
+    border-radius: 0 0 1rem 1rem;
+  }
+  .dark-glass .tf-actionbar {
+    background: rgba(10,22,40,0.85);
+    border-top-color: rgba(255,255,255,0.08);
+  }
+  .tf-btn-primary {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: #1D6AE5; color: #fff;
+    font-weight: 600; font-size: 0.875rem;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(29,106,229,0.25), 0 4px 12px rgba(29,106,229,0.18);
+    transition: all 0.15s ease;
+  }
+  .tf-btn-primary:hover { background: #1558C9; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(29,106,229,0.3), 0 8px 20px rgba(29,106,229,0.22); }
+  .tf-btn-secondary {
+    display: inline-flex; align-items: center;
+    padding: 0.625rem 1rem;
+    background: #fff; color: #475569;
+    border: 1px solid #E5E7EB;
+    font-weight: 500; font-size: 0.875rem;
+    border-radius: 10px;
+  }
+  .tf-btn-secondary:hover { background: #F8FAFC; }
+  .dark-glass .tf-btn-secondary {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.8);
+  }
+  .dark-glass .tf-btn-secondary:hover { background: rgba(255,255,255,0.08); }
+</style>
+
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <!-- Page header -->
+  <div class="mb-5 flex items-start justify-between gap-4">
+    <div class="min-w-0">
+      <a href="/tasks" class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-brand-600 mb-2">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Back to tasks
+      </a>
+      <h1 class="text-2xl font-bold text-gray-900 tracking-tight"><%= pageTitle %></h1>
+      <p class="text-sm text-gray-500 mt-0.5"><%= isEdit ? 'Update details, owners and progress' : 'Capture the who, what and when — then assign' %></p>
+    </div>
     <% if (isEdit && typeof linkedCompliance !== 'undefined' && linkedCompliance) { %>
-      <div class="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-violet-50 border border-violet-200 rounded-lg text-sm">
-        <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-        <span class="text-violet-700">Linked to Plan: <strong><%= linkedCompliance.reference_number || linkedCompliance.title %></strong></span>
-        <a href="/compliance/<%= linkedCompliance.id %>/edit" class="text-violet-600 hover:text-violet-800 underline ml-1">View Plan</a>
-      </div>
+      <a href="/compliance/<%= linkedCompliance.id %>/edit" class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 bg-violet-50 border border-violet-200 rounded-lg text-xs font-medium text-violet-700 hover:bg-violet-100 flex-shrink-0">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+        <%= linkedCompliance.reference_number || 'Plan' %>
+      </a>
     <% } %>
   </div>
 
-  <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+  <% if (isEdit && !canEdit) { %>
+    <div class="mb-4 flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      Read-only — only the task owner or an admin can edit this task.
+    </div>
+  <% } %>
+
+  <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
     <form method="POST" action="<%= formAction %>">
       <%- include('../partials/csrf') %>
       <input type="hidden" name="return_to" value="<%= returnTo %>">
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Job -->
-        <div>
-          <label for="job_id" class="block text-sm font-medium text-gray-600 mb-1">Project <span class="text-gray-400 font-normal text-xs">(optional)</span></label>
-          <select id="job_id" name="job_id" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
-            <option value="">No project</option>
-            <% jobs.forEach(function(job) { %>
-              <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.project_name ? job.project_name + ' (' + job.client + ')' : job.client %></option>
-            <% }) %>
-          </select>
-        </div>
+      <!-- Section 1: Overview -->
+      <div class="tf-section">
+        <div class="tf-section-title">Overview</div>
 
-        <!-- Division -->
-        <div>
-          <label for="division" class="block text-sm font-medium text-gray-600 mb-1">Division <span class="text-red-600">*</span></label>
-          <select id="division" name="division" required <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
-            <option value="">Select division...</option>
-            <option value="ops" <%= isEdit && task.division === 'ops' ? 'selected' : (!isEdit ? 'selected' : '') %>>Operations</option>
-            <option value="planning" <%= isEdit && task.division === 'planning' ? 'selected' : '' %>>Planning</option>
-            <option value="finance" <%= isEdit && task.division === 'finance' ? 'selected' : '' %>>Finance</option>
-            <option value="admin" <%= isEdit && task.division === 'admin' ? 'selected' : '' %>>Admin</option>
-            <option value="hr" <%= isEdit && task.division === 'hr' ? 'selected' : '' %>>Human Resources</option>
-          </select>
-        </div>
+        <div class="grid grid-cols-1 gap-5">
+          <div>
+            <label class="tf-label" for="title">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+              Title <span class="text-red-500 font-normal">*</span>
+            </label>
+            <input type="text" id="title" name="title" required <%= disabled %> value="<%= isEdit ? task.title : '' %>" class="tf-input text-base <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>" placeholder="What needs doing?">
+          </div>
 
-        <!-- Task Type -->
-        <div>
-          <label for="task_type" class="block text-sm font-medium text-gray-600 mb-1">Task Type</label>
-          <select id="task_type" name="task_type" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
-            <option value="one_off" <%= isEdit && task.task_type === 'one_off' ? 'selected' : (!isEdit ? 'selected' : '') %>>One-off</option>
-            <option value="daily" <%= isEdit && task.task_type === 'daily' ? 'selected' : '' %>>Daily</option>
-            <option value="weekly" <%= isEdit && task.task_type === 'weekly' ? 'selected' : '' %>>Weekly</option>
-          </select>
+          <div>
+            <label class="tf-label" for="description">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+              Description
+            </label>
+            <textarea id="description" name="description" rows="3" <%= disabled %> class="tf-textarea <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>" placeholder="Context, links, definition of done..."><%= isEdit && task.description ? task.description : '' %></textarea>
+          </div>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+      <!-- Section 2: Assignment -->
+      <div class="tf-section">
+        <div class="tf-section-title">Assignment</div>
 
-        <!-- Title -->
-        <div class="md:col-span-2">
-          <label for="title" class="block text-sm font-medium text-gray-600 mb-1">Title <span class="text-red-600">*</span></label>
-          <input type="text" id="title" name="title" required <%= disabled %> value="<%= isEdit ? task.title : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>" placeholder="Task title...">
-        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+          <div>
+            <label class="tf-label" for="job_id">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+              Project <span class="text-gray-400 font-normal normal-case tracking-normal">(optional)</span>
+            </label>
+            <select id="job_id" name="job_id" <%= disabled %> class="tf-select <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
+              <option value="">No project</option>
+              <% jobs.forEach(function(job) { %>
+                <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> — <%= job.project_name ? job.project_name + ' (' + job.client + ')' : job.client %></option>
+              <% }) %>
+            </select>
+          </div>
 
-        <!-- Description -->
-        <div class="md:col-span-2">
-          <label for="description" class="block text-sm font-medium text-gray-600 mb-1">Description</label>
-          <textarea id="description" name="description" rows="3" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>" placeholder="Task description..."><%= isEdit && task.description ? task.description : '' %></textarea>
+          <div>
+            <label class="tf-label" for="division">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+              Division <span class="text-red-500 font-normal">*</span>
+            </label>
+            <select id="division" name="division" required <%= disabled %> class="tf-select <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
+              <option value="">Select division…</option>
+              <option value="ops" <%= isEdit && task.division === 'ops' ? 'selected' : (!isEdit ? 'selected' : '') %>>Operations</option>
+              <option value="planning" <%= isEdit && task.division === 'planning' ? 'selected' : '' %>>Planning</option>
+              <option value="finance" <%= isEdit && task.division === 'finance' ? 'selected' : '' %>>Finance</option>
+              <option value="admin" <%= isEdit && task.division === 'admin' ? 'selected' : '' %>>Admin</option>
+              <option value="hr" <%= isEdit && task.division === 'hr' ? 'selected' : '' %>>Human Resources</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="tf-label" for="task_type">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Recurrence
+            </label>
+            <select id="task_type" name="task_type" <%= disabled %> class="tf-select <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
+              <option value="one_off" <%= isEdit && task.task_type === 'one_off' ? 'selected' : (!isEdit ? 'selected' : '') %>>One-off</option>
+              <option value="daily" <%= isEdit && task.task_type === 'daily' ? 'selected' : '' %>>Daily</option>
+              <option value="weekly" <%= isEdit && task.task_type === 'weekly' ? 'selected' : '' %>>Weekly</option>
+            </select>
+          </div>
         </div>
 
         <!-- Owners (multi-select) -->
         <div>
-          <label class="block text-sm font-medium text-gray-600 mb-1">Owner(s) <span class="text-red-600">*</span></label>
+          <label class="tf-label">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            Owner(s) <span class="text-red-500 font-normal">*</span>
+          </label>
           <div id="owner-select-wrapper" class="<%= disabled ? 'opacity-60 pointer-events-none' : '' %>">
-            <!-- Selected owners as chips -->
-            <div id="owner-chips" class="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
+            <div id="owner-chips" class="flex flex-wrap gap-1.5 mb-2 min-h-[24px]">
               <%
                 const selectedOwners = isEdit && task.owners ? task.owners : [];
                 selectedOwners.forEach(function(o) {
               %>
-                <span class="owner-chip inline-flex items-center gap-1 px-2.5 py-1 bg-brand-50 text-brand-700 text-xs font-medium rounded-full border border-brand-200" data-id="<%= o.id %>">
+                <span class="owner-chip" data-id="<%= o.id %>">
                   <%= o.full_name %>
-                  <button type="button" onclick="removeOwner(<%= o.id %>)" class="hover:text-red-500 transition-colors">&times;</button>
+                  <button type="button" onclick="removeOwner(<%= o.id %>)">×</button>
                 </span>
               <% }) %>
             </div>
-            <!-- Hidden inputs for form submission -->
             <div id="owner-hidden-inputs">
               <% selectedOwners.forEach(function(o) { %>
                 <input type="hidden" name="owner_id" value="<%= o.id %>">
               <% }) %>
             </div>
-            <!-- Dropdown to add owners -->
-            <select id="owner-add-select" onchange="addOwner(this)" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm">
-              <option value="">+ Add owner...</option>
+            <select id="owner-add-select" onchange="addOwner(this)" class="tf-select">
+              <option value="">+ Add owner…</option>
               <% users.forEach(function(u) { %>
                 <option value="<%= u.id %>" data-name="<%= u.full_name || u.username %>"
-                  <% if (selectedOwners.some(function(o) { return String(o.id) === String(u.id); })) { %>disabled class="hidden"<% } %>
+                  <% if (selectedOwners.some(function(o) { return String(o.id) === String(u.id); })) { %>disabled<% } %>
                 ><%= u.full_name || u.username %></option>
               <% }) %>
             </select>
           </div>
           <% if (isEdit && task.created_by_name) { %>
-            <p class="text-xs text-gray-400 mt-1">Assigned by <span class="font-medium text-gray-500"><%= task.created_by_name %></span></p>
+            <p class="text-xs text-gray-400 mt-2">Assigned by <span class="font-medium text-gray-500"><%= task.created_by_name %></span></p>
           <% } %>
-        </div>
-        <script>
-        function addOwner(sel) {
-          const id = sel.value;
-          if (!id) return;
-          const name = sel.options[sel.selectedIndex].getAttribute('data-name');
-          // Add chip
-          const chip = document.createElement('span');
-          chip.className = 'owner-chip inline-flex items-center gap-1 px-2.5 py-1 bg-brand-50 text-brand-700 text-xs font-medium rounded-full border border-brand-200';
-          chip.dataset.id = id;
-          chip.innerHTML = name + ' <button type="button" onclick="removeOwner(' + id + ')" class="hover:text-red-500 transition-colors">&times;</button>';
-          document.getElementById('owner-chips').appendChild(chip);
-          // Add hidden input
-          const input = document.createElement('input');
-          input.type = 'hidden'; input.name = 'owner_id'; input.value = id;
-          document.getElementById('owner-hidden-inputs').appendChild(input);
-          // Disable option in dropdown
-          sel.options[sel.selectedIndex].disabled = true;
-          sel.value = '';
-        }
-        function removeOwner(id) {
-          // Remove chip
-          document.querySelectorAll('.owner-chip').forEach(c => { if (c.dataset.id == id) c.remove(); });
-          // Remove hidden input
-          document.querySelectorAll('#owner-hidden-inputs input').forEach(i => { if (i.value == id) i.remove(); });
-          // Re-enable option
-          const sel = document.getElementById('owner-add-select');
-          for (let i = 0; i < sel.options.length; i++) {
-            if (sel.options[i].value == id) { sel.options[i].disabled = false; break; }
-          }
-        }
-        // Form validation: require at least one owner
-        document.querySelector('form').addEventListener('submit', function(e) {
-          const owners = document.querySelectorAll('#owner-hidden-inputs input');
-          if (owners.length === 0) {
-            e.preventDefault();
-            alert('Please select at least one owner.');
-          }
-        });
-        </script>
-
-        <!-- Due Date -->
-        <div>
-          <label for="due_date" class="block text-sm font-medium text-gray-600 mb-1">Due Date <span class="text-red-600">*</span></label>
-          <input type="date" id="due_date" name="due_date" required <%= disabled %> value="<%= isEdit && task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '' %>" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
-        </div>
-
-        <!-- Status -->
-        <div>
-          <label for="status" class="block text-sm font-medium text-gray-600 mb-1">Status</label>
-          <select id="status" name="status" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
-            <% (settingsOptions.task_status || []).forEach(opt => { %>
-              <option value="<%= opt.key %>" <%= isEdit && task.status === opt.key ? 'selected' : '' %>><%= opt.label %></option>
-            <% }) %>
-          </select>
-        </div>
-
-        <!-- Priority -->
-        <div>
-          <label for="priority" class="block text-sm font-medium text-gray-600 mb-1">Priority</label>
-          <select id="priority" name="priority" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
-            <% (settingsOptions.task_priority || []).forEach(opt => { %>
-              <option value="<%= opt.key %>" <%= isEdit && task.priority === opt.key ? 'selected' : '' %>><%= opt.label %></option>
-            <% }) %>
-          </select>
-        </div>
-
-        <!-- Notes -->
-        <div class="md:col-span-2">
-          <label for="notes" class="block text-sm font-medium text-gray-600 mb-1">Notes</label>
-          <textarea id="notes" name="notes" rows="3" <%= disabled %> class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>" placeholder="Additional notes..."><%= isEdit && task.notes ? task.notes : '' %></textarea>
         </div>
       </div>
 
-      <!-- Buttons -->
-      <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 mt-6 pt-6 border-t border-gray-200">
+      <!-- Section 3: Schedule & Priority -->
+      <div class="tf-section">
+        <div class="tf-section-title">Schedule &amp; Priority</div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+          <div>
+            <label class="tf-label" for="due_date">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              Due Date <span class="text-red-500 font-normal">*</span>
+            </label>
+            <input type="date" id="due_date" name="due_date" required <%= disabled %> value="<%= isEdit && task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '' %>" class="tf-input <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
+          </div>
+
+          <div>
+            <label class="tf-label">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              Status
+            </label>
+            <div class="tf-seg" role="radiogroup" aria-label="Status">
+              <% (settingsOptions.task_status || []).forEach((opt, i) => {
+                   const curStatus = isEdit ? task.status : 'not_started';
+                   const checked = curStatus === opt.key;
+              %>
+                <input type="radio" name="status" id="status-<%= opt.key %>" value="<%= opt.key %>" <%= checked ? 'checked' : '' %> <%= disabled %>>
+                <label for="status-<%= opt.key %>"><%= opt.label %></label>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="tf-label">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+            Priority
+          </label>
+          <div class="tf-seg" role="radiogroup" aria-label="Priority">
+            <% (settingsOptions.task_priority || []).forEach((opt) => {
+                 const curPrio = isEdit ? task.priority : 'medium';
+                 const checked = curPrio === opt.key;
+            %>
+              <input type="radio" name="priority" id="priority-<%= opt.key %>" value="<%= opt.key %>" <%= checked ? 'checked' : '' %> <%= disabled %> class="p-<%= opt.key %>">
+              <label for="priority-<%= opt.key %>"><%= opt.label %></label>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 4: Notes (collapsible) -->
+      <div class="tf-section">
+        <details<%= isEdit && task.notes ? ' open' : '' %>>
+          <summary class="list-none cursor-pointer flex items-center justify-between group">
+            <div class="tf-section-title m-0 flex items-center gap-2">
+              Notes
+              <span class="text-[10px] text-gray-400 font-medium normal-case tracking-normal">(optional)</span>
+            </div>
+            <svg class="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </summary>
+          <div class="mt-3">
+            <textarea id="notes" name="notes" rows="3" <%= disabled %> class="tf-textarea <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>" placeholder="Additional context, internal notes, links..."><%= isEdit && task.notes ? task.notes : '' %></textarea>
+          </div>
+        </details>
+      </div>
+
+      <!-- Action bar -->
+      <div class="tf-actionbar flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <% if (isEdit && canEdit) { %>
-            <button type="button" onclick="document.getElementById('delete-modal').classList.remove('hidden')" class="px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-lg transition font-medium text-sm">
-              <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              Delete Task
+            <button type="button" onclick="document.getElementById('delete-modal').classList.remove('hidden')" class="inline-flex items-center gap-1.5 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition text-sm font-medium">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              Delete
             </button>
           <% } %>
         </div>
-        <div class="flex flex-col-reverse sm:flex-row gap-3">
-          <a href="/tasks" class="px-4 py-2.5 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition font-medium text-center">
+        <div class="flex flex-col-reverse sm:flex-row gap-2">
+          <a href="/tasks" class="tf-btn-secondary justify-center">
             <%= canEdit ? 'Cancel' : 'Back' %>
           </a>
           <% if (canEdit) { %>
-            <button type="submit" class="px-6 py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-500 transition font-semibold">
+            <button type="submit" class="tf-btn-primary justify-center">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
               <%= isEdit ? 'Update Task' : 'Create Task' %>
             </button>
           <% } %>
@@ -215,6 +412,39 @@
       </div>
     </form>
   </div>
+
+  <script>
+    function addOwner(sel) {
+      const id = sel.value;
+      if (!id) return;
+      const name = sel.options[sel.selectedIndex].getAttribute('data-name');
+      const chip = document.createElement('span');
+      chip.className = 'owner-chip';
+      chip.dataset.id = id;
+      chip.innerHTML = name + ' <button type="button" onclick="removeOwner(' + id + ')">&times;</button>';
+      document.getElementById('owner-chips').appendChild(chip);
+      const input = document.createElement('input');
+      input.type = 'hidden'; input.name = 'owner_id'; input.value = id;
+      document.getElementById('owner-hidden-inputs').appendChild(input);
+      sel.options[sel.selectedIndex].disabled = true;
+      sel.value = '';
+    }
+    function removeOwner(id) {
+      document.querySelectorAll('.owner-chip').forEach(c => { if (c.dataset.id == id) c.remove(); });
+      document.querySelectorAll('#owner-hidden-inputs input').forEach(i => { if (i.value == id) i.remove(); });
+      const sel = document.getElementById('owner-add-select');
+      for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value == id) { sel.options[i].disabled = false; break; }
+      }
+    }
+    document.querySelector('form').addEventListener('submit', function(e) {
+      const owners = document.querySelectorAll('#owner-hidden-inputs input');
+      if (owners.length === 0) {
+        e.preventDefault();
+        alert('Please select at least one owner.');
+      }
+    });
+  </script>
 
   <% if (isEdit) { %>
   <!-- Subtasks -->
