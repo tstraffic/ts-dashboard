@@ -1,75 +1,465 @@
-<div class="space-y-5">
-  <a href="/w/hr" class="inline-flex items-center text-sm text-brand-600 font-medium">
-    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-    Back to HR
-  </a>
+<%
+  // Helpers
+  function fmtDate(d) { if (!d) return ''; return new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  function dayNum(iso) { return parseInt(iso.split('-')[2], 10); }
+  // Build rows of 7 cells
+  const rows = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+%>
 
-  <div class="flex items-center justify-between">
-    <h1 class="text-xl font-bold text-gray-900">Leave Requests</h1>
+<style>
+  .lv-wrap { padding: 0 0.5rem 0.5rem; }
+  .lv-monthbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.625rem 0.75rem;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    margin: 0.5rem 0 0.75rem;
+  }
+  .lv-monthbar button, .lv-monthbar a {
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 8px; color: rgba(255,255,255,0.6);
+  }
+  .lv-monthbar button:hover, .lv-monthbar a:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .lv-monthbar .lv-month { font-size: 0.9rem; font-weight: 600; color: #fff; letter-spacing: 0.02em; }
+
+  .lv-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .lv-head { text-align: center; font-size: 0.625rem; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 0.06em; padding: 0.25rem 0 0.375rem; }
+  .lv-cell {
+    position: relative;
+    min-height: 72px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 6px 6px 4px;
+    text-align: center;
+    color: rgba(255,255,255,0.35);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .lv-cell.lv-has { color: #fff; }
+  .lv-cell.lv-has { background: rgba(255,255,255,0.05); }
+  .lv-cell.lv-today { box-shadow: 0 0 0 2px #F59E0B; color: #F59E0B; }
+  .lv-cell.lv-selected { box-shadow: 0 0 0 2px #2B7FFF; background: rgba(43,127,255,0.12); color: #fff; }
+  .lv-cell.lv-empty { background: transparent; border-color: transparent; cursor: default; }
+  .lv-cell.lv-past { opacity: 0.35; cursor: default; }
+  .lv-cell .lv-d { font-size: 1.05rem; font-weight: 700; line-height: 1; margin-top: 2px; }
+  .lv-cell .lv-icons { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 8px; }
+  .lv-cell svg.lv-plane { width: 16px; height: 16px; opacity: 0.18; }
+  .lv-cell svg.lv-plane.on-day    { opacity: 1; color: #F59E0B; }
+  .lv-cell svg.lv-plane.on-night  { opacity: 1; color: #3B82F6; }
+  .lv-cell svg.lv-plane.pending-day   { opacity: 1; color: #F59E0B; filter: drop-shadow(0 0 2px rgba(245,158,11,0.3)); }
+  .lv-cell svg.lv-plane.pending-night { opacity: 1; color: #3B82F6; filter: drop-shadow(0 0 2px rgba(59,130,246,0.3)); }
+  .lv-cell.lv-pending { background-image: repeating-linear-gradient(45deg, rgba(245,158,11,0.08), rgba(245,158,11,0.08) 3px, transparent 3px, transparent 6px); }
+
+  .lv-legend {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 0.75rem;
+    padding: 0.75rem; margin-top: 0.75rem;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; font-size: 0.75rem; color: rgba(255,255,255,0.72);
+  }
+  .lv-legend-row { display: flex; align-items: center; gap: 0.5rem; }
+  .lv-legend-sw {
+    width: 18px; height: 18px; border-radius: 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* FAB */
+  .lv-fab {
+    position: fixed; right: 18px; bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+    width: 54px; height: 54px; border-radius: 27px;
+    background: linear-gradient(135deg, #F59E0B, #EA580C);
+    box-shadow: 0 8px 20px rgba(234,88,12,0.35), 0 2px 4px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; z-index: 40;
+  }
+  .lv-fab:active { transform: scale(0.95); }
+
+  /* Sheet (modal) */
+  .lv-sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); z-index: 60; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .lv-sheet-bg.open { opacity: 1; pointer-events: auto; }
+  .lv-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    background: #0F1B30; color: #fff;
+    border-radius: 18px 18px 0 0;
+    max-height: 90vh; overflow-y: auto;
+    transform: translateY(100%); transition: transform 0.25s ease;
+    padding: 0.75rem 1rem 1.25rem;
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  }
+  .lv-sheet.open { transform: translateY(0); }
+  .lv-sheet-handle { width: 36px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 0.375rem auto 0.875rem; }
+  .lv-sheet h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.75rem; }
+  .lv-label { display: block; font-size: 0.65rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.375rem; }
+  .lv-input, .lv-select, .lv-textarea {
+    width: 100%; background: rgba(255,255,255,0.05); color: #fff;
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+    padding: 0.625rem 0.75rem; font-size: 0.875rem;
+  }
+  .lv-select {
+    appearance: none; -webkit-appearance: none;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath stroke='rgba(255,255,255,0.55)' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' fill='none' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 0.625rem center; background-size: 1.1rem;
+  }
+  .lv-select option { background: #0F1B30; color: #fff; }
+  .lv-input:focus, .lv-select:focus, .lv-textarea:focus { outline: none; border-color: #F59E0B; box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+  .lv-textarea { min-height: 70px; resize: vertical; }
+
+  /* Mode segmented */
+  .lv-seg { display: inline-flex; width: 100%; padding: 3px; background: rgba(255,255,255,0.05); border-radius: 10px; gap: 2px; }
+  .lv-seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .lv-seg label { flex: 1; text-align: center; padding: 0.5rem; font-size: 0.8rem; font-weight: 600; color: rgba(255,255,255,0.55); border-radius: 7px; cursor: pointer; }
+  .lv-seg input:checked + label { background: rgba(255,255,255,0.1); color: #fff; }
+
+  /* Weekday checkbox chips */
+  .lv-wd { display: flex; gap: 4px; flex-wrap: wrap; }
+  .lv-wd input { position: absolute; opacity: 0; pointer-events: none; }
+  .lv-wd label {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.75rem; font-weight: 700; cursor: pointer;
+  }
+  .lv-wd input:checked + label { background: rgba(245,158,11,0.2); color: #F59E0B; border-color: rgba(245,158,11,0.5); }
+
+  /* Selected dates chips */
+  .lv-selected-chips { display: flex; flex-wrap: wrap; gap: 4px; min-height: 28px; padding: 6px; background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.1); border-radius: 8px; }
+  .lv-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 6px 3px 8px; background: rgba(245,158,11,0.15); color: #F59E0B;
+    border-radius: 999px; font-size: 0.7rem; font-weight: 600;
+  }
+  .lv-chip button { font-size: 0.85rem; line-height: 1; padding: 0 2px; color: inherit; opacity: 0.7; }
+  .lv-chip button:hover { opacity: 1; }
+
+  .lv-btn-primary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    width: 100%; padding: 0.75rem;
+    background: linear-gradient(135deg, #F59E0B, #EA580C); color: #fff;
+    font-weight: 700; font-size: 0.9rem; border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(234,88,12,0.3);
+  }
+  .lv-btn-secondary {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 100%; padding: 0.625rem; background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.8); font-weight: 600; font-size: 0.85rem; border-radius: 10px;
+  }
+
+  /* History */
+  .lv-history-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.625rem 0.75rem;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+  }
+  .lv-history-item + .lv-history-item { margin-top: 0.375rem; }
+
+  .lv-status-dot { width: 6px; height: 6px; border-radius: 999px; display: inline-block; }
+</style>
+
+<div class="lv-wrap">
+
+  <!-- Month navigation -->
+  <div class="lv-monthbar">
+    <a href="/w/hr/leave?m=<%= prevM %>" aria-label="Previous month">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <span class="lv-month"><%= monthLabel %></span>
+    <a href="/w/hr/leave?m=<%= nextM %>" aria-label="Next month">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </a>
   </div>
 
-  <!-- New Leave Request Form -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-    <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Submit New Request</h3>
-    <form method="POST" action="/w/hr/leave" class="space-y-3">
-      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+  <!-- Calendar -->
+  <div class="lv-grid">
+    <div class="lv-head">MON</div><div class="lv-head">TUE</div><div class="lv-head">WED</div>
+    <div class="lv-head">THU</div><div class="lv-head">FRI</div><div class="lv-head">SAT</div>
+    <div class="lv-head">SUN</div>
+
+    <% cells.forEach(function(iso) {
+      if (!iso) { %>
+        <div class="lv-cell lv-empty"></div>
+      <% } else {
+        const entries = byDate[iso] || [];
+        const hasDay = entries.some(e => e.period === 'day' || e.period === 'full_day');
+        const hasNight = entries.some(e => e.period === 'night' || e.period === 'full_day');
+        const anyPending = entries.some(e => e.status === 'pending');
+        const isToday = iso === todayIso;
+        const isPast = iso < todayIso;
+        const cls = [
+          'lv-cell',
+          entries.length ? 'lv-has' : '',
+          isToday ? 'lv-today' : '',
+          isPast && !entries.length ? 'lv-past' : '',
+          anyPending ? 'lv-pending' : ''
+        ].filter(Boolean).join(' ');
+    %>
+      <button type="button" class="<%= cls %>" data-date="<%= iso %>" data-has="<%= entries.length %>" onclick="lvCellTap('<%= iso %>', <%= entries.length %>)">
+        <div class="lv-d"><%= dayNum(iso) %></div>
+        <div class="lv-icons">
+          <svg class="lv-plane <%= hasDay ? (anyPending ? 'pending-day' : 'on-day') : '' %>" viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg>
+          <svg class="lv-plane <%= hasNight ? (anyPending ? 'pending-night' : 'on-night') : '' %>" viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg>
+        </div>
+      </button>
+    <% } }); %>
+  </div>
+
+  <!-- Legend -->
+  <div class="lv-legend">
+    <div class="lv-legend-row"><span class="lv-legend-sw" style="border: 2px solid #F59E0B;"></span>Today</div>
+    <div class="lv-legend-row">
+      <span class="lv-legend-sw" style="background: rgba(245,158,11,0.2); color: #F59E0B;">
+        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg>
+      </span>
+      On leave 6am–6pm
+    </div>
+    <div class="lv-legend-row"><span class="lv-legend-sw" style="background-image: repeating-linear-gradient(45deg, rgba(245,158,11,0.3), rgba(245,158,11,0.3) 2px, transparent 2px, transparent 5px);"></span>Awaiting approval</div>
+    <div class="lv-legend-row">
+      <span class="lv-legend-sw" style="background: rgba(59,130,246,0.2); color: #3B82F6;">
+        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg>
+      </span>
+      On leave 6pm–6am
+    </div>
+  </div>
+
+  <!-- Upcoming / History -->
+  <% if (recentLeave && recentLeave.length > 0) { %>
+    <h3 class="text-[11px] font-bold text-white/50 uppercase tracking-wider mt-5 mb-2 px-1">Your leave</h3>
+    <% recentLeave.forEach(l => {
+      const stColor = l.status === 'approved' ? '#10B981' : l.status === 'rejected' ? '#EF4444' : l.status === 'cancelled' ? '#64748B' : '#F59E0B';
+      const stLabel = (l.status || 'pending').charAt(0).toUpperCase() + (l.status || 'pending').slice(1);
+      const periodLabel = l.shift_period === 'day' ? '6am–6pm' : l.shift_period === 'night' ? '6pm–6am' : 'Full day';
+    %>
+      <div class="lv-history-item">
+        <div class="min-w-0 flex-1 pr-2">
+          <div class="flex items-center gap-2">
+            <span class="lv-status-dot" style="background: <%= stColor %>;"></span>
+            <p class="text-sm font-semibold text-white"><%= fmtDate(l.start_date) %><% if (l.start_date !== l.end_date) { %> – <%= fmtDate(l.end_date) %><% } %></p>
+          </div>
+          <p class="text-[11px] text-white/55 mt-0.5">
+            <%= (l.leave_type || 'annual').charAt(0).toUpperCase() + (l.leave_type || 'annual').slice(1) %> · <%= periodLabel %> · <%= stLabel %>
+          </p>
+        </div>
+        <% if (l.status === 'pending') { %>
+          <form method="POST" action="/w/hr/leave/<%= l.id %>/cancel" onsubmit="return confirm('Cancel this leave?')">
+            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+            <button type="submit" class="text-[11px] font-semibold text-red-400 px-2 py-1 rounded-md hover:bg-red-500/10">Cancel</button>
+          </form>
+        <% } %>
+      </div>
+    <% }) %>
+  <% } %>
+</div>
+
+<!-- Floating Action Button -->
+<button class="lv-fab" type="button" onclick="lvOpen()" aria-label="Add leave">
+  <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+</button>
+
+<!-- Add Leave Sheet -->
+<div class="lv-sheet-bg" id="lv-bg" onclick="lvClose()"></div>
+<div class="lv-sheet" id="lv-sheet" role="dialog" aria-label="Add leave">
+  <div class="lv-sheet-handle"></div>
+  <h3>Request Leave</h3>
+
+  <form method="POST" action="/w/hr/leave" id="lv-form">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <input type="hidden" name="mode" id="lv-mode" value="single">
+
+    <!-- Mode -->
+    <div class="lv-seg mb-4">
+      <input type="radio" name="mode_seg" id="mode-single" value="single" checked onchange="lvSetMode('single')">
+      <label for="mode-single">Single</label>
+      <input type="radio" name="mode_seg" id="mode-multi" value="multiple" onchange="lvSetMode('multiple')">
+      <label for="mode-multi">Multiple</label>
+      <input type="radio" name="mode_seg" id="mode-recur" value="recurring" onchange="lvSetMode('recurring')">
+      <label for="mode-recur">Recurring</label>
+    </div>
+
+    <!-- Single -->
+    <div id="lv-mode-single" class="lv-mode-panel space-y-3">
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Leave Type</label>
-        <select name="leave_type" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
-          <option value="annual">Annual Leave</option>
-          <option value="sick">Sick Leave</option>
-          <option value="personal">Personal Leave</option>
-          <option value="unpaid">Unpaid Leave</option>
+        <label class="lv-label">Date</label>
+        <input type="date" class="lv-input" id="lv-single-date" min="<%= todayIso %>">
+      </div>
+    </div>
+
+    <!-- Multiple -->
+    <div id="lv-mode-multiple" class="lv-mode-panel space-y-3" style="display:none;">
+      <div>
+        <label class="lv-label">Add dates</label>
+        <div class="flex gap-2">
+          <input type="date" class="lv-input" id="lv-multi-add" min="<%= todayIso %>">
+          <button type="button" class="lv-btn-secondary" style="width: auto; padding: 0.625rem 1rem;" onclick="lvAddDate()">Add</button>
+        </div>
+      </div>
+      <div>
+        <label class="lv-label">Selected dates</label>
+        <div id="lv-multi-chips" class="lv-selected-chips"><span class="text-[11px] text-white/40 px-1">No dates selected</span></div>
+      </div>
+    </div>
+
+    <!-- Recurring -->
+    <div id="lv-mode-recurring" class="lv-mode-panel space-y-3" style="display:none;">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="lv-label">Starts</label>
+          <input type="date" class="lv-input" name="recur_start" min="<%= todayIso %>">
+        </div>
+        <div>
+          <label class="lv-label">Until</label>
+          <input type="date" class="lv-input" name="recur_until" min="<%= todayIso %>">
+        </div>
+      </div>
+      <div>
+        <label class="lv-label">Repeat</label>
+        <select class="lv-select" name="recur_freq">
+          <option value="weekly">Every week</option>
+          <option value="fortnightly">Every fortnight</option>
+          <option value="monthly">Every month (on start date)</option>
+        </select>
+      </div>
+      <div id="lv-weekday-row">
+        <label class="lv-label">On days (optional)</label>
+        <div class="lv-wd">
+          <% ['M','T','W','T','F','S','S'].forEach((l, i) => {
+             const dayVal = (i + 1) % 7; // JS: 0=Sun … here 0=Mon -> map: M=1,T=2,...,S=0 %>
+            <input type="checkbox" id="wd-<%= i %>" name="recur_weekdays" value="<%= dayVal %>">
+            <label for="wd-<%= i %>"><%= l %></label>
+          <% }) %>
+        </div>
+        <p class="text-[11px] text-white/40 mt-1">Leave empty to use the start date's weekday only.</p>
+      </div>
+    </div>
+
+    <!-- Shift period -->
+    <div class="mt-4">
+      <label class="lv-label">Shift period</label>
+      <div class="lv-seg">
+        <input type="radio" name="shift_period" id="sp-full" value="full_day" checked>
+        <label for="sp-full">Full day</label>
+        <input type="radio" name="shift_period" id="sp-day" value="day">
+        <label for="sp-day">Day 6a–6p</label>
+        <input type="radio" name="shift_period" id="sp-night" value="night">
+        <label for="sp-night">Night 6p–6a</label>
+      </div>
+    </div>
+
+    <!-- Leave type & reason -->
+    <div class="grid grid-cols-2 gap-3 mt-4">
+      <div>
+        <label class="lv-label">Type</label>
+        <select class="lv-select" name="leave_type">
+          <option value="annual">Annual</option>
+          <option value="sick">Sick</option>
+          <option value="personal">Personal</option>
+          <option value="unpaid">Unpaid</option>
           <option value="other">Other</option>
         </select>
       </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
-          <input type="date" name="start_date" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">End Date</label>
-          <input type="date" name="end_date" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500">
-        </div>
-      </div>
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Reason (optional)</label>
-        <textarea name="reason" rows="2" placeholder="Brief reason..." class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 resize-none"></textarea>
+        <label class="lv-label">Reason (optional)</label>
+        <input type="text" class="lv-input" name="reason" placeholder="Optional...">
       </div>
-      <button type="submit" class="w-full py-2.5 bg-brand-600 text-white rounded-lg font-medium text-sm hover:bg-brand-700 transition">Submit Request</button>
-    </form>
-  </div>
+    </div>
 
-  <!-- Leave History -->
-  <% if (leaveRequests.length > 0) { %>
-    <div>
-      <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Request History</h2>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm divide-y divide-gray-100">
-        <% leaveRequests.forEach(l => { %>
-          <div class="p-3">
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-xs font-medium text-gray-700"><%= l.leave_type.charAt(0).toUpperCase() + l.leave_type.slice(1) %> Leave</span>
-              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold
-                <%= l.status === 'approved' ? 'bg-emerald-50 text-emerald-700'
-                  : l.status === 'rejected' ? 'bg-red-50 text-red-700'
-                  : l.status === 'cancelled' ? 'bg-gray-100 text-gray-500'
-                  : 'bg-amber-50 text-amber-700' %>">
-                <%= l.status.charAt(0).toUpperCase() + l.status.slice(1) %>
-              </span>
-            </div>
-            <p class="text-sm text-gray-900">
-              <%= new Date(l.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) %> — <%= new Date(l.end_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) %>
-              <span class="text-gray-400">(<%= l.total_days %> day<%= l.total_days > 1 ? 's' : '' %>)</span>
-            </p>
-            <% if (l.reason) { %><p class="text-xs text-gray-500 mt-0.5"><%= l.reason %></p><% } %>
-          </div>
-        <% }) %>
-      </div>
+    <!-- Hidden multi dates container (JSON-encoded dates submitted as repeated dates[] inputs) -->
+    <div id="lv-dates-container"></div>
+
+    <div class="grid grid-cols-[1fr_2fr] gap-2 mt-5">
+      <button type="button" class="lv-btn-secondary" onclick="lvClose()">Cancel</button>
+      <button type="submit" class="lv-btn-primary">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        Submit request
+      </button>
     </div>
-  <% } else { %>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
-      <p class="text-gray-500 text-sm">No leave requests yet</p>
-    </div>
-  <% } %>
+  </form>
 </div>
+
+<script>
+  (function () {
+    var bg = document.getElementById('lv-bg');
+    var sheet = document.getElementById('lv-sheet');
+    var modeInput = document.getElementById('lv-mode');
+    var selectedDates = new Set();
+
+    window.lvOpen = function (preDate) {
+      bg.classList.add('open');
+      sheet.classList.add('open');
+      if (preDate) {
+        var mode = 'single';
+        var single = document.getElementById('mode-single');
+        single.checked = true;
+        lvSetMode('single');
+        document.getElementById('lv-single-date').value = preDate;
+      }
+    };
+    window.lvClose = function () {
+      bg.classList.remove('open');
+      sheet.classList.remove('open');
+    };
+    window.lvSetMode = function (mode) {
+      modeInput.value = mode;
+      document.querySelectorAll('.lv-mode-panel').forEach(function (p) { p.style.display = 'none'; });
+      document.getElementById('lv-mode-' + mode).style.display = 'block';
+    };
+    window.lvAddDate = function () {
+      var inp = document.getElementById('lv-multi-add');
+      var v = inp.value;
+      if (!v) return;
+      if (!selectedDates.has(v)) {
+        selectedDates.add(v);
+        lvRenderChips();
+      }
+      inp.value = '';
+    };
+    window.lvRemoveDate = function (d) {
+      selectedDates.delete(d);
+      lvRenderChips();
+    };
+    function lvRenderChips() {
+      var wrap = document.getElementById('lv-multi-chips');
+      if (selectedDates.size === 0) {
+        wrap.innerHTML = '<span class="text-[11px] text-white/40 px-1">No dates selected</span>';
+        return;
+      }
+      var arr = Array.from(selectedDates).sort();
+      wrap.innerHTML = arr.map(function (d) {
+        var short = new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+        return '<span class="lv-chip">' + short + '<button type="button" onclick="lvRemoveDate(\'' + d + '\')">×</button></span>';
+      }).join('');
+    }
+
+    // Tapping a calendar cell opens the sheet pre-filled
+    window.lvCellTap = function (iso, hasEntries) {
+      if (iso < '<%= todayIso %>' && !hasEntries) return;
+      lvOpen(iso);
+    };
+
+    // Build hidden dates[] inputs before submit
+    document.getElementById('lv-form').addEventListener('submit', function (e) {
+      var mode = modeInput.value;
+      var container = document.getElementById('lv-dates-container');
+      container.innerHTML = '';
+      if (mode === 'single') {
+        var d = document.getElementById('lv-single-date').value;
+        if (!d) { e.preventDefault(); alert('Please pick a date.'); return; }
+        container.innerHTML = '<input type="hidden" name="dates" value="' + d + '">';
+      } else if (mode === 'multiple') {
+        if (selectedDates.size === 0) { e.preventDefault(); alert('Please add at least one date.'); return; }
+        Array.from(selectedDates).forEach(function (d) {
+          var i = document.createElement('input');
+          i.type = 'hidden'; i.name = 'dates'; i.value = d;
+          container.appendChild(i);
+        });
+      }
+      // Recurring is expanded server-side from recur_start/recur_until/recur_freq/recur_weekdays
+    });
+  })();
+</script>

@@ -5125,6 +5125,14 @@ function runMigrations(db) {
     console.log('Migration 114 applied: test dummy worker seeded');
   }
 
+  // Migration 116: Add shift_period to employee_leave for day/night/full_day split
+  if (!isMigrationApplied.get(116)) {
+    try { db.exec("ALTER TABLE employee_leave ADD COLUMN shift_period TEXT DEFAULT 'full_day'"); } catch (e) { /* column may exist */ }
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_employee_leave_dates ON employee_leave(crew_member_id, start_date, end_date)"); } catch (e) { /* may exist */ }
+    recordMigration.run(116, 'Add shift_period to employee_leave (day/night/full_day)');
+    console.log('Migration 116 applied: shift_period on employee_leave');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
