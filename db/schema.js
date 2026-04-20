@@ -5133,6 +5133,48 @@ function runMigrations(db) {
     console.log('Migration 116 applied: shift_period on employee_leave');
   }
 
+  // Migration 121: Home personalisation — cards, preferences, streaks
+  if (!isMigrationApplied.get(121)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS home_cards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+        card_type TEXT NOT NULL,
+        card_key TEXT NOT NULL,
+        priority INTEGER NOT NULL DEFAULT 50,
+        payload TEXT DEFAULT '{}',
+        shown_at DATETIME,
+        dismissed_at DATETIME,
+        acted_at DATETIME,
+        created_at DATETIME DEFAULT (datetime('now')),
+        UNIQUE(crew_member_id, card_key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_home_cards_member ON home_cards(crew_member_id);
+      CREATE INDEX IF NOT EXISTS idx_home_cards_active ON home_cards(crew_member_id, dismissed_at);
+
+      CREATE TABLE IF NOT EXISTS home_preferences (
+        crew_member_id INTEGER PRIMARY KEY REFERENCES crew_members(id) ON DELETE CASCADE,
+        section_order TEXT DEFAULT '',
+        hidden_sections TEXT DEFAULT '',
+        fab_actions TEXT DEFAULT '',
+        updated_at DATETIME DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS streaks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+        streak_type TEXT NOT NULL,
+        current_count INTEGER NOT NULL DEFAULT 0,
+        best_count INTEGER NOT NULL DEFAULT 0,
+        last_incremented_at DATETIME,
+        UNIQUE(crew_member_id, streak_type)
+      );
+      CREATE INDEX IF NOT EXISTS idx_streaks_member ON streaks(crew_member_id);
+    `);
+    recordMigration.run(121, 'Home personalisation: home_cards, home_preferences, streaks');
+    console.log('Migration 121 applied: home personalisation tables');
+  }
+
   // Migration 120: Induction signature — consent block + signed PDF
   if (!isMigrationApplied.get(120)) {
     try { db.exec("ALTER TABLE induction_submissions ADD COLUMN signature_url TEXT DEFAULT ''"); } catch (e) {}

@@ -1,18 +1,12 @@
 <%
   function fmtTime(t) {
     if (!t) return '';
-    // Accept 'HH:MM' or 'HH:MM:SS'
     const parts = String(t).split(':');
     let h = parseInt(parts[0], 10);
     const m = parts[1] || '00';
     const am = h < 12;
     h = h % 12; if (h === 0) h = 12;
     return h + (m === '00' ? '' : ':' + m) + (am ? 'am' : 'pm');
-  }
-  function fmtDayMon(iso) {
-    if (!iso) return '';
-    const d = new Date(iso + 'T00:00:00');
-    return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
   }
   function relDay(iso) {
     const d = new Date(iso + 'T00:00:00');
@@ -27,6 +21,13 @@
     const d = new Date(ts);
     return d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
   }
+
+  // Default section order
+  const defaultOrder = ['hero','cards','streaks','weather','week','timeline','compliance','today','actions','upcoming','activity'];
+  const hidden = (prefs && prefs.hidden_sections) || [];
+  const orderSource = (prefs && prefs.section_order && prefs.section_order.length) ? prefs.section_order : defaultOrder;
+  // Preserve any new sections we added after the user saved their prefs
+  const order = [...orderSource, ...defaultOrder.filter(s => !orderSource.includes(s))];
 %>
 
 <style>
@@ -49,140 +50,130 @@
     background: radial-gradient(closest-side, rgba(0,210,190,0.18), transparent);
     filter: blur(40px); pointer-events: none;
   }
-  .wh-hero-greet { font-size: 1.5rem; font-weight: 800; color: #fff; letter-spacing: -0.01em; line-height: 1.15; }
-  .wh-hero-sub { font-size: 0.8rem; color: rgba(255,255,255,0.55); margin-top: 0.125rem; }
-  .wh-hero-status { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; font-size: 0.7rem; font-weight: 700; border-radius: 999px; margin-top: 0.75rem; }
-  .wh-hero-status.on { background: rgba(16,185,129,0.15); color: #34D399; border: 1px solid rgba(16,185,129,0.3); }
-  .wh-hero-status.off { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.1); }
-  .wh-hero-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; animation: wh-pulse 2s infinite; }
-  @keyframes wh-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .wh-hero-sub { font-size: 0.75rem; color: rgba(255,255,255,0.55); letter-spacing: 0.02em; }
+  .wh-hero-greet { font-size: 1.5rem; font-weight: 800; color: #fff; letter-spacing: -0.01em; line-height: 1.15; margin-top: 0.125rem; }
+  .wh-hero-ctx { font-size: 0.85rem; color: #93C5FD; margin-top: 0.5rem; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; }
+  .wh-hero-ctx.shift { color: #FCD34D; }
+  .wh-hero-ctx.compliance { color: #FDA4AF; }
+  .wh-hero-ctx.leave { color: #A78BFA; }
+  .wh-hero-ctx.birthday, .wh-hero-ctx.anniversary { color: #F9A8D4; }
+  .wh-hero-ctx .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; opacity: 0.8; animation: wh-pulse 2.4s infinite; }
+  @keyframes wh-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
 
   /* Stats grid */
   .wh-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
-  .wh-stat {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 12px;
-    padding: 10px 12px;
-    position: relative;
-  }
+  .wh-stat { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 12px; position: relative; }
   .wh-stat-label { font-size: 0.625rem; font-weight: 700; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.07em; }
   .wh-stat-value { font-size: 1.5rem; font-weight: 800; color: #fff; margin-top: 2px; letter-spacing: -0.02em; line-height: 1; }
   .wh-stat-unit { font-size: 0.8rem; font-weight: 600; color: rgba(255,255,255,0.45); margin-left: 3px; }
   .wh-stat-sub { font-size: 0.65rem; color: rgba(255,255,255,0.4); margin-top: 4px; }
-  .wh-stat-ico {
-    position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-  }
+  .wh-stat-ico { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
   .wh-stat.hrs .wh-stat-ico { background: rgba(43,127,255,0.15); color: #60A5FA; }
   .wh-stat.days .wh-stat-ico { background: rgba(16,185,129,0.15); color: #34D399; }
   .wh-stat.up .wh-stat-ico { background: rgba(245,158,11,0.15); color: #F59E0B; }
   .wh-stat.leave .wh-stat-ico { background: rgba(167,139,250,0.15); color: #A78BFA; }
 
-  /* Section heading */
   .wh-section-head { display: flex; align-items: center; justify-content: space-between; margin: 1.25rem 0 0.5rem; padding: 0 2px; }
   .wh-section-title { font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.08em; }
   .wh-section-link { font-size: 0.75rem; font-weight: 600; color: #60A5FA; display: inline-flex; align-items: center; gap: 2px; }
 
+  /* Cards carousel */
+  .wh-cards { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: none; scroll-snap-type: x mandatory; }
+  .wh-cards::-webkit-scrollbar { display: none; }
+  .wh-card {
+    flex: 0 0 82%; max-width: 280px;
+    position: relative; padding: 14px;
+    border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+    scroll-snap-align: start; min-height: 110px;
+    display: flex; flex-direction: column; gap: 6px;
+    animation: wh-slide-in 0.35s ease-out both;
+  }
+  @keyframes wh-slide-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .wh-card-top { display: flex; align-items: center; gap: 8px; }
+  .wh-card-ic { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .wh-card-ic.red { background: rgba(239,68,68,0.15); color: #F87171; }
+  .wh-card-ic.amber { background: rgba(245,158,11,0.15); color: #F59E0B; }
+  .wh-card-ic.blue { background: rgba(43,127,255,0.15); color: #60A5FA; }
+  .wh-card-ic.emerald { background: rgba(16,185,129,0.15); color: #34D399; }
+  .wh-card-ic.indigo { background: rgba(99,102,241,0.15); color: #818CF8; }
+  .wh-card-title { font-size: 0.82rem; font-weight: 700; color: #fff; line-height: 1.2; flex: 1; min-width: 0; }
+  .wh-card-body { font-size: 0.72rem; color: rgba(255,255,255,0.6); line-height: 1.3; }
+  .wh-card-dismiss { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.04); }
+  .wh-card-dismiss:hover { color: #fff; background: rgba(255,255,255,0.1); }
+  .wh-card-cta { display: inline-flex; align-items: center; gap: 3px; font-size: 0.72rem; font-weight: 700; color: #60A5FA; align-self: flex-start; margin-top: auto; padding: 4px 0; }
+
+  /* Streaks strip */
+  .wh-streaks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .wh-streak { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 12px; position: relative; overflow: hidden; }
+  .wh-streak-label { font-size: 0.625rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.07em; display: flex; align-items: center; gap: 6px; }
+  .wh-streak-ic { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+  .wh-streak-ic.emerald { background: rgba(16,185,129,0.18); color: #34D399; }
+  .wh-streak-ic.blue { background: rgba(43,127,255,0.18); color: #60A5FA; }
+  .wh-streak-ic.purple { background: rgba(167,139,250,0.18); color: #A78BFA; }
+  .wh-streak-ic.amber { background: rgba(245,158,11,0.18); color: #F59E0B; }
+  .wh-streak-value { font-size: 1.35rem; font-weight: 800; color: #fff; margin-top: 4px; letter-spacing: -0.02em; }
+  .wh-streak-unit { font-size: 0.7rem; font-weight: 600; color: rgba(255,255,255,0.4); margin-left: 2px; }
+  .wh-streak-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  .wh-streak-bar-fill { height: 100%; background: currentColor; transition: width 0.8s ease-out; }
+
   /* Week strip */
   .wh-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  .wh-wday {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 10px;
-    padding: 8px 2px 6px;
-    text-align: center;
-    color: rgba(255,255,255,0.6);
-  }
+  .wh-wday { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 8px 2px 6px; text-align: center; color: rgba(255,255,255,0.6); }
   .wh-wday.today { box-shadow: 0 0 0 1.5px #F59E0B; color: #F59E0B; background: rgba(245,158,11,0.08); }
   .wh-wday-letter { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.04em; opacity: 0.65; }
   .wh-wday-num { font-size: 0.95rem; font-weight: 700; margin-top: 1px; line-height: 1.1; color: #fff; }
   .wh-wday.past .wh-wday-num { opacity: 0.45; }
-  .wh-wday-pill {
-    display: inline-block; height: 4px; width: 20px; border-radius: 2px; margin-top: 4px;
-    background: rgba(255,255,255,0.08);
-  }
+  .wh-wday-pill { display: inline-block; height: 4px; width: 20px; border-radius: 2px; margin-top: 4px; background: rgba(255,255,255,0.08); }
   .wh-wday.has-shift .wh-wday-pill { background: #00D2BE; }
   .wh-wday.has-shift-night .wh-wday-pill { background: #3B82F6; }
   .wh-wday.has-leave .wh-wday-pill { background: #F59E0B; }
-  .wh-wday.has-leave-pending .wh-wday-pill {
-    background: linear-gradient(90deg, #F59E0B 50%, transparent 50%);
-    background-size: 4px 4px;
-  }
+  .wh-wday.has-leave-pending .wh-wday-pill { background: linear-gradient(90deg, #F59E0B 50%, transparent 50%); background-size: 4px 4px; }
+
+  /* Weather */
+  .wh-weather { background: linear-gradient(135deg, rgba(43,127,255,0.12), rgba(10,22,40,0.5)); border: 1px solid rgba(96,165,250,0.25); border-radius: 14px; padding: 14px; display: flex; align-items: center; gap: 14px; }
+  .wh-weather-temp { font-size: 2.4rem; font-weight: 800; color: #fff; line-height: 1; }
+  .wh-weather-meta { flex: 1; min-width: 0; }
+  .wh-weather-desc { font-size: 0.85rem; color: #fff; font-weight: 600; text-transform: capitalize; }
+  .wh-weather-sub { font-size: 0.7rem; color: rgba(255,255,255,0.55); margin-top: 2px; }
+  .wh-weather-warn { margin-top: 10px; padding: 8px 10px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); border-radius: 10px; color: #FBBF24; font-size: 0.72rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+
+  /* Today timeline */
+  .wh-timeline { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 14px; }
+  .wh-timeline-head { font-size: 0.8rem; font-weight: 700; color: #fff; }
+  .wh-timeline-sub { font-size: 0.7rem; color: rgba(255,255,255,0.55); margin-top: 2px; }
+  .wh-timeline-track { position: relative; height: 64px; margin-top: 12px; background: rgba(255,255,255,0.04); border-radius: 8px; overflow: hidden; }
+  .wh-timeline-fill { position: absolute; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(43,127,255,0.35), rgba(0,210,190,0.35)); border-radius: 8px; }
+  .wh-timeline-block { position: absolute; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .wh-timeline-block-dot { width: 12px; height: 12px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.12); }
+  .wh-timeline-block-lbl { font-size: 0.58rem; font-weight: 700; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+  .wh-timeline-now { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #F59E0B; box-shadow: 0 0 8px rgba(245,158,11,0.6); z-index: 2; transition: left 1s linear; }
+  .wh-timeline-now::before { content: ''; position: absolute; top: -6px; left: -5px; width: 12px; height: 12px; border-radius: 999px; background: #F59E0B; box-shadow: 0 0 10px rgba(245,158,11,0.8); }
 
   /* Alert banner */
-  .wh-alert {
-    padding: 12px; border-radius: 12px;
-    background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.05));
-    border: 1px solid rgba(245,158,11,0.25);
-    color: #FDE68A;
-  }
+  .wh-alert { padding: 12px; border-radius: 12px; background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.05)); border: 1px solid rgba(245,158,11,0.25); color: #FDE68A; }
   .wh-alert h4 { font-size: 0.8rem; font-weight: 700; color: #F59E0B; }
   .wh-alert ul { margin-top: 4px; font-size: 0.75rem; color: #FCD34D; line-height: 1.4; }
 
   /* Shift card */
-  .wh-shift {
-    background: #fff; border: 1px solid #E5E7EB;
-    border-radius: 14px; overflow: hidden;
-  }
-  .wh-shift-header {
-    padding: 10px 14px;
-    display: flex; align-items: center; justify-content: space-between;
-    background: linear-gradient(90deg, #EFF6FF, #F8FAFC);
-    border-bottom: 1px solid #E5E7EB;
-  }
+  .wh-shift { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; overflow: hidden; }
+  .wh-shift-header { padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(90deg, #EFF6FF, #F8FAFC); border-bottom: 1px solid #E5E7EB; }
   .wh-shift-body { padding: 14px; color: #111827; }
   .wh-shift-client { font-size: 1rem; font-weight: 700; color: #111827; }
   .wh-shift-job { font-size: 0.7rem; color: #6B7280; font-family: ui-monospace, SFMono-Regular, monospace; }
   .wh-meta-row { display: flex; align-items: flex-start; gap: 8px; font-size: 0.82rem; color: #374151; }
   .wh-meta-row + .wh-meta-row { margin-top: 8px; }
   .wh-meta-row svg { width: 16px; height: 16px; color: #9CA3AF; flex-shrink: 0; margin-top: 1px; }
+  .wh-shift-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 14px; background: #F9FAFB; border-top: 1px solid #E5E7EB; }
+  .wh-act-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 9px; font-size: 0.8rem; font-weight: 600; border-radius: 10px; background: #fff; color: #374151; border: 1px solid #E5E7EB; }
+  .wh-act-btn.primary { background: #1D6AE5; color: #fff; border-color: #1D6AE5; box-shadow: 0 2px 6px rgba(29,106,229,0.3); }
 
-  .wh-shift-actions {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-    padding: 10px 14px; background: #F9FAFB; border-top: 1px solid #E5E7EB;
-  }
-  .wh-act-btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-    padding: 9px; font-size: 0.8rem; font-weight: 600;
-    border-radius: 10px; background: #fff; color: #374151; border: 1px solid #E5E7EB;
-  }
-  .wh-act-btn.primary {
-    background: #1D6AE5; color: #fff; border-color: #1D6AE5;
-    box-shadow: 0 2px 6px rgba(29,106,229,0.3);
-  }
+  .wh-empty { text-align: center; padding: 24px 12px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08); border-radius: 12px; }
+  .wh-empty-ic { width: 40px; height: 40px; border-radius: 999px; margin: 0 auto 8px; background: rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.3); }
 
-  .wh-dark-card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 12px;
-    padding: 12px 14px;
-  }
-  .wh-empty {
-    text-align: center; padding: 24px 12px;
-    background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08);
-    border-radius: 12px;
-  }
-  .wh-empty-ic {
-    width: 40px; height: 40px; border-radius: 999px; margin: 0 auto 8px;
-    background: rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,0.3);
-  }
-
-  /* Quick actions grid */
+  /* Quick actions */
   .wh-qa { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .wh-qa-btn {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 12px;
-    padding: 10px 4px 8px;
-    text-align: center;
-    color: rgba(255,255,255,0.85);
-  }
-  .wh-qa-ic {
-    width: 32px; height: 32px; border-radius: 10px; margin: 0 auto 5px;
-    display: flex; align-items: center; justify-content: center;
-  }
+  .wh-qa-btn { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 4px 8px; text-align: center; color: rgba(255,255,255,0.85); }
+  .wh-qa-ic { width: 32px; height: 32px; border-radius: 10px; margin: 0 auto 5px; display: flex; align-items: center; justify-content: center; }
   .wh-qa-lbl { font-size: 0.68rem; font-weight: 600; line-height: 1.1; }
   .wh-qa-ic.g { background: rgba(16,185,129,0.15); color: #34D399; }
   .wh-qa-ic.r { background: rgba(239,68,68,0.15); color: #F87171; }
@@ -192,17 +183,9 @@
   .wh-qa-ic.t { background: rgba(0,210,190,0.15); color: #00D2BE; }
 
   /* Upcoming list */
-  .wh-up-item { display: flex; gap: 10px; padding: 10px 12px;
-    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 12px; align-items: center;
-  }
+  .wh-up-item { display: flex; gap: 10px; padding: 10px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; align-items: center; }
   .wh-up-item + .wh-up-item { margin-top: 6px; }
-  .wh-up-date {
-    width: 44px; min-height: 44px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    border-radius: 10px; background: rgba(43,127,255,0.12); color: #60A5FA;
-    flex-shrink: 0;
-  }
+  .wh-up-date { width: 44px; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px; background: rgba(43,127,255,0.12); color: #60A5FA; flex-shrink: 0; }
   .wh-up-date .d { font-size: 1.1rem; font-weight: 800; line-height: 1; }
   .wh-up-date .m { font-size: 0.55rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
   .wh-up-body { flex: 1; min-width: 0; }
@@ -210,119 +193,182 @@
   .wh-up-sub { font-size: 0.7rem; color: rgba(255,255,255,0.55); margin-top: 1px; }
 
   /* Activity */
-  .wh-act-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px;
-    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
-    border-radius: 10px;
-  }
+  .wh-act-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 10px; }
   .wh-act-item + .wh-act-item { margin-top: 4px; }
-  .wh-act-ic { width: 28px; height: 28px; border-radius: 999px;
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  }
+  .wh-act-ic { width: 28px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .wh-act-ic.in { background: rgba(16,185,129,0.15); color: #34D399; }
   .wh-act-ic.out { background: rgba(239,68,68,0.15); color: #F87171; }
   .wh-act-txt { font-size: 0.8rem; color: rgba(255,255,255,0.85); flex: 1; }
   .wh-act-when { font-size: 0.7rem; color: rgba(255,255,255,0.4); }
+
+  /* FAB */
+  .wh-fab { position: fixed; right: 16px; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); z-index: 50; }
+  .wh-fab-main { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #1D6AE5, #00D2BE); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(29,106,229,0.45), 0 2px 6px rgba(0,0,0,0.3); transition: transform 0.25s ease; }
+  .wh-fab-main:active { transform: scale(0.92); }
+  .wh-fab-main svg { transition: transform 0.3s ease; }
+  .wh-fab.open .wh-fab-main svg { transform: rotate(45deg); }
+  .wh-fab-menu { position: absolute; bottom: 64px; right: 0; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; opacity: 0 !important; pointer-events: none; transform: translateY(10px); transition: opacity 0.22s ease, transform 0.22s ease; animation: none !important; }
+  .wh-fab.open .wh-fab-menu { opacity: 1 !important; pointer-events: auto; transform: translateY(0); }
+  .wh-fab-action { display: inline-flex; align-items: center; gap: 10px; padding: 8px 12px 8px 10px; background: #0F1B30; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; font-size: 0.8rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .wh-fab-action-ic { width: 28px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 </style>
 
 <div class="wh-wrap">
 
-  <!-- HERO -->
+<% function section(name, body) {
+  if (hidden.includes(name)) return '';
+  return body();
+} %>
+
+<% order.forEach(function(section) { %>
+
+<% if (section === 'hero' && !hidden.includes('hero')) { %>
   <div class="wh-hero">
     <p class="wh-hero-sub"><%= new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' }) %></p>
     <h1 class="wh-hero-greet"><%= greeting %>,<br><%= firstName %>.</h1>
-    <% if (onShift) { %>
-      <span class="wh-hero-status on"><span class="wh-hero-dot"></span> On shift</span>
-    <% } else if (todaysShifts.length > 0) { %>
-      <span class="wh-hero-status on"><span class="wh-hero-dot"></span> Scheduled today</span>
-    <% } else { %>
-      <span class="wh-hero-status off">Off duty</span>
+    <% if (subtext) { %>
+      <p class="wh-hero-ctx <%= subtext.kind %>"><span class="dot"></span><%= subtext.text %></p>
     <% } %>
 
-    <!-- Stats grid -->
     <div class="wh-stats">
-      <div class="wh-stat hrs">
-        <p class="wh-stat-label">Hours this week</p>
-        <p class="wh-stat-value"><%= stats.hoursThisWeek %><span class="wh-stat-unit">hrs</span></p>
-        <p class="wh-stat-sub">Mon–Sun</p>
-        <div class="wh-stat-ico">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        </div>
-      </div>
-      <div class="wh-stat days">
-        <p class="wh-stat-label">Days worked</p>
-        <p class="wh-stat-value"><%= stats.daysWorked %><span class="wh-stat-unit">/7</span></p>
-        <p class="wh-stat-sub">Last 7 days</p>
-        <div class="wh-stat-ico">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-        </div>
-      </div>
-      <div class="wh-stat up">
-        <p class="wh-stat-label">Upcoming</p>
-        <p class="wh-stat-value"><%= stats.upcomingShifts %></p>
-        <p class="wh-stat-sub">Next 14 days</p>
-        <div class="wh-stat-ico">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-        </div>
-      </div>
-      <div class="wh-stat leave">
-        <p class="wh-stat-label">Pending leave</p>
-        <p class="wh-stat-value"><%= stats.pendingLeave %></p>
-        <p class="wh-stat-sub">Awaiting approval</p>
-        <div class="wh-stat-ico">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg>
-        </div>
-      </div>
+      <div class="wh-stat hrs"><p class="wh-stat-label">Hours this week</p><p class="wh-stat-value" data-count="<%= stats.hoursThisWeek %>"><%= stats.hoursThisWeek %><span class="wh-stat-unit">hrs</span></p><p class="wh-stat-sub">Mon–Sun</p>
+        <div class="wh-stat-ico"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div></div>
+      <div class="wh-stat days"><p class="wh-stat-label">Days worked</p><p class="wh-stat-value" data-count="<%= stats.daysWorked %>"><%= stats.daysWorked %><span class="wh-stat-unit">/7</span></p><p class="wh-stat-sub">Last 7 days</p>
+        <div class="wh-stat-ico"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div></div>
+      <div class="wh-stat up"><p class="wh-stat-label">Upcoming</p><p class="wh-stat-value" data-count="<%= stats.upcomingShifts %>"><%= stats.upcomingShifts %></p><p class="wh-stat-sub">Next 14 days</p>
+        <div class="wh-stat-ico"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div></div>
+      <div class="wh-stat leave"><p class="wh-stat-label">Pending leave</p><p class="wh-stat-value" data-count="<%= stats.pendingLeave %>"><%= stats.pendingLeave %></p><p class="wh-stat-sub">Awaiting approval</p>
+        <div class="wh-stat-ico"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg></div></div>
     </div>
   </div>
+<% } %>
 
-  <!-- THIS WEEK STRIP -->
-  <div class="wh-section-head">
-    <span class="wh-section-title">This week</span>
-    <a href="/w/shifts" class="wh-section-link">Schedule ›</a>
+<% if (section === 'cards' && !hidden.includes('cards') && cards && cards.length > 0) { %>
+  <div class="wh-section-head"><span class="wh-section-title">For you</span></div>
+  <div class="wh-cards">
+    <% cards.forEach(function(c) { %>
+      <div class="wh-card" data-card-id="<%= c.id %>">
+        <button type="button" class="wh-card-dismiss" aria-label="Dismiss" onclick="whDismissCard(<%= c.id %>)">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <div class="wh-card-top">
+          <div class="wh-card-ic <%= c.payload.tone || 'blue' %>">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div class="wh-card-title"><%= c.payload.title %></div>
+        </div>
+        <p class="wh-card-body"><%= c.payload.body %></p>
+        <% if (c.payload.cta && c.payload.link) { %>
+          <a href="<%= c.payload.link %>" class="wh-card-cta" onclick="whActCard(<%= c.id %>)">
+            <%= c.payload.cta %> <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          </a>
+        <% } %>
+      </div>
+    <% }); %>
   </div>
-  <div class="wh-week">
-    <% weekDays.forEach(d => {
-      let cls = ['wh-wday'];
-      if (d.isToday) cls.push('today');
-      if (d.isPast && !d.kind) cls.push('past');
-      if (d.kind === 'shift' && d.shiftType === 'night') cls.push('has-shift-night');
-      else if (d.kind === 'shift') cls.push('has-shift');
-      if (d.kind === 'leave' && d.leaveStatus === 'pending') cls.push('has-leave-pending');
-      else if (d.kind === 'leave') cls.push('has-leave');
-    %>
-      <div class="<%= cls.join(' ') %>">
-        <div class="wh-wday-letter"><%= d.dayLetter %></div>
-        <div class="wh-wday-num"><%= d.dayNum %></div>
-        <span class="wh-wday-pill"></span>
+<% } %>
+
+<% if (section === 'streaks' && !hidden.includes('streaks') && streaks) { %>
+  <div class="wh-section-head"><span class="wh-section-title">Streaks &amp; milestones</span></div>
+  <div class="wh-streaks">
+    <% const streakEntries = [
+      ['shift_streak', streaks.shift_streak],
+      ['incident_free', streaks.incident_free],
+      ['forms_streak', streaks.forms_streak],
+      ['hours_milestone', streaks.hours_milestone],
+    ]; streakEntries.forEach(function([k, s]) { if (!s) return; %>
+      <div class="wh-streak" style="color: <%= s.tone === 'emerald' ? '#34D399' : s.tone === 'blue' ? '#60A5FA' : s.tone === 'purple' ? '#A78BFA' : '#F59E0B' %>;">
+        <p class="wh-streak-label">
+          <span class="wh-streak-ic <%= s.tone %>">
+            <% if (s.iconKey === 'fire') { %><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2c1.5 4 5 5 5 9a5 5 0 11-10 0c0-1.5.5-3 1.5-4.5C9 8 11 5 12 2z"/></svg>
+            <% } else if (s.iconKey === 'shield') { %><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <% } else if (s.iconKey === 'check') { %><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            <% } else { %><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M5 3h14l-1 11H6L5 3zm3 14h8v2H8v-2z"/></svg>
+            <% } %>
+          </span>
+          <%= s.label %>
+        </p>
+        <p class="wh-streak-value" data-count="<%= s.current %>"><%= s.current %><span class="wh-streak-unit"><%= s.unit %></span></p>
+        <% if (s.progress != null) { %>
+          <div class="wh-streak-bar"><div class="wh-streak-bar-fill" style="width: 0%;" data-target="<%= s.progress %>"></div></div>
+        <% } %>
       </div>
     <% }) %>
   </div>
+<% } %>
 
-  <!-- COMPLIANCE ALERT -->
-  <% if (compliance && (!compliance.canAllocate || compliance.fatigueBlocked || (compliance.expiringItems && compliance.expiringItems.length > 0) || (compliance.expiredItems && compliance.expiredItems.length > 0))) { %>
-    <div class="wh-section-head">
-      <span class="wh-section-title">Heads up</span>
+<% if (section === 'weather' && !hidden.includes('weather') && weather) { %>
+  <div class="wh-section-head"><span class="wh-section-title">Weather at next site<% if (weather.city) { %> · <%= weather.city %><% } %></span></div>
+  <div class="wh-weather">
+    <% const iconUrl = weather.icon ? 'https://openweathermap.org/img/wn/' + weather.icon + '@2x.png' : ''; %>
+    <% if (iconUrl) { %><img src="<%= iconUrl %>" alt="" style="width: 64px; height: 64px;"><% } %>
+    <div class="wh-weather-meta">
+      <div class="flex items-baseline gap-1"><span class="wh-weather-temp"><%= weather.temp %>°</span><span class="text-xs text-white/50 ml-1">feels <%= weather.feels_like %>°</span></div>
+      <p class="wh-weather-desc"><%= weather.description || weather.condition %></p>
+      <p class="wh-weather-sub">Wind <%= weather.wind_kmh %> km/h<% if (weather.rain_chance) { %> · <%= weather.rain_chance %>% rain<% } %></p>
     </div>
-    <div class="wh-alert">
-      <h4>Compliance needs attention</h4>
-      <ul class="list-disc pl-5">
-        <% if (compliance.fatigueBlocked) { %><li>Fatigue limit reached (<%= compliance.daysWorked %>/7 days worked)</li><% } %>
-        <% if (compliance.expiredItems && compliance.expiredItems.length > 0) { %><li>Expired: <%= compliance.expiredItems.join(', ') %></li><% } %>
-        <% if (compliance.expiringItems && compliance.expiringItems.length > 0) { %><li>Expiring soon: <%= compliance.expiringItems.join(', ') %></li><% } %>
-        <% if (!compliance.inductionComplete) { %><li>Induction not completed</li><% } %>
-      </ul>
+  </div>
+  <% if (weather.rain_chance && weather.rain_chance >= 40) { %>
+    <div class="wh-weather-warn mt-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999A5.002 5.002 0 006.1 8H6a4 4 0 00-3 7zm8 2v-4m0 0v-2"/></svg>
+      Wet weather PPE recommended — chance of rain above 40%
     </div>
   <% } %>
+<% } %>
 
-  <!-- TODAY'S SHIFT -->
-  <div class="wh-section-head">
-    <span class="wh-section-title">Today's shift</span>
+<% if (section === 'week' && !hidden.includes('week')) { %>
+  <div class="wh-section-head"><span class="wh-section-title">This week</span><a href="/w/shifts" class="wh-section-link">Schedule ›</a></div>
+  <div class="wh-week">
+    <% weekDays.forEach(function(d) {
+      let cls = ['wh-wday']; if (d.isToday) cls.push('today'); if (d.isPast && !d.kind) cls.push('past');
+      if (d.kind === 'shift' && d.shiftType === 'night') cls.push('has-shift-night'); else if (d.kind === 'shift') cls.push('has-shift');
+      if (d.kind === 'leave' && d.leaveStatus === 'pending') cls.push('has-leave-pending'); else if (d.kind === 'leave') cls.push('has-leave');
+    %>
+      <div class="<%= cls.join(' ') %>"><div class="wh-wday-letter"><%= d.dayLetter %></div><div class="wh-wday-num"><%= d.dayNum %></div><span class="wh-wday-pill"></span></div>
+    <% }) %>
   </div>
+<% } %>
+
+<% if (section === 'timeline' && !hidden.includes('timeline') && timeline) { %>
+  <div class="wh-section-head"><span class="wh-section-title">Today</span></div>
+  <div class="wh-timeline">
+    <p class="wh-timeline-head"><%= timeline.shiftLabel %></p>
+    <p class="wh-timeline-sub"><%= fmtTime((Math.floor(timeline.startMin/60).toString().padStart(2,'0'))+':'+((timeline.startMin%60).toString().padStart(2,'0'))) %> – <%= fmtTime((Math.floor(timeline.endMin/60).toString().padStart(2,'0'))+':'+((timeline.endMin%60).toString().padStart(2,'0'))) %></p>
+    <div class="wh-timeline-track" data-start="<%= timeline.startMin %>" data-end="<%= timeline.endMin %>">
+      <div class="wh-timeline-fill" style="left: 0; right: 0;"></div>
+      <div class="wh-timeline-now" id="wh-timeline-now"></div>
+      <% timeline.blocks.forEach(function(b) {
+        const [bh, bm] = (b.at || '00:00').split(':').map(Number);
+        const pm = (bh*60) + (bm||0);
+        const pct = Math.min(100, Math.max(0, ((pm - timeline.startMin) / Math.max(1, timeline.endMin - timeline.startMin)) * 100));
+      %>
+        <div class="wh-timeline-block" style="left: <%= pct %>%;">
+          <span class="wh-timeline-block-dot"></span>
+          <span class="wh-timeline-block-lbl"><%= b.label %> · <%= fmtTime(b.at) %></span>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+<% } %>
+
+<% if (section === 'compliance' && !hidden.includes('compliance') && compliance && (!compliance.canAllocate || compliance.fatigueBlocked || (compliance.expiringItems && compliance.expiringItems.length > 0) || (compliance.expiredItems && compliance.expiredItems.length > 0))) { %>
+  <div class="wh-section-head"><span class="wh-section-title">Heads up</span></div>
+  <div class="wh-alert">
+    <h4>Compliance needs attention</h4>
+    <ul class="list-disc pl-5">
+      <% if (compliance.fatigueBlocked) { %><li>Fatigue limit reached (<%= compliance.daysWorked %>/7 days worked)</li><% } %>
+      <% if (compliance.expiredItems && compliance.expiredItems.length > 0) { %><li>Expired: <%= compliance.expiredItems.join(', ') %></li><% } %>
+      <% if (compliance.expiringItems && compliance.expiringItems.length > 0) { %><li>Expiring soon: <%= compliance.expiringItems.join(', ') %></li><% } %>
+      <% if (!compliance.inductionComplete) { %><li>Induction not completed</li><% } %>
+    </ul>
+  </div>
+<% } %>
+
+<% if (section === 'today' && !hidden.includes('today')) { %>
+  <div class="wh-section-head"><span class="wh-section-title">Today's shift</span></div>
   <% if (todaysShifts.length === 0) { %>
     <div class="wh-empty">
-      <div class="wh-empty-ic">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-      </div>
+      <div class="wh-empty-ic"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
       <p class="text-sm text-white/70 font-semibold">No shift today</p>
       <p class="text-xs text-white/40 mt-1">Enjoy the day off</p>
     </div>
@@ -330,18 +376,12 @@
     <% todaysShifts.forEach(shift => { %>
       <div class="wh-shift">
         <div class="wh-shift-header">
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide
-            <%= shift.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700'
-              : shift.status === 'completed' ? 'bg-blue-100 text-blue-700'
-              : 'bg-amber-100 text-amber-700' %>">
-            <%= shift.status %>
-          </span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide <%= shift.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' : shift.status === 'completed' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700' %>"><%= shift.status %></span>
           <span class="text-[10px] text-gray-500 font-semibold"><%= (shift.shift_type || 'day').toUpperCase() %> SHIFT · <%= fmtTime(shift.start_time) %> – <%= fmtTime(shift.end_time) %></span>
         </div>
         <div class="wh-shift-body">
           <p class="wh-shift-client"><%= shift.client %></p>
           <p class="wh-shift-job mb-2"><%= shift.job_number %><% if (shift.job_name) { %> · <%= shift.job_name %><% } %></p>
-
           <% if (shift.site_address) { %>
             <div class="wh-meta-row">
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -349,111 +389,152 @@
             </div>
           <% } %>
           <% if (shift.supervisor_name) { %>
-            <div class="wh-meta-row">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-              <span>Supervisor: <strong><%= shift.supervisor_name %></strong></span>
-            </div>
-          <% } %>
-          <% if (shift.role_on_site) { %>
-            <div class="wh-meta-row">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/></svg>
-              <span>Role: <%= shift.role_on_site.replace(/_/g, ' ') %></span>
-            </div>
+            <div class="wh-meta-row"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg><span>Supervisor: <strong><%= shift.supervisor_name %></strong></span></div>
           <% } %>
         </div>
         <div class="wh-shift-actions">
-          <a href="/w/clock" class="wh-act-btn primary">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <%= onShift ? 'Clock out' : 'Clock in' %>
-          </a>
+          <a href="/w/clock" class="wh-act-btn primary"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><%= onShift ? 'Clock out' : 'Clock in' %></a>
           <a href="/w/jobs/<%= shift.job_id %>" class="wh-act-btn">Details ›</a>
         </div>
       </div>
     <% }) %>
   <% } %>
+<% } %>
 
-  <!-- QUICK ACTIONS -->
-  <div class="wh-section-head">
-    <span class="wh-section-title">Quick actions</span>
-  </div>
+<% if (section === 'actions' && !hidden.includes('actions')) { %>
+  <div class="wh-section-head"><span class="wh-section-title">Quick actions</span></div>
   <div class="wh-qa">
-    <a href="/w/forms/prestart" class="wh-qa-btn">
-      <div class="wh-qa-ic g"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-      <span class="wh-qa-lbl">Pre-Start</span>
-    </a>
-    <a href="/w/forms/incident" class="wh-qa-btn">
-      <div class="wh-qa-ic r"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg></div>
-      <span class="wh-qa-lbl">Incident</span>
-    </a>
-    <a href="/w/dockets" class="wh-qa-btn">
-      <div class="wh-qa-ic b"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></div>
-      <span class="wh-qa-lbl">Dockets</span>
-    </a>
-    <a href="/w/timesheets" class="wh-qa-btn">
-      <div class="wh-qa-ic t"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-      <span class="wh-qa-lbl">Timesheet</span>
-    </a>
-    <a href="/w/hr/leave" class="wh-qa-btn">
-      <div class="wh-qa-ic y"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg></div>
-      <span class="wh-qa-lbl">Leave</span>
-    </a>
-    <a href="/w/forms" class="wh-qa-btn">
-      <div class="wh-qa-ic p"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
-      <span class="wh-qa-lbl">Forms</span>
-    </a>
-    <a href="/w/hr" class="wh-qa-btn">
-      <div class="wh-qa-ic b"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/></svg></div>
-      <span class="wh-qa-lbl">Wallet</span>
-    </a>
-    <a href="/w/availability" class="wh-qa-btn">
-      <div class="wh-qa-ic g"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
-      <span class="wh-qa-lbl">Availability</span>
-    </a>
+    <a href="/w/forms/prestart" class="wh-qa-btn"><div class="wh-qa-ic g"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><span class="wh-qa-lbl">Pre-Start</span></a>
+    <a href="/w/forms/incident" class="wh-qa-btn"><div class="wh-qa-ic r"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg></div><span class="wh-qa-lbl">Incident</span></a>
+    <a href="/w/dockets" class="wh-qa-btn"><div class="wh-qa-ic b"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></div><span class="wh-qa-lbl">Dockets</span></a>
+    <a href="/w/timesheets" class="wh-qa-btn"><div class="wh-qa-ic t"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><span class="wh-qa-lbl">Timesheet</span></a>
+    <a href="/w/hr/leave" class="wh-qa-btn"><div class="wh-qa-ic y"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg></div><span class="wh-qa-lbl">Leave</span></a>
+    <a href="/w/forms" class="wh-qa-btn"><div class="wh-qa-ic p"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div><span class="wh-qa-lbl">Forms</span></a>
+    <a href="/w/hr" class="wh-qa-btn"><div class="wh-qa-ic b"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/></svg></div><span class="wh-qa-lbl">Wallet</span></a>
+    <a href="/w/home/customise" class="wh-qa-btn"><div class="wh-qa-ic p"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.204-.107-.397.165-.71.505-.78.929l-.15.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"/></svg></div><span class="wh-qa-lbl">Customise</span></a>
   </div>
+<% } %>
 
-  <!-- UPCOMING SHIFTS -->
-  <% if (upcomingShifts && upcomingShifts.length > 0) { %>
-    <div class="wh-section-head">
-      <span class="wh-section-title">Upcoming shifts</span>
-      <a href="/w/shifts" class="wh-section-link">See all ›</a>
-    </div>
-    <% upcomingShifts.forEach(s => {
-      const d = new Date(s.allocation_date + 'T00:00:00');
-      const dNum = d.getDate();
-      const dMon = d.toLocaleDateString('en-AU', { month: 'short' });
-    %>
-      <a href="/w/jobs/<%= s.job_id %>" class="wh-up-item" style="text-decoration: none;">
-        <div class="wh-up-date"<%= s.shift_type === 'night' ? ' style="background: rgba(59,130,246,0.12); color: #93C5FD;"' : '' %>>
-          <span class="d"><%= dNum %></span>
-          <span class="m"><%= dMon %></span>
-        </div>
-        <div class="wh-up-body">
-          <p class="wh-up-title"><%= s.client %></p>
-          <p class="wh-up-sub"><%= relDay(s.allocation_date) %> · <%= fmtTime(s.start_time) %>–<%= fmtTime(s.end_time) %><% if (s.suburb) { %> · <%= s.suburb %><% } %></p>
-        </div>
-      </a>
-    <% }) %>
-  <% } %>
-
-  <!-- RECENT ACTIVITY -->
-  <% if (recentClocks && recentClocks.length > 0) { %>
-    <div class="wh-section-head">
-      <span class="wh-section-title">Recent activity</span>
-    </div>
-    <% recentClocks.forEach(a => { %>
-      <div class="wh-act-item">
-        <div class="wh-act-ic <%= a.subtype === 'clock_in' ? 'in' : 'out' %>">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <% if (a.subtype === 'clock_in') { %>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-            <% } else { %>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
-            <% } %>
-          </svg>
-        </div>
-        <span class="wh-act-txt"><%= a.subtype === 'clock_in' ? 'Clocked in' : 'Clocked out' %></span>
-        <span class="wh-act-when"><%= fmtClockTime(a.at) %></span>
+<% if (section === 'upcoming' && !hidden.includes('upcoming') && upcomingShifts && upcomingShifts.length > 0) { %>
+  <div class="wh-section-head"><span class="wh-section-title">Upcoming shifts</span><a href="/w/shifts" class="wh-section-link">See all ›</a></div>
+  <% upcomingShifts.forEach(s => {
+    const d = new Date(s.allocation_date + 'T00:00:00');
+    const dNum = d.getDate(); const dMon = d.toLocaleDateString('en-AU', { month: 'short' });
+  %>
+    <a href="/w/jobs/<%= s.job_id %>" class="wh-up-item" style="text-decoration: none;">
+      <div class="wh-up-date"<%= s.shift_type === 'night' ? ' style="background: rgba(59,130,246,0.12); color: #93C5FD;"' : '' %>>
+        <span class="d"><%= dNum %></span><span class="m"><%= dMon %></span>
       </div>
-    <% }) %>
-  <% } %>
+      <div class="wh-up-body"><p class="wh-up-title"><%= s.client %></p><p class="wh-up-sub"><%= relDay(s.allocation_date) %> · <%= fmtTime(s.start_time) %>–<%= fmtTime(s.end_time) %><% if (s.suburb) { %> · <%= s.suburb %><% } %></p></div>
+    </a>
+  <% }) %>
+<% } %>
+
+<% if (section === 'activity' && !hidden.includes('activity') && recentClocks && recentClocks.length > 0) { %>
+  <div class="wh-section-head"><span class="wh-section-title">Recent activity</span></div>
+  <% recentClocks.forEach(a => { %>
+    <div class="wh-act-item">
+      <div class="wh-act-ic <%= a.subtype === 'clock_in' ? 'in' : 'out' %>">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <% if (a.subtype === 'clock_in') { %><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/><% } else { %><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/><% } %>
+        </svg>
+      </div>
+      <span class="wh-act-txt"><%= a.subtype === 'clock_in' ? 'Clocked in' : 'Clocked out' %></span>
+      <span class="wh-act-when"><%= fmtClockTime(a.at) %></span>
+    </div>
+  <% }) %>
+<% } %>
+
+<% }); %>
+
 </div>
+
+<!-- FAB -->
+<div class="wh-fab" id="wh-fab">
+  <div class="wh-fab-menu">
+    <a href="/w/clock" class="wh-fab-action"><span class="wh-fab-action-ic" style="background: rgba(16,185,129,0.2); color: #34D399;"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span><%= onShift ? 'Clock off' : 'Clock on' %></a>
+    <a href="/w/hr/leave" class="wh-fab-action"><span class="wh-fab-action-ic" style="background: rgba(245,158,11,0.2); color: #F59E0B;"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg></span>Request leave</a>
+    <a href="/w/forms/incident" class="wh-fab-action"><span class="wh-fab-action-ic" style="background: rgba(239,68,68,0.2); color: #F87171;"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg></span>Submit hazard</a>
+    <a href="/w/hr" class="wh-fab-action"><span class="wh-fab-action-ic" style="background: rgba(43,127,255,0.2); color: #60A5FA;"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/></svg></span>Latest payslip</a>
+  </div>
+  <button type="button" class="wh-fab-main" aria-label="Quick actions" onclick="document.getElementById('wh-fab').classList.toggle('open')">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+  </button>
+</div>
+
+<script>
+(function () {
+  // ===== Animated counters =====
+  function animateCount(el, target) {
+    var start = 0, dur = 700, t0 = null;
+    var isFloat = String(target).indexOf('.') !== -1;
+    target = parseFloat(target) || 0;
+    function step(ts) {
+      if (!t0) t0 = ts;
+      var p = Math.min(1, (ts - t0) / dur);
+      var v = start + (target - start) * (1 - Math.pow(1 - p, 3));
+      // Keep unit span intact
+      var unit = el.querySelector('.wh-stat-unit, .wh-streak-unit');
+      var display = isFloat ? v.toFixed(1) : Math.round(v);
+      if (unit) {
+        el.firstChild.nodeValue = display;
+      } else {
+        el.textContent = display;
+      }
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  document.querySelectorAll('[data-count]').forEach(function (el) {
+    var t = el.getAttribute('data-count');
+    animateCount(el, t);
+  });
+  // Progress bars
+  document.querySelectorAll('.wh-streak-bar-fill[data-target]').forEach(function (el) {
+    setTimeout(function () { el.style.width = el.getAttribute('data-target') + '%'; }, 40);
+  });
+
+  // ===== Card dismiss / act =====
+  window.whDismissCard = function (id) {
+    var card = document.querySelector('[data-card-id="' + id + '"]');
+    if (card) { card.style.opacity = '0'; card.style.transform = 'translateX(-20px)'; card.style.transition = 'all 0.25s ease'; }
+    setTimeout(function () { if (card) card.remove(); }, 260);
+    fetch('/w/home/cards/' + id + '/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+      body: '_csrf=' + encodeURIComponent(document.querySelector('meta[name="csrf-token"]')?.content || '')
+    }).catch(function () {});
+  };
+  window.whActCard = function (id) {
+    fetch('/w/home/cards/' + id + '/act', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: '_csrf=' + encodeURIComponent(document.querySelector('meta[name="csrf-token"]')?.content || '')
+    }).catch(function () {});
+  };
+
+  // ===== Timeline live indicator =====
+  function updateTimeline() {
+    var track = document.querySelector('.wh-timeline-track');
+    if (!track) return;
+    var now = document.getElementById('wh-timeline-now');
+    var startMin = parseInt(track.getAttribute('data-start'), 10);
+    var endMin = parseInt(track.getAttribute('data-end'), 10);
+    var d = new Date();
+    var curMin = d.getHours() * 60 + d.getMinutes();
+    if (curMin < startMin) { now.style.left = '0%'; now.style.opacity = '0.35'; return; }
+    if (curMin > endMin) { now.style.left = '100%'; now.style.opacity = '0.35'; return; }
+    var pct = ((curMin - startMin) / Math.max(1, endMin - startMin)) * 100;
+    now.style.left = pct + '%';
+    now.style.opacity = '1';
+  }
+  updateTimeline();
+  setInterval(updateTimeline, 30000);
+
+  // ===== FAB close on outside click =====
+  document.addEventListener('click', function (e) {
+    var fab = document.getElementById('wh-fab');
+    if (fab && !fab.contains(e.target)) fab.classList.remove('open');
+  });
+})();
+</script>

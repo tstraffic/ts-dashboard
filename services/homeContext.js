@@ -1,0 +1,439 @@
+// Dynamic home page context: greeting subtext, cards, streaks, weather.
+// Pure data assembly — no HTML. View consumes whatever this returns.
+
+const https = require('https');
+
+function localIso(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Priority order per spec (lower = higher priority)
+const CARD_PRIORITY = {
+  compliance_expiring: 10,
+  compliance_overdue: 5,
+  induction_overdue: 8,
+  doc_acknowledge: 12,
+  new_payslip: 20,
+  allowance_approved: 25,
+  shift_tomorrow: 30,
+  roster_published: 35,
+  swap_response: 28,
+  kudos_received: 40,
+  milestone_hit: 42,
+  mood_checkin: 50,
+  eap_reminder: 60,
+};
+
+// =========================================================
+// Greeting subtext — priority-ordered rules
+// =========================================================
+function buildGreetingSubtext(db, worker, member, employee, todaysShifts) {
+  const today = localIso(new Date());
+
+  // 1. Cert expiring ≤14 days
+  if (employee) {
+    const soon = db.prepare(`
+      SELECT competency_name, expiry_date FROM employee_competencies
+      WHERE employee_id = ? AND expiry_date IS NOT NULL
+        AND expiry_date <= date(?, '+14 days') AND expiry_date >= date(?)
+      ORDER BY expiry_date ASC LIMIT 1
+    `).get(employee.id, today, today);
+    if (soon) {
+      const days = Math.max(0, Math.round((new Date(soon.expiry_date) - new Date(today)) / 86400000));
+      return { kind: 'compliance', text: `Your ${soon.competency_name} expires in ${days} day${days === 1 ? '' : 's'}` };
+    }
+  }
+
+  // 2. Shift starting in <2hrs
+  const imminentShift = (todaysShifts || []).find(s => {
+    if (!s.start_time) return false;
+    const [h, m] = s.start_time.split(':').map(Number);
+    const start = new Date(); start.setHours(h, m || 0, 0, 0);
+    const diffMin = (start - new Date()) / 60000;
+    return diffMin > -1 && diffMin <= 120;
+  });
+  if (imminentShift) {
+    return { kind: 'shift', text: `Your shift at ${imminentShift.suburb || imminentShift.client} starts at ${formatTime(imminentShift.start_time)}` };
+  }
+
+  // 3. Unviewed payslip — not implemented (no payslip table yet), skip gracefully
+  // 4. Pending leave
+  const pendingLeave = db.prepare(`
+    SELECT COUNT(*) as c FROM employee_leave WHERE crew_member_id = ? AND status = 'pending'
+  `).get(worker.id).c;
+  if (pendingLeave > 0) {
+    return { kind: 'leave', text: `You have ${pendingLeave} leave request${pendingLeave === 1 ? '' : 's'} awaiting approval` };
+  }
+
+  // 5. Birthday today
+  if (employee && employee.date_of_birth) {
+    const dob = new Date(employee.date_of_birth);
+    const now = new Date();
+    if (dob.getMonth() === now.getMonth() && dob.getDate() === now.getDate()) {
+      const first = (worker.full_name || '').split(' ')[0];
+      return { kind: 'birthday', text: `Happy birthday, ${first} 🎂` };
+    }
+  }
+
+  // 6. Work anniversary
+  if (employee && employee.start_date) {
+    const start = new Date(employee.start_date);
+    const now = new Date();
+    if (start.getMonth() === now.getMonth() && start.getDate() === now.getDate() && now > start) {
+      const years = now.getFullYear() - start.getFullYear();
+      if (years >= 1) return { kind: 'anniversary', text: `${years} year${years === 1 ? '' : 's'} with T&S today 🎉` };
+    }
+  }
+
+  // 7. Default based on shift status
+  if (todaysShifts && todaysShifts.length > 0) return { kind: 'default', text: `You're scheduled on ${todaysShifts[0].client}` };
+  return { kind: 'default', text: "You're off duty today." };
+}
+
+function formatTime(t) {
+  if (!t) return '';
+  const [hStr, m] = String(t).split(':');
+  let h = parseInt(hStr, 10);
+  const am = h < 12;
+  h = h % 12; if (h === 0) h = 12;
+  return h + ((m && m !== '00') ? ':' + m : '') + (am ? 'am' : 'pm');
+}
+
+// =========================================================
+// Cards — derive from data, merge with persisted dismissals
+// =========================================================
+function buildSmartCards(db, worker, member, employee) {
+  const today = localIso(new Date());
+  const derived = [];
+
+  // Compliance cards (per-cert expiring)
+  if (employee) {
+    const expiringCerts = db.prepare(`
+      SELECT id, competency_name, expiry_date FROM employee_competencies
+      WHERE employee_id = ? AND expiry_date IS NOT NULL
+        AND expiry_date <= date(?, '+30 days')
+      ORDER BY expiry_date ASC LIMIT 3
+    `).all(employee.id, today);
+    for (const c of expiringCerts) {
+      const days = Math.round((new Date(c.expiry_date) - new Date(today)) / 86400000);
+      const overdue = days < 0;
+      derived.push({
+        card_key: `cert_${c.id}`,
+        card_type: overdue ? 'compliance_overdue' : 'compliance_expiring',
+        priority: overdue ? 5 : CARD_PRIORITY.compliance_expiring,
+        payload: {
+          icon: 'shield',
+          tone: overdue ? 'red' : 'amber',
+          title: overdue ? `${c.competency_name} has expired` : `${c.competency_name} expires soon`,
+          body: overdue ? `Expired ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago — renew ASAP` : `${days} day${days === 1 ? '' : 's'} left · renew now`,
+          cta: 'Renew',
+          link: '/w/hr/certs',
+        }
+      });
+    }
+
+    // Induction overdue
+    if (employee.induction_status && employee.induction_status !== 'completed') {
+      derived.push({
+        card_key: 'induction_overdue',
+        card_type: 'induction_overdue',
+        priority: CARD_PRIORITY.induction_overdue,
+        payload: {
+          icon: 'document',
+          tone: 'amber',
+          title: 'Induction still open',
+          body: 'Finish your induction to stay allocatable',
+          cta: 'Open',
+          link: '/induction',
+        }
+      });
+    }
+  }
+
+  // Shift tomorrow
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomIso = localIso(tomorrow);
+  const tomorrowShift = db.prepare(`
+    SELECT ca.start_time, ca.end_time, ca.shift_type, j.client, j.suburb
+    FROM crew_allocations ca JOIN jobs j ON ca.job_id = j.id
+    WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
+    ORDER BY ca.start_time ASC LIMIT 1
+  `).get(worker.id, tomIso);
+  if (tomorrowShift) {
+    derived.push({
+      card_key: `shift_${tomIso}`,
+      card_type: 'shift_tomorrow',
+      priority: CARD_PRIORITY.shift_tomorrow,
+      payload: {
+        icon: 'calendar',
+        tone: 'blue',
+        title: `Shift tomorrow at ${tomorrowShift.suburb || tomorrowShift.client}`,
+        body: `${formatTime(tomorrowShift.start_time)}–${formatTime(tomorrowShift.end_time)} with ${tomorrowShift.client}`,
+        cta: 'Details',
+        link: '/w/shifts',
+      }
+    });
+  }
+
+  // Pending leave acknowledgment card
+  const pendingLeaveRow = db.prepare(`
+    SELECT id, start_date FROM employee_leave WHERE crew_member_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1
+  `).get(worker.id);
+  if (pendingLeaveRow) {
+    derived.push({
+      card_key: `leave_${pendingLeaveRow.id}`,
+      card_type: 'leave_pending',
+      priority: 45,
+      payload: {
+        icon: 'plane',
+        tone: 'indigo',
+        title: 'Leave awaiting approval',
+        body: `Submitted for ${new Date(pendingLeaveRow.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`,
+        cta: 'View',
+        link: '/w/hr/leave',
+      }
+    });
+  }
+
+  // Upsert derived cards — keep existing dismissals/acks
+  const upsert = db.prepare(`
+    INSERT INTO home_cards (crew_member_id, card_type, card_key, priority, payload, shown_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(crew_member_id, card_key) DO UPDATE SET
+      card_type = excluded.card_type,
+      priority = excluded.priority,
+      payload = excluded.payload,
+      shown_at = COALESCE(home_cards.shown_at, excluded.shown_at)
+  `);
+  const tx = db.transaction(() => {
+    for (const c of derived) {
+      upsert.run(worker.id, c.card_type, c.card_key, c.priority, JSON.stringify(c.payload));
+    }
+  });
+  try { tx(); } catch (e) { /* ignore — table may not be there yet */ }
+
+  // Fetch active cards (not dismissed, not acted), ordered by priority
+  const rows = db.prepare(`
+    SELECT * FROM home_cards
+    WHERE crew_member_id = ? AND dismissed_at IS NULL AND acted_at IS NULL
+    ORDER BY priority ASC, id DESC LIMIT 5
+  `).all(worker.id);
+
+  return rows.map(r => ({
+    id: r.id, card_type: r.card_type, card_key: r.card_key, priority: r.priority,
+    payload: JSON.parse(r.payload || '{}'),
+  }));
+}
+
+// =========================================================
+// Streaks — compute current/best from existing data
+// =========================================================
+function buildStreaks(db, worker) {
+  const out = {};
+
+  // Shift streak: consecutive calendar days with at least one clock_in
+  const recent = db.prepare(`
+    SELECT DISTINCT DATE(event_time) as d FROM clock_events
+    WHERE crew_member_id = ? AND event_type = 'clock_in'
+    ORDER BY d DESC LIMIT 90
+  `).all(worker.id).map(r => r.d);
+  let streak = 0;
+  if (recent.length > 0) {
+    const today = localIso(new Date());
+    const yesterday = localIso(new Date(Date.now() - 86400000));
+    let cursor = recent.includes(today) ? new Date(today) : recent.includes(yesterday) ? new Date(yesterday) : null;
+    while (cursor) {
+      const iso = localIso(cursor);
+      if (recent.includes(iso)) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else break;
+    }
+  }
+  out.shift_streak = { label: 'Shift streak', current: streak, unit: 'days', tone: 'emerald', iconKey: 'fire' };
+
+  // Incident-free days (personal) — days since induction (no direct crew↔incident link)
+  let incidentFree = 0;
+  try {
+    const member = db.prepare('SELECT induction_date FROM crew_members WHERE id = ?').get(worker.id);
+    if (member && member.induction_date) {
+      incidentFree = Math.max(0, Math.floor((new Date() - new Date(member.induction_date)) / 86400000));
+    }
+  } catch (e) { /* ignore */ }
+  out.incident_free = { label: 'Incident-free', current: incidentFree, unit: 'days', tone: 'blue', iconKey: 'shield' };
+
+  // Forms-on-time streak — count safety_forms submissions in last 30 days (table may not exist)
+  let formsStreak = 0;
+  try {
+    const row = db.prepare(`SELECT COUNT(*) as c FROM safety_forms WHERE crew_member_id = ? AND submitted_at >= date('now', '-30 days')`).get(worker.id);
+    formsStreak = row ? row.c : 0;
+  } catch (e) { /* table may not exist */ }
+  out.forms_streak = { label: 'Forms this month', current: formsStreak, unit: '', tone: 'purple', iconKey: 'check' };
+
+  // Hours → next milestone (1000hr club)
+  const hoursRow = db.prepare(`
+    SELECT COALESCE(SUM(total_hours), 0) as hrs FROM timesheets WHERE crew_member_id = ?
+  `).get(worker.id);
+  const totalHrs = Math.round(hoursRow.hrs || 0);
+  const milestones = [100, 250, 500, 1000, 2500, 5000];
+  const nextMs = milestones.find(m => totalHrs < m) || (totalHrs + 1000);
+  out.hours_milestone = {
+    label: `Next milestone: ${nextMs}h`, current: totalHrs, unit: `/ ${nextMs}`,
+    tone: 'amber', iconKey: 'trophy',
+    progress: Math.min(100, Math.round((totalHrs / nextMs) * 100))
+  };
+
+  // Persist into streaks table (best_count tracked)
+  const persist = db.prepare(`
+    INSERT INTO streaks (crew_member_id, streak_type, current_count, best_count, last_incremented_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(crew_member_id, streak_type) DO UPDATE SET
+      current_count = excluded.current_count,
+      best_count = CASE WHEN excluded.current_count > streaks.best_count THEN excluded.current_count ELSE streaks.best_count END,
+      last_incremented_at = excluded.last_incremented_at
+  `);
+  try {
+    persist.run(worker.id, 'shift_streak', streak, streak);
+    persist.run(worker.id, 'incident_free', incidentFree, incidentFree);
+    persist.run(worker.id, 'hours_milestone', totalHrs, totalHrs);
+  } catch (e) { /* ignore */ }
+
+  return out;
+}
+
+// =========================================================
+// Weather — OpenWeatherMap (optional)
+// =========================================================
+const weatherCache = new Map(); // key → { expires, data }
+
+function getWeather(lat, lng) {
+  const key = (process.env.OPENWEATHER_KEY || '').trim();
+  if (!key) return Promise.resolve(null);
+  if (lat == null || lng == null) return Promise.resolve(null);
+  const cacheKey = `${lat.toFixed(2)}:${lng.toFixed(2)}`;
+  const cached = weatherCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) return Promise.resolve(cached.data);
+
+  const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&units=metric&appid=${key}`;
+  return new Promise(resolve => {
+    const req = https.get(url, { timeout: 3000 }, res => {
+      let body = '';
+      res.on('data', c => { body += c; });
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(body);
+          const out = {
+            temp: Math.round(j.main?.temp),
+            feels_like: Math.round(j.main?.feels_like),
+            condition: j.weather?.[0]?.main || '',
+            description: j.weather?.[0]?.description || '',
+            icon: j.weather?.[0]?.icon || '',
+            wind_kmh: Math.round((j.wind?.speed || 0) * 3.6),
+            rain_chance: j.rain ? Math.min(100, Math.round((j.rain['1h'] || 0) * 20)) : 0,
+            uv: null, // free tier lacks UV; upgrade endpoint to include
+            city: j.name || '',
+          };
+          weatherCache.set(cacheKey, { expires: Date.now() + 3600 * 1000, data: out });
+          resolve(out);
+        } catch (e) { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+// Attempt to geocode a suburb/address for weather using OpenWeatherMap geocoding
+function geocodeAddress(q) {
+  const key = (process.env.OPENWEATHER_KEY || '').trim();
+  if (!key || !q) return Promise.resolve(null);
+  const cacheKey = `geo:${q}`;
+  const cached = weatherCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) return Promise.resolve(cached.data);
+  const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(q + ',AU')}&limit=1&appid=${key}`;
+  return new Promise(resolve => {
+    https.get(url, { timeout: 3000 }, res => {
+      let body = '';
+      res.on('data', c => { body += c; });
+      res.on('end', () => {
+        try {
+          const arr = JSON.parse(body);
+          if (Array.isArray(arr) && arr[0]) {
+            const out = { lat: arr[0].lat, lng: arr[0].lon };
+            weatherCache.set(cacheKey, { expires: Date.now() + 24 * 3600 * 1000, data: out });
+            return resolve(out);
+          }
+          resolve(null);
+        } catch (e) { resolve(null); }
+      });
+    }).on('error', () => resolve(null));
+  });
+}
+
+// =========================================================
+// Today timeline blocks — shift start/end, scheduled forms, pay
+// =========================================================
+function buildTodayTimeline(todaysShifts) {
+  if (!todaysShifts || todaysShifts.length === 0) return null;
+  const s = todaysShifts[0];
+  const [sh, sm] = (s.start_time || '06:00').split(':').map(Number);
+  const [eh, em] = (s.end_time || '18:00').split(':').map(Number);
+  const startMin = (sh || 0) * 60 + (sm || 0);
+  const endMin = (eh || 0) * 60 + (em || 0);
+
+  const blocks = [];
+  blocks.push({ kind: 'shift_start', label: 'Clock on', at: s.start_time, icon: 'play' });
+  // Pre-start form 15 min before
+  blocks.push({ kind: 'prestart', label: 'Pre-start check', at: minutesToTime(Math.max(0, startMin - 15)), icon: 'check' });
+  // Break — mid-shift
+  const midMin = Math.round((startMin + endMin) / 2);
+  blocks.push({ kind: 'break', label: 'Scheduled break', at: minutesToTime(midMin), icon: 'coffee' });
+  blocks.push({ kind: 'shift_end', label: 'Clock off', at: s.end_time, icon: 'stop' });
+
+  return {
+    startMin, endMin,
+    shiftLabel: `${s.client} — ${s.suburb || ''}`,
+    blocks,
+  };
+}
+
+function minutesToTime(m) {
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+// =========================================================
+// Preferences
+// =========================================================
+function loadPreferences(db, worker) {
+  try {
+    const row = db.prepare('SELECT * FROM home_preferences WHERE crew_member_id = ?').get(worker.id);
+    if (!row) return { section_order: null, hidden_sections: [], fab_actions: null };
+    return {
+      section_order: safeParse(row.section_order, null),
+      hidden_sections: safeParse(row.hidden_sections, []),
+      fab_actions: safeParse(row.fab_actions, null),
+    };
+  } catch (e) { return { section_order: null, hidden_sections: [], fab_actions: null }; }
+}
+
+function safeParse(s, fallback) {
+  if (!s) return fallback;
+  try { return JSON.parse(s); } catch (e) { return fallback; }
+}
+
+module.exports = {
+  buildGreetingSubtext,
+  buildSmartCards,
+  buildStreaks,
+  buildTodayTimeline,
+  loadPreferences,
+  getWeather,
+  geocodeAddress,
+  formatTime,
+  localIso,
+};

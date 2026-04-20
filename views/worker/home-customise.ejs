@@ -1,0 +1,140 @@
+<%
+  const sections = [
+    { key: 'hero', label: 'Greeting & stats', desc: 'Time-aware hello and the four metric cards' },
+    { key: 'cards', label: 'For you carousel', desc: 'Smart contextual cards (certs, shifts, leave)' },
+    { key: 'streaks', label: 'Streaks & milestones', desc: 'Shift streak, hours milestone, incident-free days' },
+    { key: 'weather', label: 'Weather at next site', desc: 'Temperature and rain alert for your shift location' },
+    { key: 'week', label: 'This week strip', desc: '7-day rollup with shift / leave indicators' },
+    { key: 'timeline', label: 'Today timeline', desc: 'Live progress of your current shift with breaks' },
+    { key: 'compliance', label: 'Compliance heads-up', desc: 'Expiring tickets and fatigue warnings' },
+    { key: 'today', label: "Today's shift card", desc: 'Client, site, supervisor and clock-on button' },
+    { key: 'actions', label: 'Quick actions grid', desc: 'Shortcut tiles for common tasks' },
+    { key: 'upcoming', label: 'Upcoming shifts', desc: 'Next five scheduled shifts' },
+    { key: 'activity', label: 'Recent activity', desc: 'Your last few clock events' },
+  ];
+  const hidden = (prefs.hidden_sections || []);
+  const order = (prefs.section_order && prefs.section_order.length) ? prefs.section_order : sections.map(s => s.key);
+  const ordered = [...order, ...sections.map(s => s.key).filter(k => !order.includes(k))];
+%>
+
+<style>
+  .cus-wrap { padding: 0 0.5rem 0.5rem; }
+  .cus-hero { padding: 1rem; border-radius: 14px; background: linear-gradient(160deg, rgba(43,127,255,0.15), rgba(10,22,40,0.5)); border: 1px solid rgba(255,255,255,0.08); margin-top: 0.5rem; }
+  .cus-hero h1 { font-size: 1.2rem; font-weight: 800; color: #fff; }
+  .cus-hero p { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 4px; }
+
+  .cus-list { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 8px; }
+  .cus-row { display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; cursor: grab; transition: all 0.15s ease; }
+  .cus-row.dragging { opacity: 0.5; cursor: grabbing; }
+  .cus-row.drag-over { border-color: #60A5FA; box-shadow: 0 0 0 2px rgba(96,165,250,0.25); }
+  .cus-row:active { cursor: grabbing; }
+  .cus-grip { display: flex; flex-direction: column; gap: 3px; color: rgba(255,255,255,0.3); cursor: grab; padding: 4px; }
+  .cus-grip div { width: 3px; height: 3px; border-radius: 999px; background: currentColor; }
+  .cus-row-body { flex: 1; min-width: 0; }
+  .cus-row-title { font-size: 0.9rem; font-weight: 700; color: #fff; }
+  .cus-row-desc { font-size: 0.7rem; color: rgba(255,255,255,0.55); margin-top: 1px; }
+
+  .cus-toggle { position: relative; width: 42px; height: 24px; background: rgba(255,255,255,0.12); border-radius: 999px; transition: background 0.2s; flex-shrink: 0; }
+  .cus-toggle.on { background: #1D6AE5; }
+  .cus-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #fff; border-radius: 999px; transition: left 0.2s ease; }
+  .cus-toggle.on::after { left: 20px; }
+  .cus-toggle input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  .cus-save { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 0.75rem; background: #1D6AE5; color: #fff; font-weight: 700; border-radius: 12px; box-shadow: 0 4px 12px rgba(29,106,229,0.3); margin-top: 1rem; }
+  .cus-save:disabled { opacity: 0.5; box-shadow: none; cursor: not-allowed; }
+
+  .cus-toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); padding: 0.625rem 1rem; border-radius: 12px; background: rgba(16,185,129,0.95); color: #fff; font-size: 0.8rem; font-weight: 600; z-index: 90; box-shadow: 0 6px 20px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .cus-toast.show { opacity: 1; }
+</style>
+
+<div class="cus-wrap">
+  <a href="/w/home" class="inline-flex items-center gap-1 text-xs text-white/50 mt-2 mb-1 hover:text-white">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    Home
+  </a>
+  <div class="cus-hero">
+    <h1>Customise Home</h1>
+    <p>Drag to reorder, toggle to hide. Your choices sync to every device you sign in on.</p>
+  </div>
+
+  <form method="POST" action="/w/home/preferences" id="cus-form">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <div class="cus-list" id="cus-list">
+      <% ordered.forEach(function(key) {
+        const s = sections.find(x => x.key === key); if (!s) return;
+        const visible = !hidden.includes(key);
+      %>
+        <div class="cus-row" draggable="true" data-key="<%= key %>">
+          <div class="cus-grip"><div></div><div></div><div></div><div></div><div></div><div></div></div>
+          <div class="cus-row-body">
+            <p class="cus-row-title"><%= s.label %></p>
+            <p class="cus-row-desc"><%= s.desc %></p>
+          </div>
+          <label class="cus-toggle <%= visible ? 'on' : '' %>" onclick="event.stopPropagation();">
+            <input type="checkbox" data-section="<%= key %>" <%= visible ? 'checked' : '' %>>
+          </label>
+          <input type="hidden" name="section_order" value="<%= key %>" data-order>
+          <% if (!visible) { %><input type="hidden" name="hidden_sections" value="<%= key %>" data-hidden><% } %>
+        </div>
+      <% }) %>
+    </div>
+
+    <button type="submit" class="cus-save">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+      Save preferences
+    </button>
+  </form>
+</div>
+
+<% if (flash_success && flash_success.length) { %>
+  <div class="cus-toast show" id="cus-toast"><%= flash_success[0] %></div>
+  <script>setTimeout(function () { document.getElementById('cus-toast').classList.remove('show'); }, 2800);</script>
+<% } %>
+
+<script>
+(function () {
+  // ===== Toggle behaviour =====
+  document.querySelectorAll('.cus-toggle input').forEach(function (input) {
+    input.addEventListener('change', function () {
+      var toggle = input.closest('.cus-toggle');
+      var row = input.closest('.cus-row');
+      toggle.classList.toggle('on', input.checked);
+      // Sync hidden_sections[] hidden input
+      var existing = row.querySelector('input[data-hidden]');
+      if (input.checked && existing) existing.remove();
+      if (!input.checked && !existing) {
+        var h = document.createElement('input');
+        h.type = 'hidden'; h.name = 'hidden_sections'; h.value = input.getAttribute('data-section');
+        h.setAttribute('data-hidden', '1');
+        row.appendChild(h);
+      }
+    });
+  });
+
+  // ===== Drag & drop reorder (HTML5) =====
+  var list = document.getElementById('cus-list');
+  var dragged = null;
+  list.querySelectorAll('.cus-row').forEach(function (row) {
+    row.addEventListener('dragstart', function (e) {
+      dragged = row;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', function () {
+      row.classList.remove('dragging');
+      list.querySelectorAll('.drag-over').forEach(function (r) { r.classList.remove('drag-over'); });
+    });
+    row.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      if (dragged && dragged !== row) {
+        row.classList.add('drag-over');
+        var rect = row.getBoundingClientRect();
+        var after = (e.clientY - rect.top) > rect.height / 2;
+        if (after) list.insertBefore(dragged, row.nextSibling);
+        else list.insertBefore(dragged, row);
+      }
+    });
+    row.addEventListener('dragleave', function () { row.classList.remove('drag-over'); });
+  });
+})();
+</script>
