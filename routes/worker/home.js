@@ -113,15 +113,26 @@ router.get('/home', async (req, res) => {
   // Today timeline
   const timeline = buildTodayTimeline(todaysShifts);
 
-  // Weather for next shift site (today's shift or next upcoming)
+  // Weather for next shift site — or depot fallback when the worker has nothing scheduled.
   let weather = null;
+  let weatherSource = null; // 'shift' | 'depot'
   try {
     const shiftForWeather = todaysShifts[0] || upcomingShifts[0];
+    let q = null;
     if (shiftForWeather) {
-      const q = [shiftForWeather.suburb, shiftForWeather.site_address].filter(Boolean).join(', ');
+      q = [shiftForWeather.suburb, shiftForWeather.site_address].filter(Boolean).join(', ');
+      weatherSource = 'shift';
+    } else {
+      q = (process.env.DEPOT_SUBURB || 'Villawood NSW').trim();
+      weatherSource = 'depot';
+    }
+    if (q) {
       const geo = await geocodeAddress(q);
       if (geo) weather = await getWeather(geo.lat, geo.lng);
-      if (weather) weather.forShift = shiftForWeather;
+      if (weather) {
+        weather.source = weatherSource;
+        if (shiftForWeather) weather.forShift = shiftForWeather;
+      }
     }
   } catch (e) { /* best effort */ }
 

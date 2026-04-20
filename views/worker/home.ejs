@@ -298,7 +298,7 @@
 <% } %>
 
 <% if (section === 'weather' && !hidden.includes('weather') && weather) { %>
-  <div class="wh-section-head"><span class="wh-section-title">Weather at next site<% if (weather.city) { %> · <%= weather.city %><% } %></span></div>
+  <div class="wh-section-head"><span class="wh-section-title"><%= weather.source === 'depot' ? 'Weather at the depot' : 'Weather at next site' %><% if (weather.city) { %> · <%= weather.city %><% } %></span></div>
   <div class="wh-weather">
     <% const iconUrl = weather.icon ? 'https://openweathermap.org/img/wn/' + weather.icon + '@2x.png' : ''; %>
     <% if (iconUrl) { %><img src="<%= iconUrl %>" alt="" style="width: 64px; height: 64px;"><% } %>
