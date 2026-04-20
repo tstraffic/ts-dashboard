@@ -1,0 +1,104 @@
+<%- include('partials/secure-form-style') %>
+
+<div class="sf-wrap">
+  <a href="/w/hr" class="sf-back">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    HR & My Info
+  </a>
+
+  <div class="sf-hero">
+    <div class="sf-hero-ic" style="background: rgba(16,185,129,0.2); color: #34D399;">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </div>
+    <h1 class="sf-title">Superannuation</h1>
+    <p class="sf-sub">Your chosen super fund. We'll forward details to payroll for QBO.</p>
+  </div>
+
+  <% if (current) { %>
+    <div class="sf-section">
+      <div class="sf-section-title">
+        Current on file
+        <% if (current.status === 'synced') { %><span class="sf-pill ok">✓ Synced to QBO</span>
+        <% } else if (current.status === 'rejected') { %><span class="sf-pill bad">Rejected</span>
+        <% } else { %><span class="sf-pill warn">⧗ Pending approval</span><% } %>
+      </div>
+      <div class="sf-readrow"><span class="sf-k">Fund</span><span class="sf-v"><%= current.fund_name || '—' %><% if (current.use_default) { %> <span class="text-emerald-300 text-xs">(company default)</span><% } %></span></div>
+      <div class="sf-readrow"><span class="sf-k">USI</span><span class="sf-v"><%= current.usi || '—' %></span></div>
+      <div class="sf-readrow"><span class="sf-k">Member #</span><span class="sf-v"><%= current.member_number || '—' %></span></div>
+      <% if (current.fund_abn) { %><div class="sf-readrow"><span class="sf-k">Fund ABN</span><span class="sf-v"><%= current.fund_abn %></span></div><% } %>
+      <% if (current.choice_form_url) { %>
+        <div class="sf-readrow"><span class="sf-k">Choice form</span><span class="sf-v"><a class="text-brand-400 underline" href="<%= current.choice_form_url %>" target="_blank">View PDF</a></span></div>
+      <% } %>
+      <p class="sf-meta">Submitted <%= new Date(current.updated_at).toLocaleString('en-AU') %></p>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/w/hr/super" enctype="multipart/form-data" class="sf-section" id="super-form">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <div class="sf-section-title"><%= current ? 'Update super details' : 'Add super details' %></div>
+
+    <label class="sf-check mb-3" style="margin-bottom:0.75rem;">
+      <input type="checkbox" name="use_default" id="use-default" <%= defaultFund ? '' : 'disabled' %>>
+      <span class="sf-check-label">Use company default fund<% if (defaultFund) { %> — <%= defaultFund.fund_name %><% } else { %> (not configured yet)<% } %></span>
+    </label>
+
+    <div id="super-fields">
+      <div class="sf-field">
+        <label class="sf-label">Fund name</label>
+        <input type="text" name="fund_name" class="sf-input">
+      </div>
+      <div class="sf-grid2">
+        <div class="sf-field">
+          <label class="sf-label">USI</label>
+          <input type="text" name="usi" class="sf-input" placeholder="AUS0100AU">
+        </div>
+        <div class="sf-field">
+          <label class="sf-label">Member number</label>
+          <input type="text" name="member_number" class="sf-input">
+        </div>
+      </div>
+      <div class="sf-field">
+        <label class="sf-label">Fund ABN (optional)</label>
+        <input type="text" name="fund_abn" class="sf-input" inputmode="numeric" maxlength="14" placeholder="11 digits">
+      </div>
+      <div class="sf-field">
+        <label class="sf-label">Or upload a Super Choice form (PDF, max 5MB)</label>
+        <input type="file" name="choice_form" class="sf-input" accept="application/pdf" style="padding: 0.45rem 0.5rem;">
+      </div>
+    </div>
+
+    <div class="sf-pin-callout">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      <span>Enter your portal PIN to confirm</span>
+    </div>
+    <div class="sf-field">
+      <input type="password" name="pin_confirm" class="sf-input sf-pin" inputmode="numeric" required pattern="\d{4,6}" maxlength="6" placeholder="••••">
+    </div>
+
+    <div class="flex justify-end mt-4">
+      <button type="submit" class="sf-btn-primary">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        Submit for approval
+      </button>
+    </div>
+  </form>
+</div>
+
+<% if (flash_success && flash_success.length) { %><div class="sf-toast show"><%= flash_success[0] %></div>
+<% } else if (flash_error && flash_error.length) { %><div class="sf-toast show err"><%= flash_error[0] %></div>
+<% } %>
+<script>
+  setTimeout(()=>{ const t=document.querySelector('.sf-toast.show'); if(t) t.classList.remove('show'); }, 3500);
+  // Toggle fund fields when "use default" is picked
+  (function(){
+    const cb = document.getElementById('use-default');
+    const fields = document.getElementById('super-fields');
+    if (!cb) return;
+    function apply() {
+      fields.style.opacity = cb.checked ? 0.45 : 1;
+      fields.querySelectorAll('input').forEach(i => { if (i.name !== 'choice_form') i.disabled = cb.checked; });
+    }
+    cb.addEventListener('change', apply);
+    apply();
+  })();
+</script>

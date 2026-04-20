@@ -5133,6 +5133,109 @@ function runMigrations(db) {
     console.log('Migration 116 applied: shift_period on employee_leave');
   }
 
+  // Migration 119: Expand activity_log CHECK to include 'view'
+  if (!isMigrationApplied.get(119)) {
+    try {
+      const info = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='activity_log'").get();
+      if (info && info.sql && !info.sql.includes("'view'")) {
+        db.exec('BEGIN TRANSACTION');
+        const cols = db.prepare("PRAGMA table_info(activity_log)").all().map(c => c.name).join(', ');
+        db.exec(`CREATE TABLE activity_log_rebuild (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          user_name TEXT,
+          action TEXT NOT NULL CHECK(action IN ('create','update','delete','view','login','logout','upload','download','complete','approve','reject')),
+          entity_type TEXT,
+          entity_id INTEGER,
+          entity_label TEXT DEFAULT '',
+          job_id INTEGER,
+          job_number TEXT DEFAULT '',
+          details TEXT DEFAULT '',
+          before_value TEXT DEFAULT '',
+          after_value TEXT DEFAULT '',
+          ip_address TEXT DEFAULT '',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
+        db.exec(`INSERT INTO activity_log_rebuild (${cols}) SELECT ${cols} FROM activity_log`);
+        db.exec('DROP TABLE activity_log');
+        db.exec('ALTER TABLE activity_log_rebuild RENAME TO activity_log');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_activity_log_user ON activity_log(user_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_activity_log_entity ON activity_log(entity_type, entity_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_activity_log_job ON activity_log(job_id)');
+        db.exec('COMMIT');
+      }
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch (r) {}
+      console.error('Migration 119 error:', e.message);
+    }
+    recordMigration.run(119, 'Expand activity_log action CHECK to include view');
+    console.log('Migration 119 applied: activity_log supports view action');
+  }
+
+  // Migration 118: Secure HR forms — bank_accounts, super_funds, tfn_declarations
+  if (!isMigrationApplied.get(118)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bank_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        account_name TEXT NOT NULL,
+        bsb_last3 TEXT DEFAULT '',
+        account_last3 TEXT DEFAULT '',
+        bsb_encrypted TEXT,
+        account_number_encrypted TEXT,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','synced','rejected')),
+        synced_at DATETIME,
+        synced_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT (datetime('now')),
+        updated_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_bank_accounts_emp ON bank_accounts(employee_id);
+      CREATE INDEX IF NOT EXISTS idx_bank_accounts_status ON bank_accounts(status);
+
+      CREATE TABLE IF NOT EXISTS super_funds (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        fund_name TEXT,
+        usi TEXT,
+        member_number TEXT,
+        fund_abn TEXT,
+        choice_form_url TEXT,
+        use_default INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','synced','rejected')),
+        synced_at DATETIME,
+        synced_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT (datetime('now')),
+        updated_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_super_funds_emp ON super_funds(employee_id);
+      CREATE INDEX IF NOT EXISTS idx_super_funds_status ON super_funds(status);
+
+      CREATE TABLE IF NOT EXISTS tfn_declarations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        tfn_encrypted TEXT,
+        tfn_last3 TEXT DEFAULT '',
+        residency_status TEXT CHECK(residency_status IN ('resident','foreign','working_holiday')),
+        claim_threshold INTEGER DEFAULT 0,
+        has_help_debt INTEGER DEFAULT 0,
+        has_stsl_debt INTEGER DEFAULT 0,
+        medicare_variation TEXT DEFAULT 'none',
+        signature_url TEXT,
+        pdf_url TEXT,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','synced','rejected')),
+        submitted_at DATETIME DEFAULT (datetime('now')),
+        processed_at DATETIME,
+        processed_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT (datetime('now')),
+        updated_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_tfn_emp ON tfn_declarations(employee_id);
+      CREATE INDEX IF NOT EXISTS idx_tfn_status ON tfn_declarations(status);
+    `);
+    recordMigration.run(118, 'Secure HR forms — bank_accounts, super_funds, tfn_declarations');
+    console.log('Migration 118 applied: secure HR forms schema');
+  }
+
   // Migration 117: My Profile — profile_photo_url, address_line1/2 on employees + emergency_contacts table
   if (!isMigrationApplied.get(117)) {
     try { db.exec("ALTER TABLE employees ADD COLUMN profile_photo_url TEXT"); } catch (e) { /* exists */ }

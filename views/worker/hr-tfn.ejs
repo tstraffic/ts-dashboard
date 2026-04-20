@@ -1,0 +1,180 @@
+<%- include('partials/secure-form-style') %>
+
+<div class="sf-wrap">
+  <a href="/w/hr" class="sf-back">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    HR & My Info
+  </a>
+
+  <div class="sf-hero">
+    <div class="sf-hero-ic" style="background: rgba(167,139,250,0.2); color: #A78BFA;">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+    </div>
+    <h1 class="sf-title">TFN Declaration</h1>
+    <p class="sf-sub">Digital equivalent of the ATO TFN declaration form (NAT 3092).</p>
+  </div>
+
+  <% if (current) { %>
+    <div class="sf-section">
+      <div class="sf-section-title">
+        Current on file
+        <% if (current.status === 'synced') { %><span class="sf-pill ok">✓ Actioned in QBO</span>
+        <% } else if (current.status === 'rejected') { %><span class="sf-pill bad">Rejected</span>
+        <% } else { %><span class="sf-pill warn">⧗ Pending admin action</span><% } %>
+      </div>
+      <div class="sf-readrow"><span class="sf-k">TFN</span><span class="sf-v">••• ••• •••<%= current.tfn_last3 %></span></div>
+      <div class="sf-readrow"><span class="sf-k">Residency</span><span class="sf-v"><%= current.residency_status === 'resident' ? 'Resident' : current.residency_status === 'foreign' ? 'Foreign resident' : 'Working holiday' %></span></div>
+      <div class="sf-readrow"><span class="sf-k">Tax-free threshold</span><span class="sf-v"><%= current.claim_threshold ? 'Claimed' : 'Not claimed' %></span></div>
+      <div class="sf-readrow"><span class="sf-k">HELP / STSL</span><span class="sf-v"><%= current.has_help_debt ? 'HELP' : '' %><% if (current.has_help_debt && current.has_stsl_debt) { %> + <% } %><%= current.has_stsl_debt ? 'STSL' : '' %><% if (!current.has_help_debt && !current.has_stsl_debt) { %>None<% } %></span></div>
+      <div class="sf-readrow"><span class="sf-k">Medicare</span><span class="sf-v capitalize"><%= current.medicare_variation %></span></div>
+      <% if (current.pdf_url) { %>
+        <div class="sf-readrow"><span class="sf-k">Signed copy</span><span class="sf-v"><a class="text-brand-400 underline" href="<%= current.pdf_url %>" target="_blank">Download PDF</a></span></div>
+      <% } %>
+      <p class="sf-meta">Submitted <%= new Date(current.submitted_at).toLocaleString('en-AU') %></p>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/w/hr/tfn" class="sf-section" id="tfn-form">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <input type="hidden" name="signature_data" id="signature_data">
+    <div class="sf-section-title"><%= current ? 'New declaration' : 'Submit TFN declaration' %></div>
+
+    <div class="sf-field">
+      <label class="sf-label">Tax File Number (9 digits)</label>
+      <input type="text" name="tfn" id="tfn-input" class="sf-input" required inputmode="numeric" pattern="\d{3}\s?\d{3}\s?\d{3}" maxlength="11" placeholder="123 456 789" autocomplete="off">
+      <p class="sf-help" id="tfn-hint">Validated with the ATO checksum before submission.</p>
+    </div>
+
+    <div class="sf-field">
+      <label class="sf-label">Residency status for tax purposes</label>
+      <select name="residency_status" class="sf-input" required>
+        <option value="">Select…</option>
+        <option value="resident">Australian resident</option>
+        <option value="foreign">Foreign resident</option>
+        <option value="working_holiday">Working holiday maker</option>
+      </select>
+    </div>
+
+    <div class="sf-field">
+      <label class="sf-check"><input type="checkbox" name="claim_threshold" value="1"><span class="sf-check-label">I claim the tax-free threshold from this payer</span></label>
+    </div>
+    <div class="sf-field">
+      <label class="sf-check"><input type="checkbox" name="has_help_debt" value="1"><span class="sf-check-label">I have a Higher Education Loan Program (HELP) debt</span></label>
+    </div>
+    <div class="sf-field">
+      <label class="sf-check"><input type="checkbox" name="has_stsl_debt" value="1"><span class="sf-check-label">I have a Student Start-up Loan / STSL debt</span></label>
+    </div>
+
+    <div class="sf-field">
+      <label class="sf-label">Medicare levy variation</label>
+      <select name="medicare_variation" class="sf-input">
+        <option value="none">No variation</option>
+        <option value="reduction">Request reduced Medicare levy</option>
+        <option value="exemption">Request full Medicare levy exemption</option>
+      </select>
+    </div>
+
+    <!-- Signature -->
+    <div class="sf-field">
+      <label class="sf-label">Signature</label>
+      <div class="sig-wrap">
+        <canvas id="sig-canvas" class="sig-canvas"></canvas>
+        <span class="sig-placeholder" id="sig-placeholder">Sign here with your finger or stylus</span>
+        <div class="sig-actions"><button type="button" id="sig-clear" class="text-xs font-semibold text-gray-500 hover:text-gray-700">Clear</button></div>
+      </div>
+    </div>
+
+    <div class="sf-pin-callout">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      <span>Enter your portal PIN to confirm</span>
+    </div>
+    <div class="sf-field">
+      <input type="password" name="pin_confirm" class="sf-input sf-pin" inputmode="numeric" required pattern="\d{4,6}" maxlength="6" placeholder="••••">
+    </div>
+
+    <div class="flex justify-end mt-4">
+      <button type="submit" class="sf-btn-primary">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        Submit declaration
+      </button>
+    </div>
+  </form>
+
+  <div class="sf-note">
+    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <span>Your TFN is encrypted with AES-256-GCM. Only the last three digits are retained in plaintext for identification.</span>
+  </div>
+</div>
+
+<% if (flash_success && flash_success.length) { %><div class="sf-toast show"><%= flash_success[0] %></div>
+<% } else if (flash_error && flash_error.length) { %><div class="sf-toast show err"><%= flash_error[0] %></div>
+<% } %>
+
+<script>
+(function () {
+  setTimeout(()=>{ const t=document.querySelector('.sf-toast.show'); if(t) t.classList.remove('show'); }, 3500);
+
+  // TFN checksum on client (weights 1,4,3,7,5,8,6,9,10)
+  function validateTfn(raw) {
+    const d = String(raw).replace(/\D/g, '');
+    if (d.length !== 9) return false;
+    const w = [1,4,3,7,5,8,6,9,10];
+    let s = 0; for (let i = 0; i < 9; i++) s += parseInt(d[i],10) * w[i];
+    return s % 11 === 0;
+  }
+  const tfnInput = document.getElementById('tfn-input');
+  const tfnHint = document.getElementById('tfn-hint');
+  tfnInput.addEventListener('input', () => {
+    const v = tfnInput.value;
+    if (v.replace(/\D/g,'').length === 9) {
+      const ok = validateTfn(v);
+      tfnHint.textContent = ok ? '✓ Checksum OK' : '✗ Invalid — check the digits';
+      tfnHint.style.color = ok ? '#34D399' : '#F87171';
+    } else {
+      tfnHint.textContent = 'Validated with the ATO checksum before submission.';
+      tfnHint.style.color = '';
+    }
+  });
+
+  // Signature canvas
+  const canvas = document.getElementById('sig-canvas');
+  const placeholder = document.getElementById('sig-placeholder');
+  const ctx = canvas.getContext('2d');
+  function sizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    canvas.width = r.width * dpr;
+    canvas.height = r.height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#1D4ED8';
+  }
+  sizeCanvas();
+  window.addEventListener('resize', sizeCanvas);
+
+  let drawing = false, hasInk = false, last = null;
+  function pt(e) {
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  function start(e) { drawing = true; last = pt(e); placeholder.style.display = 'none'; e.preventDefault(); }
+  function move(e) { if (!drawing) return; const p = pt(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; hasInk = true; e.preventDefault(); }
+  function end() { drawing = false; last = null; }
+  canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); canvas.addEventListener('mouseup', end); canvas.addEventListener('mouseleave', end);
+  canvas.addEventListener('touchstart', start, { passive: false }); canvas.addEventListener('touchmove', move, { passive: false }); canvas.addEventListener('touchend', end);
+
+  document.getElementById('sig-clear').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    hasInk = false; placeholder.style.display = '';
+  });
+
+  // On submit, serialise signature + validate TFN
+  document.getElementById('tfn-form').addEventListener('submit', function (e) {
+    if (!validateTfn(tfnInput.value)) { e.preventDefault(); alert('TFN is not valid. Please check the digits.'); return; }
+    if (!hasInk) { e.preventDefault(); alert('Please sign the declaration.'); return; }
+    document.getElementById('signature_data').value = canvas.toDataURL('image/png');
+  });
+})();
+</script>

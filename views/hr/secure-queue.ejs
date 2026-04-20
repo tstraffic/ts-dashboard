@@ -1,0 +1,190 @@
+<% locals.currentPage = 'hr-secure-queue' %>
+
+<div class="space-y-5">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Pending payroll sync</h1>
+      <p class="text-sm text-gray-500 mt-1">Bank, super and TFN submissions awaiting action in QuickBooks Online.</p>
+    </div>
+    <a href="/hr/roster" class="text-sm text-brand-600 font-medium">Roster →</a>
+  </div>
+
+  <!-- Stats strip -->
+  <div class="grid grid-cols-3 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Bank</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1"><%= pendingBank.length %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Super</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1"><%= pendingSuper.length %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-[10px] font-bold text-purple-500 uppercase tracking-widest">TFN</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1"><%= pendingTfn.length %></p>
+    </div>
+  </div>
+
+  <!-- Bank -->
+  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+      <span class="inline-flex w-6 h-6 rounded-md bg-blue-50 text-blue-600 items-center justify-center">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z"/></svg>
+      </span>
+      <h2 class="text-sm font-bold text-gray-900">Bank Account (<%= pendingBank.length %>)</h2>
+    </div>
+    <% if (pendingBank.length === 0) { %>
+      <p class="text-sm text-gray-400 text-center py-6">No pending bank submissions.</p>
+    <% } else { %>
+      <ul class="divide-y divide-gray-100">
+        <% pendingBank.forEach(b => { %>
+          <li class="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold text-gray-900"><%= b.full_name %> <span class="text-xs font-mono text-gray-400"><%= b.employee_code %></span></p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                <%= b.account_name %> · BSB •••-••<%= b.bsb_last3 %> · Acct ••••••<%= b.account_last3 %>
+              </p>
+              <p class="text-[11px] text-gray-400 mt-0.5">Submitted <%= new Date(b.updated_at).toLocaleString('en-AU') %></p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" class="px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg" onclick="revealSensitive('bank', <%= b.id %>, this)">Reveal for QBO</button>
+              <form method="POST" action="/hr/secure-queue/bank/<%= b.id %>/sync" class="inline">
+                <%- include('../partials/csrf') %>
+                <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">Mark synced</button>
+              </form>
+              <form method="POST" action="/hr/secure-queue/bank/<%= b.id %>/reject" class="inline" onsubmit="return confirm('Reject this submission?')">
+                <%- include('../partials/csrf') %>
+                <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg">Reject</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </section>
+
+  <!-- Super -->
+  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+      <span class="inline-flex w-6 h-6 rounded-md bg-emerald-50 text-emerald-600 items-center justify-center">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v8m-4-4h8"/></svg>
+      </span>
+      <h2 class="text-sm font-bold text-gray-900">Superannuation (<%= pendingSuper.length %>)</h2>
+    </div>
+    <% if (pendingSuper.length === 0) { %>
+      <p class="text-sm text-gray-400 text-center py-6">No pending super submissions.</p>
+    <% } else { %>
+      <ul class="divide-y divide-gray-100">
+        <% pendingSuper.forEach(s => { %>
+          <li class="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold text-gray-900"><%= s.full_name %> <span class="text-xs font-mono text-gray-400"><%= s.employee_code %></span></p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                <%= s.fund_name || (s.use_default ? 'Company default fund' : 'Choice form attached') %> · USI <%= s.usi || '—' %> · Member <%= s.member_number || '—' %>
+              </p>
+              <% if (s.choice_form_url) { %><a href="<%= s.choice_form_url %>" target="_blank" class="text-[11px] text-brand-600 underline">View Choice form PDF</a><% } %>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <form method="POST" action="/hr/secure-queue/super/<%= s.id %>/sync" class="inline">
+                <%- include('../partials/csrf') %>
+                <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">Mark synced</button>
+              </form>
+              <form method="POST" action="/hr/secure-queue/super/<%= s.id %>/reject" class="inline" onsubmit="return confirm('Reject this submission?')">
+                <%- include('../partials/csrf') %>
+                <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg">Reject</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </section>
+
+  <!-- TFN -->
+  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+      <span class="inline-flex w-6 h-6 rounded-md bg-purple-50 text-purple-600 items-center justify-center">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      </span>
+      <h2 class="text-sm font-bold text-gray-900">TFN Declaration (<%= pendingTfn.length %>)</h2>
+    </div>
+    <% if (pendingTfn.length === 0) { %>
+      <p class="text-sm text-gray-400 text-center py-6">No pending TFN declarations.</p>
+    <% } else { %>
+      <ul class="divide-y divide-gray-100">
+        <% pendingTfn.forEach(t => { %>
+          <li class="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold text-gray-900"><%= t.full_name %> <span class="text-xs font-mono text-gray-400"><%= t.employee_code %></span></p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                TFN •••••••<%= t.tfn_last3 %> · <%= t.residency_status %> · Threshold <%= t.claim_threshold ? 'Y' : 'N' %> · HELP <%= t.has_help_debt ? 'Y' : 'N' %> · STSL <%= t.has_stsl_debt ? 'Y' : 'N' %> · Medicare <%= t.medicare_variation %>
+              </p>
+              <% if (t.pdf_url) { %><a href="<%= t.pdf_url %>" target="_blank" class="text-[11px] text-brand-600 underline">Signed PDF</a><% } %>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" class="px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg" onclick="revealSensitive('tfn', <%= t.id %>, this)">Reveal for QBO</button>
+              <form method="POST" action="/hr/secure-queue/tfn/<%= t.id %>/sync" class="inline">
+                <%- include('../partials/csrf') %>
+                <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">Mark actioned</button>
+              </form>
+              <form method="POST" action="/hr/secure-queue/tfn/<%= t.id %>/reject" class="inline" onsubmit="return confirm('Reject this declaration?')">
+                <%- include('../partials/csrf') %>
+                <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg">Reject</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </section>
+</div>
+
+<!-- Reveal modal -->
+<div id="reveal-bg" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50"></div>
+<div id="reveal-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 space-y-3">
+    <div class="flex items-center gap-2 text-amber-600">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+      <h3 class="font-bold text-gray-900">Decrypted for QBO export</h3>
+    </div>
+    <p class="text-xs text-gray-500">This view is logged. Copy the values into QuickBooks, then close.</p>
+    <div id="reveal-body" class="font-mono text-sm bg-gray-50 border border-gray-200 rounded-lg p-3 whitespace-pre-wrap break-all"></div>
+    <div class="flex justify-end">
+      <button onclick="closeReveal()" class="px-4 py-2 text-sm font-semibold bg-gray-100 hover:bg-gray-200 rounded-lg">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function revealSensitive(type, id, btn) {
+  btn.disabled = true; btn.textContent = 'Loading…';
+  try {
+    const r = await fetch('/hr/secure-queue/' + type + '/' + id + '/reveal');
+    const payload = await r.json();
+    if (!payload.ok) throw new Error(payload.error || 'Failed');
+    let body = '';
+    if (type === 'bank') {
+      const bsb = (payload.data.bsb || '').replace(/(\d{3})(\d{3})/, '$1-$2');
+      body = 'Account name: ' + payload.data.account_name + '\n' +
+             'BSB: ' + bsb + '\n' +
+             'Account number: ' + (payload.data.account_number || '');
+    } else if (type === 'tfn') {
+      const t = (payload.data.tfn || '').replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
+      body = 'TFN: ' + t;
+    }
+    document.getElementById('reveal-body').textContent = body;
+    document.getElementById('reveal-bg').classList.remove('hidden');
+    document.getElementById('reveal-modal').classList.remove('hidden');
+  } catch (e) {
+    alert('Could not reveal: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Reveal for QBO';
+  }
+}
+function closeReveal() {
+  document.getElementById('reveal-bg').classList.add('hidden');
+  document.getElementById('reveal-modal').classList.add('hidden');
+  document.getElementById('reveal-body').textContent = '';
+}
+document.getElementById('reveal-bg').addEventListener('click', closeReveal);
+</script>

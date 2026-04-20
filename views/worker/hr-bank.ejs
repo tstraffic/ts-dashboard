@@ -1,0 +1,84 @@
+<%- include('partials/secure-form-style') %>
+
+<div class="sf-wrap">
+  <a href="/w/hr" class="sf-back">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    HR & My Info
+  </a>
+
+  <div class="sf-hero">
+    <div class="sf-hero-ic" style="background: rgba(43,127,255,0.2); color: #60A5FA;">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z"/></svg>
+    </div>
+    <h1 class="sf-title">Bank Account</h1>
+    <p class="sf-sub">Where your wages land. Encrypted end-to-end.</p>
+  </div>
+
+  <% if (current) { %>
+    <div class="sf-section">
+      <div class="sf-section-title">
+        Current on file
+        <% if (current.status === 'synced') { %>
+          <span class="sf-pill ok">✓ Synced to QBO</span>
+        <% } else if (current.status === 'rejected') { %>
+          <span class="sf-pill bad">Rejected</span>
+        <% } else { %>
+          <span class="sf-pill warn">⧗ Pending admin approval</span>
+        <% } %>
+      </div>
+      <div class="sf-readrow"><span class="sf-k">Account name</span><span class="sf-v"><%= current.account_name %></span></div>
+      <div class="sf-readrow"><span class="sf-k">BSB</span><span class="sf-v">•••-•••<%= current.bsb_last3 %></span></div>
+      <div class="sf-readrow"><span class="sf-k">Account number</span><span class="sf-v">••••••<%= current.account_last3 %></span></div>
+      <% if (current.synced_at) { %>
+        <p class="sf-meta">Synced to QBO <%= new Date(current.synced_at).toLocaleString('en-AU') %></p>
+      <% } else { %>
+        <p class="sf-meta">Submitted <%= new Date(current.updated_at).toLocaleString('en-AU') %></p>
+      <% } %>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/w/hr/bank" class="sf-section">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <div class="sf-section-title"><%= current ? 'Update bank details' : 'Add bank details' %></div>
+
+    <div class="sf-field">
+      <label class="sf-label">Account name</label>
+      <input type="text" name="account_name" class="sf-input" required placeholder="Name on the account">
+    </div>
+    <div class="sf-grid2">
+      <div class="sf-field">
+        <label class="sf-label">BSB</label>
+        <input type="text" name="bsb" class="sf-input" required inputmode="numeric" placeholder="062-000" pattern="\d{3}-?\d{3}" maxlength="7">
+      </div>
+      <div class="sf-field">
+        <label class="sf-label">Account number</label>
+        <input type="text" name="account_number" class="sf-input" required inputmode="numeric" placeholder="12345678" pattern="\d{6,10}" maxlength="10">
+      </div>
+    </div>
+
+    <div class="sf-pin-callout">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      <span>Enter your portal PIN to confirm</span>
+    </div>
+    <div class="sf-field">
+      <input type="password" name="pin_confirm" class="sf-input sf-pin" inputmode="numeric" required pattern="\d{4,6}" maxlength="6" placeholder="••••">
+    </div>
+
+    <div class="flex justify-end mt-4">
+      <button type="submit" class="sf-btn-primary">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        Submit for approval
+      </button>
+    </div>
+  </form>
+
+  <div class="sf-note">
+    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <span>Your BSB and account number are encrypted with AES-256-GCM and never shown in full after save.</span>
+  </div>
+</div>
+
+<% if (flash_success && flash_success.length) { %><div class="sf-toast show"><%= flash_success[0] %></div>
+<% } else if (flash_error && flash_error.length) { %><div class="sf-toast show err"><%= flash_error[0] %></div>
+<% } %>
+<script>setTimeout(()=>{ const t=document.querySelector('.sf-toast.show'); if(t) t.classList.remove('show'); }, 3500);</script>
