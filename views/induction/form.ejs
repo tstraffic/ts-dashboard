@@ -874,6 +874,13 @@
       newPanel.classList.remove('hidden');
       newPanel.classList.add('step-fade-enter');
 
+      // When the signature step becomes visible, size the canvas
+      if (step === 7 && typeof window.__indSizeSignature === 'function') {
+        // Run twice: once synchronously, once after reflow / transition
+        window.__indSizeSignature();
+        setTimeout(window.__indSizeSignature, 60);
+      }
+
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -1019,15 +1026,27 @@
       var dateSpan = document.getElementById('sig-date');
       if (dateSpan) dateSpan.textContent = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
       function sizeCanvas() {
-        var dpr = window.devicePixelRatio || 1;
         var r = c.getBoundingClientRect();
-        c.width = r.width * dpr;
-        c.height = r.height * dpr;
+        if (r.width === 0) return; // panel not visible yet
+        var dpr = window.devicePixelRatio || 1;
+        // Preserve any existing ink across resize
+        var snap = null;
+        if (c.width > 0 && c.height > 0 && window.__indHasInk) {
+          try { snap = ctx.getImageData(0, 0, c.width, c.height); } catch (e) {}
+        }
+        c.width = Math.floor(r.width * dpr);
+        c.height = Math.floor(r.height * dpr);
+        c.style.touchAction = 'none';
+        // Reset any previous transform then scale fresh so resize doesn't compound
+        if (typeof ctx.setTransform === 'function') ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(dpr, dpr);
         ctx.lineWidth = 2.2;
         ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         ctx.strokeStyle = '#1D4ED8';
+        if (snap) { try { ctx.putImageData(snap, 0, 0); } catch (e) {} }
       }
+      window.__indSizeSignature = sizeCanvas;
       sizeCanvas();
       window.addEventListener('resize', sizeCanvas);
       var drawing = false, last = null;
