@@ -1,0 +1,83 @@
+<% locals.currentPage = 'kudos-values' %>
+
+<div class="space-y-5">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Company values</h1>
+      <p class="text-sm text-gray-500 mt-1">Workers tag kudos with one of these values. Rename, recolour, or deactivate without touching code.</p>
+    </div>
+    <a href="/kudos-admin/queue" class="text-sm text-brand-600 font-medium">Moderation queue →</a>
+  </div>
+
+  <!-- Existing values -->
+  <% if (values.length === 0) { %>
+    <div class="bg-white border border-gray-200 rounded-xl p-6 text-center text-sm text-gray-500">No values yet — add one below.</div>
+  <% } else { %>
+    <div class="space-y-3">
+      <% values.forEach(v => { %>
+        <form method="POST" action="/kudos-admin/values/<%= v.id %>" class="bg-white border border-gray-200 rounded-xl p-4 <%= !v.active ? 'opacity-60' : '' %>">
+          <%- include('../partials/csrf') %>
+          <div class="grid grid-cols-1 sm:grid-cols-[1.5fr_1fr_100px_80px_auto] gap-3 items-center">
+            <div>
+              <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</label>
+              <input name="name" value="<%= v.name %>" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Description</label>
+              <input name="description" value="<%= v.description %>" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Colour</label>
+              <input name="colour" type="color" value="<%= v.colour %>" class="w-full mt-1 h-9 rounded border border-gray-300">
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order</label>
+              <input name="sort_order" type="number" value="<%= v.sort_order %>" class="w-full mt-1 px-2 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="flex items-center gap-1 text-xs font-medium text-gray-600">
+                <input type="checkbox" name="active" value="1" <%= v.active ? 'checked' : '' %>> Active
+              </label>
+              <input type="hidden" name="icon" value="<%= v.icon %>">
+              <button type="submit" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-lg">Save</button>
+            </div>
+          </div>
+          <div class="mt-3 flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold" style="background: <%= v.colour %>20; color: <%= v.colour %>;">★ <%= v.name %></span>
+            <span class="text-xs text-gray-400">preview</span>
+          </div>
+        </form>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <!-- Add new -->
+  <form method="POST" action="/kudos-admin/values" class="bg-white border border-gray-200 rounded-xl p-4">
+    <%- include('../partials/csrf') %>
+    <h3 class="text-sm font-bold text-gray-900 mb-3">Add a value</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-[1.5fr_1fr_100px_80px_auto] gap-3 items-end">
+      <div>
+        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</label>
+        <input name="name" required placeholder="e.g. Customer Focus" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Description</label>
+        <input name="description" placeholder="Short line" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Colour</label>
+        <input name="colour" type="color" value="#2B7FFF" class="w-full mt-1 h-9 rounded border border-gray-300">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order</label>
+        <input name="sort_order" type="number" value="100" class="w-full mt-1 px-2 py-2 border border-gray-300 rounded-lg text-sm">
+      </div>
+      <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">Add</button>
+    </div>
+  </form>
+
+  <% if (flash_success && flash_success.length) { %>
+    <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-semibold shadow-lg z-50" id="flash"><%= flash_success[0] %></div>
+    <script>setTimeout(()=>document.getElementById('flash')?.remove(), 2800);</script>
+  <% } %>
+</div>

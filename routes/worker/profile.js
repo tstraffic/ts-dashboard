@@ -87,12 +87,18 @@ function wantsJson(req) {
 // ============================================
 router.get('/profile', (req, res) => {
   const { member, employee, contacts } = loadSelf(req.session.worker);
+  let kudosSummary = null;
+  try {
+    const { getProfileSummary } = require('../../services/kudos');
+    kudosSummary = getProfileSummary({ crewId: req.session.worker.id });
+  } catch (e) { /* service may not be loaded — view has a null-guard */ }
   res.render('worker/profile', {
     title: 'My Profile',
     currentPage: 'more',
     member,
     employee,
     contacts,
+    kudosSummary,
     flash_success: req.flash('success'),
     flash_error: req.flash('error'),
   });

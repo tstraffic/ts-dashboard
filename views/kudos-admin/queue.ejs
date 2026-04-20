@@ -1,0 +1,103 @@
+<% locals.currentPage = 'kudos-queue' %>
+
+<div class="space-y-5">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Kudos moderation</h1>
+      <p class="text-sm text-gray-500 mt-1">Review reports and keep an eye on engagement.</p>
+    </div>
+    <a href="/kudos-admin/values" class="text-sm text-brand-600 font-medium">← Values</a>
+  </div>
+
+  <!-- Analytics -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total kudos</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1"><%= totalKudos %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Last 30 days</p>
+      <p class="text-2xl font-bold text-emerald-600 mt-1"><%= last30 %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Pending reports</p>
+      <p class="text-2xl font-bold text-amber-600 mt-1"><%= reports.length %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-brand-500 uppercase tracking-widest">Avg / day</p>
+      <p class="text-2xl font-bold text-brand-600 mt-1"><%= Math.round((last30 / 30) * 10) / 10 %></p>
+    </div>
+  </div>
+
+  <!-- Top senders / receivers / value mix -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Top senders (30d)</p>
+      <% if (topSenders.length === 0) { %><p class="text-sm text-gray-400">No data.</p><% } %>
+      <% topSenders.forEach((s, i) => { %>
+        <div class="flex justify-between items-center py-1.5 border-b border-gray-100 last:border-b-0">
+          <span class="text-sm text-gray-700"><span class="text-gray-400 font-semibold mr-2"><%= i + 1 %>.</span><%= s.full_name %></span>
+          <span class="text-sm font-bold text-gray-900"><%= s.c %></span>
+        </div>
+      <% }) %>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Top receivers (30d)</p>
+      <% if (topReceivers.length === 0) { %><p class="text-sm text-gray-400">No data.</p><% } %>
+      <% topReceivers.forEach((r, i) => { %>
+        <div class="flex justify-between items-center py-1.5 border-b border-gray-100 last:border-b-0">
+          <span class="text-sm text-gray-700"><span class="text-gray-400 font-semibold mr-2"><%= i + 1 %>.</span><%= r.full_name %></span>
+          <span class="text-sm font-bold text-gray-900"><%= r.c %></span>
+        </div>
+      <% }) %>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Value distribution (30d)</p>
+      <% if (valueDist.length === 0) { %><p class="text-sm text-gray-400">No data.</p><% } %>
+      <% const maxDist = Math.max(...valueDist.map(v => v.c), 1); %>
+      <% valueDist.forEach(v => { %>
+        <div class="mb-2">
+          <div class="flex justify-between text-xs mb-1"><span class="font-semibold" style="color: <%= v.colour %>;"><%= v.name %></span><span class="text-gray-600"><%= v.c %></span></div>
+          <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div style="width: <%= (v.c / maxDist * 100) %>%; background: <%= v.colour %>;" class="h-full"></div></div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <!-- Reports queue -->
+  <div class="bg-white border border-gray-200 rounded-xl">
+    <div class="px-4 py-3 border-b border-gray-200">
+      <h2 class="text-sm font-bold text-gray-900">Reports queue (<%= reports.length %>)</h2>
+    </div>
+    <% if (reports.length === 0) { %>
+      <p class="text-sm text-gray-400 text-center py-6">Nothing to moderate — all clean.</p>
+    <% } else { %>
+      <ul class="divide-y divide-gray-100">
+        <% reports.forEach(r => { %>
+          <li class="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm text-gray-900">
+                <strong><%= r.reporter_name %></strong> reported
+                <% if (r.kudos_id) { %>a kudos from <strong><%= r.sender_name || 'unknown' %></strong><% } else { %>a comment<% } %>
+                <% if (r.hidden_at) { %><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-red-50 text-red-700 ml-1">Already hidden</span><% } %>
+              </p>
+              <% if (r.kudos_message) { %><p class="text-xs text-gray-500 mt-1 italic">"<%= r.kudos_message %>"</p><% } %>
+              <% if (r.reason) { %><p class="text-xs text-gray-600 mt-1">Reason: <%= r.reason %></p><% } %>
+              <p class="text-[11px] text-gray-400 mt-1"><%= new Date(r.created_at).toLocaleString('en-AU') %></p>
+            </div>
+            <div class="flex gap-2 flex-shrink-0">
+              <form method="POST" action="/kudos-admin/queue/<%= r.id %>/hide">
+                <%- include('../partials/csrf') %>
+                <button type="submit" class="px-3 py-1.5 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg">Hide</button>
+              </form>
+              <form method="POST" action="/kudos-admin/queue/<%= r.id %>/dismiss">
+                <%- include('../partials/csrf') %>
+                <button type="submit" class="px-3 py-1.5 text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg">Dismiss</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+</div>

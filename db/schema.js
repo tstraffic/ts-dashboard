@@ -5133,6 +5133,109 @@ function runMigrations(db) {
     console.log('Migration 116 applied: shift_period on employee_leave');
   }
 
+  // Migration 122: Kudos — peer recognition system
+  if (!isMigrationApplied.get(122)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS company_values (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        slug TEXT UNIQUE NOT NULL,
+        colour TEXT NOT NULL DEFAULT '#2B7FFF',
+        icon TEXT DEFAULT 'star',
+        description TEXT DEFAULT '',
+        active INTEGER NOT NULL DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS kudos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sender_crew_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+        value_id INTEGER REFERENCES company_values(id),
+        message TEXT NOT NULL,
+        photo_url TEXT,
+        visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public','team','private')),
+        is_leadership INTEGER NOT NULL DEFAULT 0,
+        hidden_at DATETIME,
+        hidden_by_user_id INTEGER REFERENCES users(id),
+        hidden_reason TEXT,
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_kudos_sender ON kudos(sender_crew_id);
+      CREATE INDEX IF NOT EXISTS idx_kudos_value ON kudos(value_id);
+      CREATE INDEX IF NOT EXISTS idx_kudos_created ON kudos(created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS kudos_recipients (
+        kudos_id INTEGER NOT NULL REFERENCES kudos(id) ON DELETE CASCADE,
+        recipient_crew_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+        PRIMARY KEY (kudos_id, recipient_crew_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_kudos_recipients_rcpt ON kudos_recipients(recipient_crew_id);
+
+      CREATE TABLE IF NOT EXISTS kudos_reactions (
+        kudos_id INTEGER NOT NULL REFERENCES kudos(id) ON DELETE CASCADE,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+        reaction_type TEXT NOT NULL CHECK(reaction_type IN ('clap','heart','raise','flex','fire')),
+        created_at DATETIME DEFAULT (datetime('now')),
+        PRIMARY KEY (kudos_id, crew_member_id, reaction_type)
+      );
+
+      CREATE TABLE IF NOT EXISTS kudos_comments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kudos_id INTEGER NOT NULL REFERENCES kudos(id) ON DELETE CASCADE,
+        parent_comment_id INTEGER REFERENCES kudos_comments(id) ON DELETE CASCADE,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+        message TEXT NOT NULL,
+        hidden_at DATETIME,
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_kudos_comments_kudos ON kudos_comments(kudos_id);
+
+      CREATE TABLE IF NOT EXISTS kudos_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kudos_id INTEGER REFERENCES kudos(id) ON DELETE CASCADE,
+        comment_id INTEGER REFERENCES kudos_comments(id) ON DELETE CASCADE,
+        reporter_crew_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+        reason TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','actioned','dismissed')),
+        created_at DATETIME DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_kudos_reports_status ON kudos_reports(status);
+
+      CREATE TABLE IF NOT EXISTS kudos_blocks (
+        blocker_crew_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+        blocked_crew_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+        created_at DATETIME DEFAULT (datetime('now')),
+        PRIMARY KEY (blocker_crew_id, blocked_crew_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS kudos_milestones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+        milestone_type TEXT NOT NULL,
+        payload TEXT DEFAULT '{}',
+        posted_at DATETIME DEFAULT (datetime('now')),
+        UNIQUE(crew_member_id, milestone_type)
+      );
+
+      CREATE TABLE IF NOT EXISTS leaderboard_optouts (
+        crew_member_id INTEGER PRIMARY KEY REFERENCES crew_members(id) ON DELETE CASCADE,
+        opted_out_at DATETIME DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Seed default company values
+    const seed = db.prepare("INSERT OR IGNORE INTO company_values (name, slug, colour, icon, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)");
+    seed.run('Safety First', 'safety', '#EF4444', 'shield', 'Looking out for mates and the public on every job.', 10);
+    seed.run('Teamwork', 'teamwork', '#2B7FFF', 'users', 'Lifting the crew — sharing knowledge and backing each other.', 20);
+    seed.run('Going The Extra Mile', 'extra-mile', '#F59E0B', 'star', 'Doing more than asked, staying late, catching the details.', 30);
+    seed.run('Customer Focus', 'customer', '#8B5CF6', 'handshake', 'Professional, respectful, problem-solvers for our clients.', 40);
+    seed.run('Reliability', 'reliability', '#10B981', 'check', 'On time, every time. People you can count on.', 50);
+
+    recordMigration.run(122, 'Kudos peer recognition system');
+    console.log('Migration 122 applied: kudos tables + default values seeded');
+  }
+
   // Migration 121: Home personalisation — cards, preferences, streaks
   if (!isMigrationApplied.get(121)) {
     db.exec(`

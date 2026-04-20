@@ -1,0 +1,67 @@
+<%
+  function initials(name) { return (name || '').split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase(); }
+  function timeAgo(ts) {
+    const d = new Date(ts); const diff = Math.max(0, (Date.now() - d.getTime()) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  }
+  const reactionEmoji = { clap: '👏', heart: '❤️', raise: '🙌', flex: '💪', fire: '🔥' };
+%>
+<% items.forEach(function (k) { %>
+  <div class="kd-item <%= k.is_leadership ? 'leadership' : '' %>" id="kudos-<%= k.id %>" data-id="<%= k.id %>">
+    <div class="kd-top">
+      <div class="kd-avatar"><%= initials(k.sender_name) %></div>
+      <div class="kd-top-meta">
+        <p class="kd-top-line">
+          <strong><%= k.sender_name %></strong> gave kudos to
+          <% (k.recipients || []).forEach(function (r, i) { %><strong><%= r.name %></strong><%= i < k.recipients.length - 1 ? ', ' : '' %><% }); %>
+          <% if (k.is_leadership) { %><span class="kd-leadership-badge">★ Leadership</span><% } %>
+        </p>
+        <p class="kd-top-time"><%= timeAgo(k.created_at) %><% if (k.visibility === 'private') { %> · 🔒 Private<% } else if (k.visibility === 'team') { %> · Team<% } %></p>
+      </div>
+      <div class="kd-action-menu">
+        <button type="button" class="kd-action" aria-label="More" onclick="kdToggleMenu(this)">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+        </button>
+        <div class="kd-menu">
+          <form method="POST" action="/w/feed/<%= k.id %>/report">
+            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+            <button type="submit" class="danger">Report</button>
+          </form>
+          <% if (k.sender_crew_id !== viewerCrewId) { %>
+            <form method="POST" action="/w/feed/block">
+              <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+              <input type="hidden" name="crew_id" value="<%= k.sender_crew_id %>">
+              <button type="submit" class="danger">Block sender</button>
+            </form>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <% if (k.value_name) { %>
+      <span class="kd-value" style="background: <%= (k.value_colour || '#2B7FFF') %>20; color: <%= k.value_colour || '#2B7FFF' %>;">★ <%= k.value_name %></span>
+    <% } %>
+    <p class="kd-msg"><%= k.message %></p>
+    <% if (k.photo_url) { %><div class="kd-photo"><img src="<%= k.photo_url %>" alt=""></div><% } %>
+
+    <div class="kd-reactions">
+      <% ['clap','heart','raise','flex','fire'].forEach(function (rt) { %>
+        <button type="button" class="kd-reaction <%= (k.myReactions || []).includes(rt) ? 'on' : '' %>" data-rt="<%= rt %>" onclick="kdReact(<%= k.id %>, '<%= rt %>', this)">
+          <span><%= reactionEmoji[rt] %></span>
+          <span class="kd-reaction-count" data-count><%= k.reactions[rt] || 0 %></span>
+        </button>
+      <% }) %>
+    </div>
+
+    <div class="kd-actions">
+      <a href="/w/feed/<%= k.id %>" class="kd-action">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h10M7 16h6M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <%= k.comment_count || 0 %> comment<%= (k.comment_count || 0) === 1 ? '' : 's' %>
+      </a>
+    </div>
+  </div>
+<% }); %>

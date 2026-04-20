@@ -1,0 +1,106 @@
+<%- include('partials/kudos-style') %>
+
+<div class="kd-wrap">
+
+  <!-- Filter pills -->
+  <div class="kd-pills">
+    <a href="/w/feed?filter=all" class="kd-pill <%= filter === 'all' ? 'on' : '' %>">Everyone</a>
+    <a href="/w/feed?filter=team" class="kd-pill <%= filter === 'team' ? 'on' : '' %>">My team</a>
+    <a href="/w/feed?filter=mentions" class="kd-pill <%= filter === 'mentions' ? 'on' : '' %>">Mentions</a>
+    <a href="/w/feed?filter=mine" class="kd-pill <%= filter === 'mine' ? 'on' : '' %>">Sent by me</a>
+    <a href="/w/leaderboard" class="kd-pill" style="margin-left: auto; background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.3); color: #FBBF24;">🏆 Leaderboard</a>
+  </div>
+
+  <!-- Milestones strip -->
+  <% if (milestones && milestones.length > 0) { %>
+    <div style="margin-bottom: 12px;">
+      <% milestones.slice(0, 2).forEach(function (m) {
+        const p = m.payload || {};
+        let emoji = '🎉', title = 'Milestone';
+        if (m.milestone_type.startsWith('anniversary')) { emoji = '🎂'; title = `${m.full_name} — ${p.years} year${p.years === 1 ? '' : 's'} with T&S`; }
+        else if (m.milestone_type.startsWith('shifts')) { emoji = '🏆'; title = `${m.full_name} hit ${p.shifts} shifts`; }
+      %>
+        <div class="kd-milestone">
+          <div class="kd-milestone-ic"><%= emoji %></div>
+          <div class="kd-milestone-msg"><strong><%= title %></strong></div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <!-- Feed -->
+  <div id="kd-feed">
+    <% if (items.length === 0) { %>
+      <div class="kd-empty">
+        <div class="kd-empty-ic"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.6.6-5 4.5 1.5 6.8L12 17l-6 3.2 1.5-6.8-5-4.5 6.6-.6L12 2z"/></svg></div>
+        <p class="text-sm font-bold text-white">No kudos yet</p>
+        <p class="text-xs text-white/50 mt-1">Be the first to recognise a teammate.</p>
+      </div>
+    <% } else { %>
+      <%- include('_feed_items', { items, viewerCrewId }) %>
+    <% } %>
+  </div>
+
+  <% if (nextBefore) { %>
+    <div id="kd-load-more-wrap" style="text-align:center; padding: 16px 0;">
+      <button id="kd-load-more" data-before="<%= nextBefore %>" style="padding: 10px 18px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; font-size: 0.82rem; font-weight: 700;">Load more</button>
+    </div>
+  <% } %>
+</div>
+
+<!-- FAB -->
+<a href="/w/feed/new" class="kd-fab" aria-label="Send kudos">
+  <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+</a>
+
+<% if (flash_success && flash_success.length) { %>
+  <div class="fixed left-1/2 -translate-x-1/2 bottom-[90px] px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-500 shadow-lg z-50" id="kd-toast"><%= flash_success[0] %></div>
+  <script>setTimeout(()=>{ document.getElementById('kd-toast')?.remove(); }, 2800);</script>
+<% } %>
+
+<script>
+(function () {
+  // ===== Reactions =====
+  window.kdReact = async function (id, rt, btn) {
+    try {
+      const r = await fetch('/w/feed/' + id + '/react', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'type=' + rt + '&_csrf=' + encodeURIComponent(document.querySelector('meta[name="csrf-token"]')?.content || '')
+      });
+      const j = await r.json();
+      if (!j.ok) return;
+      btn.classList.toggle('on', j.added);
+      const countEl = btn.querySelector('[data-count]');
+      if (countEl) countEl.textContent = Math.max(0, parseInt(countEl.textContent, 10) + (j.added ? 1 : -1));
+    } catch (e) {}
+  };
+
+  // ===== Dots menu =====
+  window.kdToggleMenu = function (btn) {
+    var menu = btn.parentElement.querySelector('.kd-menu');
+    var open = menu.classList.contains('open');
+    document.querySelectorAll('.kd-menu.open').forEach(m => m.classList.remove('open'));
+    if (!open) menu.classList.add('open');
+  };
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.kd-action-menu')) document.querySelectorAll('.kd-menu.open').forEach(m => m.classList.remove('open'));
+  });
+
+  // ===== Load more =====
+  const btn = document.getElementById('kd-load-more');
+  if (btn) {
+    btn.addEventListener('click', async function () {
+      btn.disabled = true; btn.textContent = 'Loading…';
+      try {
+        const r = await fetch('/w/feed?filter=<%= filter %>&before=' + btn.dataset.before + '&partial=1', { headers: { 'Accept': 'application/json' } });
+        const j = await r.json();
+        if (!j.ok) throw new Error(j.error || 'failed');
+        document.getElementById('kd-feed').insertAdjacentHTML('beforeend', j.html);
+        if (j.nextBefore) btn.dataset.before = j.nextBefore, btn.disabled = false, btn.textContent = 'Load more';
+        else document.getElementById('kd-load-more-wrap')?.remove();
+      } catch (e) { btn.disabled = false; btn.textContent = 'Load more'; }
+    });
+  }
+})();
+</script>

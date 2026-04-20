@@ -1,0 +1,75 @@
+<%- include('partials/kudos-style') %>
+<%
+  function initials(name) { return (name || '').split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase(); }
+  function timeAgo(ts) {
+    const d = new Date(ts); const diff = Math.max(0, (Date.now() - d.getTime()) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  }
+  // Group comments into root + reply buckets
+  const rootComments = k.comments.filter(c => !c.parent_comment_id);
+  const repliesByParent = {};
+  k.comments.filter(c => c.parent_comment_id).forEach(c => {
+    (repliesByParent[c.parent_comment_id] = repliesByParent[c.parent_comment_id] || []).push(c);
+  });
+%>
+
+<div class="kd-wrap">
+  <a href="/w/feed" class="inline-flex items-center gap-1 text-xs text-white/50 mt-2 mb-1">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    Feed
+  </a>
+
+  <div class="kd-item <%= k.is_leadership ? 'leadership' : '' %>">
+    <div class="kd-top">
+      <div class="kd-avatar"><%= initials(k.sender_name) %></div>
+      <div class="kd-top-meta">
+        <p class="kd-top-line">
+          <strong><%= k.sender_name %></strong> gave kudos to
+          <% (k.recipients || []).forEach(function (r, i) { %><strong><%= r.name %></strong><%= i < k.recipients.length - 1 ? ', ' : '' %><% }); %>
+        </p>
+        <p class="kd-top-time"><%= timeAgo(k.created_at) %></p>
+      </div>
+    </div>
+    <% if (k.value_name) { %>
+      <span class="kd-value" style="background: <%= k.value_colour %>20; color: <%= k.value_colour %>;">★ <%= k.value_name %></span>
+    <% } %>
+    <p class="kd-msg"><%= k.message %></p>
+    <% if (k.photo_url) { %><div class="kd-photo"><img src="<%= k.photo_url %>" alt=""></div><% } %>
+
+    <div class="kd-comments">
+      <p style="font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.07em;">Comments (<%= k.comments.length %>)</p>
+      <% if (rootComments.length === 0) { %>
+        <p style="font-size: 0.78rem; color: rgba(255,255,255,0.4); margin-top: 8px;">Be the first to comment.</p>
+      <% } %>
+      <% rootComments.forEach(function (c) { %>
+        <div class="kd-comment">
+          <div class="kd-avatar sm"><%= initials(c.author_name) %></div>
+          <div class="kd-comment-body">
+            <p class="kd-comment-name"><%= c.author_name %></p>
+            <p class="kd-comment-msg"><%= c.message %></p>
+            <p class="kd-comment-when"><%= timeAgo(c.created_at) %></p>
+          </div>
+        </div>
+        <% (repliesByParent[c.id] || []).forEach(function (r) { %>
+          <div class="kd-comment kd-reply">
+            <div class="kd-avatar sm"><%= initials(r.author_name) %></div>
+            <div class="kd-comment-body">
+              <p class="kd-comment-name"><%= r.author_name %></p>
+              <p class="kd-comment-msg"><%= r.message %></p>
+              <p class="kd-comment-when"><%= timeAgo(r.created_at) %></p>
+            </div>
+          </div>
+        <% }) %>
+      <% }) %>
+
+      <form method="POST" action="/w/feed/<%= k.id %>/comment" class="kd-comment-form">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <input type="text" name="message" class="kd-comment-input" placeholder="Write a comment…" maxlength="280" required>
+        <button type="submit" class="kd-comment-submit">Post</button>
+      </form>
+    </div>
+  </div>
+</div>

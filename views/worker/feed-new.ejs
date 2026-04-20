@@ -1,0 +1,172 @@
+<%- include('partials/kudos-style') %>
+
+<div class="kd-wrap">
+  <a href="/w/feed" class="inline-flex items-center gap-1 text-xs text-white/50 mt-2 mb-1 hover:text-white">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    Feed
+  </a>
+
+  <div style="padding: 1.1rem; border-radius: 16px; background: linear-gradient(160deg, rgba(245,158,11,0.15), rgba(236,72,153,0.1)); border: 1px solid rgba(245,158,11,0.25); text-align: center;">
+    <div style="width: 48px; height: 48px; border-radius: 14px; margin: 0 auto; background: linear-gradient(135deg, #F59E0B, #EC4899); display: flex; align-items: center; justify-content: center;">
+      <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+    </div>
+    <h1 style="font-size: 1.2rem; font-weight: 800; color: #fff; margin-top: 0.5rem;">Send kudos</h1>
+    <p style="font-size: 0.75rem; color: rgba(255,255,255,0.6); margin-top: 2px;">Recognise a teammate who's crushing it.</p>
+  </div>
+
+  <form method="POST" action="/w/feed/send" enctype="multipart/form-data" style="margin-top: 0.75rem;" id="kd-form">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+
+    <!-- Recipient search -->
+    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 1rem; margin-bottom: 0.75rem;">
+      <p style="font-size: 0.68rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Who are you recognising?</p>
+      <div id="kd-recipient-chips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; min-height: 0;"></div>
+      <input type="text" id="kd-search" placeholder="Search crew by name or ID…" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 0.6rem 0.75rem; color: #fff; font-size: 0.875rem;">
+      <ul id="kd-search-results" style="list-style: none; margin-top: 6px; max-height: 200px; overflow-y: auto; display: none; background: rgba(255,255,255,0.04); border-radius: 10px;"></ul>
+    </div>
+
+    <!-- Value tag -->
+    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 1rem; margin-bottom: 0.75rem;">
+      <p style="font-size: 0.68rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">Company value</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <% values.forEach(function (v) { %>
+          <label style="cursor: pointer;">
+            <input type="radio" name="value_id" value="<%= v.id %>" style="display: none;" class="kd-val">
+            <span data-colour="<%= v.colour %>" style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; background: <%= v.colour %>20; color: <%= v.colour %>; border: 1.5px solid transparent; transition: all 0.15s;">★ <%= v.name %></span>
+          </label>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- Message -->
+    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 1rem; margin-bottom: 0.75rem;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+        <p style="font-size: 0.68rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Your message</p>
+        <p style="font-size: 0.7rem; color: rgba(255,255,255,0.4);"><span id="kd-char-count">0</span>/280</p>
+      </div>
+      <textarea name="message" id="kd-message" required maxlength="280" placeholder="What did they do well?" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 0.6rem 0.75rem; color: #fff; font-size: 0.875rem; min-height: 90px; resize: vertical;"></textarea>
+      <button type="button" id="kd-voice" style="margin-top: 6px; font-size: 0.72rem; font-weight: 600; color: #60A5FA; padding: 4px 8px;">🎤 Voice-to-text</button>
+      <label style="display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 0.72rem; color: rgba(255,255,255,0.55); display: none;" id="kd-profanity-wrap">
+        <input type="checkbox" name="allow_profanity" value="1" id="kd-profanity">
+        <span>Send anyway (includes filtered language)</span>
+      </label>
+    </div>
+
+    <!-- Photo -->
+    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 1rem; margin-bottom: 0.75rem;">
+      <p style="font-size: 0.68rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Photo (optional)</p>
+      <input type="file" name="photo" accept="image/*" style="color: rgba(255,255,255,0.7); font-size: 0.8rem;">
+    </div>
+
+    <!-- Visibility -->
+    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 1rem; margin-bottom: 0.75rem;">
+      <p style="font-size: 0.68rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">Who can see this?</p>
+      <div style="display: flex; gap: 6px;">
+        <% [['public','Everyone','🌏'],['team','My team','👥'],['private','Private','🔒']].forEach(function (opt) { %>
+          <label style="flex: 1; cursor: pointer;">
+            <input type="radio" name="visibility" value="<%= opt[0] %>" <%= opt[0] === 'public' ? 'checked' : '' %> style="display: none;" class="kd-vis">
+            <span style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.1);">
+              <span style="font-size: 1.3rem;"><%= opt[2] %></span>
+              <%= opt[1] %>
+            </span>
+          </label>
+        <% }) %>
+      </div>
+    </div>
+
+    <button type="submit" id="kd-submit" style="width: 100%; padding: 0.8rem; background: linear-gradient(135deg, #F59E0B, #EC4899); color: #fff; font-weight: 800; font-size: 0.9rem; border-radius: 12px; box-shadow: 0 6px 18px rgba(245,158,11,0.3);">Send kudos ✨</button>
+  </form>
+
+  <% if (flash_error && flash_error.length) { %>
+    <p style="margin-top: 10px; padding: 10px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); border-radius: 10px; color: #FCA5A5; font-size: 0.78rem; text-align: center;"><%= flash_error[0] %></p>
+  <% } %>
+</div>
+
+<script>
+(function () {
+  var crew = <%- JSON.stringify(crew) %>;
+  var selected = new Map();
+
+  var chips = document.getElementById('kd-recipient-chips');
+  var search = document.getElementById('kd-search');
+  var results = document.getElementById('kd-search-results');
+
+  function renderChips() {
+    chips.innerHTML = '';
+    selected.forEach(function (c, id) {
+      var s = document.createElement('span');
+      s.style.cssText = 'display:inline-flex; align-items:center; gap:4px; padding:4px 8px 4px 10px; background:rgba(43,127,255,0.2); color:#93C5FD; border-radius:999px; font-size:0.75rem; font-weight:700;';
+      s.innerHTML = c.full_name + ' <button type="button" style="color:inherit; opacity:0.7; margin-left:2px;" onclick="kdRemove(' + id + ')">×</button>' +
+        '<input type="hidden" name="recipient_crew_id" value="' + id + '">';
+      chips.appendChild(s);
+    });
+  }
+  window.kdRemove = function (id) { selected.delete(id); renderChips(); };
+
+  search.addEventListener('input', function () {
+    var q = search.value.trim().toLowerCase();
+    if (!q) { results.style.display = 'none'; return; }
+    var matches = crew.filter(function (c) {
+      return !selected.has(c.id) && (c.full_name.toLowerCase().includes(q) || (c.employee_id || '').toLowerCase().includes(q));
+    }).slice(0, 6);
+    if (!matches.length) { results.style.display = 'none'; return; }
+    results.innerHTML = matches.map(function (c) {
+      return '<li style="padding:8px 10px; font-size:0.82rem; color:#fff; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.04);" onclick="kdPick(' + c.id + ', ' + JSON.stringify(c.full_name).replace(/\"/g, '&quot;') + ')">' +
+        c.full_name + ' <span style="color:rgba(255,255,255,0.4); font-size:0.7rem;">' + (c.employee_id || '') + '</span></li>';
+    }).join('');
+    results.style.display = 'block';
+  });
+  window.kdPick = function (id, name) {
+    selected.set(id, { full_name: name });
+    search.value = ''; results.style.display = 'none'; renderChips();
+  };
+
+  // Value pill highlight
+  document.querySelectorAll('.kd-val').forEach(function (r) {
+    r.addEventListener('change', function () {
+      document.querySelectorAll('.kd-val + span').forEach(function (s) { s.style.borderColor = 'transparent'; });
+      var span = r.nextElementSibling;
+      span.style.borderColor = span.dataset.colour;
+    });
+  });
+  // Visibility pill highlight
+  document.querySelectorAll('.kd-vis').forEach(function (r) {
+    r.addEventListener('change', function () {
+      document.querySelectorAll('.kd-vis + span').forEach(function (s) { s.style.borderColor = 'rgba(255,255,255,0.1)'; s.style.color = 'rgba(255,255,255,0.7)'; });
+      var span = r.nextElementSibling;
+      span.style.borderColor = '#2B7FFF'; span.style.color = '#fff';
+    });
+    if (r.checked) r.dispatchEvent(new Event('change'));
+  });
+
+  // Char counter + profanity warning
+  var msg = document.getElementById('kd-message');
+  var counter = document.getElementById('kd-char-count');
+  var profanityWrap = document.getElementById('kd-profanity-wrap');
+  var BAD = ['fuck','shit','bitch','asshole','bastard','cunt','dickhead','wanker','retard','slut','whore'];
+  msg.addEventListener('input', function () {
+    counter.textContent = msg.value.length;
+    var lower = msg.value.toLowerCase();
+    var hit = BAD.some(function (w) { return new RegExp('\\b' + w + '\\b', 'i').test(lower); });
+    profanityWrap.style.display = hit ? 'flex' : 'none';
+  });
+
+  // Voice to text
+  var voiceBtn = document.getElementById('kd-voice');
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SR) {
+    var rec = new SR(); rec.lang = 'en-AU'; rec.interimResults = false;
+    rec.onresult = function (e) {
+      var text = e.results[0][0].transcript;
+      msg.value = (msg.value ? msg.value + ' ' : '') + text;
+      msg.dispatchEvent(new Event('input'));
+    };
+    voiceBtn.addEventListener('click', function () { try { rec.start(); } catch (e) {} });
+  } else { voiceBtn.style.display = 'none'; }
+
+  // Block submit without recipient
+  document.getElementById('kd-form').addEventListener('submit', function (e) {
+    if (selected.size === 0) { e.preventDefault(); alert('Pick at least one recipient.'); }
+  });
+})();
+</script>

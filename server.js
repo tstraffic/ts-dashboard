@@ -147,6 +147,7 @@ app.use('/w', requireWorker, workerLocals, require('./routes/worker/incidents'))
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/dockets'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/hr'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/hr-secure'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/kudos'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/profile'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/forms'));
 app.get('/w/more', requireWorker, workerLocals, (req, res) => {
@@ -209,6 +210,7 @@ app.use('/reports', requireLogin, requirePermission('reports'), require('./route
 app.use('/defects', requireLogin, requirePermission('defects'), require('./routes/defects'));
 app.use('/hr', requireLogin, require('./routes/hr-secure'));
 app.use('/hr', requireLogin, require('./routes/hr'));
+app.use('/kudos-admin', requireLogin, require('./routes/kudos-admin'));
 app.use('/crm', requireLogin, requirePermission('crm'), require('./routes/crm'));
 app.use('/opportunities', requireLogin, requirePermission('crm'), require('./routes/opportunities'));
 app.use('/chat', requireLogin, require('./routes/chat'));
