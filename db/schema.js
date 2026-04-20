@@ -5040,6 +5040,60 @@ function runMigrations(db) {
     console.log('Migration 113 applied');
   }
 
+  // Migration 115: Add 'hr' to tasks.division CHECK constraint
+  if (!isMigrationApplied.get(115)) {
+    console.log('Running migration 115: Add hr to tasks.division CHECK');
+    const tableSQL = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get();
+    const currentSQL = tableSQL ? tableSQL.sql : '';
+    if (!currentSQL.includes("'hr'")) {
+      const existingCols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
+      const targetCols = ['id','job_id','division','title','description','owner_id','due_date','status','priority','escalation_level','task_type','notes','completed_date','created_at','updated_at','created_by','compliance_id'];
+      const commonCols = targetCols.filter(c => existingCols.includes(c));
+      const colList = commonCols.join(', ');
+      try {
+        db.exec('BEGIN TRANSACTION');
+        db.exec(`
+          CREATE TABLE tasks_rebuild_115 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+            division TEXT NOT NULL DEFAULT 'ops' CHECK(division IN ('ops','planning','finance','admin','marketing','accounts','management','hr')),
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            owner_id INTEGER REFERENCES users(id),
+            due_date DATE,
+            status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','in_progress','blocked','complete')),
+            priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('high','medium','low')),
+            escalation_level INTEGER NOT NULL DEFAULT 0,
+            task_type TEXT DEFAULT 'one_off',
+            notes TEXT DEFAULT '',
+            completed_date DATE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            created_by INTEGER REFERENCES users(id),
+            compliance_id INTEGER REFERENCES compliance(id) ON DELETE SET NULL
+          )
+        `);
+        db.exec(`INSERT INTO tasks_rebuild_115 (${colList}) SELECT ${colList} FROM tasks`);
+        db.exec('DROP TABLE tasks');
+        db.exec('ALTER TABLE tasks_rebuild_115 RENAME TO tasks');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_job ON tasks(job_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_id)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date)');
+        db.exec('COMMIT');
+        console.log('Migration 115: tasks table rebuilt with hr division.');
+      } catch (e) {
+        try { db.exec('ROLLBACK'); } catch (r) {}
+        console.error('Migration 115 FAILED:', e.message);
+        throw new Error('Migration 115 failed: ' + e.message);
+      }
+    } else {
+      console.log('Migration 115: hr already in CHECK, skipping.');
+    }
+    recordMigration.run(115, 'Add hr to tasks.division CHECK constraint');
+    console.log('Migration 115 complete.');
+  }
+
   // Migration 114: Seed test dummy worker account for Worker Portal Preview
   if (!isMigrationApplied.get(114)) {
     try {
