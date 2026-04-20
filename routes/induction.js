@@ -177,6 +177,28 @@ function handleSubmission(req, res) {
         throw new Error('induction_submissions table not found — migrations may not have run');
       }
 
+      // Signature + consent
+      let signatureUrl = '';
+      try {
+        const sigDataUrl = b.signature_data || '';
+        if (/^data:image\/(png|jpeg);base64,/.test(sigDataUrl)) {
+          const sigDir = path.join(__dirname, '..', 'data', 'uploads', 'inductions', 'signatures');
+          fs.mkdirSync(sigDir, { recursive: true });
+          const fname = `signature_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`;
+          const base64 = sigDataUrl.split(',')[1];
+          fs.writeFileSync(path.join(sigDir, fname), Buffer.from(base64, 'base64'));
+          signatureUrl = `/data/uploads/inductions/signatures/${fname}`;
+        }
+      } catch (e) { console.error('Signature save failed:', e.message); }
+      const consentAck = (b.consent_ack === 'on' || b.consent_ack === '1' || b.consent_ack === true);
+      const consentFullName = (b.consent_full_name || '').trim();
+      const nowIso = new Date().toISOString();
+
+      if (!signatureUrl || !consentAck || !consentFullName) {
+        if (wantsJSON) return res.status(400).json({ ok: false, error: 'Please sign the induction agreement, type your full name and tick the acknowledgement.' });
+        return res.status(400).send('Please sign the induction agreement, type your full name and tick the acknowledgement.');
+      }
+
       // All possible column→value mappings
       const allFields = {
         access_token: accessToken,
@@ -225,7 +247,12 @@ function handleSubmission(req, res) {
         emergency_contact_relationship: b.emergency_contact_relationship || '',
         company_intro_completed: (b.company_intro_completed === 'on' || b.company_intro_completed === '1') ? 1 : 0,
         ppe_acknowledged: (b.ppe_acknowledged === 'on' || b.ppe_acknowledged === '1') ? 1 : 0,
-        submitted_at: new Date().toISOString(),
+        submitted_at: nowIso,
+        signature_url: signatureUrl,
+        consent_signed_at: nowIso,
+        consent_full_name: consentFullName,
+        consent_version: 'induction-consent-v1',
+        signed_ip: (req.ip || req.connection?.remoteAddress || '').toString().slice(0, 45),
       };
 
       // Build named params — only for columns that exist in the table

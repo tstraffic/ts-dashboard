@@ -5133,6 +5133,18 @@ function runMigrations(db) {
     console.log('Migration 116 applied: shift_period on employee_leave');
   }
 
+  // Migration 120: Induction signature — consent block + signed PDF
+  if (!isMigrationApplied.get(120)) {
+    try { db.exec("ALTER TABLE induction_submissions ADD COLUMN signature_url TEXT DEFAULT ''"); } catch (e) {}
+    try { db.exec("ALTER TABLE induction_submissions ADD COLUMN consent_signed_at DATETIME"); } catch (e) {}
+    try { db.exec("ALTER TABLE induction_submissions ADD COLUMN consent_full_name TEXT DEFAULT ''"); } catch (e) {}
+    try { db.exec("ALTER TABLE induction_submissions ADD COLUMN consent_version TEXT DEFAULT ''"); } catch (e) {}
+    try { db.exec("ALTER TABLE induction_submissions ADD COLUMN signed_pdf_url TEXT DEFAULT ''"); } catch (e) {}
+    try { db.exec("ALTER TABLE induction_submissions ADD COLUMN signed_ip TEXT DEFAULT ''"); } catch (e) {}
+    recordMigration.run(120, 'Induction signature + signed PDF columns');
+    console.log('Migration 120 applied: induction signature columns');
+  }
+
   // Migration 119: Expand activity_log CHECK to include 'view'
   if (!isMigrationApplied.get(119)) {
     try {

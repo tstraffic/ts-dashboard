@@ -35,8 +35,8 @@
   <!-- Progress Stepper -->
   <div class="max-w-2xl mx-auto px-4 pt-6 pb-2">
     <div class="flex items-center justify-between" id="stepper">
-      <% const stepLabels = ['About T&S','Details','Fitness','Licences','Employment','PPE']; %>
-      <% for (let i = 0; i < 6; i++) { %>
+      <% const stepLabels = ['About T&S','Details','Fitness','Licences','Employment','PPE','Sign']; %>
+      <% for (let i = 0; i < 7; i++) { %>
         <div class="flex flex-col items-center flex-1 step-indicator" data-step="<%= i + 1 %>">
           <div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300
             <%= i === 0 ? 'bg-brand-500 text-white border-brand-500' : 'bg-white text-gray-400 border-gray-300' %>"
@@ -46,7 +46,7 @@
           </div>
           <span class="text-[10px] mt-1 text-center leading-tight font-medium text-gray-400" id="stepLabel<%= i + 1 %>"><%= stepLabels[i] %></span>
         </div>
-        <% if (i < 5) { %>
+        <% if (i < 6) { %>
           <div class="flex-1 h-0.5 bg-gray-200 mx-1 mt-[-12px] transition-all duration-300" id="stepLine<%= i + 1 %>"></div>
         <% } %>
       <% } %>
@@ -693,8 +693,70 @@
             <button type="button" onclick="goToStep(5)" style="background:#fff;color:#374151;border:1px solid #d1d5db;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:bg-gray-50">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Previous
             </button>
+            <button type="button" onclick="goToStep(7)" style="background:#2B7FFF;color:#fff;border:1px solid #1D6AE5;" class="flex items-center gap-2 font-bold rounded-xl px-6 py-3.5 text-sm transition shadow-md hover:opacity-90">
+              Next: Sign
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 7: Sign & Consent ===================== -->
+      <div class="step-panel hidden" id="step7">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#2B7FFF,#00D2BE);">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+            </div>
+            <div>
+              <h2 class="text-xl font-bold text-gray-900">Sign & Submit</h2>
+              <p class="text-sm text-gray-500">Read and sign to complete your induction.</p>
+            </div>
+          </div>
+
+          <!-- Consent block (scrollable) -->
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 max-h-56 overflow-y-auto text-[12.5px] leading-relaxed text-gray-700 space-y-2" id="consentText">
+            <p class="font-bold text-gray-900">T&S Traffic Control — Induction, Conduct & Privacy Agreement</p>
+            <p><strong>1. Accurate information.</strong> I declare that the personal details, tax/identification numbers, qualifications and bank account information I have provided are true, current and belong to me.</p>
+            <p><strong>2. Work health &amp; safety.</strong> I have read the PPE and workplace conduct expectations. I will comply with all T&amp;S Traffic Control policies, supervisor directions, relevant Australian work-health-and-safety laws, SafeWork NSW codes of practice and any client site rules.</p>
+            <p><strong>3. Fit for work.</strong> I acknowledge that T&amp;S operates a zero-tolerance drug &amp; alcohol policy. I consent to being subject to random testing. A positive result or refusal to test will result in immediate removal from site and may end my engagement.</p>
+            <p><strong>4. Confidentiality.</strong> I will keep confidential any client information, site plans, pricing, incident records and employee details that I learn through my work. This obligation continues after my engagement ends.</p>
+            <p><strong>5. Privacy consent.</strong> I consent to T&amp;S collecting, holding, using and disclosing the personal information on this form (including tax file number / ABN and bank details) for payroll, compliance, insurance and workforce-management purposes under the Privacy Act 1988 (Cth).</p>
+            <p><strong>6. Electronic signature.</strong> I agree that the signature I apply below, together with my typed full name, is my legally binding electronic signature under the Electronic Transactions Act 1999 (Cth) and is equivalent to a handwritten signature.</p>
+            <p><strong>7. Acknowledgement.</strong> I understand that providing false or misleading information is a serious offence and may result in termination of engagement and, where applicable, penalties under the Taxation Administration Act 1953.</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Full legal name (as it appears on your ID)</label>
+            <input type="text" id="consent_full_name" name="consent_full_name" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Type your full name" autocomplete="off" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Signature</label>
+            <div class="relative rounded-xl border border-gray-300 bg-white overflow-hidden" style="background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 23px, rgba(0,0,0,0.04) 23px, rgba(0,0,0,0.04) 24px);">
+              <canvas id="induction-sig" class="block w-full touch-none" style="height: 170px; display:block;"></canvas>
+              <span id="induction-sig-placeholder" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">Sign here with your finger or stylus</span>
+              <div class="flex items-center justify-between px-3 py-2 bg-gray-50 border-t border-gray-200">
+                <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Signed on <span id="sig-date"></span></span>
+                <button type="button" id="induction-sig-clear" class="text-xs font-semibold text-gray-500 hover:text-gray-700">Clear</button>
+              </div>
+            </div>
+            <input type="hidden" name="signature_data" id="signature_data">
+            <p id="sigError" class="hidden text-red-500 text-xs font-medium mt-1">Please sign above to continue.</p>
+          </div>
+
+          <label class="flex items-start gap-3 bg-emerald-50 rounded-xl p-4 cursor-pointer border border-emerald-200 hover:border-emerald-300 transition">
+            <input type="checkbox" id="consent_ack" name="consent_ack" value="on" required class="w-5 h-5 rounded text-emerald-500 focus:ring-emerald-500 mt-0.5" />
+            <span class="text-sm font-medium text-gray-700">I have read the induction, conduct &amp; privacy agreement above and the information I have provided is true and accurate.</span>
+          </label>
+          <div id="consentError" class="hidden text-red-500 text-xs font-medium -mt-3">You must acknowledge the agreement to submit.</div>
+
+          <div class="pt-2 flex justify-between">
+            <button type="button" onclick="goToStep(6)" style="background:#fff;color:#374151;border:1px solid #d1d5db;" class="flex items-center gap-2 font-semibold rounded-xl px-6 py-3.5 text-sm transition shadow-sm hover:bg-gray-50">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Previous
+            </button>
             <button type="submit" id="submitBtn" style="background:#10b981;color:#fff;border:1px solid #059669;" class="flex items-center gap-2 font-bold rounded-xl px-8 py-3.5 text-sm transition shadow-md hover:opacity-90">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Submit Application
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Sign &amp; Submit
             </button>
           </div>
         </div>
@@ -770,7 +832,7 @@
       document.getElementById('step' + currentStep).classList.remove('step-fade-enter');
 
       // update stepper UI
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= 7; i++) {
         const circle = document.getElementById('stepCircle' + i);
         const num = document.getElementById('stepNum' + i);
         const check = document.getElementById('stepCheck' + i);
@@ -798,7 +860,7 @@
           label.classList.add('text-gray-400');
         }
 
-        if (i < 6) {
+        if (i < 7) {
           const line = document.getElementById('stepLine' + i);
           line.className = i < step
             ? 'flex-1 h-0.5 mx-1 mt-[-12px] transition-all duration-300 bg-emerald-500'
@@ -948,6 +1010,47 @@
       });
     }
 
+    /* ───── Signature canvas for step 7 ───── */
+    (function () {
+      var c = document.getElementById('induction-sig');
+      if (!c) return;
+      var ctx = c.getContext('2d');
+      var placeholder = document.getElementById('induction-sig-placeholder');
+      var dateSpan = document.getElementById('sig-date');
+      if (dateSpan) dateSpan.textContent = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+      function sizeCanvas() {
+        var dpr = window.devicePixelRatio || 1;
+        var r = c.getBoundingClientRect();
+        c.width = r.width * dpr;
+        c.height = r.height * dpr;
+        ctx.scale(dpr, dpr);
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#1D4ED8';
+      }
+      sizeCanvas();
+      window.addEventListener('resize', sizeCanvas);
+      var drawing = false, last = null;
+      window.__indHasInk = false;
+      function pt(e) {
+        var r = c.getBoundingClientRect();
+        var t = e.touches ? e.touches[0] : e;
+        return { x: t.clientX - r.left, y: t.clientY - r.top };
+      }
+      function start(e) { drawing = true; last = pt(e); if (placeholder) placeholder.style.display = 'none'; e.preventDefault(); }
+      function move(e) { if (!drawing) return; var p = pt(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; window.__indHasInk = true; e.preventDefault(); }
+      function end() { drawing = false; last = null; }
+      c.addEventListener('mousedown', start); c.addEventListener('mousemove', move);
+      c.addEventListener('mouseup', end); c.addEventListener('mouseleave', end);
+      c.addEventListener('touchstart', start, { passive: false }); c.addEventListener('touchmove', move, { passive: false }); c.addEventListener('touchend', end);
+      document.getElementById('induction-sig-clear').addEventListener('click', function () {
+        ctx.clearRect(0, 0, c.width, c.height);
+        window.__indHasInk = false;
+        if (placeholder) placeholder.style.display = '';
+      });
+      window.__indGetSignatureDataUrl = function () { return window.__indHasInk ? c.toDataURL('image/png') : ''; };
+    })();
+
     /* ───── Form submit via fetch with image compression ───── */
     document.getElementById('inductionForm').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -956,12 +1059,43 @@
       var ppe = document.getElementById('ppeAcknowledge');
       var ppeErr = document.getElementById('ppeError');
       if (!ppe.checked) {
+        goToStep(6);
         ppeErr.classList.remove('hidden');
         ppe.closest('label')?.classList.add('ring-2', 'ring-red-300');
         ppe.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
       ppeErr.classList.add('hidden');
+
+      // Step 7 validation: signature + consent + full name
+      var consentAck = document.getElementById('consent_ack');
+      var consentName = document.getElementById('consent_full_name');
+      var consentErr = document.getElementById('consentError');
+      var sigErr = document.getElementById('sigError');
+      var hasInk = typeof window.__indGetSignatureDataUrl === 'function' && !!window.__indGetSignatureDataUrl();
+      var nameOk = consentName && consentName.value.trim().length >= 2;
+      if (!nameOk) {
+        consentName.classList.add('ring-2', 'ring-red-300');
+        consentName.focus();
+        return;
+      } else {
+        consentName.classList.remove('ring-2', 'ring-red-300');
+      }
+      if (!hasInk) {
+        sigErr.classList.remove('hidden');
+        document.getElementById('induction-sig').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      sigErr.classList.add('hidden');
+      if (!consentAck.checked) {
+        consentErr.classList.remove('hidden');
+        consentAck.closest('label')?.classList.add('ring-2', 'ring-red-300');
+        consentAck.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      consentErr.classList.add('hidden');
+      // Stamp signature data into the hidden input before submit
+      document.getElementById('signature_data').value = window.__indGetSignatureDataUrl();
 
       var btn = document.getElementById('submitBtn');
       btn.disabled = true;
