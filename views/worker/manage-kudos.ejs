@@ -1,0 +1,51 @@
+<%- include('partials/manage-style') %>
+
+<div class="mg-wrap">
+  <a href="/w/manage" class="mg-back"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Manage</a>
+
+  <div class="mg-hero">
+    <p class="mg-hero-label">Kudos moderation</p>
+    <h1 class="mg-hero-title"><%= reports.length %> report<%= reports.length === 1 ? '' : 's' %> to review</h1>
+    <p class="mg-hero-sub">Hide inappropriate posts or dismiss false reports.</p>
+  </div>
+
+  <% if (reports.length === 0) { %>
+    <div class="mg-empty" style="margin-top: 12px;">Nothing flagged — all clean.</div>
+  <% } else { %>
+    <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+      <% reports.forEach(function (r) { %>
+        <div class="mg-job-block">
+          <div class="mg-job-head" style="background: rgba(239,68,68,0.08);">
+            <p class="mg-job-client" style="font-size: 0.85rem;">Reported by <%= r.reporter_name %></p>
+            <p class="mg-job-meta">
+              <% if (r.kudos_id) { %>Kudos from <strong style="color: rgba(255,255,255,0.8);"><%= r.sender_name || 'unknown' %></strong><% } else { %>Comment<% } %>
+              · <%= new Date(r.created_at).toLocaleString('en-AU') %>
+              <% if (r.hidden_at) { %> · <span style="color: #F87171;">Already hidden</span><% } %>
+            </p>
+          </div>
+          <div style="padding: 12px 14px;">
+            <% if (r.kudos_message) { %>
+              <p style="font-size: 0.82rem; color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.04); border-left: 3px solid rgba(239,68,68,0.4); padding: 8px 10px; border-radius: 0 8px 8px 0; font-style: italic;">"<%= r.kudos_message %>"</p>
+            <% } %>
+            <% if (r.reason) { %><p style="font-size: 0.75rem; color: rgba(255,255,255,0.55); margin-top: 6px;">Reason: <%= r.reason %></p><% } %>
+            <div style="display: flex; gap: 6px; margin-top: 12px;">
+              <form method="POST" action="/w/manage/kudos/<%= r.id %>/hide" style="flex: 1;">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <button type="submit" class="mg-btn-danger" style="width: 100%;">Hide</button>
+              </form>
+              <form method="POST" action="/w/manage/kudos/<%= r.id %>/dismiss" style="flex: 1;">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <button type="submit" class="mg-btn-ghost" style="width: 100%;">Dismiss</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<% if (flash_success && flash_success.length) { %>
+  <div class="fixed left-1/2 -translate-x-1/2 bottom-[90px] px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-500 shadow-lg z-50" id="mg-toast"><%= flash_success[0] %></div>
+  <script>setTimeout(()=>document.getElementById('mg-toast')?.remove(), 2800);</script>
+<% } %>

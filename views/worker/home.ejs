@@ -22,8 +22,8 @@
     return d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
   }
 
-  // Default section order
-  const defaultOrder = ['hero','cards','streaks','weather','week','timeline','compliance','today','actions','upcoming','activity'];
+  // Default section order (manager card is inserted after the hero for managers only)
+  const defaultOrder = ['hero','manager','cards','streaks','weather','week','timeline','compliance','today','actions','upcoming','activity'];
   const hidden = (prefs && prefs.hidden_sections) || [];
   const orderSource = (prefs && prefs.section_order && prefs.section_order.length) ? prefs.section_order : defaultOrder;
   // Preserve any new sections we added after the user saved their prefs
@@ -241,6 +241,20 @@
         <div class="wh-stat-ico"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg></div></div>
     </div>
   </div>
+<% } %>
+
+<% if (section === 'manager' && typeof isManager !== 'undefined' && isManager) { %>
+  <a href="/w/manage" style="display: block; margin-top: 12px; padding: 14px 16px; border-radius: 14px; background: linear-gradient(135deg, rgba(245,158,11,0.18), rgba(236,72,153,0.14)); border: 1px solid rgba(245,158,11,0.3); text-decoration: none; display: flex; align-items: center; gap: 12px;">
+    <div style="width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, #F59E0B, #EC4899); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+      <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+    </div>
+    <div style="flex: 1; min-width: 0;">
+      <p style="font-size: 0.65rem; font-weight: 700; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.08em;">Manager tools</p>
+      <p style="font-size: 0.95rem; font-weight: 800; color: #fff; margin-top: 1px;">Operations overview</p>
+      <p style="font-size: 0.72rem; color: rgba(255,255,255,0.6); margin-top: 1px;">All shifts, leave approvals, moderation</p>
+    </div>
+    <svg style="width: 16px; height: 16px; color: rgba(255,255,255,0.5); flex-shrink: 0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+  </a>
 <% } %>
 
 <% if (section === 'cards' && !hidden.includes('cards') && cards && cards.length > 0) { %>

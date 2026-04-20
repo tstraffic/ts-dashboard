@@ -1,0 +1,50 @@
+<%- include('partials/manage-style') %>
+<%
+  function fmtDate(d) { if (!d) return ''; return new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }); }
+%>
+
+<div class="mg-wrap">
+  <a href="/w/manage" class="mg-back"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Manage</a>
+
+  <div class="mg-hero">
+    <p class="mg-hero-label">Pending leave</p>
+    <h1 class="mg-hero-title"><%= pending.length %> awaiting approval</h1>
+    <p class="mg-hero-sub">Approve or reject straight from the portal. Decisions post to the audit log.</p>
+  </div>
+
+  <% if (pending.length === 0) { %>
+    <div class="mg-empty" style="margin-top: 12px;">All clear — nothing pending.</div>
+  <% } else { %>
+    <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+      <% pending.forEach(function (l) {
+        const period = l.shift_period === 'day' ? '6am–6pm' : l.shift_period === 'night' ? '6pm–6am' : 'Full day';
+      %>
+        <div class="mg-job-block">
+          <div class="mg-job-head" style="background: rgba(245,158,11,0.08);">
+            <p class="mg-job-client"><%= l.crew_name %></p>
+            <p class="mg-job-meta"><%= l.crew_emp_id %> · <%= (l.leave_type || 'annual').charAt(0).toUpperCase() + (l.leave_type || 'annual').slice(1) %> · <%= period %></p>
+          </div>
+          <div style="padding: 12px 14px;">
+            <p style="font-size: 0.85rem; color: #fff;"><%= fmtDate(l.start_date) %><% if (l.start_date !== l.end_date) { %> – <%= fmtDate(l.end_date) %><% } %> <span style="color: rgba(255,255,255,0.4);">(<%= l.total_days %> day<%= l.total_days > 1 ? 's' : '' %>)</span></p>
+            <% if (l.reason) { %><p style="font-size: 0.78rem; color: rgba(255,255,255,0.7); margin-top: 6px; font-style: italic;">"<%= l.reason %>"</p><% } %>
+            <div style="display: flex; gap: 6px; margin-top: 12px;">
+              <form method="POST" action="/w/manage/leave/<%= l.id %>/approve" style="flex: 1;">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <button type="submit" class="mg-btn-primary" style="width: 100%;">✓ Approve</button>
+              </form>
+              <form method="POST" action="/w/manage/leave/<%= l.id %>/reject" style="flex: 1;" onsubmit="return confirm('Reject this leave request?')">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <button type="submit" class="mg-btn-danger" style="width: 100%;">✗ Reject</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<% if (flash_success && flash_success.length) { %>
+  <div class="fixed left-1/2 -translate-x-1/2 bottom-[90px] px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-500 shadow-lg z-50" id="mg-toast"><%= flash_success[0] %></div>
+  <script>setTimeout(()=>document.getElementById('mg-toast')?.remove(), 2800);</script>
+<% } %>

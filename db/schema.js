@@ -5133,6 +5133,52 @@ function runMigrations(db) {
     console.log('Migration 116 applied: shift_period on employee_leave');
   }
 
+  // Migration 123: Manager portal access — is_manager flag + provision rows for known managers
+  if (!isMigrationApplied.get(123)) {
+    try { db.exec("ALTER TABLE crew_members ADD COLUMN is_manager INTEGER NOT NULL DEFAULT 0"); } catch (e) { /* exists */ }
+
+    // Provision a crew_member + employees row for each existing admin-level user so they can sign
+    // into the employee portal. PIN must be set by an admin via the standard /hr/employees/:id flow —
+    // we intentionally don't write a default PIN here (passwords in migrations are a smell).
+    const managers = ['taj', 'saadat', 'suhail.a', 'savanah'];
+    const getUser = db.prepare("SELECT id, full_name, email FROM users WHERE username = ? AND active = 1");
+    const hasCrew = db.prepare("SELECT id FROM crew_members WHERE employee_id = ?");
+    const insCrew = db.prepare(`
+      INSERT INTO crew_members (full_name, employee_id, role, phone, email, company, employment_type, active, status, is_manager)
+      VALUES (?, ?, 'supervisor', '', ?, 'T&S Traffic Control', 'employee', 1, 'active', 1)
+    `);
+    const hasEmp = db.prepare("SELECT id FROM employees WHERE employee_code = ?");
+    const insEmp = db.prepare(`
+      INSERT INTO employees (employee_code, first_name, last_name, full_name, company, employment_type, employment_status, email, active, linked_crew_member_id, linked_user_id, internal_notes, induction_status)
+      VALUES (?, ?, ?, ?, 'T&S Traffic Control', 'full_time', 'active', ?, 1, ?, ?, 'Auto-created manager account', 'completed')
+    `);
+
+    let counter = 1;
+    for (const uname of managers) {
+      try {
+        const u = getUser.get(uname); if (!u) continue;
+        const empId = `MGR-${String(counter).padStart(3, '0')}`;
+        counter++;
+        let crewRow = hasCrew.get(empId);
+        if (!crewRow) {
+          const result = insCrew.run(u.full_name || uname, empId, u.email || '');
+          crewRow = { id: result.lastInsertRowid };
+        } else {
+          db.prepare("UPDATE crew_members SET is_manager = 1 WHERE id = ?").run(crewRow.id);
+        }
+        if (!hasEmp.get(empId)) {
+          const parts = (u.full_name || uname).split(' ');
+          const first = parts[0] || uname;
+          const last = parts.slice(1).join(' ') || '';
+          insEmp.run(empId, first, last, u.full_name || uname, u.email || '', crewRow.id, u.id);
+        }
+      } catch (e) { console.log('Migration 123: skip ' + uname + ': ' + e.message); }
+    }
+
+    recordMigration.run(123, 'Manager portal access — is_manager flag + provision manager crew rows');
+    console.log('Migration 123 applied: manager portal flag + provisioned manager logins');
+  }
+
   // Migration 122: Kudos — peer recognition system
   if (!isMigrationApplied.get(122)) {
     db.exec(`

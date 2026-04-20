@@ -1,0 +1,53 @@
+<style>
+  .mg-wrap { padding: 0.5rem; }
+
+  .mg-hero { padding: 1.1rem 1rem; border-radius: 16px; background: radial-gradient(120% 80% at 0% 0%, rgba(245,158,11,0.25), transparent 55%), linear-gradient(160deg, #1F1430, #0A1628); border: 1px solid rgba(245,158,11,0.18); }
+  .mg-hero-label { font-size: 0.65rem; font-weight: 800; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.1em; }
+  .mg-hero-title { font-size: 1.35rem; font-weight: 800; color: #fff; margin-top: 2px; }
+  .mg-hero-sub { font-size: 0.78rem; color: rgba(255,255,255,0.6); margin-top: 3px; }
+
+  .mg-kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+  .mg-kpi { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 12px; position: relative; }
+  .mg-kpi-label { font-size: 0.625rem; font-weight: 700; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.07em; }
+  .mg-kpi-value { font-size: 1.5rem; font-weight: 800; color: #fff; margin-top: 2px; line-height: 1; }
+  .mg-kpi-sub { font-size: 0.65rem; color: rgba(255,255,255,0.4); margin-top: 4px; }
+  .mg-kpi.warn .mg-kpi-value { color: #FBBF24; }
+  .mg-kpi.danger .mg-kpi-value { color: #F87171; }
+  .mg-kpi.ok .mg-kpi-value { color: #34D399; }
+
+  .mg-section-head { display: flex; align-items: center; justify-content: space-between; margin: 1rem 0 0.5rem; padding: 0 2px; }
+  .mg-section-title { font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.08em; }
+  .mg-section-link { font-size: 0.75rem; font-weight: 600; color: #60A5FA; }
+
+  .mg-list { display: flex; flex-direction: column; gap: 6px; }
+  .mg-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; }
+  .mg-row-body { flex: 1; min-width: 0; }
+  .mg-row-title { font-size: 0.85rem; font-weight: 700; color: #fff; line-height: 1.2; }
+  .mg-row-sub { font-size: 0.7rem; color: rgba(255,255,255,0.55); margin-top: 1px; }
+  .mg-state { font-size: 0.62rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; flex-shrink: 0; }
+  .mg-state.in { background: rgba(16,185,129,0.2); color: #34D399; }
+  .mg-state.out { background: rgba(100,116,139,0.25); color: #CBD5E1; }
+  .mg-state.pending { background: rgba(245,158,11,0.2); color: #FBBF24; }
+  .mg-state.late { background: rgba(239,68,68,0.2); color: #F87171; }
+  .mg-state.scheduled { background: rgba(43,127,255,0.2); color: #93C5FD; }
+
+  .mg-job-block { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; overflow: hidden; margin-bottom: 10px; }
+  .mg-job-head { padding: 10px 14px; background: rgba(43,127,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .mg-job-client { font-size: 0.95rem; font-weight: 800; color: #fff; }
+  .mg-job-meta { font-size: 0.72rem; color: rgba(255,255,255,0.55); margin-top: 1px; }
+
+  .mg-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 7px 12px; background: #10B981; color: #fff; font-weight: 700; font-size: 0.75rem; border-radius: 8px; }
+  .mg-btn-danger { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 7px 12px; background: rgba(239,68,68,0.18); color: #FCA5A5; font-weight: 700; font-size: 0.75rem; border-radius: 8px; border: 1px solid rgba(239,68,68,0.3); }
+  .mg-btn-ghost { display: inline-flex; align-items: center; justify-content: center; padding: 7px 12px; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8); font-weight: 600; font-size: 0.75rem; border-radius: 8px; }
+
+  .mg-empty { text-align: center; padding: 24px 12px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08); border-radius: 12px; color: rgba(255,255,255,0.5); font-size: 0.82rem; }
+
+  .mg-quick-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .mg-quick { display: flex; align-items: center; gap: 10px; padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+  .mg-quick-ic { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .mg-quick-title { font-size: 0.82rem; font-weight: 700; color: #fff; }
+  .mg-quick-sub { font-size: 0.68rem; color: rgba(255,255,255,0.5); margin-top: 1px; }
+
+  .mg-back { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; color: rgba(255,255,255,0.55); margin: 0.5rem 0 0.25rem; font-weight: 500; }
+  .mg-back:hover { color: #fff; }
+</style>

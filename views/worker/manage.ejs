@@ -1,0 +1,66 @@
+<%- include('partials/manage-style') %>
+<%
+  function fmtTime(t) { if (!t) return ''; const p = String(t).split(':'); let h = parseInt(p[0],10); const m = p[1]||'00'; const am = h<12; h = h%12||12; return h+(m==='00'?'':':'+m)+(am?'am':'pm'); }
+%>
+
+<div class="mg-wrap">
+  <div class="mg-hero">
+    <p class="mg-hero-label">Manager view</p>
+    <h1 class="mg-hero-title">Operations overview</h1>
+    <p class="mg-hero-sub"><%= new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' }) %></p>
+
+    <div class="mg-kpis">
+      <div class="mg-kpi"><p class="mg-kpi-label">Crew on today</p><p class="mg-kpi-value"><%= kpis.activeCrew %></p><p class="mg-kpi-sub">Allocated across jobs</p></div>
+      <div class="mg-kpi ok"><p class="mg-kpi-label">On site now</p><p class="mg-kpi-value"><%= kpis.clockedIn %></p><p class="mg-kpi-sub">Clocked in</p></div>
+      <div class="mg-kpi warn"><p class="mg-kpi-label">Starting soon</p><p class="mg-kpi-value"><%= kpis.startingSoon %></p><p class="mg-kpi-sub">Next 30 min</p></div>
+      <div class="mg-kpi <%= kpis.late > 0 ? 'danger' : '' %>"><p class="mg-kpi-label">Late / missing</p><p class="mg-kpi-value"><%= kpis.late %></p><p class="mg-kpi-sub">Should be on site</p></div>
+    </div>
+  </div>
+
+  <!-- Quick tiles -->
+  <div class="mg-section-head"><span class="mg-section-title">Manage</span></div>
+  <div class="mg-quick-grid">
+    <a href="/w/manage/shifts" class="mg-quick">
+      <div class="mg-quick-ic" style="background: rgba(43,127,255,0.15); color: #60A5FA;"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+      <div><p class="mg-quick-title">All shifts today</p><p class="mg-quick-sub">Board by site</p></div>
+    </a>
+    <a href="/w/manage/leave" class="mg-quick">
+      <div class="mg-quick-ic" style="background: rgba(245,158,11,0.15); color: #F59E0B;"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg></div>
+      <div><p class="mg-quick-title">Leave approvals</p><p class="mg-quick-sub"><%= kpis.pendingLeave %> pending</p></div>
+    </a>
+    <a href="/w/manage/kudos" class="mg-quick">
+      <div class="mg-quick-ic" style="background: rgba(236,72,153,0.15); color: #F472B6;"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.6.6-5 4.5 1.5 6.8L12 17l-6 3.2 1.5-6.8-5-4.5 6.6-.6L12 2z"/></svg></div>
+      <div><p class="mg-quick-title">Kudos reports</p><p class="mg-quick-sub"><%= kpis.pendingReports %> to review</p></div>
+    </a>
+    <a href="/w/incidents" class="mg-quick">
+      <div class="mg-quick-ic" style="background: rgba(239,68,68,0.15); color: #F87171;"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg></div>
+      <div><p class="mg-quick-title">Open incidents</p><p class="mg-quick-sub"><%= kpis.openIncidents %> open</p></div>
+    </a>
+  </div>
+
+  <!-- Today's shifts -->
+  <div class="mg-section-head"><span class="mg-section-title">Today at a glance</span><a href="/w/manage/shifts" class="mg-section-link">View all ›</a></div>
+  <% if (shifts.length === 0) { %>
+    <div class="mg-empty">No crew allocated today.</div>
+  <% } else { %>
+    <div class="mg-list">
+      <% shifts.slice(0, 8).forEach(function (s) { %>
+        <div class="mg-row">
+          <div class="mg-row-body">
+            <p class="mg-row-title"><%= s.crew_name %></p>
+            <p class="mg-row-sub"><%= s.client %><% if (s.suburb) { %> · <%= s.suburb %><% } %> · <%= fmtTime(s.start_time) %>–<%= fmtTime(s.end_time) %></p>
+          </div>
+          <span class="mg-state <%= s.clockState %>"><%= s.clockState === 'in' ? 'On site' : s.clockState === 'out' ? 'Off' : s.clockState === 'late' ? 'Late' : s.clockState === 'pending' ? 'Starting' : 'Scheduled' %></span>
+        </div>
+      <% }); %>
+      <% if (shifts.length > 8) { %>
+        <a href="/w/manage/shifts" class="mg-row" style="justify-content: center; color: #60A5FA; font-weight: 600; font-size: 0.8rem;">+ <%= shifts.length - 8 %> more shifts →</a>
+      <% } %>
+    </div>
+  <% } %>
+</div>
+
+<% if (flash_success && flash_success.length) { %>
+  <div class="fixed left-1/2 -translate-x-1/2 bottom-[90px] px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-500 shadow-lg z-50" id="mg-toast"><%= flash_success[0] %></div>
+  <script>setTimeout(()=>document.getElementById('mg-toast')?.remove(), 2800);</script>
+<% } %>

@@ -803,6 +803,24 @@ router.post('/employees/:id/clear-pin', requirePermission('hr_employees'), (req,
   res.redirect(`/hr/employees/${employee.id}#workforce`);
 });
 
+// POST /employees/:id/toggle-manager — Grant or revoke manager portal access
+router.post('/employees/:id/toggle-manager', requirePermission('hr_employees'), (req, res) => {
+  const data = loadEmployeeWithCrew(req, res, { autoCreate: true });
+  if (!data) return res.redirect(`/hr/employees/${req.params.id}#workforce`);
+  const { employee, crewMember } = data;
+
+  const enable = req.body.enable === '1';
+  getDb().prepare('UPDATE crew_members SET is_manager = ? WHERE id = ?').run(enable ? 1 : 0, crewMember.id);
+  logActivity({
+    user: req.session.user, action: 'update', entityType: 'crew_member',
+    entityId: crewMember.id, entityLabel: crewMember.full_name,
+    details: enable ? 'Granted manager portal access' : 'Revoked manager portal access',
+    ip: req.ip,
+  });
+  req.flash('success', enable ? `${crewMember.full_name} is now a manager in the portal.` : `Manager access removed for ${crewMember.full_name}.`);
+  res.redirect(`/hr/employees/${employee.id}#workforce`);
+});
+
 // POST /employees/:id/send-invite — Send email invitation for worker portal
 router.post('/employees/:id/send-invite', requirePermission('hr_employees'), async (req, res) => {
   const data = loadEmployeeWithCrew(req, res, { autoCreate: true });

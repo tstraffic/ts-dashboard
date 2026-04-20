@@ -802,6 +802,22 @@
                   </form>
                 <% } %>
               </div>
+              <!-- Manager toggle -->
+              <div class="pt-3 mt-3 border-t border-gray-100">
+                <div class="flex items-center justify-between gap-2">
+                  <div>
+                    <p class="text-xs font-semibold text-gray-700">Manager portal access</p>
+                    <p class="text-[11px] text-gray-500 mt-0.5">Unlocks shift board, leave approvals and kudos moderation in the worker portal.</p>
+                  </div>
+                  <form method="POST" action="/hr/employees/<%= employee.id %>/toggle-manager">
+                    <%- include('../partials/csrf') %>
+                    <input type="hidden" name="enable" value="<%= crewMember.is_manager ? '0' : '1' %>">
+                    <button type="submit" class="px-3 py-1.5 <%= crewMember.is_manager ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700' %> text-xs font-semibold rounded-lg transition whitespace-nowrap">
+                      <%= crewMember.is_manager ? '✓ Manager' : 'Grant access' %>
+                    </button>
+                  </form>
+                </div>
+              </div>
             </div>
           <% } %>
         </div>

@@ -9,6 +9,7 @@ const path = require('path');
 const { initializeDatabase } = require('./db/schema');
 const { requireLogin, requirePermission, canAccess } = require('./middleware/auth');
 const { requireWorker, blockWorkerFromAdmin, workerLocals } = require('./middleware/workerAuth');
+const { managerLocals } = require('./middleware/managerAuth');
 const { notificationCountMiddleware, generateNotifications, sendDailyDigests, generateWeeklySummaries } = require('./middleware/notifications');
 const { settingsMiddleware } = require('./middleware/settings');
 const { sidebarBadges } = require('./middleware/sidebarBadges');
@@ -136,6 +137,8 @@ app.post('/w/login', loginLimiter);
 
 // Worker Portal routes (must be BEFORE blockWorkerFromAdmin)
 app.use('/w', require('./routes/worker/auth'));
+// Apply managerLocals once so every /w page has res.locals.isManager available
+app.use('/w', (req, res, next) => { if (req.session && req.session.worker) require('./middleware/managerAuth').managerLocals(req, res, next); else next(); });
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/home'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/jobs'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/clock'));
@@ -147,10 +150,12 @@ app.use('/w', requireWorker, workerLocals, require('./routes/worker/incidents'))
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/dockets'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/hr'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/hr-secure'));
-app.use('/w', requireWorker, workerLocals, require('./routes/worker/kudos'));
+app.use('/w', requireWorker, workerLocals, managerLocals, require('./routes/worker/kudos'));
+app.use('/w', requireWorker, workerLocals, managerLocals, require('./routes/worker/manage'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/profile'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/forms'));
 app.get('/w/more', requireWorker, workerLocals, (req, res) => {
+  res.locals.isManager = require('./middleware/managerAuth').isManager(req.session.worker);
   res.render('worker/more', { title: 'More', currentPage: 'more' });
 });
 

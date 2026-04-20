@@ -1,0 +1,51 @@
+<%- include('partials/manage-style') %>
+<%
+  function fmtTime(t) { if (!t) return ''; const p = String(t).split(':'); let h = parseInt(p[0],10); const m = p[1]||'00'; const am = h<12; h = h%12||12; return h+(m==='00'?'':':'+m)+(am?'am':'pm'); }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const shown = new Date(date + 'T00:00:00');
+  const prev = new Date(shown); prev.setDate(prev.getDate() - 1);
+  const next = new Date(shown); next.setDate(next.getDate() + 1);
+  function iso(d){ return d.toISOString().split('T')[0]; }
+%>
+
+<div class="mg-wrap">
+  <a href="/w/manage" class="mg-back"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Manage</a>
+
+  <div class="mg-hero">
+    <p class="mg-hero-label">Shift board</p>
+    <h1 class="mg-hero-title"><%= shown.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' }) %></h1>
+    <div style="display: flex; gap: 6px; margin-top: 10px;">
+      <a href="?date=<%= iso(prev) %>" class="mg-btn-ghost">← Prev</a>
+      <a href="?date=<%= iso(today) %>" class="mg-btn-ghost">Today</a>
+      <a href="?date=<%= iso(next) %>" class="mg-btn-ghost">Next →</a>
+    </div>
+  </div>
+
+  <% if (jobs.length === 0) { %>
+    <div class="mg-empty" style="margin-top: 12px;">No allocations for this date.</div>
+  <% } %>
+
+  <% jobs.forEach(function (job) { %>
+    <div class="mg-job-block" style="margin-top: 10px;">
+      <div class="mg-job-head">
+        <p class="mg-job-client"><%= job.client %></p>
+        <p class="mg-job-meta">
+          <%= job.job_number %><% if (job.suburb) { %> · <%= job.suburb %><% } %>
+          <% if (job.supervisor) { %> · Supervisor: <%= job.supervisor %><% } %>
+          · <%= job.members.length %> on crew
+        </p>
+      </div>
+      <div class="mg-list" style="padding: 10px;">
+        <% job.members.forEach(function (m) { %>
+          <div class="mg-row">
+            <div class="mg-row-body">
+              <p class="mg-row-title"><%= m.crew_name %> <% if (m.role_on_site) { %><span style="color: rgba(255,255,255,0.4); font-size: 0.7rem; font-weight: 500;"> · <%= m.role_on_site.replace(/_/g, ' ') %></span><% } %></p>
+              <p class="mg-row-sub"><%= fmtTime(m.start_time) %>–<%= fmtTime(m.end_time) %> · <%= m.shift_type || 'day' %> shift · <%= m.clockLabel %></p>
+            </div>
+            <% if (m.crew_phone) { %><a href="tel:<%= m.crew_phone %>" class="mg-btn-ghost" style="font-size: 0.7rem;">Call</a><% } %>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  <% }) %>
+</div>
