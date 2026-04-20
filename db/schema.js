@@ -5133,6 +5133,105 @@ function runMigrations(db) {
     console.log('Migration 116 applied: shift_period on employee_leave');
   }
 
+  // Migration 125: Second-pass merge using first-name prefix match.
+  // Migration 124 only caught exact full_name matches — but users.full_name on prod is
+  // stored as just the first name ("Taj", "Saadat", "Savanah") while the canonical crew
+  // row uses the full legal name ("Taj Rahman", "Saadat Ahmed", etc.). This pass matches
+  // by crew.full_name LIKE '<firstname> %' (prefix + space) and prefers the row with
+  // real shift history.
+  if (!isMigrationApplied.get(125)) {
+    console.log('Migration 125: prefix-match merge for remaining MGR-XXX duplicates');
+    const managerUsers = db.prepare("SELECT id, username, full_name FROM users WHERE username IN ('taj','saadat','suhail.a','savanah')").all();
+
+    const fkTables = [
+      ['crew_allocations', 'crew_member_id'],
+      ['timesheets', 'crew_member_id'],
+      ['clock_events', 'crew_member_id'],
+      ['employee_leave', 'crew_member_id'],
+      ['worker_availability', 'crew_member_id'],
+      ['crew_availability', 'crew_member_id'],
+      ['kudos', 'sender_crew_id'],
+      ['kudos_recipients', 'recipient_crew_id'],
+      ['kudos_reactions', 'crew_member_id'],
+      ['kudos_comments', 'crew_member_id'],
+      ['kudos_reports', 'reporter_crew_id'],
+      ['kudos_blocks', 'blocker_crew_id'],
+      ['kudos_blocks', 'blocked_crew_id'],
+      ['kudos_milestones', 'crew_member_id'],
+      ['leaderboard_optouts', 'crew_member_id'],
+      ['home_cards', 'crew_member_id'],
+      ['home_preferences', 'crew_member_id'],
+      ['streaks', 'crew_member_id'],
+    ];
+
+    for (const u of managerUsers) {
+      try {
+        const mgr = db.prepare(`SELECT * FROM crew_members WHERE employee_id LIKE 'MGR-%' AND LOWER(full_name) = LOWER(?)`).get(u.full_name);
+        if (!mgr) continue;
+
+        // Prefix-match: canonical full_name starts with user's first name + space OR exact match.
+        // Tiebreaker: most activity wins.
+        const candidates = db.prepare(`
+          SELECT cm.*,
+            (SELECT COUNT(*) FROM timesheets t WHERE t.crew_member_id = cm.id) +
+            (SELECT COUNT(*) FROM crew_allocations a WHERE a.crew_member_id = cm.id) +
+            (SELECT COUNT(*) FROM clock_events ce WHERE ce.crew_member_id = cm.id) AS activity
+          FROM crew_members cm
+          WHERE cm.id != ?
+            AND cm.employee_id NOT LIKE 'MGR-%'
+            AND (LOWER(cm.full_name) = LOWER(?) OR LOWER(cm.full_name) LIKE LOWER(?) || ' %')
+          ORDER BY activity DESC, cm.id ASC
+        `).all(mgr.id, u.full_name, u.full_name);
+        const canonical = candidates[0];
+
+        if (!canonical) {
+          console.log(`[mig 125] ${mgr.employee_id} still orphaned — no prefix match for "${u.full_name}"`);
+          continue;
+        }
+
+        console.log(`[mig 125] Merging ${mgr.employee_id} → ${canonical.employee_id} (${canonical.full_name})`);
+
+        db.prepare('UPDATE crew_members SET is_manager = 1 WHERE id = ?').run(canonical.id);
+        if (!canonical.pin_hash && mgr.pin_hash) {
+          try { db.prepare('UPDATE crew_members SET pin_hash = ?, pin_set_at = ? WHERE id = ?').run(mgr.pin_hash, mgr.pin_set_at, canonical.id); } catch (e) {}
+        }
+
+        const canonicalEmp = db.prepare('SELECT * FROM employees WHERE linked_crew_member_id = ? LIMIT 1').get(canonical.id);
+        const mgrEmp = db.prepare('SELECT * FROM employees WHERE linked_crew_member_id = ? LIMIT 1').get(mgr.id);
+        if (canonicalEmp && mgrEmp && canonicalEmp.id !== mgrEmp.id) {
+          if (!canonicalEmp.linked_user_id && mgrEmp.linked_user_id) {
+            db.prepare('UPDATE employees SET linked_user_id = ? WHERE id = ?').run(mgrEmp.linked_user_id, canonicalEmp.id);
+          }
+          const empFkTables = [
+            'emergency_contacts','employee_competencies','employee_documents','employee_leave',
+            'bank_accounts','super_funds','tfn_declarations',
+          ];
+          for (const t of empFkTables) {
+            try { db.prepare(`UPDATE OR IGNORE ${t} SET employee_id = ? WHERE employee_id = ?`).run(canonicalEmp.id, mgrEmp.id); } catch (e) {}
+            try { db.prepare(`DELETE FROM ${t} WHERE employee_id = ?`).run(mgrEmp.id); } catch (e) {}
+          }
+          try { db.prepare('DELETE FROM employees WHERE id = ?').run(mgrEmp.id); } catch (e) { console.log('[mig 125] could not delete duplicate employees row:', e.message); }
+        } else if (mgrEmp && !canonicalEmp) {
+          db.prepare('UPDATE employees SET linked_crew_member_id = ? WHERE id = ?').run(canonical.id, mgrEmp.id);
+        }
+
+        for (const [table, col] of fkTables) {
+          try { db.prepare(`UPDATE OR IGNORE ${table} SET ${col} = ? WHERE ${col} = ?`).run(canonical.id, mgr.id); } catch (e) {}
+          try { db.prepare(`DELETE FROM ${table} WHERE ${col} = ?`).run(mgr.id); } catch (e) {}
+        }
+        try { db.prepare(`UPDATE activity_log SET entity_id = ? WHERE entity_type = 'crew_member' AND entity_id = ?`).run(canonical.id, mgr.id); } catch (e) {}
+
+        db.prepare('DELETE FROM crew_members WHERE id = ?').run(mgr.id);
+        console.log(`[mig 125] ${mgr.employee_id} merged into ${canonical.employee_id} and deleted`);
+      } catch (e) {
+        console.error(`[mig 125] Merge failed for ${u.username}:`, e.message);
+      }
+    }
+
+    recordMigration.run(125, 'Prefix-match merge for remaining MGR-XXX manager duplicates');
+    console.log('Migration 125 applied');
+  }
+
   // Migration 124: Merge MGR-XXX duplicate crew rows into existing canonical rows.
   // Migration 123 created fresh crew_member rows for every known manager, but most of
   // them already worked shifts and had a crew profile. This merge preserves the real
