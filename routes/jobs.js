@@ -82,22 +82,27 @@ router.post('/:id/status', (req, res) => {
   res.redirect('/jobs');
 });
 
-// Close out a job — sets status = 'closed', drops it off priority, and returns to the detail page
+// Close out a job — sets status='closed', stage='closeout', percent_complete=100,
+// and drops it off priority. Returns to the detail page.
 router.post('/:id/close', (req, res) => {
   const db = getDb();
   const job = db.prepare('SELECT id, job_number FROM jobs WHERE id = ?').get(req.params.id);
   if (!job) { req.flash('error', 'Job not found'); return res.redirect('/jobs'); }
-  db.prepare("UPDATE jobs SET status = 'closed', priority = 'normal' WHERE id = ?").run(job.id);
+  db.prepare(`
+    UPDATE jobs SET status = 'closed', stage = 'closeout', percent_complete = 100, priority = 'normal'
+    WHERE id = ?
+  `).run(job.id);
   req.flash('success', `${job.job_number} closed out.`);
   res.redirect(`/jobs/${job.id}`);
 });
 
-// Reopen a closed job — sets status = 'active' and returns to the detail page
+// Reopen a closed job — status back to 'active', stage back to 'delivery'.
+// Leaves percent_complete alone; the operator can adjust manually.
 router.post('/:id/reopen', (req, res) => {
   const db = getDb();
   const job = db.prepare('SELECT id, job_number FROM jobs WHERE id = ?').get(req.params.id);
   if (!job) { req.flash('error', 'Job not found'); return res.redirect('/jobs'); }
-  db.prepare("UPDATE jobs SET status = 'active' WHERE id = ?").run(job.id);
+  db.prepare("UPDATE jobs SET status = 'active', stage = 'delivery' WHERE id = ?").run(job.id);
   req.flash('success', `${job.job_number} reopened.`);
   res.redirect(`/jobs/${job.id}`);
 });
