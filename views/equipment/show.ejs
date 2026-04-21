@@ -110,7 +110,7 @@
   </div>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
     <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Next Inspection</p>
-    <p class="text-sm font-medium <%= inspOverdue ? 'text-red-600' : text-gray-900' %>">
+    <p class="text-sm font-medium <%= inspOverdue ? 'text-red-600' : 'text-gray-900' %>">
       <% if (item.next_inspection_date) { %>
         <% if (inspOverdue) { %>
           <span class="flex items-center gap-1">
