@@ -5750,6 +5750,28 @@ function runMigrations(db) {
     console.log('Migration 126 applied: hire_dockets + hire_docket_items');
   }
 
+  // Migration 127: Backfill stale closed jobs so every row in the register visibly reflects
+  // the closed state — stage='closeout', percent_complete=100, priority='normal'.
+  // Safe to re-run: only touches rows where one of those fields is still stale.
+  if (!isMigrationApplied.get(127)) {
+    try {
+      const r = db.prepare(`
+        UPDATE jobs SET
+          stage = 'closeout',
+          percent_complete = 100,
+          priority = 'normal',
+          updated_at = CURRENT_TIMESTAMP
+        WHERE status = 'closed'
+          AND (stage != 'closeout' OR percent_complete < 100 OR priority != 'normal')
+      `).run();
+      console.log(`Migration 127: backfilled ${r.changes} closed jobs to stage='closeout', percent_complete=100, priority='normal'`);
+    } catch (e) {
+      console.error('Migration 127 error:', e.message);
+    }
+    recordMigration.run(127, 'Backfill closed jobs: stage=closeout, percent_complete=100, priority=normal');
+    console.log('Migration 127 applied: closed jobs backfilled');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
