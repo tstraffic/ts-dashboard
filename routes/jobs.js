@@ -82,6 +82,26 @@ router.post('/:id/status', (req, res) => {
   res.redirect('/jobs');
 });
 
+// Close out a job — sets status = 'closed', drops it off priority, and returns to the detail page
+router.post('/:id/close', (req, res) => {
+  const db = getDb();
+  const job = db.prepare('SELECT id, job_number FROM jobs WHERE id = ?').get(req.params.id);
+  if (!job) { req.flash('error', 'Job not found'); return res.redirect('/jobs'); }
+  db.prepare("UPDATE jobs SET status = 'closed', priority = 'normal' WHERE id = ?").run(job.id);
+  req.flash('success', `${job.job_number} closed out.`);
+  res.redirect(`/jobs/${job.id}`);
+});
+
+// Reopen a closed job — sets status = 'active' and returns to the detail page
+router.post('/:id/reopen', (req, res) => {
+  const db = getDb();
+  const job = db.prepare('SELECT id, job_number FROM jobs WHERE id = ?').get(req.params.id);
+  if (!job) { req.flash('error', 'Job not found'); return res.redirect('/jobs'); }
+  db.prepare("UPDATE jobs SET status = 'active' WHERE id = ?").run(job.id);
+  req.flash('success', `${job.job_number} reopened.`);
+  res.redirect(`/jobs/${job.id}`);
+});
+
 // New job form
 router.get('/new', (req, res) => {
   const db = getDb();
@@ -416,16 +436,18 @@ router.get('/:id/edit', (req, res) => {
 router.post('/:id', (req, res) => {
   const db = getDb();
   const b = req.body;
+  const existing = db.prepare('SELECT job_number FROM jobs WHERE id = ?').get(req.params.id);
+  if (!existing) { req.flash('error', 'Job not found.'); return res.redirect('/jobs'); }
   let clientName = b.client || '';
   if (b.client_id) {
     const cl = db.prepare('SELECT company_name FROM clients WHERE id = ?').get(b.client_id);
     if (cl) clientName = cl.company_name;
   }
-  const jobName = `${b.job_number} | ${clientName} | ${b.suburb} | ${b.start_date}`;
+  const jobName = `${existing.job_number} | ${clientName} | ${b.suburb} | ${b.start_date}`;
 
   try {
     db.prepare(`
-      UPDATE jobs SET job_number=?, job_name=?, client=?, client_id=?, site_address=?, suburb=?, status=?, stage=?, percent_complete=?, start_date=?, end_date=?,
+      UPDATE jobs SET job_name=?, client=?, client_id=?, site_address=?, suburb=?, status=?, stage=?, percent_complete=?, start_date=?, end_date=?,
         project_manager_id=?, ops_supervisor_id=?, planning_owner_id=?, marketing_owner_id=?, accounts_owner_id=?,
         health=?, accounts_status=?, division_tags=?, notes=?,
         client_project_number=?, project_name=?, principal_contractor=?, traffic_supervisor_id=?,
@@ -435,7 +457,7 @@ router.post('/:id', (req, res) => {
         updated_at=CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
-      b.job_number, jobName, clientName, b.client_id || null, b.site_address, b.suburb,
+      jobName, clientName, b.client_id || null, b.site_address, b.suburb,
       b.status, b.stage, parseInt(b.percent_complete) || 0,
       b.start_date, b.end_date || null,
       b.project_manager_id || null, b.ops_supervisor_id || null,
