@@ -482,8 +482,11 @@
     <% } %>
     <form method="POST" action="/tasks/<%= task.id %>/subtasks" class="flex gap-2">
       <%- include('../partials/csrf') %>
-      <input type="text" name="title" placeholder="Add a subtask..." class="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none" required>
-      <button type="submit" class="px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">Add</button>
+      <input type="text" name="title" placeholder="Add a subtask..." class="flex-1 min-w-0 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none" required>
+      <button type="submit" class="flex-shrink-0 inline-flex items-center gap-1 px-4 py-1.5 text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white rounded-lg transition-colors shadow-sm">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+        Add
+      </button>
     </form>
   </div>
 
@@ -535,19 +538,35 @@
       </div>
     <% } %>
 
-    <form method="POST" action="/tasks/<%= task.id %>/dependencies" class="flex gap-2">
-      <%- include('../partials/csrf') %>
-      <select name="depends_on_id" required class="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white">
-        <option value="">Select a task...</option>
-        <% if (typeof allTasks !== 'undefined') { allTasks.forEach(t => { %>
-          <% const alreadyDep = typeof dependencies !== 'undefined' && dependencies.some(d => d.depends_on_id === t.id); %>
-          <% if (!alreadyDep) { %>
+    <%
+      // Build the list of tasks that are available to be added as dependencies
+      // (exclude current + already-linked). This lets us render a useful
+      // empty state when there's nothing to pick.
+      const depsExisting = (typeof dependencies !== 'undefined' ? dependencies : []);
+      const pickable = (typeof allTasks !== 'undefined' ? allTasks : []).filter(t => !depsExisting.some(d => d.depends_on_id === t.id));
+      const hasNoDeps = depsExisting.length === 0 && (typeof dependents === 'undefined' || dependents.length === 0);
+    %>
+    <% if (pickable.length === 0) { %>
+      <% if (hasNoDeps) { %>
+        <p class="text-sm text-gray-400 text-center py-3">No other tasks to link as dependencies yet.</p>
+      <% } else { %>
+        <p class="text-xs text-gray-400 mt-2">No more tasks available to add as a dependency.</p>
+      <% } %>
+    <% } else { %>
+      <form method="POST" action="/tasks/<%= task.id %>/dependencies" class="flex gap-2">
+        <%- include('../partials/csrf') %>
+        <select name="depends_on_id" required class="flex-1 min-w-0 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white">
+          <option value="">Select a task...</option>
+          <% pickable.forEach(t => { %>
             <option value="<%= t.id %>"><%= t.title %> (<%= t.status === 'not_started' ? 'Not Started' : t.status === 'in_progress' ? 'In Progress' : t.status === 'blocked' ? 'Blocked' : 'Complete' %>)</option>
-          <% } %>
-        <% }) } %>
-      </select>
-      <button type="submit" class="px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">Add</button>
-    </form>
+          <% }) %>
+        </select>
+        <button type="submit" class="flex-shrink-0 inline-flex items-center gap-1 px-4 py-1.5 text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white rounded-lg transition-colors shadow-sm">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          Add
+        </button>
+      </form>
+    <% } %>
   </div>
 
   <!-- Comments -->
@@ -602,7 +621,7 @@
       <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
     </div>
     <h3 class="text-lg font-bold text-gray-900 text-center mb-2">Delete Task?</h3>
-    <p class="text-sm text-gray-500 text-center mb-6">This will permanently delete "<%= task.title %>". This action cannot be undone.</p>
+    <p class="text-sm text-gray-500 text-center mb-6">"<%= task.title %>" will be moved to Deleted Tasks. You can restore it from there if needed.</p>
     <div class="flex gap-3">
       <button onclick="document.getElementById('delete-modal').classList.add('hidden')" class="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition font-medium">Cancel</button>
       <form method="POST" action="/tasks/<%= task.id %>/delete" class="flex-1">
