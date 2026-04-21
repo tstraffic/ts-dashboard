@@ -1,5 +1,6 @@
 // Sidebar badge counts — lightweight middleware, cached for 60 seconds
 const { getDb } = require('../db/database');
+const { isAdminRole } = require('../lib/taskVisibility');
 
 // Per-role cache — different counts for different roles
 let cacheByRole = {};
@@ -15,7 +16,12 @@ function sidebarBadges(req, res, next) {
   const now = Date.now();
   const userRole = (req.session.user.role || '').toLowerCase();
   const userId = req.session.user.id;
-  const cacheKey = userRole === 'planning' ? `planning_${userId}` : 'global';
+  const isAdmin = isAdminRole(req.session.user);
+  // Admins see admin-division tasks; everyone else has them filtered out.
+  // Cache bucket has to separate the two or admin totals leak into non-admin badges.
+  const cacheKey = isAdmin
+    ? 'admin_global'
+    : userRole === 'planning' ? `planning_${userId}` : 'nonadmin_global';
 
   if (cacheByRole[cacheKey] && now < cacheByRole[cacheKey].expires) {
     res.locals.sidebarBadges = cacheByRole[cacheKey].data;
@@ -32,6 +38,8 @@ function sidebarBadges(req, res, next) {
     const taskFilter = isPlanningRole
       ? `(division = 'planning' OR owner_id = ${userId} OR compliance_id IS NOT NULL)`
       : '1=1';
+    // Everyone except admin/management has admin-division tasks hidden.
+    const adminGuard = isAdmin ? '' : " AND division != 'admin'";
 
     const badges = {
       // Bookings — today's allocations
@@ -41,8 +49,8 @@ function sidebarBadges(req, res, next) {
       jobActions: safeCount(db, "SELECT COUNT(DISTINCT j.id) as c FROM jobs j WHERE j.status NOT IN ('completed','closed','cancelled') AND (EXISTS (SELECT 1 FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') OR EXISTS (SELECT 1 FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired')))", []),
 
       // Tasks — role-aware totals (kept for any legacy consumers)
-      tasksOverdue: safeCount(db, `SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND due_date < ? AND ${taskFilter}`, [today]),
-      tasks: safeCount(db, `SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND (due_date >= ? OR due_date IS NULL) AND ${taskFilter}`, [today]),
+      tasksOverdue: safeCount(db, `SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND due_date < ? AND ${taskFilter}${adminGuard}`, [today]),
+      tasks: safeCount(db, `SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND (due_date >= ? OR due_date IS NULL) AND ${taskFilter}${adminGuard}`, [today]),
 
       // Tasks — per-division counts so the Planning and Operations sidebar entries show their own workload
       tasksPlanningOverdue: safeCount(db, "SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND division = 'planning' AND due_date < ?", [today]),

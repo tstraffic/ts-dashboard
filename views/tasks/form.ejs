@@ -269,7 +269,9 @@
               <option value="ops" <%= isEdit && task.division === 'ops' ? 'selected' : (!isEdit ? 'selected' : '') %>>Operations</option>
               <option value="planning" <%= isEdit && task.division === 'planning' ? 'selected' : '' %>>Planning</option>
               <option value="finance" <%= isEdit && task.division === 'finance' ? 'selected' : '' %>>Finance</option>
-              <option value="admin" <%= isEdit && task.division === 'admin' ? 'selected' : '' %>>Admin</option>
+              <% if (user && ['admin','management'].includes((user.role || '').toLowerCase())) { %>
+                <option value="admin" <%= isEdit && task.division === 'admin' ? 'selected' : '' %>>Admin (private)</option>
+              <% } %>
               <option value="hr" <%= isEdit && task.division === 'hr' ? 'selected' : '' %>>Human Resources</option>
             </select>
           </div>

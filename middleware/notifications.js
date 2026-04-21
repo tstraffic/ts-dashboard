@@ -60,11 +60,16 @@ function generateNotifications() {
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
     const in3days = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
 
+    // Admin-division tasks only notify owners who are admin/management —
+    // these are private items and shouldn't leak to ops/planning/etc. inboxes.
     const upcomingTasks = db.prepare(`
       SELECT t.id, t.title, t.due_date, t.owner_id, t.job_id, j.job_number
       FROM tasks t LEFT JOIN jobs j ON t.job_id = j.id
       WHERE t.status NOT IN ('complete') AND t.owner_id IS NOT NULL
       AND t.due_date IN (?, ?, ?)
+      AND (t.division != 'admin' OR EXISTS (
+        SELECT 1 FROM users u WHERE u.id = t.owner_id AND LOWER(u.role) IN ('admin','management')
+      ))
     `).all(today, tomorrow, in3days);
 
     for (const t of upcomingTasks) {
@@ -80,6 +85,9 @@ function generateNotifications() {
       FROM tasks t JOIN jobs j ON t.job_id = j.id
       WHERE t.due_date < ? AND t.status != 'complete'
       AND t.owner_id IS NOT NULL
+      AND (t.division != 'admin' OR EXISTS (
+        SELECT 1 FROM users u WHERE u.id = t.owner_id AND LOWER(u.role) IN ('admin','management')
+      ))
     `).all(today);
 
     for (const t of overdueTasks) {

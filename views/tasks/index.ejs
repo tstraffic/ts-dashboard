@@ -211,7 +211,9 @@
         <option value="ops" <%= filters.division === 'ops' ? 'selected' : '' %>>Operations</option>
         <option value="planning" <%= filters.division === 'planning' ? 'selected' : '' %>>Planning</option>
         <option value="finance" <%= filters.division === 'finance' ? 'selected' : '' %>>Finance</option>
-        <option value="admin" <%= filters.division === 'admin' ? 'selected' : '' %>>Admin</option>
+        <% if (user && ['admin','management'].includes((user.role || '').toLowerCase())) { %>
+          <option value="admin" <%= filters.division === 'admin' ? 'selected' : '' %>>Admin</option>
+        <% } %>
         <option value="hr" <%= filters.division === 'hr' ? 'selected' : '' %>>Human Resources</option>
       </select>
       <select name="task_type" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
