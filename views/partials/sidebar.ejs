@@ -83,11 +83,11 @@
     </a>
     <% } %>
     <% if (canAccess(user, 'tasks')) { %>
-    <a href="/tasks" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'tasks' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
+    <a href="/tasks?division=planning" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'tasks' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
       <span class="flex-1">Tasks</span>
-      <% if (b.tasksOverdue) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.tasksOverdue %></span><% } %>
-      <% if (b.tasks) { %><span class="sidebar-badge bg-blue-500 text-white"><%= b.tasks %></span><% } %>
+      <% if (b.tasksPlanningOverdue) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.tasksPlanningOverdue %></span><% } %>
+      <% if (b.tasksPlanning) { %><span class="sidebar-badge bg-blue-500 text-white"><%= b.tasksPlanning %></span><% } %>
     </a>
     <% } %>
     <% if (canAccess(user, 'audits')) { %>
@@ -121,11 +121,11 @@
     </a>
     <% } %>
     <% if (canAccess(user, 'tasks')) { %>
-    <a href="/tasks" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'tasks' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
+    <a href="/tasks?division=ops" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'tasks' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
       <span class="flex-1">Tasks</span>
-      <% if (b.tasksOverdue) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.tasksOverdue %></span><% } %>
-      <% if (b.tasks) { %><span class="sidebar-badge bg-blue-500 text-white"><%= b.tasks %></span><% } %>
+      <% if (b.tasksOpsOverdue) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.tasksOpsOverdue %></span><% } %>
+      <% if (b.tasksOps) { %><span class="sidebar-badge bg-blue-500 text-white"><%= b.tasksOps %></span><% } %>
     </a>
     <% } %>
     <% if (canAccess(user, 'bookings')) { %>

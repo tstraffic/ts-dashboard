@@ -40,9 +40,15 @@ function sidebarBadges(req, res, next) {
       // Jobs — jobs with outstanding items (blue)
       jobActions: safeCount(db, "SELECT COUNT(DISTINCT j.id) as c FROM jobs j WHERE j.status NOT IN ('completed','closed','cancelled') AND (EXISTS (SELECT 1 FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') OR EXISTS (SELECT 1 FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired')))", []),
 
-      // Tasks — filtered by role
+      // Tasks — role-aware totals (kept for any legacy consumers)
       tasksOverdue: safeCount(db, `SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND due_date < ? AND ${taskFilter}`, [today]),
       tasks: safeCount(db, `SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND (due_date >= ? OR due_date IS NULL) AND ${taskFilter}`, [today]),
+
+      // Tasks — per-division counts so the Planning and Operations sidebar entries show their own workload
+      tasksPlanningOverdue: safeCount(db, "SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND division = 'planning' AND due_date < ?", [today]),
+      tasksPlanning: safeCount(db, "SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND division = 'planning' AND (due_date >= ? OR due_date IS NULL)", [today]),
+      tasksOpsOverdue: safeCount(db, "SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND division = 'ops' AND due_date < ?", [today]),
+      tasksOps: safeCount(db, "SELECT COUNT(*) as c FROM tasks WHERE status != 'complete' AND division = 'ops' AND (due_date >= ? OR due_date IS NULL)", [today]),
 
       // Plans & Approvals — split: overdue (red) vs outstanding non-overdue (blue)
       complianceOverdue: safeCount(db, "SELECT COUNT(*) as c FROM compliance WHERE status NOT IN ('approved','expired','submitted') AND due_date IS NOT NULL AND due_date < ?", [today]),
