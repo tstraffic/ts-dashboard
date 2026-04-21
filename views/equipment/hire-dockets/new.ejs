@@ -1,0 +1,98 @@
+<% locals.currentPage = 'equipment' %>
+
+<div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
+  <a href="/equipment" class="hover:text-gray-700">Equipment</a>
+  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <a href="/equipment/hire-dockets" class="hover:text-gray-700">Hire Dockets</a>
+  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <span class="text-gray-600">New</span>
+</div>
+
+<h1 class="text-2xl font-bold text-gray-900 mb-1">New Hire Docket</h1>
+<p class="text-gray-500 text-sm mb-5">Start a pick-up &amp; drop-off checklist for a hire. Items are added on the next screen.</p>
+
+<form method="POST" action="/equipment/hire-dockets" class="space-y-5">
+  <%- include('../../partials/csrf') %>
+
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Job Details</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job / PO #</label>
+        <input type="text" name="job_number" placeholder="e.g. J-0423 or PO12345" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Link to Job</label>
+        <select name="job_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">— None —</option>
+          <% jobs.forEach(j => { %>
+            <option value="<%= j.id %>"><%= j.job_number %> — <%= j.project_name || j.client %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date Prepared</label>
+        <input type="date" name="date_prepared" value="<%= today %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div class="sm:col-span-2 lg:col-span-3">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Site / Location</label>
+        <input type="text" name="site_location" placeholder="Site address or location" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Prepared By</label>
+        <input type="text" name="prepared_by" value="<%= user.full_name %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Contact #</label>
+        <input type="text" name="prepared_by_contact" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Supervisor</label>
+        <input type="text" name="supervisor" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div class="sm:col-span-2 lg:col-span-3">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Crew</label>
+        <input type="text" name="crew" placeholder="Names on the crew..." class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Supplier Details</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Supplier Name</label>
+        <input type="text" name="supplier_name" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Hire Ref #</label>
+        <input type="text" name="supplier_hire_ref" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Contact Person</label>
+        <input type="text" name="supplier_contact" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Phone</label>
+        <input type="text" name="supplier_phone" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div class="sm:col-span-2 lg:col-span-3">
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Pick-up Address</label>
+        <input type="text" name="pickup_address" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Hire Period</label>
+        <input type="text" name="hire_period" placeholder="e.g. 14 days / 2 weeks" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Agreed Rate</label>
+        <input type="text" name="agreed_rate" placeholder="e.g. $120/day" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-2">
+    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Create &amp; Add Items</button>
+    <a href="/equipment/hire-dockets" class="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</a>
+  </div>
+</form>
