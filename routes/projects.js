@@ -12,8 +12,8 @@ router.get('/', (req, res) => {
   const db = getDb();
   const { status, search, suburb } = req.query;
   let query = `SELECT j.*, u.full_name as pm_name, bm.budget_contract, bm.total_spent as budget_spent,
-    (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') as pending_tasks,
-    (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.due_date < date('now')) as overdue_tasks,
+    (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.deleted_at IS NULL) as pending_tasks,
+    (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.deleted_at IS NULL AND t.due_date < date('now')) as overdue_tasks,
     (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved')) as pending_plans,
     (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired','submitted') AND c.due_date IS NOT NULL AND c.due_date < date('now')) as overdue_compliance,
     ${HEALTH_CALC_SQL} as calculated_health
@@ -167,7 +167,7 @@ router.get('/:id', (req, res) => {
   const tasks = db.prepare(`
     SELECT t.*, u.full_name as owner_name FROM tasks t
     LEFT JOIN users u ON t.owner_id = u.id
-    WHERE t.job_id = ? ORDER BY CASE t.status WHEN 'blocked' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'not_started' THEN 3 ELSE 4 END, t.due_date ASC
+    WHERE t.job_id = ? AND t.deleted_at IS NULL ORDER BY CASE t.status WHEN 'blocked' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'not_started' THEN 3 ELSE 4 END, t.due_date ASC
   `).all(job.id);
 
   const complianceItems = db.prepare(`

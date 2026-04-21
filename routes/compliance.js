@@ -308,7 +308,7 @@ router.get('/:id/edit', (req, res) => {
   let documents = [];
   try { documents = db.prepare('SELECT cd.*, u.full_name as uploaded_by_name FROM compliance_documents cd LEFT JOIN users u ON cd.uploaded_by_id = u.id WHERE cd.compliance_id = ? ORDER BY cd.created_at DESC').all(item.id); } catch (e) { /* table may not exist yet */ }
   let linkedTask = null;
-  try { linkedTask = db.prepare('SELECT t.id, t.title, t.status, t.owner_id, u.full_name as owner_name FROM tasks t LEFT JOIN users u ON t.owner_id = u.id WHERE t.compliance_id = ?').get(item.id); } catch (e) { /* column may not exist yet */ }
+  try { linkedTask = db.prepare('SELECT t.id, t.title, t.status, t.owner_id, u.full_name as owner_name FROM tasks t LEFT JOIN users u ON t.owner_id = u.id WHERE t.compliance_id = ? AND t.deleted_at IS NULL').get(item.id); } catch (e) { /* column may not exist yet */ }
   let revisions = [];
   try { revisions = db.prepare('SELECT * FROM compliance_revisions WHERE compliance_id = ? ORDER BY revision_number ASC').all(item.id); } catch (e) { /* table may not exist yet */ }
   res.render('compliance/form', { title: 'Edit Plan / Approval', item, jobs, clients, users, user: req.session.user, prefillJobId: '', prefillClientId: '', returnTo, documents, linkedTask, revisions });
@@ -343,7 +343,7 @@ router.post('/:id', (req, res) => {
 
     // Sync linked task: create if new assignee, update if exists, complete if plan approved
     try {
-      const existingTask = db.prepare('SELECT id, status FROM tasks WHERE compliance_id = ?').get(req.params.id);
+      const existingTask = db.prepare('SELECT id, status FROM tasks WHERE compliance_id = ? AND deleted_at IS NULL').get(req.params.id);
       const typeLabels = { traffic_guidance: 'TGS', road_occupancy: 'ROL', rol: 'ROL', council_permit: 'Council Permit', tmp_approval: 'TMP', swms_review: 'SWMS', insurance: 'Insurance', induction: 'Induction', environmental: 'Environmental', utility_clearance: 'Utility Clearance', spa: 'SPA', sza: 'SZA', police_notification: 'Police Notification', letter_drop: 'Letter Drop', bus_approval: 'Bus Approval', other: 'Other' };
       const typeLabel = typesArr.map(t => typeLabels[t] || t).join(' / ') || 'Plan';
       const taskTitle = `${typeLabel}: ${b.title || 'Compliance Item'}`;

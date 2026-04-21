@@ -18,7 +18,7 @@ function getUrgencyKpis(db, today, user) {
   const adminGuard = hideAdmin ? " AND division != 'admin'" : '';
 
   return {
-    overdueTasks: db.prepare(`SELECT COUNT(*) as c FROM tasks WHERE due_date < ? AND status != 'complete' ${taskFilter}${adminGuard}`).get(today).c,
+    overdueTasks: db.prepare(`SELECT COUNT(*) as c FROM tasks WHERE due_date < ? AND status != 'complete' AND deleted_at IS NULL ${taskFilter}${adminGuard}`).get(today).c,
     openIncidents: db.prepare("SELECT COUNT(*) as c FROM incidents WHERE investigation_status NOT IN ('closed', 'resolved')").get().c,
     openDefects: db.prepare("SELECT COUNT(*) as c FROM defects WHERE status NOT IN ('closed', 'deferred')").get().c,
     unconfirmedAllocations: db.prepare("SELECT COUNT(*) as c FROM crew_allocations WHERE allocation_date = ? AND status = 'allocated'").get(today).c,
@@ -113,7 +113,7 @@ function getMyWork(db, user, today) {
     FROM tasks t
     LEFT JOIN jobs j ON t.job_id = j.id
     LEFT JOIN users u ON t.owner_id = u.id
-    WHERE t.owner_id = ? AND t.due_date < ? AND t.status != 'complete'${adminGuard}
+    WHERE t.owner_id = ? AND t.due_date < ? AND t.status != 'complete' AND t.deleted_at IS NULL${adminGuard}
     ORDER BY t.due_date ASC LIMIT 10
   `).all(userId, today);
 
@@ -139,7 +139,7 @@ function getMyTasks(db, user, today) {
     LEFT JOIN jobs j ON t.job_id = j.id
     LEFT JOIN users u ON t.owner_id = u.id
     LEFT JOIN users cb ON t.created_by = cb.id
-    WHERE t.owner_id = ? AND t.status != 'complete'${adminGuard}
+    WHERE t.owner_id = ? AND t.status != 'complete' AND t.deleted_at IS NULL${adminGuard}
     ORDER BY
       CASE WHEN t.due_date < ? THEN 0 ELSE 1 END,
       t.due_date ASC,
@@ -156,7 +156,7 @@ function getTasksIAssigned(db, user, today) {
     FROM tasks t
     LEFT JOIN jobs j ON t.job_id = j.id
     LEFT JOIN users u ON t.owner_id = u.id
-    WHERE t.created_by = ? AND t.owner_id != ? AND t.status != 'complete'${adminGuard}
+    WHERE t.created_by = ? AND t.owner_id != ? AND t.status != 'complete' AND t.deleted_at IS NULL${adminGuard}
     ORDER BY
       CASE WHEN t.due_date < ? THEN 0 ELSE 1 END,
       t.due_date ASC,

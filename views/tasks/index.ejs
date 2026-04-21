@@ -6,6 +6,7 @@
     if (newTab) p.push('tab=' + newTab);
     if (filters.view) p.push('view=' + encodeURIComponent(filters.view));
     if (filters.owner) p.push('owner=' + encodeURIComponent(filters.owner));
+    if (filters.scope) p.push('scope=' + encodeURIComponent(filters.scope));
     if (filters.priority && filters.priority !== 'all') p.push('priority=' + encodeURIComponent(filters.priority));
     if (filters.division && filters.division !== 'all') p.push('division=' + encodeURIComponent(filters.division));
     if (filters.job_id) p.push('job_id=' + encodeURIComponent(filters.job_id));
@@ -17,6 +18,7 @@
     if (newView && newView !== 'all') p.push('view=' + newView);
     if (filters.tab) p.push('tab=' + encodeURIComponent(filters.tab));
     if (filters.owner) p.push('owner=' + encodeURIComponent(filters.owner));
+    if (filters.scope) p.push('scope=' + encodeURIComponent(filters.scope));
     if (filters.priority && filters.priority !== 'all') p.push('priority=' + encodeURIComponent(filters.priority));
     if (filters.division && filters.division !== 'all') p.push('division=' + encodeURIComponent(filters.division));
     if (filters.job_id) p.push('job_id=' + encodeURIComponent(filters.job_id));
@@ -30,6 +32,24 @@
     for (const [k, v] of Object.entries(base)) { if (v) p.push(k + '=' + encodeURIComponent(v)); }
     return '/tasks' + (p.length ? '?' + p.join('&') : '');
   }
+  // Toggle "My Tasks" — mutually exclusive with the "Assigned by Me" scope
+  function myTasksToggleUrl() {
+    const base = { ...filters };
+    if (filters.owner === 'me') { delete base.owner; } else { base.owner = 'me'; delete base.scope; }
+    const p = [];
+    for (const [k, v] of Object.entries(base)) { if (v) p.push(k + '=' + encodeURIComponent(v)); }
+    return '/tasks' + (p.length ? '?' + p.join('&') : '');
+  }
+  // Toggle "Assigned by Me" — mutually exclusive with the owner=me filter
+  function assignedByMeToggleUrl() {
+    const base = { ...filters };
+    if (filters.scope === 'assigned_by_me') { delete base.scope; }
+    else { base.scope = 'assigned_by_me'; if (base.owner === 'me') delete base.owner; }
+    const p = [];
+    for (const [k, v] of Object.entries(base)) { if (v) p.push(k + '=' + encodeURIComponent(v)); }
+    return '/tasks' + (p.length ? '?' + p.join('&') : '');
+  }
+  const assignedByMeActive = filters.scope === 'assigned_by_me';
 
   const currentView = activeView || 'all';
 
@@ -110,10 +130,23 @@
         <input type="checkbox" id="select-all" class="rounded bg-white border-gray-300 text-brand-500 focus:ring-brand-500">
         <span class="hidden sm:inline">Select All</span>
       </label>
-      <a href="<%= filterUrl('owner', filters.owner === 'me' ? '' : 'me') %>"
+      <a href="<%= myTasksToggleUrl() %>"
          class="inline-flex items-center px-4 py-2 rounded-lg font-medium text-sm transition <%= filters.owner === 'me' ? 'bg-brand-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50' %>">
         <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
         My Tasks
+      </a>
+      <a href="<%= assignedByMeToggleUrl() %>"
+         class="inline-flex items-center px-4 py-2 rounded-lg font-medium text-sm transition <%= assignedByMeActive ? 'bg-brand-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50' %>"
+         title="Show tasks I assigned to others">
+        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>
+        Assigned by Me
+      </a>
+      <a href="/tasks/deleted" class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 transition" title="View deleted tasks">
+        <svg class="w-4 h-4 mr-1.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
+        <span class="hidden sm:inline">Deleted</span>
+        <% if (typeof deletedCount !== 'undefined' && deletedCount > 0) { %>
+          <span class="ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-semibold rounded-full bg-gray-100 text-gray-700"><%= deletedCount %></span>
+        <% } %>
       </a>
       <a href="/tasks/new" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500 transition text-sm shadow-sm">
         <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -192,10 +225,11 @@
     <%- include('../partials/csrf') %>
     <% if (filters.tab) { %><input type="hidden" name="tab" value="<%= filters.tab %>"><% } %>
     <% if (filters.view) { %><input type="hidden" name="view" value="<%= filters.view %>"><% } %>
-    <% if (filters.owner === 'me') { %><input type="hidden" name="owner" value="me"><% } %>
+    <% if (filters.scope) { %><input type="hidden" name="scope" value="<%= filters.scope %>"><% } %>
     <div class="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-3">
       <select name="owner" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <option value="all">All Owners</option>
+        <option value="all" <%= filters.owner === 'all' ? 'selected' : '' %>>All Owners</option>
+        <option value="me" <%= filters.owner === 'me' ? 'selected' : '' %>>My Tasks</option>
         <% users.forEach(function(u) { %>
           <option value="<%= u.id %>" <%= filters.owner == u.id ? 'selected' : '' %>><%= u.full_name %></option>
         <% }) %>
