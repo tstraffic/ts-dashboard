@@ -5772,6 +5772,14 @@ function runMigrations(db) {
     console.log('Migration 127 applied: closed jobs backfilled');
   }
 
+  // Migration 128: Add deleted_at column to tasks for soft-delete (enables "view deleted tasks")
+  if (!isMigrationApplied.get(128)) {
+    try { db.exec("ALTER TABLE tasks ADD COLUMN deleted_at DATETIME"); } catch (e) { /* column may exist */ }
+    try { db.exec("ALTER TABLE tasks ADD COLUMN deleted_by INTEGER REFERENCES users(id)"); } catch (e) { /* column may exist */ }
+    recordMigration.run(128, 'Tasks soft-delete columns');
+    console.log('Migration 128 applied: tasks.deleted_at + deleted_by');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

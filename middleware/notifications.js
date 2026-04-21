@@ -65,7 +65,7 @@ function generateNotifications() {
     const upcomingTasks = db.prepare(`
       SELECT t.id, t.title, t.due_date, t.owner_id, t.job_id, j.job_number
       FROM tasks t LEFT JOIN jobs j ON t.job_id = j.id
-      WHERE t.status NOT IN ('complete') AND t.owner_id IS NOT NULL
+      WHERE t.status NOT IN ('complete') AND t.deleted_at IS NULL AND t.owner_id IS NOT NULL
       AND t.due_date IN (?, ?, ?)
       AND (t.division != 'admin' OR EXISTS (
         SELECT 1 FROM users u WHERE u.id = t.owner_id AND LOWER(u.role) IN ('admin','management')
@@ -83,7 +83,7 @@ function generateNotifications() {
     const overdueTasks = db.prepare(`
       SELECT t.id, t.title, t.owner_id, t.job_id, j.job_number
       FROM tasks t JOIN jobs j ON t.job_id = j.id
-      WHERE t.due_date < ? AND t.status != 'complete'
+      WHERE t.due_date < ? AND t.status != 'complete' AND t.deleted_at IS NULL
       AND t.owner_id IS NOT NULL
       AND (t.division != 'admin' OR EXISTS (
         SELECT 1 FROM users u WHERE u.id = t.owner_id AND LOWER(u.role) IN ('admin','management')

@@ -15,9 +15,9 @@ function recalculateJobHealth(db, jobId) {
   const stats = db.prepare(`
     SELECT
       j.status, j.end_date, j.accounts_status,
-      (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.due_date IS NOT NULL AND t.due_date < ?) as overdue_tasks,
+      (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.deleted_at IS NULL AND t.due_date IS NOT NULL AND t.due_date < ?) as overdue_tasks,
       (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired','submitted') AND c.due_date IS NOT NULL AND c.due_date < ?) as overdue_compliance,
-      (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') as pending_tasks,
+      (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.deleted_at IS NULL) as pending_tasks,
       (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired')) as pending_plans
     FROM jobs j WHERE j.id = ?
   `).get(today, today, jobId);
@@ -63,12 +63,12 @@ function updateHealth(db, jobId, health) {
  * Requires the subquery aliases: overdue_tasks, overdue_compliance, pending_tasks, pending_plans
  */
 const HEALTH_CALC_SQL = `CASE
-  WHEN (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.due_date IS NOT NULL AND t.due_date < date('now')) > 0
+  WHEN (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.deleted_at IS NULL AND t.due_date IS NOT NULL AND t.due_date < date('now')) > 0
     OR (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired','submitted') AND c.due_date IS NOT NULL AND c.due_date < date('now')) > 0
     THEN 'red'
   WHEN j.end_date IS NOT NULL AND j.end_date < date('now') AND j.status = 'active'
     THEN 'red'
-  WHEN (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete') > 5
+  WHEN (SELECT COUNT(*) FROM tasks t WHERE t.job_id = j.id AND t.status != 'complete' AND t.deleted_at IS NULL) > 5
     OR (SELECT COUNT(*) FROM compliance c WHERE c.job_id = j.id AND c.status NOT IN ('approved','expired')) > 3
     THEN 'amber'
   WHEN j.accounts_status IN ('overdue','disputed')

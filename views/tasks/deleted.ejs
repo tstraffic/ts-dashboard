@@ -1,0 +1,114 @@
+<% locals.currentPage = 'tasks' %>
+<%
+  const role = (user && user.role ? user.role : '').toLowerCase();
+  const canPurge = role === 'admin' || role === 'management';
+  const statusColors = { not_started: 'bg-gray-100 text-gray-700', in_progress: 'bg-blue-100 text-blue-700', blocked: 'bg-red-100 text-red-700', complete: 'bg-emerald-100 text-emerald-700' };
+  const statusLabels = { not_started: 'Not Started', in_progress: 'In Progress', blocked: 'Blocked', complete: 'Complete' };
+  function fmtDateTime(v) {
+    if (!v) return '';
+    const d = new Date(v.replace ? v.replace(' ', 'T') + 'Z' : v);
+    if (isNaN(d.getTime())) return v;
+    return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
+           d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+  }
+%>
+
+<!-- Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <div>
+    <div class="flex items-center gap-2 text-xs text-gray-500 mb-1">
+      <a href="/tasks" class="hover:text-brand-600">Tasks</a>
+      <span>/</span>
+      <span>Deleted</span>
+    </div>
+    <h1 class="text-2xl font-bold text-gray-900">Deleted Tasks</h1>
+    <p class="text-sm text-gray-500 mt-0.5">Recently deleted tasks can be restored here.</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/tasks" class="inline-flex items-center px-4 py-2 bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">
+      <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+      Back to Tasks
+    </a>
+  </div>
+</div>
+
+<% if (tasks.length === 0) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+    <svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
+    <p class="text-gray-500 text-sm mb-1">No deleted tasks</p>
+    <p class="text-gray-400 text-sm">When tasks are deleted they'll show up here so you can restore them.</p>
+  </div>
+<% } else { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50">
+          <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th class="px-4 py-3">Task</th>
+            <th class="px-4 py-3 hidden md:table-cell">Project</th>
+            <th class="px-4 py-3 hidden sm:table-cell">Status</th>
+            <th class="px-4 py-3 hidden lg:table-cell">Deleted By</th>
+            <th class="px-4 py-3">Deleted</th>
+            <th class="px-4 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% tasks.forEach(function(t) { %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3 align-top">
+                <div class="font-semibold text-gray-900"><%= t.title %></div>
+                <% if (t.description) { %>
+                  <div class="text-xs text-gray-500 mt-0.5 line-clamp-2"><%= t.description %></div>
+                <% } %>
+                <% if (t.owner_name) { %>
+                  <div class="text-xs text-gray-400 mt-1">Owner: <%= t.owner_name %></div>
+                <% } %>
+              </td>
+              <td class="px-4 py-3 align-top hidden md:table-cell">
+                <% if (t.job_number) { %>
+                  <a href="/projects/<%= t.job_id %>" class="text-brand-600 hover:text-brand-700 font-medium"><%= t.job_number %></a>
+                  <div class="text-xs text-gray-500 mt-0.5"><%= t.client %></div>
+                <% } else { %>
+                  <span class="text-xs text-gray-400">—</span>
+                <% } %>
+              </td>
+              <td class="px-4 py-3 align-top hidden sm:table-cell">
+                <span class="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full <%= statusColors[t.status] || 'bg-gray-100 text-gray-700' %>">
+                  <%= statusLabels[t.status] || t.status %>
+                </span>
+              </td>
+              <td class="px-4 py-3 align-top hidden lg:table-cell text-xs text-gray-600">
+                <%= t.deleted_by_name || '—' %>
+              </td>
+              <td class="px-4 py-3 align-top text-xs text-gray-600 whitespace-nowrap">
+                <%= fmtDateTime(t.deleted_at) %>
+              </td>
+              <td class="px-4 py-3 align-top text-right whitespace-nowrap">
+                <form method="POST" action="/tasks/<%= t.id %>/restore" class="inline">
+                  <%- include('../partials/csrf') %>
+                  <button type="submit" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition">
+                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                    Restore
+                  </button>
+                </form>
+                <% if (canPurge) { %>
+                  <form method="POST" action="/tasks/<%= t.id %>/purge" class="inline" onsubmit="return confirm('Permanently delete this task? This cannot be undone.');">
+                    <%- include('../partials/csrf') %>
+                    <button type="submit" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg bg-white text-red-600 border border-red-200 hover:bg-red-50 transition ml-1">
+                      <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
+                      Purge
+                    </button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-6 text-center text-sm text-gray-400">
+    Showing <%= tasks.length %> deleted task<%= tasks.length !== 1 ? 's' : '' %>
+  </div>
+<% } %>

@@ -45,9 +45,12 @@ function getTaskOwnerNames(db, taskId) {
 // GET / — Main tasks view with tabs, counts, and filters
 router.get('/', (req, res) => {
   const db = getDb();
-  const { tab, owner, priority, division, job_id, task_type, view } = req.query;
+  const { tab, owner, priority, division, job_id, task_type, view, scope } = req.query;
   const today = new Date().toISOString().split('T')[0];
   const activeView = view || 'all';
+  // scope='assigned_by_me' shows tasks the current user created (typically ones they
+  // delegated to other people). Takes precedence over the owner filter.
+  const assignedByMe = scope === 'assigned_by_me';
 
   // Build WHERE clause for tab filter
   let baseWhere = '1=1';
@@ -77,7 +80,12 @@ router.get('/', (req, res) => {
   const userRole = (req.session.user.role || '').toLowerCase();
   const isAdminRole = ['admin', 'management'].includes(userRole);
   const isPlanningRole = userRole === 'planning';
-  if (owner === 'all' || (!owner && isAdminRole)) { /* show all tasks */ }
+  if (assignedByMe) {
+    // "Assigned by me" overrides the owner filter entirely — scope is by creator
+    baseWhere += ' AND t.created_by = ?';
+    params.push(req.session.user.id);
+  }
+  else if (owner === 'all' || (!owner && isAdminRole)) { /* show all tasks */ }
   else if (!owner && isPlanningRole) {
     // Planning sees: their own tasks + planning division tasks + compliance-linked tasks
     baseWhere += " AND (t.owner_id = ? OR t.id IN (SELECT task_id FROM task_owners WHERE user_id = ?) OR t.division = 'planning' OR t.compliance_id IS NOT NULL)";
@@ -95,6 +103,8 @@ router.get('/', (req, res) => {
   if (division && division !== 'all') { baseWhere += ' AND t.division = ?'; params.push(division); }
   if (job_id) { baseWhere += ' AND t.job_id = ?'; params.push(job_id); }
   if (task_type && task_type !== 'all') { baseWhere += ' AND t.task_type = ?'; params.push(task_type); }
+  // Hide soft-deleted tasks from all default listings
+  baseWhere += ' AND t.deleted_at IS NULL';
   // Admin-division tasks are private to the admin team
   baseWhere += hideAdminTasksSql(req.session.user);
 
@@ -136,7 +146,11 @@ router.get('/', (req, res) => {
     countWhere += ' AND t.due_date BETWEEN ? AND ?';
     countParams.push(mon2.toISOString().split('T')[0], sun2.toISOString().split('T')[0]);
   }
-  if (owner === 'all' || (!owner && isAdminRole)) { /* count all */ }
+  if (assignedByMe) {
+    countWhere += ' AND t.created_by = ?';
+    countParams.push(req.session.user.id);
+  }
+  else if (owner === 'all' || (!owner && isAdminRole)) { /* count all */ }
   else if (owner === 'me' || (!owner && !isAdminRole)) {
     countWhere += ' AND (t.owner_id = ? OR t.id IN (SELECT task_id FROM task_owners WHERE user_id = ?))';
     countParams.push(req.session.user.id, req.session.user.id);
@@ -149,6 +163,7 @@ router.get('/', (req, res) => {
   if (division && division !== 'all') { countWhere += ' AND t.division = ?'; countParams.push(division); }
   if (job_id) { countWhere += ' AND t.job_id = ?'; countParams.push(job_id); }
   if (task_type && task_type !== 'all') { countWhere += ' AND t.task_type = ?'; countParams.push(task_type); }
+  countWhere += ' AND t.deleted_at IS NULL';
   countWhere += hideAdminTasksSql(req.session.user);
 
   const counts = db.prepare(`
@@ -166,17 +181,103 @@ router.get('/', (req, res) => {
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND username != 'admin' ORDER BY full_name").all();
 
+  // Count deleted (respecting admin-division visibility) for the "View Deleted" link
+  let deletedCount = 0;
+  try {
+    const delWhere = '1=1' + hideAdminTasksSql(req.session.user);
+    deletedCount = db.prepare(`SELECT COUNT(*) as c FROM tasks t WHERE t.deleted_at IS NOT NULL AND ${delWhere}`).get().c;
+  } catch (e) { /* deleted_at column may not exist pre-migration */ }
+
   res.render('tasks/index', {
     title: 'Tasks & Actions',
     tasks,
     jobs,
     users,
     counts: counts || { total: 0, not_started: 0, in_progress: 0, blocked: 0, complete: 0, overdue: 0 },
+    deletedCount,
     today,
     filters: req.query,
     activeView,
     user: req.session.user,
   });
+});
+
+// GET /deleted — List soft-deleted tasks
+router.get('/deleted', (req, res) => {
+  const db = getDb();
+  // Respect admin-division privacy rule just like the main index
+  let where = 't.deleted_at IS NOT NULL';
+  where += hideAdminTasksSql(req.session.user);
+
+  const tasks = db.prepare(`
+    SELECT t.*, j.job_number, j.client,
+           u.full_name as owner_name,
+           cb.full_name as created_by_name,
+           db.full_name as deleted_by_name
+    FROM tasks t
+    LEFT JOIN jobs j  ON t.job_id = j.id
+    LEFT JOIN users u  ON t.owner_id = u.id
+    LEFT JOIN users cb ON t.created_by = cb.id
+    LEFT JOIN users db ON t.deleted_by = db.id
+    WHERE ${where}
+    ORDER BY t.deleted_at DESC
+  `).all();
+
+  res.render('tasks/deleted', {
+    title: 'Deleted Tasks',
+    tasks,
+    user: req.session.user,
+  });
+});
+
+// POST /:id/restore — Restore a soft-deleted task (owner + admin/management only)
+router.post('/:id/restore', (req, res) => {
+  const db = getDb();
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  if (!task) {
+    req.flash('error', 'Task not found.');
+    return res.redirect('/tasks/deleted');
+  }
+  if (!task.deleted_at) {
+    req.flash('error', 'Task is not deleted.');
+    return res.redirect('/tasks/deleted');
+  }
+  if (!canModifyTask(task, req.session.user)) {
+    req.flash('error', 'You can only restore your own tasks.');
+    return res.redirect('/tasks/deleted');
+  }
+
+  db.prepare('UPDATE tasks SET deleted_at = NULL, deleted_by = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.id);
+
+  if (task.job_id) {
+    autoLogDiary(db, {
+      jobId: task.job_id,
+      category: 'Task Updated',
+      summary: `[${req.session.user ? req.session.user.full_name : 'System'}] Task restored: "${task.title}".`,
+      userId: req.session.user ? req.session.user.id : null
+    });
+  }
+
+  req.flash('success', 'Task restored.');
+  res.redirect('/tasks/deleted');
+});
+
+// POST /:id/purge — Permanently delete a soft-deleted task (admin/management only)
+router.post('/:id/purge', (req, res) => {
+  const db = getDb();
+  const role = (req.session.user.role || '').toLowerCase();
+  if (!['admin', 'management'].includes(role)) {
+    req.flash('error', 'Only admin/management can permanently delete tasks.');
+    return res.redirect('/tasks/deleted');
+  }
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ? AND deleted_at IS NOT NULL').get(req.params.id);
+  if (!task) {
+    req.flash('error', 'Deleted task not found.');
+    return res.redirect('/tasks/deleted');
+  }
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
+  req.flash('success', 'Task permanently deleted.');
+  res.redirect('/tasks/deleted');
 });
 
 // GET /new — Create form
@@ -292,10 +393,11 @@ router.post('/bulk', (req, res) => {
     });
     req.flash('success', allowedIds.length + ' task(s) marked complete.');
   } else if (action === 'delete') {
-    const delStmt = db.prepare('DELETE FROM tasks WHERE id = ?');
+    const delStmt = db.prepare('UPDATE tasks SET deleted_at = CURRENT_TIMESTAMP, deleted_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL');
+    const userId = req.session.user ? req.session.user.id : null;
     allowedIds.forEach(id => {
       const t = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
-      delStmt.run(id);
+      delStmt.run(userId, id);
       // Auto-log to site diary
       if (t && t.job_id) {
         autoLogDiary(db, {
@@ -320,6 +422,13 @@ router.get('/:id/edit', (req, res) => {
     WHERE t.id = ?
   `).get(req.params.id);
   if (!task) { req.flash('error', 'Task not found.'); return res.redirect('/tasks'); }
+
+  // Soft-deleted tasks are not editable — redirect to the deleted list so the
+  // user can restore if needed.
+  if (task.deleted_at) {
+    req.flash('error', 'This task has been deleted. Restore it to edit.');
+    return res.redirect('/tasks/deleted');
+  }
 
   // Admin-division tasks are private to the admin team — hide from everyone else.
   // Return the same "not found" message so non-admins can't probe for task existence.
@@ -370,8 +479,8 @@ router.get('/:id/edit', (req, res) => {
     `).all(req.params.id);
   } catch (e) { /* table may not exist yet */ }
 
-  // All tasks (for dependency picker), excluding current task
-  const allTasks = db.prepare('SELECT id, title, status, due_date FROM tasks WHERE id != ? ORDER BY title').all(req.params.id);
+  // All tasks (for dependency picker), excluding current task + deleted tasks
+  const allTasks = db.prepare('SELECT id, title, status, due_date FROM tasks WHERE id != ? AND deleted_at IS NULL ORDER BY title').all(req.params.id);
 
   // Activity log
   const activityLog = db.prepare(`
@@ -412,6 +521,10 @@ router.post('/:id', (req, res) => {
     if (!existingTask) {
       req.flash('error', 'Task not found.');
       return res.redirect('/tasks');
+    }
+    if (existingTask.deleted_at) {
+      req.flash('error', 'Cannot edit a deleted task. Restore it first.');
+      return res.redirect('/tasks/deleted');
     }
     // Admin-division tasks are admin-only, even for writes — present as "not found"
     // so non-admins can't confirm the task exists via a crafted POST.
@@ -605,7 +718,7 @@ router.post('/:id/complete', (req, res) => {
   res.redirect(req.headers.referer || '/tasks');
 });
 
-// POST /:id/delete — Delete task (owner + admin/management only)
+// POST /:id/delete — Soft-delete task (owner + admin/management only)
 router.post('/:id/delete', (req, res) => {
   const db = getDb();
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
@@ -613,7 +726,8 @@ router.post('/:id/delete', (req, res) => {
     req.flash('error', 'You can only delete your own tasks.');
     return res.redirect(req.body.return_to || '/tasks');
   }
-  db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
+  const userId = req.session.user ? req.session.user.id : null;
+  db.prepare('UPDATE tasks SET deleted_at = CURRENT_TIMESTAMP, deleted_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL').run(userId, req.params.id);
 
   // Auto-log to site diary
   if (task && task.job_id) {
@@ -625,7 +739,7 @@ router.post('/:id/delete', (req, res) => {
     });
   }
 
-  req.flash('success', 'Task deleted.');
+  req.flash('success', 'Task deleted. View it from the Deleted Tasks page.');
   res.redirect(req.body.return_to || '/tasks');
 });
 
