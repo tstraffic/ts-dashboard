@@ -8,6 +8,7 @@ const { canViewAccounts } = require('../middleware/auth');
 const { recalculateJobHealth, HEALTH_CALC_SQL } = require('../middleware/jobHealth');
 const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadForEntity } = require('../lib/chat');
 const { generateJobNumber } = require('../lib/jobNumbers');
+const { hideAdminTasksSql } = require('../lib/taskVisibility');
 
 // Multer for diary attachments
 const diaryStorage = multer.diskStorage({
@@ -223,7 +224,8 @@ router.get('/:id', (req, res) => {
   const tasks = db.prepare(`
     SELECT t.*, u.full_name as owner_name FROM tasks t
     LEFT JOIN users u ON t.owner_id = u.id
-    WHERE t.job_id = ? ORDER BY CASE t.status WHEN 'blocked' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'not_started' THEN 3 ELSE 4 END, t.due_date ASC
+    WHERE t.job_id = ?${hideAdminTasksSql(req.session.user)}
+    ORDER BY CASE t.status WHEN 'blocked' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'not_started' THEN 3 ELSE 4 END, t.due_date ASC
   `).all(job.id);
   // Enrich tasks with all owners from junction table
   try {

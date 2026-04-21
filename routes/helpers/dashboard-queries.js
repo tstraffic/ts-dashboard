@@ -1,5 +1,6 @@
 // Dashboard query helpers — extracted for clarity and role-based filtering
 const { HEALTH_CALC_SQL } = require('../../middleware/jobHealth');
+const { isAdminRole } = require('../../lib/taskVisibility');
 
 function getUrgencyKpis(db, today, user) {
   const next30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
@@ -7,14 +8,17 @@ function getUrgencyKpis(db, today, user) {
   const userRole = user ? (user.role || '').toLowerCase() : '';
   const userId = user ? user.id : 0;
   const isPlanningRole = userRole === 'planning';
+  const hideAdmin = !isAdminRole(user);
 
   // Planning only sees planning division + own + compliance-linked tasks
   const taskFilter = isPlanningRole
     ? `AND (division = 'planning' OR owner_id = ${userId} OR compliance_id IS NOT NULL)`
     : '';
+  // Everyone but admin/management has admin-division tasks hidden
+  const adminGuard = hideAdmin ? " AND division != 'admin'" : '';
 
   return {
-    overdueTasks: db.prepare(`SELECT COUNT(*) as c FROM tasks WHERE due_date < ? AND status != 'complete' ${taskFilter}`).get(today).c,
+    overdueTasks: db.prepare(`SELECT COUNT(*) as c FROM tasks WHERE due_date < ? AND status != 'complete' ${taskFilter}${adminGuard}`).get(today).c,
     openIncidents: db.prepare("SELECT COUNT(*) as c FROM incidents WHERE investigation_status NOT IN ('closed', 'resolved')").get().c,
     openDefects: db.prepare("SELECT COUNT(*) as c FROM defects WHERE status NOT IN ('closed', 'deferred')").get().c,
     unconfirmedAllocations: db.prepare("SELECT COUNT(*) as c FROM crew_allocations WHERE allocation_date = ? AND status = 'allocated'").get(today).c,
@@ -90,8 +94,10 @@ function getChartData(db) {
   };
 }
 
-function getMyWork(db, userId, today) {
+function getMyWork(db, user, today) {
+  const userId = user && user.id ? user.id : user; // tolerate legacy callers that pass just an id
   const last7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+  const adminGuard = isAdminRole(user) ? '' : " AND t.division != 'admin'";
 
   const myJobs = db.prepare(`
     SELECT j.*, u.full_name as pm_name FROM jobs j
@@ -107,7 +113,7 @@ function getMyWork(db, userId, today) {
     FROM tasks t
     LEFT JOIN jobs j ON t.job_id = j.id
     LEFT JOIN users u ON t.owner_id = u.id
-    WHERE t.owner_id = ? AND t.due_date < ? AND t.status != 'complete'
+    WHERE t.owner_id = ? AND t.due_date < ? AND t.status != 'complete'${adminGuard}
     ORDER BY t.due_date ASC LIMIT 10
   `).all(userId, today);
 
@@ -123,7 +129,9 @@ function getMyWork(db, userId, today) {
   return { myJobs, overdueTasksList, recentUpdates };
 }
 
-function getMyTasks(db, userId, today) {
+function getMyTasks(db, user, today) {
+  const userId = user && user.id ? user.id : user;
+  const adminGuard = isAdminRole(user) ? '' : " AND t.division != 'admin'";
   return db.prepare(`
     SELECT t.*, j.job_number, j.client, u.full_name as owner_name,
       cb.full_name as created_by_name
@@ -131,7 +139,7 @@ function getMyTasks(db, userId, today) {
     LEFT JOIN jobs j ON t.job_id = j.id
     LEFT JOIN users u ON t.owner_id = u.id
     LEFT JOIN users cb ON t.created_by = cb.id
-    WHERE t.owner_id = ? AND t.status != 'complete'
+    WHERE t.owner_id = ? AND t.status != 'complete'${adminGuard}
     ORDER BY
       CASE WHEN t.due_date < ? THEN 0 ELSE 1 END,
       t.due_date ASC,
@@ -140,13 +148,15 @@ function getMyTasks(db, userId, today) {
   `).all(userId, today);
 }
 
-function getTasksIAssigned(db, userId, today) {
+function getTasksIAssigned(db, user, today) {
+  const userId = user && user.id ? user.id : user;
+  const adminGuard = isAdminRole(user) ? '' : " AND t.division != 'admin'";
   return db.prepare(`
     SELECT t.*, j.job_number, j.client, u.full_name as owner_name
     FROM tasks t
     LEFT JOIN jobs j ON t.job_id = j.id
     LEFT JOIN users u ON t.owner_id = u.id
-    WHERE t.created_by = ? AND t.owner_id != ? AND t.status != 'complete'
+    WHERE t.created_by = ? AND t.owner_id != ? AND t.status != 'complete'${adminGuard}
     ORDER BY
       CASE WHEN t.due_date < ? THEN 0 ELSE 1 END,
       t.due_date ASC,

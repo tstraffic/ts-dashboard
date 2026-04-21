@@ -4,6 +4,7 @@ const { getDb } = require('../db/database');
 const { sendTaskAssignmentEmail, sendTaskStatusEmail } = require('../middleware/email');
 const { sendPushToUser } = require('../services/pushNotification');
 const { autoLogDiary, logStatusChange } = require('../lib/diary');
+const { isAdminRole, hideAdminTasksSql } = require('../lib/taskVisibility');
 
 /**
  * Check if current user can modify a task.
@@ -94,6 +95,8 @@ router.get('/', (req, res) => {
   if (division && division !== 'all') { baseWhere += ' AND t.division = ?'; params.push(division); }
   if (job_id) { baseWhere += ' AND t.job_id = ?'; params.push(job_id); }
   if (task_type && task_type !== 'all') { baseWhere += ' AND t.task_type = ?'; params.push(task_type); }
+  // Admin-division tasks are private to the admin team
+  baseWhere += hideAdminTasksSql(req.session.user);
 
   // Fetch tasks
   const tasks = db.prepare(`
@@ -146,6 +149,7 @@ router.get('/', (req, res) => {
   if (division && division !== 'all') { countWhere += ' AND t.division = ?'; countParams.push(division); }
   if (job_id) { countWhere += ' AND t.job_id = ?'; countParams.push(job_id); }
   if (task_type && task_type !== 'all') { countWhere += ' AND t.task_type = ?'; countParams.push(task_type); }
+  countWhere += hideAdminTasksSql(req.session.user);
 
   const counts = db.prepare(`
     SELECT
@@ -189,7 +193,10 @@ router.post('/', (req, res) => {
     const db = getDb();
     const b = req.body;
     const jobId = b.job_id || null;
-    const division = b.division || 'ops';
+    // Only admins/management can file a task under the admin division; for anyone
+    // else, silently downgrade to 'ops' rather than creating a task they can't see.
+    let division = b.division || 'ops';
+    if (division === 'admin' && !isAdminRole(req.session.user)) division = 'ops';
     // Handle multiple owners: owner_id can be string or array
     const ownerIds = Array.isArray(b.owner_id) ? b.owner_id.filter(Boolean) : (b.owner_id ? [b.owner_id] : []);
     const primaryOwnerId = ownerIds[0] || null;
@@ -314,6 +321,13 @@ router.get('/:id/edit', (req, res) => {
   `).get(req.params.id);
   if (!task) { req.flash('error', 'Task not found.'); return res.redirect('/tasks'); }
 
+  // Admin-division tasks are private to the admin team — hide from everyone else.
+  // Return the same "not found" message so non-admins can't probe for task existence.
+  if (task.division === 'admin' && !isAdminRole(req.session.user)) {
+    req.flash('error', 'Task not found.');
+    return res.redirect('/tasks');
+  }
+
   // Check ownership — non-owners can view but form will be read-only
   const editable = canModifyTask(task, req.session.user);
 
@@ -399,6 +413,12 @@ router.post('/:id', (req, res) => {
       req.flash('error', 'Task not found.');
       return res.redirect('/tasks');
     }
+    // Admin-division tasks are admin-only, even for writes — present as "not found"
+    // so non-admins can't confirm the task exists via a crafted POST.
+    if (existingTask.division === 'admin' && !isAdminRole(req.session.user)) {
+      req.flash('error', 'Task not found.');
+      return res.redirect('/tasks');
+    }
     if (!canModifyTask(existingTask, req.session.user)) {
       req.flash('error', 'You can only edit tasks assigned to you.');
       return res.redirect('/tasks/' + req.params.id + '/edit');
@@ -411,7 +431,9 @@ router.post('/:id', (req, res) => {
     const ownersChanged = JSON.stringify(newOwnerIds.sort()) !== JSON.stringify(oldOwnerIds.sort());
 
     const updateJobId = b.job_id || null;
-    const division = b.division || 'ops';
+    // Only admins/management can park a task in the admin division (private).
+    let division = b.division || 'ops';
+    if (division === 'admin' && !isAdminRole(req.session.user)) division = existingTask.division || 'ops';
     const completedDate = b.status === 'complete' ? new Date().toISOString().split('T')[0] : null;
     db.prepare(`
       UPDATE tasks SET job_id=?, division=?, title=?, description=?, owner_id=?, due_date=?,
