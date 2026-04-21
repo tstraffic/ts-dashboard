@@ -5673,6 +5673,83 @@ function runMigrations(db) {
     console.log('Migration 117 applied: profile + emergency contacts schema');
   }
 
+  // Migration 126: Equipment hire dockets — multi-item pick-up / drop-off checklists
+  if (!isMigrationApplied.get(126)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS hire_dockets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        docket_number TEXT,
+        job_number TEXT DEFAULT '',
+        job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+        date_prepared DATE,
+        site_location TEXT DEFAULT '',
+        prepared_by TEXT DEFAULT '',
+        prepared_by_contact TEXT DEFAULT '',
+        supervisor TEXT DEFAULT '',
+        crew TEXT DEFAULT '',
+        supplier_name TEXT DEFAULT '',
+        supplier_hire_ref TEXT DEFAULT '',
+        supplier_contact TEXT DEFAULT '',
+        supplier_phone TEXT DEFAULT '',
+        pickup_address TEXT DEFAULT '',
+        hire_period TEXT DEFAULT '',
+        agreed_rate TEXT DEFAULT '',
+        pickup_notes TEXT DEFAULT '',
+        dropoff_notes TEXT DEFAULT '',
+        pickup_collected_by TEXT DEFAULT '',
+        pickup_signature TEXT DEFAULT '',
+        pickup_date DATE,
+        pickup_supplier_rep TEXT DEFAULT '',
+        dropoff_returned_by TEXT DEFAULT '',
+        dropoff_signature TEXT DEFAULT '',
+        dropoff_date DATE,
+        dropoff_supplier_rep TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','picked_up','returned','closed')),
+        created_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS hire_docket_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        docket_id INTEGER NOT NULL REFERENCES hire_dockets(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL DEFAULT 1,
+        equipment_type TEXT DEFAULT '',
+        rego_serial TEXT DEFAULT '',
+        asset_id TEXT DEFAULT '',
+        equipment_id INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+        quantity INTEGER DEFAULT 1,
+        summary_notes TEXT DEFAULT '',
+        pickup_datetime DATETIME,
+        pickup_hours_odometer TEXT DEFAULT '',
+        pickup_fuel TEXT DEFAULT '',
+        pickup_damage_observed INTEGER DEFAULT 0,
+        pickup_photos_taken INTEGER DEFAULT 0,
+        pickup_damage_notes TEXT DEFAULT '',
+        pickup_roadworthy TEXT DEFAULT '',
+        pickup_accessories TEXT DEFAULT '',
+        pickup_clean INTEGER DEFAULT 0,
+        pickup_initials TEXT DEFAULT '',
+        dropoff_datetime DATETIME,
+        dropoff_hours_odometer TEXT DEFAULT '',
+        dropoff_fuel TEXT DEFAULT '',
+        dropoff_damage_observed INTEGER DEFAULT 0,
+        dropoff_photos_taken INTEGER DEFAULT 0,
+        dropoff_damage_notes TEXT DEFAULT '',
+        dropoff_roadworthy TEXT DEFAULT '',
+        dropoff_accessories TEXT DEFAULT '',
+        dropoff_clean INTEGER DEFAULT 0,
+        dropoff_initials TEXT DEFAULT ''
+      )
+    `);
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_hire_docket_items_docket ON hire_docket_items(docket_id)"); } catch (e) {}
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_hire_dockets_status ON hire_dockets(status)"); } catch (e) {}
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_hire_dockets_job ON hire_dockets(job_id)"); } catch (e) {}
+    recordMigration.run(126, 'Equipment hire dockets: multi-item pick-up / drop-off checklists');
+    console.log('Migration 126 applied: hire_dockets + hire_docket_items');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
