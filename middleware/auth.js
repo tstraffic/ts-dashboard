@@ -84,6 +84,9 @@ const PERMISSIONS = {
   hr_reports:         ['admin', 'hr'],
   hr_settings:        ['admin'],
   hr_compliance_view: ['admin', 'hr', 'operations'],
+
+  // ── Marketing ──
+  marketing:          ['admin'],
 };
 
 // ---- Helpers ----

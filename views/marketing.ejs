@@ -1,0 +1,196 @@
+<% locals.currentPage = 'marketing' %>
+
+<%
+  const statusClasses = {
+    live:  'bg-emerald-50 text-emerald-700',
+    plan:  'bg-blue-50 text-blue-700',
+    prep:  'bg-amber-50 text-amber-700',
+    pause: 'bg-amber-50 text-amber-700',
+  };
+  const tagClasses = {
+    indig: 'bg-orange-50 text-orange-700',
+    seo:   'bg-emerald-50 text-emerald-700',
+    paid:  'bg-brand-50 text-brand-700',
+    brand: 'bg-purple-50 text-purple-700',
+  };
+  const chgClasses = {
+    up:   'text-emerald-600',
+    down: 'text-red-600',
+    flat: 'text-gray-400',
+  };
+  const deltaClasses = {
+    up:    'text-emerald-600',
+    down:  'text-red-600',
+    flat:  'text-gray-400',
+    muted: 'text-gray-400',
+  };
+  const stageClasses = {
+    'brand-dark':  'bg-gradient-to-br from-brand-900 to-brand-700',
+    'brand-mid':   'bg-gradient-to-br from-brand-800 to-brand-600',
+    'brand-light': 'bg-gradient-to-br from-brand-600 to-brand-500',
+    'emerald':     'bg-gradient-to-br from-emerald-700 to-emerald-500',
+  };
+%>
+
+<!-- Header -->
+<div class="flex flex-wrap items-baseline justify-between gap-3 mb-2">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Marketing</h1>
+    <p class="text-sm text-gray-500 mt-0.5">Campaigns · content · social · SEO · pipeline influence</p>
+  </div>
+  <span class="inline-flex items-center px-3 py-1 rounded-full bg-brand-50 text-brand-700 text-xs font-semibold">
+    <%= data.periodLabel %>
+  </span>
+</div>
+<p class="text-sm text-gray-500 mb-4">Review each Monday with the agency. Full monthly report delivered by day 3 of next month.</p>
+
+<!-- Preview banner -->
+<div class="flex items-start gap-2 p-3 mb-5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+  <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  <span>Preview — metrics and layout only. Illustrative numbers. Wiring to real sources after agency scope confirmed (see Marketing Brief §10).</span>
+</div>
+
+<!-- KPI strip -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+  <% data.kpis.forEach(function(k) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-card p-4">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><%= k.label %></p>
+      <p class="text-2xl font-bold text-gray-900 mt-1"><%= k.value %></p>
+      <p class="text-xs font-semibold mt-1 <%= deltaClasses[k.tone] || 'text-gray-400' %>"><%= k.delta %></p>
+    </div>
+  <% }) %>
+</div>
+
+<!-- Row 1: Campaigns (8) + Social (4) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+  <!-- Active campaigns -->
+  <div class="lg:col-span-8 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+    <h2 class="text-base font-bold text-gray-900">Active campaigns</h2>
+    <p class="text-xs text-gray-500 mb-3">Live initiatives — status, spend, reach.</p>
+    <div class="divide-y divide-gray-100">
+      <% data.campaigns.forEach(function(c) { %>
+        <div class="grid grid-cols-12 gap-3 items-center py-3 text-sm">
+          <div class="col-span-12 sm:col-span-5">
+            <span class="font-semibold text-gray-900"><%= c.name %></span>
+            <span class="inline-block ml-1 align-middle text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded <%= tagClasses[c.tagTone] || 'bg-gray-100 text-gray-700' %>"><%= c.tag %></span>
+          </div>
+          <div class="col-span-4 sm:col-span-2">
+            <span class="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold <%= statusClasses[c.status] || 'bg-gray-100 text-gray-700' %>"><%= c.statusLabel %></span>
+          </div>
+          <div class="col-span-8 sm:col-span-3">
+            <div class="text-gray-700 text-xs mb-1"><%= c.spendText %></div>
+            <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div class="h-full bg-gradient-to-r from-brand-500 to-brand-700" style="width: <%= c.progress %>%"></div>
+            </div>
+          </div>
+          <div class="col-span-12 sm:col-span-2 text-xs text-gray-500 sm:text-right"><%= c.reach %></div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <!-- Social & audience -->
+  <div class="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+    <h2 class="text-base font-bold text-gray-900">Social &amp; audience</h2>
+    <p class="text-xs text-gray-500 mb-3">LinkedIn is primary. Facebook/Insta for employer brand.</p>
+
+    <div class="grid grid-cols-3 gap-2 mb-4">
+      <% data.social.stats.forEach(function(s) { %>
+        <div class="bg-gray-50 border border-gray-100 rounded-lg p-2.5">
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider"><%= s.k %></p>
+          <p class="text-lg font-bold text-gray-900 mt-0.5"><%= s.v %></p>
+          <p class="text-[11px] font-semibold mt-0.5 <%= deltaClasses[s.dTone] || 'text-gray-400' %>"><%= s.d %></p>
+        </div>
+      <% }) %>
+    </div>
+
+    <p class="text-xs text-gray-500 mb-1">Follower growth — last 6 months</p>
+    <svg class="block w-full h-16" viewBox="0 0 300 70" preserveAspectRatio="none">
+      <polyline points="<%= data.social.sparkline.points %>" fill="none" stroke="#1D6AE5" stroke-width="2.5"/>
+      <polyline points="<%= data.social.sparkline.points %> 300,70 0,70" fill="#1D6AE5" fill-opacity="0.12" stroke="none"/>
+    </svg>
+    <div class="flex justify-between text-[11px] text-gray-400 mt-1">
+      <% data.social.sparkline.months.forEach(function(m) { %><span><%= m %></span><% }) %>
+    </div>
+  </div>
+</div>
+
+<!-- Row 2: Content pipeline (6) + SEO snapshot (6) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+  <!-- Content pipeline -->
+  <div class="lg:col-span-6 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+    <h2 class="text-base font-bold text-gray-900">Content pipeline</h2>
+    <p class="text-xs text-gray-500 mb-3">What's in production this month vs plan.</p>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+      <% data.content.cards.forEach(function(c) { %>
+        <div class="bg-gray-50 border border-gray-100 rounded-lg p-3 text-center">
+          <p class="text-xl font-bold text-brand-700"><%= c.num %></p>
+          <p class="text-xs text-gray-600 mt-0.5"><%= c.cat %></p>
+          <p class="text-[11px] text-gray-400"><%= c.sub %></p>
+        </div>
+      <% }) %>
+    </div>
+    <div class="space-y-2">
+      <% data.content.items.forEach(function(item) { %>
+        <div class="flex items-center justify-between gap-3 bg-gray-50 rounded-lg px-3 py-2 text-xs">
+          <span class="text-gray-800"><%= item.title %></span>
+          <span class="text-gray-400 flex-shrink-0"><%= item.meta %></span>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <!-- SEO snapshot -->
+  <div class="lg:col-span-6 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+    <h2 class="text-base font-bold text-gray-900">SEO snapshot</h2>
+    <p class="text-xs text-gray-500 mb-3">Rankings for target NSW terms. Top 10 = page 1 of Google.</p>
+    <div class="grid grid-cols-12 gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest pb-2 border-b border-gray-200">
+      <div class="col-span-6">Keyword</div>
+      <div class="col-span-2">Position</div>
+      <div class="col-span-2">Change</div>
+      <div class="col-span-2">Volume</div>
+    </div>
+    <div class="divide-y divide-gray-100">
+      <% data.seo.keywords.forEach(function(k) { %>
+        <div class="grid grid-cols-12 gap-2 items-center py-2 text-sm">
+          <div class="col-span-6 font-semibold text-gray-900"><%= k.kw %></div>
+          <div class="col-span-2 text-gray-700"><%= k.pos %></div>
+          <div class="col-span-2 text-xs font-bold <%= chgClasses[k.chgTone] || 'text-gray-400' %>"><%= k.chg %></div>
+          <div class="col-span-2 text-gray-500 text-xs"><%= k.volume %></div>
+        </div>
+      <% }) %>
+    </div>
+    <div class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-xs text-gray-500">
+      <span class="font-bold text-gray-900"><%= data.seo.footer.onPageOne %> of <%= data.seo.footer.totalTargets %></span>
+      target keywords now on page 1. Domain authority <%= data.seo.footer.domainAuthority %> (<%= data.seo.footer.daDelta %>).
+    </div>
+  </div>
+</div>
+
+<!-- Row 3: Pipeline influence (12) -->
+<div class="bg-white border border-gray-200 rounded-xl shadow-card p-5 mb-4">
+  <h2 class="text-base font-bold text-gray-900">Pipeline influence — marketing to revenue</h2>
+  <p class="text-xs text-gray-500 mb-4">How marketing is contributing to the sales pipeline. Attribution: first-touch + last-touch.</p>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <% data.funnel.forEach(function(s) { %>
+      <div class="rounded-xl p-4 text-white text-center <%= stageClasses[s.tone] || 'bg-gradient-to-br from-gray-700 to-gray-500' %>">
+        <p class="text-[10px] uppercase tracking-widest opacity-90"><%= s.label %></p>
+        <p class="text-3xl font-extrabold mt-1"><%= s.value %></p>
+        <p class="text-[11px] opacity-85 mt-1"><%= s.sub %></p>
+      </div>
+    <% }) %>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+    <% data.evidence.forEach(function(e) { %>
+      <div class="bg-gray-50 border border-gray-100 rounded-lg p-3">
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider"><%= e.k %></p>
+        <p class="text-lg font-bold text-gray-900 mt-0.5"><%= e.v %></p>
+        <p class="text-[11px] text-gray-400 mt-0.5"><%= e.d %></p>
+      </div>
+    <% }) %>
+  </div>
+</div>
+
+<p class="text-center text-xs text-gray-400 pt-2 pb-6">
+  Mockup for agency conversation — layout and metrics only. Wire to real sources after scope agreed.
+</p>

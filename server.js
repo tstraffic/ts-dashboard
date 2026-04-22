@@ -213,6 +213,7 @@ app.use('/equipment', requireLogin, requirePermission('equipment'), require('./r
 app.use('/checklists', requireLogin, requirePermission('checklists'), require('./routes/checklists'));
 app.use('/exports', requireLogin, requirePermission('exports'), require('./routes/exports'));
 app.use('/reports', requireLogin, requirePermission('reports'), require('./routes/reports'));
+app.use('/marketing', requireLogin, requirePermission('marketing'), require('./routes/marketing'));
 app.use('/defects', requireLogin, requirePermission('defects'), require('./routes/defects'));
 app.use('/hr', requireLogin, require('./routes/hr-secure'));
 app.use('/hr', requireLogin, require('./routes/hr'));
