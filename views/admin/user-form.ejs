@@ -65,9 +65,13 @@
             <option value="finance" <%= isEdit && editUser.role === 'finance' ? 'selected' : '' %>>Finance</option>
             <option value="hr" <%= isEdit && editUser.role === 'hr' ? 'selected' : '' %>>HR</option>
             <option value="sales" <%= isEdit && editUser.role === 'sales' ? 'selected' : '' %>>Sales</option>
-            <option value="management" <%= isEdit && editUser.role === 'management' ? 'selected' : '' %>>Management</option>
             <option value="marketing" <%= isEdit && editUser.role === 'marketing' ? 'selected' : '' %>>Marketing</option>
-            <option value="accounts" <%= isEdit && editUser.role === 'accounts' ? 'selected' : '' %>>Accounts</option>
+            <% if (isEdit && editUser.role === 'management') { %>
+            <option value="management" selected>Management (legacy — behaves as Admin)</option>
+            <% } %>
+            <% if (isEdit && editUser.role === 'accounts') { %>
+            <option value="accounts" selected>Accounts (legacy — behaves as Finance)</option>
+            <% } %>
           </select>
         </div>
 
