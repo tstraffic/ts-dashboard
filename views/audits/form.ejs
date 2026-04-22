@@ -564,8 +564,11 @@
       const client = opt.getAttribute('data-client') || '';
       const site = opt.getAttribute('data-site') || '';
       const suburb = opt.getAttribute('data-suburb') || '';
+      // Don't auto-fill from job_name — that's a 4-part pipe-concat
+      // (`J-XXXX | Client | Suburb | Date`) that reads badly as a
+      // Project / Site label. Use a clean `job-number — client` instead.
       const fields = {
-        'f-project_site': n || (num + (client ? ' — ' + client : '')),
+        'f-project_site': num + (client ? ' — ' + client : ''),
         'f-client': client,
         'f-location': [site, suburb].filter(Boolean).join(', '),
       };
