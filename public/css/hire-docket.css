@@ -67,6 +67,12 @@
 .hd-pill:hover:not(.is-active) {
   background: #f3f4f6;
 }
+/* Keyboard focus — the input is visually hidden but still focusable, so
+   surface a ring on the label whenever the hidden input is :focus-visible. */
+.hd-pill:has(input:focus-visible) {
+  outline: 2px solid #2B7FFF;
+  outline-offset: 2px;
+}
 .hd-pill-sm { padding: 4px 10px; font-size: 11px; min-height: 28px; }
 
 .hd-yn-group { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -120,12 +126,8 @@
     break-inside: avoid;
   }
 
-  details { }
   details summary { list-style: none; pointer-events: none; }
   details > summary::-webkit-details-marker { display: none; }
-  details[open] > summary { }
-  /* Force every details open in print mode */
-  details { }
 }
 details[open] > summary svg.rotate-180 { transform: rotate(180deg); }
 
