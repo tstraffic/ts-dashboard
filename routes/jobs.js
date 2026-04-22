@@ -221,10 +221,13 @@ router.get('/:id', (req, res) => {
   // Auto-calculate health from live data
   job.health = recalculateJobHealth(db, job.id);
 
+  // Job's Tasks tab = ops work only. Planning-division tasks (including
+  // legacy auto-tasks from Plans & Approvals that pre-date the compliance_id
+  // column) live under Traffic Plans instead.
   const tasks = db.prepare(`
     SELECT t.*, u.full_name as owner_name FROM tasks t
     LEFT JOIN users u ON t.owner_id = u.id
-    WHERE t.job_id = ? AND t.deleted_at IS NULL AND t.compliance_id IS NULL${hideAdminTasksSql(req.session.user)}
+    WHERE t.job_id = ? AND t.deleted_at IS NULL AND t.compliance_id IS NULL AND t.division != 'planning'${hideAdminTasksSql(req.session.user)}
     ORDER BY CASE t.status WHEN 'blocked' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'not_started' THEN 3 ELSE 4 END, t.due_date ASC
   `).all(job.id);
   // Enrich tasks with all owners from junction table
