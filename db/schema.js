@@ -5997,6 +5997,40 @@ function runMigrations(db) {
     console.log('Migration 132 applied: task cleanup');
   }
 
+  // Migration 133: Expand users.role CHECK to include 'marketing' (and the
+  // legacy aliases 'management', 'accounts' that the /admin/users form has
+  // always offered but the CHECK constraint quietly rejected).
+  if (!isMigrationApplied.get(133)) {
+    const userSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
+    if (userSql && userSql.sql && !userSql.sql.includes("'marketing'")) {
+      const cols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+      const colDefs = db.prepare("PRAGMA table_info(users)").all().map(c => {
+        const notNull = c.notnull ? ' NOT NULL' : '';
+        const dflt = c.dflt_value !== null ? ` DEFAULT ${c.dflt_value}` : '';
+        const pk = c.pk ? ' PRIMARY KEY AUTOINCREMENT' : '';
+        const unique = c.name === 'username' ? ' UNIQUE' : '';
+        return `${c.name} ${c.type}${pk}${unique}${notNull}${dflt}`;
+      }).join(',\n            ');
+
+      db.pragma('foreign_keys = OFF');
+      db.exec(`
+        CREATE TABLE users_new (
+            ${colDefs},
+            CHECK(role IN ('admin','operations','planning','finance','hr','sales','management','marketing','accounts'))
+        );
+      `);
+      db.exec(`INSERT INTO users_new (${cols.join(',')}) SELECT ${cols.join(',')} FROM users;`);
+      db.exec('DROP TABLE users;');
+      db.exec('ALTER TABLE users_new RENAME TO users;');
+      db.pragma('foreign_keys = ON');
+      console.log("Migration 133: users.role CHECK now includes 'marketing', 'management', 'accounts'");
+    } else {
+      console.log('Migration 133: users CHECK already permits marketing — nothing to do.');
+    }
+    recordMigration.run(133, "Expand users.role CHECK to include marketing/management/accounts");
+    console.log('Migration 133 applied.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

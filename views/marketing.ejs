@@ -1,0 +1,577 @@
+<% locals.currentPage = 'marketing' %>
+
+<%
+  const statusClasses = {
+    live:    'bg-emerald-50 text-emerald-700',
+    plan:    'bg-blue-50 text-blue-700',
+    prep:    'bg-gray-100 text-gray-700',
+    blocked: 'bg-red-50 text-red-700',
+  };
+  const tagClasses = {
+    indig: 'bg-amber-50 text-amber-700',
+    seo:   'bg-emerald-50 text-emerald-700',
+    paid:  'bg-brand-50 text-brand-700',
+    brand: 'bg-purple-50 text-purple-700',
+  };
+  const chgClasses = {
+    up:   'text-emerald-600',
+    down: 'text-red-600',
+    flat: 'text-gray-400',
+  };
+  const deltaClasses = {
+    up:    'text-emerald-600',
+    down:  'text-red-600',
+    flat:  'text-gray-400',
+    warn:  'text-amber-600',
+  };
+  const priorityClasses = {
+    high: 'bg-red-50 text-red-700',
+    med:  'bg-amber-50 text-amber-700',
+    low:  'bg-gray-100 text-gray-500',
+  };
+  const avatarColors = {
+    sa: 'bg-brand-600',
+    li: 'bg-emerald-600',
+    to: 'bg-amber-600',
+    je: 'bg-purple-600',
+    mk: 'bg-pink-600',
+  };
+  const avatarInitials = { sa: 'SA', li: 'LI', to: 'TO', je: 'JE', mk: 'MK' };
+  const agencyValTone = {
+    good: 'text-emerald-600',
+    warn: 'text-amber-600',
+    neutral: 'text-gray-900',
+  };
+  const paceFillTone = {
+    good: 'bg-gradient-to-r from-brand-600 to-brand-500',
+    warn: 'bg-gradient-to-r from-amber-500 to-amber-400',
+  };
+  const alertClasses = {
+    bad:  'bg-red-50 text-red-700 border border-red-200',
+    warn: 'bg-amber-50 text-amber-700 border border-amber-200',
+  };
+%>
+
+<div class="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-4">
+
+  <!-- ══════════════════════════════ Sub-sidebar ══════════════════════════════ -->
+  <aside class="hidden lg:block bg-white border border-gray-200 rounded-xl shadow-card p-3 h-fit sticky top-20">
+    <div class="text-[10px] uppercase tracking-widest text-gray-400 px-2 pb-3 border-b border-gray-100 mb-3">
+      T&amp;S <span class="text-gray-300 mx-1">/</span> <strong class="text-gray-900">Marketing</strong>
+    </div>
+    <% ['daily','work','performance','manage'].forEach(function(group) { %>
+      <div class="mb-4">
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-1"><%= group %></p>
+        <% data.subNav[group].forEach(function(item) { %>
+          <a href="<%= item.href %>"
+             class="flex items-center gap-2 px-2 py-2 rounded-lg text-sm <%= item.active ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' %>">
+            <span class="w-1.5 h-1.5 rounded-full <%= item.active ? 'bg-brand-600' : 'bg-gray-300' %>"></span>
+            <span class="flex-1"><%= item.label %></span>
+            <% if (item.badge) { %>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full
+                <%= item.badgeTone === 'warn' ? 'bg-amber-500 text-white'
+                    : item.badgeTone === 'ghost' ? 'bg-gray-100 text-gray-500'
+                    : 'bg-brand-600 text-white' %>"><%= item.badge %></span>
+            <% } %>
+          </a>
+        <% }) %>
+      </div>
+    <% }) %>
+    <div class="border-t border-gray-100 pt-3 px-2 text-[11px] text-gray-400 leading-relaxed">
+      Viewing as <strong class="text-gray-700"><%= user.full_name || user.username %></strong><br>
+      <%= (user.role === 'marketing') ? 'Marketing' : (user.role === 'admin' || user.role === 'management') ? 'Owner' : user.role %>
+    </div>
+  </aside>
+
+  <!-- ══════════════════════════════ Main content ══════════════════════════════ -->
+  <div class="min-w-0" id="sec-top">
+
+    <!-- Preview banner -->
+    <div class="flex items-start gap-2 p-3 mb-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+      <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span>Preview — operational workspace layout. Numbers, tasks and approvals are illustrative. Buttons are non-interactive until the data model (spec §3) is wired.</span>
+    </div>
+
+    <!-- Alerts strip -->
+    <div id="sec-alerts" class="flex items-center gap-3 flex-wrap p-3 mb-4 rounded-xl bg-red-50 border border-red-200">
+      <span class="text-[11px] font-bold uppercase tracking-widest text-red-700 pr-3 border-r border-red-200">Needs attention</span>
+      <% data.alerts.forEach(function(a) { %>
+        <span class="text-xs px-3 py-1 rounded-full <%= alertClasses[a.tone] %>"><%= a.text %></span>
+      <% }) %>
+    </div>
+
+    <!-- Header -->
+    <div class="flex flex-wrap items-baseline justify-between gap-3 mb-1">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Marketing</h1>
+        <p class="text-sm text-gray-500 mt-0.5">Campaigns · content · social · SEO · reach · agency performance</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[11px] text-gray-500">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Last synced <%= data.syncedAgo %>
+        </span>
+        <span class="inline-flex items-center px-3 py-1 rounded-full bg-brand-50 text-brand-700 text-xs font-semibold"><%= data.periodLabel %></span>
+        <button type="button" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50">Weekly agenda</button>
+        <button type="button" class="px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700">+ New task</button>
+      </div>
+    </div>
+    <p class="text-sm text-gray-500 mb-4">Reviewed weekly with agency. Team updates status here; you approve, comment, and assign. Two-way.</p>
+
+    <!-- KPI strip -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <% data.kpis.forEach(function(k) { %>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-card p-4">
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><%= k.label %></p>
+          <p class="text-2xl font-bold text-gray-900 mt-1">
+            <%= k.value %><% if (k.valueSuffix) { %><span class="text-sm font-medium text-gray-400"><%= k.valueSuffix %></span><% } %>
+          </p>
+          <% if (k.split) { %><p class="text-[11px] text-gray-400 mt-0.5"><%= k.split %></p><% } %>
+          <% if (k.delta) { %><p class="text-xs font-semibold mt-1 <%= deltaClasses[k.tone] || 'text-gray-400' %>"><%= k.delta %></p><% } %>
+          <% if (k.target) { %><p class="text-[10px] text-gray-400 mt-0.5"><%= k.target %></p><% } %>
+          <% if (k.pace) { %>
+            <div class="relative h-2 bg-gray-100 rounded mt-2 overflow-hidden">
+              <div class="h-full bg-gradient-to-r from-brand-600 to-brand-500" style="width: <%= k.pace.fill %>%"></div>
+              <div class="absolute top-[-2px] bottom-[-2px] w-[2px] bg-amber-400" style="left: <%= k.pace.mark %>%"></div>
+            </div>
+            <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+              <span><%= k.pace.leftLabel %></span><span><%= k.pace.rightLabel %> ↑</span>
+            </div>
+          <% } %>
+        </div>
+      <% }) %>
+    </div>
+
+    <!-- Tasks + Approvals -->
+    <div id="sec-tasks" class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+      <!-- Tasks -->
+      <div class="lg:col-span-6 bg-white border border-brand-200 rounded-xl shadow-card p-5">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+          <div>
+            <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+              Tasks &amp; to-dos <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-600 text-white">11 open</span>
+            </h2>
+            <p class="text-xs text-gray-500 mt-0.5">Two-way between you and the marketing team. Check off as done.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="inline-flex bg-gray-100 rounded-full p-0.5 text-[11px]" id="task-tabs">
+              <button type="button" data-task-tab="mine"   class="tk-btn active px-3 py-1 rounded-full bg-brand-600 text-white font-semibold">Assigned to me <span class="ml-0.5 opacity-90">4</span></button>
+              <button type="button" data-task-tab="theirs" class="tk-btn px-3 py-1 rounded-full text-gray-500 font-semibold">Assigned to them <span class="ml-0.5">7</span></button>
+            </div>
+            <button type="button" class="px-2.5 py-1 rounded-lg bg-brand-600 text-white text-[11px] font-semibold">+ Add</button>
+          </div>
+        </div>
+
+        <div data-task-list="mine" class="divide-y divide-gray-100">
+          <% data.tasks.mine.forEach(function(t) { %>
+            <div class="grid grid-cols-[16px_1fr_auto_auto] sm:grid-cols-[16px_1fr_auto_auto_auto] gap-2 sm:gap-3 items-center py-3 text-sm">
+              <div class="w-4 h-4 rounded border-2 border-gray-300 cursor-pointer"></div>
+              <div>
+                <p class="text-gray-900 font-medium"><%= t.title %></p>
+                <p class="text-[11px] text-gray-400 mt-0.5">
+                  From <strong class="text-gray-600"><%= t.from %></strong>
+                  <% if (t.link) { %> · <a href="#" class="text-brand-600"><%= t.link %></a><% } %>
+                  <% if (t.note) { %> · <%= t.note %><% } %>
+                  <% if (t.comments) { %> · <%= t.comments %> comments<% } %>
+                </p>
+              </div>
+              <div class="hidden sm:flex w-6 h-6 rounded-full text-[10px] font-bold text-white items-center justify-center bg-brand-600">SA</div>
+              <span class="hidden sm:inline text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded <%= priorityClasses[t.priority] || 'bg-gray-100 text-gray-500' %>"><%= t.priority %></span>
+              <span class="text-[11px] <%= t.dueUrgent ? 'text-red-600 font-semibold' : 'text-gray-400' %>"><%= t.due %></span>
+            </div>
+          <% }) %>
+        </div>
+
+        <div data-task-list="theirs" class="divide-y divide-gray-100 hidden">
+          <% data.tasks.theirs.forEach(function(t) { %>
+            <div class="grid grid-cols-[16px_1fr_auto_auto] sm:grid-cols-[16px_1fr_auto_auto_auto] gap-2 sm:gap-3 items-center py-3 text-sm">
+              <div class="w-4 h-4 rounded border-2 border-gray-300 cursor-pointer"></div>
+              <div>
+                <p class="text-gray-900 font-medium"><%= t.title %></p>
+                <p class="text-[11px] text-gray-400 mt-0.5">
+                  Assigned to <strong class="text-gray-600"><%= t.to %></strong><% if (t.note) { %> · <%= t.note %><% } %>
+                </p>
+              </div>
+              <div class="hidden sm:flex w-6 h-6 rounded-full text-[10px] font-bold text-white items-center justify-center <%= avatarColors[t.avatar] || 'bg-gray-500' %>"><%= avatarInitials[t.avatar] || '??' %></div>
+              <span class="hidden sm:inline text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded <%= priorityClasses[t.priority] || 'bg-gray-100 text-gray-500' %>"><%= t.priority %></span>
+              <span class="text-[11px] text-gray-400"><%= t.due %></span>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <!-- Approvals -->
+      <div class="lg:col-span-6 bg-white border border-amber-200 rounded-xl shadow-card p-5">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+          <div>
+            <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+              Waiting on your approval <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white">4</span>
+            </h2>
+            <p class="text-xs text-gray-500 mt-0.5">The agency has paused. Every hour costs momentum.</p>
+          </div>
+          <button type="button" class="px-3 py-1 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600">Approval history</button>
+        </div>
+        <% data.approvals.forEach(function(a) { %>
+          <div class="flex items-center justify-between gap-3 mb-2 pl-3 p-3 rounded-lg bg-gray-50 border-l-4 border-amber-400">
+            <div class="min-w-0">
+              <div class="text-[10px] font-bold uppercase tracking-wider inline-block px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 mr-1 align-middle"><%= a.type %></div>
+              <span class="text-sm font-semibold text-gray-900 align-middle"><%= a.title %></span>
+              <p class="text-[11px] text-gray-500 mt-1"><%= a.meta %> Due <strong class="<%= a.dueTone === 'urgent' ? 'text-red-600' : 'text-gray-700' %>"><%= a.dueText %></strong>.</p>
+            </div>
+            <div class="flex gap-1 flex-shrink-0">
+              <button type="button" class="px-2.5 py-1 rounded bg-emerald-600 text-white text-[11px] font-semibold">Approve</button>
+              <button type="button" class="px-2.5 py-1 rounded border border-red-300 text-red-600 text-[11px] font-semibold">Reject</button>
+              <button type="button" class="px-2.5 py-1 rounded border border-gray-200 text-gray-600 text-[11px] font-semibold">Review</button>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- Campaigns + Social -->
+    <div id="sec-campaigns" class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+      <div class="lg:col-span-8 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h2 class="text-base font-bold text-gray-900">Active campaigns</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Live initiatives. Click any row to open campaign detail.</p>
+          </div>
+          <button type="button" class="px-3 py-1 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600">+ New campaign</button>
+        </div>
+        <div class="divide-y divide-gray-100">
+          <% data.campaigns.forEach(function(c) { %>
+            <div class="grid grid-cols-12 gap-3 items-center py-3 text-sm">
+              <div class="col-span-12 sm:col-span-5">
+                <span class="font-semibold text-gray-900"><%= c.name %></span>
+                <span class="inline-block ml-1 align-middle text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded <%= tagClasses[c.tagTone] || 'bg-gray-100 text-gray-700' %>"><%= c.tag %></span>
+              </div>
+              <div class="col-span-4 sm:col-span-2">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold <%= statusClasses[c.status] || 'bg-gray-100 text-gray-700' %>"><%= c.statusLabel %></span>
+              </div>
+              <div class="col-span-8 sm:col-span-3">
+                <div class="text-gray-700 text-xs mb-1"><%= c.spendText %></div>
+                <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-gradient-to-r from-brand-500 to-brand-700" style="width: <%= c.progress %>%"></div>
+                </div>
+              </div>
+              <div class="col-span-12 sm:col-span-2 text-xs text-gray-500 sm:text-right"><%= c.reach %></div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <div id="sec-social" class="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+        <h2 class="text-base font-bold text-gray-900">Social &amp; audience</h2>
+        <p class="text-xs text-gray-500 mb-3">LinkedIn primary (B2B buyers). Facebook/Insta for employer brand.</p>
+        <div class="grid grid-cols-3 gap-2 mb-4">
+          <% data.social.stats.forEach(function(s) { %>
+            <div class="bg-gray-50 border border-gray-100 rounded-lg p-2.5">
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider"><%= s.k %></p>
+              <p class="text-lg font-bold text-gray-900 mt-0.5"><%= s.v %></p>
+              <p class="text-[11px] font-semibold mt-0.5 <%= deltaClasses[s.dTone] || 'text-gray-400' %>"><%= s.d %></p>
+              <p class="text-[10px] text-gray-400 mt-0.5"><%= s.target %></p>
+            </div>
+          <% }) %>
+        </div>
+        <p class="text-xs text-gray-500 mb-1"><%= data.social.followersLabel %></p>
+        <svg class="block w-full h-16" viewBox="0 0 300 70" preserveAspectRatio="none">
+          <polyline points="<%= data.social.sparkline.points %>" fill="none" stroke="#1D6AE5" stroke-width="2.5"/>
+          <polyline points="<%= data.social.sparkline.points %> 300,70 0,70" fill="#1D6AE5" fill-opacity="0.14" stroke="none"/>
+        </svg>
+        <div class="flex justify-between text-[11px] text-gray-400 mt-1">
+          <% data.social.sparkline.months.forEach(function(m) { %><span><%= m %></span><% }) %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leads + Regions + Reviews -->
+    <div id="sec-leads" class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+      <!-- Lead source -->
+      <div class="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+        <h2 class="text-base font-bold text-gray-900">Where leads came from</h2>
+        <p class="text-xs text-gray-500 mb-3">Breakdown of this month's 17 qualified leads.</p>
+        <div class="inline-flex bg-gray-100 rounded-full p-0.5 text-[11px] mb-3" id="lead-toggle">
+          <button type="button" data-attr-mode="last"  class="lead-btn active px-3 py-1 rounded-full bg-brand-600 text-white font-semibold">Last-touch</button>
+          <button type="button" data-attr-mode="first" class="lead-btn px-3 py-1 rounded-full text-gray-500 font-semibold">First-touch</button>
+        </div>
+        <div class="space-y-2">
+          <% data.leadSource.forEach(function(s) { %>
+            <div class="grid grid-cols-[120px_1fr_32px] gap-2 items-center text-[13px]">
+              <div class="text-gray-700"><%= s.label %></div>
+              <div class="h-4 bg-gray-100 rounded overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-brand-600 to-brand-500 lead-bar transition-all" data-last="<%= Math.round(s.last*100/7) %>" data-first="<%= Math.round(s.first*100/7) %>" style="width:<%= Math.round(s.last*100/7) %>%"></div>
+              </div>
+              <div class="text-right font-bold text-gray-900 lead-n" data-last="<%= s.last %>" data-first="<%= s.first %>"><%= s.last %></div>
+            </div>
+          <% }) %>
+        </div>
+        <p class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 border-l-4 border-brand-500">
+          <strong class="text-gray-900">First-touch</strong> = channel that first brought them in. <strong class="text-gray-900">Last-touch</strong> = what closed the lead. Don't defund first-touch channels that aren't closing directly — they feed the rest.
+        </p>
+      </div>
+
+      <!-- Regions -->
+      <div class="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+        <h2 class="text-base font-bold text-gray-900">Leads by NSW region</h2>
+        <p class="text-xs text-gray-500 mb-3">Where marketing is landing across your footprint.</p>
+        <div class="divide-y divide-gray-100">
+          <% data.regions.forEach(function(r) { %>
+            <div class="flex items-center justify-between py-2 text-sm gap-2">
+              <div class="flex-1 text-gray-700 truncate"><%= r.label %></div>
+              <div class="h-1 w-16 bg-gray-100 rounded overflow-hidden"><div class="h-full bg-brand-600" style="width: <%= r.barPct %>%"></div></div>
+              <div class="text-right whitespace-nowrap">
+                <span class="font-bold text-gray-900"><%= r.n %></span>
+                <span class="text-[11px] text-gray-400 ml-1"><%= r.pct ? r.pct + '%' : '—' %></span>
+              </div>
+            </div>
+          <% }) %>
+          <div class="flex items-center justify-between pt-2 text-sm font-bold text-gray-900">
+            <div>Total accounted for</div>
+            <div>17 / 17</div>
+          </div>
+        </div>
+        <p class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 border-l-4 border-brand-500">
+          Regional pipeline is a gap. Ask agency about regional LGA content + Google Business locations for Newcastle / Wollongong depots.
+        </p>
+      </div>
+
+      <!-- Reviews -->
+      <div id="sec-reviews" class="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+        <h2 class="text-base font-bold text-gray-900">Google reviews &amp; reputation</h2>
+        <p class="text-xs text-gray-500 mb-3">Direct trust signal for buyers and local SEO ranking factor.</p>
+        <div class="flex items-baseline gap-2 mb-2">
+          <span class="text-2xl font-extrabold text-gray-900">★ <%= data.reviews.stars %></span>
+          <span class="text-xs text-gray-500"><%= data.reviews.totalText %></span>
+        </div>
+        <div class="divide-y divide-gray-100">
+          <% data.reviews.rows.forEach(function(r) { %>
+            <div class="flex items-center justify-between py-1.5 text-sm">
+              <span class="text-gray-500"><%= r.k %></span>
+              <span class="font-bold text-gray-900">
+                <%= r.v %><% if (r.delta) { %> <span class="text-emerald-600 font-semibold text-[11px] ml-1"><%= r.delta %></span><% } %>
+              </span>
+            </div>
+          <% }) %>
+        </div>
+        <p class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 border-l-4 border-brand-500">
+          <%= data.reviews.footer %>
+        </p>
+      </div>
+    </div>
+
+    <!-- Content pipeline + SEO -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+      <!-- Content pipeline -->
+      <div id="sec-content" class="lg:col-span-6 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h2 class="text-base font-bold text-gray-900">Content pipeline <span class="text-[11px] font-medium text-gray-400 ml-1">month totals · every item in flight</span></h2>
+            <p class="text-xs text-gray-500 mt-0.5">Click any row to open, comment, change status or reassign.</p>
+          </div>
+          <button type="button" class="px-3 py-1 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600">+ New item</button>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+          <% data.content.cards.forEach(function(c) { %>
+            <div class="bg-gray-50 border border-gray-100 rounded-lg p-3 text-center">
+              <p class="text-xl font-bold text-brand-700"><%= c.num %></p>
+              <p class="text-xs text-gray-600 mt-0.5"><%= c.cat %></p>
+              <p class="text-[11px] text-gray-400"><%= c.sub %></p>
+            </div>
+          <% }) %>
+        </div>
+        <div class="space-y-2">
+          <% data.content.items.forEach(function(item) { %>
+            <div class="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 sm:gap-3 items-center px-3 py-2 rounded-lg text-sm
+                 <%= item.missed ? 'bg-red-50 border-l-4 border-red-500' : 'bg-gray-50' %>">
+              <div class="text-gray-800 truncate">
+                <%= item.title %>
+                <% if (item.missed) { %><span class="inline-block ml-2 align-middle text-[10px] font-bold text-red-700">MISSED</span><% } %>
+              </div>
+              <div class="hidden sm:block text-[11px] text-gray-400 whitespace-nowrap"><%= item.meta %></div>
+              <div class="text-[11px] <%= item.comments > 0 ? 'text-brand-600' : 'text-gray-400' %>">💬 <%= item.comments %></div>
+              <div class="w-6 h-6 rounded-full text-[10px] font-bold text-white flex items-center justify-center <%= avatarColors[item.avatar] || 'bg-gray-500' %>"><%= avatarInitials[item.avatar] || '??' %></div>
+              <span class="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold <%= statusClasses[item.status] || 'bg-gray-100 text-gray-700' %>"><%= item.statusLabel %></span>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <!-- SEO snapshot -->
+      <div id="sec-seo" class="lg:col-span-6 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+        <h2 class="text-base font-bold text-gray-900">SEO snapshot</h2>
+        <p class="text-xs text-gray-500 mb-3">Rankings for target NSW terms. Top 10 = page 1 of Google.</p>
+        <div class="grid grid-cols-12 gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest pb-2 border-b border-gray-200">
+          <div class="col-span-6">Keyword</div><div class="col-span-2">Position</div><div class="col-span-2">Change</div><div class="col-span-2">Volume</div>
+        </div>
+        <div class="divide-y divide-gray-100">
+          <% data.seo.keywords.forEach(function(k) { %>
+            <div class="grid grid-cols-12 gap-2 items-center py-2 text-sm">
+              <div class="col-span-6 font-semibold text-gray-900">
+                <%= k.kw %>
+                <% if (k.tag) { %><span class="inline-block ml-1 align-middle text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded <%= tagClasses[k.tagTone] || 'bg-gray-100 text-gray-700' %>"><%= k.tag %></span><% } %>
+              </div>
+              <div class="col-span-2 text-gray-700"><%= k.pos %></div>
+              <div class="col-span-2 text-xs font-bold <%= chgClasses[k.chgTone] || 'text-gray-400' %>"><%= k.chg %></div>
+              <div class="col-span-2 text-gray-500 text-xs"><%= k.volume %></div>
+            </div>
+          <% }) %>
+        </div>
+        <p class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 border-l-4 border-brand-500">
+          <%= data.seo.footer %>
+        </p>
+      </div>
+    </div>
+
+    <!-- Agency + Influence -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+      <!-- Agency performance -->
+      <div id="sec-agency" class="lg:col-span-6 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+        <h2 class="text-base font-bold text-gray-900">Agency performance</h2>
+        <p class="text-xs text-gray-500 mb-3">How your agency is delivering against what you're paying for.</p>
+        <div class="divide-y divide-gray-100">
+          <% data.agency.forEach(function(row) { %>
+            <% if (row.note) { %>
+              <div class="py-1 text-[11px] <%= agencyValTone[row.tone] || 'text-gray-500' %>">
+                <%= row.val %>
+              </div>
+            <% } else { %>
+              <div class="flex items-center justify-between py-2.5 text-sm gap-3">
+                <span class="text-gray-700"><%= row.lbl %></span>
+                <div class="flex items-center gap-2 font-bold <%= agencyValTone[row.tone] || 'text-gray-900' %>">
+                  <% if (row.pace) { %>
+                    <span class="relative w-20 h-1.5 bg-gray-100 rounded overflow-hidden">
+                      <span class="block h-full <%= paceFillTone[row.pace.tone] || 'bg-brand-600' %>" style="width: <%= row.pace.fill %>%"></span>
+                      <% if (row.pace.mark) { %><span class="absolute top-[-2px] bottom-[-2px] w-[2px] bg-amber-400" style="left: <%= row.pace.mark %>%"></span><% } %>
+                    </span>
+                  <% } %>
+                  <span><%= row.val %></span>
+                </div>
+              </div>
+            <% } %>
+          <% }) %>
+        </div>
+      </div>
+
+      <!-- Pipeline influence -->
+      <div class="lg:col-span-6 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+        <h2 class="text-base font-bold text-gray-900">Marketing influence on pipeline</h2>
+        <p class="text-xs text-gray-500 mb-3">How marketing flows into the sales pipeline. Full tender tracker lives in <em>Jobs &amp; Tenders</em>.</p>
+        <div class="flex items-stretch flex-wrap lg:flex-nowrap gap-1">
+          <% data.funnel.forEach(function(s, i) { %>
+            <div class="flex-1 min-w-[120px] p-3 rounded-lg text-center <%= s.isWin ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200' : 'bg-gray-50 border border-gray-200' %>">
+              <p class="text-[10px] uppercase tracking-widest text-gray-500"><%= s.label %></p>
+              <p class="text-2xl font-extrabold mt-0.5 <%= s.isWin ? 'text-emerald-700' : 'text-gray-900' %>"><%= s.value %></p>
+              <p class="text-[11px] text-gray-500 mt-0.5"><%= s.sub %></p>
+            </div>
+            <% if (s.conv) { %>
+              <div class="flex items-center justify-center flex-col sm:px-1 gap-1 text-gray-400">
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full border <%= s.convTone === 'weak' ? 'text-amber-600 border-amber-200 bg-amber-50' : 'text-brand-600 border-brand-200 bg-brand-50' %>"><%= s.conv %></span>
+                <span class="text-sm">→</span>
+              </div>
+            <% } %>
+          <% }) %>
+        </div>
+        <p class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 border-l-4 border-brand-500">
+          <%- data.funnelNote.replace(/Bottleneck:/,'<strong class="text-gray-900">Bottleneck:</strong>') %>
+        </p>
+      </div>
+    </div>
+
+    <!-- Activity + Quick ask -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+      <div class="lg:col-span-8 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <h2 class="text-base font-bold text-gray-900">Activity feed <span class="text-[11px] font-medium text-gray-400 ml-1">everything the team has done recently</span></h2>
+          <div class="inline-flex bg-gray-100 rounded-full p-0.5 text-[11px]">
+            <button type="button" class="px-3 py-1 rounded-full bg-brand-600 text-white font-semibold">All</button>
+            <button type="button" class="px-3 py-1 rounded-full text-gray-500 font-semibold">Content</button>
+            <button type="button" class="px-3 py-1 rounded-full text-gray-500 font-semibold">Campaigns</button>
+            <button type="button" class="px-3 py-1 rounded-full text-gray-500 font-semibold">Comments</button>
+          </div>
+        </div>
+        <div class="divide-y divide-gray-100">
+          <% data.activity.forEach(function(a) { %>
+            <div class="grid grid-cols-[24px_1fr_auto] gap-3 items-start py-2.5 text-sm">
+              <div class="w-6 h-6 rounded-full text-[10px] font-bold text-white flex items-center justify-center <%= avatarColors[a.avatar] || 'bg-gray-500' %>"><%= avatarInitials[a.avatar] || '??' %></div>
+              <div class="text-gray-700"><%- a.text %></div>
+              <div class="text-[11px] text-gray-400 whitespace-nowrap"><%= a.when %></div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <div class="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-card p-5">
+        <h2 class="text-base font-bold text-gray-900">Quick ask <span class="text-[11px] font-medium text-gray-400 ml-1">send it to the team</span></h2>
+        <p class="text-xs text-gray-500 mb-3">An idea, a request, a complaint, a new priority. The team sees it instantly.</p>
+        <form onsubmit="event.preventDefault(); alert('Preview only — not wired.');" class="space-y-2">
+          <textarea rows="3" placeholder='Type your ask — "Need a 30s social clip for Mother&apos;s Day shoutout to our female controllers, by Friday"' class="w-full rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+          <div class="flex flex-wrap gap-2">
+            <select class="flex-1 min-w-[140px] rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700">
+              <option>To: Whole team</option>
+              <option>To: Lisa (content)</option>
+              <option>To: Tom (paid media)</option>
+              <option>To: Mike (SEO)</option>
+              <option>To: Jess (internal)</option>
+            </select>
+            <select class="flex-1 min-w-[120px] rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700">
+              <option>Priority: Normal</option>
+              <option>Priority: High</option>
+              <option>Priority: Urgent</option>
+            </select>
+            <select class="flex-1 min-w-[140px] rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700">
+              <option>Due: No deadline</option>
+              <option>Due: Today</option>
+              <option>Due: This week</option>
+              <option>Due: This month</option>
+            </select>
+            <button type="submit" class="w-full px-4 py-2 rounded-lg bg-brand-600 text-white text-xs font-semibold">Send to team</button>
+          </div>
+        </form>
+        <p class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 border-l-4 border-brand-500">
+          Every ask creates a task on their side automatically, with a link back to this dashboard.
+        </p>
+      </div>
+    </div>
+
+    <p class="text-center text-xs text-gray-400 pt-2 pb-6">
+      Operational marketing workspace — metrics and layout illustrative; every panel becomes interactive once wired.
+    </p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // Task tabs (Assigned to me / them)
+  var tabs = document.querySelectorAll('.tk-btn');
+  tabs.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var mode = btn.getAttribute('data-task-tab');
+      tabs.forEach(function (b) {
+        var active = b === btn;
+        b.classList.toggle('bg-brand-600', active);
+        b.classList.toggle('text-white', active);
+        b.classList.toggle('text-gray-500', !active);
+      });
+      document.querySelectorAll('[data-task-list]').forEach(function (el) {
+        el.classList.toggle('hidden', el.getAttribute('data-task-list') !== mode);
+      });
+    });
+  });
+
+  // Lead attribution toggle (last/first)
+  var leadBtns = document.querySelectorAll('.lead-btn');
+  leadBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var mode = btn.getAttribute('data-attr-mode');
+      leadBtns.forEach(function (b) {
+        var active = b === btn;
+        b.classList.toggle('bg-brand-600', active);
+        b.classList.toggle('text-white', active);
+        b.classList.toggle('text-gray-500', !active);
+      });
+      var attr = 'data-' + mode;
+      document.querySelectorAll('.lead-bar').forEach(function (el) { el.style.width = el.getAttribute(attr) + '%'; });
+      document.querySelectorAll('.lead-n').forEach(function (el) { el.textContent = el.getAttribute(attr); });
+    });
+  });
+})();
+</script>

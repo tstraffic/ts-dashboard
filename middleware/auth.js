@@ -7,7 +7,9 @@
 const ROLE_ALIASES = {
   management: 'admin',
   accounts:   'finance',
-  marketing:  'operations',
+  // 'marketing' used to alias to 'operations' when there was no Marketing
+  // module to land on. Now that /marketing exists, marketing is a real
+  // standalone role — see PERMISSIONS.marketing below.
 };
 
 /** Normalise a role: convert legacy names to current ones */
@@ -22,11 +24,11 @@ function normaliseRole(role) {
 //        hr (HR modules + limited ops), sales (CRM + limited ops)
 const PERMISSIONS = {
   // ── Shared ──
-  dashboard:     ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'marketing', 'accounts'],
+  dashboard:     ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
   jobs:          ['admin', 'operations', 'planning', 'finance', 'sales', 'management'],
   projects:      ['admin', 'operations', 'planning', 'finance', 'sales', 'management'],
-  clients:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'marketing', 'accounts'],
-  notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'marketing', 'accounts'],
+  clients:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
+  notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
 
   // ── Operations only (no planning) ──
   tasks:         ['admin', 'operations', 'planning'],  // planning sees only their own + plan-linked tasks
@@ -84,6 +86,11 @@ const PERMISSIONS = {
   hr_reports:         ['admin', 'hr'],
   hr_settings:        ['admin'],
   hr_compliance_view: ['admin', 'hr', 'operations'],
+
+  // ── Marketing ──
+  // Standalone role + admin. Marketing users see only /marketing (plus
+  // /profile and /logout, which bypass permission checks).
+  marketing:          ['admin', 'marketing'],
 };
 
 // ---- Helpers ----

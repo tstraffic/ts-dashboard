@@ -17,7 +17,7 @@ router.get('/users', (req, res) => {
   const users = db.prepare('SELECT id, username, full_name, email, role, active, created_at, CASE WHEN password_hash = \'INVITE_PENDING\' THEN 0 ELSE 1 END as has_password FROM users ORDER BY full_name').all();
 
   // Stats
-  const roleAliases = { management: 'admin', accounts: 'finance', marketing: 'operations' };
+  const roleAliases = { management: 'admin', accounts: 'finance' };
   const stats = {
     total: users.length,
     active: users.filter(u => u.active && u.has_password).length,

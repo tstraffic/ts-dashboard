@@ -6,8 +6,12 @@ const { createInvitation, validateToken, markTokenUsed, TOKEN_EXPIRY_HOURS } = r
 const { sendEmail } = require('../services/email');
 const { passwordResetEmail } = require('../services/emailTemplates');
 
+function landingFor(user) {
+  return user && user.role === 'marketing' ? '/marketing' : '/dashboard';
+}
+
 router.get('/login', (req, res) => {
-  if (req.session.user) return res.redirect('/dashboard');
+  if (req.session.user) return res.redirect(landingFor(req.session.user));
   res.render('login', { layout: false, title: 'Login', user: null, flash_error: req.flash('error') });
 });
 
@@ -35,7 +39,7 @@ router.post('/login', (req, res) => {
     return res.redirect('/profile');
   }
 
-  const returnTo = req.session.returnTo || '/dashboard';
+  const returnTo = req.session.returnTo || landingFor(req.session.user);
   delete req.session.returnTo;
   res.redirect(returnTo);
 });
