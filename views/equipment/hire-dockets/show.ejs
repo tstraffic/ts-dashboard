@@ -115,6 +115,20 @@
       <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-400 text-amber-900">Hire source</span>
     </header>
     <div class="p-4 sm:p-5 space-y-4">
+      <% if (typeof suppliers !== 'undefined' && suppliers.length > 0) { %>
+        <div class="flex flex-wrap items-end gap-3 bg-brand-50 border border-brand-200 rounded-lg p-3 print:hidden">
+          <div class="flex-1 min-w-[200px]">
+            <label class="hd-label">Load from saved supplier</label>
+            <select id="hd-supplier-load" class="hd-input" data-draft-skip>
+              <option value="">— pick a saved supplier to pre-fill —</option>
+              <% suppliers.forEach(function(s) { %>
+                <option value="<%= s.id %>"><%= s.name %><%= s.contact_person ? ' · ' + s.contact_person : '' %></option>
+              <% }) %>
+            </select>
+          </div>
+          <p class="text-[11px] text-brand-900/70 flex-1 min-w-[160px]">Overwrites the Supplier + Commercial Terms fields below. Your typed values aren't saved to the supplier profile until you hit "Save supplier".</p>
+        </div>
+      <% } %>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <label class="hd-label">Supplier Name <span class="text-red-500">*</span></label>
@@ -185,9 +199,20 @@
   </section>
 
   <!-- Save-header button (after supplier so it's not hidden way at the bottom) -->
-  <div class="flex items-center gap-2 print:hidden">
+  <div class="flex flex-wrap items-center gap-2 print:hidden">
     <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Save docket details</button>
     <span class="text-xs text-gray-400">Equipment items, accessories, photos and signatures save independently below.</span>
+    <!-- "Save supplier to profile" uses formaction to POST to the supplier-
+         save endpoint without submitting the whole docket form to that path.
+         The docket's supplier fields are read from the DB by the handler,
+         so whatever's typed here needs to be saved first (via "Save docket
+         details") before hitting this button. -->
+    <button type="submit" formaction="/equipment/hire-dockets/<%= docket.id %>/save-supplier"
+      class="text-xs px-3 py-1.5 rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 inline-flex items-center gap-1.5 ml-auto"
+      title="Upsert current Supplier + Commercial Terms into the saved-supplier list. Save the docket first if you've just typed in new values.">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+      Save supplier to profile
+    </button>
   </div>
 
   <!-- ========== 4. JOB ATTACHMENTS (rendered inside main form but uploads via separate form) ========== -->

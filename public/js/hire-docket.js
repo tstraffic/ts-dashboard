@@ -264,6 +264,60 @@
     });
   })();
 
+  // ---------- Supplier profile: load a saved supplier into the form fields ----------
+  // Picking an option in the "Load from saved supplier" dropdown fetches the
+  // supplier JSON and pushes its values into the docket's supplier + commercial
+  // terms fields. Confirms before overwriting if the current form has values.
+  (function () {
+    const loadSelect = document.getElementById('hd-supplier-load');
+    if (!loadSelect) return;
+    const fieldMap = {
+      supplier_name: 'name',
+      supplier_contact: 'contact_person',
+      supplier_phone: 'phone',
+      pickup_address: 'pickup_address',
+      included_allowance: 'included_allowance',
+      excess_charge: 'excess_charge',
+      fuel_return_requirement: 'fuel_return_requirement',
+      cleaning_expectation: 'cleaning_expectation',
+    };
+    function setIfPresent(name, value) {
+      const el = document.querySelector('[name="' + name + '"]');
+      if (el && typeof value === 'string') el.value = value;
+    }
+    function setPill(name, value) {
+      // Match the radio in the group whose value equals `value` (handles Y/N and tri-state).
+      document.querySelectorAll('input[name="' + CSS.escape(name) + '"]').forEach(function (r) {
+        r.checked = (r.value === value);
+        const pill = r.closest('.hd-pill');
+        if (pill) pill.classList.toggle('is-active', r.checked);
+      });
+    }
+    loadSelect.addEventListener('change', function () {
+      const id = loadSelect.value;
+      if (!id) return;
+      // Quick "have we filled anything?" check so the user doesn't torch their work.
+      const hasTypedData = ['supplier_name', 'supplier_contact', 'supplier_phone', 'pickup_address', 'included_allowance', 'excess_charge'].some(function (name) {
+        const el = document.querySelector('[name="' + name + '"]');
+        return el && String(el.value || '').trim() !== '';
+      });
+      if (hasTypedData && !confirm('Overwrite the current Supplier + Commercial Terms fields with the saved supplier values?')) {
+        loadSelect.value = '';
+        return;
+      }
+      fetch('/equipment/hire-dockets/api/suppliers/' + encodeURIComponent(id), { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error('Supplier fetch failed'); return r.json(); })
+        .then(function (s) {
+          Object.keys(fieldMap).forEach(function (formName) {
+            setIfPresent(formName, s[fieldMap[formName]] || '');
+          });
+          setPill('damage_liability_received', s.damage_liability_received ? '1' : '');
+          setPill('late_return_approved', s.late_return_approved || '');
+        })
+        .catch(function () { alert('Could not load that supplier — try again.'); });
+    });
+  })();
+
   // ---------- Auto-submit photo uploads when files are chosen ----------
   document.querySelectorAll('.hd-photo-upload').forEach(function (form) {
     const trigger = form.querySelector('.hd-photo-trigger');

@@ -5947,6 +5947,33 @@ function runMigrations(db) {
     console.log('Migration 130 applied: hire_dockets.dispute_item_id');
   }
 
+  // Migration 131: Hire supplier profiles — save supplier contact + commercial
+  // terms once, pre-fill on future hire dockets instead of retyping every time.
+  if (!isMigrationApplied.get(131)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS hire_suppliers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        contact_person TEXT DEFAULT '',
+        phone TEXT DEFAULT '',
+        pickup_address TEXT DEFAULT '',
+        included_allowance TEXT DEFAULT '',
+        excess_charge TEXT DEFAULT '',
+        fuel_return_requirement TEXT DEFAULT '',
+        cleaning_expectation TEXT DEFAULT '',
+        damage_liability_received INTEGER DEFAULT 0,
+        late_return_approved TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        created_by_id INTEGER REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_hire_suppliers_name ON hire_suppliers(name COLLATE NOCASE)"); } catch (e) { /* ignore */ }
+    recordMigration.run(131, 'Hire supplier profiles table');
+    console.log('Migration 131 applied: hire_suppliers');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
