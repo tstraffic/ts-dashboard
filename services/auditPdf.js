@@ -195,48 +195,51 @@ function generateAuditPdf(opts, out) {
       var key = sec.key + '.' + (idx + 1);
       var r = responses[key] || {};
       if (normaliseState(r) === 'no') {
-        var short = item.length > 55 ? item.substring(0, 52) + '...' : item;
-        failures.push({ key: key, item: short, section: sec.title });
+        // Keep the full item text — PDFKit's pixel-width ellipsis trims on
+        // render. Hard char truncation was cutting mid-word (e.g. "operatin…").
+        failures.push({ key: key, item: item, section: sec.title });
       }
     });
   });
   if (failures.length > 0) {
-    var fsH = 14 + Math.min(failures.length, 10) * 9; // cap at 10 items on cover
+    var headerH = 16;
+    var rowH    = 12;
+    var showFailures = failures.slice(0, 10); // max 10 on cover
+    var fsH = headerH + 4 + showFailures.length * rowH + 6;
     need(fsH);
     var fsY = curY();
-    roundRect(ML, fsY, pw, 14, 3, RED_LIGHT);
-    roundRect(ML, fsY, 3, 14, 1, RED);
-    font('Helvetica-Bold', 7, RED);
-    txt(failures.length + ' non-conformance' + (failures.length !== 1 ? 's' : '') + ' identified (see details)', ML + 8, fsY + 3, { width: pw - 16 });
-    setY(fsY + 14);
-    var showFailures = failures.slice(0, 10); // max 10 on cover
-    // Each txt() call advances doc.y by a line height even with lineBreak:false,
-    // so three txt() calls at curY() produced a 3-line cascade — the ref on
-    // line 1, item on line 2, section on line 3. Capture the row's y once and
-    // pass it explicitly so the three cells sit on the same baseline.
-    var refColX  = ML + 8;
-    var refColW  = 24;
-    var itemColX = ML + 34;
-    var itemColW = Math.floor((pw - 42) * 0.60);
-    var secColX  = itemColX + itemColW + 6;
-    var secColW  = (ML + pw) - secColX - 4;
+    // Header bar — slightly taller, with a little more horizontal padding.
+    roundRect(ML, fsY, pw, headerH, 3, RED_LIGHT);
+    roundRect(ML, fsY, 3, headerH, 1, RED);
+    font('Helvetica-Bold', 7.5, RED);
+    txt(failures.length + ' non-conformance' + (failures.length !== 1 ? 's' : '') + ' identified',
+      ML + 10, fsY + 4, { width: pw - 20 });
+    setY(fsY + headerH + 4);
+    // Column geometry. Give the item text the bulk of the width — the section
+    // name is short and right-aligned, so its column doesn't need to be big.
+    var refColX  = ML + 10;
+    var refColW  = 28;
+    var itemColX = ML + 40;
+    var itemColW = Math.floor((pw - 48) * 0.74);
+    var secColX  = itemColX + itemColW + 8;
+    var secColW  = (ML + pw) - secColX - 6;
     showFailures.forEach(function (f) {
-      need(9);
+      need(rowH);
       var rowY = curY();
-      font('Helvetica-Bold', 6, GRAY_DARK);
-      txt(f.key, refColX, rowY, { width: refColW });
-      font('Helvetica', 6, GRAY_DARK);
-      txt(f.item, itemColX, rowY, { width: itemColW, height: 8, ellipsis: true });
+      font('Helvetica-Bold', 6.5, GRAY_DARK);
+      txt(f.key, refColX, rowY + 1, { width: refColW });
+      font('Helvetica', 6.5, GRAY_DARK);
+      txt(f.item, itemColX, rowY + 1, { width: itemColW, height: 10, ellipsis: true });
       font('Helvetica', 5.5, GRAY);
-      txt('(' + f.section + ')', secColX, rowY, { width: secColW, height: 8, ellipsis: true, align: 'right' });
-      setY(rowY + 9);
+      txt('(' + f.section + ')', secColX, rowY + 1.5, { width: secColW, height: 10, ellipsis: true, align: 'right' });
+      setY(rowY + rowH);
     });
     if (failures.length > 10) {
-      font('Helvetica', 5, GRAY);
-      txt('... and ' + (failures.length - 10) + ' more (see checklist)', ML + 8, curY(), { width: pw - 16 });
+      font('Helvetica', 5.5, GRAY);
+      txt('… and ' + (failures.length - 10) + ' more (see checklist)', ML + 10, curY(), { width: pw - 20 });
       gap(8);
     }
-    gap(2);
+    gap(4);
   }
 
   // ── Audit Details Table ──
