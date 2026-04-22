@@ -23,14 +23,14 @@
     <div class="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div>
         <label class="hd-label">Job / PO # <span class="text-red-500">*</span></label>
-        <input type="text" name="job_number" placeholder="e.g. J-0423 or PO12345" class="hd-input" required>
+        <input type="text" id="hd-job-number" name="job_number" placeholder="e.g. J-0423 or PO12345" class="hd-input" required>
       </div>
       <div>
         <label class="hd-label">Link to job</label>
-        <select name="job_id" class="hd-input">
+        <select id="hd-job-link" name="job_id" class="hd-input">
           <option value="">— None —</option>
           <% jobs.forEach(j => { %>
-            <option value="<%= j.id %>"><%= j.job_number %> — <%= j.project_name || j.client %></option>
+            <option value="<%= j.id %>" data-job-number="<%= j.job_number %>"><%= j.job_number %> — <%= j.project_name || j.client %></option>
           <% }) %>
         </select>
       </div>
@@ -110,3 +110,25 @@
 </form>
 
 <link rel="stylesheet" href="/css/hire-docket.css?v=1">
+
+<script>
+  // When the user picks a job from the Link-to-job dropdown, auto-fill the
+  // Job / PO # field with that job's number. Don't overwrite a value the
+  // user has already typed themselves — we only fill when the field is
+  // blank or still matches the previously-linked job's number.
+  (function () {
+    var link = document.getElementById('hd-job-link');
+    var num = document.getElementById('hd-job-number');
+    if (!link || !num) return;
+    var lastLinked = '';
+    link.addEventListener('change', function () {
+      var opt = link.options[link.selectedIndex];
+      var next = opt && opt.dataset ? (opt.dataset.jobNumber || '') : '';
+      var current = num.value.trim();
+      if (current === '' || current === lastLinked) {
+        num.value = next;
+      }
+      lastLinked = next;
+    });
+  })();
+</script>
