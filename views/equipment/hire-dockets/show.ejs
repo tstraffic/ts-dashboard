@@ -552,20 +552,102 @@
           </div>
         </details>
 
+        <!-- Itemised Accessories — one list per equipment item, spans both phases -->
+        <details class="border border-gray-200 rounded-lg" <%= print ? 'open' : '' %>>
+          <summary class="px-3 py-2 text-xs font-bold text-brand-800 uppercase tracking-wider cursor-pointer bg-gray-50 rounded-t-lg flex items-center justify-between">
+            <span>🎒 Itemised accessories <span class="font-normal text-gray-500 normal-case">(<%= (it.accessories || []).length %> line<%= (it.accessories || []).length === 1 ? '' : 's' %>)</span></span>
+            <span class="text-[11px] text-gray-500 font-normal">Qty out at pick-up · Qty back at drop-off</span>
+          </summary>
+          <div class="p-3">
+            <% if ((it.accessories || []).length === 0) { %>
+              <p class="text-xs text-gray-400 italic mb-2">No accessories yet — click "+ Add line" or "Load standard list".</p>
+            <% } else { %>
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs min-w-[560px]">
+                  <thead>
+                    <tr class="text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                      <th class="px-2 py-1">Item</th>
+                      <th class="px-2 py-1 w-16">Qty out</th>
+                      <th class="px-2 py-1 w-16">Qty back</th>
+                      <th class="px-2 py-1">Condition</th>
+                      <th class="px-2 py-1 w-28">Missing / damaged</th>
+                      <th class="px-2 py-1 w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% (it.accessories || []).forEach(acc => { %>
+                      <tr>
+                        <td colspan="6" class="py-1">
+                          <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/accessories/<%= acc.id %>" class="hd-acc-row grid grid-cols-[1fr,56px,56px,1fr,100px,30px] gap-1.5 items-center">
+                            <%- include('../../partials/csrf') %>
+                            <input type="text" name="item_name" value="<%= acc.item_name %>" class="hd-input hd-input-sm">
+                            <input type="number" name="qty_out" min="0" value="<%= acc.qty_out %>" class="hd-input hd-input-sm text-right">
+                            <input type="number" name="qty_back" min="0" value="<%= acc.qty_back %>" class="hd-input hd-input-sm text-right">
+                            <input type="text" name="condition" value="<%= acc.condition || '' %>" placeholder="Good / scratched / etc." class="hd-input hd-input-sm">
+                            <label class="flex items-center gap-1 text-xs justify-center bg-white border border-gray-200 rounded-md px-1.5 py-1 cursor-pointer">
+                              <input type="checkbox" name="missing_damaged" value="1" <%= acc.missing_damaged ? 'checked' : '' %> class="rounded text-red-500 focus:ring-red-400">
+                            </label>
+                            <button type="submit" class="text-brand-600 hover:text-brand-700" title="Save"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></button>
+                          </form>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colspan="6" class="pb-2 px-2 print:hidden">
+                          <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/accessories/<%= acc.id %>/delete" class="inline" onsubmit="return confirm('Remove this accessory line?')">
+                            <%- include('../../partials/csrf') %>
+                            <button type="submit" class="text-[11px] text-gray-400 hover:text-red-600">✕ remove line</button>
+                          </form>
+                        </td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            <% } %>
+            <div class="mt-2 print:hidden flex flex-wrap items-center gap-2">
+              <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/accessories" class="hd-acc-new grid grid-cols-[1fr,56px,auto] gap-1.5 items-center flex-1 min-w-[200px]">
+                <%- include('../../partials/csrf') %>
+                <input type="text" name="item_name" placeholder="New accessory name" class="hd-input hd-input-sm">
+                <input type="number" name="qty_out" min="0" value="1" class="hd-input hd-input-sm text-right">
+                <button type="submit" class="hd-add-btn-sm">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                  Add line
+                </button>
+              </form>
+              <% if (typeConfig && typeConfig.accessoryPresets && typeConfig.accessoryPresets.length > 0) { %>
+              <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/accessories/load-preset" class="inline">
+                <%- include('../../partials/csrf') %>
+                <button type="submit" class="text-xs px-3 py-1.5 rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">Load standard list</button>
+              </form>
+              <% } %>
+            </div>
+            <% if (it.pickup_accessories || it.dropoff_accessories) { %>
+              <div class="mt-3 space-y-1">
+                <% if (it.pickup_accessories) { %>
+                  <p class="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-1.5"><span class="font-semibold">Legacy pick-up accessories:</span> <%= it.pickup_accessories %></p>
+                <% } %>
+                <% if (it.dropoff_accessories) { %>
+                  <p class="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-1.5"><span class="font-semibold">Legacy drop-off accessories:</span> <%= it.dropoff_accessories %></p>
+                <% } %>
+              </div>
+            <% } %>
+          </div>
+        </details>
+
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <!-- PICK-UP phase -->
           <%- include('partials/item-phase', {
             it, docket, phase: 'pickup', phaseLabel: 'Pick-up',
             accentBg: 'bg-blue-50/40', accentBorder: 'border-blue-200', accentText: 'text-blue-700',
             fuelLevels, fuelLabels, roadworthyKeys, typeConfig, print,
-            accessories: it.accessories || [], photos: it.photos.pickup || {}
+            photos: it.photos.pickup || {}
           }) %>
           <!-- DROP-OFF phase -->
           <%- include('partials/item-phase', {
             it, docket, phase: 'dropoff', phaseLabel: 'Drop-off',
             accentBg: 'bg-purple-50/40', accentBorder: 'border-purple-200', accentText: 'text-purple-700',
             fuelLevels, fuelLabels, roadworthyKeys, typeConfig, print,
-            accessories: it.accessories || [], photos: it.photos.dropoff || {}
+            photos: it.photos.dropoff || {}
           }) %>
         </div>
 
