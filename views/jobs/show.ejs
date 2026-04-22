@@ -870,7 +870,10 @@
     </script>
     <%
       // Combine traffic_plans + compliance items with plan-related types for this tab
-      const planTypes = ['traffic_guidance','tmp_approval','spa','rol'];
+      const planTypes = [
+        'traffic_guidance','tmp_approval','spa','sza','rol',
+        'council_permit','bus_approval','police_notification','letter_drop','other'
+      ];
       const compliancePlans = (typeof complianceItems !== 'undefined' ? complianceItems : []).filter(function(c) {
         const types = (c.item_types || c.item_type || '').split(',');
         return types.some(function(t) { return planTypes.includes(t.trim()); });
@@ -901,12 +904,12 @@
         <tbody class="divide-y divide-gray-200">
           <% allPlans.forEach(function(item) {
             const types = (item.item_types || item.item_type || '').split(',').filter(Boolean);
-            const typeLabels = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', spa: 'SPA', rol: 'ROL', council_permit: 'Council', bus_approval: 'Bus' };
+            const typeLabels = { traffic_guidance: 'TGS', tmp_approval: 'CTMP', spa: 'SPA', sza: 'SZA', rol: 'ROL', council_permit: 'Council', bus_approval: 'Bus', police_notification: 'Police', letter_drop: 'Letter', other: 'Other' };
             const statusColors = { not_started: 'bg-gray-100 text-gray-600', started: 'bg-purple-50 text-purple-700', submitted: 'bg-blue-50 text-blue-700', approved: 'bg-emerald-50 text-emerald-700', rejected: 'bg-red-50 text-red-700', expired: 'bg-amber-50 text-amber-700' };
           %>
           <tr class="hover:bg-gray-50">
             <td class="px-4 py-3">
-              <a href="/compliance/<%= item.id %>/edit" class="text-brand-600 hover:text-brand-700 font-medium"><%= item.title %></a>
+              <a href="/compliance/<%= item.id %>/edit?return_to=/jobs/<%= job.id %>%23plans" class="text-brand-600 hover:text-brand-700 font-medium"><%= item.title %></a>
               <% if (item.reference_number) { %><div class="text-xs text-gray-400"><%= item.reference_number %></div><% } %>
             </td>
             <td class="px-4 py-3">
@@ -923,7 +926,7 @@
             <td class="px-4 py-3 text-gray-500 text-xs"><%= item.due_date ? formatDateShort(item.due_date) : '-' %></td>
             <td class="px-4 py-3 text-gray-500 text-xs"><%= item.expiry_date ? formatDateShort(item.expiry_date) : '-' %></td>
             <td class="px-4 py-3 whitespace-nowrap">
-              <a href="/compliance/<%= item.id %>/edit" class="text-brand-600 hover:text-brand-700 text-xs font-medium mr-2">Edit</a>
+              <a href="/compliance/<%= item.id %>/edit?return_to=/jobs/<%= job.id %>%23plans" class="text-brand-600 hover:text-brand-700 text-xs font-medium mr-2">Edit</a>
               <form method="POST" action="/jobs/<%= job.id %>/unlink-compliance" class="inline" onsubmit="return confirm('Unlink this item from the job?')">
                 <%- include('../partials/csrf') %>
                 <input type="hidden" name="compliance_id" value="<%= item.id %>">
