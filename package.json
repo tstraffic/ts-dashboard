@@ -4,8 +4,9 @@
   "description": "T&S Traffic Control - Operations Dashboard",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
+    "start": "tsx server.js",
+    "dev": "tsx watch server.js",
+    "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report"
@@ -31,9 +32,12 @@
     "resend": "^6.9.3",
     "sharp": "^0.33.2",
     "sqlite3": "^6.0.1",
+    "tsx": "^4.21.0",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1"
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
   }
 }
