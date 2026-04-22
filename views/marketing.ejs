@@ -25,9 +25,10 @@
     warn:  'text-amber-600',
   };
   const priorityClasses = {
-    high: 'bg-red-50 text-red-700',
-    med:  'bg-amber-50 text-amber-700',
-    low:  'bg-gray-100 text-gray-500',
+    high:   'bg-red-50 text-red-700',
+    urgent: 'bg-red-100 text-red-800',
+    med:    'bg-amber-50 text-amber-700',
+    low:    'bg-gray-100 text-gray-500',
   };
   const avatarColors = {
     sa: 'bg-brand-600',
@@ -50,6 +51,43 @@
     bad:  'bg-red-50 text-red-700 border border-red-200',
     warn: 'bg-amber-50 text-amber-700 border border-amber-200',
   };
+
+  // Render initials from a label ("Lisa (agency)" → "LI", "Tom Smith" → "TS")
+  function labelInitials(label) {
+    if (!label) return '??';
+    const clean = String(label).replace(/\(.*?\)/g, '').trim();
+    const parts = clean.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '??';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  function labelColor(label) {
+    const palette = ['bg-brand-600','bg-emerald-600','bg-amber-600','bg-purple-600','bg-pink-600','bg-indigo-600','bg-teal-600'];
+    let h = 0; for (let i = 0; i < (label || '').length; i++) h = (h * 31 + label.charCodeAt(i)) | 0;
+    return palette[Math.abs(h) % palette.length];
+  }
+
+  const subNav = {
+    daily: [
+      { label: 'Overview',           href: '#sec-top',       active: true },
+      { label: 'Tasks & approvals',  href: '#sec-tasks',     badge: String(data.tasks.openTotal + data.approvals.length), badgeTone: 'warn' },
+    ],
+    work: [
+      { label: 'Campaigns', href: '#sec-campaigns', badge: String(data.campaigns.length) },
+      { label: 'Content',   href: '#sec-content',   badge: String(data.content.items.length) },
+      { label: 'Leads',     href: '#sec-leads',     badge: '17', badgeTone: 'ghost' },
+    ],
+    performance: [
+      { label: 'SEO',     href: '#sec-seo' },
+      { label: 'Social',  href: '#sec-social' },
+      { label: 'Reviews', href: '#sec-reviews', badge: '12' },
+    ],
+    manage: [
+      { label: 'Agency',          href: '#sec-agency' },
+      { label: 'Budget',          href: '#sec-top' },
+      { label: 'Brand & assets',  href: '#sec-content' },
+    ],
+  };
 %>
 
 <div class="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-4">
@@ -62,12 +100,12 @@
     <% ['daily','work','performance','manage'].forEach(function(group) { %>
       <div class="mb-4">
         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-1"><%= group %></p>
-        <% data.subNav[group].forEach(function(item) { %>
+        <% subNav[group].forEach(function(item) { %>
           <a href="<%= item.href %>"
              class="flex items-center gap-2 px-2 py-2 rounded-lg text-sm <%= item.active ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900' %>">
             <span class="w-1.5 h-1.5 rounded-full <%= item.active ? 'bg-brand-600' : 'bg-gray-300' %>"></span>
             <span class="flex-1"><%= item.label %></span>
-            <% if (item.badge) { %>
+            <% if (item.badge && item.badge !== '0') { %>
               <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full
                 <%= item.badgeTone === 'warn' ? 'bg-amber-500 text-white'
                     : item.badgeTone === 'ghost' ? 'bg-gray-100 text-gray-500'
@@ -86,10 +124,25 @@
   <!-- ══════════════════════════════ Main content ══════════════════════════════ -->
   <div class="min-w-0" id="sec-top">
 
-    <!-- Preview banner -->
-    <div class="flex items-start gap-2 p-3 mb-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+    <!-- Flash messages -->
+    <% if (flash_success && flash_success.length) { %>
+      <div class="p-3 mb-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
+        <%= flash_success.join(' ') %>
+      </div>
+    <% } %>
+    <% if (flash_error && flash_error.length) { %>
+      <div class="p-3 mb-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm">
+        <%= flash_error.join(' ') %>
+      </div>
+    <% } %>
+
+    <!-- Scope banner -->
+    <div class="flex items-start gap-2 p-3 mb-4 rounded-xl bg-brand-50 border border-brand-200 text-brand-800 text-xs">
       <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      <span>Preview — operational workspace layout. Numbers, tasks and approvals are illustrative. Buttons are non-interactive until the data model (spec §3) is wired.</span>
+      <span>
+        <strong>Live:</strong> Tasks, Approvals, Quick ask, Activity feed — all saved to the database.
+        <strong>Placeholder:</strong> KPIs, campaigns, lead source, regions, reviews, SEO, social, agency performance — illustrative until the relevant integrations (GA4, Google/LinkedIn Ads, Search Console, GBP) are wired.
+      </span>
     </div>
 
     <!-- Alerts strip -->
@@ -111,8 +164,7 @@
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Last synced <%= data.syncedAgo %>
         </span>
         <span class="inline-flex items-center px-3 py-1 rounded-full bg-brand-50 text-brand-700 text-xs font-semibold"><%= data.periodLabel %></span>
-        <button type="button" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50">Weekly agenda</button>
-        <button type="button" class="px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700">+ New task</button>
+        <button type="button" onclick="document.getElementById('add-task-form').classList.toggle('hidden'); document.getElementById('add-task-input')?.focus();" class="px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700">+ New task</button>
       </div>
     </div>
     <p class="text-sm text-gray-500 mb-4">Reviewed weekly with agency. Team updates status here; you approve, comment, and assign. Two-way.</p>
@@ -148,55 +200,78 @@
         <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
           <div>
             <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
-              Tasks &amp; to-dos <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-600 text-white">11 open</span>
+              Tasks &amp; to-dos <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-600 text-white"><%= data.tasks.openTotal %> open</span>
             </h2>
             <p class="text-xs text-gray-500 mt-0.5">Two-way between you and the marketing team. Check off as done.</p>
           </div>
           <div class="flex items-center gap-2">
             <div class="inline-flex bg-gray-100 rounded-full p-0.5 text-[11px]" id="task-tabs">
-              <button type="button" data-task-tab="mine"   class="tk-btn active px-3 py-1 rounded-full bg-brand-600 text-white font-semibold">Assigned to me <span class="ml-0.5 opacity-90">4</span></button>
-              <button type="button" data-task-tab="theirs" class="tk-btn px-3 py-1 rounded-full text-gray-500 font-semibold">Assigned to them <span class="ml-0.5">7</span></button>
+              <button type="button" data-task-tab="mine"   class="tk-btn active px-3 py-1 rounded-full bg-brand-600 text-white font-semibold">Assigned to me <span class="ml-0.5 opacity-90"><%= data.tasks.mineCount %></span></button>
+              <button type="button" data-task-tab="theirs" class="tk-btn px-3 py-1 rounded-full text-gray-500 font-semibold">Assigned to them <span class="ml-0.5"><%= data.tasks.theirsCount %></span></button>
             </div>
-            <button type="button" class="px-2.5 py-1 rounded-lg bg-brand-600 text-white text-[11px] font-semibold">+ Add</button>
+            <button type="button" onclick="document.getElementById('add-task-form').classList.toggle('hidden'); document.getElementById('add-task-input')?.focus();" class="px-2.5 py-1 rounded-lg bg-brand-600 text-white text-[11px] font-semibold">+ Add</button>
           </div>
         </div>
 
-        <div data-task-list="mine" class="divide-y divide-gray-100">
-          <% data.tasks.mine.forEach(function(t) { %>
-            <div class="grid grid-cols-[16px_1fr_auto_auto] sm:grid-cols-[16px_1fr_auto_auto_auto] gap-2 sm:gap-3 items-center py-3 text-sm">
-              <div class="w-4 h-4 rounded border-2 border-gray-300 cursor-pointer"></div>
-              <div>
-                <p class="text-gray-900 font-medium"><%= t.title %></p>
-                <p class="text-[11px] text-gray-400 mt-0.5">
-                  From <strong class="text-gray-600"><%= t.from %></strong>
-                  <% if (t.link) { %> · <a href="#" class="text-brand-600"><%= t.link %></a><% } %>
-                  <% if (t.note) { %> · <%= t.note %><% } %>
-                  <% if (t.comments) { %> · <%= t.comments %> comments<% } %>
-                </p>
-              </div>
-              <div class="hidden sm:flex w-6 h-6 rounded-full text-[10px] font-bold text-white items-center justify-center bg-brand-600">SA</div>
-              <span class="hidden sm:inline text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded <%= priorityClasses[t.priority] || 'bg-gray-100 text-gray-500' %>"><%= t.priority %></span>
-              <span class="text-[11px] <%= t.dueUrgent ? 'text-red-600 font-semibold' : 'text-gray-400' %>"><%= t.due %></span>
-            </div>
-          <% }) %>
-        </div>
+        <!-- Inline add-task form -->
+        <form id="add-task-form" method="POST" action="/marketing/tasks" class="hidden mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="text" id="add-task-input" name="title" required placeholder="Task title" class="w-full rounded-lg border border-gray-200 bg-white p-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <div class="flex flex-wrap gap-2">
+            <select name="assignee_user_id" class="flex-1 min-w-[140px] rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700">
+              <option value="">— Assign to (internal) —</option>
+              <% data.people.forEach(function(p) { %>
+                <option value="<%= p.id %>" <%= p.id === user.id ? 'selected' : '' %>><%= p.full_name || p.username %><%= p.id === user.id ? ' (me)' : '' %></option>
+              <% }) %>
+            </select>
+            <input type="text" name="assignee_label" placeholder="or label — e.g. Lisa (agency)" class="flex-1 min-w-[160px] rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700">
+            <select name="priority" class="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700">
+              <option value="low">Low</option>
+              <option value="med" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+            <input type="text" name="due_text" placeholder="Due — free text (e.g. Fri 25 Apr)" class="flex-1 min-w-[140px] rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700">
+            <button type="submit" class="px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold">Add task</button>
+            <button type="button" onclick="document.getElementById('add-task-form').classList.add('hidden');" class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600">Cancel</button>
+          </div>
+        </form>
 
-        <div data-task-list="theirs" class="divide-y divide-gray-100 hidden">
-          <% data.tasks.theirs.forEach(function(t) { %>
-            <div class="grid grid-cols-[16px_1fr_auto_auto] sm:grid-cols-[16px_1fr_auto_auto_auto] gap-2 sm:gap-3 items-center py-3 text-sm">
-              <div class="w-4 h-4 rounded border-2 border-gray-300 cursor-pointer"></div>
-              <div>
-                <p class="text-gray-900 font-medium"><%= t.title %></p>
-                <p class="text-[11px] text-gray-400 mt-0.5">
-                  Assigned to <strong class="text-gray-600"><%= t.to %></strong><% if (t.note) { %> · <%= t.note %><% } %>
-                </p>
+        <% ['mine','theirs'].forEach(function(which) {
+             const rows = data.tasks[which]; %>
+          <div data-task-list="<%= which %>" class="divide-y divide-gray-100 <%= which === 'theirs' ? 'hidden' : '' %>">
+            <% if (!rows.length) { %>
+              <p class="py-4 text-xs text-gray-400 text-center">No open tasks here.</p>
+            <% } %>
+            <% rows.forEach(function(t) {
+                 const initials = labelInitials(t.assignee_label);
+                 const color = labelColor(t.assignee_label); %>
+              <div class="grid grid-cols-[16px_1fr_auto_auto] sm:grid-cols-[16px_1fr_auto_auto_auto_auto] gap-2 sm:gap-3 items-center py-3 text-sm">
+                <form method="POST" action="/marketing/tasks/<%= t.id %>/toggle" class="contents">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" aria-label="Toggle done" class="w-4 h-4 rounded border-2 <%= t.status === 'done' ? 'bg-emerald-500 border-emerald-500 text-white flex items-center justify-center text-[10px]' : 'border-gray-300 hover:border-brand-500' %> cursor-pointer"><%= t.status === 'done' ? '✓' : '' %></button>
+                </form>
+                <div>
+                  <p class="text-gray-900 font-medium <%= t.status === 'done' ? 'line-through text-gray-400' : '' %>"><%= t.title %></p>
+                  <p class="text-[11px] text-gray-400 mt-0.5">
+                    <% if (which === 'mine') { %>
+                      From <strong class="text-gray-600"><%= t.from_label || 'Team' %></strong>
+                    <% } else { %>
+                      Assigned to <strong class="text-gray-600"><%= t.assignee_label %></strong>
+                    <% } %>
+                  </p>
+                </div>
+                <div class="hidden sm:flex w-6 h-6 rounded-full text-[10px] font-bold text-white items-center justify-center <%= color %>"><%= initials %></div>
+                <span class="hidden sm:inline text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded <%= priorityClasses[t.priority] || 'bg-gray-100 text-gray-500' %>"><%= t.priority %></span>
+                <span class="text-[11px] <%= (t.due_text && /today|tomorrow|urgent/i.test(t.due_text)) ? 'text-red-600 font-semibold' : 'text-gray-400' %>"><%= t.due_text || '' %></span>
+                <form method="POST" action="/marketing/tasks/<%= t.id %>/delete" class="contents" onsubmit="return confirm('Delete this task?');">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" aria-label="Delete" class="text-gray-300 hover:text-red-500 text-xs">✕</button>
+                </form>
               </div>
-              <div class="hidden sm:flex w-6 h-6 rounded-full text-[10px] font-bold text-white items-center justify-center <%= avatarColors[t.avatar] || 'bg-gray-500' %>"><%= avatarInitials[t.avatar] || '??' %></div>
-              <span class="hidden sm:inline text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded <%= priorityClasses[t.priority] || 'bg-gray-100 text-gray-500' %>"><%= t.priority %></span>
-              <span class="text-[11px] text-gray-400"><%= t.due %></span>
-            </div>
-          <% }) %>
-        </div>
+            <% }) %>
+          </div>
+        <% }) %>
       </div>
 
       <!-- Approvals -->
@@ -204,23 +279,36 @@
         <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
           <div>
             <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
-              Waiting on your approval <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white">4</span>
+              Waiting on your approval <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white"><%= data.approvals.length %></span>
             </h2>
             <p class="text-xs text-gray-500 mt-0.5">The agency has paused. Every hour costs momentum.</p>
           </div>
-          <button type="button" class="px-3 py-1 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600">Approval history</button>
         </div>
+        <% if (!data.approvals.length) { %>
+          <p class="py-6 text-xs text-gray-400 text-center">Nothing pending your approval.</p>
+        <% } %>
         <% data.approvals.forEach(function(a) { %>
           <div class="flex items-center justify-between gap-3 mb-2 pl-3 p-3 rounded-lg bg-gray-50 border-l-4 border-amber-400">
             <div class="min-w-0">
               <div class="text-[10px] font-bold uppercase tracking-wider inline-block px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 mr-1 align-middle"><%= a.type %></div>
               <span class="text-sm font-semibold text-gray-900 align-middle"><%= a.title %></span>
-              <p class="text-[11px] text-gray-500 mt-1"><%= a.meta %> Due <strong class="<%= a.dueTone === 'urgent' ? 'text-red-600' : 'text-gray-700' %>"><%= a.dueText %></strong>.</p>
+              <p class="text-[11px] text-gray-500 mt-1">
+                <%= a.meta %>
+                <% if (a.due_text) { %> Due <strong class="<%= /today|urgent/i.test(a.due_text) ? 'text-red-600' : 'text-gray-700' %>"><%= a.due_text %></strong>.<% } %>
+              </p>
             </div>
             <div class="flex gap-1 flex-shrink-0">
-              <button type="button" class="px-2.5 py-1 rounded bg-emerald-600 text-white text-[11px] font-semibold">Approve</button>
-              <button type="button" class="px-2.5 py-1 rounded border border-red-300 text-red-600 text-[11px] font-semibold">Reject</button>
-              <button type="button" class="px-2.5 py-1 rounded border border-gray-200 text-gray-600 text-[11px] font-semibold">Review</button>
+              <form method="POST" action="/marketing/approvals/<%= a.id %>/decide" class="contents">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="decision" value="approved">
+                <button type="submit" class="px-2.5 py-1 rounded bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700">Approve</button>
+              </form>
+              <form method="POST" action="/marketing/approvals/<%= a.id %>/decide" class="contents" onsubmit="var n = prompt('Reason for rejection (optional):'); if (n === null) return false; this.querySelector('[name=note]').value = n; return true;">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="decision" value="rejected">
+                <input type="hidden" name="note" value="">
+                <button type="submit" class="px-2.5 py-1 rounded border border-red-300 text-red-600 text-[11px] font-semibold hover:bg-red-50">Reject</button>
+              </form>
             </div>
           </div>
         <% }) %>
@@ -232,10 +320,9 @@
       <div class="lg:col-span-8 bg-white border border-gray-200 rounded-xl shadow-card p-5">
         <div class="flex items-start justify-between gap-3 mb-3">
           <div>
-            <h2 class="text-base font-bold text-gray-900">Active campaigns</h2>
-            <p class="text-xs text-gray-500 mt-0.5">Live initiatives. Click any row to open campaign detail.</p>
+            <h2 class="text-base font-bold text-gray-900">Active campaigns <span class="text-[10px] text-gray-400 font-normal ml-1">placeholder</span></h2>
+            <p class="text-xs text-gray-500 mt-0.5">Live initiatives. Will populate from Google Ads / LinkedIn Ads / SEO tools when wired.</p>
           </div>
-          <button type="button" class="px-3 py-1 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600">+ New campaign</button>
         </div>
         <div class="divide-y divide-gray-100">
           <% data.campaigns.forEach(function(c) { %>
@@ -260,7 +347,7 @@
       </div>
 
       <div id="sec-social" class="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-card p-5">
-        <h2 class="text-base font-bold text-gray-900">Social &amp; audience</h2>
+        <h2 class="text-base font-bold text-gray-900">Social &amp; audience <span class="text-[10px] text-gray-400 font-normal ml-1">placeholder</span></h2>
         <p class="text-xs text-gray-500 mb-3">LinkedIn primary (B2B buyers). Facebook/Insta for employer brand.</p>
         <div class="grid grid-cols-3 gap-2 mb-4">
           <% data.social.stats.forEach(function(s) { %>
@@ -285,9 +372,8 @@
 
     <!-- Leads + Regions + Reviews -->
     <div id="sec-leads" class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
-      <!-- Lead source -->
       <div class="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-card p-5">
-        <h2 class="text-base font-bold text-gray-900">Where leads came from</h2>
+        <h2 class="text-base font-bold text-gray-900">Where leads came from <span class="text-[10px] text-gray-400 font-normal ml-1">placeholder</span></h2>
         <p class="text-xs text-gray-500 mb-3">Breakdown of this month's 17 qualified leads.</p>
         <div class="inline-flex bg-gray-100 rounded-full p-0.5 text-[11px] mb-3" id="lead-toggle">
           <button type="button" data-attr-mode="last"  class="lead-btn active px-3 py-1 rounded-full bg-brand-600 text-white font-semibold">Last-touch</button>
@@ -305,13 +391,12 @@
           <% }) %>
         </div>
         <p class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 border-l-4 border-brand-500">
-          <strong class="text-gray-900">First-touch</strong> = channel that first brought them in. <strong class="text-gray-900">Last-touch</strong> = what closed the lead. Don't defund first-touch channels that aren't closing directly — they feed the rest.
+          <strong class="text-gray-900">First-touch</strong> = channel that first brought them in. <strong class="text-gray-900">Last-touch</strong> = what closed the lead.
         </p>
       </div>
 
-      <!-- Regions -->
       <div class="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-card p-5">
-        <h2 class="text-base font-bold text-gray-900">Leads by NSW region</h2>
+        <h2 class="text-base font-bold text-gray-900">Leads by NSW region <span class="text-[10px] text-gray-400 font-normal ml-1">placeholder</span></h2>
         <p class="text-xs text-gray-500 mb-3">Where marketing is landing across your footprint.</p>
         <div class="divide-y divide-gray-100">
           <% data.regions.forEach(function(r) { %>
@@ -329,14 +414,10 @@
             <div>17 / 17</div>
           </div>
         </div>
-        <p class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 border-l-4 border-brand-500">
-          Regional pipeline is a gap. Ask agency about regional LGA content + Google Business locations for Newcastle / Wollongong depots.
-        </p>
       </div>
 
-      <!-- Reviews -->
       <div id="sec-reviews" class="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-card p-5">
-        <h2 class="text-base font-bold text-gray-900">Google reviews &amp; reputation</h2>
+        <h2 class="text-base font-bold text-gray-900">Google reviews &amp; reputation <span class="text-[10px] text-gray-400 font-normal ml-1">placeholder</span></h2>
         <p class="text-xs text-gray-500 mb-3">Direct trust signal for buyers and local SEO ranking factor.</p>
         <div class="flex items-baseline gap-2 mb-2">
           <span class="text-2xl font-extrabold text-gray-900">★ <%= data.reviews.stars %></span>
@@ -352,23 +433,14 @@
             </div>
           <% }) %>
         </div>
-        <p class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 border-l-4 border-brand-500">
-          <%= data.reviews.footer %>
-        </p>
       </div>
     </div>
 
     <!-- Content pipeline + SEO -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
-      <!-- Content pipeline -->
       <div id="sec-content" class="lg:col-span-6 bg-white border border-gray-200 rounded-xl shadow-card p-5">
-        <div class="flex items-start justify-between gap-3 mb-3">
-          <div>
-            <h2 class="text-base font-bold text-gray-900">Content pipeline <span class="text-[11px] font-medium text-gray-400 ml-1">month totals · every item in flight</span></h2>
-            <p class="text-xs text-gray-500 mt-0.5">Click any row to open, comment, change status or reassign.</p>
-          </div>
-          <button type="button" class="px-3 py-1 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600">+ New item</button>
-        </div>
+        <h2 class="text-base font-bold text-gray-900">Content pipeline <span class="text-[10px] text-gray-400 font-normal ml-1">placeholder</span></h2>
+        <p class="text-xs text-gray-500 mb-3">Month totals · every item in flight.</p>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
           <% data.content.cards.forEach(function(c) { %>
             <div class="bg-gray-50 border border-gray-100 rounded-lg p-3 text-center">
@@ -395,9 +467,8 @@
         </div>
       </div>
 
-      <!-- SEO snapshot -->
       <div id="sec-seo" class="lg:col-span-6 bg-white border border-gray-200 rounded-xl shadow-card p-5">
-        <h2 class="text-base font-bold text-gray-900">SEO snapshot</h2>
+        <h2 class="text-base font-bold text-gray-900">SEO snapshot <span class="text-[10px] text-gray-400 font-normal ml-1">placeholder</span></h2>
         <p class="text-xs text-gray-500 mb-3">Rankings for target NSW terms. Top 10 = page 1 of Google.</p>
         <div class="grid grid-cols-12 gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest pb-2 border-b border-gray-200">
           <div class="col-span-6">Keyword</div><div class="col-span-2">Position</div><div class="col-span-2">Change</div><div class="col-span-2">Volume</div>
@@ -415,17 +486,13 @@
             </div>
           <% }) %>
         </div>
-        <p class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 border-l-4 border-brand-500">
-          <%= data.seo.footer %>
-        </p>
       </div>
     </div>
 
     <!-- Agency + Influence -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
-      <!-- Agency performance -->
       <div id="sec-agency" class="lg:col-span-6 bg-white border border-gray-200 rounded-xl shadow-card p-5">
-        <h2 class="text-base font-bold text-gray-900">Agency performance</h2>
+        <h2 class="text-base font-bold text-gray-900">Agency performance <span class="text-[10px] text-gray-400 font-normal ml-1">placeholder</span></h2>
         <p class="text-xs text-gray-500 mb-3">How your agency is delivering against what you're paying for.</p>
         <div class="divide-y divide-gray-100">
           <% data.agency.forEach(function(row) { %>
@@ -451,12 +518,11 @@
         </div>
       </div>
 
-      <!-- Pipeline influence -->
       <div class="lg:col-span-6 bg-white border border-gray-200 rounded-xl shadow-card p-5">
-        <h2 class="text-base font-bold text-gray-900">Marketing influence on pipeline</h2>
+        <h2 class="text-base font-bold text-gray-900">Marketing influence on pipeline <span class="text-[10px] text-gray-400 font-normal ml-1">placeholder</span></h2>
         <p class="text-xs text-gray-500 mb-3">How marketing flows into the sales pipeline. Full tender tracker lives in <em>Jobs &amp; Tenders</em>.</p>
         <div class="flex items-stretch flex-wrap lg:flex-nowrap gap-1">
-          <% data.funnel.forEach(function(s, i) { %>
+          <% data.funnel.forEach(function(s) { %>
             <div class="flex-1 min-w-[120px] p-3 rounded-lg text-center <%= s.isWin ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200' : 'bg-gray-50 border border-gray-200' %>">
               <p class="text-[10px] uppercase tracking-widest text-gray-500"><%= s.label %></p>
               <p class="text-2xl font-extrabold mt-0.5 <%= s.isWin ? 'text-emerald-700' : 'text-gray-900' %>"><%= s.value %></p>
@@ -480,20 +546,19 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
       <div class="lg:col-span-8 bg-white border border-gray-200 rounded-xl shadow-card p-5">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-          <h2 class="text-base font-bold text-gray-900">Activity feed <span class="text-[11px] font-medium text-gray-400 ml-1">everything the team has done recently</span></h2>
-          <div class="inline-flex bg-gray-100 rounded-full p-0.5 text-[11px]">
-            <button type="button" class="px-3 py-1 rounded-full bg-brand-600 text-white font-semibold">All</button>
-            <button type="button" class="px-3 py-1 rounded-full text-gray-500 font-semibold">Content</button>
-            <button type="button" class="px-3 py-1 rounded-full text-gray-500 font-semibold">Campaigns</button>
-            <button type="button" class="px-3 py-1 rounded-full text-gray-500 font-semibold">Comments</button>
-          </div>
+          <h2 class="text-base font-bold text-gray-900">Activity feed <span class="text-[11px] font-medium text-gray-400 ml-1">the last 20 things that happened</span></h2>
         </div>
         <div class="divide-y divide-gray-100">
-          <% data.activity.forEach(function(a) { %>
+          <% if (!data.activity.length) { %>
+            <p class="py-6 text-xs text-gray-400 text-center">Nothing yet. Create a task or make an approval decision.</p>
+          <% } %>
+          <% data.activity.forEach(function(a) {
+               const initials = labelInitials(a.actor_label);
+               const color = labelColor(a.actor_label); %>
             <div class="grid grid-cols-[24px_1fr_auto] gap-3 items-start py-2.5 text-sm">
-              <div class="w-6 h-6 rounded-full text-[10px] font-bold text-white flex items-center justify-center <%= avatarColors[a.avatar] || 'bg-gray-500' %>"><%= avatarInitials[a.avatar] || '??' %></div>
-              <div class="text-gray-700"><%- a.text %></div>
-              <div class="text-[11px] text-gray-400 whitespace-nowrap"><%= a.when %></div>
+              <div class="w-6 h-6 rounded-full text-[10px] font-bold text-white flex items-center justify-center <%= color %>"><%= initials %></div>
+              <div class="text-gray-700"><%- a.snippet %></div>
+              <div class="text-[11px] text-gray-400 whitespace-nowrap"><%= a.created_at %></div>
             </div>
           <% }) %>
         </div>
@@ -501,46 +566,50 @@
 
       <div class="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-card p-5">
         <h2 class="text-base font-bold text-gray-900">Quick ask <span class="text-[11px] font-medium text-gray-400 ml-1">send it to the team</span></h2>
-        <p class="text-xs text-gray-500 mb-3">An idea, a request, a complaint, a new priority. The team sees it instantly.</p>
-        <form onsubmit="event.preventDefault(); alert('Preview only — not wired.');" class="space-y-2">
-          <textarea rows="3" placeholder='Type your ask — "Need a 30s social clip for Mother&apos;s Day shoutout to our female controllers, by Friday"' class="w-full rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+        <p class="text-xs text-gray-500 mb-3">An idea, a request, a complaint, a new priority. Creates a task on their side.</p>
+        <form method="POST" action="/marketing/quick-ask" class="space-y-2">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <textarea rows="3" name="body" required placeholder='Type your ask — "Need a 30s social clip for Mother&apos;s Day shoutout to our female controllers, by Friday"' class="w-full rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
           <div class="flex flex-wrap gap-2">
-            <select class="flex-1 min-w-[140px] rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700">
-              <option>To: Whole team</option>
-              <option>To: Lisa (content)</option>
-              <option>To: Tom (paid media)</option>
-              <option>To: Mike (SEO)</option>
-              <option>To: Jess (internal)</option>
+            <select name="to" class="flex-1 min-w-[140px] rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700">
+              <option value="label:Whole team">To: Whole team</option>
+              <% data.people.forEach(function(p) { %>
+                <option value="user:<%= p.id %>">To: <%= p.full_name || p.username %></option>
+              <% }) %>
+              <option value="label:Lisa (agency)">To: Lisa (agency)</option>
+              <option value="label:Tom (agency)">To: Tom (agency)</option>
+              <option value="label:Mike (agency)">To: Mike (agency)</option>
+              <option value="label:Jess (internal)">To: Jess (internal)</option>
             </select>
-            <select class="flex-1 min-w-[120px] rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700">
-              <option>Priority: Normal</option>
-              <option>Priority: High</option>
-              <option>Priority: Urgent</option>
+            <select name="priority" class="flex-1 min-w-[120px] rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700">
+              <option value="med">Priority: Normal</option>
+              <option value="high">Priority: High</option>
+              <option value="urgent">Priority: Urgent</option>
             </select>
-            <select class="flex-1 min-w-[140px] rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700">
-              <option>Due: No deadline</option>
-              <option>Due: Today</option>
-              <option>Due: This week</option>
-              <option>Due: This month</option>
+            <select name="due" class="flex-1 min-w-[140px] rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700">
+              <option value="">Due: No deadline</option>
+              <option value="today">Due: Today</option>
+              <option value="this_week">Due: This week</option>
+              <option value="this_month">Due: This month</option>
             </select>
-            <button type="submit" class="w-full px-4 py-2 rounded-lg bg-brand-600 text-white text-xs font-semibold">Send to team</button>
+            <button type="submit" class="w-full px-4 py-2 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700">Send to team</button>
           </div>
         </form>
         <p class="mt-3 px-3 py-2 bg-gray-50 rounded-lg text-[11px] text-gray-500 border-l-4 border-brand-500">
-          Every ask creates a task on their side automatically, with a link back to this dashboard.
+          Every ask creates a task in the list above with a link back here.
         </p>
       </div>
     </div>
 
     <p class="text-center text-xs text-gray-400 pt-2 pb-6">
-      Operational marketing workspace — metrics and layout illustrative; every panel becomes interactive once wired.
+      Internal workflow panels are live. External data panels populate from integrations once wired.
     </p>
   </div>
 </div>
 
 <script>
 (function () {
-  // Task tabs (Assigned to me / them)
+  // Task tabs
   var tabs = document.querySelectorAll('.tk-btn');
   tabs.forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -557,7 +626,7 @@
     });
   });
 
-  // Lead attribution toggle (last/first)
+  // Lead attribution toggle
   var leadBtns = document.querySelectorAll('.lead-btn');
   leadBtns.forEach(function (btn) {
     btn.addEventListener('click', function () {

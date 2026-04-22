@@ -6031,6 +6031,119 @@ function runMigrations(db) {
     console.log('Migration 133 applied.');
   }
 
+  // Migration 134: Marketing internal-workflow tables — tasks, approvals,
+  // activity log. Backs the /marketing Tasks, Waiting on approval, Quick
+  // ask, and Activity feed panels. External-data panels (KPIs, campaigns,
+  // SEO, social, reviews, etc.) remain illustrative until the relevant
+  // integration adapters land.
+  if (!isMigrationApplied.get(134)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS marketing_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        assignee_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        assignee_label TEXT NOT NULL,
+        from_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        from_label TEXT,
+        priority TEXT NOT NULL DEFAULT 'med' CHECK(priority IN ('low','med','high','urgent')),
+        due_text TEXT,
+        status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','done')),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completed_at TEXT
+      );
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_mkt_tasks_assignee ON marketing_tasks(assignee_user_id);`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_mkt_tasks_status ON marketing_tasks(status);`);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS marketing_approvals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        meta TEXT,
+        due_text TEXT,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+        decided_at TEXT,
+        decision_note TEXT,
+        decided_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_mkt_approvals_status ON marketing_approvals(status);`);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS marketing_activity (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        actor_label TEXT NOT NULL,
+        verb TEXT NOT NULL,
+        target_type TEXT,
+        target_id INTEGER,
+        snippet TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_mkt_activity_created ON marketing_activity(created_at DESC);`);
+
+    // Seed once — illustrative tasks + approvals + activity so the page
+    // has something to show on fresh install. If any row exists we skip.
+    const existingTasks = db.prepare('SELECT COUNT(*) as c FROM marketing_tasks').get().c;
+    if (existingTasks === 0) {
+      const adminUser = db.prepare("SELECT id, full_name FROM users WHERE role IN ('admin') AND active = 1 ORDER BY id LIMIT 1").get();
+      const adminId = adminUser ? adminUser.id : null;
+      const adminName = adminUser ? adminUser.full_name : 'Admin';
+
+      const insertTask = db.prepare(`
+        INSERT INTO marketing_tasks (title, assignee_user_id, assignee_label, from_user_id, from_label, priority, due_text, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'open', datetime('now', ?))
+      `);
+
+      // Assigned to owner
+      insertTask.run('Review & approve Parramatta Council case study (v2)', adminId, adminName, null, 'Lisa (agency)', 'high', 'Due tomorrow', '-2 hours');
+      insertTask.run('Approve Google Ads budget increase (+$2,000)',         adminId, adminName, null, 'Tom (agency)',  'med',  'Due today',    '-6 hours');
+      insertTask.run('Sign off Acknowledgement of Country video script',     adminId, adminName, null, 'Jess (internal)','high','Fri 25 Apr',   '-1 day');
+      insertTask.run('Send 3 recent tender wins for case study pipeline',    adminId, adminName, null, 'Lisa (agency)', 'med',  'Wed 30 Apr',   '-3 hours');
+
+      // Assigned to agency / team (external labels, no user id)
+      insertTask.run('Book shoot day for controller recruitment video',                      null, 'Lisa (agency)', adminId, adminName, 'high', 'Tue 29 Apr', '-4 hours');
+      insertTask.run('Draft May content calendar with safety + RAP themes',                  null, 'Lisa (agency)', adminId, adminName, 'high', 'Thu 1 May',  '-5 hours');
+      insertTask.run('Propose 3 regional LGA content pieces',                                null, 'Tom (agency)',  adminId, adminName, 'med',  'Mon 5 May',  '-6 hours');
+      insertTask.run("Reschedule missed blog \"Why safety isn't a checkbox\"",               null, 'Lisa (agency)', adminId, adminName, 'med',  'Fri 25 Apr', '-1 day');
+      insertTask.run('Lift employee advocacy participation from 7 → 12',                     null, 'Jess (internal)',adminId, adminName, 'low',  'End May',    '-2 days');
+      insertTask.run('Site CRO review (leads conversion 0.8% — below B2B benchmark)',        null, 'Mike (agency)', adminId, adminName, 'high', 'Fri 9 May',  '-2 days');
+      insertTask.run('Shortlist 2 Supply Nation partners for next shoot',                    null, 'Lisa (agency)', adminId, adminName, 'med',  'Fri 9 May',  '-3 days');
+
+      const insertApproval = db.prepare(`
+        INSERT INTO marketing_approvals (type, title, meta, due_text, status, created_at)
+        VALUES (?, ?, ?, ?, 'pending', datetime('now', ?))
+      `);
+      insertApproval.run('BUDGET',     'Google Ads April — top-up $2,000',            'Tom (agency) · Strong CPL ($128 vs $145 target); wants to scale.', 'today',      '-12 hours');
+      insertApproval.run('CONTENT',    "Blog — \"Western Sydney projects we're proud of\"", 'Lisa (agency) · Draft ready · 4 images pending sign-off.',         'Fri 25 Apr', '-1 day');
+      insertApproval.run('CASE STUDY', 'Parramatta Council TGS — final version',      'Council legal cleared · waiting on your logo + quote approval.',    'Sat 26 Apr', '-1 day');
+      insertApproval.run('CREATIVE',   'LinkedIn ABM creative set (3 variants)',      'Tom (agency) · Live next Monday · needs your pick.',                'Thu 5pm',    '-2 days');
+
+      const insertAct = db.prepare(`
+        INSERT INTO marketing_activity (actor_user_id, actor_label, verb, target_type, target_id, snippet, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now', ?))
+      `);
+      insertAct.run(null,    'Tom (agency)',  'requested', 'approval', null, '<strong>Tom (agency)</strong> requested a $2,000 budget top-up on <strong>Google Ads — Traffic control NSW</strong>. Awaiting your approval.', '-12 minutes');
+      insertAct.run(null,    'Lisa (agency)', 'moved',     'content',  null, "<strong>Lisa (agency)</strong> moved <strong>\"Western Sydney projects we're proud of\"</strong> to Awaiting approval.",                         '-48 minutes');
+      insertAct.run(adminId, adminName,       'commented', 'content',  null, '<strong>You</strong> commented on the Parramatta case study: <em>"Use the wide shot from page 3 as the hero."</em>',                                '-2 hours');
+      insertAct.run(null,    'Jess (internal)','uploaded', 'content',  null, '<strong>Jess</strong> uploaded the Acknowledgement of Country script · cultural review cleared by Uncle David.',                                    '-3 hours');
+      insertAct.run(null,    'Tom (agency)',  'leads',     'leads',    null, '3 new leads from <strong>Google Ads</strong> (1 form, 2 phone). Enquiries routed to sales inbox.',                                                 '-5 hours');
+      insertAct.run(null,    'Mike (agency)', 'shipped',   'seo',      null, '<strong>Mike (agency)</strong> shipped SEO update: "traffic guidance scheme newcastle" improved by 4 positions.',                                  '-1 day');
+      insertAct.run(null,    'Lisa (agency)', 'shipped',   'content',  null, '<strong>Lisa (agency)</strong> shipped blog: "TMP vs TGS — what councils actually need." Published on LinkedIn + site.',                           '-2 days');
+      insertAct.run(adminId, adminName,       'approved',  'invoice',  null, '<strong>You</strong> approved invoice $8,000 · April retainer.',                                                                                   '-2 days');
+
+      console.log(`Migration 134: seeded ${existingTasks === 0 ? '11 tasks, 4 approvals, 8 activity rows' : 'nothing (tables non-empty)'}`);
+    } else {
+      console.log('Migration 134: marketing_tasks already has rows, skipping seed.');
+    }
+
+    recordMigration.run(134, 'Marketing internal-workflow tables (tasks, approvals, activity) + seed');
+    console.log('Migration 134 applied.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

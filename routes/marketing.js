@@ -1,15 +1,18 @@
-// Marketing dashboard — Phase 1 + 2 UI.
-// All numbers / tasks / approvals / activity items are illustrative
-// placeholders that mirror Marketing-Dashboard-Mockup.html v4 and the
-// Dashboard-Build-Spec.md. Tasks, approvals, comments, and the quick-ask
-// form are NOT persisted yet — buttons are no-ops until the data model
-// from spec §3 lands. Use this page as the visual contract for agency
-// scoping; wire real sources afterwards.
+// Marketing dashboard.
+//
+// INTERNAL workflow panels (Tasks, Approvals, Quick ask, Activity feed) are
+// backed by real tables — migration 134 — and these routes handle the
+// mutations. EXTERNAL-data panels (KPIs, campaigns, SEO, social, lead
+// source, regions, reviews, agency performance) remain illustrative until
+// the integration adapters (GA4 / Google Ads / LinkedIn / GSC / GBP /
+// CRM) land. The banner on the page explains which is which.
 
 const express = require('express');
 const router = express.Router();
+const { getDb } = require('../db/database');
 
-const data = {
+// ── External-data placeholders (still illustrative) ─────────────────────
+const staticData = {
   periodLabel: 'April 2026 · month-to-date',
   syncedAgo: '8 min ago',
 
@@ -25,31 +28,6 @@ const data = {
     { label: 'Cost per qualified lead',   value: '$128',     delta: '▼ 12% vs target',   tone: 'up',  target: 'Target: $145' },
     { label: 'Content delivered vs plan', value: '92%',      delta: '11 of 12 shipped',  tone: 'flat', target: 'Target: 100%' },
     { label: 'Spend this month',          value: '$10.8k',   valueSuffix: ' / $12k', pace: { fill: 90, mark: 73, leftLabel: 'spend 90%', rightLabel: 'month 73%' } },
-  ],
-
-  tasks: {
-    mine: [
-      { title: 'Review & approve Parramatta Council case study (v2)', from: 'Lisa (agency)', link: 'Parramatta TGS campaign', comments: 3, priority: 'high', due: 'Due tomorrow', dueUrgent: true },
-      { title: 'Approve Google Ads budget increase (+$2,000)',        from: 'Tom (agency)',  link: 'Paid search campaign',   comments: 1, priority: 'med',  due: 'Due today',    dueUrgent: true },
-      { title: 'Sign off Acknowledgement of Country video script',    from: 'Jess (internal)', note: 'cultural review cleared', comments: 5, priority: 'high', due: 'Fri 25 Apr' },
-      { title: 'Send 3 recent tender wins for case study pipeline',   from: 'Lisa (agency)', note: 'need job codes + permissions', priority: 'med', due: 'Wed 30 Apr' },
-    ],
-    theirs: [
-      { title: 'Book shoot day for controller recruitment video',          to: 'Lisa (agency)',  avatar: 'li', note: 'crew + location required',            priority: 'high', due: 'Tue 29 Apr' },
-      { title: 'Draft May content calendar with safety + RAP themes',      to: 'Lisa (agency)',  avatar: 'li',                                               priority: 'high', due: 'Thu 1 May' },
-      { title: 'Propose 3 regional LGA content pieces',                    to: 'Tom (agency)',   avatar: 'to', note: 'Newcastle, Wollongong, Central Coast', priority: 'med',  due: 'Mon 5 May' },
-      { title: 'Reschedule missed blog "Why safety isn\'t a checkbox"',    to: 'Lisa (agency)',  avatar: 'li',                                               priority: 'med',  due: 'Fri 25 Apr' },
-      { title: 'Lift employee advocacy participation from 7 → 12',         to: 'Jess (internal)', avatar: 'je', note: 'propose incentive structure',         priority: 'low',  due: 'End May' },
-      { title: 'Site CRO review (leads conversion 0.8% — below B2B benchmark)', to: 'Mike (agency)', avatar: 'mk', note: 'audit + recommendations',          priority: 'high', due: 'Fri 9 May' },
-      { title: 'Shortlist 2 Supply Nation partners for next shoot',        to: 'Lisa (agency)',  avatar: 'li', note: 'RAP alignment',                        priority: 'med',  due: 'Fri 9 May' },
-    ],
-  },
-
-  approvals: [
-    { type: 'BUDGET',     title: 'Google Ads April — top-up $2,000',          meta: 'Tom (agency) · Strong CPL ($128 vs $145 target); wants to scale.', dueText: 'today', dueTone: 'urgent' },
-    { type: 'CONTENT',    title: 'Blog — "Western Sydney projects we\'re proud of"', meta: 'Lisa (agency) · Draft ready · 4 images pending sign-off.',  dueText: 'Fri 25 Apr' },
-    { type: 'CASE STUDY', title: 'Parramatta Council TGS — final version',    meta: 'Council legal cleared · waiting on your logo + quote approval.',   dueText: 'Sat 26 Apr' },
-    { type: 'CREATIVE',   title: 'LinkedIn ABM creative set (3 variants)',    meta: 'Tom (agency) · Live next Monday · needs your pick.',              dueText: 'Thu 5pm' },
   ],
 
   campaigns: [
@@ -153,47 +131,243 @@ const data = {
   ],
 
   funnelNote: 'Bottleneck: site conversion 0.8% — below 1.5% B2B benchmark. Ask agency for CRO review before scaling paid traffic. Later stages look healthy.',
-
-  activity: [
-    { avatar: 'to', text: '<strong>Tom (agency)</strong> requested a $2,000 budget top-up on <strong>Google Ads — Traffic control NSW</strong>. Awaiting your approval.', when: '12 min ago' },
-    { avatar: 'li', text: '<strong>Lisa (agency)</strong> moved <strong>"Western Sydney projects we\'re proud of"</strong> to Awaiting approval.', when: '48 min ago' },
-    { avatar: 'sa', text: '<strong>You</strong> commented on the Parramatta case study: <em>"Use the wide shot from page 3 as the hero."</em>', when: '2 hr ago' },
-    { avatar: 'je', text: '<strong>Jess</strong> uploaded the Acknowledgement of Country script · cultural review cleared by Uncle David.', when: '3 hr ago' },
-    { avatar: 'to', text: '3 new leads from <strong>Google Ads</strong> (1 form, 2 phone). Enquiries routed to sales inbox.', when: '5 hr ago' },
-    { avatar: 'mk', text: '<strong>Mike (agency)</strong> shipped SEO update: "traffic guidance scheme newcastle" improved by 4 positions.', when: 'Yesterday' },
-    { avatar: 'li', text: '<strong>Lisa (agency)</strong> shipped blog: "TMP vs TGS — what councils actually need." Published on LinkedIn + site.', when: '2 days ago' },
-    { avatar: 'sa', text: '<strong>You</strong> approved invoice $8,000 · April retainer.', when: '2 days ago' },
-  ],
-
-  subNav: {
-    daily: [
-      { label: 'Overview',           href: '#sec-top',       active: true },
-      { label: 'Tasks & approvals',  href: '#sec-tasks',     badge: '4', badgeTone: 'warn' },
-    ],
-    work: [
-      { label: 'Campaigns', href: '#sec-campaigns', badge: '6' },
-      { label: 'Content',   href: '#sec-content',   badge: '9' },
-      { label: 'Leads',     href: '#sec-leads',     badge: '17', badgeTone: 'ghost' },
-    ],
-    performance: [
-      { label: 'SEO',     href: '#sec-seo' },
-      { label: 'Social',  href: '#sec-social' },
-      { label: 'Reviews', href: '#sec-reviews', badge: '12' },
-    ],
-    manage: [
-      { label: 'Agency',          href: '#sec-agency' },
-      { label: 'Budget',          href: '#sec-top' },
-      { label: 'Brand & assets',  href: '#sec-content' },
-    ],
-  },
 };
 
+// ── Helpers ──────────────────────────────────────────────────────────────
+const VALID_PRIORITY = new Set(['low', 'med', 'high', 'urgent']);
+const VALID_DECISION = new Set(['approved', 'rejected']);
+const VALID_TYPE     = new Set(['BUDGET', 'CONTENT', 'CASE STUDY', 'CREATIVE', 'INVOICE', 'SCOPE CHANGE']);
+
+function logActivity(db, user, verb, targetType, targetId, snippet) {
+  db.prepare(`
+    INSERT INTO marketing_activity (actor_user_id, actor_label, verb, target_type, target_id, snippet)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(user.id, user.full_name || user.username, verb, targetType, targetId || null, snippet);
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function dueFromOption(option) {
+  const now = new Date();
+  switch (option) {
+    case 'today':      return 'Today';
+    case 'this_week':  return 'This week';
+    case 'this_month': return 'This month';
+    default:           return null;
+  }
+}
+
+// ── GET /marketing ──────────────────────────────────────────────────────
 router.get('/', (req, res) => {
+  const db = getDb();
+  const user = req.session.user;
+
+  // Tasks split by assignee for the two tabs.
+  const mine = db.prepare(`
+    SELECT * FROM marketing_tasks
+    WHERE assignee_user_id = ? AND status = 'open'
+    ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'med' THEN 2 WHEN 'low' THEN 3 END,
+             created_at DESC
+  `).all(user.id);
+
+  const theirs = db.prepare(`
+    SELECT * FROM marketing_tasks
+    WHERE (assignee_user_id IS NULL OR assignee_user_id != ?) AND status = 'open'
+    ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'med' THEN 2 WHEN 'low' THEN 3 END,
+             created_at DESC
+  `).all(user.id);
+
+  const openTotal = mine.length + theirs.length;
+
+  const approvals = db.prepare(`
+    SELECT * FROM marketing_approvals
+    WHERE status = 'pending'
+    ORDER BY created_at ASC
+  `).all();
+
+  const activity = db.prepare(`
+    SELECT * FROM marketing_activity
+    ORDER BY created_at DESC
+    LIMIT 20
+  `).all();
+
+  // People picker for the "+ Add task" and "Quick ask" forms — pull
+  // internal users who could be assignees (admin, management, marketing).
+  const people = db.prepare(`
+    SELECT id, full_name, username, role FROM users
+    WHERE active = 1 AND role IN ('admin','management','marketing')
+    ORDER BY full_name COLLATE NOCASE
+  `).all();
+
   res.render('marketing', {
     title: 'Marketing',
     currentPage: 'marketing',
-    data,
+    data: {
+      ...staticData,
+      tasks: {
+        mine,
+        theirs,
+        openTotal,
+        mineCount: mine.length,
+        theirsCount: theirs.length,
+      },
+      approvals,
+      activity,
+      people,
+    },
+    flash_success: req.flash('success'),
+    flash_error:   req.flash('error'),
   });
+});
+
+// ── POST /marketing/tasks — create a task ────────────────────────────────
+router.post('/tasks', (req, res) => {
+  const db = getDb();
+  const user = req.session.user;
+  const b = req.body || {};
+
+  const title = String(b.title || '').trim();
+  if (!title) {
+    req.flash('error', 'Task title is required.');
+    return res.redirect('/marketing#sec-tasks');
+  }
+
+  const priority = VALID_PRIORITY.has(b.priority) ? b.priority : 'med';
+  const dueText  = String(b.due_text || '').trim() || null;
+
+  // Assignee: either an internal user_id, or a free-text label.
+  let assigneeUserId = null;
+  let assigneeLabel  = '';
+  if (b.assignee_user_id && Number(b.assignee_user_id) > 0) {
+    const u = db.prepare('SELECT id, full_name, username FROM users WHERE id = ? AND active = 1').get(Number(b.assignee_user_id));
+    if (u) {
+      assigneeUserId = u.id;
+      assigneeLabel  = u.full_name || u.username;
+    }
+  }
+  if (!assigneeLabel) {
+    assigneeLabel = String(b.assignee_label || '').trim() || 'Unassigned';
+  }
+
+  const info = db.prepare(`
+    INSERT INTO marketing_tasks (title, assignee_user_id, assignee_label, from_user_id, from_label, priority, due_text, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'open')
+  `).run(title, assigneeUserId, assigneeLabel, user.id, user.full_name || user.username, priority, dueText);
+
+  logActivity(
+    db, user, 'created', 'task', info.lastInsertRowid,
+    `<strong>${escapeHtml(user.full_name || user.username)}</strong> created task <strong>"${escapeHtml(title)}"</strong>${assigneeLabel ? ` for <strong>${escapeHtml(assigneeLabel)}</strong>` : ''}.`
+  );
+
+  req.flash('success', 'Task added.');
+  res.redirect('/marketing#sec-tasks');
+});
+
+// ── POST /marketing/tasks/:id/toggle — flip open/done ────────────────────
+router.post('/tasks/:id/toggle', (req, res) => {
+  const db = getDb();
+  const user = req.session.user;
+  const t = db.prepare('SELECT * FROM marketing_tasks WHERE id = ?').get(req.params.id);
+  if (!t) { req.flash('error', 'Task not found.'); return res.redirect('/marketing#sec-tasks'); }
+
+  if (t.status === 'open') {
+    db.prepare("UPDATE marketing_tasks SET status = 'done', completed_at = CURRENT_TIMESTAMP WHERE id = ?").run(t.id);
+    logActivity(db, user, 'completed', 'task', t.id,
+      `<strong>${escapeHtml(user.full_name || user.username)}</strong> completed <strong>"${escapeHtml(t.title)}"</strong>.`);
+  } else {
+    db.prepare("UPDATE marketing_tasks SET status = 'open', completed_at = NULL WHERE id = ?").run(t.id);
+    logActivity(db, user, 'reopened', 'task', t.id,
+      `<strong>${escapeHtml(user.full_name || user.username)}</strong> reopened <strong>"${escapeHtml(t.title)}"</strong>.`);
+  }
+
+  res.redirect('/marketing#sec-tasks');
+});
+
+// ── POST /marketing/tasks/:id/delete ─────────────────────────────────────
+router.post('/tasks/:id/delete', (req, res) => {
+  const db = getDb();
+  const user = req.session.user;
+  const t = db.prepare('SELECT * FROM marketing_tasks WHERE id = ?').get(req.params.id);
+  if (!t) { req.flash('error', 'Task not found.'); return res.redirect('/marketing#sec-tasks'); }
+
+  db.prepare('DELETE FROM marketing_tasks WHERE id = ?').run(t.id);
+  logActivity(db, user, 'deleted', 'task', t.id,
+    `<strong>${escapeHtml(user.full_name || user.username)}</strong> deleted task <strong>"${escapeHtml(t.title)}"</strong>.`);
+
+  req.flash('success', 'Task deleted.');
+  res.redirect('/marketing#sec-tasks');
+});
+
+// ── POST /marketing/approvals/:id/decide ─────────────────────────────────
+router.post('/approvals/:id/decide', (req, res) => {
+  const db = getDb();
+  const user = req.session.user;
+  const a = db.prepare('SELECT * FROM marketing_approvals WHERE id = ?').get(req.params.id);
+  if (!a) { req.flash('error', 'Approval not found.'); return res.redirect('/marketing#sec-tasks'); }
+
+  const decision = String(req.body.decision || '').toLowerCase();
+  if (!VALID_DECISION.has(decision)) {
+    req.flash('error', 'Invalid decision.');
+    return res.redirect('/marketing#sec-tasks');
+  }
+
+  const note = String(req.body.note || '').trim() || null;
+
+  db.prepare(`
+    UPDATE marketing_approvals
+    SET status = ?, decided_at = CURRENT_TIMESTAMP, decision_note = ?, decided_by_user_id = ?
+    WHERE id = ?
+  `).run(decision, note, user.id, a.id);
+
+  const verb = decision === 'approved' ? 'approved' : 'rejected';
+  logActivity(db, user, verb, 'approval', a.id,
+    `<strong>${escapeHtml(user.full_name || user.username)}</strong> ${verb} <strong>${escapeHtml(a.type)}</strong> — ${escapeHtml(a.title)}${note ? ` <em>"${escapeHtml(note)}"</em>` : ''}.`);
+
+  req.flash('success', `Approval ${verb}.`);
+  res.redirect('/marketing#sec-tasks');
+});
+
+// ── POST /marketing/quick-ask — creates a task from the quick-ask form ──
+router.post('/quick-ask', (req, res) => {
+  const db = getDb();
+  const user = req.session.user;
+  const b = req.body || {};
+
+  const body = String(b.body || '').trim();
+  if (!body) {
+    req.flash('error', 'Ask cannot be empty.');
+    return res.redirect('/marketing#sec-tasks');
+  }
+
+  // Title = first 80 chars of body
+  const title = body.length > 80 ? body.slice(0, 77) + '...' : body;
+  const priority = VALID_PRIORITY.has(b.priority) ? b.priority : 'med';
+  const dueText = dueFromOption(String(b.due || ''));
+
+  // Assignee: dropdown value is either a user id ("user:123") or a label ("label:Whole team")
+  const toRaw = String(b.to || '').trim();
+  let assigneeUserId = null;
+  let assigneeLabel  = 'Whole team';
+  if (toRaw.startsWith('user:')) {
+    const uid = Number(toRaw.slice(5));
+    const u = db.prepare('SELECT id, full_name, username FROM users WHERE id = ? AND active = 1').get(uid);
+    if (u) { assigneeUserId = u.id; assigneeLabel = u.full_name || u.username; }
+  } else if (toRaw.startsWith('label:')) {
+    assigneeLabel = toRaw.slice(6) || 'Whole team';
+  }
+
+  const info = db.prepare(`
+    INSERT INTO marketing_tasks (title, assignee_user_id, assignee_label, from_user_id, from_label, priority, due_text, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'open')
+  `).run(title, assigneeUserId, assigneeLabel, user.id, user.full_name || user.username, priority, dueText);
+
+  logActivity(db, user, 'asked', 'task', info.lastInsertRowid,
+    `<strong>${escapeHtml(user.full_name || user.username)}</strong> sent a quick ask to <strong>${escapeHtml(assigneeLabel)}</strong>: <em>"${escapeHtml(title)}"</em>`);
+
+  req.flash('success', `Ask sent to ${assigneeLabel}.`);
+  res.redirect('/marketing#sec-tasks');
 });
 
 module.exports = router;
