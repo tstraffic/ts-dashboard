@@ -213,55 +213,91 @@
 
 <% const isAdmin = canAccess(user, 'admin'); %>
 <%
-  // Always show all tabs — no more Planning/Operations split
-  const showPlanning = true;
-  const showOps = true;
+  // Per-role tab visibility on the job detail page.
+  // Matrix (handles legacy role aliases: management→admin, accounts→finance, marketing→operations):
+  //   admin      → every tab
+  //   operations → ops work: diary/tasks/compliance/incidents/equipment/contacts + final plans + budget
+  //   planning   → plan production: traffic plans + final plans (read-only) + chat
+  //   finance    → money view: budget + accounts + timesheets + final plans (to check scope) + chat
+  // Any other role (sales, hr, etc.) gets just the two universally-safe tabs.
+  const ROLE_ALIASES_TABS = { management: 'admin', accounts: 'finance', marketing: 'operations' };
+  const _rawRole = (user && user.role) ? user.role : '';
+  const role = ROLE_ALIASES_TABS[_rawRole] || _rawRole;
+  const TABS_BY_ROLE = {
+    admin:      ['overview','diary','tasks','plans','final-plans','compliance','timesheets','incidents','equipment','contacts','chat','budget','accounts'],
+    operations: ['overview','diary','tasks',         'final-plans','compliance','timesheets','incidents','equipment','contacts','chat','budget'],
+    planning:   ['overview',        'plans','final-plans',                                                                      'chat'],
+    finance:    ['overview',                'final-plans',             'timesheets',                                             'chat','budget','accounts'],
+  };
+  const visibleTabs = TABS_BY_ROLE[role] || ['overview','chat'];
+  function showTab(t) { return visibleTabs.includes(t); }
 %>
 
 <!-- Tab Navigation -->
 <div class="border-b border-gray-200 mb-6">
   <nav class="flex gap-0 -mb-px overflow-x-auto">
+    <% if (showTab('overview')) { %>
     <a href="#overview" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Overview</a>
+    <% } %>
 
+    <% if (showTab('diary')) { %>
     <a href="#diary" data-tab="diary" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Site Diary</a>
+    <% } %>
+    <% if (showTab('tasks')) { %>
     <a href="#tasks" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Tasks</a>
+    <% } %>
+    <% if (showTab('plans')) { %>
     <a href="#plans" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Traffic Plans</a>
+    <% } %>
+    <% if (showTab('final-plans')) { %>
     <a href="#final-plans" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Final Plans</a>
+    <% } %>
+    <% if (showTab('compliance')) { %>
     <a href="#compliance" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Compliance</a>
+    <% } %>
+    <% if (showTab('timesheets')) { %>
     <a href="#timesheets" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Timesheets</a>
+    <% } %>
+    <% if (showTab('incidents')) { %>
     <a href="#incidents" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Incidents</a>
+    <% } %>
+    <% if (showTab('equipment')) { %>
     <a href="#equipment" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Equipment</a>
-    <a href="#defects" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
-      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
-      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Defects</a>
+    <% } %>
+    <% if (showTab('contacts')) { %>
     <a href="#contacts" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Contacts</a>
+    <% } %>
+    <% if (showTab('chat')) { %>
     <a href="#chat" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Chat</a>
-    <% if (canViewAccounts) { %>
+    <% } %>
+    <% if (showTab('budget')) { %>
     <a href="#budget" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Budget</a>
+    <% } %>
+    <% if (showTab('accounts')) { %>
     <a href="#accounts" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Accounts</a>
@@ -273,6 +309,7 @@
 <div class="tab-group">
 
   <!-- Overview Tab -->
+  <% if (showTab('overview')) { %>
   <div id="overview" class="tab-content">
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Job Summary</h2>
@@ -397,9 +434,10 @@
       <% } %>
     </div>
   </div>
+  <% } %>
 
   <!-- Final Plans Tab (Operations view — read-only) -->
-  <% if (showOps) { %>
+  <% if (showTab('final-plans')) { %>
   <div id="final-plans" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Final Plans</h2>
@@ -521,6 +559,7 @@
   <% } %>
 
   <!-- Tasks Tab -->
+  <% if (showTab('tasks')) { %>
   <div id="tasks" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Tasks</h2>
@@ -582,8 +621,10 @@
     </div>
     <% } %>
   </div>
+  <% } %>
 
   <!-- Compliance Tab — Document Upload -->
+  <% if (showTab('compliance')) { %>
   <div id="compliance" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Compliance Documents</h2>
@@ -702,8 +743,10 @@
     </div>
     <% } %>
   </div>
+  <% } %>
 
   <!-- Traffic Plans Tab -->
+  <% if (showTab('plans')) { %>
   <div id="plans" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Traffic Plans</h2>
@@ -998,8 +1041,10 @@
     </div>
     <% } %>
   </div>
+  <% } %>
 
   <!-- Incidents Tab -->
+  <% if (showTab('incidents')) { %>
   <div id="incidents" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Safety & Incidents</h2>
@@ -1049,8 +1094,10 @@
     </div>
     <% } %>
   </div>
+  <% } %>
 
   <!-- Contacts Tab -->
+  <% if (showTab('contacts')) { %>
   <div id="contacts" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Client Contacts</h2>
@@ -1089,8 +1136,10 @@
     </div>
     <% } %>
   </div>
+  <% } %>
 
   <!-- Timesheets Tab -->
+  <% if (showTab('timesheets')) { %>
   <div id="timesheets" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Timesheets</h2>
@@ -1135,8 +1184,10 @@
     </div>
     <% } %>
   </div>
+  <% } %>
 
   <!-- Equipment Tab -->
+  <% if (showTab('equipment')) { %>
   <div id="equipment" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Equipment Deployed</h2>
@@ -1222,60 +1273,10 @@
       </div>
     <% } %>
   </div>
-
-  <!-- Defects Tab -->
-  <div id="defects" class="tab-content">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">Defects & Snags</h2>
-      <a href="/defects/new?job_id=<%= job.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">+ Report Defect</a>
-    </div>
-    <% if (defects.length === 0) { %>
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
-        <p class="text-gray-400 text-sm">No defects recorded for this job.</p>
-      </div>
-    <% } else { %>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-gray-200">
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ref</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Severity</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned To</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target Close</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200">
-          <% defects.forEach(d => { %>
-          <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3 text-brand-600 font-medium text-xs"><%= d.defect_number || '-' %></td>
-            <td class="px-4 py-3 text-gray-600"><%= d.title %></td>
-            <td class="px-4 py-3">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                <% if (d.severity === 'critical') { %>bg-red-50 text-red-700 ring-1 ring-red-600/20
-                <% } else if (d.severity === 'major') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
-                <% } else if (d.severity === 'moderate') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
-                <% } else { %>bg-white text-gray-600<% } %>"><%= d.severity %></span>
-            </td>
-            <td class="px-4 py-3">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                <% if (d.status === 'closed') { %>bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20
-                <% } else if (d.status === 'rectification') { %>bg-blue-50 text-blue-700 ring-1 ring-blue-600/20
-                <% } else if (d.status === 'investigating') { %>bg-amber-50 text-amber-700 ring-1 ring-amber-600/20
-                <% } else { %>bg-red-50 text-red-700 ring-1 ring-red-600/20<% } %>"><%= d.status ? d.status.replace(/_/g, ' ') : 'open' %></span>
-            </td>
-            <td class="px-4 py-3 text-gray-500"><%= d.assigned_to_name || '-' %></td>
-            <td class="px-4 py-3 text-gray-500 text-xs"><%= d.target_close_date ? formatDate(d.target_close_date) : '-' %></td>
-          </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    </div>
-    <% } %>
-  </div>
+  <% } %>
 
   <!-- Site Diary Tab -->
+  <% if (showTab('diary')) { %>
   <div id="diary" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Site Diary</h2>
@@ -1517,8 +1518,10 @@
     </div>
     <% } %>
   </div>
+  <% } %>
 
   <!-- Chat Tab -->
+  <% if (showTab('chat')) { %>
   <div id="chat" class="tab-content">
     <div class="mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Job Chat</h2>
@@ -1561,9 +1564,10 @@
       </div>
     <% } %>
   </div>
+  <% } %>
 
-  <!-- Budget Tab (conditional) -->
-  <% if (canViewAccounts) { %>
+  <!-- Budget Tab -->
+  <% if (showTab('budget')) { %>
   <div id="budget" class="tab-content">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Budget & Costs</h2>
@@ -1658,8 +1662,8 @@
   </div>
   <% } %>
 
-  <!-- Accounts Tab (conditional) -->
-  <% if (canViewAccounts) { %>
+  <!-- Accounts Tab -->
+  <% if (showTab('accounts')) { %>
   <div id="accounts" class="tab-content">
     <div class="mb-4">
       <h2 class="text-lg font-semibold text-gray-900">Accounts</h2>
