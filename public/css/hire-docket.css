@@ -105,6 +105,21 @@
 /* ---- Print overrides ---- */
 @media print {
   .print\:hidden { display: none !important; }
+
+  /* Each equipment item starts on a fresh page so two half-items don't get
+     spliced awkwardly across a page break. The first item doesn't break
+     (it flows after the docket-level header sections). */
+  details[id^="item-"] {
+    break-before: page;
+    break-inside: avoid-page;
+  }
+  details[id^="item-"]:first-of-type { break-before: auto; }
+
+  /* Keep accessory tables + photo grids + signature pads from splitting. */
+  table, .hd-photo-slots, .hd-signature-pad-wrap, .hd-signature-existing {
+    break-inside: avoid;
+  }
+
   details { }
   details summary { list-style: none; pointer-events: none; }
   details > summary::-webkit-details-marker { display: none; }
