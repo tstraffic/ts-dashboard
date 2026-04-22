@@ -17,6 +17,7 @@ const {
   OFFHIRE_METHODS,
   OFFHIRE_METHOD_LABELS,
   getEquipmentType,
+  getPowerKind,
 } = require('../lib/hireDocketConfig');
 
 const ROADWORTHY_KEYS = ['tyres', 'lights', 'indicators', 'plate', 'chains', 'coupling'];
@@ -330,6 +331,7 @@ router.get('/:id', (req, res) => {
     roadworthyKeys: ROADWORTHY_KEYS,
     fuelLevels: FUEL_LEVELS,
     fuelLabels: FUEL_LABELS,
+    getPowerKind,
     offhireMethods: OFFHIRE_METHODS,
     offhireMethodLabels: OFFHIRE_METHOD_LABELS,
     canReconcile: isAdminRole(req.session.user),

@@ -33,13 +33,21 @@
     </div>
   </div>
 
+  <%
+    // Adaptive label + per-level text based on equipment type. Battery-powered
+    // items (VMS, arrow board, scissor lift, etc.) show percentage buckets;
+    // fuel items show Empty / 1/4 / 1/2 / 3/4 / Full; mixed types default to
+    // fuel fractions with the "Fuel / battery level" label. The underlying
+    // column values are unchanged.
+    const pk = (typeof powerKind !== 'undefined' && powerKind) ? powerKind : { label: 'Fuel / battery level', labels: fuelLabels };
+  %>
   <div class="mt-3">
-    <label class="hd-label">Fuel / battery level</label>
+    <label class="hd-label"><%= pk.label %></label>
     <div class="flex flex-wrap gap-2">
       <% fuelLevels.forEach(f => { %>
         <label class="hd-pill hd-pill-sm <%= get('fuel') === f ? 'is-active' : '' %>">
           <input type="radio" name="<%= ph %>_fuel" value="<%= f %>" <%= get('fuel') === f ? 'checked' : '' %>>
-          <span><%= fuelLabels[f] %></span>
+          <span><%= pk.labels[f] || fuelLabels[f] %></span>
         </label>
       <% }) %>
     </div>

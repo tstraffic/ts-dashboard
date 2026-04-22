@@ -657,6 +657,7 @@
             it, docket, phase: 'pickup', phaseLabel: 'Pick-up',
             accentBg: 'bg-blue-50/40', accentBorder: 'border-blue-200', accentText: 'text-blue-700',
             fuelLevels, fuelLabels, roadworthyKeys, typeConfig, print,
+            powerKind: getPowerKind(it.equipment_type),
             photos: it.photos.pickup || {}
           }) %>
           <!-- DROP-OFF phase -->
@@ -664,6 +665,7 @@
             it, docket, phase: 'dropoff', phaseLabel: 'Drop-off',
             accentBg: 'bg-purple-50/40', accentBorder: 'border-purple-200', accentText: 'text-purple-700',
             fuelLevels, fuelLabels, roadworthyKeys, typeConfig, print,
+            powerKind: getPowerKind(it.equipment_type),
             photos: it.photos.dropoff || {}
           }) %>
         </div>
