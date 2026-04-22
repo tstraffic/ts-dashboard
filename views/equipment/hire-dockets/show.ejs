@@ -369,20 +369,19 @@
           <textarea name="dropoff_notes" rows="4" class="hd-input resize-y"><%= docket.dropoff_notes || '' %></textarea>
         </div>
       </div>
-      <!-- Pick-up confirmation -->
+      <!-- Pick-up sign-off — supervisor/yard-manager acknowledges the whole docket.
+           Per-item "Collected by" lives in Chain of Custody on each item; this is
+           the single point of accountability for the entire pickup, not a duplicate. -->
       <div class="bg-blue-50/40 border border-blue-200 rounded-lg p-4">
-        <h3 class="text-xs font-bold text-blue-700 uppercase tracking-widest mb-3">Pick-up confirmation</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <h3 class="text-xs font-bold text-blue-700 uppercase tracking-widest mb-3">Pick-up sign-off <span class="font-normal normal-case tracking-normal text-[11px] text-blue-800/80">· Supervisor / yard manager</span></h3>
+        <p class="text-[11px] text-blue-900/70 mb-3">Who collected each individual item is captured in that item's Chain of Custody. This block is a single supervisor or yard-manager sign-off for the whole docket.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label class="hd-label">Collected by — printed name</label>
+            <label class="hd-label">Supervisor — printed name</label>
             <input type="text" name="pickup_collected_by" value="<%= docket.pickup_collected_by || '' %>" class="hd-input">
           </div>
           <div>
-            <label class="hd-label">Initials / typed signature</label>
-            <input type="text" name="pickup_signature" value="<%= docket.pickup_signature || '' %>" class="hd-input">
-          </div>
-          <div>
-            <label class="hd-label">Date / time</label>
+            <label class="hd-label">Date</label>
             <input type="date" name="pickup_date" value="<%= docket.pickup_date || '' %>" class="hd-input">
           </div>
           <div>
@@ -391,24 +390,21 @@
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-          <%- include('partials/signature-pad', { slot: 'pickup', label: 'Collected-by signature', currentPath: docket.pickup_signature_path, docketId: docket.id, print }) %>
+          <%- include('partials/signature-pad', { slot: 'pickup', label: 'Supervisor signature', currentPath: docket.pickup_signature_path, docketId: docket.id, print }) %>
           <%- include('partials/signature-pad', { slot: 'pickup_supplier_rep', label: 'Supplier-rep signature', currentPath: docket.pickup_supplier_rep_signature_path, docketId: docket.id, print }) %>
         </div>
       </div>
-      <!-- Drop-off confirmation -->
+      <!-- Drop-off sign-off — mirror of pick-up -->
       <div class="bg-purple-50/40 border border-purple-200 rounded-lg p-4">
-        <h3 class="text-xs font-bold text-purple-700 uppercase tracking-widest mb-3">Drop-off confirmation</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <h3 class="text-xs font-bold text-purple-700 uppercase tracking-widest mb-3">Drop-off sign-off <span class="font-normal normal-case tracking-normal text-[11px] text-purple-800/80">· Supervisor / yard manager</span></h3>
+        <p class="text-[11px] text-purple-900/70 mb-3">Per-item return detail is captured in each item's Chain of Custody. This is the single supervisor sign-off for the whole return.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label class="hd-label">Returned by — printed name</label>
+            <label class="hd-label">Supervisor — printed name</label>
             <input type="text" name="dropoff_returned_by" value="<%= docket.dropoff_returned_by || '' %>" class="hd-input">
           </div>
           <div>
-            <label class="hd-label">Initials / typed signature</label>
-            <input type="text" name="dropoff_signature" value="<%= docket.dropoff_signature || '' %>" class="hd-input">
-          </div>
-          <div>
-            <label class="hd-label">Date / time</label>
+            <label class="hd-label">Date</label>
             <input type="date" name="dropoff_date" value="<%= docket.dropoff_date || '' %>" class="hd-input">
           </div>
           <div>
@@ -417,7 +413,7 @@
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-          <%- include('partials/signature-pad', { slot: 'dropoff', label: 'Returned-by signature', currentPath: docket.dropoff_signature_path, docketId: docket.id, print }) %>
+          <%- include('partials/signature-pad', { slot: 'dropoff', label: 'Supervisor signature', currentPath: docket.dropoff_signature_path, docketId: docket.id, print }) %>
           <%- include('partials/signature-pad', { slot: 'dropoff_supplier_rep', label: 'Supplier-rep signature', currentPath: docket.dropoff_supplier_rep_signature_path, docketId: docket.id, print }) %>
         </div>
       </div>
