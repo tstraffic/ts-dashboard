@@ -168,6 +168,64 @@
     document.querySelectorAll('form[data-draft-key]').forEach(wire);
   })();
 
+  // ---------- Soft validators (non-blocking warnings for date + odometer order) ----------
+  // Drop-off date/time before pick-up date/time = warn.
+  // Drop-off odometer/hours below pick-up odometer/hours = warn.
+  // Pure UX — server doesn't reject, crews can still save (the reading may be
+  // genuinely correct, e.g. an odometer rollover).
+  (function () {
+    function warningEl(field) {
+      var sibling = field.parentElement.querySelector('.hd-softwarn');
+      if (sibling) return sibling;
+      var p = document.createElement('p');
+      p.className = 'hd-softwarn text-[11px] text-amber-700 mt-1 print:hidden';
+      field.parentElement.appendChild(p);
+      return p;
+    }
+    function clearWarn(field) {
+      var existing = field.parentElement.querySelector('.hd-softwarn');
+      if (existing) existing.remove();
+    }
+
+    document.querySelectorAll('form[action*="/items/"][method="post"], form[action*="/items/"][method="POST"]').forEach(function (form) {
+      // Only wire the per-item inspection forms — the ones that carry both
+      // pickup_datetime and dropoff_datetime. Skip the /accessories / /photos /
+      // /duplicate / /delete forms.
+      if (!form.querySelector('[name="pickup_datetime"]') && !form.querySelector('[name="dropoff_datetime"]')) return;
+
+      var pUp = form.querySelector('[name="pickup_datetime"]');
+      var dUp = form.querySelector('[name="dropoff_datetime"]');
+      var pHrs = form.querySelector('[name="pickup_hours_odometer"]');
+      var dHrs = form.querySelector('[name="dropoff_hours_odometer"]');
+
+      function checkDates() {
+        if (!pUp || !dUp) return;
+        clearWarn(dUp);
+        if (pUp.value && dUp.value && dUp.value < pUp.value) {
+          warningEl(dUp).textContent = '⚠ Drop-off is before pick-up. Double-check the date/time.';
+        }
+      }
+      function firstNumber(v) {
+        var m = String(v || '').match(/[-+]?\d+(\.\d+)?/);
+        return m ? parseFloat(m[0]) : null;
+      }
+      function checkHours() {
+        if (!pHrs || !dHrs) return;
+        clearWarn(dHrs);
+        var pv = firstNumber(pHrs.value);
+        var dv = firstNumber(dHrs.value);
+        if (pv != null && dv != null && dv < pv) {
+          warningEl(dHrs).textContent = '⚠ Drop-off reading is lower than pick-up (' + pv + ' → ' + dv + '). Odometer rollover? Confirm before saving.';
+        }
+      }
+      [pUp, dUp].forEach(function (el) { if (el) el.addEventListener('change', checkDates); });
+      [pHrs, dHrs].forEach(function (el) { if (el) el.addEventListener('input', checkHours); });
+      // Run once at load so stored-but-suspect values are flagged too.
+      checkDates();
+      checkHours();
+    });
+  })();
+
   // ---------- Auto-submit photo uploads when files are chosen ----------
   document.querySelectorAll('.hd-photo-upload').forEach(function (form) {
     const trigger = form.querySelector('.hd-photo-trigger');
