@@ -16,7 +16,7 @@ Full-stack operations management platform for **T&S Traffic Control** (Sydney tr
 - **Push Notifications**: Web Push (VAPID) via `web-push` npm package
 - **Node path on this machine**: `PATH="/c/Program Files/nodejs:$PATH"` (required for all node/npm commands)
 - **GitHub repo**: `tstraffic/ts-dashboard` (origin)
-- **Live URL**: `https://ts-dashboard.up.railway.app`
+- **Live URL**: `https://tstc.up.railway.app`
 
 ## Brand Colors
 - Primary: `#2B7FFF` (brand-600: `#1D6AE5`)
@@ -203,7 +203,7 @@ public/js/worker-sw.js           — Worker service worker
 ```
 DATABASE_PATH=./data/database.sqlite
 SESSION_SECRET=<random-string>
-APP_BASE_URL=https://ts-dashboard.up.railway.app
+APP_BASE_URL=https://tstc.up.railway.app
 RESEND_API_KEY=re_xxxxxxxxxxxx       # or SMTP_PASS=re_xxxxxxxxxxxx
 SMTP_FROM_EMAIL=onboarding@resend.dev # change after domain verification
 SMTP_FROM_NAME=T&S Traffic Control
