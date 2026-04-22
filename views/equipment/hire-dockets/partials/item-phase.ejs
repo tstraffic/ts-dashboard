@@ -1,0 +1,348 @@
+<%
+  // Pick-up OR Drop-off phase panel for a single item.
+  // Args: it, docket, phase ('pickup'|'dropoff'), phaseLabel, accent* classes,
+  // fuelLevels, fuelLabels, roadworthyKeys, typeConfig (null if no type picked),
+  // accessories (all rows for the item — same list feeds both phases),
+  // photos (object keyed by checklist_key for this phase), print (bool).
+  const ph = phase;
+  const get = (suffix) => it[`${ph}_${suffix}`];
+  const getRoadworthySet = () => ph === 'pickup' ? it.pickup_roadworthy_set : it.dropoff_roadworthy_set;
+  const fmtDateTimeLocal = (v) => v ? String(v).replace(' ', 'T').slice(0, 16) : '';
+  const damageVal = get('damage_observed') ? '1' : '';
+  const cleanVal = get('clean') ? '1' : '';
+  const cleanName = `${ph}_clean`;
+  const signoffPath = get('signoff_signature_path');
+  const signoffAt = get('signoff_at');
+%>
+<div class="<%= accentBg %> border <%= accentBorder %> rounded-lg p-4" data-phase="<%= ph %>">
+  <div class="flex items-center justify-between mb-3">
+    <h3 class="text-xs font-bold <%= accentText %> uppercase tracking-widest flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full <%= ph === 'pickup' ? 'bg-blue-500' : 'bg-purple-500' %>"></span>
+      <%= phaseLabel %>
+    </h3>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div>
+      <label class="hd-label">Date / time</label>
+      <input type="datetime-local" name="<%= ph %>_datetime" value="<%= fmtDateTimeLocal(get('datetime')) %>" class="hd-input">
+    </div>
+    <div>
+      <label class="hd-label">Hours / odometer</label>
+      <input type="text" name="<%= ph %>_hours_odometer" value="<%= get('hours_odometer') || '' %>" class="hd-input">
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <label class="hd-label">Fuel / battery level</label>
+    <div class="flex flex-wrap gap-2">
+      <% fuelLevels.forEach(f => { %>
+        <label class="hd-pill hd-pill-sm <%= get('fuel') === f ? 'is-active' : '' %>">
+          <input type="radio" name="<%= ph %>_fuel" value="<%= f %>" <%= get('fuel') === f ? 'checked' : '' %>>
+          <span><%= fuelLabels[f] %></span>
+        </label>
+      <% }) %>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <label class="hd-label">Damage observed</label>
+    <%- include('yn', { name: `${ph}_damage_observed`, value: damageVal, withNa: false }) %>
+    <textarea name="<%= ph %>_damage_notes" rows="2" placeholder="Damage / condition notes" class="hd-input resize-y mt-2"><%= get('damage_notes') || '' %></textarea>
+  </div>
+
+  <% if (ph === 'pickup') { %>
+  <div class="mt-3 bg-amber-50 border-l-4 border-amber-400 rounded-r-lg p-3">
+    <label class="flex items-center gap-2 text-xs text-amber-900 cursor-pointer">
+      <input type="checkbox" name="pickup_pre_existing_damage_ack" value="1" <%= it.pickup_pre_existing_damage_ack ? 'checked' : '' %> class="rounded text-amber-600 focus:ring-amber-500">
+      <span>Pre-existing damage identified and <u>acknowledged by supplier rep</u></span>
+    </label>
+    <div class="mt-2">
+      <label class="hd-label text-amber-900">Supplier disputes noted damage?</label>
+      <div class="hd-yn-group" data-yn-name="pickup_supplier_disputes_damage">
+        <label class="hd-pill hd-pill-sm <%= it.pickup_supplier_disputes_damage === 'yes' ? 'is-active' : '' %>"><input type="radio" name="pickup_supplier_disputes_damage" value="yes" <%= it.pickup_supplier_disputes_damage === 'yes' ? 'checked' : '' %>><span>Yes — supplier disputes</span></label>
+        <label class="hd-pill hd-pill-sm <%= it.pickup_supplier_disputes_damage === 'no' ? 'is-active' : '' %>"><input type="radio" name="pickup_supplier_disputes_damage" value="no" <%= it.pickup_supplier_disputes_damage === 'no' ? 'checked' : '' %>><span>No — agreed</span></label>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Operational test -->
+  <details class="mt-3 border border-gray-200 rounded-lg bg-white/60" <%= print ? 'open' : '' %>>
+    <summary class="px-3 py-2 text-xs font-bold text-brand-800 uppercase tracking-wider cursor-pointer flex items-center justify-between">
+      <span>🔧 Operational test</span>
+      <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </summary>
+    <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="hd-label">Test completed</label>
+        <%- include('yn', { name: `${ph}_op_test_completed`, value: get('op_test_completed') ? '1' : '', withNa: false }) %>
+      </div>
+      <div>
+        <label class="hd-label">Unit powers on / functions correctly</label>
+        <%- include('yn', { name: `${ph}_op_powers_on`, value: get('op_powers_on') ? '1' : '', withNa: false }) %>
+      </div>
+      <div>
+        <label class="hd-label">Safe to use</label>
+        <div class="hd-yn-group" data-yn-name="<%= ph %>_op_safe_to_use">
+          <label class="hd-pill hd-pill-sm <%= get('op_safe_to_use') === 'safe' ? 'is-active' : '' %>"><input type="radio" name="<%= ph %>_op_safe_to_use" value="safe" <%= get('op_safe_to_use') === 'safe' ? 'checked' : '' %>><span>Safe</span></label>
+          <label class="hd-pill hd-pill-sm <%= get('op_safe_to_use') === 'unsafe' ? 'is-active' : '' %>"><input type="radio" name="<%= ph %>_op_safe_to_use" value="unsafe" <%= get('op_safe_to_use') === 'unsafe' ? 'checked' : '' %>><span>Unsafe</span></label>
+        </div>
+      </div>
+      <div>
+        <label class="hd-label">Reported to supplier at <%= ph === 'pickup' ? 'pickup' : 'return' %></label>
+        <%- include('yn', { name: `${ph}_op_reported_to_supplier`, value: get('op_reported_to_supplier') || '', withNa: true }) %>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="hd-label">Faults affecting function</label>
+        <textarea name="<%= ph %>_op_faults" rows="2" class="hd-input resize-y"><%= get('op_faults') || '' %></textarea>
+      </div>
+    </div>
+  </details>
+
+  <!-- Itemised accessories (renders the full accessories list for the ITEM — qty_out is relevant for pickup, qty_back + condition for dropoff) -->
+  <details class="mt-3 border border-gray-200 rounded-lg bg-white/60" <%= print ? 'open' : '' %>>
+    <summary class="px-3 py-2 text-xs font-bold text-brand-800 uppercase tracking-wider cursor-pointer flex items-center justify-between">
+      <span>🎒 Itemised accessories <span class="font-normal text-gray-500 normal-case"><%= accessories.length %> line<%= accessories.length === 1 ? '' : 's' %></span></span>
+      <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </summary>
+    <div class="p-3">
+      <% if (accessories.length === 0) { %>
+        <p class="text-xs text-gray-400 italic mb-2">No accessories yet — click "+ Add line" or "Load standard list".</p>
+      <% } else { %>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs min-w-[520px]">
+            <thead>
+              <tr class="text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                <th class="px-2 py-1">Item</th>
+                <th class="px-2 py-1 w-16">Qty out</th>
+                <th class="px-2 py-1 w-16">Qty back</th>
+                <th class="px-2 py-1">Condition</th>
+                <th class="px-2 py-1 w-24">Missing / damaged</th>
+                <th class="px-2 py-1 w-8"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% accessories.forEach(acc => { %>
+                <tr data-acc-id="<%= acc.id %>">
+                  <td colspan="6" class="py-1">
+                    <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/accessories/<%= acc.id %>" class="hd-acc-row grid grid-cols-[1fr,56px,56px,1fr,90px,30px] gap-1.5 items-center">
+                      <%- include('../../../partials/csrf') %>
+                      <input type="text" name="item_name" value="<%= acc.item_name %>" class="hd-input hd-input-sm">
+                      <input type="number" name="qty_out" min="0" value="<%= acc.qty_out %>" class="hd-input hd-input-sm text-right">
+                      <input type="number" name="qty_back" min="0" value="<%= acc.qty_back %>" class="hd-input hd-input-sm text-right">
+                      <input type="text" name="condition" value="<%= acc.condition || '' %>" placeholder="Good / scratched / etc." class="hd-input hd-input-sm">
+                      <label class="flex items-center gap-1 text-xs justify-center bg-white border border-gray-200 rounded-md px-1.5 py-1 cursor-pointer">
+                        <input type="checkbox" name="missing_damaged" value="1" <%= acc.missing_damaged ? 'checked' : '' %> class="rounded text-red-500 focus:ring-red-400">
+                      </label>
+                      <div class="flex items-center gap-1">
+                        <button type="submit" class="text-brand-600 hover:text-brand-700" title="Save"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></button>
+                      </div>
+                    </form>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="6" class="pb-2 px-2 print:hidden">
+                    <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/accessories/<%= acc.id %>/delete" class="inline" onsubmit="return confirm('Remove this accessory line?')">
+                      <%- include('../../../partials/csrf') %>
+                      <button type="submit" class="text-[11px] text-gray-400 hover:text-red-600">✕ remove line</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <div class="mt-2 print:hidden flex flex-wrap items-center gap-2">
+        <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/accessories" class="hd-acc-new grid grid-cols-[1fr,56px,auto] gap-1.5 items-center flex-1 min-w-[200px]">
+          <%- include('../../../partials/csrf') %>
+          <input type="text" name="item_name" placeholder="New accessory name" class="hd-input hd-input-sm">
+          <input type="number" name="qty_out" min="0" value="1" class="hd-input hd-input-sm text-right">
+          <button type="submit" class="hd-add-btn-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            Add line
+          </button>
+        </form>
+        <% if (typeConfig && typeConfig.accessoryPresets && typeConfig.accessoryPresets.length > 0) { %>
+        <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/accessories/load-preset" class="inline">
+          <%- include('../../../partials/csrf') %>
+          <button type="submit" class="text-xs px-3 py-1.5 rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-50">Load standard list</button>
+        </form>
+        <% } %>
+      </div>
+      <% if (ph === 'pickup' && it.pickup_accessories) { %>
+        <p class="mt-3 text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-1.5"><span class="font-semibold">Legacy pick-up accessories:</span> <%= it.pickup_accessories %></p>
+      <% } %>
+      <% if (ph === 'dropoff' && it.dropoff_accessories) { %>
+        <p class="mt-3 text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-1.5"><span class="font-semibold">Legacy drop-off accessories:</span> <%= it.dropoff_accessories %></p>
+      <% } %>
+    </div>
+  </details>
+
+  <!-- Photos (required-shot slots driven by equipment type + additional slot) -->
+  <div class="mt-3 bg-white/60 border border-gray-200 rounded-lg p-3">
+    <h4 class="text-xs font-bold text-brand-800 uppercase tracking-wider mb-2">📷 Photos</h4>
+    <% if (!typeConfig) { %>
+      <p class="text-xs text-gray-400 italic">Select equipment type above to load required photo checklist.</p>
+    <% } %>
+    <div class="hd-photo-slots grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <% (typeConfig ? typeConfig.photoChecklist : []).forEach(slot => { const shots = photos[slot.key] || []; %>
+        <div class="border border-gray-200 rounded-lg p-2 bg-gray-50/60">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[11px] font-bold text-gray-700 uppercase tracking-widest"><%= slot.label %></span>
+            <span class="text-[10px] text-gray-500"><%= shots.length %> shot<%= shots.length === 1 ? '' : 's' %></span>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            <% shots.forEach(p => { %>
+              <div class="relative w-14 h-14 rounded-md overflow-hidden bg-white border border-gray-200 group">
+                <img src="/equipment/hire-dockets/<%= docket.id %>/photos/<%= p.id %>" alt="<%= p.original_name %>" class="w-full h-full object-cover">
+                <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/photos/<%= p.id %>/delete" class="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition print:hidden" onsubmit="return confirm('Delete this photo?')">
+                  <%- include('../../../partials/csrf') %>
+                  <button type="submit" class="w-5 h-5 rounded-bl-md bg-red-600 text-white text-xs flex items-center justify-center hover:bg-red-500">✕</button>
+                </form>
+              </div>
+            <% }) %>
+          </div>
+          <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/photos" enctype="multipart/form-data" class="print:hidden hd-photo-upload">
+            <%- include('../../../partials/csrf') %>
+            <input type="hidden" name="phase" value="<%= ph %>">
+            <input type="hidden" name="checklist_key" value="<%= slot.key %>">
+            <input type="file" name="photos" multiple accept="image/*,application/pdf" class="hd-photo-input hidden">
+            <button type="button" class="hd-photo-trigger hd-add-btn-sm">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16l4-4a3 3 0 014 0l5 5M14 14l1.293-1.293a3 3 0 014.243 0L21 14M8 10a2 2 0 11-4 0 2 2 0 014 0zM4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+              Upload photos
+            </button>
+          </form>
+        </div>
+      <% }) %>
+      <!-- Additional photos / documents slot -->
+      <div class="border border-gray-200 rounded-lg p-2 bg-gray-50/60">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-[11px] font-bold text-gray-700 uppercase tracking-widest">Additional photos / documents</span>
+          <span class="text-[10px] text-gray-500"><%= (photos._additional || []).length %> file<%= (photos._additional || []).length === 1 ? '' : 's' %></span>
+        </div>
+        <div class="flex flex-wrap gap-1.5 mb-2">
+          <% (photos._additional || []).forEach(p => { %>
+            <div class="relative w-14 h-14 rounded-md overflow-hidden bg-white border border-gray-200 group">
+              <% if (/^image\//i.test(p.mime_type)) { %>
+                <img src="/equipment/hire-dockets/<%= docket.id %>/photos/<%= p.id %>" alt="<%= p.original_name %>" class="w-full h-full object-cover">
+              <% } else { %>
+                <a href="/equipment/hire-dockets/<%= docket.id %>/photos/<%= p.id %>" target="_blank" class="w-full h-full flex items-center justify-center text-[10px] text-gray-600 p-1 text-center">📄</a>
+              <% } %>
+              <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/photos/<%= p.id %>/delete" class="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition print:hidden" onsubmit="return confirm('Delete this file?')">
+                <%- include('../../../partials/csrf') %>
+                <button type="submit" class="w-5 h-5 rounded-bl-md bg-red-600 text-white text-xs flex items-center justify-center hover:bg-red-500">✕</button>
+              </form>
+            </div>
+          <% }) %>
+        </div>
+        <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/photos" enctype="multipart/form-data" class="print:hidden hd-photo-upload">
+          <%- include('../../../partials/csrf') %>
+          <input type="hidden" name="phase" value="<%= ph %>">
+          <input type="hidden" name="checklist_key" value="">
+          <input type="file" name="photos" multiple accept="image/*,application/pdf" class="hd-photo-input hidden">
+          <button type="button" class="hd-photo-trigger hd-add-btn-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            Add file
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Site & weather -->
+  <details class="mt-3 border border-gray-200 rounded-lg bg-white/60" <%= print ? 'open' : '' %>>
+    <summary class="px-3 py-2 text-xs font-bold text-brand-800 uppercase tracking-wider cursor-pointer flex items-center justify-between">
+      <span>🌦 Site &amp; weather context</span>
+      <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </summary>
+    <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="hd-label">Site conditions</label>
+        <input type="text" name="<%= ph %>_site_conditions" value="<%= get('site_conditions') || '' %>" placeholder="e.g. Muddy, sandy, high dust" class="hd-input">
+      </div>
+      <div>
+        <label class="hd-label">Weather</label>
+        <input type="text" name="<%= ph %>_weather" value="<%= get('weather') || '' %>" placeholder="e.g. Rain, 28°C, heavy wind" class="hd-input">
+      </div>
+    </div>
+  </details>
+
+  <!-- Inspection exception -->
+  <details class="mt-3 border border-gray-200 rounded-lg bg-white/60" <%= (print || get('full_inspection_not_possible')) ? 'open' : '' %>>
+    <summary class="px-3 py-2 text-xs font-bold text-amber-800 uppercase tracking-wider cursor-pointer bg-amber-50 rounded-t-lg flex items-center justify-between">
+      <span>⚠ Inspection exception (if not fully inspected)</span>
+      <svg class="w-3.5 h-3.5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </summary>
+    <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="hd-label">Full inspection not possible?</label>
+        <%- include('yn', { name: `${ph}_full_inspection_not_possible`, value: get('full_inspection_not_possible') ? '1' : '', withNa: false }) %>
+      </div>
+      <div>
+        <label class="hd-label">Limited photos taken?</label>
+        <%- include('yn', { name: `${ph}_limited_photos`, value: get('limited_photos') ? '1' : '', withNa: false }) %>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="hd-label">Reason</label>
+        <input type="text" name="<%= ph %>_inspection_reason" value="<%= get('inspection_reason') || '' %>" placeholder="After hours / darkness / etc." class="hd-input">
+      </div>
+      <div>
+        <label class="hd-label">Supplier notified of limited inspection?</label>
+        <%- include('yn', { name: `${ph}_supplier_notified_limited`, value: get('supplier_notified_limited') ? '1' : '', withNa: false }) %>
+      </div>
+    </div>
+  </details>
+
+  <div class="mt-3">
+    <label class="hd-label">Clean</label>
+    <%- include('yn', { name: cleanName, value: cleanVal, withNa: false }) %>
+  </div>
+
+  <!-- Roadworthy checklist (retained from v1 — useful for trailer-type items) -->
+  <div class="mt-3">
+    <label class="hd-label">Roadworthy checklist (trailer / tow items)</label>
+    <div class="flex flex-wrap gap-2">
+      <% roadworthyKeys.forEach(k => { %>
+        <label class="hd-pill hd-pill-sm <%= getRoadworthySet().has(k) ? 'is-active' : '' %>">
+          <input type="checkbox" name="<%= ph %>_roadworthy_<%= k %>" value="1" <%= getRoadworthySet().has(k) ? 'checked' : '' %>>
+          <span class="capitalize"><%= k %></span>
+        </label>
+      <% }) %>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <label class="hd-label">Initials</label>
+    <input type="text" name="<%= ph %>_initials" value="<%= get('initials') || '' %>" placeholder="e.g. JS" class="hd-input w-24">
+  </div>
+
+  <!-- Sign-off for this item + phase -->
+  <div class="mt-4 border-t border-gray-200 pt-3">
+    <p class="text-[11px] font-bold text-gray-600 uppercase tracking-widest mb-2">Sign-off for this item</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="hd-label">Printed name <span class="text-red-500">*</span></label>
+        <input type="text" name="<%= ph %>_signoff_name" value="<%= get('signoff_name') || '' %>" class="hd-input">
+      </div>
+      <div>
+        <label class="hd-label">Timestamp</label>
+        <input type="text" readonly value="<%= signoffAt || '— auto-fills on signature capture —' %>" class="hd-input bg-gray-50">
+      </div>
+    </div>
+    <div class="mt-3 hd-signature" data-slot="<%= ph %>" data-docket="<%= docket.id %>" data-kind="item" data-item="<%= it.id %>">
+      <% if (signoffPath) { %>
+        <img src="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/signature/<%= ph %>?v=<%= Date.now() %>" alt="Sign-off" class="hd-signature-existing w-full max-w-xs border border-gray-300 rounded-lg bg-white">
+      <% } %>
+      <div class="hd-signature-pad-wrap print:hidden <%= signoffPath ? 'mt-2' : '' %>">
+        <canvas class="hd-signature-pad border border-gray-300 rounded-lg bg-white w-full" width="400" height="120"></canvas>
+        <div class="flex items-center gap-2 mt-1 text-xs">
+          <button type="button" class="hd-sig-clear px-2.5 py-1 rounded-md bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">Clear</button>
+          <button type="button" class="hd-sig-save px-3 py-1 rounded-md bg-brand-600 text-white hover:bg-brand-500 font-medium">Save signature</button>
+          <span class="hd-sig-status text-gray-400"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

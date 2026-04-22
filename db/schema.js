@@ -5780,6 +5780,164 @@ function runMigrations(db) {
     console.log('Migration 128 applied: tasks.deleted_at + deleted_by');
   }
 
+  // Migration 129: Hire docket checklist v2 — rebuild to PDF spec
+  // Adds: commercial terms, off-hire notification, dispute block, reconciliation,
+  // canvas-signature paths, hire_end_date, soft-delete columns on hire_dockets.
+  // Adds: chain of custody, pre-existing damage tracking, operational test,
+  // site/weather, inspection exception, per-item sign-off on hire_docket_items.
+  // New tables: hire_docket_accessories, hire_docket_attachments, hire_docket_photos.
+  if (!isMigrationApplied.get(129)) {
+    console.log('Running migration 129: Hire docket checklist v2');
+
+    const docketCols = [
+      // Commercial terms
+      "ALTER TABLE hire_dockets ADD COLUMN included_allowance TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN excess_charge TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN fuel_return_requirement TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN cleaning_expectation TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN damage_liability_received INTEGER DEFAULT 0",
+      "ALTER TABLE hire_dockets ADD COLUMN late_return_approved TEXT DEFAULT ''",
+      // Off-hire notification
+      "ALTER TABLE hire_dockets ADD COLUMN offhire_method TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN offhire_notified_at DATETIME",
+      "ALTER TABLE hire_dockets ADD COLUMN offhire_person_notified TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN offhire_reference TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN offhire_notified_by TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN offhire_confirmed INTEGER DEFAULT 0",
+      // Dispute
+      "ALTER TABLE hire_dockets ADD COLUMN dispute_alleged_damage INTEGER DEFAULT 0",
+      "ALTER TABLE hire_dockets ADD COLUMN dispute_photos_both_parties INTEGER DEFAULT 0",
+      "ALTER TABLE hire_dockets ADD COLUMN dispute_raised_immediately INTEGER DEFAULT 0",
+      "ALTER TABLE hire_dockets ADD COLUMN dispute_details TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN dispute_internal_notified TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN dispute_est_value REAL DEFAULT 0",
+      "ALTER TABLE hire_dockets ADD COLUMN dispute_next_action TEXT DEFAULT ''",
+      // Admin / reconciliation
+      "ALTER TABLE hire_dockets ADD COLUMN recon_reviewed_by_id INTEGER REFERENCES users(id)",
+      "ALTER TABLE hire_dockets ADD COLUMN recon_review_date DATE",
+      "ALTER TABLE hire_dockets ADD COLUMN recon_invoice_number TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN recon_charges_checked INTEGER DEFAULT 0",
+      "ALTER TABLE hire_dockets ADD COLUMN recon_variations_reconciled TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN recon_closed_out INTEGER DEFAULT 0",
+      "ALTER TABLE hire_dockets ADD COLUMN recon_notes TEXT DEFAULT ''",
+      // Canvas signatures (PNG file paths)
+      "ALTER TABLE hire_dockets ADD COLUMN pickup_signature_path TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN pickup_supplier_rep_signature_path TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN dropoff_signature_path TEXT DEFAULT ''",
+      "ALTER TABLE hire_dockets ADD COLUMN dropoff_supplier_rep_signature_path TEXT DEFAULT ''",
+      // Hire window + soft-delete
+      "ALTER TABLE hire_dockets ADD COLUMN hire_end_date DATE",
+      "ALTER TABLE hire_dockets ADD COLUMN deleted_at DATETIME",
+      "ALTER TABLE hire_dockets ADD COLUMN deleted_by INTEGER REFERENCES users(id)",
+    ];
+    for (const sql of docketCols) {
+      try { db.exec(sql); } catch (e) { /* column may already exist */ }
+    }
+
+    const itemCols = [
+      // Chain of custody
+      "ALTER TABLE hire_docket_items ADD COLUMN collected_full_name TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN collected_mobile TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN collected_company TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN returned_full_name TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN returned_mobile TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN returned_company TEXT DEFAULT ''",
+      // Pre-existing damage
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_pre_existing_damage_ack INTEGER DEFAULT 0",
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_supplier_disputes_damage TEXT DEFAULT ''",
+      // Operational test — pickup
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_op_test_completed INTEGER DEFAULT 0",
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_op_powers_on INTEGER DEFAULT 0",
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_op_safe_to_use TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_op_reported_to_supplier TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_op_faults TEXT DEFAULT ''",
+      // Operational test — dropoff
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_op_test_completed INTEGER DEFAULT 0",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_op_powers_on INTEGER DEFAULT 0",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_op_safe_to_use TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_op_reported_to_supplier TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_op_faults TEXT DEFAULT ''",
+      // Site & weather
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_site_conditions TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_weather TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_site_conditions TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_weather TEXT DEFAULT ''",
+      // Inspection exception — pickup
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_full_inspection_not_possible INTEGER DEFAULT 0",
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_inspection_reason TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_limited_photos INTEGER DEFAULT 0",
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_supplier_notified_limited INTEGER DEFAULT 0",
+      // Inspection exception — dropoff
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_full_inspection_not_possible INTEGER DEFAULT 0",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_inspection_reason TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_limited_photos INTEGER DEFAULT 0",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_supplier_notified_limited INTEGER DEFAULT 0",
+      // Per-item sign-off
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_signoff_name TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_signoff_signature_path TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN pickup_signoff_at DATETIME",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_signoff_name TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_signoff_signature_path TEXT DEFAULT ''",
+      "ALTER TABLE hire_docket_items ADD COLUMN dropoff_signoff_at DATETIME",
+    ];
+    for (const sql of itemCols) {
+      try { db.exec(sql); } catch (e) { /* column may already exist */ }
+    }
+
+    // Accessories line items (one row per accessory per equipment item)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS hire_docket_accessories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id INTEGER NOT NULL REFERENCES hire_docket_items(id) ON DELETE CASCADE,
+        item_name TEXT NOT NULL,
+        qty_out INTEGER DEFAULT 0,
+        qty_back INTEGER DEFAULT 0,
+        condition TEXT DEFAULT '',
+        missing_damaged INTEGER DEFAULT 0,
+        notes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_hda_item ON hire_docket_accessories(item_id)"); } catch (e) { /* ignore */ }
+
+    // Categorised docket-level attachments (hire agreement, pickup/return dockets, etc.)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS hire_docket_attachments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        docket_id INTEGER NOT NULL REFERENCES hire_dockets(id) ON DELETE CASCADE,
+        category TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        original_name TEXT DEFAULT '',
+        mime_type TEXT DEFAULT '',
+        size_bytes INTEGER DEFAULT 0,
+        uploaded_by_id INTEGER REFERENCES users(id),
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_hda_att_docket ON hire_docket_attachments(docket_id, category)"); } catch (e) { /* ignore */ }
+
+    // Per-item photos (with optional link to a required-shot slot via checklist_key)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS hire_docket_photos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id INTEGER NOT NULL REFERENCES hire_docket_items(id) ON DELETE CASCADE,
+        phase TEXT NOT NULL,
+        checklist_key TEXT DEFAULT '',
+        file_path TEXT NOT NULL,
+        original_name TEXT DEFAULT '',
+        mime_type TEXT DEFAULT '',
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_hdp_item_phase ON hire_docket_photos(item_id, phase)"); } catch (e) { /* ignore */ }
+
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_hire_dockets_deleted ON hire_dockets(deleted_at)"); } catch (e) { /* ignore */ }
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_hire_dockets_overdue ON hire_dockets(status, hire_end_date) WHERE deleted_at IS NULL"); } catch (e) { /* SQLite may reject partial-index expression on older versions */ }
+
+    recordMigration.run(129, 'Hire docket checklist v2 — PDF spec fields + accessories/photos/attachments tables');
+    console.log('Migration 129 applied: hire docket v2 fields + tables');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

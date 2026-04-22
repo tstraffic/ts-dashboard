@@ -1176,6 +1176,48 @@
       </table>
     </div>
     <% } %>
+
+    <% const hd = (typeof hireDockets !== 'undefined' ? hireDockets : []); %>
+    <% if (hd.length > 0) { %>
+      <div class="mt-6 flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-gray-900">Hired equipment (dockets)</h3>
+        <a href="/equipment/hire-dockets/new" class="text-xs text-brand-600 hover:text-brand-700 font-medium">New hire docket &rarr;</a>
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr class="border-b border-gray-200">
+              <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Docket</th>
+              <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Supplier</th>
+              <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Items</th>
+              <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Period</th>
+              <th class="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <% hd.forEach(function(d) { %>
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2.5"><a href="/equipment/hire-dockets/<%= d.id %>" class="text-brand-600 hover:text-brand-700 hover:underline font-medium"><%= d.docket_number %></a></td>
+                <td class="px-4 py-2.5 text-gray-700"><%= d.supplier_name || '—' %></td>
+                <td class="px-4 py-2.5 text-gray-600"><%= d.item_count %></td>
+                <td class="px-4 py-2.5 text-gray-500 text-xs">
+                  <%= d.hire_period || '—' %>
+                  <% if (d.hire_end_date) { %><span class="text-gray-400"> · ends <%= d.hire_end_date %></span><% } %>
+                </td>
+                <td class="px-4 py-2.5">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium
+                    <% const cls = { open: 'bg-gray-100 text-gray-700', picked_up: 'bg-blue-50 text-blue-700', returned: 'bg-amber-50 text-amber-700', closed: 'bg-emerald-50 text-emerald-700' }[d.status] || 'bg-gray-100 text-gray-600'; %>
+                    <%= cls %>"><%= d.status.replace(/_/g, ' ') %></span>
+                  <% if (d.is_overdue) { %>
+                    <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white" title="Past return date — still on meter">OVERDUE</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
   </div>
 
   <!-- Defects Tab -->

@@ -143,9 +143,10 @@
     </a>
     <% } %>
     <% if (canAccess(user, 'equipment')) { %>
-    <a href="/equipment" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'equipment' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
+    <a href="/equipment" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'equipment' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all" <%= b.hireOverdue ? 'title="' + b.hireOverdue + ' hire(s) past return date — still on meter"' : '' %>>
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
-      Equipment
+      <span class="flex-1">Equipment</span>
+      <% if (b.hireOverdue) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.hireOverdue %></span><% } %>
     </a>
     <% } %>
     <% if (canAccess(user, 'checklists')) { %>

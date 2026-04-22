@@ -20,10 +20,19 @@
     <h1 class="text-2xl font-bold text-gray-900">Hire Dockets</h1>
     <p class="text-gray-500 text-sm mt-0.5">Pick-up &amp; drop-off inspections for hired equipment</p>
   </div>
-  <a href="/equipment/hire-dockets/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
-    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-    New Docket
-  </a>
+  <div class="flex items-center gap-2">
+    <a href="/equipment/hire-dockets/deleted" class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 transition" title="View deleted dockets">
+      <svg class="w-4 h-4 mr-1.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
+      <span class="hidden sm:inline">Deleted</span>
+      <% if (typeof deletedCount !== 'undefined' && deletedCount > 0) { %>
+        <span class="ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-semibold rounded-full bg-gray-100 text-gray-700"><%= deletedCount %></span>
+      <% } %>
+    </a>
+    <a href="/equipment/hire-dockets/new" class="inline-flex items-center justify-center px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      New Docket
+    </a>
+  </div>
 </div>
 
 <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
@@ -99,6 +108,9 @@
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= statusColors[d.status] || 'bg-gray-100 text-gray-600' %>">
               <%= d.status.replace(/_/g, ' ') %>
             </span>
+            <% if (d.is_overdue) { %>
+              <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white" title="Past hire end date — still on meter">OVERDUE</span>
+            <% } %>
           </td>
           <td class="px-4 py-3 text-gray-500 text-xs"><%= d.date_prepared || '-' %></td>
         </tr>
