@@ -210,15 +210,26 @@ function generateAuditPdf(opts, out) {
     txt(failures.length + ' non-conformance' + (failures.length !== 1 ? 's' : '') + ' identified (see details)', ML + 8, fsY + 3, { width: pw - 16 });
     setY(fsY + 14);
     var showFailures = failures.slice(0, 10); // max 10 on cover
+    // Each txt() call advances doc.y by a line height even with lineBreak:false,
+    // so three txt() calls at curY() produced a 3-line cascade — the ref on
+    // line 1, item on line 2, section on line 3. Capture the row's y once and
+    // pass it explicitly so the three cells sit on the same baseline.
+    var refColX  = ML + 8;
+    var refColW  = 24;
+    var itemColX = ML + 34;
+    var itemColW = Math.floor((pw - 42) * 0.60);
+    var secColX  = itemColX + itemColW + 6;
+    var secColW  = (ML + pw) - secColX - 4;
     showFailures.forEach(function (f) {
       need(9);
-      font('Helvetica-Bold', 5.5, GRAY_DARK);
-      txt(f.key, ML + 8, curY(), { width: 22 });
-      font('Helvetica', 5.5, GRAY_DARK);
-      txt(f.item, ML + 30, curY(), { width: pw * 0.48 });
-      font('Helvetica', 5, GRAY);
-      txt('(' + f.section + ')', ML + 30 + pw * 0.48 + 4, curY(), { width: pw * 0.3 });
-      gap(9);
+      var rowY = curY();
+      font('Helvetica-Bold', 6, GRAY_DARK);
+      txt(f.key, refColX, rowY, { width: refColW });
+      font('Helvetica', 6, GRAY_DARK);
+      txt(f.item, itemColX, rowY, { width: itemColW, height: 8, ellipsis: true });
+      font('Helvetica', 5.5, GRAY);
+      txt('(' + f.section + ')', secColX, rowY, { width: secColW, height: 8, ellipsis: true, align: 'right' });
+      setY(rowY + 9);
     });
     if (failures.length > 10) {
       font('Helvetica', 5, GRAY);
