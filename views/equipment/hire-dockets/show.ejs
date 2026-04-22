@@ -47,7 +47,7 @@
 </div>
 
 <!-- Header form (everything in the main <form> posts to the /:id endpoint) -->
-<form method="POST" action="/equipment/hire-dockets/<%= docket.id %>" class="space-y-5">
+<form method="POST" action="/equipment/hire-dockets/<%= docket.id %>" class="space-y-5" data-draft-key="docket-<%= docket.id %>">
   <%- include('../../partials/csrf') %>
 
   <!-- ========== 1. JOB DETAILS ========== -->
@@ -506,7 +506,7 @@
 
     <div class="border-t border-gray-200 p-4 sm:p-5 space-y-5" data-item-id="<%= it.id %>">
       <!-- Item form (identification + all inspection fields) -->
-      <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>" class="space-y-5">
+      <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>" class="space-y-5" data-draft-key="docket-<%= docket.id %>-item-<%= it.id %>">
         <%- include('../../partials/csrf') %>
 
         <!-- Identification -->

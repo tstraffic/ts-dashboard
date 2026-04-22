@@ -54,6 +54,120 @@
     radios.forEach(function (r) { r.addEventListener('change', sync); });
   })();
 
+  // ---------- Draft autosave (localStorage) ----------
+  // Any form marked with data-draft-key="<unique-key>" gets its field values
+  // shadowed to localStorage on change, debounced. On successful submit the
+  // draft is cleared. On page load, if a draft exists AND differs from the
+  // rendered values, we show a yellow restore banner above the form so the
+  // crew can choose to restore or discard.
+  (function () {
+    var DRAFT_PREFIX = 'hd-draft/';
+    var DEBOUNCE_MS = 600;
+
+    function formFields(form) {
+      return form.querySelectorAll('input, textarea, select');
+    }
+    function isDraftable(el) {
+      if (!el.name || el.name.startsWith('_')) return false;
+      if (el.type === 'file' || el.type === 'hidden' || el.type === 'submit' || el.type === 'button') return false;
+      if (el.closest('[data-draft-skip]')) return false;
+      return true;
+    }
+    function snapshot(form) {
+      var data = {};
+      formFields(form).forEach(function (el) {
+        if (!isDraftable(el)) return;
+        if (el.type === 'checkbox') {
+          data[el.name] = el.checked ? (el.value || '1') : '';
+        } else if (el.type === 'radio') {
+          if (el.checked) data[el.name] = el.value;
+          else if (!(el.name in data)) data[el.name] = data[el.name] || '';
+        } else {
+          data[el.name] = el.value;
+        }
+      });
+      return data;
+    }
+    function restore(form, data) {
+      formFields(form).forEach(function (el) {
+        if (!isDraftable(el)) return;
+        if (!(el.name in data)) return;
+        var v = data[el.name];
+        if (el.type === 'checkbox') {
+          el.checked = !!v;
+        } else if (el.type === 'radio') {
+          el.checked = el.value === v;
+        } else {
+          el.value = v == null ? '' : v;
+        }
+        // Keep pill visual state in sync with restored radios/checkboxes
+        var pill = el.closest('.hd-pill');
+        if (pill) pill.classList.toggle('is-active', !!el.checked);
+      });
+    }
+    function isDraftDifferent(form, data) {
+      var current = snapshot(form);
+      var keys = Object.keys(Object.assign({}, current, data));
+      for (var i = 0; i < keys.length; i++) {
+        if ((current[keys[i]] || '') !== (data[keys[i]] || '')) return true;
+      }
+      return false;
+    }
+    function showRestoreBanner(form, key, saved) {
+      var savedAt = saved.__savedAt || 'earlier';
+      var banner = document.createElement('div');
+      banner.className = 'mb-3 p-3 rounded-lg bg-amber-50 border border-amber-300 text-sm text-amber-900 flex items-center gap-3 print:hidden';
+      banner.innerHTML =
+        '<svg class="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' +
+        '<div class="flex-1">Unsaved changes from ' + savedAt + ' are available for this form.</div>' +
+        '<button type="button" data-restore class="px-3 py-1 text-xs font-medium rounded-md bg-amber-600 text-white hover:bg-amber-500">Restore</button>' +
+        '<button type="button" data-discard class="px-3 py-1 text-xs font-medium rounded-md bg-white border border-amber-300 text-amber-800 hover:bg-amber-100">Discard</button>';
+      form.parentNode.insertBefore(banner, form);
+      banner.querySelector('[data-restore]').addEventListener('click', function () {
+        var copy = Object.assign({}, saved); delete copy.__savedAt;
+        restore(form, copy);
+        banner.remove();
+      });
+      banner.querySelector('[data-discard]').addEventListener('click', function () {
+        try { localStorage.removeItem(key); } catch (e) {}
+        banner.remove();
+      });
+    }
+    function wire(form) {
+      var key = DRAFT_PREFIX + form.dataset.draftKey;
+      // Restore check
+      try {
+        var raw = localStorage.getItem(key);
+        if (raw) {
+          var saved = JSON.parse(raw);
+          if (saved && typeof saved === 'object' && isDraftDifferent(form, saved)) {
+            showRestoreBanner(form, key, saved);
+          }
+        }
+      } catch (e) { /* ignore corrupt draft */ }
+
+      // Debounced save on change / input
+      var timer = null;
+      function queueSave() {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          try {
+            var data = snapshot(form);
+            data.__savedAt = new Date().toLocaleString();
+            localStorage.setItem(key, JSON.stringify(data));
+          } catch (e) { /* quota / privacy mode — silent */ }
+        }, DEBOUNCE_MS);
+      }
+      form.addEventListener('input', queueSave);
+      form.addEventListener('change', queueSave);
+      // On submit, clear the draft (the server's the source of truth after save).
+      form.addEventListener('submit', function () {
+        try { localStorage.removeItem(key); } catch (e) {}
+      });
+    }
+    document.querySelectorAll('form[data-draft-key]').forEach(wire);
+  })();
+
   // ---------- Auto-submit photo uploads when files are chosen ----------
   document.querySelectorAll('.hd-photo-upload').forEach(function (form) {
     const trigger = form.querySelector('.hd-photo-trigger');
