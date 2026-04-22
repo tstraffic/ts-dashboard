@@ -137,18 +137,20 @@ router.get('/api/next-ref', (req, res) => {
   };
   const prefix = prefixMap[type] || 'TSREF';
 
-  // Find highest existing number with this prefix
+  // Lowest unused number starting at 3001 — fills gaps left by deleted items
+  // so the sequence stays contiguous rather than growing forever.
   const rows = db.prepare("SELECT reference_number FROM compliance WHERE reference_number LIKE ? || '%'").all(prefix);
-  let maxNum = 3000; // Start from 3001 to continue after existing TSTGS3xxx series
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const tailRe = new RegExp('^' + escaped + '(\\d+)$');
+  const used = new Set();
   rows.forEach(r => {
-    const match = r.reference_number.match(new RegExp(prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\d+)'));
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxNum) maxNum = num;
-    }
+    const match = r.reference_number.match(tailRe);
+    if (match) used.add(parseInt(match[1], 10));
   });
+  let next = 3001;
+  while (used.has(next)) next++;
 
-  res.json({ reference_number: prefix + (maxNum + 1) });
+  res.json({ reference_number: prefix + next });
 });
 
 // API: Check if a reference number already exists
@@ -237,12 +239,23 @@ router.post('/', (req, res) => {
 
 // Bulk operations (must be before /:id routes)
 router.post('/bulk-delete', (req, res) => {
-  const db = getDb();
-  const ids = req.body.ids;
-  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No items selected' });
-  const placeholders = ids.map(() => '?').join(',');
-  db.prepare(`DELETE FROM compliance WHERE id IN (${placeholders})`).run(...ids);
-  res.json({ success: true });
+  try {
+    const db = getDb();
+    const ids = req.body.ids;
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No items selected' });
+    const placeholders = ids.map(() => '?').join(',');
+    // site_diary_entries.compliance_item_id is ON DELETE NO ACTION, so a linked
+    // diary row blocks the delete. Detach diary links first, then delete.
+    const tx = db.transaction(() => {
+      db.prepare(`UPDATE site_diary_entries SET compliance_item_id = NULL WHERE compliance_item_id IN (${placeholders})`).run(...ids);
+      db.prepare(`DELETE FROM compliance WHERE id IN (${placeholders})`).run(...ids);
+    });
+    tx();
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[compliance] bulk-delete failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.post('/bulk-status', (req, res) => {
@@ -436,14 +449,24 @@ router.post('/:id', (req, res) => {
     console.error('Compliance update error:', err.message);
     req.flash('error', 'Failed to update: ' + err.message);
   }
-  // Stay on edit page after update
-  res.redirect('/compliance/' + req.params.id + '/edit' + (b.return_to ? '?return_to=' + encodeURIComponent(b.return_to) : ''));
+  // Return the user where they came from (job page, register, etc.) — fall back to the edit page.
+  const returnTo = b.return_to && b.return_to !== '/compliance' ? b.return_to : '/compliance/' + req.params.id + '/edit';
+  res.redirect(returnTo);
 });
 
 router.post('/:id/delete', (req, res) => {
   const db = getDb();
-  db.prepare('DELETE FROM compliance WHERE id = ?').run(req.params.id);
-  req.flash('success', 'Item deleted.');
+  try {
+    const tx = db.transaction(() => {
+      db.prepare('UPDATE site_diary_entries SET compliance_item_id = NULL WHERE compliance_item_id = ?').run(req.params.id);
+      db.prepare('DELETE FROM compliance WHERE id = ?').run(req.params.id);
+    });
+    tx();
+    req.flash('success', 'Item deleted.');
+  } catch (e) {
+    console.error('[compliance] single delete failed:', e.message);
+    req.flash('error', 'Failed to delete: ' + e.message);
+  }
   res.redirect(req.body.return_to || '/compliance');
 });
 
