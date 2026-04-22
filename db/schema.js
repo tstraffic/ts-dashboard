@@ -5974,6 +5974,29 @@ function runMigrations(db) {
     console.log('Migration 131 applied: hire_suppliers');
   }
 
+  // Migration 132: Backfill — close tasks whose linked compliance item is
+  // already approved or submitted. Without this, planning assignees see a
+  // queue of tasks that were never marked complete because historical bulk-
+  // status actions didn't sync task state. One-shot cleanup.
+  if (!isMigrationApplied.get(132)) {
+    try {
+      const result = db.prepare(`
+        UPDATE tasks
+        SET status = 'complete',
+            completed_date = COALESCE(completed_date, date('now')),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE compliance_id IN (SELECT id FROM compliance WHERE status IN ('approved','submitted'))
+          AND status != 'complete'
+          AND deleted_at IS NULL
+      `).run();
+      console.log(`Migration 132: closed ${result.changes} task(s) for approved/submitted compliance items`);
+    } catch (e) {
+      console.error('Migration 132 error:', e.message);
+    }
+    recordMigration.run(132, 'Backfill: close tasks for approved/submitted compliance');
+    console.log('Migration 132 applied: task cleanup');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
