@@ -1,0 +1,40 @@
+{
+  "//": "Incremental TypeScript migration config. Co-exists with the ~50 existing .js files via allowJs+checkJs=false. New .ts files get full strict checks; existing .js is left alone until its owner migrates it.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": [
+    "server.js",
+    "lib/**/*",
+    "services/**/*",
+    "middleware/**/*",
+    "routes/**/*",
+    "db/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "public",
+    "views",
+    "data",
+    "playwright-report",
+    "test-results",
+    ".claude"
+  ]
+}
