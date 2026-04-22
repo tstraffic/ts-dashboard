@@ -150,17 +150,18 @@ function generateAuditPdf(opts, out) {
   const scoreCardH = 70;
   roundRect(ML, scoreCardY, pw, scoreCardH, 6, GRAY_BG);
 
-  // Score circle area (left)
+  // Score circle area (left). The number + label stack inside the ring —
+  // width is the full diameter so 2- and 3-digit percentages (94%, 100%)
+  // don't wrap under the %, and the score/max line sits below the number
+  // without overlapping it.
   const circleX = ML + 45;
   const circleY = scoreCardY + 35;
   const circleR = 26;
-  // Outer ring
-  doc.save().circle(circleX, circleY, circleR).lineWidth(4).strokeColor(BRAND).stroke().restore();
-  // Score text centered
-  font('Helvetica-Bold', 22, BRAND);
-  txt(score.percent + '%', circleX - 20, circleY - 11, { width: 40, align: 'center' });
-  font('Helvetica', 7, GRAY);
-  txt(score.total + '/' + score.max, circleX - 15, circleY + 10, { width: 30, align: 'center' });
+  doc.save().circle(circleX, circleY, circleR).lineWidth(3.5).strokeColor(BRAND).stroke().restore();
+  font('Helvetica-Bold', 16, BRAND);
+  txt(score.percent + '%', circleX - circleR, circleY - 12, { width: circleR * 2, align: 'center' });
+  font('Helvetica', 6.5, GRAY);
+  txt(score.total + ' / ' + score.max, circleX - circleR, circleY + 7, { width: circleR * 2, align: 'center' });
 
   // Overall finding badge (right of circle)
   const badgeX = ML + 100;
@@ -588,34 +589,33 @@ function generateAuditPdf(opts, out) {
      SIGNATURES
      ═══════════════════════════════════════════════════════════ */
   if (a.auditor_signature_text || a.supervisor_signature_text) {
-    need(80);
-    gap(6);
+    // Reserve enough for the whole block (title + gap + two 52pt boxes + trailing gap)
+    // so we don't start the section then overflow mid-box onto a new page.
+    need(88);
+    gap(4);
     line(ML, curY(), ML + pw, curY(), BRAND, 1);
-    gap(8);
-    font('Helvetica-Bold', 10, BRAND);
+    gap(6);
+    font('Helvetica-Bold', 9, BRAND);
     txt('Sign-off', ML, curY(), { width: pw });
-    gap(16);
+    gap(14);
 
     var sigY = curY();
-    var sigW = (pw - 16) / 2;
+    var sigW = (pw - 14) / 2;
+    var sigH = 52;
 
     function drawSigBox(x, label, name, signedAt) {
-      // Box with brand top border
-      roundRect(x, sigY, sigW, 58, 5, WHITE);
-      rect(x, sigY, sigW, 3, BRAND);
-      // Subtle border
-      doc.save().roundedRect(x, sigY, sigW, 58, 5).strokeColor(GRAY_LINE).lineWidth(0.5).stroke().restore();
-      // Label
+      roundRect(x, sigY, sigW, sigH, 4, WHITE);
+      rect(x, sigY, sigW, 2.5, BRAND);
+      doc.save().roundedRect(x, sigY, sigW, sigH, 4).strokeColor(GRAY_LINE).lineWidth(0.5).stroke().restore();
       font('Helvetica-Bold', 6, GRAY);
-      txt(label, x + 10, sigY + 8, { width: sigW - 20 });
-      // Signature name — large italic cursive
-      doc.font('Helvetica-Oblique').fontSize(16).fillColor(GRAY_DARK);
-      txt(name, x + 10, sigY + 20, { width: sigW - 20 });
+      txt(label, x + 10, sigY + 7, { width: sigW - 20 });
+      // Signature name — italic, sized to fit one line inside the box
+      doc.font('Helvetica-Oblique').fontSize(14).fillColor(GRAY_DARK);
+      txt(name, x + 10, sigY + 18, { width: sigW - 20 });
       doc.font('Helvetica');
-      // Signed date
       if (signedAt) {
         font('Helvetica', 6, GREEN);
-        txt('✓ Signed  ·  ' + fmtDate(signedAt), x + 10, sigY + 43, { width: sigW - 20 });
+        txt('Signed  ·  ' + fmtDate(signedAt), x + 10, sigY + 38, { width: sigW - 20 });
       }
     }
 
@@ -623,9 +623,9 @@ function generateAuditPdf(opts, out) {
       drawSigBox(ML, 'AUDITOR', a.auditor_signature_text, a.auditor_signed_at);
     }
     if (a.supervisor_signature_text) {
-      drawSigBox(ML + sigW + 16, 'SUPERVISOR / STMS', a.supervisor_signature_text, a.supervisor_signed_at);
+      drawSigBox(ML + sigW + 14, 'SUPERVISOR / STMS', a.supervisor_signature_text, a.supervisor_signed_at);
     }
-    setY(sigY + 64);
+    setY(sigY + sigH + 6);
   }
 
   // ── Annotated TGS ──
@@ -670,6 +670,11 @@ function generateAuditPdf(opts, out) {
   var totalPages = range.count;
   for (var p = range.start; p < range.start + totalPages; p++) {
     doc.switchToPage(p);
+    // The footer writes inside the bottom margin. PDFKit auto-paginates when
+    // text is drawn past pageBot with a width set (even with lineBreak:false),
+    // which previously spawned a blank trailing page per existing page.
+    // Drop the margin for these writes; the document ends right after.
+    doc.page.margins.bottom = 0;
     // Bottom brand line
     line(ML, ph - MB + 10, ML + pw, ph - MB + 10, GRAY_LINE, 0.3);
     // Footer text
