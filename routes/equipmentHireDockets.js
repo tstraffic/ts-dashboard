@@ -611,6 +611,41 @@ router.post('/:id/items/:itemId/delete', (req, res) => {
   res.redirect(`/equipment/hire-dockets/${docket.id}`);
 });
 
+// Duplicate an item — clones type + accessories + summary notes so hiring
+// three identical light towers is three clicks instead of three full fills.
+// Fresh rego / asset / inspection fields so nothing gets copied by mistake.
+router.post('/:id/items/:itemId/duplicate', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  const src = loadItem(db, docket.id, req.params.itemId);
+  if (!src) { req.flash('error', 'Item not found.'); return res.redirect(`/equipment/hire-dockets/${docket.id}`); }
+
+  const nextPos = (db.prepare('SELECT MAX(position) as m FROM hire_docket_items WHERE docket_id = ?').get(docket.id).m || 0) + 1;
+  const result = db.prepare(`
+    INSERT INTO hire_docket_items (
+      docket_id, position, equipment_type, rego_serial, asset_id, equipment_id,
+      quantity, summary_notes
+    ) VALUES (?, ?, ?, '', '', NULL, 1, ?)
+  `).run(docket.id, nextPos, src.equipment_type || '', src.summary_notes || '');
+  const newItemId = result.lastInsertRowid;
+
+  // Clone accessory lines (qty_out only — qty_back/condition/missing are
+  // drop-off state and shouldn't carry across).
+  try {
+    const accRows = db.prepare('SELECT item_name, qty_out, notes FROM hire_docket_accessories WHERE item_id = ? ORDER BY id ASC').all(src.id);
+    const insAcc = db.prepare('INSERT INTO hire_docket_accessories (item_id, item_name, qty_out, notes) VALUES (?, ?, ?, ?)');
+    accRows.forEach(r => insAcc.run(newItemId, r.item_name, r.qty_out || 0, r.notes || ''));
+  } catch (e) { /* accessories table may not exist on very old DBs */ }
+
+  logActivity({
+    user: req.session.user, action: 'create', entityType: 'hire_docket',
+    entityId: docket.id, entityLabel: `${docket.docket_number} item ${newItemId} (duplicated from ${src.id})`, ip: req.ip
+  });
+  req.flash('success', 'Item duplicated — fill in the new rego / asset ID.');
+  res.redirect(`/equipment/hire-dockets/${docket.id}#item-${newItemId}`);
+});
+
 // ==================================================
 // ACCESSORIES
 // ==================================================
