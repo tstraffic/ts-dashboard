@@ -7,9 +7,16 @@
     returned: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
     closed: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
   };
-  const fuelLabels = { empty: 'Empty', '1_4': '1/4', '1_2': '1/2', '3_4': '3/4', full: 'Full', na: 'N/A' };
+  function fmtDateTimeLocal(v) {
+    if (!v) return '';
+    return String(v).replace(' ', 'T').slice(0, 16);
+  }
+  function cat(key) { return attachmentCategories.find(c => c.key === key); }
+  const today = new Date().toISOString().split('T')[0];
+  const isOverdue = docket.status === 'picked_up' && docket.hire_end_date && docket.hire_end_date < today;
 %>
 
+<!-- Breadcrumb -->
 <div class="flex items-center gap-2 text-sm text-gray-500 mb-3 print:hidden">
   <a href="/equipment" class="hover:text-gray-700">Equipment</a>
   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
@@ -18,44 +25,56 @@
   <span class="text-gray-600"><%= docket.docket_number %></span>
 </div>
 
+<!-- Heading + top actions -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-  <div class="flex items-center gap-3">
+  <div class="flex items-center gap-3 flex-wrap">
     <h1 class="text-2xl font-bold text-gray-900"><%= docket.docket_number %></h1>
     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= statusColors[docket.status] %>"><%= docket.status.replace(/_/g, ' ') %></span>
+    <% if (isOverdue) { %>
+      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 ring-1 ring-red-600/30">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Past return date — still on meter
+      </span>
+    <% } %>
   </div>
   <div class="flex items-center gap-2 print:hidden">
     <a href="/equipment/hire-dockets/<%= docket.id %>?print=1" target="_blank" class="px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Print</a>
-    <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/delete" onsubmit="return confirm('Delete docket <%= docket.docket_number %>? This cannot be undone.')">
+    <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/delete" onsubmit="return confirm('Move docket <%= docket.docket_number %> to Deleted? You can restore it later.')">
       <%- include('../../partials/csrf') %>
       <button type="submit" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-sm font-medium rounded-lg transition">Delete</button>
     </form>
   </div>
 </div>
 
+<!-- Header form (everything in the main <form> posts to the /:id endpoint) -->
 <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>" class="space-y-5">
   <%- include('../../partials/csrf') %>
 
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Job Details</h2>
-      <div class="print:hidden">
-        <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-2">Status</label>
-        <select name="status" class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          <option value="open" <%= docket.status === 'open' ? 'selected' : '' %>>Open</option>
-          <option value="picked_up" <%= docket.status === 'picked_up' ? 'selected' : '' %>>Picked Up</option>
-          <option value="returned" <%= docket.status === 'returned' ? 'selected' : '' %>>Returned</option>
-          <option value="closed" <%= docket.status === 'closed' ? 'selected' : '' %>>Closed</option>
-        </select>
+  <!-- ========== 1. JOB DETAILS ========== -->
+  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <header class="bg-gradient-to-r from-[#1f476b] to-[#2a5d8e] px-4 py-2.5 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-white tracking-wide">Job Details</h2>
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-400 text-amber-900">Required</span>
+        <div class="print:hidden">
+          <label class="text-[10px] font-bold text-white/70 uppercase tracking-widest mr-1">Status</label>
+          <select name="status" class="px-2.5 py-1 bg-white/95 border border-white/20 rounded-md text-xs focus:outline-none">
+            <option value="open" <%= docket.status === 'open' ? 'selected' : '' %>>Open</option>
+            <option value="picked_up" <%= docket.status === 'picked_up' ? 'selected' : '' %>>Picked Up</option>
+            <option value="returned" <%= docket.status === 'returned' ? 'selected' : '' %>>Returned</option>
+            <option value="closed" <%= docket.status === 'closed' ? 'selected' : '' %>>Closed</option>
+          </select>
+        </div>
       </div>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    </header>
+    <div class="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job / PO #</label>
-        <input type="text" name="job_number" value="<%= docket.job_number || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="hd-label">Job / PO # <span class="text-red-500">*</span></label>
+        <input type="text" name="job_number" value="<%= docket.job_number || '' %>" class="hd-input">
       </div>
       <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Link to Job</label>
-        <select name="job_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="hd-label">Link to Job</label>
+        <select name="job_id" class="hd-input">
           <option value="">— None —</option>
           <% jobs.forEach(j => { %>
             <option value="<%= j.id %>" <%= docket.job_id === j.id ? 'selected' : '' %>><%= j.job_number %> — <%= j.project_name || j.client %></option>
@@ -63,383 +82,554 @@
         </select>
       </div>
       <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date Prepared</label>
-        <input type="date" name="date_prepared" value="<%= docket.date_prepared || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="hd-label">Date Prepared</label>
+        <input type="date" name="date_prepared" value="<%= docket.date_prepared || '' %>" class="hd-input">
       </div>
       <div class="sm:col-span-2 lg:col-span-3">
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Site / Location</label>
-        <input type="text" name="site_location" value="<%= docket.site_location || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="hd-label">Site / Location <span class="text-red-500">*</span></label>
+        <input type="text" name="site_location" value="<%= docket.site_location || '' %>" class="hd-input">
       </div>
       <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Prepared By</label>
-        <input type="text" name="prepared_by" value="<%= docket.prepared_by || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="hd-label">Prepared By <span class="text-red-500">*</span></label>
+        <input type="text" name="prepared_by" value="<%= docket.prepared_by || '' %>" class="hd-input">
       </div>
       <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Contact #</label>
-        <input type="text" name="prepared_by_contact" value="<%= docket.prepared_by_contact || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="hd-label">Contact #</label>
+        <input type="text" name="prepared_by_contact" value="<%= docket.prepared_by_contact || '' %>" class="hd-input">
       </div>
       <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Supervisor</label>
-        <input type="text" name="supervisor" value="<%= docket.supervisor || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="hd-label">Supervisor</label>
+        <input type="text" name="supervisor" value="<%= docket.supervisor || '' %>" class="hd-input">
       </div>
       <div class="sm:col-span-2 lg:col-span-3">
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Crew</label>
-        <input type="text" name="crew" value="<%= docket.crew || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <label class="hd-label">Crew</label>
+        <input type="text" name="crew" value="<%= docket.crew || '' %>" class="hd-input">
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Supplier Details</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Supplier Name</label>
-        <input type="text" name="supplier_name" value="<%= docket.supplier_name || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Hire Ref #</label>
-        <input type="text" name="supplier_hire_ref" value="<%= docket.supplier_hire_ref || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Contact Person</label>
-        <input type="text" name="supplier_contact" value="<%= docket.supplier_contact || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Phone</label>
-        <input type="text" name="supplier_phone" value="<%= docket.supplier_phone || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-      </div>
-      <div class="sm:col-span-2 lg:col-span-3">
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Pick-up Address</label>
-        <input type="text" name="pickup_address" value="<%= docket.pickup_address || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Hire Period</label>
-        <input type="text" name="hire_period" value="<%= docket.hire_period || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Agreed Rate</label>
-        <input type="text" name="agreed_rate" value="<%= docket.agreed_rate || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-      </div>
-    </div>
-  </div>
-
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-      <h2 class="text-xs font-bold text-blue-700 uppercase tracking-widest mb-3">Pick-up Notes</h2>
-      <textarea name="pickup_notes" rows="4" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"><%= docket.pickup_notes || '' %></textarea>
-    </div>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
-      <h2 class="text-xs font-bold text-purple-700 uppercase tracking-widest mb-3">Drop-off Notes</h2>
-      <textarea name="dropoff_notes" rows="4" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"><%= docket.dropoff_notes || '' %></textarea>
-    </div>
-  </div>
-
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <div class="bg-blue-50/40 border border-blue-200 rounded-xl shadow-sm p-4 sm:p-5">
-      <h2 class="text-xs font-bold text-blue-700 uppercase tracking-widest mb-3">Pick-up Authorisation</h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div class="sm:col-span-2">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Collected By</label>
-          <input type="text" name="pickup_collected_by" value="<%= docket.pickup_collected_by || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+  <!-- ========== 2. SUPPLIER ========== -->
+  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <header class="bg-gradient-to-r from-[#1f476b] to-[#2a5d8e] px-4 py-2.5 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-white tracking-wide">Supplier</h2>
+      <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-400 text-amber-900">Hire source</span>
+    </header>
+    <div class="p-4 sm:p-5 space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div>
+          <label class="hd-label">Supplier Name <span class="text-red-500">*</span></label>
+          <input type="text" name="supplier_name" value="<%= docket.supplier_name || '' %>" class="hd-input">
         </div>
         <div>
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Signature / Initials</label>
-          <input type="text" name="pickup_signature" value="<%= docket.pickup_signature || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label class="hd-label">Hire Reference #</label>
+          <input type="text" name="supplier_hire_ref" value="<%= docket.supplier_hire_ref || '' %>" class="hd-input">
         </div>
         <div>
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date</label>
-          <input type="date" name="pickup_date" value="<%= docket.pickup_date || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label class="hd-label">Hire Period</label>
+          <input type="text" name="hire_period" value="<%= docket.hire_period || '' %>" placeholder="e.g. 22 Apr – 28 Apr" class="hd-input">
+        </div>
+        <div>
+          <label class="hd-label">Contact Person</label>
+          <input type="text" name="supplier_contact" value="<%= docket.supplier_contact || '' %>" class="hd-input">
+        </div>
+        <div>
+          <label class="hd-label">Phone</label>
+          <input type="text" name="supplier_phone" value="<%= docket.supplier_phone || '' %>" class="hd-input">
+        </div>
+        <div>
+          <label class="hd-label">Agreed Rate</label>
+          <input type="text" name="agreed_rate" value="<%= docket.agreed_rate || '' %>" class="hd-input">
         </div>
         <div class="sm:col-span-2">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Supplier Rep</label>
-          <input type="text" name="pickup_supplier_rep" value="<%= docket.pickup_supplier_rep || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label class="hd-label">Pick-up Address</label>
+          <input type="text" name="pickup_address" value="<%= docket.pickup_address || '' %>" class="hd-input">
+        </div>
+        <div>
+          <label class="hd-label">Hire End Date</label>
+          <input type="date" name="hire_end_date" value="<%= docket.hire_end_date || '' %>" class="hd-input">
         </div>
       </div>
+      <details class="border border-gray-200 rounded-lg" <%= print ? 'open' : '' %>>
+        <summary class="px-3 py-2 text-xs font-bold text-brand-800 uppercase tracking-wider cursor-pointer bg-gray-50 rounded-t-lg flex items-center justify-between">
+          <span>Commercial terms (km / fuel / cleaning / liability)</span>
+          <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </summary>
+        <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="hd-label">Included km / hours allowance</label>
+            <input type="text" name="included_allowance" value="<%= docket.included_allowance || '' %>" placeholder="e.g. 200 km/day" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Excess km / hour charge</label>
+            <input type="text" name="excess_charge" value="<%= docket.excess_charge || '' %>" placeholder="e.g. $0.45/km" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Fuel return requirement</label>
+            <input type="text" name="fuel_return_requirement" value="<%= docket.fuel_return_requirement || '' %>" placeholder="e.g. Return full" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Cleaning expectation</label>
+            <input type="text" name="cleaning_expectation" value="<%= docket.cleaning_expectation || '' %>" placeholder="e.g. Broom-clean or $150 fee" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Damage liability terms received</label>
+            <%- include('partials/yn', { name: 'damage_liability_received', value: docket.damage_liability_received ? '1' : '', withNa: false }) %>
+          </div>
+          <div>
+            <label class="hd-label">Late return approved?</label>
+            <%- include('partials/yn', { name: 'late_return_approved', value: docket.late_return_approved || '', withNa: true, valueMap: { yes: 'yes', no: 'no', na: 'na' } }) %>
+          </div>
+        </div>
+      </details>
     </div>
-    <div class="bg-purple-50/40 border border-purple-200 rounded-xl shadow-sm p-4 sm:p-5">
-      <h2 class="text-xs font-bold text-purple-700 uppercase tracking-widest mb-3">Drop-off Authorisation</h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div class="sm:col-span-2">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Returned By</label>
-          <input type="text" name="dropoff_returned_by" value="<%= docket.dropoff_returned_by || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
-        <div>
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Signature / Initials</label>
-          <input type="text" name="dropoff_signature" value="<%= docket.dropoff_signature || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
-        <div>
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date</label>
-          <input type="date" name="dropoff_date" value="<%= docket.dropoff_date || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
-        <div class="sm:col-span-2">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Supplier Rep</label>
-          <input type="text" name="dropoff_supplier_rep" value="<%= docket.dropoff_supplier_rep || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
-      </div>
-    </div>
-  </div>
+  </section>
 
+  <!-- Save-header button (after supplier so it's not hidden way at the bottom) -->
   <div class="flex items-center gap-2 print:hidden">
-    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Save Docket Header</button>
-    <a href="/equipment/hire-dockets/<%= docket.id %>" class="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Discard</a>
+    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Save docket details</button>
+    <span class="text-xs text-gray-400">Equipment items, accessories, photos and signatures save independently below.</span>
   </div>
+
+  <!-- ========== 4. JOB ATTACHMENTS (rendered inside main form but uploads via separate form) ========== -->
+  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <header class="bg-gradient-to-r from-[#1f476b] to-[#2a5d8e] px-4 py-2.5 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-white tracking-wide">Job Attachments</h2>
+      <% const totalFiles = attachmentCategories.reduce((n, c) => n + (attachmentsByCategory[c.key] || []).length, 0); %>
+      <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-400 text-amber-900"><%= totalFiles %> file<%= totalFiles === 1 ? '' : 's' %></span>
+    </header>
+    <div class="p-4 sm:p-5 space-y-3">
+      <p class="text-xs text-gray-500 mb-2">Categorise supplier paperwork here. Hire agreement, pick-up docket, return docket, condition/damage reports.</p>
+      <% attachmentCategories.forEach(c => { const files = attachmentsByCategory[c.key] || []; %>
+      <details class="border border-gray-200 rounded-lg" <%= print ? 'open' : '' %>>
+        <summary class="px-3 py-2 text-xs font-bold text-brand-800 uppercase tracking-wider cursor-pointer bg-gray-50 flex items-center justify-between">
+          <span class="flex items-center gap-2">
+            <%= c.label %>
+            <% if (c.expectedByDefault) { %>
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-400 text-amber-900">EXPECTED</span>
+            <% } %>
+            <% if (c.expectedByDefault && files.length === 0) { %>
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white">MISSING</span>
+            <% } %>
+          </span>
+          <span class="text-[11px] text-gray-500 font-normal"><%= files.length %> file<%= files.length === 1 ? '' : 's' %></span>
+        </summary>
+        <div class="p-3 space-y-2">
+          <% if (files.length > 0) { %>
+            <ul class="space-y-1.5">
+              <% files.forEach(f => { %>
+              <li class="flex items-center gap-2 text-xs bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
+                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <a href="/equipment/hire-dockets/<%= docket.id %>/attachments/<%= f.id %>" class="flex-1 truncate text-brand-700 hover:text-brand-800"><%= f.original_name || f.file_path %></a>
+                <% if (f.uploaded_by_name) { %><span class="text-gray-400 hidden sm:inline"><%= f.uploaded_by_name %></span><% } %>
+                <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/attachments/<%= f.id %>/delete" class="inline print:hidden" onsubmit="return confirm('Remove this file?')">
+                  <%- include('../../partials/csrf') %>
+                  <button type="submit" class="text-gray-400 hover:text-red-600" title="Remove"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </form>
+              </li>
+              <% }) %>
+            </ul>
+          <% } else { %>
+            <p class="text-xs text-gray-400 italic">No files yet.</p>
+          <% } %>
+          <div class="hire-attachment-upload print:hidden" data-docket="<%= docket.id %>" data-category="<%= c.key %>">
+            <button type="button" class="hd-add-btn-sm" data-trigger-upload>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+              Upload
+            </button>
+          </div>
+        </div>
+      </details>
+      <% }) %>
+    </div>
+  </section>
+
+  <!-- ========== 5. OFF-HIRE NOTIFICATION ========== -->
+  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <header class="bg-gradient-to-r from-[#1f476b] to-[#2a5d8e] px-4 py-2.5 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-white tracking-wide">Off-Hire Notification</h2>
+      <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-400 text-amber-900">Stop the meter</span>
+    </header>
+    <div class="p-4 sm:p-5 space-y-3">
+      <div class="bg-blue-50 border-l-4 border-blue-400 px-3 py-2 text-xs text-blue-900 rounded">
+        Record this <strong>every time</strong>. Some suppliers keep charging until a formal off-hire is on file.
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-3">
+          <label class="hd-label">Method</label>
+          <div class="flex flex-wrap gap-2">
+            <% offhireMethods.forEach(m => { %>
+              <label class="hd-pill">
+                <input type="radio" name="offhire_method" value="<%= m %>" <%= docket.offhire_method === m ? 'checked' : '' %>>
+                <span><%= offhireMethodLabels[m] %></span>
+              </label>
+            <% }) %>
+          </div>
+        </div>
+        <div>
+          <label class="hd-label">Date / time notified</label>
+          <input type="datetime-local" name="offhire_notified_at" value="<%= fmtDateTimeLocal(docket.offhire_notified_at) %>" class="hd-input">
+        </div>
+        <div>
+          <label class="hd-label">Person notified</label>
+          <input type="text" name="offhire_person_notified" value="<%= docket.offhire_person_notified || '' %>" placeholder="Full name at supplier" class="hd-input">
+        </div>
+        <div>
+          <label class="hd-label">Reference / confirmation #</label>
+          <input type="text" name="offhire_reference" value="<%= docket.offhire_reference || '' %>" class="hd-input">
+        </div>
+        <div>
+          <label class="hd-label">Notified by (our team)</label>
+          <input type="text" name="offhire_notified_by" value="<%= docket.offhire_notified_by || '' %>" class="hd-input">
+        </div>
+        <div>
+          <label class="hd-label">Confirmed by supplier?</label>
+          <%- include('partials/yn', { name: 'offhire_confirmed', value: docket.offhire_confirmed ? '1' : '', withNa: false }) %>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 6. DISPUTE & DISCREPANCY ========== -->
+  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <header class="bg-gradient-to-r from-[#1f476b] to-[#2a5d8e] px-4 py-2.5 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-white tracking-wide">Drop-Off Dispute &amp; Discrepancy</h2>
+      <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-red-500 text-white">Disputes</span>
+    </header>
+    <div class="p-4 sm:p-5 space-y-4">
+      <p class="text-xs text-gray-500">Fill only if supplier has raised anything at return. Capture it now — your record beats their recollection.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="hd-label">Supplier alleged new damage?</label>
+          <%- include('partials/yn', { name: 'dispute_alleged_damage', value: docket.dispute_alleged_damage ? '1' : '', withNa: false }) %>
+        </div>
+        <div>
+          <label class="hd-label">Photos taken by both parties?</label>
+          <%- include('partials/yn', { name: 'dispute_photos_both_parties', value: docket.dispute_photos_both_parties ? '1' : '', withNa: false }) %>
+        </div>
+        <div>
+          <label class="hd-label">Dispute raised immediately?</label>
+          <%- include('partials/yn', { name: 'dispute_raised_immediately', value: docket.dispute_raised_immediately ? '1' : '', withNa: false }) %>
+        </div>
+      </div>
+      <div>
+        <label class="hd-label">Details of alleged damage / discrepancy</label>
+        <textarea name="dispute_details" rows="3" class="hd-input resize-y"><%= docket.dispute_details || '' %></textarea>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="hd-label">Internal person notified</label>
+          <input type="text" name="dispute_internal_notified" value="<%= docket.dispute_internal_notified || '' %>" placeholder="Name + time" class="hd-input">
+        </div>
+        <div>
+          <label class="hd-label">Est. dispute $ value</label>
+          <input type="number" step="0.01" min="0" name="dispute_est_value" value="<%= docket.dispute_est_value || '' %>" class="hd-input">
+        </div>
+        <div>
+          <label class="hd-label">Next action</label>
+          <input type="text" name="dispute_next_action" value="<%= docket.dispute_next_action || '' %>" placeholder="e.g. Photo pack to insurer" class="hd-input">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 7. NOTES + FINAL SIGN-OFF ========== -->
+  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <header class="bg-gradient-to-r from-[#1f476b] to-[#2a5d8e] px-4 py-2.5">
+      <h2 class="text-sm font-bold text-white tracking-wide">Notes &amp; Final Sign-off</h2>
+    </header>
+    <div class="p-4 sm:p-5 space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div>
+          <label class="hd-label">Pick-up notes</label>
+          <textarea name="pickup_notes" rows="4" class="hd-input resize-y"><%= docket.pickup_notes || '' %></textarea>
+        </div>
+        <div>
+          <label class="hd-label">Drop-off notes</label>
+          <textarea name="dropoff_notes" rows="4" class="hd-input resize-y"><%= docket.dropoff_notes || '' %></textarea>
+        </div>
+      </div>
+      <!-- Pick-up confirmation -->
+      <div class="bg-blue-50/40 border border-blue-200 rounded-lg p-4">
+        <h3 class="text-xs font-bold text-blue-700 uppercase tracking-widest mb-3">Pick-up confirmation</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="hd-label">Collected by — printed name</label>
+            <input type="text" name="pickup_collected_by" value="<%= docket.pickup_collected_by || '' %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Initials / typed signature</label>
+            <input type="text" name="pickup_signature" value="<%= docket.pickup_signature || '' %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Date / time</label>
+            <input type="date" name="pickup_date" value="<%= docket.pickup_date || '' %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Supplier rep — printed name</label>
+            <input type="text" name="pickup_supplier_rep" value="<%= docket.pickup_supplier_rep || '' %>" class="hd-input">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          <%- include('partials/signature-pad', { slot: 'pickup', label: 'Collected-by signature', currentPath: docket.pickup_signature_path, docketId: docket.id, print }) %>
+          <%- include('partials/signature-pad', { slot: 'pickup_supplier_rep', label: 'Supplier-rep signature', currentPath: docket.pickup_supplier_rep_signature_path, docketId: docket.id, print }) %>
+        </div>
+      </div>
+      <!-- Drop-off confirmation -->
+      <div class="bg-purple-50/40 border border-purple-200 rounded-lg p-4">
+        <h3 class="text-xs font-bold text-purple-700 uppercase tracking-widest mb-3">Drop-off confirmation</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="hd-label">Returned by — printed name</label>
+            <input type="text" name="dropoff_returned_by" value="<%= docket.dropoff_returned_by || '' %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Initials / typed signature</label>
+            <input type="text" name="dropoff_signature" value="<%= docket.dropoff_signature || '' %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Date / time</label>
+            <input type="date" name="dropoff_date" value="<%= docket.dropoff_date || '' %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Supplier rep — printed name</label>
+            <input type="text" name="dropoff_supplier_rep" value="<%= docket.dropoff_supplier_rep || '' %>" class="hd-input">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          <%- include('partials/signature-pad', { slot: 'dropoff', label: 'Returned-by signature', currentPath: docket.dropoff_signature_path, docketId: docket.id, print }) %>
+          <%- include('partials/signature-pad', { slot: 'dropoff_supplier_rep', label: 'Supplier-rep signature', currentPath: docket.dropoff_supplier_rep_signature_path, docketId: docket.id, print }) %>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 8. ADMIN & RECONCILIATION (office-only) ========== -->
+  <% if (canReconcile) { %>
+  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <details <%= (print || docket.recon_reviewed_by_id) ? 'open' : '' %>>
+      <summary class="bg-gradient-to-r from-[#1f476b] to-[#2a5d8e] px-4 py-2.5 cursor-pointer flex items-center justify-between">
+        <h2 class="text-sm font-bold text-white tracking-wide">Admin &amp; Reconciliation</h2>
+        <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/20 text-white">Office use</span>
+      </summary>
+      <div class="p-4 sm:p-5 space-y-4">
+        <p class="text-xs text-gray-500">For office / admin after the hire closes — don't expect crews to fill this in.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="hd-label">Reviewed by</label>
+            <input type="text" readonly value="<%= docket.recon_reviewer_name || (docket.recon_reviewed_by_id ? 'User #' + docket.recon_reviewed_by_id : '— auto-fills on save —') %>" class="hd-input bg-gray-50">
+            <input type="hidden" name="recon_reviewed_by_id" value="<%= docket.recon_reviewed_by_id || '' %>">
+          </div>
+          <div>
+            <label class="hd-label">Review date</label>
+            <input type="date" name="recon_review_date" value="<%= docket.recon_review_date || '' %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Invoice # received</label>
+            <input type="text" name="recon_invoice_number" value="<%= docket.recon_invoice_number || '' %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Charges checked vs form?</label>
+            <%- include('partials/yn', { name: 'recon_charges_checked', value: docket.recon_charges_checked ? '1' : '', withNa: false }) %>
+          </div>
+          <div>
+            <label class="hd-label">Variations / damages reconciled?</label>
+            <%- include('partials/yn', { name: 'recon_variations_reconciled', value: docket.recon_variations_reconciled || '', withNa: true }) %>
+          </div>
+          <div>
+            <label class="hd-label">Final hire closed out?</label>
+            <%- include('partials/yn', { name: 'recon_closed_out', value: docket.recon_closed_out ? '1' : '', withNa: false }) %>
+          </div>
+        </div>
+        <div>
+          <label class="hd-label">Reconciliation notes</label>
+          <textarea name="recon_notes" rows="3" class="hd-input resize-y"><%= docket.recon_notes || '' %></textarea>
+        </div>
+        <input type="hidden" name="_save_recon" value="1">
+        <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Save reconciliation</button>
+      </div>
+    </details>
+  </section>
+  <% } %>
 </form>
 
-<!-- ITEMS -->
-<div class="mt-8 mb-4 flex items-center justify-between">
-  <h2 class="text-lg font-bold text-gray-900">Equipment Items <span class="text-gray-400 text-sm font-normal">(<%= items.length %>)</span></h2>
-</div>
+<!-- ========== 3. EQUIPMENT ITEMS (separate forms per item — not inside the header form) ========== -->
+<section class="mt-6">
+  <div class="mb-3 flex items-center justify-between">
+    <h2 class="text-lg font-bold text-gray-900">Equipment Items <span class="text-gray-400 text-sm font-normal">(<%= items.length %>)</span></h2>
+  </div>
 
-<% if (items.length === 0) { %>
-<div class="bg-white border border-dashed border-gray-300 rounded-xl p-6 text-center mb-4">
-  <p class="text-gray-500 text-sm">No items yet. Add the first one below.</p>
-</div>
-<% } %>
+  <% if (items.length === 0) { %>
+  <div class="bg-white border border-dashed border-gray-300 rounded-xl p-6 text-center mb-4">
+    <p class="text-gray-500 text-sm">No items yet. Add one using the form at the bottom.</p>
+  </div>
+  <% } %>
 
-<% items.forEach((it, idx) => { %>
-<details id="item-<%= it.id %>" class="bg-white border border-gray-200 rounded-xl shadow-sm mb-3 group" <%= print ? 'open' : '' %>>
-  <summary class="cursor-pointer list-none p-4 flex items-center justify-between hover:bg-gray-50 rounded-xl">
-    <div class="flex items-center gap-3 min-w-0">
-      <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-50 text-brand-700 text-xs font-bold ring-1 ring-brand-600/20"><%= idx + 1 %></span>
-      <div class="min-w-0">
-        <p class="text-sm font-semibold text-gray-900 truncate"><%= it.equipment_type || '(type not set)' %></p>
-        <p class="text-xs text-gray-500 truncate">
-          <%= it.rego_serial ? 'Rego/Serial: ' + it.rego_serial : '' %>
-          <%= it.rego_serial && it.asset_id ? ' · ' : '' %>
-          <%= it.asset_id ? 'Asset: ' + it.asset_id : '' %>
-          <%= !it.rego_serial && !it.asset_id ? 'no identifiers yet' : '' %>
-        </p>
+  <% items.forEach((it, idx) => {
+    const pickupDone = !!it.pickup_signoff_name || !!it.pickup_datetime;
+    const dropoffDone = !!it.dropoff_signoff_name || !!it.dropoff_datetime;
+    const typeConfig = equipmentTypes.find(t => t.value === it.equipment_type) || null;
+  %>
+  <details id="item-<%= it.id %>" class="bg-white border border-gray-200 rounded-xl shadow-sm mb-4 group" <%= print ? 'open' : '' %>>
+    <summary class="cursor-pointer list-none p-4 flex items-center justify-between hover:bg-gray-50 rounded-t-xl">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-50 text-brand-700 text-xs font-bold ring-1 ring-brand-600/20"><%= idx + 1 %></span>
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-gray-900 truncate"><%= typeConfig ? typeConfig.label : (it.equipment_type || 'Not specified') %></p>
+          <p class="text-xs text-gray-500 truncate">
+            <%= it.rego_serial ? 'Rego/Serial: ' + it.rego_serial : '' %><%= it.rego_serial && it.asset_id ? ' · ' : '' %><%= it.asset_id ? 'Asset: ' + it.asset_id : '' %><%= !it.rego_serial && !it.asset_id ? 'no identifiers yet' : '' %>
+          </p>
+        </div>
       </div>
-    </div>
-    <div class="flex items-center gap-2 text-xs">
-      <span class="px-2 py-0.5 rounded-full <%= it.pickup_datetime ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' : 'bg-gray-100 text-gray-500' %>">Pick-up <%= it.pickup_datetime ? '✓' : '…' %></span>
-      <span class="px-2 py-0.5 rounded-full <%= it.dropoff_datetime ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : 'bg-gray-100 text-gray-500' %>">Drop-off <%= it.dropoff_datetime ? '✓' : '…' %></span>
-      <svg class="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-    </div>
-  </summary>
+      <div class="flex items-center gap-2 text-xs">
+        <span class="px-2 py-0.5 rounded-full <%= pickupDone ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' : 'bg-gray-100 text-gray-500' %>">Pick-up <%= pickupDone ? '✓' : '…' %></span>
+        <span class="px-2 py-0.5 rounded-full <%= dropoffDone ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : 'bg-gray-100 text-gray-500' %>">Drop-off <%= dropoffDone ? '✓' : '…' %></span>
+        <svg class="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </div>
+    </summary>
 
-  <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>" class="border-t border-gray-200 p-4 sm:p-5 space-y-4">
-    <%- include('../../partials/csrf') %>
+    <div class="border-t border-gray-200 p-4 sm:p-5 space-y-5" data-item-id="<%= it.id %>">
+      <!-- Item form (identification + all inspection fields) -->
+      <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>" class="space-y-5">
+        <%- include('../../partials/csrf') %>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <!-- Identification -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="sm:col-span-2">
+            <label class="hd-label">Equipment type <span class="text-red-500">*</span></label>
+            <select name="equipment_type" class="hd-input hd-type-select" data-item-id="<%= it.id %>">
+              <option value="">Select…</option>
+              <% equipmentTypes.forEach(t => { %>
+                <option value="<%= t.value %>" <%= it.equipment_type === t.value ? 'selected' : '' %>><%= t.label %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div>
+            <label class="hd-label">Rego / Serial #</label>
+            <input type="text" name="rego_serial" value="<%= it.rego_serial || '' %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Asset ID / internal ref</label>
+            <input type="text" name="asset_id" value="<%= it.asset_id || '' %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Qty</label>
+            <input type="number" name="quantity" min="1" value="<%= it.quantity || 1 %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Link asset (optional)</label>
+            <select name="equipment_id" class="hd-input">
+              <option value="">—</option>
+              <% equipment.forEach(e => { %>
+                <option value="<%= e.id %>" <%= it.equipment_id === e.id ? 'selected' : '' %>><%= e.asset_number %> — <%= e.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="hd-label">Summary notes</label>
+            <input type="text" name="summary_notes" value="<%= it.summary_notes || '' %>" class="hd-input">
+          </div>
+        </div>
+
+        <!-- Chain of custody (collapsible) -->
+        <details class="border border-gray-200 rounded-lg" <%= print ? 'open' : '' %>>
+          <summary class="px-3 py-2 text-xs font-bold text-brand-800 uppercase tracking-wider cursor-pointer bg-gray-50 rounded-t-lg flex items-center justify-between">
+            <span>Chain of custody</span>
+            <span class="text-[11px] text-gray-500 font-normal">Who collected / who returned</span>
+          </summary>
+          <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-3">
+              <p class="text-[11px] font-bold text-gray-600 uppercase tracking-widest border-b border-gray-100 pb-1">Collected by (pick-up)</p>
+              <div><label class="hd-label">Full name</label><input type="text" name="collected_full_name" value="<%= it.collected_full_name || '' %>" class="hd-input"></div>
+              <div><label class="hd-label">Mobile</label><input type="text" name="collected_mobile" value="<%= it.collected_mobile || '' %>" class="hd-input"></div>
+              <div><label class="hd-label">Company</label><input type="text" name="collected_company" value="<%= it.collected_company || '' %>" class="hd-input"></div>
+            </div>
+            <div class="space-y-3">
+              <p class="text-[11px] font-bold text-gray-600 uppercase tracking-widest border-b border-gray-100 pb-1">Returned by (drop-off)</p>
+              <div><label class="hd-label">Full name</label><input type="text" name="returned_full_name" value="<%= it.returned_full_name || '' %>" class="hd-input"></div>
+              <div><label class="hd-label">Mobile</label><input type="text" name="returned_mobile" value="<%= it.returned_mobile || '' %>" class="hd-input"></div>
+              <div><label class="hd-label">Company</label><input type="text" name="returned_company" value="<%= it.returned_company || '' %>" class="hd-input"></div>
+            </div>
+          </div>
+        </details>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <!-- PICK-UP phase -->
+          <%- include('partials/item-phase', {
+            it, docket, phase: 'pickup', phaseLabel: 'Pick-up',
+            accentBg: 'bg-blue-50/40', accentBorder: 'border-blue-200', accentText: 'text-blue-700',
+            fuelLevels, fuelLabels, roadworthyKeys, typeConfig, print,
+            accessories: it.accessories || [], photos: it.photos.pickup || {}
+          }) %>
+          <!-- DROP-OFF phase -->
+          <%- include('partials/item-phase', {
+            it, docket, phase: 'dropoff', phaseLabel: 'Drop-off',
+            accentBg: 'bg-purple-50/40', accentBorder: 'border-purple-200', accentText: 'text-purple-700',
+            fuelLevels, fuelLabels, roadworthyKeys, typeConfig, print,
+            accessories: it.accessories || [], photos: it.photos.dropoff || {}
+          }) %>
+        </div>
+
+        <div class="flex items-center justify-between pt-3 border-t border-gray-100 print:hidden">
+          <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Save item</button>
+        </div>
+      </form>
+
+      <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/delete" class="pt-3 print:hidden" onsubmit="return confirm('Remove this item from the docket?')">
+        <%- include('../../partials/csrf') %>
+        <button type="submit" class="text-xs text-red-600 hover:text-red-700 hover:underline">Remove item from docket</button>
+      </form>
+    </div>
+  </details>
+  <% }) %>
+
+  <!-- Add item -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 mt-4 print:hidden">
+    <h3 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Add item</h3>
+    <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <%- include('../../partials/csrf') %>
       <div class="sm:col-span-2">
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Equipment Type</label>
-        <input type="text" name="equipment_type" value="<%= it.equipment_type || '' %>" placeholder="e.g. Traffic lights trailer" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Rego / Serial</label>
-        <input type="text" name="rego_serial" value="<%= it.rego_serial || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Asset ID</label>
-        <input type="text" name="asset_id" value="<%= it.asset_id || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Qty</label>
-        <input type="number" name="quantity" min="1" value="<%= it.quantity || 1 %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Link Asset (optional)</label>
-        <select name="equipment_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          <option value="">—</option>
-          <% equipment.forEach(e => { %>
-            <option value="<%= e.id %>" <%= it.equipment_id === e.id ? 'selected' : '' %>><%= e.asset_number %> — <%= e.name %></option>
+        <label class="hd-label">Equipment type</label>
+        <select name="equipment_type" class="hd-input">
+          <option value="">Select…</option>
+          <% equipmentTypes.forEach(t => { %>
+            <option value="<%= t.value %>"><%= t.label %></option>
           <% }) %>
         </select>
       </div>
-      <div class="sm:col-span-2">
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Summary Notes</label>
-        <input type="text" name="summary_notes" value="<%= it.summary_notes || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      <div>
+        <label class="hd-label">Rego / Serial</label>
+        <input type="text" name="rego_serial" class="hd-input">
       </div>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <!-- PICK-UP -->
-      <div class="bg-blue-50/30 border border-blue-200 rounded-lg p-4">
-        <h3 class="text-xs font-bold text-blue-700 uppercase tracking-widest mb-3">Pick-up</h3>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date / Time</label>
-            <input type="datetime-local" name="pickup_datetime" value="<%= it.pickup_datetime ? it.pickup_datetime.replace(' ', 'T').slice(0, 16) : '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Hours / Odometer</label>
-            <input type="text" name="pickup_hours_odometer" value="<%= it.pickup_hours_odometer || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-        </div>
-        <div class="mt-3">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Fuel / Battery</label>
-          <div class="flex flex-wrap gap-2">
-            <% fuelLevels.forEach(f => { %>
-              <label class="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-                <input type="radio" name="pickup_fuel" value="<%= f %>" <%= it.pickup_fuel === f ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500">
-                <span><%= fuelLabels[f] %></span>
-              </label>
-            <% }) %>
-          </div>
-        </div>
-        <div class="mt-3 flex flex-wrap gap-4">
-          <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
-            <input type="checkbox" name="pickup_damage_observed" value="1" <%= it.pickup_damage_observed ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500 rounded">
-            Damage observed
-          </label>
-          <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
-            <input type="checkbox" name="pickup_photos_taken" value="1" <%= it.pickup_photos_taken ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500 rounded">
-            Photos taken
-          </label>
-          <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
-            <input type="checkbox" name="pickup_clean" value="1" <%= it.pickup_clean ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500 rounded">
-            Clean
-          </label>
-        </div>
-        <div class="mt-3">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Damage Notes</label>
-          <textarea name="pickup_damage_notes" rows="2" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"><%= it.pickup_damage_notes || '' %></textarea>
-        </div>
-        <div class="mt-3">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Roadworthy (trailer)</label>
-          <div class="flex flex-wrap gap-2">
-            <% roadworthyKeys.forEach(k => { %>
-              <label class="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
-                <input type="checkbox" name="pickup_roadworthy_<%= k %>" value="1" <%= it.pickup_roadworthy_set.has(k) ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500 rounded">
-                <span class="capitalize"><%= k %></span>
-              </label>
-            <% }) %>
-          </div>
-        </div>
-        <div class="mt-3">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Accessories (keys, remotes, cables, manuals, cones)</label>
-          <input type="text" name="pickup_accessories" value="<%= it.pickup_accessories || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
-        <div class="mt-3">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Initials</label>
-          <input type="text" name="pickup_initials" value="<%= it.pickup_initials || '' %>" placeholder="e.g. JS" class="w-32 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
+      <div>
+        <label class="hd-label">Asset ID</label>
+        <input type="text" name="asset_id" class="hd-input">
       </div>
-
-      <!-- DROP-OFF -->
-      <div class="bg-purple-50/30 border border-purple-200 rounded-lg p-4">
-        <h3 class="text-xs font-bold text-purple-700 uppercase tracking-widest mb-3">Drop-off</h3>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date / Time</label>
-            <input type="datetime-local" name="dropoff_datetime" value="<%= it.dropoff_datetime ? it.dropoff_datetime.replace(' ', 'T').slice(0, 16) : '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Hours / Odometer</label>
-            <input type="text" name="dropoff_hours_odometer" value="<%= it.dropoff_hours_odometer || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-        </div>
-        <div class="mt-3">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Fuel / Battery</label>
-          <div class="flex flex-wrap gap-2">
-            <% fuelLevels.forEach(f => { %>
-              <label class="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 cursor-pointer has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50">
-                <input type="radio" name="dropoff_fuel" value="<%= f %>" <%= it.dropoff_fuel === f ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500">
-                <span><%= fuelLabels[f] %></span>
-              </label>
-            <% }) %>
-          </div>
-        </div>
-        <div class="mt-3 flex flex-wrap gap-4">
-          <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
-            <input type="checkbox" name="dropoff_damage_observed" value="1" <%= it.dropoff_damage_observed ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500 rounded">
-            Damage observed
-          </label>
-          <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
-            <input type="checkbox" name="dropoff_photos_taken" value="1" <%= it.dropoff_photos_taken ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500 rounded">
-            Photos taken
-          </label>
-          <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
-            <input type="checkbox" name="dropoff_clean" value="1" <%= it.dropoff_clean ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500 rounded">
-            Clean
-          </label>
-        </div>
-        <div class="mt-3">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Damage Notes</label>
-          <textarea name="dropoff_damage_notes" rows="2" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"><%= it.dropoff_damage_notes || '' %></textarea>
-        </div>
-        <div class="mt-3">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Roadworthy (trailer)</label>
-          <div class="flex flex-wrap gap-2">
-            <% roadworthyKeys.forEach(k => { %>
-              <label class="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
-                <input type="checkbox" name="dropoff_roadworthy_<%= k %>" value="1" <%= it.dropoff_roadworthy_set.has(k) ? 'checked' : '' %> class="text-brand-600 focus:ring-brand-500 rounded">
-                <span class="capitalize"><%= k %></span>
-              </label>
-            <% }) %>
-          </div>
-        </div>
-        <div class="mt-3">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Accessories</label>
-          <input type="text" name="dropoff_accessories" value="<%= it.dropoff_accessories || '' %>" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
-        <div class="mt-3">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Initials</label>
-          <input type="text" name="dropoff_initials" value="<%= it.dropoff_initials || '' %>" class="w-32 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-        </div>
+      <div>
+        <label class="hd-label">Qty</label>
+        <input type="number" name="quantity" min="1" value="1" class="hd-input">
       </div>
-    </div>
-
-    <div class="flex items-center justify-between pt-3 border-t border-gray-100 print:hidden">
-      <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Save Item</button>
-    </div>
-  </form>
-
-  <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items/<%= it.id %>/delete" class="px-4 pb-4 print:hidden" onsubmit="return confirm('Remove this item from the docket?')">
-    <%- include('../../partials/csrf') %>
-    <button type="submit" class="text-xs text-red-600 hover:text-red-700 hover:underline">Remove item</button>
-  </form>
-</details>
-<% }) %>
-
-<!-- ADD ITEM -->
-<div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 mt-4 print:hidden">
-  <h3 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Add Item</h3>
-  <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/items" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-    <%- include('../../partials/csrf') %>
-    <div class="sm:col-span-2">
-      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Equipment Type</label>
-      <input type="text" name="equipment_type" placeholder="e.g. Traffic lights trailer" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-    </div>
-    <div>
-      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Rego / Serial</label>
-      <input type="text" name="rego_serial" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-    </div>
-    <div>
-      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Asset ID</label>
-      <input type="text" name="asset_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-    </div>
-    <div>
-      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Qty</label>
-      <input type="number" name="quantity" min="1" value="1" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-    </div>
-    <div class="sm:col-span-4">
-      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Notes</label>
-      <input type="text" name="summary_notes" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-    </div>
-    <div class="flex items-end">
-      <button type="submit" class="w-full px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition">Add</button>
-    </div>
-  </form>
-</div>
-
-<div class="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900 print:hidden">
-  <p class="font-semibold mb-1">Reminders</p>
-  <ul class="list-disc ml-5 space-y-0.5 text-xs">
-    <li>Walk around EVERY trailer before hitching — lights, indicators, brake lights, plate, safety chains, coupling, tyres.</li>
-    <li>Photograph any damage, scratches, or missing accessories at pick-up BEFORE leaving the yard.</li>
-    <li>Record fuel/battery level on pick-up and return — refuel before drop-off to avoid charges.</li>
-    <li>Retain copies of this checklist, hire docket, and photos with the job file.</li>
-    <li>Any issues on return (damage, missing items, cleaning) must be noted and signed by both parties.</li>
-  </ul>
-</div>
+      <div class="sm:col-span-4">
+        <label class="hd-label">Notes</label>
+        <input type="text" name="summary_notes" class="hd-input">
+      </div>
+      <div class="flex items-end">
+        <button type="submit" class="w-full px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition">Add item</button>
+      </div>
+    </form>
+  </div>
+</section>
 
 <% if (activities && activities.length > 0) { %>
 <div class="mt-6 print:hidden">
-  <div class="bg-white border border-gray-200 rounded-2xl p-5">
-    <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-4">Activity History</h3>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+    <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-4">Activity history</h3>
     <%- include('../../partials/activity-timeline', { activities, entityLink: '' }) %>
   </div>
 </div>
 <% } %>
+
+<!-- Hidden equipment-type config for client JS (photo checklist slots per type) -->
+<script id="hire-docket-config" type="application/json"><%- JSON.stringify(equipmentTypes) %></script>
+
+<link rel="stylesheet" href="/css/hire-docket.css?v=1">
+<script src="/js/hire-docket.js?v=1" defer></script>

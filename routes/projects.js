@@ -227,6 +227,22 @@ router.get('/:id', (req, res) => {
     WHERE ea.job_id = ? ORDER BY ea.assigned_date DESC
   `).all(job.id);
 
+  // Hire dockets linked to this job — so the project page surfaces hired gear
+  // alongside the owned-equipment assignments above.
+  let hireDockets = [];
+  try {
+    hireDockets = db.prepare(`
+      SELECT hd.id, hd.docket_number, hd.supplier_name, hd.status, hd.date_prepared,
+        hd.hire_period, hd.hire_end_date,
+        (SELECT COUNT(*) FROM hire_docket_items hdi WHERE hdi.docket_id = hd.id) as item_count,
+        CASE WHEN hd.status = 'picked_up' AND hd.hire_end_date IS NOT NULL AND hd.hire_end_date < date('now')
+             THEN 1 ELSE 0 END as is_overdue
+      FROM hire_dockets hd
+      WHERE hd.job_id = ? AND hd.deleted_at IS NULL
+      ORDER BY hd.created_at DESC
+    `).all(job.id);
+  } catch (e) { /* table or column may be older — ignore */ }
+
   const defects = db.prepare(`
     SELECT d.*, u.full_name as reported_by_name, u2.full_name as assigned_to_name
     FROM defects d
@@ -318,7 +334,7 @@ router.get('/:id', (req, res) => {
     job, tasks, complianceItems, complianceDocs, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
     complianceCosts, equipmentCosts,
-    equipmentAssignments, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
+    equipmentAssignments, hireDockets, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
     complianceTgsItems, allUsers, diaryAttachments, chatMembers, activities,
     finalPlans, finalPlanDocs, planFlags, planRevisions, viewMode,
     user: req.session.user,

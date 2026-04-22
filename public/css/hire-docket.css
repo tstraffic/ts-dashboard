@@ -1,0 +1,120 @@
+/* Hire docket v2 — compact form classes + pill button styles + signature pad */
+
+.hd-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.hd-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.25;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.hd-input:focus {
+  border-color: #2B7FFF;
+  box-shadow: 0 0 0 3px rgba(43, 127, 255, 0.18);
+}
+.hd-input[readonly] { color: #6b7280; }
+
+.hd-input-sm {
+  padding: 5px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+/* ---- Pill radio/checkbox groups ---- */
+.hd-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  user-select: none;
+  min-height: 32px;
+}
+.hd-pill input[type="radio"],
+.hd-pill input[type="checkbox"] {
+  /* Keep the input but hide it — the label IS the button */
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
+.hd-pill.is-active,
+.hd-pill:has(input:checked) {
+  background: #2B7FFF;
+  color: #fff;
+  border-color: #1D6AE5;
+}
+.hd-pill:hover:not(.is-active) {
+  background: #f3f4f6;
+}
+.hd-pill-sm { padding: 4px 10px; font-size: 11px; min-height: 28px; }
+
+.hd-yn-group { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---- Add buttons (solid small) ---- */
+.hd-add-btn-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  background: #2B7FFF;
+  border: 1px solid #1D6AE5;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 120ms ease;
+  flex-shrink: 0;
+}
+.hd-add-btn-sm:hover { background: #1D6AE5; }
+
+/* ---- Signature pad ---- */
+.hd-signature-pad {
+  display: block;
+  touch-action: none; /* prevent page panning while drawing */
+  cursor: crosshair;
+  max-width: 100%;
+}
+.hd-signature-pad-wrap { max-width: 400px; }
+.hd-signature-existing { max-width: 400px; }
+.hd-sig-status.is-saving { color: #2563eb; }
+.hd-sig-status.is-saved { color: #059669; }
+.hd-sig-status.is-error { color: #dc2626; }
+
+/* ---- Print overrides ---- */
+@media print {
+  .print\:hidden { display: none !important; }
+  details { }
+  details summary { list-style: none; pointer-events: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] > summary { }
+  /* Force every details open in print mode */
+  details { }
+}
+details[open] > summary svg.rotate-180 { transform: rotate(180deg); }
+
+/* Narrow viewport: give the accessory table horizontal scroll instead of forcing overflow */
+@media (max-width: 640px) {
+  .hd-acc-row { grid-template-columns: 1fr 48px 48px 1fr 70px 26px; font-size: 11px; }
+}

@@ -1,0 +1,24 @@
+<%
+  // Canvas signature pad.
+  // Args: slot (pickup, pickup_supplier_rep, dropoff, dropoff_supplier_rep),
+  // label, currentPath (existing *_signature_path value, can be empty),
+  // docketId, print.
+  const sig_slot = slot;
+  const sig_label = label || 'Signature';
+  const sig_has = !!currentPath;
+  const sig_src = sig_has ? `/equipment/hire-dockets/${docketId}/signature/${sig_slot}` : '';
+%>
+<div class="hd-signature" data-slot="<%= sig_slot %>" data-docket="<%= docketId %>" data-kind="docket">
+  <label class="hd-label"><%= sig_label %></label>
+  <% if (sig_has) { %>
+    <img src="<%= sig_src %>?v=<%= Date.now() %>" alt="<%= sig_label %>" class="hd-signature-existing w-full max-w-xs border border-gray-300 rounded-lg bg-white">
+  <% } %>
+  <div class="hd-signature-pad-wrap print:hidden <%= sig_has ? 'mt-2' : '' %>">
+    <canvas class="hd-signature-pad border border-gray-300 rounded-lg bg-white w-full" width="400" height="140"></canvas>
+    <div class="flex items-center gap-2 mt-1 text-xs">
+      <button type="button" class="hd-sig-clear px-2.5 py-1 rounded-md bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">Clear</button>
+      <button type="button" class="hd-sig-save px-3 py-1 rounded-md bg-brand-600 text-white hover:bg-brand-500 font-medium">Save signature</button>
+      <span class="hd-sig-status text-gray-400"></span>
+    </div>
+  </div>
+</div>

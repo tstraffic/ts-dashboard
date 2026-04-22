@@ -1,0 +1,35 @@
+<%
+  // Yes/No (optionally Yes/No/NA) pill radio group.
+  //
+  // Two modes:
+  //   withNa = false  → boolean.  Yes = "1", No = "".  value should be "1" or "".
+  //                     "No" is rendered as checked when value is "" (DB default 0).
+  //   withNa = true   → tri-state.  Yes = "yes", No = "no", N/A = "na".
+  //                     Nothing is checked when value is "".
+  const yn_name = name;
+  const yn_value = (value == null) ? '' : String(value);
+  const yn_withNa = !!withNa;
+  const yn_yesVal = yn_withNa ? 'yes' : '1';
+  const yn_noVal = yn_withNa ? 'no' : '';
+  const yn_yesChecked = yn_value === yn_yesVal;
+  // In boolean mode, unset defaults to "No" (DB column default is 0).
+  // In tri-state mode, unset leaves nothing checked.
+  const yn_noChecked = yn_withNa ? yn_value === 'no' : yn_value !== yn_yesVal;
+  const yn_naChecked = yn_withNa && yn_value === 'na';
+%>
+<div class="hd-yn-group" data-yn-name="<%= yn_name %>">
+  <label class="hd-pill hd-pill-sm <%= yn_yesChecked ? 'is-active' : '' %>">
+    <input type="radio" name="<%= yn_name %>" value="<%= yn_yesVal %>" <%= yn_yesChecked ? 'checked' : '' %>>
+    <span>Yes</span>
+  </label>
+  <label class="hd-pill hd-pill-sm <%= yn_noChecked ? 'is-active' : '' %>">
+    <input type="radio" name="<%= yn_name %>" value="<%= yn_noVal %>" <%= yn_noChecked ? 'checked' : '' %>>
+    <span>No</span>
+  </label>
+  <% if (yn_withNa) { %>
+  <label class="hd-pill hd-pill-sm <%= yn_naChecked ? 'is-active' : '' %>">
+    <input type="radio" name="<%= yn_name %>" value="na" <%= yn_naChecked ? 'checked' : '' %>>
+    <span>N/A</span>
+  </label>
+  <% } %>
+</div>

@@ -1,11 +1,28 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { getDb } = require('../db/database');
 const { logActivity } = require('../middleware/audit');
+const {
+  EQUIPMENT_TYPES,
+  ATTACHMENT_CATEGORIES,
+  ATTACHMENT_CATEGORY_KEYS,
+  DOCKET_SIGNATURE_SLOTS,
+  ITEM_SIGNATURE_SLOTS,
+  FUEL_LEVELS,
+  FUEL_LABELS,
+  STATUSES,
+  OFFHIRE_METHODS,
+  OFFHIRE_METHOD_LABELS,
+  getEquipmentType,
+} = require('../lib/hireDocketConfig');
 
 const ROADWORTHY_KEYS = ['tyres', 'lights', 'indicators', 'plate', 'chains', 'coupling'];
-const FUEL_LEVELS = ['empty', '1_4', '1_2', '3_4', 'full', 'na'];
-const STATUSES = ['open', 'picked_up', 'returned', 'closed'];
+const ADMIN_ROLES = new Set(['admin', 'management', 'finance']);
+
+// ---------- Shared helpers ----------
 
 function nextDocketNumber(db) {
   const year = new Date().getFullYear();
@@ -25,10 +42,103 @@ function roadworthyCsv(body, prefix) {
   return ROADWORTHY_KEYS.filter(k => body[`${prefix}_roadworthy_${k}`]).join(',');
 }
 
+function bool(v) { return v ? 1 : 0; }
+function int(v) { return v == null || v === '' ? null : parseInt(v, 10); }
+function num(v) { return v == null || v === '' ? 0 : parseFloat(v) || 0; }
+function trimOr(v, d = '') { return v == null ? d : String(v).trim(); }
+function yesNoNa(v) { return ['yes', 'no', 'na'].includes(v) ? v : ''; }
+function yesNo(v) { return ['yes', 'no'].includes(v) ? v : ''; }
+function safeToUse(v) { return ['safe', 'unsafe'].includes(v) ? v : ''; }
+function isAdminRole(user) { return !!(user && ADMIN_ROLES.has((user.role || '').toLowerCase())); }
+
+function docketUploadRoot(docketId) {
+  return path.join(__dirname, '..', 'data', 'uploads', 'hire-dockets', String(docketId));
+}
+function ensureDir(p) { fs.mkdirSync(p, { recursive: true }); }
+
+const ALLOWED_MIME = /^(image\/(jpeg|png|gif|webp|heic|heif)|application\/pdf)$/i;
+
+// ---------- Multer: photos (per item) ----------
+
+const photoStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dest = path.join(docketUploadRoot(req.params.id), 'items', String(req.params.itemId));
+    ensureDir(dest);
+    cb(null, dest);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  },
+});
+const photoUpload = multer({
+  storage: photoStorage,
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME.test(file.mimetype)) cb(null, true);
+    else cb(new Error('File type not allowed (images + PDF only)'));
+  },
+});
+
+// ---------- Multer: attachments (docket-level, by category) ----------
+
+const attachmentStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dest = path.join(docketUploadRoot(req.params.id), 'attachments');
+    ensureDir(dest);
+    cb(null, dest);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname) || '';
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  },
+});
+const attachmentUpload = multer({
+  storage: attachmentStorage,
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME.test(file.mimetype)) cb(null, true);
+    else cb(new Error('File type not allowed (images + PDF only)'));
+  },
+});
+
+// ---------- Find helpers ----------
+
+function loadDocket(db, id, opts = {}) {
+  const where = opts.includeDeleted ? '' : ' AND hd.deleted_at IS NULL';
+  return db.prepare(`
+    SELECT hd.*, j.job_number as linked_job_number, j.client as linked_client,
+      ru.full_name as recon_reviewer_name,
+      du.full_name as deleted_by_name
+    FROM hire_dockets hd
+    LEFT JOIN jobs j ON hd.job_id = j.id
+    LEFT JOIN users ru ON hd.recon_reviewed_by_id = ru.id
+    LEFT JOIN users du ON hd.deleted_by = du.id
+    WHERE hd.id = ?${where}
+  `).get(id);
+}
+
+function loadItem(db, docketId, itemId) {
+  return db.prepare('SELECT * FROM hire_docket_items WHERE id = ? AND docket_id = ?').get(itemId, docketId);
+}
+
+function groupPhotos(rows) {
+  const grouped = { pickup: {}, dropoff: {} };
+  rows.forEach(p => {
+    const phase = p.phase === 'dropoff' ? 'dropoff' : 'pickup';
+    const key = p.checklist_key || '_additional';
+    if (!grouped[phase][key]) grouped[phase][key] = [];
+    grouped[phase][key].push(p);
+  });
+  return grouped;
+}
+
+// ==================================================
 // LIST
+// ==================================================
 router.get('/', (req, res) => {
   const db = getDb();
-  const where = [];
+  const where = ['hd.deleted_at IS NULL'];
   const params = [];
   if (req.query.status && STATUSES.includes(req.query.status)) {
     where.push('hd.status = ?');
@@ -39,26 +149,35 @@ router.get('/', (req, res) => {
     const s = `%${req.query.search}%`;
     params.push(s, s, s, s);
   }
-  const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : '';
+  const whereClause = 'WHERE ' + where.join(' AND ');
+  const today = new Date().toISOString().split('T')[0];
 
   const dockets = db.prepare(`
     SELECT hd.*, j.job_number as linked_job_number,
-      (SELECT COUNT(*) FROM hire_docket_items hdi WHERE hdi.docket_id = hd.id) as item_count
+      (SELECT COUNT(*) FROM hire_docket_items hdi WHERE hdi.docket_id = hd.id) as item_count,
+      CASE WHEN hd.status = 'picked_up' AND hd.hire_end_date IS NOT NULL AND hd.hire_end_date < ?
+           THEN 1 ELSE 0 END as is_overdue
     FROM hire_dockets hd
     LEFT JOIN jobs j ON hd.job_id = j.id
     ${whereClause}
     ORDER BY hd.created_at DESC
-  `).all(...params);
+  `).all(today, ...params);
 
   const counts = db.prepare(`
-    SELECT status, COUNT(*) as c FROM hire_dockets GROUP BY status
+    SELECT status, COUNT(*) as c FROM hire_dockets WHERE deleted_at IS NULL GROUP BY status
   `).all().reduce((acc, r) => { acc[r.status] = r.c; return acc; }, {});
+
+  let deletedCount = 0;
+  try {
+    deletedCount = db.prepare('SELECT COUNT(*) as c FROM hire_dockets WHERE deleted_at IS NOT NULL').get().c;
+  } catch (e) { /* ignore */ }
 
   res.render('equipment/hire-dockets/index', {
     title: 'Hire Dockets',
     currentPage: 'equipment',
     dockets,
     filters: req.query,
+    deletedCount,
     stats: {
       total: dockets.length,
       open: counts.open || 0,
@@ -69,7 +188,9 @@ router.get('/', (req, res) => {
   });
 });
 
-// NEW
+// ==================================================
+// NEW (create form)
+// ==================================================
 router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number DESC").all();
@@ -81,7 +202,35 @@ router.get('/new', (req, res) => {
   });
 });
 
+// ==================================================
+// DELETED LIST (must come before /:id)
+// ==================================================
+router.get('/deleted', (req, res) => {
+  if (!isAdminRole(req.session.user)) {
+    req.flash('error', 'Only admin/management can view deleted dockets.');
+    return res.redirect('/equipment/hire-dockets');
+  }
+  const db = getDb();
+  const dockets = db.prepare(`
+    SELECT hd.*, j.job_number as linked_job_number,
+      (SELECT COUNT(*) FROM hire_docket_items hdi WHERE hdi.docket_id = hd.id) as item_count,
+      du.full_name as deleted_by_name
+    FROM hire_dockets hd
+    LEFT JOIN jobs j ON hd.job_id = j.id
+    LEFT JOIN users du ON hd.deleted_by = du.id
+    WHERE hd.deleted_at IS NOT NULL
+    ORDER BY hd.deleted_at DESC
+  `).all();
+  res.render('equipment/hire-dockets/deleted', {
+    title: 'Deleted Hire Dockets',
+    currentPage: 'equipment',
+    dockets,
+  });
+});
+
+// ==================================================
 // CREATE
+// ==================================================
 router.post('/', (req, res) => {
   const db = getDb();
   const b = req.body;
@@ -92,26 +241,27 @@ router.post('/', (req, res) => {
       docket_number, job_number, job_id, date_prepared, site_location,
       prepared_by, prepared_by_contact, supervisor, crew,
       supplier_name, supplier_hire_ref, supplier_contact, supplier_phone,
-      pickup_address, hire_period, agreed_rate,
+      pickup_address, hire_period, hire_end_date, agreed_rate,
       created_by_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     docketNumber,
-    b.job_number || '',
-    b.job_id ? parseInt(b.job_id, 10) : null,
+    trimOr(b.job_number),
+    int(b.job_id),
     b.date_prepared || null,
-    b.site_location || '',
-    b.prepared_by || req.session.user.full_name || '',
-    b.prepared_by_contact || '',
-    b.supervisor || '',
-    b.crew || '',
-    b.supplier_name || '',
-    b.supplier_hire_ref || '',
-    b.supplier_contact || '',
-    b.supplier_phone || '',
-    b.pickup_address || '',
-    b.hire_period || '',
-    b.agreed_rate || '',
+    trimOr(b.site_location),
+    trimOr(b.prepared_by) || req.session.user.full_name || '',
+    trimOr(b.prepared_by_contact),
+    trimOr(b.supervisor),
+    trimOr(b.crew),
+    trimOr(b.supplier_name),
+    trimOr(b.supplier_hire_ref),
+    trimOr(b.supplier_contact),
+    trimOr(b.supplier_phone),
+    trimOr(b.pickup_address),
+    trimOr(b.hire_period),
+    b.hire_end_date || null,
+    trimOr(b.agreed_rate),
     req.session.user.id,
   );
 
@@ -123,23 +273,41 @@ router.post('/', (req, res) => {
   res.redirect(`/equipment/hire-dockets/${result.lastInsertRowid}`);
 });
 
-// SHOW
+// ==================================================
+// SHOW (full detail)
+// ==================================================
 router.get('/:id', (req, res) => {
   const db = getDb();
-  const docket = db.prepare(`
-    SELECT hd.*, j.job_number as linked_job_number, j.client as linked_client
-    FROM hire_dockets hd LEFT JOIN jobs j ON hd.job_id = j.id
-    WHERE hd.id = ?
-  `).get(req.params.id);
+  const docket = loadDocket(db, req.params.id);
   if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
 
   const items = db.prepare(`
     SELECT * FROM hire_docket_items WHERE docket_id = ? ORDER BY position ASC, id ASC
   `).all(docket.id);
 
+  // Enrich each item with: accessories rows + photos grouped by phase+key
+  const accStmt = db.prepare('SELECT * FROM hire_docket_accessories WHERE item_id = ? ORDER BY id ASC');
+  const photoStmt = db.prepare('SELECT * FROM hire_docket_photos WHERE item_id = ? ORDER BY uploaded_at ASC');
   items.forEach(it => {
     it.pickup_roadworthy_set = new Set((it.pickup_roadworthy || '').split(',').filter(Boolean));
     it.dropoff_roadworthy_set = new Set((it.dropoff_roadworthy || '').split(',').filter(Boolean));
+    it.accessories = accStmt.all(it.id);
+    it.photos = groupPhotos(photoStmt.all(it.id));
+  });
+
+  // Attachments grouped by category
+  const attachmentRows = db.prepare(`
+    SELECT a.*, u.full_name as uploaded_by_name
+    FROM hire_docket_attachments a
+    LEFT JOIN users u ON a.uploaded_by_id = u.id
+    WHERE a.docket_id = ?
+    ORDER BY a.uploaded_at DESC
+  `).all(docket.id);
+  const attachmentsByCategory = {};
+  ATTACHMENT_CATEGORY_KEYS.forEach(k => { attachmentsByCategory[k] = []; });
+  attachmentRows.forEach(a => {
+    if (attachmentsByCategory[a.category]) attachmentsByCategory[a.category].push(a);
+    else (attachmentsByCategory.other ||= []).push(a);
   });
 
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status IN ('active','on_hold','won') ORDER BY job_number DESC").all();
@@ -156,88 +324,161 @@ router.get('/:id', (req, res) => {
     title: `Hire Docket ${docket.docket_number}`,
     currentPage: 'equipment',
     docket, items, jobs, equipment, activities,
+    attachmentsByCategory,
+    attachmentCategories: ATTACHMENT_CATEGORIES,
+    equipmentTypes: EQUIPMENT_TYPES,
     roadworthyKeys: ROADWORTHY_KEYS,
     fuelLevels: FUEL_LEVELS,
+    fuelLabels: FUEL_LABELS,
+    offhireMethods: OFFHIRE_METHODS,
+    offhireMethodLabels: OFFHIRE_METHOD_LABELS,
+    canReconcile: isAdminRole(req.session.user),
     print: req.query.print === '1',
   });
 });
 
-// UPDATE HEADER
+// ==================================================
+// UPDATE HEADER (docket-level fields)
+// ==================================================
 router.post('/:id', (req, res) => {
   const db = getDb();
   const b = req.body;
-  const docket = db.prepare('SELECT id, docket_number FROM hire_dockets WHERE id = ?').get(req.params.id);
+  const docket = loadDocket(db, req.params.id);
   if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
 
-  const status = STATUSES.includes(b.status) ? b.status : 'open';
+  const status = STATUSES.includes(b.status) ? b.status : docket.status;
+  const reconAllowed = isAdminRole(req.session.user);
 
+  // Core update — excludes reconciliation fields.
   db.prepare(`
     UPDATE hire_dockets SET
       job_number = ?, job_id = ?, date_prepared = ?, site_location = ?,
       prepared_by = ?, prepared_by_contact = ?, supervisor = ?, crew = ?,
       supplier_name = ?, supplier_hire_ref = ?, supplier_contact = ?, supplier_phone = ?,
-      pickup_address = ?, hire_period = ?, agreed_rate = ?,
+      pickup_address = ?, hire_period = ?, hire_end_date = ?, agreed_rate = ?,
+      included_allowance = ?, excess_charge = ?, fuel_return_requirement = ?, cleaning_expectation = ?,
+      damage_liability_received = ?, late_return_approved = ?,
       pickup_notes = ?, dropoff_notes = ?,
       pickup_collected_by = ?, pickup_signature = ?, pickup_date = ?, pickup_supplier_rep = ?,
       dropoff_returned_by = ?, dropoff_signature = ?, dropoff_date = ?, dropoff_supplier_rep = ?,
+      offhire_method = ?, offhire_notified_at = ?, offhire_person_notified = ?, offhire_reference = ?,
+      offhire_notified_by = ?, offhire_confirmed = ?,
+      dispute_alleged_damage = ?, dispute_photos_both_parties = ?, dispute_raised_immediately = ?,
+      dispute_details = ?, dispute_internal_notified = ?, dispute_est_value = ?, dispute_next_action = ?,
       status = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
-    b.job_number || '',
-    b.job_id ? parseInt(b.job_id, 10) : null,
-    b.date_prepared || null,
-    b.site_location || '',
-    b.prepared_by || '',
-    b.prepared_by_contact || '',
-    b.supervisor || '',
-    b.crew || '',
-    b.supplier_name || '',
-    b.supplier_hire_ref || '',
-    b.supplier_contact || '',
-    b.supplier_phone || '',
-    b.pickup_address || '',
-    b.hire_period || '',
-    b.agreed_rate || '',
-    b.pickup_notes || '',
-    b.dropoff_notes || '',
-    b.pickup_collected_by || '',
-    b.pickup_signature || '',
-    b.pickup_date || null,
-    b.pickup_supplier_rep || '',
-    b.dropoff_returned_by || '',
-    b.dropoff_signature || '',
-    b.dropoff_date || null,
-    b.dropoff_supplier_rep || '',
-    status,
-    docket.id,
+    trimOr(b.job_number), int(b.job_id), b.date_prepared || null, trimOr(b.site_location),
+    trimOr(b.prepared_by), trimOr(b.prepared_by_contact), trimOr(b.supervisor), trimOr(b.crew),
+    trimOr(b.supplier_name), trimOr(b.supplier_hire_ref), trimOr(b.supplier_contact), trimOr(b.supplier_phone),
+    trimOr(b.pickup_address), trimOr(b.hire_period), b.hire_end_date || null, trimOr(b.agreed_rate),
+    trimOr(b.included_allowance), trimOr(b.excess_charge), trimOr(b.fuel_return_requirement), trimOr(b.cleaning_expectation),
+    bool(b.damage_liability_received === '1'), yesNoNa(b.late_return_approved),
+    trimOr(b.pickup_notes), trimOr(b.dropoff_notes),
+    trimOr(b.pickup_collected_by), trimOr(b.pickup_signature), b.pickup_date || null, trimOr(b.pickup_supplier_rep),
+    trimOr(b.dropoff_returned_by), trimOr(b.dropoff_signature), b.dropoff_date || null, trimOr(b.dropoff_supplier_rep),
+    OFFHIRE_METHODS.includes(b.offhire_method) ? b.offhire_method : '',
+    b.offhire_notified_at || null,
+    trimOr(b.offhire_person_notified), trimOr(b.offhire_reference), trimOr(b.offhire_notified_by),
+    bool(b.offhire_confirmed === '1'),
+    bool(b.dispute_alleged_damage === '1'), bool(b.dispute_photos_both_parties === '1'), bool(b.dispute_raised_immediately === '1'),
+    trimOr(b.dispute_details), trimOr(b.dispute_internal_notified), num(b.dispute_est_value), trimOr(b.dispute_next_action),
+    status, docket.id,
   );
+
+  // Reconciliation (admin/management/finance only)
+  if (reconAllowed && b._save_recon === '1') {
+    db.prepare(`
+      UPDATE hire_dockets SET
+        recon_reviewed_by_id = ?, recon_review_date = ?, recon_invoice_number = ?,
+        recon_charges_checked = ?, recon_variations_reconciled = ?, recon_closed_out = ?, recon_notes = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      int(b.recon_reviewed_by_id) || req.session.user.id,
+      b.recon_review_date || null,
+      trimOr(b.recon_invoice_number),
+      bool(b.recon_charges_checked === '1'),
+      yesNoNa(b.recon_variations_reconciled),
+      bool(b.recon_closed_out === '1'),
+      trimOr(b.recon_notes),
+      docket.id,
+    );
+  }
 
   logActivity({
     user: req.session.user, action: 'update', entityType: 'hire_docket',
     entityId: docket.id, entityLabel: docket.docket_number, ip: req.ip
   });
-  req.flash('success', 'Docket updated.');
+  req.flash('success', 'Docket saved.');
   res.redirect(`/equipment/hire-dockets/${docket.id}`);
 });
 
-// DELETE DOCKET
+// ==================================================
+// SOFT-DELETE + RESTORE + PURGE
+// ==================================================
 router.post('/:id/delete', (req, res) => {
   const db = getDb();
-  const docket = db.prepare('SELECT id, docket_number FROM hire_dockets WHERE id = ?').get(req.params.id);
+  const docket = loadDocket(db, req.params.id);
   if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
-  db.prepare('DELETE FROM hire_dockets WHERE id = ?').run(docket.id);
+  db.prepare('UPDATE hire_dockets SET deleted_at = CURRENT_TIMESTAMP, deleted_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL')
+    .run(req.session.user.id, docket.id);
   logActivity({
     user: req.session.user, action: 'delete', entityType: 'hire_docket',
     entityId: docket.id, entityLabel: docket.docket_number, ip: req.ip
   });
-  req.flash('success', `Hire docket ${docket.docket_number} deleted.`);
+  req.flash('success', `Hire docket ${docket.docket_number} moved to Deleted.`);
   res.redirect('/equipment/hire-dockets');
 });
 
-// ADD ITEM
+router.post('/:id/restore', (req, res) => {
+  if (!isAdminRole(req.session.user)) {
+    req.flash('error', 'Only admin/management can restore dockets.');
+    return res.redirect('/equipment/hire-dockets/deleted');
+  }
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id, { includeDeleted: true });
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets/deleted'); }
+  db.prepare('UPDATE hire_dockets SET deleted_at = NULL, deleted_by = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(docket.id);
+  logActivity({
+    user: req.session.user, action: 'update', entityType: 'hire_docket',
+    entityId: docket.id, entityLabel: docket.docket_number + ' (restored)', ip: req.ip
+  });
+  req.flash('success', `Hire docket ${docket.docket_number} restored.`);
+  res.redirect(`/equipment/hire-dockets/${docket.id}`);
+});
+
+router.post('/:id/purge', (req, res) => {
+  if (!isAdminRole(req.session.user)) {
+    req.flash('error', 'Only admin/management can permanently delete dockets.');
+    return res.redirect('/equipment/hire-dockets/deleted');
+  }
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id, { includeDeleted: true });
+  if (!docket || !docket.deleted_at) {
+    req.flash('error', 'Deleted docket not found.');
+    return res.redirect('/equipment/hire-dockets/deleted');
+  }
+  // Best-effort: remove the upload folder.
+  try {
+    const root = docketUploadRoot(docket.id);
+    if (fs.existsSync(root)) fs.rmSync(root, { recursive: true, force: true });
+  } catch (e) { /* ignore */ }
+  db.prepare('DELETE FROM hire_dockets WHERE id = ?').run(docket.id);
+  logActivity({
+    user: req.session.user, action: 'delete', entityType: 'hire_docket',
+    entityId: docket.id, entityLabel: docket.docket_number + ' (purged)', ip: req.ip
+  });
+  req.flash('success', `Hire docket ${docket.docket_number} permanently deleted.`);
+  res.redirect('/equipment/hire-dockets/deleted');
+});
+
+// ==================================================
+// ITEMS
+// ==================================================
 router.post('/:id/items', (req, res) => {
   const db = getDb();
-  const docket = db.prepare('SELECT id FROM hire_dockets WHERE id = ?').get(req.params.id);
+  const docket = loadDocket(db, req.params.id);
   if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
 
   const b = req.body;
@@ -251,66 +492,98 @@ router.post('/:id/items', (req, res) => {
   `).run(
     docket.id,
     nextPos,
-    b.equipment_type || '',
-    b.rego_serial || '',
-    b.asset_id || '',
-    b.equipment_id ? parseInt(b.equipment_id, 10) : null,
+    trimOr(b.equipment_type),
+    trimOr(b.rego_serial),
+    trimOr(b.asset_id),
+    int(b.equipment_id),
     parseInt(b.quantity, 10) || 1,
-    b.summary_notes || '',
+    trimOr(b.summary_notes),
   );
 
   req.flash('success', 'Item added.');
   res.redirect(`/equipment/hire-dockets/${docket.id}`);
 });
 
-// UPDATE ITEM (full inspection — pick-up + drop-off)
 router.post('/:id/items/:itemId', (req, res) => {
   const db = getDb();
-  const docket = db.prepare('SELECT id, docket_number FROM hire_dockets WHERE id = ?').get(req.params.id);
+  const docket = loadDocket(db, req.params.id);
   if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
-  const item = db.prepare('SELECT id FROM hire_docket_items WHERE id = ? AND docket_id = ?').get(req.params.itemId, docket.id);
+  const item = loadItem(db, docket.id, req.params.itemId);
   if (!item) { req.flash('error', 'Item not found.'); return res.redirect(`/equipment/hire-dockets/${docket.id}`); }
 
   const b = req.body;
+  const wantsPickupDamage = b.pickup_damage_observed === '1' || b.pickup_damage_observed === 1;
+  const wantsDropoffDamage = b.dropoff_damage_observed === '1' || b.dropoff_damage_observed === 1;
+
+  // Damage-requires-photo guard: you said damage was observed, so at least one
+  // photo must be on file for that phase before we let the save land.
+  if (wantsPickupDamage) {
+    const count = db.prepare("SELECT COUNT(*) as c FROM hire_docket_photos WHERE item_id = ? AND phase = 'pickup'").get(item.id).c;
+    if (count === 0) {
+      req.flash('error', 'Upload at least one pick-up photo before saving with damage observed.');
+      return res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+    }
+  }
+  if (wantsDropoffDamage) {
+    const count = db.prepare("SELECT COUNT(*) as c FROM hire_docket_photos WHERE item_id = ? AND phase = 'dropoff'").get(item.id).c;
+    if (count === 0) {
+      req.flash('error', 'Upload at least one drop-off photo before saving with damage observed.');
+      return res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+    }
+  }
 
   db.prepare(`
     UPDATE hire_docket_items SET
       equipment_type = ?, rego_serial = ?, asset_id = ?, equipment_id = ?,
       quantity = ?, summary_notes = ?,
+      collected_full_name = ?, collected_mobile = ?, collected_company = ?,
+      returned_full_name = ?, returned_mobile = ?, returned_company = ?,
       pickup_datetime = ?, pickup_hours_odometer = ?, pickup_fuel = ?,
       pickup_damage_observed = ?, pickup_photos_taken = ?, pickup_damage_notes = ?,
-      pickup_roadworthy = ?, pickup_accessories = ?, pickup_clean = ?, pickup_initials = ?,
+      pickup_roadworthy = ?, pickup_clean = ?, pickup_initials = ?,
+      pickup_pre_existing_damage_ack = ?, pickup_supplier_disputes_damage = ?,
+      pickup_op_test_completed = ?, pickup_op_powers_on = ?, pickup_op_safe_to_use = ?,
+      pickup_op_reported_to_supplier = ?, pickup_op_faults = ?,
+      pickup_site_conditions = ?, pickup_weather = ?,
+      pickup_full_inspection_not_possible = ?, pickup_inspection_reason = ?,
+      pickup_limited_photos = ?, pickup_supplier_notified_limited = ?,
+      pickup_signoff_name = ?,
       dropoff_datetime = ?, dropoff_hours_odometer = ?, dropoff_fuel = ?,
       dropoff_damage_observed = ?, dropoff_photos_taken = ?, dropoff_damage_notes = ?,
-      dropoff_roadworthy = ?, dropoff_accessories = ?, dropoff_clean = ?, dropoff_initials = ?
+      dropoff_roadworthy = ?, dropoff_clean = ?, dropoff_initials = ?,
+      dropoff_op_test_completed = ?, dropoff_op_powers_on = ?, dropoff_op_safe_to_use = ?,
+      dropoff_op_reported_to_supplier = ?, dropoff_op_faults = ?,
+      dropoff_site_conditions = ?, dropoff_weather = ?,
+      dropoff_full_inspection_not_possible = ?, dropoff_inspection_reason = ?,
+      dropoff_limited_photos = ?, dropoff_supplier_notified_limited = ?,
+      dropoff_signoff_name = ?
     WHERE id = ?
   `).run(
-    b.equipment_type || '',
-    b.rego_serial || '',
-    b.asset_id || '',
-    b.equipment_id ? parseInt(b.equipment_id, 10) : null,
-    parseInt(b.quantity, 10) || 1,
-    b.summary_notes || '',
-    b.pickup_datetime || null,
-    b.pickup_hours_odometer || '',
+    trimOr(b.equipment_type), trimOr(b.rego_serial), trimOr(b.asset_id), int(b.equipment_id),
+    parseInt(b.quantity, 10) || 1, trimOr(b.summary_notes),
+    trimOr(b.collected_full_name), trimOr(b.collected_mobile), trimOr(b.collected_company),
+    trimOr(b.returned_full_name), trimOr(b.returned_mobile), trimOr(b.returned_company),
+    b.pickup_datetime || null, trimOr(b.pickup_hours_odometer),
     FUEL_LEVELS.includes(b.pickup_fuel) ? b.pickup_fuel : '',
-    b.pickup_damage_observed ? 1 : 0,
-    b.pickup_photos_taken ? 1 : 0,
-    b.pickup_damage_notes || '',
-    roadworthyCsv(b, 'pickup'),
-    b.pickup_accessories || '',
-    b.pickup_clean ? 1 : 0,
-    b.pickup_initials || '',
-    b.dropoff_datetime || null,
-    b.dropoff_hours_odometer || '',
+    bool(wantsPickupDamage), bool(b.pickup_photos_taken === '1'), trimOr(b.pickup_damage_notes),
+    roadworthyCsv(b, 'pickup'), bool(b.pickup_clean === '1'), trimOr(b.pickup_initials),
+    bool(b.pickup_pre_existing_damage_ack === '1'), yesNo(b.pickup_supplier_disputes_damage),
+    bool(b.pickup_op_test_completed === '1'), bool(b.pickup_op_powers_on === '1'),
+    safeToUse(b.pickup_op_safe_to_use), yesNoNa(b.pickup_op_reported_to_supplier), trimOr(b.pickup_op_faults),
+    trimOr(b.pickup_site_conditions), trimOr(b.pickup_weather),
+    bool(b.pickup_full_inspection_not_possible === '1'), trimOr(b.pickup_inspection_reason),
+    bool(b.pickup_limited_photos === '1'), bool(b.pickup_supplier_notified_limited === '1'),
+    trimOr(b.pickup_signoff_name),
+    b.dropoff_datetime || null, trimOr(b.dropoff_hours_odometer),
     FUEL_LEVELS.includes(b.dropoff_fuel) ? b.dropoff_fuel : '',
-    b.dropoff_damage_observed ? 1 : 0,
-    b.dropoff_photos_taken ? 1 : 0,
-    b.dropoff_damage_notes || '',
-    roadworthyCsv(b, 'dropoff'),
-    b.dropoff_accessories || '',
-    b.dropoff_clean ? 1 : 0,
-    b.dropoff_initials || '',
+    bool(wantsDropoffDamage), bool(b.dropoff_photos_taken === '1'), trimOr(b.dropoff_damage_notes),
+    roadworthyCsv(b, 'dropoff'), bool(b.dropoff_clean === '1'), trimOr(b.dropoff_initials),
+    bool(b.dropoff_op_test_completed === '1'), bool(b.dropoff_op_powers_on === '1'),
+    safeToUse(b.dropoff_op_safe_to_use), yesNoNa(b.dropoff_op_reported_to_supplier), trimOr(b.dropoff_op_faults),
+    trimOr(b.dropoff_site_conditions), trimOr(b.dropoff_weather),
+    bool(b.dropoff_full_inspection_not_possible === '1'), trimOr(b.dropoff_inspection_reason),
+    bool(b.dropoff_limited_photos === '1'), bool(b.dropoff_supplier_notified_limited === '1'),
+    trimOr(b.dropoff_signoff_name),
     item.id,
   );
 
@@ -320,18 +593,282 @@ router.post('/:id/items/:itemId', (req, res) => {
     user: req.session.user, action: 'update', entityType: 'hire_docket',
     entityId: docket.id, entityLabel: `${docket.docket_number} item ${item.id}`, ip: req.ip
   });
-  req.flash('success', 'Item inspection saved.');
+  req.flash('success', 'Item saved.');
   res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
 });
 
-// DELETE ITEM
 router.post('/:id/items/:itemId/delete', (req, res) => {
   const db = getDb();
-  const docket = db.prepare('SELECT id FROM hire_dockets WHERE id = ?').get(req.params.id);
+  const docket = loadDocket(db, req.params.id);
   if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
   db.prepare('DELETE FROM hire_docket_items WHERE id = ? AND docket_id = ?').run(req.params.itemId, docket.id);
+  // Best-effort: remove item's photo folder
+  try {
+    const dir = path.join(docketUploadRoot(docket.id), 'items', String(req.params.itemId));
+    if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+  } catch (e) { /* ignore */ }
   req.flash('success', 'Item removed.');
   res.redirect(`/equipment/hire-dockets/${docket.id}`);
+});
+
+// ==================================================
+// ACCESSORIES
+// ==================================================
+router.post('/:id/items/:itemId/accessories/load-preset', (req, res) => {
+  // NB: this must come BEFORE /:accId so Express doesn't capture "load-preset"
+  // as an accessory id and route to the update handler.
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  const item = loadItem(db, docket.id, req.params.itemId);
+  if (!item) { req.flash('error', 'Item not found.'); return res.redirect(`/equipment/hire-dockets/${docket.id}`); }
+  const type = getEquipmentType(item.equipment_type);
+  if (!type || !type.accessoryPresets || type.accessoryPresets.length === 0) {
+    req.flash('error', 'No preset for this equipment type.');
+    return res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+  }
+  const existing = new Set(db.prepare('SELECT item_name FROM hire_docket_accessories WHERE item_id = ?').all(item.id).map(r => r.item_name.toLowerCase()));
+  const ins = db.prepare('INSERT INTO hire_docket_accessories (item_id, item_name, qty_out) VALUES (?, ?, 1)');
+  let added = 0;
+  for (const name of type.accessoryPresets) {
+    if (!existing.has(name.toLowerCase())) { ins.run(item.id, name); added++; }
+  }
+  req.flash('success', `Loaded ${added} preset accessor${added === 1 ? 'y' : 'ies'}.`);
+  res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+});
+
+router.post('/:id/items/:itemId/accessories', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  const item = loadItem(db, docket.id, req.params.itemId);
+  if (!item) { req.flash('error', 'Item not found.'); return res.redirect(`/equipment/hire-dockets/${docket.id}`); }
+  const b = req.body;
+  const name = trimOr(b.item_name);
+  if (!name) {
+    req.flash('error', 'Accessory name is required.');
+    return res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+  }
+  db.prepare(`
+    INSERT INTO hire_docket_accessories (item_id, item_name, qty_out, qty_back, condition, missing_damaged, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(item.id, name, int(b.qty_out) || 0, int(b.qty_back) || 0, trimOr(b.condition), bool(b.missing_damaged === '1'), trimOr(b.notes));
+  res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+});
+
+router.post('/:id/items/:itemId/accessories/:accId', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  const item = loadItem(db, docket.id, req.params.itemId);
+  if (!item) { req.flash('error', 'Item not found.'); return res.redirect(`/equipment/hire-dockets/${docket.id}`); }
+  const b = req.body;
+  db.prepare(`
+    UPDATE hire_docket_accessories SET
+      item_name = ?, qty_out = ?, qty_back = ?, condition = ?, missing_damaged = ?, notes = ?
+    WHERE id = ? AND item_id = ?
+  `).run(trimOr(b.item_name), int(b.qty_out) || 0, int(b.qty_back) || 0, trimOr(b.condition), bool(b.missing_damaged === '1'), trimOr(b.notes), req.params.accId, item.id);
+  res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+});
+
+router.post('/:id/items/:itemId/accessories/:accId/delete', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  const item = loadItem(db, docket.id, req.params.itemId);
+  if (!item) { req.flash('error', 'Item not found.'); return res.redirect(`/equipment/hire-dockets/${docket.id}`); }
+  db.prepare('DELETE FROM hire_docket_accessories WHERE id = ? AND item_id = ?').run(req.params.accId, item.id);
+  res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+});
+
+// ==================================================
+// PHOTOS (per item, per phase)
+// ==================================================
+router.post('/:id/items/:itemId/photos', photoUpload.array('photos', 10), (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  const item = loadItem(db, docket.id, req.params.itemId);
+  if (!item) { req.flash('error', 'Item not found.'); return res.redirect(`/equipment/hire-dockets/${docket.id}`); }
+  const phase = req.body.phase === 'dropoff' ? 'dropoff' : 'pickup';
+  const checklistKey = trimOr(req.body.checklist_key);
+
+  const ins = db.prepare(`
+    INSERT INTO hire_docket_photos (item_id, phase, checklist_key, file_path, original_name, mime_type)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  (req.files || []).forEach(f => {
+    ins.run(item.id, phase, checklistKey, f.filename, f.originalname, f.mimetype);
+  });
+  req.flash('success', `${(req.files || []).length} photo(s) uploaded.`);
+  res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+});
+
+router.post('/:id/items/:itemId/photos/:photoId/delete', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  const item = loadItem(db, docket.id, req.params.itemId);
+  if (!item) { req.flash('error', 'Item not found.'); return res.redirect(`/equipment/hire-dockets/${docket.id}`); }
+  const photo = db.prepare('SELECT * FROM hire_docket_photos WHERE id = ? AND item_id = ?').get(req.params.photoId, item.id);
+  if (photo) {
+    try {
+      const fp = path.join(docketUploadRoot(docket.id), 'items', String(item.id), photo.file_path);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    } catch (e) { /* ignore */ }
+    db.prepare('DELETE FROM hire_docket_photos WHERE id = ?').run(photo.id);
+  }
+  res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+});
+
+// Serve a photo (auth-gated; does NOT expose /data/uploads publicly).
+router.get('/:id/photos/:photoId', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) return res.sendStatus(404);
+  const photo = db.prepare(`
+    SELECT p.* FROM hire_docket_photos p
+    JOIN hire_docket_items i ON p.item_id = i.id
+    WHERE p.id = ? AND i.docket_id = ?
+  `).get(req.params.photoId, docket.id);
+  if (!photo) return res.sendStatus(404);
+  const fp = path.join(docketUploadRoot(docket.id), 'items', String(photo.item_id), photo.file_path);
+  if (!fs.existsSync(fp)) return res.sendStatus(404);
+  res.sendFile(fp);
+});
+
+// ==================================================
+// ATTACHMENTS (docket-level, categorised)
+// ==================================================
+router.post('/:id/attachments', attachmentUpload.array('files', 10), (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  const category = ATTACHMENT_CATEGORY_KEYS.includes(req.body.category) ? req.body.category : 'other';
+
+  const ins = db.prepare(`
+    INSERT INTO hire_docket_attachments (docket_id, category, file_path, original_name, mime_type, size_bytes, uploaded_by_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  (req.files || []).forEach(f => {
+    ins.run(docket.id, category, f.filename, f.originalname, f.mimetype, f.size, req.session.user.id);
+  });
+  req.flash('success', `${(req.files || []).length} file(s) attached.`);
+  res.redirect(`/equipment/hire-dockets/${docket.id}`);
+});
+
+router.post('/:id/attachments/:attId/delete', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  const att = db.prepare('SELECT * FROM hire_docket_attachments WHERE id = ? AND docket_id = ?').get(req.params.attId, docket.id);
+  if (att) {
+    try {
+      const fp = path.join(docketUploadRoot(docket.id), 'attachments', att.file_path);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    } catch (e) { /* ignore */ }
+    db.prepare('DELETE FROM hire_docket_attachments WHERE id = ?').run(att.id);
+  }
+  res.redirect(`/equipment/hire-dockets/${docket.id}`);
+});
+
+router.get('/:id/attachments/:attId', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) return res.sendStatus(404);
+  const att = db.prepare('SELECT * FROM hire_docket_attachments WHERE id = ? AND docket_id = ?').get(req.params.attId, docket.id);
+  if (!att) return res.sendStatus(404);
+  const fp = path.join(docketUploadRoot(docket.id), 'attachments', att.file_path);
+  if (!fs.existsSync(fp)) return res.sendStatus(404);
+  res.download(fp, att.original_name || att.file_path);
+});
+
+// ==================================================
+// SIGNATURES (canvas → PNG file)
+// ==================================================
+
+function writeSignaturePng(dest, dataUrl) {
+  // Accept "data:image/png;base64,...." payloads. Anything else = reject.
+  const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec((dataUrl || '').replace(/\s+/g, ''));
+  if (!m) return false;
+  const buf = Buffer.from(m[1], 'base64');
+  if (buf.length === 0 || buf.length > 500 * 1024) return false; // sanity: ≤ 500 KB
+  ensureDir(path.dirname(dest));
+  fs.writeFileSync(dest, buf);
+  return true;
+}
+
+router.post('/:id/signature', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  const slot = req.body.slot;
+  if (!DOCKET_SIGNATURE_SLOTS.has(slot)) {
+    req.flash('error', 'Unknown signature slot.');
+    return res.redirect(`/equipment/hire-dockets/${docket.id}`);
+  }
+  const filename = `${slot}-${Date.now()}.png`;
+  const dest = path.join(docketUploadRoot(docket.id), 'signatures', filename);
+  if (!writeSignaturePng(dest, req.body.signature_data)) {
+    req.flash('error', 'Signature image rejected (must be a PNG under 500 KB).');
+    return res.redirect(`/equipment/hire-dockets/${docket.id}`);
+  }
+  db.prepare(`UPDATE hire_dockets SET ${slot}_signature_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(filename, docket.id);
+  logActivity({
+    user: req.session.user, action: 'update', entityType: 'hire_docket',
+    entityId: docket.id, entityLabel: `${docket.docket_number} signature:${slot}`, ip: req.ip
+  });
+  req.flash('success', 'Signature captured.');
+  res.redirect(`/equipment/hire-dockets/${docket.id}`);
+});
+
+router.post('/:id/items/:itemId/signature', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  const item = loadItem(db, docket.id, req.params.itemId);
+  if (!item) { req.flash('error', 'Item not found.'); return res.redirect(`/equipment/hire-dockets/${docket.id}`); }
+  const phase = req.body.slot;
+  if (!ITEM_SIGNATURE_SLOTS.has(phase)) {
+    req.flash('error', 'Unknown signature slot.');
+    return res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+  }
+  const filename = `item${item.id}-${phase}-${Date.now()}.png`;
+  const dest = path.join(docketUploadRoot(docket.id), 'signatures', filename);
+  if (!writeSignaturePng(dest, req.body.signature_data)) {
+    req.flash('error', 'Signature image rejected (must be a PNG under 500 KB).');
+    return res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+  }
+  db.prepare(`UPDATE hire_docket_items SET ${phase}_signoff_signature_path = ?, ${phase}_signoff_at = CURRENT_TIMESTAMP WHERE id = ?`).run(filename, item.id);
+  req.flash('success', 'Signature captured.');
+  res.redirect(`/equipment/hire-dockets/${docket.id}#item-${item.id}`);
+});
+
+router.get('/:id/signature/:slot', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) return res.sendStatus(404);
+  // slot is either a docket-level column or a per-item path: ignore item-level here.
+  if (!DOCKET_SIGNATURE_SLOTS.has(req.params.slot)) return res.sendStatus(404);
+  const filename = docket[`${req.params.slot}_signature_path`];
+  if (!filename) return res.sendStatus(404);
+  const fp = path.join(docketUploadRoot(docket.id), 'signatures', filename);
+  if (!fs.existsSync(fp)) return res.sendStatus(404);
+  res.sendFile(fp);
+});
+
+router.get('/:id/items/:itemId/signature/:phase', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) return res.sendStatus(404);
+  const item = loadItem(db, docket.id, req.params.itemId);
+  if (!item) return res.sendStatus(404);
+  if (!ITEM_SIGNATURE_SLOTS.has(req.params.phase)) return res.sendStatus(404);
+  const filename = item[`${req.params.phase}_signoff_signature_path`];
+  if (!filename) return res.sendStatus(404);
+  const fp = path.join(docketUploadRoot(docket.id), 'signatures', filename);
+  if (!fs.existsSync(fp)) return res.sendStatus(404);
+  res.sendFile(fp);
 });
 
 module.exports = router;
