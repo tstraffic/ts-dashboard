@@ -243,8 +243,16 @@ function generateAuditPdf(opts, out) {
   }
 
   // ── Audit Details Table ──
+  // Legacy audits have project_site stored as "J-XXXX | Client | Suburb | Date"
+  // (the auto-generated job_name). Collapse that to the first two segments so
+  // the value reads as a label instead of a stringified record.
+  const ps = (a.project_site || '').trim();
+  const psParts = ps.split(/\s*\|\s*/).filter(Boolean);
+  const prettyProjectSite = psParts.length >= 2
+    ? psParts.slice(0, 2).join(' — ')
+    : (ps || '—');
   const details = [
-    ['Project / Site',  a.project_site || '—'],
+    ['Project / Site',  prettyProjectSite],
     ['Client',          a.client || '—'],
     ['Date',            fmtDate(a.audit_datetime || a.created_at)],
     ['Job Number',      a.job_number || '—'],
