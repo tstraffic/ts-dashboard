@@ -38,7 +38,7 @@
     <% } %>
   </div>
   <div class="flex items-center gap-2 print:hidden">
-    <a href="/equipment/hire-dockets/<%= docket.id %>?print=1" target="_blank" class="px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Print</a>
+    <a href="/equipment/hire-dockets/<%= docket.id %>?print=1" target="_blank" data-print-check class="px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition">Print</a>
     <form method="POST" action="/equipment/hire-dockets/<%= docket.id %>/delete" onsubmit="return confirm('Move docket <%= docket.docket_number %> to Deleted? You can restore it later.')">
       <%- include('../../partials/csrf') %>
       <button type="submit" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-sm font-medium rounded-lg transition">Delete</button>
@@ -70,7 +70,7 @@
     <div class="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div>
         <label class="hd-label">Job / PO # <span class="text-red-500">*</span></label>
-        <input type="text" name="job_number" value="<%= docket.job_number || '' %>" class="hd-input">
+        <input type="text" name="job_number" value="<%= docket.job_number || '' %>" class="hd-input" data-print-required>
       </div>
       <div>
         <label class="hd-label">Link to Job</label>
@@ -87,11 +87,11 @@
       </div>
       <div class="sm:col-span-2 lg:col-span-3">
         <label class="hd-label">Site / Location <span class="text-red-500">*</span></label>
-        <input type="text" name="site_location" value="<%= docket.site_location || '' %>" class="hd-input">
+        <input type="text" name="site_location" value="<%= docket.site_location || '' %>" class="hd-input" data-print-required>
       </div>
       <div>
         <label class="hd-label">Prepared By <span class="text-red-500">*</span></label>
-        <input type="text" name="prepared_by" value="<%= docket.prepared_by || '' %>" class="hd-input">
+        <input type="text" name="prepared_by" value="<%= docket.prepared_by || '' %>" class="hd-input" data-print-required>
       </div>
       <div>
         <label class="hd-label">Contact #</label>
@@ -118,7 +118,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <label class="hd-label">Supplier Name <span class="text-red-500">*</span></label>
-          <input type="text" name="supplier_name" value="<%= docket.supplier_name || '' %>" class="hd-input">
+          <input type="text" name="supplier_name" value="<%= docket.supplier_name || '' %>" class="hd-input" data-print-required>
         </div>
         <div>
           <label class="hd-label">Hire Reference #</label>
