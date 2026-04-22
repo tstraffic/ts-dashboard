@@ -256,15 +256,15 @@
               <th class="px-3 py-2 w-10">
                 <input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)" class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 focus:ring-offset-0 cursor-pointer">
               </th>
-              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ref</th>
+              <th class="hidden md:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ref</th>
               <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Title</th>
               <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type</th>
-              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project</th>
+              <th class="hidden lg:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project</th>
               <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Due Date</th>
-              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Expiry</th>
-              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Assigned</th>
-              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fee</th>
+              <th class="hidden sm:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Due Date</th>
+              <th class="hidden xl:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Expiry</th>
+              <th class="hidden lg:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Assigned</th>
+              <th class="hidden xl:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fee</th>
               <th class="px-3 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Edit</th>
             </tr>
           </thead>
@@ -282,7 +282,7 @@
                 <td class="px-3 py-2">
                   <input type="checkbox" class="row-checkbox w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 focus:ring-offset-0 cursor-pointer" data-id="<%= item.id %>" onclick="updateBulkBar()">
                 </td>
-                <td class="px-3 py-2 whitespace-nowrap">
+                <td class="hidden md:table-cell px-3 py-2 whitespace-nowrap">
                   <% if (item.reference_number) { %>
                     <span class="text-xs font-mono text-gray-600"><%= item.reference_number %></span>
                     <% if (item.item_type === 'traffic_guidance' && item.tgs_quantity > 1) { %>
@@ -323,7 +323,7 @@
                     <% } %>
                   </div>
                 </td>
-                <td class="px-3 py-2">
+                <td class="hidden lg:table-cell px-3 py-2">
                   <% if (item.job_id) { %>
                     <a href="/projects/<%= item.job_id %>" class="text-brand-600 hover:text-brand-700 font-medium"><%= item.job_number %></a>
                     <% if (item.client_id) { %>
@@ -341,7 +341,7 @@
                 <td class="px-3 py-2">
                   <span class="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full <%= sc.color %>"><%= sc.label %></span>
                 </td>
-                <td class="px-3 py-2 whitespace-nowrap">
+                <td class="hidden sm:table-cell px-3 py-2 whitespace-nowrap">
                   <% if (item.due_date) { %>
                     <span class="<%= isOverdue ? 'text-red-600 font-semibold' : isDueSoon ? 'text-amber-600 font-medium' : 'text-gray-700' %>">
                       <%= formatDate(item.due_date) %>
@@ -361,7 +361,7 @@
                     </div>
                   <% } %>
                 </td>
-                <td class="px-3 py-2 whitespace-nowrap">
+                <td class="hidden xl:table-cell px-3 py-2 whitespace-nowrap">
                   <% if (item.expiry_date) { %>
                     <span class="<%= isExpired ? 'text-red-500 line-through' : isExpiryNear ? 'text-amber-600 font-medium' : 'text-gray-600' %>">
                       <%= formatDate(item.expiry_date) %>
@@ -371,7 +371,7 @@
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="px-3 py-2">
+                <td class="hidden lg:table-cell px-3 py-2">
                   <% if (item.assigned_name) { %>
                     <span class="inline-flex items-center gap-1 text-xs text-gray-600">
                       <span class="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-semibold text-xs flex-shrink-0"><%= item.assigned_name.charAt(0) %></span>
@@ -381,7 +381,7 @@
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="px-3 py-2 text-sm">
+                <td class="hidden xl:table-cell px-3 py-2 text-sm">
                   <% if (item.item_type === 'council_permit' && item.council_fee_amount > 0) { %>
                     <div>$<%= item.council_fee_amount.toLocaleString() %></div>
                     <% if (item.council_fee_paid) { %>

@@ -86,12 +86,12 @@
     <thead>
       <tr class="border-b border-gray-200 bg-gray-50">
         <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">Docket #</th>
-        <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">Job / PO</th>
+        <th class="hidden sm:table-cell px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">Job / PO</th>
         <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">Supplier</th>
-        <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">Site</th>
-        <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">Items</th>
+        <th class="hidden lg:table-cell px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">Site</th>
+        <th class="hidden sm:table-cell px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">Items</th>
         <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">Status</th>
-        <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">Prepared</th>
+        <th class="hidden md:table-cell px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">Prepared</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-200">
@@ -100,10 +100,10 @@
           <td class="px-4 py-3 font-medium">
             <a href="/equipment/hire-dockets/<%= d.id %>" class="text-brand-600 hover:text-brand-700 hover:underline"><%= d.docket_number %></a>
           </td>
-          <td class="px-4 py-3 text-gray-700"><%= d.linked_job_number || d.job_number || '-' %></td>
+          <td class="hidden sm:table-cell px-4 py-3 text-gray-700"><%= d.linked_job_number || d.job_number || '-' %></td>
           <td class="px-4 py-3 text-gray-700"><%= d.supplier_name || '-' %></td>
-          <td class="px-4 py-3 text-gray-600 text-xs"><%= d.site_location || '-' %></td>
-          <td class="px-4 py-3 text-gray-600"><%= d.item_count %></td>
+          <td class="hidden lg:table-cell px-4 py-3 text-gray-600 text-xs"><%= d.site_location || '-' %></td>
+          <td class="hidden sm:table-cell px-4 py-3 text-gray-600"><%= d.item_count %></td>
           <td class="px-4 py-3">
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= statusColors[d.status] || 'bg-gray-100 text-gray-600' %>">
               <%= d.status.replace(/_/g, ' ') %>
@@ -112,7 +112,7 @@
               <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white" title="Past hire end date — still on meter">OVERDUE</span>
             <% } %>
           </td>
-          <td class="px-4 py-3 text-gray-500 text-xs"><%= d.date_prepared || '-' %></td>
+          <td class="hidden md:table-cell px-4 py-3 text-gray-500 text-xs"><%= d.date_prepared || '-' %></td>
         </tr>
       <% }) %>
     </tbody>
