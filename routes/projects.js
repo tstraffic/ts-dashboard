@@ -164,10 +164,14 @@ router.get('/:id', (req, res) => {
   // Auto-calculate health from live data
   job.health = recalculateJobHealth(db, job.id);
 
+  // Tasks tab = ops work only. Planning-division tasks and compliance-linked
+  // tasks (auto-created from Plans & Approvals) live under Traffic Plans.
+  // Matches the filter in routes/jobs.js so /projects/:id and /jobs/:id agree.
   const tasks = db.prepare(`
     SELECT t.*, u.full_name as owner_name FROM tasks t
     LEFT JOIN users u ON t.owner_id = u.id
-    WHERE t.job_id = ? AND t.deleted_at IS NULL ORDER BY CASE t.status WHEN 'blocked' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'not_started' THEN 3 ELSE 4 END, t.due_date ASC
+    WHERE t.job_id = ? AND t.deleted_at IS NULL AND t.compliance_id IS NULL AND t.division != 'planning'
+    ORDER BY CASE t.status WHEN 'blocked' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'not_started' THEN 3 ELSE 4 END, t.due_date ASC
   `).all(job.id);
 
   const complianceItems = db.prepare(`
