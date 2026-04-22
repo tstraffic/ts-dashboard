@@ -41,6 +41,19 @@
   }
   wirePills(document);
 
+  // ---------- Dispute gate: show detail fields only when the top Yes/No is Yes ----------
+  (function () {
+    const detailBlock = document.querySelector('.hd-dispute-details');
+    if (!detailBlock) return;
+    const radios = document.querySelectorAll('input[name="dispute_alleged_damage"]');
+    function sync() {
+      const selected = document.querySelector('input[name="dispute_alleged_damage"]:checked');
+      const isYes = selected && selected.value === '1';
+      detailBlock.classList.toggle('hidden', !isYes);
+    }
+    radios.forEach(function (r) { r.addEventListener('change', sync); });
+  })();
+
   // ---------- Auto-submit photo uploads when files are chosen ----------
   document.querySelectorAll('.hd-photo-upload').forEach(function (form) {
     const trigger = form.querySelector('.hd-photo-trigger');

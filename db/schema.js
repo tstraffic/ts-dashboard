@@ -5938,6 +5938,15 @@ function runMigrations(db) {
     console.log('Migration 129 applied: hire docket v2 fields + tables');
   }
 
+  // Migration 130: Hire docket dispute — link an allegation to a specific item
+  // so crews can pinpoint which item a supplier is disputing (rather than
+  // leaving the whole docket's dispute block ambiguous).
+  if (!isMigrationApplied.get(130)) {
+    try { db.exec("ALTER TABLE hire_dockets ADD COLUMN dispute_item_id INTEGER REFERENCES hire_docket_items(id) ON DELETE SET NULL"); } catch (e) { /* column may exist */ }
+    recordMigration.run(130, 'Hire docket dispute_item_id column');
+    console.log('Migration 130 applied: hire_dockets.dispute_item_id');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

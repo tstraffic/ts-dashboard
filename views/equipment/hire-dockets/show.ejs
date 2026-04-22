@@ -290,43 +290,64 @@
   </section>
 
   <!-- ========== 6. DISPUTE & DISCREPANCY ========== -->
-  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+  <%
+    // Decide whether to expand the dispute detail fields. Open if any
+    // dispute field is populated OR if we're rendering for print (so
+    // print still shows the section when there's something worth seeing).
+    const disputeActive = !!(docket.dispute_alleged_damage || docket.dispute_details || docket.dispute_item_id || docket.dispute_est_value);
+  %>
+  <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden <%= (!disputeActive && !print) ? 'print:hidden' : '' %>">
     <header class="bg-gradient-to-r from-[#1f476b] to-[#2a5d8e] px-4 py-2.5 flex items-center justify-between">
       <h2 class="text-sm font-bold text-white tracking-wide">Drop-Off Dispute &amp; Discrepancy</h2>
       <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-red-500 text-white">Disputes</span>
     </header>
     <div class="p-4 sm:p-5 space-y-4">
-      <p class="text-xs text-gray-500">Fill only if supplier has raised anything at return. Capture it now — your record beats their recollection.</p>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label class="hd-label">Supplier alleged new damage?</label>
-          <%- include('partials/yn', { name: 'dispute_alleged_damage', value: docket.dispute_alleged_damage ? '1' : '', withNa: false }) %>
-        </div>
-        <div>
-          <label class="hd-label">Photos taken by both parties?</label>
-          <%- include('partials/yn', { name: 'dispute_photos_both_parties', value: docket.dispute_photos_both_parties ? '1' : '', withNa: false }) %>
-        </div>
-        <div>
-          <label class="hd-label">Dispute raised immediately?</label>
-          <%- include('partials/yn', { name: 'dispute_raised_immediately', value: docket.dispute_raised_immediately ? '1' : '', withNa: false }) %>
-        </div>
+      <p class="text-xs text-gray-500">Only flag "Yes" if the supplier has raised something at return. When No, the detail fields stay collapsed and don't get printed.</p>
+      <div class="flex items-center gap-3 flex-wrap">
+        <label class="hd-label mb-0">Was a dispute raised?</label>
+        <%- include('partials/yn', { name: 'dispute_alleged_damage', value: docket.dispute_alleged_damage ? '1' : '', withNa: false }) %>
       </div>
-      <div>
-        <label class="hd-label">Details of alleged damage / discrepancy</label>
-        <textarea name="dispute_details" rows="3" class="hd-input resize-y"><%= docket.dispute_details || '' %></textarea>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label class="hd-label">Internal person notified</label>
-          <input type="text" name="dispute_internal_notified" value="<%= docket.dispute_internal_notified || '' %>" placeholder="Name + time" class="hd-input">
+      <div class="hd-dispute-details <%= disputeActive ? '' : 'hidden' %> space-y-4 border-t border-gray-100 pt-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="hd-label">Item affected</label>
+            <select name="dispute_item_id" class="hd-input">
+              <option value="">— Whole docket / unspecified —</option>
+              <% items.forEach((it, idx) => { %>
+                <option value="<%= it.id %>" <%= String(docket.dispute_item_id) === String(it.id) ? 'selected' : '' %>>
+                  Item <%= idx + 1 %><%= it.equipment_type ? ' — ' + it.equipment_type : '' %><%= it.rego_serial ? ' (' + it.rego_serial + ')' : '' %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="hd-label">Photos taken by both parties?</label>
+              <%- include('partials/yn', { name: 'dispute_photos_both_parties', value: docket.dispute_photos_both_parties ? '1' : '', withNa: false }) %>
+            </div>
+            <div>
+              <label class="hd-label">Dispute raised immediately?</label>
+              <%- include('partials/yn', { name: 'dispute_raised_immediately', value: docket.dispute_raised_immediately ? '1' : '', withNa: false }) %>
+            </div>
+          </div>
         </div>
         <div>
-          <label class="hd-label">Est. dispute $ value</label>
-          <input type="number" step="0.01" min="0" name="dispute_est_value" value="<%= docket.dispute_est_value || '' %>" class="hd-input">
+          <label class="hd-label">Details of alleged damage / discrepancy</label>
+          <textarea name="dispute_details" rows="3" class="hd-input resize-y"><%= docket.dispute_details || '' %></textarea>
         </div>
-        <div>
-          <label class="hd-label">Next action</label>
-          <input type="text" name="dispute_next_action" value="<%= docket.dispute_next_action || '' %>" placeholder="e.g. Photo pack to insurer" class="hd-input">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="hd-label">Internal person notified</label>
+            <input type="text" name="dispute_internal_notified" value="<%= docket.dispute_internal_notified || '' %>" placeholder="Name + time" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Est. dispute $ value</label>
+            <input type="number" step="0.01" min="0" name="dispute_est_value" value="<%= docket.dispute_est_value || '' %>" class="hd-input">
+          </div>
+          <div>
+            <label class="hd-label">Next action</label>
+            <input type="text" name="dispute_next_action" value="<%= docket.dispute_next_action || '' %>" placeholder="e.g. Photo pack to insurer" class="hd-input">
+          </div>
         </div>
       </div>
     </div>

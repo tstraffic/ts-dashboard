@@ -365,6 +365,7 @@ router.post('/:id', (req, res) => {
       offhire_notified_by = ?, offhire_confirmed = ?,
       dispute_alleged_damage = ?, dispute_photos_both_parties = ?, dispute_raised_immediately = ?,
       dispute_details = ?, dispute_internal_notified = ?, dispute_est_value = ?, dispute_next_action = ?,
+      dispute_item_id = ?,
       status = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
@@ -383,6 +384,7 @@ router.post('/:id', (req, res) => {
     bool(b.offhire_confirmed === '1'),
     bool(b.dispute_alleged_damage === '1'), bool(b.dispute_photos_both_parties === '1'), bool(b.dispute_raised_immediately === '1'),
     trimOr(b.dispute_details), trimOr(b.dispute_internal_notified), num(b.dispute_est_value), trimOr(b.dispute_next_action),
+    int(b.dispute_item_id),
     status, docket.id,
   );
 
