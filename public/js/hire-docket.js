@@ -226,6 +226,44 @@
     });
   })();
 
+  // ---------- Pre-print blank-field guard ----------
+  // Intercept the Print link. If any of the docket's core fields (the ones
+  // marked data-print-required) are blank, confirm with the crew before
+  // opening the print view — offer to jump to the first blank instead.
+  (function () {
+    var link = document.querySelector('[data-print-check]');
+    if (!link) return;
+    link.addEventListener('click', function (e) {
+      var blanks = [];
+      document.querySelectorAll('[data-print-required]').forEach(function (el) {
+        // A field is "blank" if it has no value; radios are blank if no sibling
+        // in the same name-group is checked.
+        if (el.type === 'radio') {
+          var any = document.querySelector('input[name="' + CSS.escape(el.name) + '"]:checked');
+          if (!any) blanks.push(el);
+        } else {
+          if (!String(el.value || '').trim()) blanks.push(el);
+        }
+      });
+      if (blanks.length === 0) return; // let the default open-in-new-tab happen
+      e.preventDefault();
+      var names = blanks.slice(0, 4).map(function (f) {
+        var lbl = f.closest('div')?.querySelector('.hd-label');
+        return lbl ? lbl.textContent.replace('*', '').trim() : (f.name || 'field');
+      });
+      var suffix = blanks.length > 4 ? (' and ' + (blanks.length - 4) + ' more') : '';
+      var msg = blanks.length + ' core field' + (blanks.length === 1 ? ' is' : 's are') +
+        ' still blank: ' + names.join(', ') + suffix + '.\n\nPrint anyway, or cancel to jump to the first blank?';
+      if (confirm(msg)) {
+        // User chose Print anyway — open the print view manually.
+        window.open(link.href, '_blank');
+      } else {
+        blanks[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        blanks[0].focus();
+      }
+    });
+  })();
+
   // ---------- Auto-submit photo uploads when files are chosen ----------
   document.querySelectorAll('.hd-photo-upload').forEach(function (form) {
     const trigger = form.querySelector('.hd-photo-trigger');
