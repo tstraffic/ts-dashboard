@@ -267,6 +267,21 @@ router.post('/bulk-status', (req, res) => {
   // Log to diary before updating
   const items = db.prepare(`SELECT id, job_id, title, reference_number, item_type, item_types, status as old_status FROM compliance WHERE id IN (${placeholders})`).all(...ids);
   db.prepare(`UPDATE compliance SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`).run(status, ...ids);
+  // Sync linked tasks so approved/submitted plans close their assigned task
+  // instead of building up. Same status map as the single-edit handler.
+  try {
+    const statusMap = { not_started: 'not_started', started: 'in_progress', submitted: 'complete', approved: 'complete', rejected: 'not_started', expired: 'not_started' };
+    const taskStatus = statusMap[status] || 'not_started';
+    const today = new Date().toISOString().split('T')[0];
+    const completedDate = taskStatus === 'complete' ? today : null;
+    db.prepare(`
+      UPDATE tasks
+      SET status = ?, completed_date = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE compliance_id IN (${placeholders}) AND deleted_at IS NULL
+    `).run(taskStatus, completedDate, ...ids);
+  } catch (taskErr) {
+    console.error('[Compliance bulk-status] task sync failed:', taskErr.message);
+  }
   // Auto-log bulk status change to diary
   items.forEach(item => {
     if (item.job_id && item.old_status !== status) {
