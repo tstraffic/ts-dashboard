@@ -123,6 +123,18 @@ function loadItem(db, docketId, itemId) {
   return db.prepare('SELECT * FROM hire_docket_items WHERE id = ? AND docket_id = ?').get(itemId, docketId);
 }
 
+function loadSuppliers(db) {
+  try {
+    return db.prepare(`
+      SELECT id, name, contact_person, phone, pickup_address,
+        included_allowance, excess_charge, fuel_return_requirement,
+        cleaning_expectation, damage_liability_received, late_return_approved
+      FROM hire_suppliers
+      ORDER BY name COLLATE NOCASE ASC
+    `).all();
+  } catch (e) { return []; /* table may not exist yet on pre-131 DBs */ }
+}
+
 function groupPhotos(rows) {
   const grouped = { pickup: {}, dropoff: {} };
   rows.forEach(p => {
@@ -199,8 +211,24 @@ router.get('/new', (req, res) => {
     title: 'New Hire Docket',
     currentPage: 'equipment',
     jobs,
+    suppliers: loadSuppliers(db),
     today: new Date().toISOString().split('T')[0],
   });
+});
+
+// ==================================================
+// API — supplier profile JSON (must come before /:id so the "api" token
+// isn't captured as a docket id)
+// ==================================================
+router.get('/api/suppliers/:supplierId', (req, res) => {
+  const db = getDb();
+  try {
+    const row = db.prepare('SELECT * FROM hire_suppliers WHERE id = ?').get(req.params.supplierId);
+    if (!row) return res.status(404).json({ error: 'Supplier not found' });
+    res.json(row);
+  } catch (e) {
+    res.status(500).json({ error: 'Supplier lookup failed' });
+  }
 });
 
 // ==================================================
@@ -332,6 +360,7 @@ router.get('/:id', (req, res) => {
     fuelLevels: FUEL_LEVELS,
     fuelLabels: FUEL_LABELS,
     getPowerKind,
+    suppliers: loadSuppliers(db),
     offhireMethods: OFFHIRE_METHODS,
     offhireMethodLabels: OFFHIRE_METHOD_LABELS,
     canReconcile: isAdminRole(req.session.user),
@@ -820,6 +849,74 @@ router.get('/:id/attachments/:attId', (req, res) => {
   const fp = path.join(docketUploadRoot(docket.id), 'attachments', att.file_path);
   if (!fs.existsSync(fp)) return res.sendStatus(404);
   res.download(fp, att.original_name || att.file_path);
+});
+
+// ==================================================
+// SUPPLIER PROFILES (save / upsert from a docket's supplier fields)
+// ==================================================
+
+// Upsert a hire_suppliers row from the docket's current supplier + commercial
+// terms fields. Matching is by case-insensitive name — so hitting "Save
+// supplier" twice on the same supplier updates the row instead of dupe-ing.
+router.post('/:id/save-supplier', (req, res) => {
+  const db = getDb();
+  const docket = loadDocket(db, req.params.id);
+  if (!docket) { req.flash('error', 'Hire docket not found.'); return res.redirect('/equipment/hire-dockets'); }
+  // Prefer form values from the current request (so clicking Save Supplier
+  // captures whatever the user just typed into the supplier fields). Fall
+  // back to the stored docket values when the field wasn't posted — that way
+  // the button works whether or not the docket was saved first.
+  const b = req.body || {};
+  const pick = (formKey, docketKey) => {
+    const v = formKey in b ? b[formKey] : docket[docketKey || formKey];
+    return trimOr(v);
+  };
+  const name = pick('supplier_name');
+  if (!name) {
+    req.flash('error', 'Supplier name is blank — fill it in on the docket first.');
+    return res.redirect(`/equipment/hire-dockets/${docket.id}`);
+  }
+  let existing = null;
+  try {
+    existing = db.prepare('SELECT id FROM hire_suppliers WHERE name = ? COLLATE NOCASE LIMIT 1').get(name);
+  } catch (e) { /* table may not exist — will fail on insert too */ }
+  const values = [
+    pick('supplier_contact'),
+    pick('supplier_phone'),
+    pick('pickup_address'),
+    pick('included_allowance'),
+    pick('excess_charge'),
+    pick('fuel_return_requirement'),
+    pick('cleaning_expectation'),
+    bool(('damage_liability_received' in b) ? (b.damage_liability_received === '1') : docket.damage_liability_received),
+    yesNoNa(('late_return_approved' in b) ? b.late_return_approved : docket.late_return_approved),
+  ];
+  try {
+    if (existing) {
+      db.prepare(`
+        UPDATE hire_suppliers SET
+          contact_person=?, phone=?, pickup_address=?,
+          included_allowance=?, excess_charge=?, fuel_return_requirement=?,
+          cleaning_expectation=?, damage_liability_received=?, late_return_approved=?,
+          updated_at=CURRENT_TIMESTAMP
+        WHERE id=?
+      `).run(...values, existing.id);
+      req.flash('success', `Supplier "${name}" updated in profile — future dockets can pre-fill from it.`);
+    } else {
+      db.prepare(`
+        INSERT INTO hire_suppliers (
+          name, contact_person, phone, pickup_address,
+          included_allowance, excess_charge, fuel_return_requirement,
+          cleaning_expectation, damage_liability_received, late_return_approved,
+          created_by_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(name, ...values, req.session.user.id);
+      req.flash('success', `Supplier "${name}" saved — future dockets can pre-fill from it.`);
+    }
+  } catch (e) {
+    req.flash('error', 'Could not save supplier profile: ' + e.message);
+  }
+  res.redirect(`/equipment/hire-dockets/${docket.id}`);
 });
 
 // ==================================================

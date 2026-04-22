@@ -67,7 +67,22 @@
       <h2 class="text-sm font-bold text-white tracking-wide">Supplier</h2>
       <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-400 text-amber-900">Hire source</span>
     </header>
-    <div class="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="p-4 sm:p-5 space-y-4">
+      <% if (typeof suppliers !== 'undefined' && suppliers.length > 0) { %>
+        <div class="flex flex-wrap items-end gap-3 bg-brand-50 border border-brand-200 rounded-lg p-3">
+          <div class="flex-1 min-w-[200px]">
+            <label class="hd-label">Load from saved supplier</label>
+            <select id="hd-supplier-load" class="hd-input">
+              <option value="">— pick a saved supplier to pre-fill —</option>
+              <% suppliers.forEach(function(s) { %>
+                <option value="<%= s.id %>"><%= s.name %><%= s.contact_person ? ' · ' + s.contact_person : '' %></option>
+              <% }) %>
+            </select>
+          </div>
+          <p class="text-[11px] text-brand-900/70 flex-1 min-w-[160px]">Pre-fills Supplier + Commercial Terms. Commercial terms become editable once the docket is created.</p>
+        </div>
+      <% } %>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div>
         <label class="hd-label">Supplier name <span class="text-red-500">*</span></label>
         <input type="text" name="supplier_name" class="hd-input" required>
@@ -100,6 +115,7 @@
         <label class="hd-label">Hire end date <span class="text-gray-400 font-normal normal-case tracking-normal text-[11px]">(drives off-hire reminder)</span></label>
         <input type="date" name="hire_end_date" class="hd-input">
       </div>
+      </div><!-- /grid -->
     </div>
   </section>
 
@@ -129,6 +145,31 @@
         num.value = next;
       }
       lastLinked = next;
+    });
+  })();
+
+  // Pre-fill the supplier section from a saved supplier profile.
+  (function () {
+    var sel = document.getElementById('hd-supplier-load');
+    if (!sel) return;
+    var fieldMap = {
+      supplier_name: 'name',
+      supplier_contact: 'contact_person',
+      supplier_phone: 'phone',
+      pickup_address: 'pickup_address',
+    };
+    sel.addEventListener('change', function () {
+      var id = sel.value;
+      if (!id) return;
+      fetch('/equipment/hire-dockets/api/suppliers/' + encodeURIComponent(id), { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error('fetch failed'); return r.json(); })
+        .then(function (s) {
+          Object.keys(fieldMap).forEach(function (formName) {
+            var el = document.querySelector('[name="' + formName + '"]');
+            if (el) el.value = s[fieldMap[formName]] || '';
+          });
+        })
+        .catch(function () { alert('Could not load that supplier.'); });
     });
   })();
 </script>
