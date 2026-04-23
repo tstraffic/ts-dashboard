@@ -121,27 +121,36 @@ router.post('/users/:id/delete', (req, res) => {
   }
 
   try {
-    // Nullify foreign key references so delete doesn't fail
-    const refTables = [
-      { table: 'jobs', cols: ['project_manager_id', 'ops_supervisor_id', 'planning_owner_id', 'marketing_owner_id', 'accounts_owner_id', 'traffic_supervisor_id'] },
-      { table: 'tasks', cols: ['owner_id'] },
-      { table: 'timesheets', cols: ['approved_by_id'] },
-      { table: 'activity_log', cols: ['user_id'] },
-      { table: 'compliance', cols: ['internal_approver_id', 'assigned_to_id'] },
-      { table: 'communication_log', cols: ['logged_by_id'] },
-      { table: 'equipment_assignments', cols: ['assigned_by_id'] },
-      { table: 'invitations', cols: ['created_by_id'] },
-    ];
-    for (const ref of refTables) {
-      for (const col of ref.cols) {
-        try { db.prepare(`UPDATE ${ref.table} SET ${col} = NULL WHERE ${col} = ?`).run(req.params.id); } catch (e) { /* table/col may not exist */ }
+    // Dynamically discover every table with a foreign key pointing at users.
+    // For NO ACTION / RESTRICT FKs we NULL out the column so the DELETE can
+    // proceed; CASCADE / SET NULL columns are handled by SQLite itself.
+    // This replaces an old hard-coded list that missed most references —
+    // anything outside the list would block the DELETE with an FK error.
+    const tables = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    ).all();
+    for (const t of tables) {
+      let fks;
+      try { fks = db.prepare(`PRAGMA foreign_key_list('${t.name}')`).all(); } catch (e) { continue; }
+      for (const fk of fks) {
+        if (fk.table !== 'users') continue;
+        if (fk.on_delete === 'CASCADE' || fk.on_delete === 'SET NULL') continue; // DB handles it
+        try {
+          db.prepare(`UPDATE "${t.name}" SET "${fk.from}" = NULL WHERE "${fk.from}" = ?`).run(req.params.id);
+        } catch (e) {
+          console.warn(`[user-delete] could not null ${t.name}.${fk.from}:`, e.message);
+        }
       }
     }
+
+    // Clean up invitations — no FK declared but the rows are orphaned without the user.
+    try { db.prepare('DELETE FROM invitations WHERE target_id = ?').run(req.params.id); } catch (e) {}
 
     db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
     logActivity({ user: req.session.user, action: 'delete', entityType: 'user', entityId: targetUser.id, entityLabel: targetUser.full_name, details: 'Deleted user account', ip: req.ip });
     req.flash('success', `User ${targetUser.username} deleted.`);
   } catch (err) {
+    console.error('[user-delete] failed for id=' + req.params.id + ':', err);
     req.flash('error', `Failed to delete user: ${err.message}`);
   }
   res.redirect('/admin/users');
