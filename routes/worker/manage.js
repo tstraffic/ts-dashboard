@@ -8,6 +8,7 @@ const { getDb } = require('../../db/database');
 const { requireManager } = require('../../middleware/managerAuth');
 const { logActivity } = require('../../middleware/audit');
 const { hideKudos } = require('../../services/kudos');
+const { getWeather, geocodeAddress } = require('../../services/homeContext');
 
 function localIso(d) {
   const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0');
@@ -77,7 +78,7 @@ router.get('/manage', requireManager, (req, res) => {
 // ==========================================================
 // GET /w/manage/shifts — Full shift board for today
 // ==========================================================
-router.get('/manage/shifts', requireManager, (req, res) => {
+router.get('/manage/shifts', requireManager, async (req, res) => {
   const db = getDb();
   const dateParam = (req.query.date || '').match(/^\d{4}-\d{2}-\d{2}$/) ? req.query.date : localIso(new Date());
 
@@ -112,9 +113,23 @@ router.get('/manage/shifts', requireManager, (req, res) => {
     byJob.get(s.job_id).members.push(s);
   }
 
+  // Fetch weather for each site in parallel. Cached in-process for 1h so repeat loads
+  // of the manager board on the same day cost nothing extra.
+  const jobList = Array.from(byJob.values());
+  await Promise.all(jobList.map(async (j) => {
+    try {
+      const q = [j.suburb, j.site_address].filter(Boolean).join(', ');
+      if (!q) return;
+      const geo = await geocodeAddress(q);
+      if (!geo) return;
+      const w = await getWeather(geo.lat, geo.lng);
+      if (w) j.weather = w;
+    } catch (e) { /* weather is best-effort */ }
+  }));
+
   res.render('worker/manage-shifts', {
     title: 'All shifts', currentPage: 'manage',
-    date: dateParam, jobs: Array.from(byJob.values()),
+    date: dateParam, jobs: jobList,
     flash_success: req.flash('success'),
   });
 });

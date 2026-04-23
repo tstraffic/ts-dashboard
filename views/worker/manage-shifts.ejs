@@ -27,14 +27,28 @@
 
   <% jobs.forEach(function (job) { %>
     <div class="mg-job-block" style="margin-top: 10px;">
-      <div class="mg-job-head">
-        <p class="mg-job-client"><%= job.client %></p>
-        <p class="mg-job-meta">
-          <%= job.job_number %><% if (job.suburb) { %> · <%= job.suburb %><% } %>
-          <% if (job.supervisor) { %> · Supervisor: <%= job.supervisor %><% } %>
-          · <%= job.members.length %> on crew
-        </p>
+      <div class="mg-job-head" style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+        <div style="min-width: 0; flex: 1;">
+          <p class="mg-job-client"><%= job.client %></p>
+          <p class="mg-job-meta">
+            <%= job.job_number %><% if (job.suburb) { %> · <%= job.suburb %><% } %>
+            <% if (job.supervisor) { %> · Supervisor: <%= job.supervisor %><% } %>
+            · <%= job.members.length %> on crew
+          </p>
+        </div>
+        <% if (job.weather) { %>
+          <div style="flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; background: rgba(43,127,255,0.1); border: 1px solid rgba(43,127,255,0.2);">
+            <span style="font-size: 1.25rem; line-height: 1;"><%= job.weather.emoji %></span>
+            <div style="line-height: 1.1;">
+              <p style="font-size: 0.82rem; font-weight: 700; color: #fff;"><%= job.weather.temp %>°</p>
+              <p style="font-size: 0.6rem; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.03em;"><% if (job.weather.rain_chance >= 40) { %><%= job.weather.rain_chance %>% rain<% } else { %><%= job.weather.description %><% } %></p>
+            </div>
+          </div>
+        <% } %>
       </div>
+      <% if (job.weather && job.weather.rain_chance >= 40) { %>
+        <div style="margin: 0; padding: 8px 14px; background: rgba(245,158,11,0.1); border-top: 1px solid rgba(245,158,11,0.2); color: #FBBF24; font-size: 0.7rem; font-weight: 600;">⚠️ Wet weather PPE recommended — <%= job.weather.rain_chance %>% chance of rain</div>
+      <% } %>
       <div class="mg-list" style="padding: 10px;">
         <% job.members.forEach(function (m) { %>
           <div class="mg-row">

@@ -131,6 +131,7 @@ router.get('/home', async (req, res) => {
       if (geo) weather = await getWeather(geo.lat, geo.lng);
       if (weather) {
         weather.source = weatherSource;
+        weather.city = geo && geo.city ? geo.city : '';
         if (shiftForWeather) weather.forShift = shiftForWeather;
       }
     }

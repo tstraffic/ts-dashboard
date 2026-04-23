@@ -305,40 +305,18 @@ function buildStreaks(db, worker) {
 }
 
 // =========================================================
-// Weather — OpenWeatherMap (optional)
+// Weather — Open-Meteo (free, no API key)
+// https://open-meteo.com/en/docs  +  https://open-meteo.com/en/docs/geocoding-api
 // =========================================================
 const weatherCache = new Map(); // key → { expires, data }
 
-function getWeather(lat, lng) {
-  const key = (process.env.OPENWEATHER_KEY || '').trim();
-  if (!key) return Promise.resolve(null);
-  if (lat == null || lng == null) return Promise.resolve(null);
-  const cacheKey = `${lat.toFixed(2)}:${lng.toFixed(2)}`;
-  const cached = weatherCache.get(cacheKey);
-  if (cached && cached.expires > Date.now()) return Promise.resolve(cached.data);
-
-  const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&units=metric&appid=${key}`;
+function fetchJson(url, timeoutMs = 3500) {
   return new Promise(resolve => {
-    const req = https.get(url, { timeout: 3000 }, res => {
+    const req = https.get(url, { timeout: timeoutMs }, res => {
       let body = '';
       res.on('data', c => { body += c; });
       res.on('end', () => {
-        try {
-          const j = JSON.parse(body);
-          const out = {
-            temp: Math.round(j.main?.temp),
-            feels_like: Math.round(j.main?.feels_like),
-            condition: j.weather?.[0]?.main || '',
-            description: j.weather?.[0]?.description || '',
-            icon: j.weather?.[0]?.icon || '',
-            wind_kmh: Math.round((j.wind?.speed || 0) * 3.6),
-            rain_chance: j.rain ? Math.min(100, Math.round((j.rain['1h'] || 0) * 20)) : 0,
-            uv: null, // free tier lacks UV; upgrade endpoint to include
-            city: j.name || '',
-          };
-          weatherCache.set(cacheKey, { expires: Date.now() + 3600 * 1000, data: out });
-          resolve(out);
-        } catch (e) { resolve(null); }
+        try { resolve(JSON.parse(body)); } catch (e) { resolve(null); }
       });
     });
     req.on('error', () => resolve(null));
@@ -346,31 +324,99 @@ function getWeather(lat, lng) {
   });
 }
 
-// Attempt to geocode a suburb/address for weather using OpenWeatherMap geocoding
-function geocodeAddress(q) {
-  const key = (process.env.OPENWEATHER_KEY || '').trim();
-  if (!key || !q) return Promise.resolve(null);
+// WMO weather codes → friendly label + emoji icon
+// Full table: https://open-meteo.com/en/docs#weathervariables
+function describeWmo(code) {
+  const map = {
+    0: ['Clear sky', '☀️'],
+    1: ['Mostly sunny', '🌤️'],
+    2: ['Partly cloudy', '⛅'],
+    3: ['Overcast', '☁️'],
+    45: ['Fog', '🌫️'], 48: ['Fog', '🌫️'],
+    51: ['Light drizzle', '🌦️'], 53: ['Drizzle', '🌦️'], 55: ['Heavy drizzle', '🌧️'],
+    56: ['Freezing drizzle', '🌧️'], 57: ['Freezing drizzle', '🌧️'],
+    61: ['Light rain', '🌦️'], 63: ['Rain', '🌧️'], 65: ['Heavy rain', '🌧️'],
+    66: ['Freezing rain', '🌧️'], 67: ['Freezing rain', '🌧️'],
+    71: ['Light snow', '🌨️'], 73: ['Snow', '🌨️'], 75: ['Heavy snow', '❄️'],
+    77: ['Snow grains', '❄️'],
+    80: ['Light showers', '🌦️'], 81: ['Showers', '🌧️'], 82: ['Heavy showers', '⛈️'],
+    85: ['Snow showers', '🌨️'], 86: ['Snow showers', '🌨️'],
+    95: ['Thunderstorm', '⛈️'], 96: ['Thunderstorm w/ hail', '⛈️'], 99: ['Thunderstorm w/ hail', '⛈️'],
+  };
+  return map[code] || ['—', '🌡️'];
+}
+
+async function getWeather(lat, lng) {
+  if (lat == null || lng == null) return null;
+  const cacheKey = `wx:${(+lat).toFixed(2)}:${(+lng).toFixed(2)}`;
+  const cached = weatherCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) return cached.data;
+
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+    `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation,relative_humidity_2m` +
+    `&daily=precipitation_probability_max,uv_index_max,temperature_2m_max,temperature_2m_min` +
+    `&timezone=Australia%2FSydney`;
+  const j = await fetchJson(url);
+  if (!j || !j.current) return null;
+  const [desc, emoji] = describeWmo(j.current.weather_code);
+  const out = {
+    temp: Math.round(j.current.temperature_2m),
+    feels_like: Math.round(j.current.apparent_temperature),
+    description: desc,
+    condition: desc,
+    emoji,
+    wind_kmh: Math.round(j.current.wind_speed_10m || 0),
+    rain_chance: (j.daily && j.daily.precipitation_probability_max) ? (j.daily.precipitation_probability_max[0] || 0) : 0,
+    uv: (j.daily && j.daily.uv_index_max) ? Math.round((j.daily.uv_index_max[0] || 0) * 10) / 10 : null,
+    hi: (j.daily && j.daily.temperature_2m_max) ? Math.round(j.daily.temperature_2m_max[0]) : null,
+    lo: (j.daily && j.daily.temperature_2m_min) ? Math.round(j.daily.temperature_2m_min[0]) : null,
+    humidity: j.current.relative_humidity_2m != null ? Math.round(j.current.relative_humidity_2m) : null,
+    icon: '', // kept for back-compat with any view that used OpenWeatherMap icon URL
+  };
+  weatherCache.set(cacheKey, { expires: Date.now() + 3600 * 1000, data: out });
+  return out;
+}
+
+// Strip Australian state suffixes and postcodes — Open-Meteo's geocoder expects
+// just the locality name and returns zero results for things like "Villawood NSW".
+function normaliseAuQuery(q) {
+  return String(q || '')
+    .replace(/\b(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\b/gi, '')
+    .replace(/\b\d{4}\b/g, '')  // postcodes
+    .replace(/,\s*,/g, ',')
+    .replace(/^,|,$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Geocode a suburb/address using Open-Meteo's free geocoding API.
+// Falls back through comma-separated parts so we still match on just the suburb
+// when a full address doesn't geocode cleanly.
+async function geocodeAddress(q) {
+  if (!q) return null;
   const cacheKey = `geo:${q}`;
   const cached = weatherCache.get(cacheKey);
-  if (cached && cached.expires > Date.now()) return Promise.resolve(cached.data);
-  const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(q + ',AU')}&limit=1&appid=${key}`;
-  return new Promise(resolve => {
-    https.get(url, { timeout: 3000 }, res => {
-      let body = '';
-      res.on('data', c => { body += c; });
-      res.on('end', () => {
-        try {
-          const arr = JSON.parse(body);
-          if (Array.isArray(arr) && arr[0]) {
-            const out = { lat: arr[0].lat, lng: arr[0].lon };
-            weatherCache.set(cacheKey, { expires: Date.now() + 24 * 3600 * 1000, data: out });
-            return resolve(out);
-          }
-          resolve(null);
-        } catch (e) { resolve(null); }
-      });
-    }).on('error', () => resolve(null));
-  });
+  if (cached && cached.expires > Date.now()) return cached.data;
+
+  const cleaned = normaliseAuQuery(q);
+  const candidates = [cleaned];
+  // If the cleaned query has multiple parts, try each suffix from the right (usually suburb)
+  const parts = cleaned.split(',').map(p => p.trim()).filter(Boolean);
+  for (let i = 1; i < parts.length; i++) candidates.push(parts.slice(i).join(', '));
+  if (parts.length) candidates.push(parts[parts.length - 1]);
+
+  for (const cand of candidates) {
+    if (!cand) continue;
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cand)}&country=AU&count=1&language=en&format=json`;
+    const j = await fetchJson(url);
+    if (j && Array.isArray(j.results) && j.results[0]) {
+      const r = j.results[0];
+      const out = { lat: r.latitude, lng: r.longitude, city: r.name };
+      weatherCache.set(cacheKey, { expires: Date.now() + 24 * 3600 * 1000, data: out });
+      return out;
+    }
+  }
+  return null;
 }
 
 // =========================================================

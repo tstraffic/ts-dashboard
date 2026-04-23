@@ -314,12 +314,14 @@
 <% if (section === 'weather' && !hidden.includes('weather') && weather) { %>
   <div class="wh-section-head"><span class="wh-section-title"><%= weather.source === 'depot' ? 'Weather at the depot' : 'Weather at next site' %><% if (weather.city) { %> · <%= weather.city %><% } %></span></div>
   <div class="wh-weather">
-    <% const iconUrl = weather.icon ? 'https://openweathermap.org/img/wn/' + weather.icon + '@2x.png' : ''; %>
-    <% if (iconUrl) { %><img src="<%= iconUrl %>" alt="" style="width: 64px; height: 64px;"><% } %>
+    <div style="font-size: 2.6rem; line-height: 1; flex-shrink: 0;"><%= weather.emoji || '🌡️' %></div>
     <div class="wh-weather-meta">
       <div class="flex items-baseline gap-1"><span class="wh-weather-temp"><%= weather.temp %>°</span><span class="text-xs text-white/50 ml-1">feels <%= weather.feels_like %>°</span></div>
-      <p class="wh-weather-desc"><%= weather.description || weather.condition %></p>
-      <p class="wh-weather-sub">Wind <%= weather.wind_kmh %> km/h<% if (weather.rain_chance) { %> · <%= weather.rain_chance %>% rain<% } %></p>
+      <p class="wh-weather-desc"><%= weather.description %></p>
+      <p class="wh-weather-sub">
+        <% if (weather.hi != null && weather.lo != null) { %>H <%= weather.hi %>° · L <%= weather.lo %>° · <% } %>
+        Wind <%= weather.wind_kmh %> km/h<% if (weather.rain_chance) { %> · <%= weather.rain_chance %>% rain<% } %><% if (weather.uv != null) { %> · UV <%= weather.uv %><% } %>
+      </p>
     </div>
   </div>
   <% if (weather.rain_chance && weather.rain_chance >= 40) { %>
