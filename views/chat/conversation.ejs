@@ -88,10 +88,13 @@
           operations: 'bg-blue-50 text-blue-700',
           planning: 'bg-teal-50 text-teal-700',
           finance: 'bg-amber-50 text-amber-700',
+          marketing: 'bg-rose-50 text-rose-700',
+          hr: 'bg-indigo-50 text-indigo-700',
+          sales: 'bg-emerald-50 text-emerald-700',
           management: 'bg-purple-50 text-purple-700',
           accounts: 'bg-amber-50 text-amber-700'
         };
-        var roleAliases = { management: 'admin', accounts: 'finance', marketing: 'operations' };
+        var roleAliases = { management: 'admin', accounts: 'finance' };
         list.innerHTML = members.map(function(m) {
           var initials = m.full_name ? m.full_name.split(' ').map(function(n){ return n[0]; }).join('').substring(0,2).toUpperCase() : '?';
           var displayRole = roleAliases[m.role] || m.role || '';

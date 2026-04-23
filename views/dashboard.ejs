@@ -1,7 +1,7 @@
 <% locals.currentPage = 'dashboard' %>
 <%
   const role = userRole || 'admin';
-  const normalRole = { management: 'admin', accounts: 'finance', marketing: 'operations' }[role] || role;
+  const normalRole = { management: 'admin', accounts: 'finance' }[role] || role;
   const isOps = ['admin', 'operations'].includes(normalRole);
   const isPlanning = ['admin', 'planning'].includes(normalRole);
   const isFinance = ['admin', 'finance'].includes(normalRole);
