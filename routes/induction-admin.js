@@ -4,6 +4,75 @@ const path = require('path');
 const fs = require('fs');
 const { getDb } = require('../db/database');
 const { employeeGuideSlides, tcTrainingSlides } = require('../induction-slides');
+const { encrypt } = require('../services/encryption');
+
+// Copy the bank / super / TFN payroll data from an induction submission into
+// the three encrypted per-employee tables. Skips any table that already has a
+// row for this employee so we never overwrite something the worker has edited
+// in the portal. Returns an array describing what was seeded — useful for the
+// admin flash and the backfill migration.
+function seedPayrollFromSubmission(db, employeeId, submission) {
+  const seeded = [];
+  if (!employeeId || !submission) return seeded;
+
+  // Bank — BSB + account number encrypted; last-3 stored for UI hints
+  try {
+    const hasBank = db.prepare('SELECT 1 FROM bank_accounts WHERE employee_id = ?').get(employeeId);
+    const bsb = (submission.bank_bsb || '').replace(/\s|-/g, '');
+    const acct = (submission.bank_account_number || '').replace(/\s|-/g, '');
+    if (!hasBank && /^\d{6}$/.test(bsb) && /^\d{6,10}$/.test(acct)) {
+      db.prepare(`
+        INSERT INTO bank_accounts (employee_id, account_name, bsb_last3, account_last3,
+          bsb_encrypted, account_number_encrypted, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending')
+      `).run(
+        employeeId,
+        (submission.bank_account_name || submission.full_name || '').trim(),
+        bsb.slice(-3),
+        acct.slice(-3),
+        encrypt(bsb),
+        encrypt(acct),
+      );
+      seeded.push('bank');
+    }
+  } catch (e) { console.log('[seedPayroll] bank skipped:', e.message); }
+
+  // Super — fund name, USI, member number, ABN
+  try {
+    const hasSuper = db.prepare('SELECT 1 FROM super_funds WHERE employee_id = ?').get(employeeId);
+    const hasAny = (submission.super_fund_name || submission.super_usi || submission.super_member_number || submission.super_fund_abn);
+    if (!hasSuper && hasAny) {
+      db.prepare(`
+        INSERT INTO super_funds (employee_id, fund_name, usi, member_number, fund_abn, use_default, status)
+        VALUES (?, ?, ?, ?, ?, 0, 'pending')
+      `).run(
+        employeeId,
+        (submission.super_fund_name || '').trim(),
+        (submission.super_usi || '').trim(),
+        (submission.super_member_number || '').trim(),
+        (submission.super_fund_abn || '').replace(/\s/g, '').trim(),
+      );
+      seeded.push('super');
+    }
+  } catch (e) { console.log('[seedPayroll] super skipped:', e.message); }
+
+  // TFN — encrypted; last-3 stored for UI hints
+  try {
+    const hasTfn = db.prepare('SELECT 1 FROM tfn_declarations WHERE employee_id = ?').get(employeeId);
+    const tfn = (submission.tax_file_number || '').replace(/\D/g, '');
+    if (!hasTfn && /^\d{9}$/.test(tfn)) {
+      db.prepare(`
+        INSERT INTO tfn_declarations (employee_id, tfn_encrypted, tfn_last3,
+          residency_status, claim_threshold, has_help_debt, has_stsl_debt,
+          medicare_variation, submitted_at, status)
+        VALUES (?, ?, ?, 'resident', 1, 0, 0, 'none', datetime('now'), 'pending')
+      `).run(employeeId, encrypt(tfn), tfn.slice(-3));
+      seeded.push('tfn');
+    }
+  } catch (e) { console.log('[seedPayroll] tfn skipped:', e.message); }
+
+  return seeded;
+}
 
 // Allocate a unique EMP-XXX code based on the largest numeric suffix actually
 // in crew_members (ignoring non-numeric codes like EMP-TEST) and verify
@@ -168,7 +237,7 @@ router.post('/submissions/:id/status', (req, res) => {
         s.payment_type || '',
         s.email || '', s.phone || '', s.address || '', s.suburb || '', s.state || '', s.postcode || '',
         s.date_of_birth || null, crewMemberId,
-        `Auto-created from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''} AccName: ${s.bank_account_name || ''}`,
+        `Auto-created from induction #${s.id}. Payroll details (bank/super/TFN) stored in the encrypted payroll tables — review at /hr/secure-queue.`,
         s.white_card_number || '', s.tc_licence_number || '', s.tc_licence_state || '', s.tc_licence_date_of_issue || '', s.drivers_licence_number || '',
         s.emergency_contact_name || '', s.emergency_contact_phone || '', s.emergency_contact_relationship || ''
       );
@@ -176,6 +245,14 @@ router.post('/submissions/:id/status', (req, res) => {
       // 3. Get the new employee record ID
       const newEmployee = db.prepare("SELECT id FROM employees WHERE employee_code = ?").get(employeeId);
       const newEmpId = newEmployee ? newEmployee.id : null;
+
+      // 3a. Seed the encrypted payroll tables (bank, super, TFN) from the induction form
+      if (newEmpId) {
+        try {
+          const seeded = seedPayrollFromSubmission(db, newEmpId, s);
+          if (seeded.length) console.log(`Induction #${s.id}: seeded payroll tables: ${seeded.join(', ')}`);
+        } catch (e) { console.error('Seed payroll from induction failed:', e.message); }
+      }
 
       // 4. Auto-create employee documents from induction uploads
       if (newEmpId) {
@@ -286,13 +363,22 @@ router.post('/submissions/:id/convert', (req, res) => {
     `).run(employeeId, firstName, middleName, lastName, fullName, employmentType, s.payment_type || '',
       s.email || '', s.phone || '', s.address || '', s.suburb || '', s.state || '', s.postcode || '',
       s.date_of_birth || null, crewMemberId,
-      `Converted from induction #${s.id}. Payment: ${s.payment_type}. Bank: ${s.bank_name || ''} BSB: ${s.bank_bsb || ''} Acc: ${s.bank_account_number || ''}`,
+      `Converted from induction #${s.id}. Payroll details (bank/super/TFN) stored in the encrypted payroll tables — review at /hr/secure-queue.`,
       s.white_card_number || '', s.tc_licence_number || '', s.tc_licence_state || '', s.tc_licence_date_of_issue || '', s.drivers_licence_number || '',
       s.emergency_contact_name || '', s.emergency_contact_phone || '', s.emergency_contact_relationship || '');
 
     // Auto-create employee documents from induction uploads
     const newEmployee = db.prepare("SELECT id FROM employees WHERE employee_code = ?").get(employeeId);
     const newEmpId = newEmployee ? newEmployee.id : null;
+
+    // Seed encrypted payroll tables (bank, super, TFN) from the induction form
+    if (newEmpId) {
+      try {
+        const seeded = seedPayrollFromSubmission(db, newEmpId, s);
+        if (seeded.length) console.log(`Induction #${s.id} (manual convert): seeded payroll tables: ${seeded.join(', ')}`);
+      } catch (e) { console.error('Seed payroll (manual convert) failed:', e.message); }
+    }
+
     if (newEmpId) {
       const inductionUploadsDir = path.resolve(__dirname, '..', 'data', 'uploads', 'inductions');
       const hrUploadsBase = path.resolve(__dirname, '..', 'data', 'uploads', 'hr');

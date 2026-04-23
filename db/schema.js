@@ -5707,8 +5707,10 @@ function runMigrations(db) {
     console.log('Migration 117 applied: profile + emergency contacts schema');
   }
 
-  // Migration 126: Equipment hire dockets — multi-item pick-up / drop-off checklists
-  if (!isMigrationApplied.get(126)) {
+  // Migration 135: Equipment hire dockets — multi-item pick-up / drop-off checklists
+  // (Was originally numbered 126 but collided with the payslips migration that
+  //  shipped first and locked the 126 slot on prod — renumbered so this runs.)
+  if (!isMigrationApplied.get(135)) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS hire_dockets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5780,7 +5782,7 @@ function runMigrations(db) {
     try { db.exec("CREATE INDEX IF NOT EXISTS idx_hire_docket_items_docket ON hire_docket_items(docket_id)"); } catch (e) {}
     try { db.exec("CREATE INDEX IF NOT EXISTS idx_hire_dockets_status ON hire_dockets(status)"); } catch (e) {}
     try { db.exec("CREATE INDEX IF NOT EXISTS idx_hire_dockets_job ON hire_dockets(job_id)"); } catch (e) {}
-    recordMigration.run(126, 'Equipment hire dockets: multi-item pick-up / drop-off checklists');
+    recordMigration.run(135, 'Equipment hire dockets: multi-item pick-up / drop-off checklists');
     console.log('Migration 126 applied: hire_dockets + hire_docket_items');
   }
 
@@ -6176,6 +6178,86 @@ function runMigrations(db) {
 
     recordMigration.run(134, 'Marketing internal-workflow tables (tasks, approvals, activity) + seed');
     console.log('Migration 134 applied.');
+  }
+
+  // Migration 136: Backfill bank / super / TFN secure rows for already-accepted inductees.
+  // The original induction→employee conversion dumped bank details into employees.internal_notes
+  // as plaintext and never seeded the encrypted payroll tables. For every submission with
+  // linked_crew_member_id set, this walks the data into bank_accounts, super_funds and
+  // tfn_declarations (skipping any employee who already has a record there), then scrubs the
+  // plaintext bank leak from internal_notes.
+  if (!isMigrationApplied.get(136)) {
+    try {
+      const { encrypt } = require('../services/encryption');
+
+      const submissions = db.prepare(`
+        SELECT s.*, e.id as emp_id
+        FROM induction_submissions s
+        JOIN employees e ON e.linked_crew_member_id = s.linked_crew_member_id
+        WHERE s.linked_crew_member_id IS NOT NULL
+      `).all();
+
+      const hasBank = db.prepare('SELECT 1 FROM bank_accounts WHERE employee_id = ?');
+      const hasSuper = db.prepare('SELECT 1 FROM super_funds WHERE employee_id = ?');
+      const hasTfn = db.prepare('SELECT 1 FROM tfn_declarations WHERE employee_id = ?');
+      const insertBank = db.prepare(`
+        INSERT INTO bank_accounts (employee_id, account_name, bsb_last3, account_last3,
+          bsb_encrypted, account_number_encrypted, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending')
+      `);
+      const insertSuper = db.prepare(`
+        INSERT INTO super_funds (employee_id, fund_name, usi, member_number, fund_abn, use_default, status)
+        VALUES (?, ?, ?, ?, ?, 0, 'pending')
+      `);
+      const insertTfn = db.prepare(`
+        INSERT INTO tfn_declarations (employee_id, tfn_encrypted, tfn_last3,
+          residency_status, claim_threshold, has_help_debt, has_stsl_debt,
+          medicare_variation, submitted_at, status)
+        VALUES (?, ?, ?, 'resident', 1, 0, 0, 'none', datetime('now'), 'pending')
+      `);
+      const scrubNotes = db.prepare(`
+        UPDATE employees SET internal_notes = ? WHERE id = ? AND internal_notes LIKE '%Bank:%BSB:%'
+      `);
+
+      let banks = 0, supers = 0, tfns = 0, scrubbed = 0;
+      for (const s of submissions) {
+        try {
+          const empId = s.emp_id;
+          if (!empId) continue;
+
+          const bsb = (s.bank_bsb || '').replace(/\s|-/g, '');
+          const acct = (s.bank_account_number || '').replace(/\s|-/g, '');
+          if (!hasBank.get(empId) && /^\d{6}$/.test(bsb) && /^\d{6,10}$/.test(acct)) {
+            insertBank.run(empId, (s.bank_account_name || s.full_name || '').trim(), bsb.slice(-3), acct.slice(-3), encrypt(bsb), encrypt(acct));
+            banks++;
+          }
+
+          const hasAnySuper = (s.super_fund_name || s.super_usi || s.super_member_number || s.super_fund_abn);
+          if (!hasSuper.get(empId) && hasAnySuper) {
+            insertSuper.run(empId, (s.super_fund_name || '').trim(), (s.super_usi || '').trim(), (s.super_member_number || '').trim(), (s.super_fund_abn || '').replace(/\s/g, '').trim());
+            supers++;
+          }
+
+          const tfn = (s.tax_file_number || '').replace(/\D/g, '');
+          if (!hasTfn.get(empId) && /^\d{9}$/.test(tfn)) {
+            insertTfn.run(empId, encrypt(tfn), tfn.slice(-3));
+            tfns++;
+          }
+
+          // Scrub plaintext bank leak from internal_notes
+          const note = `Auto-created from induction #${s.id}. Payroll details (bank/super/TFN) stored in the encrypted payroll tables — review at /hr/secure-queue.`;
+          const result = scrubNotes.run(note, empId);
+          if (result.changes) scrubbed++;
+        } catch (inner) {
+          console.log('[mig 136] skipped submission', s.id, inner.message);
+        }
+      }
+      console.log(`Migration 136: backfilled ${banks} banks, ${supers} supers, ${tfns} TFNs; scrubbed notes on ${scrubbed} employees`);
+    } catch (e) {
+      console.error('Migration 136 error:', e.message);
+    }
+    recordMigration.run(136, 'Backfill bank/super/TFN from induction_submissions for already-accepted inductees');
+    console.log('Migration 136 applied');
   }
 
   console.log('All migrations checked/applied.');
