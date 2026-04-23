@@ -137,18 +137,22 @@ router.get('/api/next-ref', (req, res) => {
   };
   const prefix = prefixMap[type] || 'TSREF';
 
-  // Lowest unused number starting at 3001 — fills gaps left by deleted items
-  // so the sequence stays contiguous rather than growing forever.
+  // Next number after the current maximum. Monotonically increasing —
+  // never re-issues a number, even if earlier ones were deleted, so
+  // historical references stay stable and nothing ever jumps backwards.
+  // Seeds at 3001 if there's nothing for this prefix yet.
   const rows = db.prepare("SELECT reference_number FROM compliance WHERE reference_number LIKE ? || '%'").all(prefix);
   const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const tailRe = new RegExp('^' + escaped + '(\\d+)$');
-  const used = new Set();
+  const tailRe = new RegExp('^' + escaped + '(\\d+)(?:-\\d+)?$');
+  let max = 3000;
   rows.forEach(r => {
     const match = r.reference_number.match(tailRe);
-    if (match) used.add(parseInt(match[1], 10));
+    if (match) {
+      const n = parseInt(match[1], 10);
+      if (n > max) max = n;
+    }
   });
-  let next = 3001;
-  while (used.has(next)) next++;
+  const next = max + 1;
 
   res.json({ reference_number: prefix + next });
 });
