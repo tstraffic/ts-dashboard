@@ -669,6 +669,121 @@
       </div>
     </div>
 
+    <% if (typeof canViewSensitive !== 'undefined' && canViewSensitive) { %>
+    <!-- Payroll Details: Bank, Super, TFN (encrypted at rest) -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mt-4">
+      <div class="flex items-center gap-2 mb-1">
+        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        <h3 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Payroll Details</h3>
+      </div>
+      <p class="text-xs text-gray-400 mb-4">Bank, super and TFN are encrypted at rest with AES-256-GCM. Saving here bypasses the worker-submission queue and writes a 'synced' record tagged with your user.</p>
+
+      <!-- BANK -->
+      <div class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr] gap-4 mb-4 pb-4 border-b border-gray-100">
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Bank account name</label>
+          <input type="text" name="bank_account_name" value="<%= (typeof latestBank !== 'undefined' && latestBank) ? (latestBank.account_name || '') : '' %>"
+            placeholder="Name on the account"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">BSB</label>
+          <input type="text" name="bank_bsb" inputmode="numeric" maxlength="7" pattern="\d{3}-?\d{3}"
+            placeholder="<%= (typeof latestBank !== 'undefined' && latestBank && latestBank.bsb_last3) ? '•••-••' + latestBank.bsb_last3 + ' (current)' : '062-000' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Account number</label>
+          <input type="text" name="bank_account_number" inputmode="numeric" maxlength="10" pattern="\d{6,10}"
+            placeholder="<%= (typeof latestBank !== 'undefined' && latestBank && latestBank.account_last3) ? '••••••' + latestBank.account_last3 + ' (current)' : '12345678' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div class="sm:col-span-3">
+          <p class="text-[11px] text-gray-500">
+            <% if (typeof latestBank !== 'undefined' && latestBank) { %>
+              On file: <span class="font-mono">BSB •••-••<%= latestBank.bsb_last3 %>, Acct ••••••<%= latestBank.account_last3 %></span>
+              <% if (latestBank.status === 'synced') { %><span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] bg-emerald-50 text-emerald-700">✓ Synced</span>
+              <% } else if (latestBank.status === 'pending') { %><span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] bg-amber-50 text-amber-700">⧗ Pending</span><% } %>
+              <span class="text-gray-400"> — leave BSB &amp; account blank to keep.</span>
+            <% } else { %>
+              No bank record on file yet.
+            <% } %>
+          </p>
+        </div>
+      </div>
+
+      <!-- SUPER -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 pb-4 border-b border-gray-100">
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Super fund</label>
+          <input type="text" name="super_fund_name" value="<%= (typeof latestSuper !== 'undefined' && latestSuper) ? (latestSuper.fund_name || '') : '' %>"
+            placeholder="e.g. AustralianSuper"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">USI</label>
+          <input type="text" name="super_usi" value="<%= (typeof latestSuper !== 'undefined' && latestSuper) ? (latestSuper.usi || '') : '' %>"
+            placeholder="AUS0100AU"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Member number</label>
+          <input type="text" name="super_member_number" value="<%= (typeof latestSuper !== 'undefined' && latestSuper) ? (latestSuper.member_number || '') : '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Fund ABN</label>
+          <input type="text" name="super_fund_abn" value="<%= (typeof latestSuper !== 'undefined' && latestSuper) ? (latestSuper.fund_abn || '') : '' %>"
+            inputmode="numeric" maxlength="14" placeholder="11 digits"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <% if (typeof latestSuper !== 'undefined' && latestSuper && latestSuper.status) { %>
+          <div class="sm:col-span-2 lg:col-span-4">
+            <p class="text-[11px] text-gray-500">Super record: <%= latestSuper.fund_name || '—' %>
+              <% if (latestSuper.status === 'synced') { %><span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] bg-emerald-50 text-emerald-700">✓ Synced</span>
+              <% } else if (latestSuper.status === 'pending') { %><span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] bg-amber-50 text-amber-700">⧗ Pending</span><% } %>
+            </p>
+          </div>
+        <% } %>
+      </div>
+
+      <!-- TFN -->
+      <div class="grid grid-cols-1 sm:grid-cols-[1.5fr_1fr_1fr] gap-4">
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TFN (9 digits)</label>
+          <input type="text" name="tfn_number" inputmode="numeric" maxlength="11" pattern="\d{3}\s?\d{3}\s?\d{3}"
+            placeholder="<%= (typeof latestTfn !== 'undefined' && latestTfn && latestTfn.tfn_last3) ? '••• ••• •••' + latestTfn.tfn_last3 + ' (current)' : '123 456 789' %>"
+            autocomplete="off"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <p class="text-[10px] text-gray-400 mt-1">Leave blank to keep the existing TFN.</p>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Residency status</label>
+          <select name="tfn_residency" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm">
+            <% const curRes = (typeof latestTfn !== 'undefined' && latestTfn) ? latestTfn.residency_status : 'resident'; %>
+            <option value="resident" <%= curRes === 'resident' ? 'selected' : '' %>>Australian resident</option>
+            <option value="foreign" <%= curRes === 'foreign' ? 'selected' : '' %>>Foreign resident</option>
+            <option value="working_holiday" <%= curRes === 'working_holiday' ? 'selected' : '' %>>Working holiday maker</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="tfn_claim_threshold" value="1" <%= (typeof latestTfn !== 'undefined' && latestTfn && latestTfn.claim_threshold) ? 'checked' : '' %> class="w-4 h-4 rounded text-brand-600">
+            Claims tax-free threshold
+          </label>
+        </div>
+        <% if (typeof latestTfn !== 'undefined' && latestTfn && latestTfn.tfn_last3) { %>
+          <div class="sm:col-span-3">
+            <p class="text-[11px] text-gray-500">On file: <span class="font-mono">TFN ••• ••• •••<%= latestTfn.tfn_last3 %></span>
+              <% if (latestTfn.status === 'synced') { %><span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] bg-emerald-50 text-emerald-700">✓ Synced</span>
+              <% } else if (latestTfn.status === 'pending') { %><span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] bg-amber-50 text-amber-700">⧗ Pending</span><% } %>
+            </p>
+          </div>
+        <% } %>
+      </div>
+    </div>
+    <% } %>
+
     <% if (typeof showRates !== 'undefined' && showRates) { %>
     <!-- Pay Rates (Admin / Finance only) -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mt-4">

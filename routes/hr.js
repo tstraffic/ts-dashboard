@@ -590,6 +590,14 @@ router.get('/employees/:id/edit', requirePermission('hr_employees'), (req, res) 
   const users = db.prepare('SELECT id, full_name, username FROM users WHERE active = 1 ORDER BY full_name').all();
   const settingsOptions = res.locals.settingsOptions || {};
 
+  // Latest payroll records (shown for admins who already see sensitive HR data)
+  let latestBank = null, latestSuper = null, latestTfn = null;
+  try {
+    latestBank = db.prepare('SELECT id, account_name, bsb_last3, account_last3, status, synced_at, updated_at FROM bank_accounts WHERE employee_id = ? ORDER BY id DESC LIMIT 1').get(employee.id);
+    latestSuper = db.prepare('SELECT id, fund_name, usi, member_number, fund_abn, status, synced_at, updated_at FROM super_funds WHERE employee_id = ? ORDER BY id DESC LIMIT 1').get(employee.id);
+    latestTfn = db.prepare('SELECT id, tfn_last3, residency_status, claim_threshold, has_help_debt, has_stsl_debt, medicare_variation, status, submitted_at FROM tfn_declarations WHERE employee_id = ? ORDER BY id DESC LIMIT 1').get(employee.id);
+  } catch (e) { /* tables may not exist on very old deploys */ }
+
   res.render('hr/employee-form', {
     title: 'Edit Employee: ' + employee.full_name,
     currentPage: 'hr-employees',
@@ -598,6 +606,7 @@ router.get('/employees/:id/edit', requirePermission('hr_employees'), (req, res) 
     crewMembers,
     users,
     settingsOptions,
+    latestBank, latestSuper, latestTfn,
     canViewSensitive: canViewSensitiveHR(req.session.user),
     showRates: canViewRates(req.session.user),
     user: req.session.user
@@ -689,6 +698,85 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
 
   try {
     db.prepare('UPDATE employees SET ' + sets.join(', ') + ' WHERE id = ?').run(...params);
+
+    // --- Payroll details (bank, super, TFN) ---
+    // Admin can edit these inline. We write into the encrypted payroll tables
+    // (not employees.internal_notes). Each change creates a new row tagged
+    // 'synced' with synced_by = the admin user, so history is preserved and
+    // the /hr/secure-queue doesn't raise them as pending.
+    if (canViewSensitiveHR(req.session.user)) {
+      try {
+        const { encrypt } = require('../services/encryption');
+        const employeeId = parseInt(req.params.id, 10);
+
+        // Bank: only act if the admin typed a new BSB/account number OR is updating the account name on an existing row
+        const bsb = (b.bank_bsb || '').replace(/\s|-/g, '').trim();
+        const acct = (b.bank_account_number || '').replace(/\s|-/g, '').trim();
+        const accName = (b.bank_account_name || '').trim();
+        if (/^\d{6}$/.test(bsb) && /^\d{6,10}$/.test(acct)) {
+          db.prepare(`
+            INSERT INTO bank_accounts (employee_id, account_name, bsb_last3, account_last3, bsb_encrypted, account_number_encrypted, status, synced_at, synced_by_id)
+            VALUES (?, ?, ?, ?, ?, ?, 'synced', datetime('now'), ?)
+          `).run(employeeId, accName, bsb.slice(-3), acct.slice(-3), encrypt(bsb), encrypt(acct), req.session.user.id);
+          logActivity({
+            user: req.session.user, action: 'update', entityType: 'bank_account',
+            entityId: employeeId, entityLabel: b.full_name || fullName,
+            details: `Admin updated bank (BSB •••${bsb.slice(-3)}, Acct •••${acct.slice(-3)}) from employee edit`,
+            ip: req.ip,
+          });
+        } else if (accName) {
+          // Name-only update on existing record
+          const existing = db.prepare('SELECT id FROM bank_accounts WHERE employee_id = ? ORDER BY id DESC LIMIT 1').get(employeeId);
+          if (existing) db.prepare("UPDATE bank_accounts SET account_name = ?, updated_at = datetime('now') WHERE id = ?").run(accName, existing.id);
+        }
+
+        // Super: update in place if any meaningful value changed, else insert fresh
+        const fundName = (b.super_fund_name || '').trim();
+        const superUsi = (b.super_usi || '').trim();
+        const superMember = (b.super_member_number || '').trim();
+        const superAbn = (b.super_fund_abn || '').replace(/\s/g, '').trim();
+        const hasAnySuper = fundName || superUsi || superMember || superAbn;
+        if (hasAnySuper) {
+          const existingSuper = db.prepare('SELECT * FROM super_funds WHERE employee_id = ? ORDER BY id DESC LIMIT 1').get(employeeId);
+          const changed = !existingSuper ||
+            existingSuper.fund_name !== fundName ||
+            existingSuper.usi !== superUsi ||
+            existingSuper.member_number !== superMember ||
+            existingSuper.fund_abn !== superAbn;
+          if (changed) {
+            db.prepare(`
+              INSERT INTO super_funds (employee_id, fund_name, usi, member_number, fund_abn, use_default, status, synced_at, synced_by_id)
+              VALUES (?, ?, ?, ?, ?, 0, 'synced', datetime('now'), ?)
+            `).run(employeeId, fundName, superUsi, superMember, superAbn, req.session.user.id);
+            logActivity({
+              user: req.session.user, action: 'update', entityType: 'super_fund',
+              entityId: employeeId, entityLabel: b.full_name || fullName,
+              details: `Admin updated super (${fundName || 'no fund name'}) from employee edit`,
+              ip: req.ip,
+            });
+          }
+        }
+
+        // TFN: only when admin types a new 9-digit value
+        const tfn = (b.tfn_number || '').replace(/\D/g, '');
+        if (/^\d{9}$/.test(tfn)) {
+          const residency = ['resident','foreign','working_holiday'].includes(b.tfn_residency) ? b.tfn_residency : 'resident';
+          db.prepare(`
+            INSERT INTO tfn_declarations (employee_id, tfn_encrypted, tfn_last3, residency_status, claim_threshold, has_help_debt, has_stsl_debt, medicare_variation, submitted_at, status, processed_at, processed_by_id)
+            VALUES (?, ?, ?, ?, ?, 0, 0, 'none', datetime('now'), 'synced', datetime('now'), ?)
+          `).run(employeeId, encrypt(tfn), tfn.slice(-3), residency, b.tfn_claim_threshold ? 1 : 0, req.session.user.id);
+          logActivity({
+            user: req.session.user, action: 'update', entityType: 'tfn_declaration',
+            entityId: employeeId, entityLabel: b.full_name || fullName,
+            details: `Admin set TFN (•••${tfn.slice(-3)}) from employee edit`,
+            ip: req.ip,
+          });
+        }
+      } catch (payrollErr) {
+        console.error('Payroll save error (non-fatal):', payrollErr.message);
+      }
+    }
+
     req.flash('success', 'Employee updated successfully.');
   } catch (err) {
     console.error('UPDATE employee error:', err.message, { id: req.params.id, setCount: sets.length, paramCount: params.length });
