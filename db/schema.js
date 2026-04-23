@@ -5133,6 +5133,40 @@ function runMigrations(db) {
     console.log('Migration 116 applied: shift_period on employee_leave');
   }
 
+  // Migration 126: Payslips
+  if (!isMigrationApplied.get(126)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS payslips (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        period_start DATE NOT NULL,
+        period_end DATE NOT NULL,
+        pay_date DATE NOT NULL,
+        gross_pay REAL DEFAULT 0,
+        tax_withheld REAL DEFAULT 0,
+        super_amount REAL DEFAULT 0,
+        net_pay REAL DEFAULT 0,
+        ytd_gross REAL DEFAULT 0,
+        ytd_tax REAL DEFAULT 0,
+        ytd_super REAL DEFAULT 0,
+        ytd_net REAL DEFAULT 0,
+        notes TEXT DEFAULT '',
+        pdf_filename TEXT,
+        pdf_original_name TEXT,
+        pdf_size INTEGER DEFAULT 0,
+        uploaded_by_id INTEGER REFERENCES users(id),
+        uploaded_at DATETIME DEFAULT (datetime('now')),
+        viewed_at DATETIME,
+        view_count INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(employee_id, period_start, period_end)
+      );
+      CREATE INDEX IF NOT EXISTS idx_payslips_employee ON payslips(employee_id, pay_date DESC);
+      CREATE INDEX IF NOT EXISTS idx_payslips_paydate ON payslips(pay_date DESC);
+    `);
+    recordMigration.run(126, 'Payslips table');
+    console.log('Migration 126 applied: payslips table');
+  }
+
   // Migration 125: Second-pass merge using first-name prefix match.
   // Migration 124 only caught exact full_name matches — but users.full_name on prod is
   // stored as just the first name ("Taj", "Saadat", "Savanah") while the canonical crew

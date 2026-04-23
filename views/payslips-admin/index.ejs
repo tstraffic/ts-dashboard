@@ -1,0 +1,127 @@
+<% locals.currentPage = 'payslips' %>
+<%
+  function money(n) { return '$' + (n || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtDate(s) { if (!s) return ''; return new Date(s + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }); }
+%>
+
+<div class="space-y-5">
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Payslips</h1>
+      <p class="text-sm text-gray-500 mt-1">Uploaded payroll runs. Workers see their own at <span class="font-mono text-xs">/w/hr/payslips</span>.</p>
+    </div>
+    <a href="/payroll/payslips/new" class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+      Upload payslip
+    </a>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1"><%= stats.total %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Last 30 days</p>
+      <p class="text-2xl font-bold text-emerald-600 mt-1"><%= stats.last30 %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-brand-500 uppercase tracking-widest">Net paid (90d)</p>
+      <p class="text-xl font-bold text-brand-600 mt-1"><%= money(stats.totalPaid) %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Viewed by staff</p>
+      <p class="text-2xl font-bold text-purple-600 mt-1"><%= stats.viewed %></p>
+      <p class="text-xs text-gray-400 mt-0.5">of <%= stats.total %></p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <form method="GET" action="/payroll/payslips" class="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-[180px]">
+      <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Employee</label>
+      <select name="emp" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        <option value="">All</option>
+        <% employees.forEach(e => { %>
+          <option value="<%= e.id %>" <%= String(filters.emp) === String(e.id) ? 'selected' : '' %>><%= e.full_name %> — <%= e.employee_code %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pay date from</label>
+      <input type="date" name="from" value="<%= filters.from || '' %>" class="mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+    </div>
+    <div>
+      <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">to</label>
+      <input type="date" name="to" value="<%= filters.to || '' %>" class="mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+    </div>
+    <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Filter</button>
+  </form>
+
+  <!-- List -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <% if (payslips.length === 0) { %>
+      <div class="p-10 text-center">
+        <p class="text-sm text-gray-500 font-semibold">No payslips yet</p>
+        <p class="text-xs text-gray-400 mt-1">Upload one to get started.</p>
+        <a href="/payroll/payslips/new" class="inline-block mt-3 text-sm font-semibold text-brand-600">Upload your first payslip →</a>
+      </div>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Employee</th>
+              <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Period</th>
+              <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Pay date</th>
+              <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Gross</th>
+              <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Net</th>
+              <th class="px-4 py-3 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+              <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% payslips.forEach(p => { %>
+              <tr>
+                <td class="px-4 py-3 text-sm">
+                  <p class="font-semibold text-gray-900"><%= p.full_name %></p>
+                  <p class="text-[11px] text-gray-400 font-mono"><%= p.employee_code %></p>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-700 tabular-nums">
+                  <%= fmtDate(p.period_start) %> → <%= fmtDate(p.period_end) %>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-900 font-semibold tabular-nums"><%= fmtDate(p.pay_date) %></td>
+                <td class="px-4 py-3 text-sm text-gray-700 text-right tabular-nums"><%= money(p.gross_pay) %></td>
+                <td class="px-4 py-3 text-sm text-gray-900 font-bold text-right tabular-nums"><%= money(p.net_pay) %></td>
+                <td class="px-4 py-3 text-center">
+                  <% if (p.viewed_at) { %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Viewed</span>
+                  <% } else { %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 ring-1 ring-amber-600/20">New</span>
+                  <% } %>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <div class="flex items-center justify-end gap-1">
+                    <% if (p.pdf_filename) { %>
+                      <a href="/payroll/payslips/<%= p.id %>/download" target="_blank" class="px-2.5 py-1.5 text-xs font-semibold text-brand-600 hover:bg-brand-50 rounded-lg">View PDF</a>
+                    <% } %>
+                    <form method="POST" action="/payroll/payslips/<%= p.id %>/delete" onsubmit="return confirm('Delete payslip for <%= p.full_name %>?')">
+                      <%- include('../partials/csrf') %>
+                      <button type="submit" class="px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<% if (flash_success && flash_success.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-semibold shadow-lg z-50" id="flash"><%= flash_success[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flash')?.remove(), 2800);</script>
+<% } %>

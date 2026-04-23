@@ -59,7 +59,21 @@ function buildGreetingSubtext(db, worker, member, employee, todaysShifts) {
     return { kind: 'shift', text: `Your shift at ${imminentShift.suburb || imminentShift.client} starts at ${formatTime(imminentShift.start_time)}` };
   }
 
-  // 3. Unviewed payslip — not implemented (no payslip table yet), skip gracefully
+  // 3. Unviewed payslip
+  if (employee) {
+    try {
+      const unviewed = db.prepare(`
+        SELECT id, net_pay, pay_date FROM payslips
+        WHERE employee_id = ? AND viewed_at IS NULL
+        ORDER BY pay_date DESC LIMIT 1
+      `).get(employee.id);
+      if (unviewed) {
+        const amount = Number(unviewed.net_pay || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return { kind: 'payslip', text: `New payslip ready — $${amount} net` };
+      }
+    } catch (e) { /* table may not exist on older deploys */ }
+  }
+
   // 4. Pending leave
   const pendingLeave = db.prepare(`
     SELECT COUNT(*) as c FROM employee_leave WHERE crew_member_id = ? AND status = 'pending'
@@ -176,6 +190,34 @@ function buildSmartCards(db, worker, member, employee) {
         link: '/w/shifts',
       }
     });
+  }
+
+  // Unviewed payslips — one card per new one
+  if (employee) {
+    try {
+      const unviewed = db.prepare(`
+        SELECT id, net_pay, pay_date FROM payslips
+        WHERE employee_id = ? AND viewed_at IS NULL
+        ORDER BY pay_date DESC LIMIT 2
+      `).all(employee.id);
+      for (const p of unviewed) {
+        const amount = Number(p.net_pay || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const dStr = new Date(p.pay_date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+        derived.push({
+          card_key: `payslip_${p.id}`,
+          card_type: 'new_payslip',
+          priority: 20, // CARD_PRIORITY.new_payslip
+          payload: {
+            icon: 'cash',
+            tone: 'emerald',
+            title: `Payslip ready — ${dStr}`,
+            body: `$${amount} net in your account`,
+            cta: 'View',
+            link: '/w/hr/payslips',
+          }
+        });
+      }
+    } catch (e) { /* table may not exist yet */ }
   }
 
   // Pending leave acknowledgment card

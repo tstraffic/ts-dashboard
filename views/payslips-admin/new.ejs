@@ -1,0 +1,106 @@
+<% locals.currentPage = 'payslips' %>
+
+<div class="space-y-5 max-w-3xl mx-auto">
+  <a href="/payroll/payslips" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-brand-600">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    Payslips
+  </a>
+
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Upload payslip</h1>
+    <p class="text-sm text-gray-500 mt-1">Drop in a PDF from QuickBooks / payroll and enter the pay summary. The worker sees it in the portal under HR → Payslips.</p>
+  </div>
+
+  <form method="POST" action="/payroll/payslips" enctype="multipart/form-data" class="bg-white border border-gray-200 rounded-xl p-5 sm:p-6 space-y-4">
+    <%- include('../partials/csrf') %>
+
+    <div>
+      <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Employee</label>
+      <select name="employee_id" required class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        <option value="">Select employee…</option>
+        <% employees.forEach(e => { %>
+          <option value="<%= e.id %>"><%= e.full_name %> — <%= e.employee_code %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div>
+        <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Period start</label>
+        <input type="date" name="period_start" required class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      </div>
+      <div>
+        <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Period end</label>
+        <input type="date" name="period_end" required class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      </div>
+      <div>
+        <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Pay date</label>
+        <input type="date" name="pay_date" required class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      </div>
+    </div>
+
+    <div class="border-t border-gray-200 pt-4">
+      <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">This pay period</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div>
+          <label class="text-xs font-semibold text-gray-600">Gross</label>
+          <input type="number" step="0.01" name="gross_pay" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="0.00">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600">Tax withheld</label>
+          <input type="number" step="0.01" name="tax_withheld" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="0.00">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600">Super</label>
+          <input type="number" step="0.01" name="super_amount" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="0.00">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600">Net</label>
+          <input type="number" step="0.01" name="net_pay" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto if blank">
+        </div>
+      </div>
+    </div>
+
+    <div class="border-t border-gray-200 pt-4">
+      <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Year to date (optional)</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div>
+          <label class="text-xs font-semibold text-gray-600">YTD gross</label>
+          <input type="number" step="0.01" name="ytd_gross" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600">YTD tax</label>
+          <input type="number" step="0.01" name="ytd_tax" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600">YTD super</label>
+          <input type="number" step="0.01" name="ytd_super" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600">YTD net</label>
+          <input type="number" step="0.01" name="ytd_net" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        </div>
+      </div>
+    </div>
+
+    <div class="border-t border-gray-200 pt-4">
+      <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Payslip PDF (max 5MB)</label>
+      <input type="file" name="pdf" accept="application/pdf" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      <p class="text-[11px] text-gray-400 mt-1">Will be served only to the matching worker and admins.</p>
+    </div>
+
+    <div>
+      <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Notes (optional)</label>
+      <input type="text" name="notes" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g. back pay for overtime">
+    </div>
+
+    <div class="border-t border-gray-200 pt-4 flex justify-end gap-2">
+      <a href="/payroll/payslips" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Cancel</a>
+      <button type="submit" class="px-6 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">Upload</button>
+    </div>
+  </form>
+
+  <% if (flash_error && flash_error.length) { %>
+    <p class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3"><%= flash_error[0] %></p>
+  <% } %>
+</div>

@@ -1,0 +1,89 @@
+<%- include('partials/secure-form-style') %>
+<%
+  function money(n) {
+    if (n == null) return '$0.00';
+    return '$' + Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtDate(s) { if (!s) return ''; return new Date(s + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  function shortRange(a, b) {
+    const d1 = new Date(a + 'T00:00:00'); const d2 = new Date(b + 'T00:00:00');
+    const sameMonth = d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear();
+    const o = { day: 'numeric', month: 'short' };
+    return d1.toLocaleDateString('en-AU', o) + ' – ' + (sameMonth ? d2.getDate() : d2.toLocaleDateString('en-AU', o)) + ' ' + d2.getFullYear();
+  }
+%>
+
+<div class="sf-wrap">
+  <a href="/w/hr" class="sf-back">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    HR & My Info
+  </a>
+
+  <div class="sf-hero">
+    <div class="sf-hero-ic" style="background: rgba(16,185,129,0.2); color: #34D399;">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+    </div>
+    <h1 class="sf-title">Payslips</h1>
+    <p class="sf-sub">Every pay run uploaded by payroll — tap to view or download.</p>
+  </div>
+
+  <% if (notLinked) { %>
+    <div class="sf-section" style="text-align: center;">
+      <p class="text-sm text-white/75">We haven't linked your crew profile to your HR record yet.</p>
+      <p class="text-xs text-white/50 mt-1">Ask your supervisor to run the link step in the roster and your payslips will appear here.</p>
+    </div>
+  <% } else if (payslips.length === 0) { %>
+    <div class="sf-section" style="text-align: center; padding: 2rem 1rem;">
+      <div style="font-size: 2.4rem; margin-bottom: 0.5rem;">💸</div>
+      <p class="text-sm font-semibold text-white">No payslips yet</p>
+      <p class="text-xs text-white/55 mt-1">Your first payslip will land here after the next pay run.</p>
+    </div>
+  <% } else { %>
+    <% if (summary && (summary.ytd_gross || summary.ytd_net)) { %>
+      <div class="sf-section" style="background: linear-gradient(160deg, rgba(16,185,129,0.15), rgba(10,22,40,0.5)); border-color: rgba(16,185,129,0.3);">
+        <div class="sf-section-title">Year to date</div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+          <div><p style="font-size: 0.62rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Gross</p><p style="font-size: 1.05rem; font-weight: 800; color: #fff; margin-top: 2px;"><%= money(summary.ytd_gross) %></p></div>
+          <div><p style="font-size: 0.62rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Net</p><p style="font-size: 1.05rem; font-weight: 800; color: #34D399; margin-top: 2px;"><%= money(summary.ytd_net) %></p></div>
+          <div><p style="font-size: 0.62rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Tax withheld</p><p style="font-size: 0.95rem; font-weight: 700; color: rgba(255,255,255,0.85); margin-top: 2px;"><%= money(summary.ytd_tax) %></p></div>
+          <div><p style="font-size: 0.62rem; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Super</p><p style="font-size: 0.95rem; font-weight: 700; color: rgba(255,255,255,0.85); margin-top: 2px;"><%= money(summary.ytd_super) %></p></div>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="sf-section" style="padding: 0.5rem;">
+      <% payslips.forEach(function (p) {
+        const isNew = !p.viewed_at;
+      %>
+        <a href="/w/hr/payslips/<%= p.id %>" target="_blank" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; text-decoration: none; background: <%= isNew ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.02)' %>; border: 1px solid <%= isNew ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.04)' %>;">
+          <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: <%= isNew ? 'rgba(16,185,129,0.18)' : 'rgba(43,127,255,0.15)' %>; color: <%= isNew ? '#34D399' : '#60A5FA' %>; flex-shrink: 0;">
+            <span style="font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; line-height: 1;"><%= new Date(p.pay_date + 'T00:00:00').toLocaleDateString('en-AU', { month: 'short' }).toUpperCase() %></span>
+            <span style="font-size: 1.1rem; font-weight: 800; line-height: 1.1;"><%= new Date(p.pay_date + 'T00:00:00').getDate() %></span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <p style="font-size: 0.85rem; font-weight: 700; color: #fff; line-height: 1.2;"><%= shortRange(p.period_start, p.period_end) %></p>
+            <p style="font-size: 0.7rem; color: rgba(255,255,255,0.55); margin-top: 2px;">Gross <%= money(p.gross_pay) %> · Tax <%= money(p.tax_withheld) %><% if (p.super_amount) { %> · Super <%= money(p.super_amount) %><% } %></p>
+          </div>
+          <div style="text-align: right; flex-shrink: 0;">
+            <p style="font-size: 0.95rem; font-weight: 800; color: #fff;"><%= money(p.net_pay) %></p>
+            <% if (isNew) { %>
+              <span style="display: inline-block; margin-top: 2px; padding: 1px 6px; border-radius: 999px; font-size: 0.58rem; font-weight: 700; background: rgba(16,185,129,0.2); color: #34D399; text-transform: uppercase; letter-spacing: 0.05em;">New</span>
+            <% } else { %>
+              <span style="font-size: 0.6rem; color: rgba(255,255,255,0.35);">Viewed</span>
+            <% } %>
+          </div>
+        </a>
+        <% if (p !== payslips[payslips.length - 1]) { %><div style="height: 6px;"></div><% } %>
+      <% }) %>
+    </div>
+
+    <p style="margin-top: 0.75rem; text-align: center; font-size: 0.68rem; color: rgba(255,255,255,0.4); padding: 0 0.5rem;">
+      PDFs are private — only you and HR can open them.
+    </p>
+  <% } %>
+</div>
+
+<% if (flash_success && flash_success.length) { %><div class="sf-toast show"><%= flash_success[0] %></div>
+<% } else if (flash_error && flash_error.length) { %><div class="sf-toast show err"><%= flash_error[0] %></div>
+<% } %>
+<script>setTimeout(()=>{ const t=document.querySelector('.sf-toast.show'); if(t) t.classList.remove('show'); }, 3500);</script>

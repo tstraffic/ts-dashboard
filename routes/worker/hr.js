@@ -259,4 +259,80 @@ router.post('/hr/leave/:id/cancel', (req, res) => {
   res.redirect('/w/hr/leave');
 });
 
+// ============================================
+// PAYSLIPS
+// ============================================
+const path = require('path');
+const fs = require('fs');
+const PAYSLIP_DIR = path.join(__dirname, '..', '..', 'data', 'uploads', 'payroll');
+
+// Load the worker's linked employee id once per request. Returns null if the
+// crew_member isn't linked to an employees row — which also means no payslips.
+function loadLinkedEmployeeId(workerId) {
+  const db = getDb();
+  const linked = db.prepare('SELECT id FROM employees WHERE linked_crew_member_id = ?').get(workerId);
+  if (linked) return linked.id;
+  const member = db.prepare('SELECT employee_id FROM crew_members WHERE id = ?').get(workerId);
+  if (member && member.employee_id) {
+    const byCode = db.prepare('SELECT id FROM employees WHERE employee_code = ?').get(member.employee_id);
+    if (byCode) return byCode.id;
+  }
+  return null;
+}
+
+// GET /w/hr/payslips — List the worker's own payslips
+router.get('/hr/payslips', (req, res) => {
+  const db = getDb();
+  const empId = loadLinkedEmployeeId(req.session.worker.id);
+  if (!empId) {
+    return res.render('worker/hr-payslips', {
+      title: 'Payslips', currentPage: 'more',
+      payslips: [], summary: null, notLinked: true,
+      flash_success: req.flash('success'), flash_error: req.flash('error'),
+    });
+  }
+  const payslips = db.prepare(`
+    SELECT * FROM payslips WHERE employee_id = ?
+    ORDER BY pay_date DESC, id DESC LIMIT 100
+  `).all(empId);
+  const summary = db.prepare(`
+    SELECT
+      COALESCE(MAX(ytd_gross), 0) as ytd_gross,
+      COALESCE(MAX(ytd_tax), 0) as ytd_tax,
+      COALESCE(MAX(ytd_super), 0) as ytd_super,
+      COALESCE(MAX(ytd_net), 0) as ytd_net,
+      COUNT(*) as total
+    FROM payslips WHERE employee_id = ?
+  `).get(empId);
+  res.render('worker/hr-payslips', {
+    title: 'Payslips', currentPage: 'more',
+    payslips, summary, notLinked: false,
+    flash_success: req.flash('success'), flash_error: req.flash('error'),
+  });
+});
+
+// GET /w/hr/payslips/:id — Download the worker's own payslip (auth-checked stream)
+router.get('/hr/payslips/:id', (req, res) => {
+  const db = getDb();
+  const empId = loadLinkedEmployeeId(req.session.worker.id);
+  if (!empId) return res.status(404).send('Not found');
+
+  const p = db.prepare('SELECT * FROM payslips WHERE id = ? AND employee_id = ?').get(req.params.id, empId);
+  if (!p || !p.pdf_filename) return res.status(404).send('Not found');
+
+  const filePath = path.join(PAYSLIP_DIR, `emp_${p.employee_id}`, p.pdf_filename);
+  if (!fs.existsSync(filePath)) return res.status(404).send('File missing');
+
+  // First-view timestamp (for admin visibility) + always bump view_count
+  try {
+    if (!p.viewed_at) db.prepare("UPDATE payslips SET viewed_at = datetime('now'), view_count = view_count + 1 WHERE id = ?").run(p.id);
+    else db.prepare("UPDATE payslips SET view_count = view_count + 1 WHERE id = ?").run(p.id);
+  } catch (e) { /* audit-only */ }
+
+  const downloadName = `Payslip_${p.pay_date}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${downloadName}"`);
+  fs.createReadStream(filePath).pipe(res);
+});
+
 module.exports = router;
