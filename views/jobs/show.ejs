@@ -220,7 +220,7 @@
   //   planning   → plan production: traffic plans + final plans (read-only) + chat
   //   finance    → money view: budget + accounts + timesheets + final plans (to check scope) + chat
   // Any other role (sales, hr, etc.) gets just the two universally-safe tabs.
-  const ROLE_ALIASES_TABS = { management: 'admin', accounts: 'finance', marketing: 'operations' };
+  const ROLE_ALIASES_TABS = { management: 'admin', accounts: 'finance' };
   const _rawRole = (user && user.role) ? user.role : '';
   const role = ROLE_ALIASES_TABS[_rawRole] || _rawRole;
   const TABS_BY_ROLE = {

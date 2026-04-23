@@ -1,12 +1,15 @@
 <% locals.currentPage = 'admin' %>
 
 <%
-  const roleAliases = { management: 'admin', accounts: 'finance', marketing: 'operations' };
+  const roleAliases = { management: 'admin', accounts: 'finance' };
   const roleColors = {
     admin: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
     operations: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
     planning: 'bg-teal-50 text-teal-700 ring-1 ring-teal-600/20',
-    finance: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
+    finance: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
+    marketing: 'bg-rose-50 text-rose-700 ring-1 ring-rose-600/20',
+    hr: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20',
+    sales: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
   };
   function displayRole(r) { return roleAliases[r] || r; }
 %>
