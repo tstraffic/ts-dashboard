@@ -5133,8 +5133,11 @@ function runMigrations(db) {
     console.log('Migration 116 applied: shift_period on employee_leave');
   }
 
-  // Migration 126: Payslips
-  if (!isMigrationApplied.get(126)) {
+  // Migration 137: Payslips
+  // (Originally shipped as 126, but 126 was already recorded on prod by the
+  //  earlier hire_dockets migration — so this never ran there and the table
+  //  was missing. Renumbered to 137 so it actually creates the table.)
+  if (!isMigrationApplied.get(137)) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS payslips (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5163,8 +5166,8 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_payslips_employee ON payslips(employee_id, pay_date DESC);
       CREATE INDEX IF NOT EXISTS idx_payslips_paydate ON payslips(pay_date DESC);
     `);
-    recordMigration.run(126, 'Payslips table');
-    console.log('Migration 126 applied: payslips table');
+    recordMigration.run(137, 'Payslips table');
+    console.log('Migration 137 applied: payslips table');
   }
 
   // Migration 125: Second-pass merge using first-name prefix match.
