@@ -104,7 +104,29 @@ function buildGreetingSubtext(db, worker, member, employee, todaysShifts) {
 
   // 7. Default based on shift status
   if (todaysShifts && todaysShifts.length > 0) return { kind: 'default', text: `You're scheduled on ${todaysShifts[0].client}` };
-  return { kind: 'default', text: "You're off duty today." };
+
+  // 8. Off today — give them the next shift if one is scheduled,
+  //    instead of a dead-end "you're off" message.
+  try {
+    const next = db.prepare(`
+      SELECT a.allocation_date, a.start_time, j.client
+      FROM crew_allocations a
+      JOIN jobs j ON j.id = a.job_id
+      WHERE a.crew_member_id = ?
+        AND a.allocation_date > ?
+        AND (a.status IS NULL OR a.status != 'cancelled')
+      ORDER BY a.allocation_date ASC, a.start_time ASC
+      LIMIT 1
+    `).get(worker.id, today);
+    if (next) {
+      const d = new Date(next.allocation_date + 'T00:00:00');
+      const when = d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+      const time = next.start_time ? ` at ${formatTime(next.start_time)}` : '';
+      return { kind: 'default', text: `You're off today. Next shift: ${next.client} — ${when}${time}` };
+    }
+  } catch (e) { /* table/col shape shift on older deploys */ }
+
+  return { kind: 'default', text: "You're off today. No upcoming shifts scheduled." };
 }
 
 function formatTime(t) {
