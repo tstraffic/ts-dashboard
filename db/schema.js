@@ -6263,6 +6263,72 @@ function runMigrations(db) {
     console.log('Migration 136 applied');
   }
 
+  // Migration 138: clock_events schema repair.
+  //
+  // Migration 57 created clock_events with a CHECK that only permits
+  // event_type in ('clock_in','clock_out'), but every live code path
+  // reading the table also writes 'break_start' / 'break_end' — so the
+  // Clock feature crashes the moment anyone starts a break.
+  //
+  // Rebuild the table with the full event_type set. Keep the canonical
+  // `event_time` column name (which routes/worker/home.js, manage.js,
+  // shifts.js, timesheets.js, services/homeContext.js, and the timesheet
+  // form view all already read). A sibling migration/patch switches the
+  // three files that were using `timestamp` back to `event_time` so the
+  // whole codebase agrees.
+  //
+  // Carries across every existing row regardless of whether the old table
+  // had `event_time` (original shape) or `timestamp` (shape left by an
+  // earlier iteration of this migration in development).
+  if (!isMigrationApplied.get(138)) {
+    try {
+      const sqlRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='clock_events'").get();
+      const hasAllEventTypes = sqlRow && sqlRow.sql.includes("'break_start'");
+      const hasEventTimeCol = sqlRow && /\bevent_time\b/.test(sqlRow.sql);
+      const needsRebuild = sqlRow && (!hasAllEventTypes || !hasEventTimeCol);
+      if (needsRebuild) {
+        db.pragma('foreign_keys = OFF');
+        db.exec(`
+          CREATE TABLE clock_events_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+            allocation_id INTEGER REFERENCES crew_allocations(id),
+            event_type TEXT NOT NULL CHECK(event_type IN ('clock_in','clock_out','break_start','break_end')),
+            event_time DATETIME NOT NULL DEFAULT (datetime('now')),
+            latitude REAL,
+            longitude REAL,
+            accuracy REAL,
+            address TEXT,
+            notes TEXT,
+            photo_path TEXT,
+            created_at DATETIME DEFAULT (datetime('now'))
+          );
+        `);
+        const oldCols = db.prepare("PRAGMA table_info(clock_events)").all().map(c => c.name);
+        const tsSelect = oldCols.includes('event_time') ? 'event_time'
+                        : oldCols.includes('timestamp') ? 'timestamp'
+                        : "datetime('now')";
+        db.exec(`
+          INSERT INTO clock_events_new (id, crew_member_id, allocation_id, event_type, event_time, latitude, longitude, accuracy, address, notes, photo_path, created_at)
+          SELECT id, crew_member_id, allocation_id, event_type, ${tsSelect}, latitude, longitude, accuracy, address, notes, photo_path, created_at
+          FROM clock_events;
+        `);
+        db.exec('DROP TABLE clock_events;');
+        db.exec('ALTER TABLE clock_events_new RENAME TO clock_events;');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_clock_events_member_ts ON clock_events(crew_member_id, event_time DESC);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_clock_events_allocation ON clock_events(allocation_id);');
+        db.pragma('foreign_keys = ON');
+        console.log('Migration 138: rebuilt clock_events with expanded event_type CHECK (+ break_start/break_end)');
+      } else {
+        console.log('Migration 138: clock_events already in target shape, nothing to rebuild');
+      }
+    } catch (e) {
+      console.error('Migration 138 error:', e.message);
+    }
+    recordMigration.run(138, 'Expand clock_events event_type to include break_start/break_end');
+    console.log('Migration 138 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
