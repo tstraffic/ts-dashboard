@@ -9,8 +9,8 @@ function getClockStatus(db, crewMemberId) {
   // Get the last clock event for today
   const lastEvent = db.prepare(`
     SELECT * FROM clock_events
-    WHERE crew_member_id = ? AND date(timestamp) = ?
-    ORDER BY timestamp DESC LIMIT 1
+    WHERE crew_member_id = ? AND date(event_time) = ?
+    ORDER BY event_time DESC LIMIT 1
   `).get(crewMemberId, today);
 
   // Determine current status
@@ -33,20 +33,20 @@ function getClockStatus(db, crewMemberId) {
   // Get the clock-in time if currently clocked in
   if (status === 'clocked_in' || status === 'on_break') {
     const clockIn = db.prepare(`
-      SELECT timestamp FROM clock_events
-      WHERE crew_member_id = ? AND date(timestamp) = ? AND event_type = 'clock_in'
-      ORDER BY timestamp DESC LIMIT 1
+      SELECT event_time FROM clock_events
+      WHERE crew_member_id = ? AND date(event_time) = ? AND event_type = 'clock_in'
+      ORDER BY event_time DESC LIMIT 1
     `).get(crewMemberId, today);
-    if (clockIn) clockInTime = clockIn.timestamp;
+    if (clockIn) clockInTime = clockIn.event_time;
   }
 
   if (status === 'on_break') {
     const breakStart = db.prepare(`
-      SELECT timestamp FROM clock_events
-      WHERE crew_member_id = ? AND date(timestamp) = ? AND event_type = 'break_start'
-      ORDER BY timestamp DESC LIMIT 1
+      SELECT event_time FROM clock_events
+      WHERE crew_member_id = ? AND date(event_time) = ? AND event_type = 'break_start'
+      ORDER BY event_time DESC LIMIT 1
     `).get(crewMemberId, today);
-    if (breakStart) breakStartTime = breakStart.timestamp;
+    if (breakStart) breakStartTime = breakStart.event_time;
   }
 
   return { status, lastEvent, clockInTime, breakStartTime, currentAllocationId };
@@ -56,9 +56,9 @@ function getClockStatus(db, crewMemberId) {
 function getTodayTotalHours(db, crewMemberId) {
   const today = new Date().toISOString().split('T')[0];
   const events = db.prepare(`
-    SELECT event_type, timestamp FROM clock_events
-    WHERE crew_member_id = ? AND date(timestamp) = ?
-    ORDER BY timestamp ASC
+    SELECT event_type, event_time FROM clock_events
+    WHERE crew_member_id = ? AND date(event_time) = ?
+    ORDER BY event_time ASC
   `).all(crewMemberId, today);
 
   let totalMs = 0;
@@ -67,7 +67,7 @@ function getTodayTotalHours(db, crewMemberId) {
   let breakMs = 0;
 
   for (const evt of events) {
-    const t = new Date(evt.timestamp + 'Z').getTime();
+    const t = new Date(evt.event_time + 'Z').getTime();
     if (evt.event_type === 'clock_in') {
       lastClockIn = t;
       breakMs = 0;
@@ -119,8 +119,8 @@ router.get('/clock', (req, res) => {
   // Get today's clock events
   const todayEvents = db.prepare(`
     SELECT * FROM clock_events
-    WHERE crew_member_id = ? AND date(timestamp) = ?
-    ORDER BY timestamp ASC
+    WHERE crew_member_id = ? AND date(event_time) = ?
+    ORDER BY event_time ASC
   `).all(worker.id, today);
 
   const totalMs = getTodayTotalHours(db, worker.id);
@@ -250,14 +250,14 @@ router.get('/clock/history', (req, res) => {
     FROM clock_events ce
     LEFT JOIN crew_allocations ca ON ce.allocation_id = ca.id
     LEFT JOIN jobs j ON ca.job_id = j.id
-    WHERE ce.crew_member_id = ? AND date(ce.timestamp) >= ?
-    ORDER BY ce.timestamp DESC
+    WHERE ce.crew_member_id = ? AND date(ce.event_time) >= ?
+    ORDER BY ce.event_time DESC
   `).all(worker.id, sevenDaysAgoStr);
 
   // Group by date
   const groupedByDate = {};
   events.forEach(e => {
-    const date = e.timestamp.split('T')[0].split(' ')[0];
+    const date = e.event_time.split('T')[0].split(' ')[0];
     if (!groupedByDate[date]) groupedByDate[date] = [];
     groupedByDate[date].push(e);
   });
@@ -271,9 +271,9 @@ router.get('/clock/history', (req, res) => {
     let lastBreakStart = null;
 
     // Sort ascending for calculation
-    const sorted = [...dayEvents].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const sorted = [...dayEvents].sort((a, b) => a.event_time.localeCompare(b.event_time));
     for (const evt of sorted) {
-      const t = new Date(evt.timestamp + (evt.timestamp.includes('Z') ? '' : 'Z')).getTime();
+      const t = new Date(evt.event_time + (evt.event_time.includes('Z') ? '' : 'Z')).getTime();
       if (evt.event_type === 'clock_in') {
         lastClockIn = t;
         breakMs = 0;

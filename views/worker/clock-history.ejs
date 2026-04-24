@@ -27,7 +27,7 @@
         const d = new Date(date + 'T00:00:00');
         const dateLabel = d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
         const total = dailyTotals[date] || { hours: 0, mins: 0 };
-        const events = groupedByDate[date].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+        const events = groupedByDate[date].sort((a, b) => a.event_time.localeCompare(b.event_time));
       %>
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <!-- Day Header -->
@@ -67,7 +67,7 @@
             </div>
             <div class="text-right shrink-0">
               <p class="text-sm text-gray-700">
-                <%= new Date(evt.timestamp + (evt.timestamp.includes('Z') ? '' : 'Z')).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true }) %>
+                <%= new Date(evt.event_time + (evt.event_time.includes('Z') ? '' : 'Z')).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true }) %>
               </p>
               <% if (evt.latitude) { %>
                 <p class="text-[10px] text-gray-400">GPS</p>
