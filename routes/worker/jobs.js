@@ -170,14 +170,38 @@ router.get('/jobs/:id', (req, res) => {
 
   const allForms = [...forms, ...formsByJob];
 
-  // Build form completion status
+  // Build form completion status — legacy forms + the five Traffio Job-Pack
+  // checklists. allForms already contains every safety_forms row this worker
+  // has filed against this allocation (or against the same job/date when no
+  // allocation_id was set), so a simple .find() per form_type tells us if it's
+  // done. The detail page uses these flags to show emerald check vs amber pill.
   const formStatus = {
     prestart: allForms.find(f => f.form_type === 'prestart') || null,
     take5: allForms.find(f => f.form_type === 'take5') || null,
     hazard: allForms.filter(f => f.form_type === 'hazard'),
     incident: allForms.filter(f => f.form_type === 'incident'),
     equipment: allForms.find(f => f.form_type === 'equipment') || null,
+    vehicle_prestart: allForms.find(f => f.form_type === 'vehicle_prestart') || null,
+    risk_toolbox:    allForms.find(f => f.form_type === 'risk_toolbox') || null,
+    tc_prestart:     allForms.find(f => f.form_type === 'tc_prestart') || null,
+    team_leader:     allForms.find(f => f.form_type === 'team_leader') || null,
+    post_shift_vehicle: allForms.find(f => f.form_type === 'post_shift_vehicle') || null,
   };
+
+  // Admin-uploaded site documents for this job (TGS / TMP / ROL day-night /
+  // stage plans / SWMS / permits). Workers see the list on the DOCS tab and
+  // can tap to view/download the PDF.
+  const jobDocuments = db.prepare(`
+    SELECT id, doc_type, title, file_path, original_name, mime_type, size_bytes, uploaded_at
+    FROM job_documents
+    WHERE job_id = ? AND archived_at IS NULL
+    ORDER BY
+      CASE doc_type
+        WHEN 'tgs' THEN 1 WHEN 'tmp' THEN 2 WHEN 'rol_day' THEN 3 WHEN 'rol_night' THEN 4
+        WHEN 'stage_plan' THEN 5 WHEN 'swms' THEN 6 WHEN 'permit' THEN 7 ELSE 8
+      END,
+      uploaded_at DESC
+  `).all(allocation.job_id);
 
   // Get docket for this allocation
   const docket = db.prepare(`
@@ -195,7 +219,38 @@ router.get('/jobs/:id', (req, res) => {
     supervisorPhone,
     formStatus,
     docket,
+    jobDocuments,
   });
+});
+
+// GET /w/job-documents/:id — Stream an admin-uploaded job document to the
+// worker. Permission check: the worker must have an allocation on the same
+// job (current or past) before we'll serve the file.
+router.get('/job-documents/:id', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const path = require('path');
+  const fs = require('fs');
+
+  const doc = db.prepare(`
+    SELECT jd.*, j.id AS jid
+    FROM job_documents jd
+    JOIN jobs j ON jd.job_id = j.id
+    WHERE jd.id = ? AND jd.archived_at IS NULL
+  `).get(req.params.id);
+  if (!doc) return res.status(404).send('Not found');
+
+  const linked = db.prepare(`
+    SELECT 1 FROM crew_allocations
+    WHERE crew_member_id = ? AND job_id = ? AND status != 'cancelled' LIMIT 1
+  `).get(worker.id, doc.jid);
+  if (!linked) return res.status(403).send('Forbidden');
+
+  const abs = path.isAbsolute(doc.file_path) ? doc.file_path : path.join(__dirname, '..', '..', doc.file_path);
+  if (!fs.existsSync(abs)) return res.status(404).send('File missing');
+  res.setHeader('Content-Type', doc.mime_type || 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${(doc.original_name || doc.title || 'document.pdf').replace(/[^\w. -]/g, '_')}"`);
+  fs.createReadStream(abs).pipe(res);
 });
 
 // POST /w/jobs/:id/respond — Accept or decline an allocation
