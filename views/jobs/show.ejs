@@ -40,6 +40,7 @@
   <div class="flex items-center gap-2">
     <a href="/jobs/<%= job.id %>/edit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Edit</a>
     <a href="/documents/job/<%= job.id %>" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Documents</a>
+    <a href="/jobs/<%= job.id %>/documents" class="px-4 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 text-sm font-medium rounded-lg transition-colors" title="TGS / TMP / ROL / Stage Plans visible to crew on the worker portal">Site Docs</a>
     <% if (job.status === 'closed') { %>
       <form method="POST" action="/jobs/<%= job.id %>/reopen" onsubmit="return confirm('Reopen <%= job.job_number %>? Status will be set to active.')">
         <%- include('../partials/csrf') %>
