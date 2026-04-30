@@ -1,10 +1,8 @@
 // /payroll/runs — weekly pay runs imported from a Traffio Person Dockets CSV.
-// Each pay run breaks workers into Cash / TFN / ABN sections (driven by
-// employees.payment_type), aggregates Mon..Sun day/night hours, and snapshots
-// rates at import time so historical runs are immutable.
-//
-// Mounted at /payroll alongside the older payslips-admin router; the two
-// don't overlap (this owns /runs/* and /rates*).
+// Each pay run breaks workers into Cash / TFN / ABN sections with up to 8
+// hour buckets per worker (day_normal/day_ot/day_dt, night_normal/night_ot/
+// night_dt, weekend, public_holiday). Rates + classifications snapshot at
+// import time so historical runs are immutable.
 
 'use strict';
 
@@ -20,12 +18,16 @@ const { requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../middleware/audit');
 const {
   parseCsv, normalizeShift, aggregateByWorker, inferPeriod,
-  matchEmployee, buildLine, recomputeLine, formatLocalDate,
+  matchEmployee, fetchClassification,
+  buildLine, recomputeLine, recategorizeFromShifts, computeAutoAllowances,
+  resolveRates, totalsFromBuckets, emptyBuckets,
+  formatLocalDate, safeParseJson,
+  BUCKETS, BUCKET_LABELS, BUCKET_RATE_FIELDS,
   round2, toNum,
 } = require('../lib/payroll');
 
 // ----------------------------------------------------------------------------
-// Upload setup — keep the original Traffio CSV alongside the run for audit.
+// Upload setup
 // ----------------------------------------------------------------------------
 const UPLOAD_DIR = path.join(__dirname, '..', 'data', 'uploads', 'payroll-csv');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -38,7 +40,7 @@ const upload = multer({
       cb(null, `payrun_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
     },
   }),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const okExt = /\.csv$/i.test(file.originalname || '');
     const okMime = /text|csv|excel|octet-stream/i.test(file.mimetype || '');
@@ -47,38 +49,68 @@ const upload = multer({
   },
 });
 
-// ----------------------------------------------------------------------------
-// Section labels + ordering
-// ----------------------------------------------------------------------------
 const SECTIONS = [
-  { key: 'cash', label: 'Cash', accent: 'amber' },
-  { key: 'tfn',  label: 'TFN',  accent: 'emerald' },
-  { key: 'abn',  label: 'ABN',  accent: 'sky' },
+  { key: 'cash', label: 'Cash', accent: 'amber',   buckets: ['day_normal', 'night_normal'] },
+  { key: 'tfn',  label: 'TFN',  accent: 'emerald', buckets: BUCKETS },
+  { key: 'abn',  label: 'ABN',  accent: 'sky',     buckets: ['day_normal', 'day_ot', 'night_normal', 'night_ot', 'weekend'] },
 ];
 const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-function safeJson(s, fallback) {
-  try { const v = JSON.parse(s); return v == null ? fallback : v; } catch (e) { return fallback; }
-}
-
+// ----------------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------------
 function fmtMoney(n) {
   const v = parseFloat(n) || 0;
   return v.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function periodLabel(start, end) {
-  // "WE 26.04.26"  (Week ending Sunday)
   if (!end) return '';
   const d = new Date(end + 'T00:00:00');
   if (isNaN(d.getTime())) return '';
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yy = String(d.getFullYear()).slice(2);
-  return `WE ${dd}.${mm}.${yy}`;
+  return `WE ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getFullYear()).slice(2)}`;
+}
+
+function loadPHSet(db) {
+  const rows = db.prepare('SELECT date FROM public_holidays').all();
+  return new Set(rows.map(r => r.date));
+}
+function makeIsPH(phSet) { return (date) => phSet.has(date); }
+
+function hydrateLine(line) {
+  line.buckets = safeParseJson(line.buckets_json, null);
+  if (!line.buckets) {
+    // Old line missing buckets — synthesize from legacy day/night
+    const day = safeParseJson(line.day_hours_json, [0,0,0,0,0,0,0]);
+    const night = safeParseJson(line.night_hours_json, [0,0,0,0,0,0,0]);
+    line.buckets = emptyBuckets({ day_normal: line.rate_day, night_normal: line.rate_night });
+    line.buckets.day_normal.hours = day;
+    line.buckets.day_normal.total_hours = line.total_day_hours || 0;
+    line.buckets.day_normal.total_wages = line.total_day_wages || 0;
+    line.buckets.night_normal.hours = night;
+    line.buckets.night_normal.total_hours = line.total_night_hours || 0;
+    line.buckets.night_normal.total_wages = line.total_night_wages || 0;
+  }
+  line.shifts = safeParseJson(line.shifts_json, []);
+  return line;
+}
+
+function sectionTotal(arr) {
+  let hours = 0, wages = 0, allow = 0, total = 0;
+  for (const l of arr) {
+    hours += toNum(l.total_hours);
+    wages += toNum(l.total_wages);
+    allow += toNum(l.total_allowance);
+    total += toNum(l.grand_total);
+  }
+  return {
+    hours: round2(hours), wages: round2(wages), allow: round2(allow), total: round2(total),
+    gst: round2(total * 0.10), with_gst: round2(total * 1.10),
+  };
 }
 
 // ============================================================================
-// GET /payroll/runs — list all pay runs, newest first
+// GET /payroll/runs — list
 // ============================================================================
 router.get('/runs', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
@@ -100,24 +132,19 @@ router.get('/runs', requirePermission('hr_employees'), (req, res) => {
   res.render('payroll-runs/index', {
     title: 'Pay Runs',
     currentPage: 'pay-runs',
-    runs,
-    fmtMoney,
-    periodLabel,
+    runs, fmtMoney, periodLabel,
   });
 });
 
 // ============================================================================
-// GET /payroll/runs/new — upload form
+// GET /payroll/runs/new
 // ============================================================================
 router.get('/runs/new', requirePermission('hr_employees'), (req, res) => {
-  res.render('payroll-runs/new', {
-    title: 'Import Pay Run',
-    currentPage: 'pay-runs',
-  });
+  res.render('payroll-runs/new', { title: 'Import Pay Run', currentPage: 'pay-runs' });
 });
 
 // ============================================================================
-// POST /payroll/runs — handle CSV upload, parse, create pay_run + lines
+// POST /payroll/runs — handle CSV upload
 // ============================================================================
 router.post('/runs', requirePermission('hr_employees'), (req, res) => {
   upload.single('csv')(req, res, function (err) {
@@ -125,28 +152,26 @@ router.post('/runs', requirePermission('hr_employees'), (req, res) => {
     if (!req.file) { req.flash('error', 'CSV file is required.'); return res.redirect('/payroll/runs/new'); }
 
     let raw;
-    try {
-      raw = fs.readFileSync(req.file.path, 'utf8');
-    } catch (e) {
+    try { raw = fs.readFileSync(req.file.path, 'utf8'); }
+    catch (e) {
       req.flash('error', 'Could not read uploaded file: ' + e.message);
       return res.redirect('/payroll/runs/new');
     }
 
     const { rows } = parseCsv(raw);
     if (rows.length === 0) {
-      req.flash('error', 'CSV had no data rows. Please check the file is a valid Traffio Person Dockets export.');
+      req.flash('error', 'CSV had no data rows.');
       try { fs.unlinkSync(req.file.path); } catch (e) {}
       return res.redirect('/payroll/runs/new');
     }
 
     const shifts = rows.map(normalizeShift).filter(Boolean);
     if (shifts.length === 0) {
-      req.flash('error', 'CSV had no usable shifts (all rows excluded, deleted, or zero hours).');
+      req.flash('error', 'CSV had no usable shifts.');
       try { fs.unlinkSync(req.file.path); } catch (e) {}
       return res.redirect('/payroll/runs/new');
     }
 
-    // Allow user to override the inferred period via form fields
     const inferred = inferPeriod(shifts);
     const period_start = (req.body.period_start && /^\d{4}-\d{2}-\d{2}$/.test(req.body.period_start))
       ? req.body.period_start : inferred.period_start;
@@ -157,6 +182,7 @@ router.post('/runs', requirePermission('hr_employees'), (req, res) => {
 
     const workers = aggregateByWorker(shifts);
     const db = getDb();
+    const isPH = makeIsPH(loadPHSet(db));
 
     let runId;
     try {
@@ -167,7 +193,7 @@ router.post('/runs', requirePermission('hr_employees'), (req, res) => {
       const insertLine = db.prepare(`
         INSERT INTO pay_run_lines (
           pay_run_id, employee_id, person_id, full_name, payment_type, bsb, acc_number,
-          day_hours_json, night_hours_json,
+          buckets_json, day_hours_json, night_hours_json,
           total_day_hours, total_night_hours, total_hours,
           rate_day, rate_night,
           total_day_wages, total_night_wages, total_wages,
@@ -175,7 +201,7 @@ router.post('/runs', requirePermission('hr_employees'), (req, res) => {
           grand_total, paid, paid_ref, paid_at, notes, shifts_json, sort_order
         ) VALUES (
           @pay_run_id, @employee_id, @person_id, @full_name, @payment_type, @bsb, @acc_number,
-          @day_hours_json, @night_hours_json,
+          @buckets_json, @day_hours_json, @night_hours_json,
           @total_day_hours, @total_night_hours, @total_hours,
           @rate_day, @rate_night,
           @total_day_wages, @total_night_wages, @total_wages,
@@ -190,7 +216,9 @@ router.post('/runs', requirePermission('hr_employees'), (req, res) => {
         let order = 0;
         for (const agg of workers) {
           const employee = matchEmployee(db, agg);
-          const line = buildLine({ pay_run_id: runId, agg, employee });
+          const classification = (employee && employee.award_classification_id)
+            ? fetchClassification(db, employee.award_classification_id) : null;
+          const line = buildLine({ pay_run_id: runId, agg, employee, classification, isPH });
           line.sort_order = order++;
           insertLine.run(line);
         }
@@ -216,8 +244,7 @@ router.post('/runs', requirePermission('hr_employees'), (req, res) => {
 });
 
 // ============================================================================
-// GET /payroll/runs/:id — main pay run detail page
-//   Renders Cash / TFN / ABN sections plus an Unclassified bucket.
+// GET /payroll/runs/:id — main detail page
 // ============================================================================
 router.get('/runs/:id', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
@@ -225,49 +252,41 @@ router.get('/runs/:id', requirePermission('hr_employees'), (req, res) => {
   if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
 
   const lines = db.prepare(`
-    SELECT prl.*, e.employee_code, e.full_name AS emp_full_name,
-      e.payment_type AS emp_payment_type, e.rate_day AS emp_rate_day, e.rate_night AS emp_rate_night
+    SELECT prl.*, e.employee_code, e.payment_type AS emp_payment_type,
+      e.award_classification_id,
+      ac.classification AS classification_name
     FROM pay_run_lines prl
     LEFT JOIN employees e ON e.id = prl.employee_id
+    LEFT JOIN award_classifications ac ON ac.id = e.award_classification_id
     WHERE prl.pay_run_id = ?
-    ORDER BY prl.payment_type ASC, LOWER(prl.full_name) ASC
+    ORDER BY LOWER(prl.full_name) ASC
   `).all(run.id);
 
-  // Hydrate JSON arrays + bucket by payment_type
   const buckets = { cash: [], tfn: [], abn: [], unclassified: [] };
   for (const l of lines) {
-    l.day_hours = safeJson(l.day_hours_json, [0, 0, 0, 0, 0, 0, 0]);
-    l.night_hours = safeJson(l.night_hours_json, [0, 0, 0, 0, 0, 0, 0]);
-    l.shifts = safeJson(l.shifts_json, []);
+    hydrateLine(l);
     const t = (l.payment_type || '').toLowerCase();
-    if (t === 'cash') buckets.cash.push(l);
-    else if (t === 'tfn') buckets.tfn.push(l);
-    else if (t === 'abn') buckets.abn.push(l);
-    else buckets.unclassified.push(l);
+    if      (t === 'cash') buckets.cash.push(l);
+    else if (t === 'tfn')  buckets.tfn.push(l);
+    else if (t === 'abn')  buckets.abn.push(l);
+    else                    buckets.unclassified.push(l);
   }
 
-  // Section totals + GST (Cash only)
-  function sectionTotal(arr) {
-    let hours = 0, wages = 0, allow = 0, total = 0;
-    for (const l of arr) { hours += toNum(l.total_hours); wages += toNum(l.total_wages); allow += toNum(l.total_allowance); total += toNum(l.grand_total); }
-    return { hours: round2(hours), wages: round2(wages), allow: round2(allow), total: round2(total), gst: round2(total * 0.10), with_gst: round2(total * 1.10) };
-  }
   const totals = {
-    cash: sectionTotal(buckets.cash),
-    tfn:  sectionTotal(buckets.tfn),
-    abn:  sectionTotal(buckets.abn),
+    cash:         sectionTotal(buckets.cash),
+    tfn:          sectionTotal(buckets.tfn),
+    abn:          sectionTotal(buckets.abn),
     unclassified: sectionTotal(buckets.unclassified),
   };
   const grand = {
     total: round2(totals.cash.total + totals.tfn.total + totals.abn.total + totals.unclassified.total),
-    paid: round2(lines.filter(l => l.paid).reduce((s, l) => s + toNum(l.grand_total), 0)),
+    paid:  round2(lines.filter(l => l.paid).reduce((s, l) => s + toNum(l.grand_total), 0)),
     paid_count: lines.filter(l => l.paid).length,
     line_count: lines.length,
   };
 
-  // Pull active employees for the "Match to employee" dropdown on Unclassified rows
   const employees = db.prepare(`
-    SELECT id, employee_code, full_name, payment_type, rate_day, rate_night
+    SELECT id, employee_code, full_name, payment_type
     FROM employees WHERE active = 1 ORDER BY LOWER(full_name) ASC
   `).all();
 
@@ -277,18 +296,18 @@ router.get('/runs/:id', requirePermission('hr_employees'), (req, res) => {
     run,
     sections: SECTIONS,
     dowLabels: DOW_LABELS,
-    buckets,
-    totals,
-    grand,
-    employees,
-    fmtMoney,
-    periodLabel,
+    bucketLabels: BUCKET_LABELS,
+    bucketKeys: BUCKETS,
+    buckets, totals, grand, employees,
+    fmtMoney, periodLabel,
   });
 });
 
 // ============================================================================
 // POST /payroll/runs/:id/lines/:lineId — update a line
-//   Accepts JSON or form body. Recomputes totals after every update.
+//   - If payment_type changes → re-categorize from shifts_json
+//   - Else if `buckets[]` is present → use those edits
+//   - Always recompute totals + apply allowance edits
 // ============================================================================
 router.post('/runs/:id/lines/:lineId', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
@@ -300,34 +319,28 @@ router.post('/runs/:id/lines/:lineId', requirePermission('hr_employees'), (req, 
   const b = req.body || {};
   const updates = {};
 
-  // Hours editing — accept day_hours / night_hours arrays of 7 numbers
-  if (Array.isArray(b.day_hours) && b.day_hours.length === 7) {
-    updates.day_hours_json = JSON.stringify(b.day_hours.map(toNum));
-  }
-  if (Array.isArray(b.night_hours) && b.night_hours.length === 7) {
-    updates.night_hours_json = JSON.stringify(b.night_hours.map(toNum));
+  // Payment type
+  let newPT = line.payment_type || '';
+  let ptChanged = false;
+  if (b.payment_type !== undefined) {
+    const pt = String(b.payment_type || '').toLowerCase();
+    newPT = ['cash', 'tfn', 'abn'].includes(pt) ? pt : '';
+    if (newPT !== (line.payment_type || '')) {
+      ptChanged = true;
+      updates.payment_type = newPT;
+    }
   }
 
-  // Rate editing — also write back to employees if requested
-  if (b.rate_day !== undefined) updates.rate_day = toNum(b.rate_day);
-  if (b.rate_night !== undefined) updates.rate_night = toNum(b.rate_night);
+  // BSB / Account
+  if (b.bsb !== undefined)        updates.bsb = String(b.bsb || '').trim();
+  if (b.acc_number !== undefined) updates.acc_number = String(b.acc_number || '').trim();
 
   // Allowances
   if (b.travel_allowance !== undefined) updates.travel_allowance = toNum(b.travel_allowance);
-  if (b.meal_allowance !== undefined) updates.meal_allowance = toNum(b.meal_allowance);
-  if (b.other_allowance !== undefined) updates.other_allowance = toNum(b.other_allowance);
+  if (b.meal_allowance   !== undefined) updates.meal_allowance   = toNum(b.meal_allowance);
+  if (b.other_allowance  !== undefined) updates.other_allowance  = toNum(b.other_allowance);
 
-  // BSB / account
-  if (b.bsb !== undefined) updates.bsb = String(b.bsb || '').trim();
-  if (b.acc_number !== undefined) updates.acc_number = String(b.acc_number || '').trim();
-
-  // Payment type
-  if (b.payment_type !== undefined) {
-    const pt = String(b.payment_type || '').toLowerCase();
-    updates.payment_type = ['cash', 'tfn', 'abn'].includes(pt) ? pt : '';
-  }
-
-  // Paid toggle / ref
+  // Paid
   if (b.paid !== undefined) {
     const paidNow = (b.paid === true || b.paid === '1' || b.paid === 1 || b.paid === 'true' || b.paid === 'on') ? 1 : 0;
     updates.paid = paidNow;
@@ -335,37 +348,55 @@ router.post('/runs/:id/lines/:lineId', requirePermission('hr_employees'), (req, 
     if (!paidNow) updates.paid_at = null;
   }
   if (b.paid_ref !== undefined) updates.paid_ref = String(b.paid_ref || '').trim();
+  if (b.notes !== undefined)    updates.notes    = String(b.notes || '').trim();
 
-  // Notes
-  if (b.notes !== undefined) updates.notes = String(b.notes || '').trim();
+  // Resolve buckets — three paths
+  const isPH = makeIsPH(loadPHSet(db));
+  let bucketsState = null;
 
-  // Apply core edits, then recompute totals from the merged state
+  if (ptChanged) {
+    // Re-categorize from shifts_json with new section's rules + employee/classification rates
+    const employee = line.employee_id ? db.prepare('SELECT * FROM employees WHERE id = ?').get(line.employee_id) : null;
+    const classification = (employee && employee.award_classification_id)
+      ? fetchClassification(db, employee.award_classification_id) : null;
+    const { buckets, auto } = recategorizeFromShifts(line, { paymentType: newPT, employee, classification, isPH });
+    bucketsState = buckets;
+    if (b.travel_allowance === undefined) updates.travel_allowance = auto.travel;
+    if (b.meal_allowance   === undefined) updates.meal_allowance   = auto.meal;
+  } else if (b.buckets && typeof b.buckets === 'object') {
+    // Manual bucket edits — accept hours[7] + rate per bucket
+    bucketsState = safeParseJson(line.buckets_json, null) || emptyBuckets({});
+    for (const k of BUCKETS) {
+      if (!bucketsState[k]) bucketsState[k] = { hours: [0,0,0,0,0,0,0], total_hours: 0, rate: 0, total_wages: 0 };
+      const bk = b.buckets[k];
+      if (!bk) continue;
+      if (Array.isArray(bk.hours) && bk.hours.length === 7) {
+        bucketsState[k].hours = bk.hours.map(toNum).map(round2);
+      }
+      if (bk.rate !== undefined) bucketsState[k].rate = toNum(bk.rate);
+    }
+  } else {
+    // No bucket changes, no section change — keep existing
+    bucketsState = safeParseJson(line.buckets_json, null);
+  }
+
+  if (bucketsState) updates.buckets_json = JSON.stringify(bucketsState);
+
+  // Merge & recompute totals (uses buckets_json + travel/meal/other from updates+line)
   const merged = Object.assign({}, line, updates);
-  const recomputed = recomputeLine(merged);
+  const recomputed = recomputeLine(merged, { isPH });
   Object.assign(updates, recomputed);
   updates.updated_at = new Date().toISOString();
 
-  // Build the UPDATE
-  const cols = Object.keys(updates);
-  if (cols.length === 0) return res.json({ ok: true, line });
-  const setSql = cols.map(c => `${c} = ?`).join(', ');
-  const params = cols.map(c => updates[c]);
-  params.push(req.params.lineId);
-  db.prepare(`UPDATE pay_run_lines SET ${setSql} WHERE id = ?`).run(...params);
-
-  // Optionally persist BSB / account / rates back to the employee record
+  // Optionally save back to the employee record
   if (line.employee_id) {
     const empUpdates = [];
     const empParams = [];
-    if (b.save_bsb_to_employee && (b.bsb !== undefined || b.acc_number !== undefined)) {
-      if (b.bsb !== undefined)        { empUpdates.push('payroll_bsb = ?');     empParams.push(updates.bsb); }
-      if (b.acc_number !== undefined) { empUpdates.push('payroll_account = ?'); empParams.push(updates.acc_number); }
+    if (b.save_bsb_to_employee) {
+      if (updates.bsb !== undefined)        { empUpdates.push('payroll_bsb = ?');     empParams.push(updates.bsb); }
+      if (updates.acc_number !== undefined) { empUpdates.push('payroll_account = ?'); empParams.push(updates.acc_number); }
     }
-    if (b.save_rates_to_employee && (b.rate_day !== undefined || b.rate_night !== undefined)) {
-      if (b.rate_day !== undefined)   { empUpdates.push('rate_day = ?');   empParams.push(updates.rate_day); }
-      if (b.rate_night !== undefined) { empUpdates.push('rate_night = ?'); empParams.push(updates.rate_night); }
-    }
-    if (b.save_payment_type_to_employee && b.payment_type !== undefined) {
+    if (b.save_payment_type_to_employee && updates.payment_type !== undefined) {
       empUpdates.push('payment_type = ?'); empParams.push(updates.payment_type);
     }
     if (empUpdates.length > 0) {
@@ -374,20 +405,25 @@ router.post('/runs/:id/lines/:lineId', requirePermission('hr_employees'), (req, 
     }
   }
 
-  // Re-fetch the line for the response
-  const fresh = db.prepare('SELECT * FROM pay_run_lines WHERE id = ?').get(req.params.lineId);
-  fresh.day_hours = safeJson(fresh.day_hours_json, [0, 0, 0, 0, 0, 0, 0]);
-  fresh.night_hours = safeJson(fresh.night_hours_json, [0, 0, 0, 0, 0, 0, 0]);
+  // Apply UPDATE
+  const cols = Object.keys(updates);
+  if (cols.length > 0) {
+    const setSql = cols.map(c => `${c} = ?`).join(', ');
+    const params = cols.map(c => updates[c]);
+    params.push(req.params.lineId);
+    db.prepare(`UPDATE pay_run_lines SET ${setSql} WHERE id = ?`).run(...params);
+  }
 
-  // AJAX → JSON; form submit → redirect back to the run
   const wantsJson = req.xhr || (req.headers.accept || '').includes('application/json');
-  if (wantsJson) return res.json({ ok: true, line: fresh });
+  if (wantsJson) {
+    const fresh = db.prepare('SELECT * FROM pay_run_lines WHERE id = ?').get(req.params.lineId);
+    return res.json({ ok: true, line: hydrateLine(fresh) });
+  }
   return res.redirect('/payroll/runs/' + run.id);
 });
 
 // ============================================================================
-// POST /payroll/runs/:id/lines/:lineId/match — match an unmatched line to an
-// existing employee. Pulls rate + payment_type + BSB from employee if requested.
+// POST /payroll/runs/:id/lines/:lineId/match — link to employee + recategorize
 // ============================================================================
 router.post('/runs/:id/lines/:lineId/match', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
@@ -399,17 +435,24 @@ router.post('/runs/:id/lines/:lineId/match', requirePermission('hr_employees'), 
   const emp = db.prepare('SELECT * FROM employees WHERE id = ?').get(empId);
   if (!emp) { req.flash('error', 'Employee not found'); return res.redirect('/payroll/runs/' + req.params.id); }
 
+  const newPT = (emp.payment_type && ['cash', 'tfn', 'abn'].includes(String(emp.payment_type).toLowerCase()))
+    ? String(emp.payment_type).toLowerCase() : (line.payment_type || '');
+  const classification = emp.award_classification_id ? fetchClassification(db, emp.award_classification_id) : null;
+  const isPH = makeIsPH(loadPHSet(db));
+  const { buckets, auto } = recategorizeFromShifts(line, { paymentType: newPT, employee: emp, classification, isPH });
+
   const updates = {
     employee_id: emp.id,
-    payment_type: (emp.payment_type && ['cash', 'tfn', 'abn'].includes(String(emp.payment_type).toLowerCase()))
-      ? String(emp.payment_type).toLowerCase() : line.payment_type || '',
+    payment_type: newPT,
     bsb: line.bsb || (emp.payroll_bsb || ''),
     acc_number: line.acc_number || (emp.payroll_account || ''),
-    rate_day: toNum(emp.rate_day) || line.rate_day,
-    rate_night: toNum(emp.rate_night) || line.rate_night,
+    buckets_json: JSON.stringify(buckets),
+    travel_allowance: auto.travel,
+    meal_allowance: auto.meal,
     updated_at: new Date().toISOString(),
   };
-  const recomputed = recomputeLine(Object.assign({}, line, updates));
+  const merged = Object.assign({}, line, updates);
+  const recomputed = recomputeLine(merged, { isPH });
   Object.assign(updates, recomputed);
 
   const cols = Object.keys(updates);
@@ -423,7 +466,54 @@ router.post('/runs/:id/lines/:lineId/match', requirePermission('hr_employees'), 
 });
 
 // ============================================================================
-// POST /payroll/runs/:id/delete — delete a pay run (cascades to lines)
+// POST /payroll/runs/:id/refresh — re-categorize ALL lines from shifts_json
+//   Useful after editing rates / classifications / public holidays.
+// ============================================================================
+router.post('/runs/:id/refresh', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
+  if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+
+  const isPH = makeIsPH(loadPHSet(db));
+  const lines = db.prepare('SELECT * FROM pay_run_lines WHERE pay_run_id = ?').all(run.id);
+
+  const tx = db.transaction(() => {
+    let n = 0;
+    for (const line of lines) {
+      const employee = line.employee_id ? db.prepare('SELECT * FROM employees WHERE id = ?').get(line.employee_id) : null;
+      const classification = (employee && employee.award_classification_id)
+        ? fetchClassification(db, employee.award_classification_id) : null;
+      const { buckets, auto } = recategorizeFromShifts(line, {
+        paymentType: line.payment_type || '', employee, classification, isPH,
+      });
+      const updates = {
+        buckets_json: JSON.stringify(buckets),
+        travel_allowance: auto.travel,
+        meal_allowance:   auto.meal,
+        bsb: employee ? (employee.payroll_bsb || line.bsb || '') : line.bsb,
+        acc_number: employee ? (employee.payroll_account || line.acc_number || '') : line.acc_number,
+        updated_at: new Date().toISOString(),
+      };
+      const merged = Object.assign({}, line, updates);
+      const recomputed = recomputeLine(merged, { isPH });
+      Object.assign(updates, recomputed);
+      const cols = Object.keys(updates);
+      const setSql = cols.map(c => `${c} = ?`).join(', ');
+      const params = cols.map(c => updates[c]);
+      params.push(line.id);
+      db.prepare(`UPDATE pay_run_lines SET ${setSql} WHERE id = ?`).run(...params);
+      n++;
+    }
+    return n;
+  });
+  const n = tx();
+
+  req.flash('success', `Refreshed ${n} lines from current rates and classifications.`);
+  res.redirect('/payroll/runs/' + run.id);
+});
+
+// ============================================================================
+// POST /payroll/runs/:id/delete
 // ============================================================================
 router.post('/runs/:id/delete', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
@@ -444,8 +534,7 @@ router.post('/runs/:id/delete', requirePermission('hr_employees'), (req, res) =>
 });
 
 // ============================================================================
-// GET /payroll/runs/:id/export.xlsx — download the run as an xlsx mirroring
-// the existing T&S template (Cash + Management / TFN / ABN sheets).
+// GET /payroll/runs/:id/export.xlsx
 // ============================================================================
 router.get('/runs/:id/export.xlsx', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
@@ -456,14 +545,12 @@ router.get('/runs/:id/export.xlsx', requirePermission('hr_employees'), (req, res
     SELECT * FROM pay_run_lines WHERE pay_run_id = ?
     ORDER BY payment_type ASC, LOWER(full_name) ASC
   `).all(run.id);
-  for (const l of lines) {
-    l.day_hours = safeJson(l.day_hours_json, [0, 0, 0, 0, 0, 0, 0]);
-    l.night_hours = safeJson(l.night_hours_json, [0, 0, 0, 0, 0, 0, 0]);
-  }
+  for (const l of lines) hydrateLine(l);
 
-  const cash = lines.filter(l => l.payment_type === 'cash');
-  const tfn  = lines.filter(l => l.payment_type === 'tfn');
-  const abn  = lines.filter(l => l.payment_type === 'abn');
+  const sectionData = SECTIONS.map(s => ({
+    name: s.label, key: s.key, accent: s.accent, bucketKeys: s.buckets, gst: s.key === 'cash',
+    lines: lines.filter(l => l.payment_type === s.key),
+  }));
 
   const filename = `PayRun_${(run.label || periodLabel(run.period_start, run.period_end)).replace(/[^A-Za-z0-9._-]/g, '_')}.xlsx`;
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -473,36 +560,25 @@ router.get('/runs/:id/export.xlsx', requirePermission('hr_employees'), (req, res
   archive.on('error', (err) => { console.error('xlsx archive error:', err); try { res.end(); } catch (e) {} });
   archive.pipe(res);
 
-  // [Content_Types].xml + workbook + sheets
-  const sheets = [
-    { name: 'Cash', heading: 'CASH WORKERS', lines: cash, gst: true },
-    { name: 'TFN',  heading: 'TFN WORKERS',  lines: tfn,  gst: false },
-    { name: 'ABN',  heading: 'ABN WORKERS',  lines: abn,  gst: false },
-  ];
-
-  archive.append(buildContentTypes(sheets), { name: '[Content_Types].xml' });
+  archive.append(buildContentTypes(sectionData), { name: '[Content_Types].xml' });
   archive.append(buildRels(), { name: '_rels/.rels' });
-  archive.append(buildWorkbook(sheets), { name: 'xl/workbook.xml' });
-  archive.append(buildWorkbookRels(sheets), { name: 'xl/_rels/workbook.xml.rels' });
+  archive.append(buildWorkbook(sectionData), { name: 'xl/workbook.xml' });
+  archive.append(buildWorkbookRels(sectionData), { name: 'xl/_rels/workbook.xml.rels' });
   archive.append(buildStyles(), { name: 'xl/styles.xml' });
-  sheets.forEach((s, idx) => {
+  sectionData.forEach((s, idx) => {
     archive.append(buildSheetXml(s, run), { name: `xl/worksheets/sheet${idx + 1}.xml` });
   });
   archive.finalize();
 });
 
-// ----- xlsx XML builders ---------------------------------------------------
+// ----- xlsx XML builders (one row per non-zero bucket per worker) ----------
 function xmlEscape(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
-function colLetter(n) { // 1 → A, 27 → AA
-  let s = '';
-  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
-  return s;
-}
-function cellRef(col, row) { return colLetter(col) + row; }
+function colLetter(n) { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+function cellRef(c, r) { return colLetter(c) + r; }
 
 function buildContentTypes(sheets) {
   const overrides = sheets.map((_, i) =>
@@ -524,28 +600,23 @@ function buildRels() {
 </Relationships>`;
 }
 function buildWorkbook(sheets) {
-  const sheetTags = sheets.map((s, i) =>
-    `<sheet name="${xmlEscape(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`
-  ).join('');
+  const t = sheets.map((s, i) => `<sheet name="${xmlEscape(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('');
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
   xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets>${sheetTags}</sheets>
+<sheets>${t}</sheets>
 </workbook>`;
 }
 function buildWorkbookRels(sheets) {
-  const rels = sheets.map((s, i) =>
-    `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`
-  ).join('');
-  const stylesId = sheets.length + 1;
+  const r = sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('');
+  const sId = sheets.length + 1;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-${rels}
-<Relationship Id="rId${stylesId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+${r}
+<Relationship Id="rId${sId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>`;
 }
 function buildStyles() {
-  // 0 = default, 1 = bold header, 2 = currency, 3 = bold + grey fill
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00"/></numFmts>
@@ -570,87 +641,72 @@ function buildStyles() {
 </styleSheet>`;
 }
 
-// Build a single worksheet matching the T&S template:
-//  Row 1-6: padding (top totals area)
-//  Row 7: section heading (e.g. "CASH WORKERS")
-//  Row 8: column headers
-//  Rows 9+: per-worker pairs (Day row, Night row)
-//  Last rows: subtotals (+ GST for Cash)
 function buildSheetXml(section, run) {
-  const cols = ['First & Last Name', '', 'BSB / Acc', 'Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
-    'Total Hours', 'Rate', 'Total', 'Total Wages', 'Travel', 'Meal', 'Other Allow.', 'Total Allow.', 'Total'];
-  const rows = [];
+  const cols = ['First & Last Name', 'BSB / Acc', 'Time', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+    'Total Hours', 'Rate', 'Sub-total', 'Total Wages', 'Travel', 'Meal', 'Other', 'Total Allow.', 'Total'];
+  const rows = {};
 
-  // Row 7: section heading
-  const headingRow = [];
-  headingRow[1] = { v: section.heading, t: 'inlineStr', s: 1 };
-  rows[7] = headingRow;
+  // Top corner
+  rows[1] = { 1: { v: `Pay run: ${run.label || ''}`, t: 'inlineStr', s: 1 } };
+  rows[2] = { 1: { v: `${run.period_start} → ${run.period_end}`, t: 'inlineStr' } };
 
-  // Row 8: column headers
+  // Section heading
+  rows[7] = { 1: { v: `${section.name.toUpperCase()} WORKERS`, t: 'inlineStr', s: 1 } };
+
+  // Column headers
   const headerRow = {};
   cols.forEach((c, i) => { if (c) headerRow[i + 1] = { v: c, t: 'inlineStr', s: 3 }; });
   rows[8] = headerRow;
 
   let r = 9;
   for (const line of section.lines) {
-    // Day row
-    const dayR = {};
-    dayR[1] = { v: line.full_name, t: 'inlineStr' };
-    dayR[3] = { v: [line.bsb, line.acc_number].filter(Boolean).join(' / '), t: 'inlineStr' };
-    dayR[4] = { v: 'Day', t: 'inlineStr' };
-    for (let d = 0; d < 7; d++) {
-      const h = (line.day_hours[d] || 0);
-      if (h) dayR[5 + d] = { v: h, t: 'n' };
+    const buckets = line.buckets || {};
+    const activeKeys = section.bucketKeys.filter(k => (buckets[k]?.total_hours || 0) > 0);
+    if (activeKeys.length === 0) {
+      // Show worker even if no hours, on a single empty row
+      activeKeys.push('day_normal');
     }
-    dayR[12] = { v: line.total_day_hours || 0, t: 'n' };
-    dayR[13] = { v: line.rate_day || 0, t: 'n', s: 2 };
-    dayR[14] = { v: line.total_day_wages || 0, t: 'n', s: 2 };
-    dayR[15] = { v: line.total_wages || 0, t: 'n', s: 2 };
-    dayR[16] = { v: line.travel_allowance || 0, t: 'n', s: 2 };
-    dayR[17] = { v: line.meal_allowance || 0, t: 'n', s: 2 };
-    dayR[18] = { v: line.other_allowance || 0, t: 'n', s: 2 };
-    dayR[19] = { v: line.total_allowance || 0, t: 'n', s: 2 };
-    dayR[20] = { v: line.grand_total || 0, t: 'n', s: 2 };
-    rows[r++] = dayR;
 
-    // Night row
-    const nightR = {};
-    nightR[4] = { v: 'Night', t: 'inlineStr' };
-    for (let d = 0; d < 7; d++) {
-      const h = (line.night_hours[d] || 0);
-      if (h) nightR[5 + d] = { v: h, t: 'n' };
-    }
-    nightR[12] = { v: line.total_night_hours || 0, t: 'n' };
-    nightR[13] = { v: line.rate_night || 0, t: 'n', s: 2 };
-    nightR[14] = { v: line.total_night_wages || 0, t: 'n', s: 2 };
-    rows[r++] = nightR;
+    activeKeys.forEach((bk, idx) => {
+      const b = buckets[bk] || { hours: [0,0,0,0,0,0,0], total_hours: 0, rate: 0, total_wages: 0 };
+      const row = {};
+      if (idx === 0) {
+        row[1] = { v: line.full_name, t: 'inlineStr' };
+        row[2] = { v: [line.bsb, line.acc_number].filter(Boolean).join(' / '), t: 'inlineStr' };
+      }
+      row[3] = { v: BUCKET_LABELS[bk] || bk, t: 'inlineStr' };
+      for (let d = 0; d < 7; d++) {
+        const h = (b.hours && b.hours[d]) || 0;
+        if (h) row[4 + d] = { v: h, t: 'n' };
+      }
+      row[11] = { v: b.total_hours || 0, t: 'n' };
+      row[12] = { v: b.rate || 0, t: 'n', s: 2 };
+      row[13] = { v: b.total_wages || 0, t: 'n', s: 2 };
+      // Worker totals appear on the LAST row (so it lines up visually)
+      if (idx === activeKeys.length - 1) {
+        row[14] = { v: line.total_wages || 0, t: 'n', s: 2 };
+        row[15] = { v: line.travel_allowance || 0, t: 'n', s: 2 };
+        row[16] = { v: line.meal_allowance || 0, t: 'n', s: 2 };
+        row[17] = { v: line.other_allowance || 0, t: 'n', s: 2 };
+        row[18] = { v: line.total_allowance || 0, t: 'n', s: 2 };
+        row[19] = { v: line.grand_total || 0, t: 'n', s: 2 };
+      }
+      rows[r++] = row;
+    });
   }
 
   // Subtotals
   const totals = section.lines.reduce((acc, l) => {
-    acc.total += toNum(l.grand_total); acc.wages += toNum(l.total_wages); acc.allow += toNum(l.total_allowance); return acc;
-  }, { total: 0, wages: 0, allow: 0 });
-  r++; // gap
-  const totalRow = {};
-  totalRow[17] = { v: 'Total', t: 'inlineStr', s: 1 };
-  totalRow[20] = { v: round2(totals.total), t: 'n', s: 2 };
-  rows[r++] = totalRow;
+    acc.total += toNum(l.grand_total); return acc;
+  }, { total: 0 });
+  r++;
+  rows[r++] = { 16: { v: 'Total', t: 'inlineStr', s: 1 }, 19: { v: round2(totals.total), t: 'n', s: 2 } };
   if (section.gst) {
-    const gstRow = {};
-    gstRow[17] = { v: 'GST', t: 'inlineStr', s: 1 };
-    gstRow[20] = { v: round2(totals.total * 0.10), t: 'n', s: 2 };
-    rows[r++] = gstRow;
-    const withGst = {};
-    withGst[17] = { v: 'Total + GST', t: 'inlineStr', s: 1 };
-    withGst[20] = { v: round2(totals.total * 1.10), t: 'n', s: 2 };
-    rows[r++] = withGst;
+    rows[r++] = { 16: { v: 'GST', t: 'inlineStr', s: 1 }, 19: { v: round2(totals.total * 0.10), t: 'n', s: 2 } };
+    rows[r++] = { 16: { v: 'Total + GST', t: 'inlineStr', s: 1 }, 19: { v: round2(totals.total * 1.10), t: 'n', s: 2 } };
   }
 
-  // Top corner: pay run label + period
-  rows[1] = { 1: { v: `Pay run: ${run.label || ''}`, t: 'inlineStr', s: 1 } };
-  rows[2] = { 1: { v: `${run.period_start} → ${run.period_end}`, t: 'inlineStr' } };
-
-  // Render rows → XML
+  // Render to XML
   let xmlRows = '';
   Object.keys(rows).map(n => parseInt(n, 10)).sort((a, b) => a - b).forEach(rowNum => {
     const row = rows[rowNum];
@@ -658,9 +714,7 @@ function buildSheetXml(section, run) {
       const c = row[colNum];
       const ref = cellRef(colNum, rowNum);
       const styleAttr = c.s ? ` s="${c.s}"` : '';
-      if (c.t === 'inlineStr') {
-        return `<c r="${ref}"${styleAttr} t="inlineStr"><is><t>${xmlEscape(c.v)}</t></is></c>`;
-      }
+      if (c.t === 'inlineStr') return `<c r="${ref}"${styleAttr} t="inlineStr"><is><t>${xmlEscape(c.v)}</t></is></c>`;
       return `<c r="${ref}"${styleAttr}><v>${c.v}</v></c>`;
     }).join('');
     xmlRows += `<row r="${rowNum}">${cells}</row>`;
@@ -673,25 +727,36 @@ function buildSheetXml(section, run) {
 }
 
 // ============================================================================
-// GET /payroll/rates — set rate_day / rate_night for all employees in one screen
+// GET /payroll/rates — section-tabbed bulk rate editor
 // ============================================================================
 router.get('/rates', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
   const employees = db.prepare(`
-    SELECT id, employee_code, full_name, payment_type, rate_day, rate_night,
-      payroll_bsb, payroll_account
+    SELECT id, employee_code, full_name, payment_type,
+      rate_day, rate_ot, rate_dt,
+      rate_night, rate_night_ot, rate_night_dt,
+      rate_weekend, rate_public_holiday,
+      rate_meal, rate_fares_daily,
+      payroll_bsb, payroll_account,
+      award_classification_id
     FROM employees
     WHERE active = 1
-    ORDER BY payment_type DESC, LOWER(full_name) ASC
+    ORDER BY LOWER(full_name) ASC
+  `).all();
+  const classifications = db.prepare(`
+    SELECT id, classification, award_name, effective_from
+    FROM award_classifications
+    WHERE active = 1
+    ORDER BY classification ASC
   `).all();
   res.render('payroll-runs/rates', {
     title: 'Worker Rates',
     currentPage: 'pay-runs',
-    employees,
+    employees, classifications,
   });
 });
 
-// POST /payroll/rates — bulk update rates + payment_type + BSB
+// POST /payroll/rates — bulk update
 router.post('/rates', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
   const data = req.body && req.body.rows;
@@ -702,8 +767,11 @@ router.post('/rates', requirePermission('hr_employees'), (req, res) => {
 
   const stmt = db.prepare(`
     UPDATE employees SET
-      rate_day = ?, rate_night = ?,
-      payment_type = ?,
+      payment_type = ?, award_classification_id = ?,
+      rate_day = ?, rate_ot = ?, rate_dt = ?,
+      rate_night = ?, rate_night_ot = ?, rate_night_dt = ?,
+      rate_weekend = ?, rate_public_holiday = ?,
+      rate_meal = ?, rate_fares_daily = ?,
       payroll_bsb = ?, payroll_account = ?,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
@@ -715,9 +783,14 @@ router.post('/rates', requirePermission('hr_employees'), (req, res) => {
       if (!empId) continue;
       const r = data[id];
       const pt = String(r.payment_type || '').toLowerCase();
+      const cid = parseInt(r.award_classification_id, 10) || null;
       stmt.run(
-        toNum(r.rate_day), toNum(r.rate_night),
         ['cash', 'tfn', 'abn'].includes(pt) ? pt : '',
+        cid,
+        toNum(r.rate_day), toNum(r.rate_ot), toNum(r.rate_dt),
+        toNum(r.rate_night), toNum(r.rate_night_ot), toNum(r.rate_night_dt),
+        toNum(r.rate_weekend), toNum(r.rate_public_holiday),
+        toNum(r.rate_meal), toNum(r.rate_fares_daily),
         String(r.payroll_bsb || '').trim(),
         String(r.payroll_account || '').trim(),
         empId,
@@ -735,6 +808,114 @@ router.post('/rates', requirePermission('hr_employees'), (req, res) => {
 
   req.flash('success', `Saved rates for ${n} employees.`);
   res.redirect('/payroll/rates');
+});
+
+// ============================================================================
+// /payroll/award-rates — Fair Work classification rates
+// ============================================================================
+router.get('/award-rates', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const classifications = db.prepare(`
+    SELECT * FROM award_classifications ORDER BY active DESC, classification ASC
+  `).all();
+  res.render('payroll-runs/award-rates', {
+    title: 'Award Rates',
+    currentPage: 'pay-runs',
+    classifications,
+  });
+});
+
+router.post('/award-rates', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const b = req.body || {};
+  const id = parseInt(b.id, 10) || null;
+  const fields = {
+    award_name: String(b.award_name || '').trim(),
+    classification: String(b.classification || '').trim(),
+    effective_from: /^\d{4}-\d{2}-\d{2}$/.test(b.effective_from || '') ? b.effective_from : '2024-07-01',
+    effective_to: /^\d{4}-\d{2}-\d{2}$/.test(b.effective_to || '') ? b.effective_to : null,
+    rate_day: toNum(b.rate_day),
+    rate_day_ot: toNum(b.rate_day_ot),
+    rate_day_dt: toNum(b.rate_day_dt),
+    rate_night: toNum(b.rate_night),
+    rate_night_ot: toNum(b.rate_night_ot),
+    rate_night_dt: toNum(b.rate_night_dt),
+    rate_weekend: toNum(b.rate_weekend),
+    rate_public_holiday: toNum(b.rate_public_holiday),
+    rate_meal: toNum(b.rate_meal),
+    rate_fares_daily: toNum(b.rate_fares_daily),
+    notes: String(b.notes || '').trim(),
+    active: b.active === '0' ? 0 : 1,
+  };
+  if (!fields.classification) {
+    req.flash('error', 'Classification name is required.');
+    return res.redirect('/payroll/award-rates');
+  }
+
+  if (id) {
+    const cols = Object.keys(fields);
+    const setSql = cols.map(c => `${c} = ?`).join(', ');
+    const params = cols.map(c => fields[c]);
+    params.push(id);
+    db.prepare(`UPDATE award_classifications SET ${setSql}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(...params);
+    req.flash('success', `Updated ${fields.classification}.`);
+  } else {
+    const cols = Object.keys(fields);
+    const placeholders = cols.map(() => '?').join(', ');
+    const params = cols.map(c => fields[c]);
+    db.prepare(`INSERT INTO award_classifications (${cols.join(', ')}) VALUES (${placeholders})`).run(...params);
+    req.flash('success', `Added ${fields.classification}.`);
+  }
+  res.redirect('/payroll/award-rates');
+});
+
+router.post('/award-rates/:id/delete', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const cls = db.prepare('SELECT * FROM award_classifications WHERE id = ?').get(req.params.id);
+  if (!cls) { req.flash('error', 'Classification not found.'); return res.redirect('/payroll/award-rates'); }
+  // Soft-delete: set active = 0 (so historical pay runs aren't broken)
+  db.prepare('UPDATE award_classifications SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(cls.id);
+  req.flash('success', `Deactivated ${cls.classification}.`);
+  res.redirect('/payroll/award-rates');
+});
+
+// ============================================================================
+// /payroll/holidays — public holidays (NSW seeded for 2025–2027)
+// ============================================================================
+router.get('/holidays', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const holidays = db.prepare('SELECT * FROM public_holidays ORDER BY date ASC').all();
+  res.render('payroll-runs/holidays', {
+    title: 'Public Holidays',
+    currentPage: 'pay-runs',
+    holidays,
+  });
+});
+
+router.post('/holidays', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const b = req.body || {};
+  const date = String(b.date || '').trim();
+  const label = String(b.label || '').trim();
+  const jurisdiction = String(b.jurisdiction || 'NSW').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !label) {
+    req.flash('error', 'Date (YYYY-MM-DD) and label required.');
+    return res.redirect('/payroll/holidays');
+  }
+  try {
+    db.prepare('INSERT INTO public_holidays (date, label, jurisdiction) VALUES (?, ?, ?)').run(date, label, jurisdiction);
+    req.flash('success', `Added ${label} on ${date}.`);
+  } catch (e) {
+    req.flash('error', String(e.message).includes('UNIQUE') ? `${date} already exists` : e.message);
+  }
+  res.redirect('/payroll/holidays');
+});
+
+router.post('/holidays/:id/delete', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  db.prepare('DELETE FROM public_holidays WHERE id = ?').run(req.params.id);
+  req.flash('success', 'Holiday removed.');
+  res.redirect('/payroll/holidays');
 });
 
 module.exports = router;

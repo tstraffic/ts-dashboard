@@ -1,0 +1,97 @@
+<% locals.currentPage = 'pay-runs' %>
+<%
+  function fmtDateAU(s) {
+    if (!s) return '';
+    const d = new Date(s + 'T00:00:00');
+    return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  // Group by year for nicer display
+  const byYear = {};
+  holidays.forEach(h => {
+    const y = (h.date || '').slice(0, 4);
+    if (!byYear[y]) byYear[y] = [];
+    byYear[y].push(h);
+  });
+  const years = Object.keys(byYear).sort();
+%>
+
+<div class="space-y-5 max-w-4xl">
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <div>
+      <a href="/payroll/rates" class="text-sm text-brand-600 hover:underline">← Worker Rates</a>
+      <h1 class="text-2xl font-bold text-gray-900 mt-1">Public Holidays</h1>
+      <p class="text-sm text-gray-500 mt-1">Shifts on these dates pay TFN workers at the public holiday rate. Pre-seeded with NSW dates for 2025–2027.</p>
+    </div>
+  </div>
+
+  <!-- Add form -->
+  <form method="POST" action="/payroll/holidays" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+    <%- include('../partials/csrf') %>
+    <div class="flex items-end gap-3 flex-wrap">
+      <div>
+        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Date</label>
+        <input type="date" name="date" required class="px-3 py-2 border border-gray-300 rounded-lg text-sm tabular-nums">
+      </div>
+      <div class="flex-1 min-w-[200px]">
+        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Label</label>
+        <input type="text" name="label" required placeholder="e.g. Australia Day" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Jurisdiction</label>
+        <select name="jurisdiction" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+          <option value="NSW">NSW</option>
+          <option value="VIC">VIC</option>
+          <option value="QLD">QLD</option>
+          <option value="ACT">ACT</option>
+          <option value="WA">WA</option>
+          <option value="SA">SA</option>
+          <option value="TAS">TAS</option>
+          <option value="NT">NT</option>
+          <option value="NATIONAL">National</option>
+        </select>
+      </div>
+      <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">Add</button>
+    </div>
+  </form>
+
+  <!-- Holiday list grouped by year -->
+  <% if (holidays.length === 0) { %>
+    <div class="bg-white border border-gray-200 rounded-xl p-10 text-center">
+      <p class="text-sm text-gray-500 font-semibold">No holidays yet</p>
+      <p class="text-xs text-gray-400 mt-1">Add the dates you want categorized as public holiday rate.</p>
+    </div>
+  <% } else { %>
+    <% years.forEach(year => { %>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+          <h2 class="font-bold text-gray-900"><%= year %></h2>
+          <p class="text-xs text-gray-500"><%= byYear[year].length %> dates</p>
+        </div>
+        <ul class="divide-y divide-gray-100">
+          <% byYear[year].forEach(h => { %>
+            <li class="px-4 py-2.5 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3 flex-1 min-w-0">
+                <span class="text-sm font-mono text-gray-700 tabular-nums w-32"><%= fmtDateAU(h.date) %></span>
+                <span class="text-sm font-semibold text-gray-900 flex-1 truncate"><%= h.label %></span>
+                <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400"><%= h.jurisdiction %></span>
+              </div>
+              <form method="POST" action="/payroll/holidays/<%= h.id %>/delete" onsubmit="return confirm('Remove <%= h.label %> on <%= h.date %>?')">
+                <%- include('../partials/csrf') %>
+                <button type="submit" class="px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 rounded">Delete</button>
+              </form>
+            </li>
+          <% }) %>
+        </ul>
+      </div>
+    <% }) %>
+  <% } %>
+</div>
+
+<% if (flash_success && flash_success.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-semibold shadow-lg z-50" id="flash"><%= flash_success[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flash')?.remove(), 2800);</script>
+<% } %>
+<% if (flash_error && flash_error.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold shadow-lg z-50" id="flasherr"><%= flash_error[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flasherr')?.remove(), 4000);</script>
+<% } %>
