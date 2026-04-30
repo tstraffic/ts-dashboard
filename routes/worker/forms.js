@@ -371,24 +371,39 @@ const VEHICLE_PRESTART_ITEMS = [
   { key: 'load_restraint',    label: 'Load Restraint' },
 ];
 
+// All five Job-Pack forms only make sense bound to a specific shift. If a
+// worker hits one of these routes without an allocationId we redirect them
+// back to their jobs list — the FORMS tab on the relevant shift is the
+// only entry point that gets the submission tied to the right allocation.
+function requireAllocation(req, res) {
+  const db = getDb();
+  const worker = req.session.worker;
+  const allocationId = req.query.allocationId ? Number(req.query.allocationId) : null;
+  if (!allocationId) {
+    req.flash('error', 'Open this checklist from the shift it belongs to.');
+    res.redirect('/w/jobs');
+    return null;
+  }
+  const allocation = db.prepare(`
+    SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
+    FROM crew_allocations ca
+    JOIN jobs j ON ca.job_id = j.id
+    WHERE ca.id = ? AND ca.crew_member_id = ?
+  `).get(allocationId, worker.id);
+  if (!allocation) {
+    req.flash('error', 'Shift not found or not yours.');
+    res.redirect('/w/jobs');
+    return null;
+  }
+  return allocation;
+}
+
 // GET /w/forms/vehicle-prestart — Render the form
 router.get('/forms/vehicle-prestart', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const allocationId = req.query.allocationId ? Number(req.query.allocationId) : null;
-
-  // Caller may land here from a job detail (allocationId set) or from the
-  // generic forms launcher. When set, prefill the booking summary so the
-  // worker doesn't retype it.
-  let allocation = null;
-  if (allocationId) {
-    allocation = db.prepare(`
-      SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
-      FROM crew_allocations ca
-      JOIN jobs j ON ca.job_id = j.id
-      WHERE ca.id = ? AND ca.crew_member_id = ?
-    `).get(allocationId, worker.id);
-  }
+  const allocation = requireAllocation(req, res);
+  if (!allocation) return;
 
   // Vehicle suggestions: prefer the company_vehicle_assigned field on the
   // worker's employee row, then anything they've used on previous vehicle
@@ -535,19 +550,8 @@ const RA_QUESTIONS = [
 ];
 
 router.get('/forms/risk-assessment', (req, res) => {
-  const db = getDb();
-  const worker = req.session.worker;
-  const allocationId = req.query.allocationId ? Number(req.query.allocationId) : null;
-
-  let allocation = null;
-  if (allocationId) {
-    allocation = db.prepare(`
-      SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
-      FROM crew_allocations ca
-      JOIN jobs j ON ca.job_id = j.id
-      WHERE ca.id = ? AND ca.crew_member_id = ?
-    `).get(allocationId, worker.id);
-  }
+  const allocation = requireAllocation(req, res);
+  if (!allocation) return;
 
   res.render('worker/forms/risk-assessment', {
     title: 'Risk Assessment & Toolbox',
@@ -619,19 +623,8 @@ router.post('/forms/risk-assessment', (req, res) => {
 // share the same canonical list.
 
 router.get('/forms/tc-prestart', (req, res) => {
-  const db = getDb();
-  const worker = req.session.worker;
-  const allocationId = req.query.allocationId ? Number(req.query.allocationId) : null;
-
-  let allocation = null;
-  if (allocationId) {
-    allocation = db.prepare(`
-      SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
-      FROM crew_allocations ca
-      JOIN jobs j ON ca.job_id = j.id
-      WHERE ca.id = ? AND ca.crew_member_id = ?
-    `).get(allocationId, worker.id);
-  }
+  const allocation = requireAllocation(req, res);
+  if (!allocation) return;
 
   res.render('worker/forms/tc-prestart', {
     title: 'TC Prestart Declaration',
@@ -694,17 +687,8 @@ router.post('/forms/tc-prestart', (req, res) => {
 router.get('/forms/post-shift-vehicle', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const allocationId = req.query.allocationId ? Number(req.query.allocationId) : null;
-
-  let allocation = null;
-  if (allocationId) {
-    allocation = db.prepare(`
-      SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
-      FROM crew_allocations ca
-      JOIN jobs j ON ca.job_id = j.id
-      WHERE ca.id = ? AND ca.crew_member_id = ?
-    `).get(allocationId, worker.id);
-  }
+  const allocation = requireAllocation(req, res);
+  if (!allocation) return;
 
   // Suggest the vehicle the worker used on their most recent vehicle pre-start
   // today — most workers stay on the same vehicle for the day.
@@ -813,7 +797,8 @@ const PPE_ITEMS = [
 router.get('/forms/team-leader', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const allocationId = req.query.allocationId ? Number(req.query.allocationId) : null;
+  const allocation = requireAllocation(req, res);
+  if (!allocation) return;
 
   // Soft check: a member must be flagged as a manager (or supervisor on the
   // allocation) to file a Team Leader Checklist. We don't hard-block in case
@@ -821,16 +806,6 @@ router.get('/forms/team-leader', (req, res) => {
   // instead and let admins audit.
   const me = db.prepare('SELECT is_manager FROM crew_members WHERE id = ?').get(worker.id);
   const isManager = !!(me && me.is_manager);
-
-  let allocation = null;
-  if (allocationId) {
-    allocation = db.prepare(`
-      SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
-      FROM crew_allocations ca
-      JOIN jobs j ON ca.job_id = j.id
-      WHERE ca.id = ? AND ca.crew_member_id = ?
-    `).get(allocationId, worker.id);
-  }
 
   res.render('worker/forms/team-leader', {
     title: 'Team Leader Checklist',

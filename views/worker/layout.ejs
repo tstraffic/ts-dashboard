@@ -7,6 +7,21 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="T&S Employee">
   <meta name="theme-color" content="#020817">
+  <!-- The worker portal mixes a dark page background with intentionally
+       white form cards. Tell the browser we're rendering "light" form
+       controls so iOS Safari / Chrome dark mode doesn't auto-invert input
+       backgrounds (which made text fields look like blank white blocks). -->
+  <meta name="color-scheme" content="light only">
+  <style>
+    /* Backstop: any input/select/textarea inside a worker form must use a
+       white bg + dark text regardless of OS dark-mode. The Tailwind classes
+       on each input set this too — these rules just make the floor explicit. */
+    input[type=text], input[type=number], input[type=tel], input[type=email],
+    input[type=password], input[type=search], input[type=date], input[type=time],
+    input[type=datetime-local], input[type=url], select, textarea {
+      color-scheme: light;
+    }
+  </style>
   <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
   <link rel="manifest" href="/manifest.json">
   <title><%= typeof title !== 'undefined' ? title + ' | ' : '' %>T&S Employee Portal</title>

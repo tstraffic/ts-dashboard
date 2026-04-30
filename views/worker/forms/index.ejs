@@ -14,53 +14,29 @@
   </div>
 </div>
 
+<!-- Job-Pack callout — these forms are intentionally NOT listed here because
+     each one is bound to a specific shift. Workers open them from
+     /w/jobs/<allocation>?tab=forms so the submission lands against the right
+     allocation. Keep this block as a nudge so anyone hunting for a
+     pre-start/post-shift/etc still ends up in the right place. -->
+<div class="px-4 mb-4">
+  <a href="/w/jobs" class="block rounded-xl px-4 py-3 transition active:opacity-80"
+     style="background: linear-gradient(135deg, rgba(43,127,255,0.18), rgba(43,127,255,0.06)); border: 1px solid rgba(43,127,255,0.35);">
+    <div class="flex items-start gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(43,127,255,0.22);">
+        <svg class="w-5 h-5" style="color:#60A5FA;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+      </div>
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-semibold text-white">Shift checklists</p>
+        <p class="text-[11px] mt-0.5" style="color:rgba(255,255,255,0.65);">Vehicle Pre-Start, Risk &amp; Toolbox, TC Prestart, Team Leader, Post-Shift — open from the shift they belong to.</p>
+        <p class="text-[11px] mt-1.5 font-semibold" style="color:#60A5FA;">Open my shifts →</p>
+      </div>
+    </div>
+  </a>
+</div>
+
 <!-- Form List -->
 <div id="formList">
-  <!-- Vehicle Pre-Start (Job Pack) -->
-  <a href="/w/forms/vehicle-prestart" class="form-item flex items-center gap-3 px-4 py-3.5 transition" style="border-bottom:1px solid rgba(255,255,255,0.06);border-left:3px solid #2B7FFF;" data-name="vehicle prestart pre-start checklist">
-    <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(43,127,255,0.12);">
-      <svg class="w-5 h-5" style="color:#2B7FFF;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path d="M3 12l2-7h14l2 7M5 12v6a1 1 0 001 1h2a1 1 0 001-1v-1h6v1a1 1 0 001 1h2a1 1 0 001-1v-6M5 12h14"/><circle cx="7.5" cy="14.5" r="1"/><circle cx="16.5" cy="14.5" r="1"/></svg>
-    </div>
-    <span class="text-sm font-medium flex-1">1. Vehicle Pre-Start</span>
-    <svg class="w-4 h-4 text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-  </a>
-
-  <!-- Risk Assessment & Toolbox -->
-  <a href="/w/forms/risk-assessment" class="form-item flex items-center gap-3 px-4 py-3.5 transition" style="border-bottom:1px solid rgba(255,255,255,0.06);border-left:3px solid #2B7FFF;" data-name="risk assessment toolbox swms">
-    <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(43,127,255,0.12);">
-      <svg class="w-5 h-5" style="color:#2B7FFF;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path d="M12 2l9 4v6c0 5-4 9-9 10-5-1-9-5-9-10V6l9-4z"/><path d="M9 11l3 3 5-5"/></svg>
-    </div>
-    <span class="text-sm font-medium flex-1">2. Risk Assessment &amp; Toolbox</span>
-    <svg class="w-4 h-4 text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-  </a>
-
-  <!-- TC Prestart Declaration -->
-  <a href="/w/forms/tc-prestart" class="form-item flex items-center gap-3 px-4 py-3.5 transition" style="border-bottom:1px solid rgba(255,255,255,0.06);border-left:3px solid #2B7FFF;" data-name="tc prestart traffic controller declaration">
-    <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(43,127,255,0.12);">
-      <svg class="w-5 h-5" style="color:#2B7FFF;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
-    </div>
-    <span class="text-sm font-medium flex-1">3. TC Prestart Declaration</span>
-    <svg class="w-4 h-4 text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-  </a>
-
-  <!-- Team Leader Checklist -->
-  <a href="/w/forms/team-leader" class="form-item flex items-center gap-3 px-4 py-3.5 transition" style="border-bottom:1px solid rgba(255,255,255,0.06);border-left:3px solid #2B7FFF;" data-name="team leader checklist tl audit">
-    <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(43,127,255,0.12);">
-      <svg class="w-5 h-5" style="color:#2B7FFF;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path d="M16 11a4 4 0 10-8 0 4 4 0 008 0z"/><path d="M2 21a8 8 0 0116 0M19 8v6M16 11h6"/></svg>
-    </div>
-    <span class="text-sm font-medium flex-1">4. Team Leader Checklist</span>
-    <svg class="w-4 h-4 text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-  </a>
-
-  <!-- Post-Shift Vehicle Checklist -->
-  <a href="/w/forms/post-shift-vehicle" class="form-item flex items-center gap-3 px-4 py-3.5 transition" style="border-bottom:1px solid rgba(255,255,255,0.06);border-left:3px solid #2B7FFF;" data-name="post shift vehicle end checklist">
-    <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(43,127,255,0.12);">
-      <svg class="w-5 h-5" style="color:#2B7FFF;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path d="M3 12l2-7h14l2 7M5 12v6a1 1 0 001 1h2a1 1 0 001-1v-1h6v1a1 1 0 001 1h2a1 1 0 001-1v-6M5 12h14M9 16h6"/></svg>
-    </div>
-    <span class="text-sm font-medium flex-1">5. Post-Shift Vehicle Checklist</span>
-    <svg class="w-4 h-4 text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-  </a>
-
   <!-- Leave Request -->
   <a href="/w/forms/leave-request" class="form-item flex items-center gap-3 px-4 py-3.5 transition" style="border-bottom:1px solid rgba(255,255,255,0.06);" data-name="leave request">
     <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(255,255,255,0.06);">

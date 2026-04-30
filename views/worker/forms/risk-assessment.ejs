@@ -30,14 +30,14 @@
           <% if (q.type === 'text') { %>
             <input type="text" name="q_<%= q.key %>" <%= q.required ? 'required' : '' %>
               <% if (q.placeholder) { %>placeholder="<%= q.placeholder %>"<% } %>
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+              class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
           <% } else if (q.type === 'textarea') { %>
             <textarea name="q_<%= q.key %>" rows="2"
               <% if (q.placeholder) { %>placeholder="<%= q.placeholder %>"<% } %>
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
+              class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
           <% } else if (q.type === 'number') { %>
             <input type="number" name="q_<%= q.key %>" inputmode="numeric" min="0" step="1"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+              class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
           <% } else if (q.type === 'radio') { %>
             <div class="space-y-1.5">
               <% q.options.forEach(function (opt, i) { %>
@@ -73,7 +73,7 @@
 
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
         <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Notes (optional)</label>
-        <textarea name="notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
+        <textarea name="notes" rows="2" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
       </div>
 
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
