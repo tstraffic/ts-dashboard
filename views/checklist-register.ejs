@@ -82,6 +82,33 @@
     </div>
   </div>
 
+  <!-- Trends chart -->
+  <% if (monthData.weeks.length >= 2) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-baseline justify-between">
+        <h3 class="text-sm font-semibold text-gray-900">Weekly trend</h3>
+        <span class="text-xs text-gray-500">Per-checklist completion % across the month</span>
+      </div>
+      <div class="p-5"><canvas id="cr-trend-chart" height="110"></canvas></div>
+    </div>
+    <script>
+      window.__crChartData = <%- JSON.stringify({
+        labels: monthData.weeks.map(function (w) { return 'W' + w.n; }),
+        series: monthData.total.map(function (row) {
+          return {
+            key: row.key,
+            label: row.label,
+            data: monthData.weeks.map(function (w) {
+              var match = w.rows.find(function (r) { return r.key === row.key; });
+              if (!match) return null;
+              return match.required > 0 ? match.completion_pct : null;
+            }),
+          };
+        }),
+      }) %>;
+    </script>
+  <% } %>
+
   <!-- Per week -->
   <% if (monthData.weeks.length === 0) { %>
     <div class="text-center text-sm text-gray-500 py-8">No weeks fall inside this month yet.</div>
@@ -196,3 +223,46 @@
     "Required" counts come from non-cancelled bookings (Vehicle Pre-start, Post-shift Vehicle Checklist) and non-cancelled crew allocations (Risk Assessment, TC Pre-start, Team Leader). "Completed" counts safety_forms submissions inside each window, by form type.
   </p>
 </div>
+
+<% if (monthData.weeks.length >= 2) { %>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  var data = window.__crChartData;
+  if (!data) return;
+  var canvas = document.getElementById('cr-trend-chart');
+  if (!canvas) return;
+  // T&S brand-aligned palette per checklist; loops if more series.
+  var palette = ['#1D6AE5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#0EA5E9'];
+  var datasets = data.series.map(function (s, i) {
+    var c = palette[i % palette.length];
+    return {
+      label: s.label,
+      data: s.data,
+      borderColor: c,
+      backgroundColor: c,
+      tension: 0.25,
+      spanGaps: true,
+      pointRadius: 3,
+      pointHoverRadius: 4,
+    };
+  });
+  new Chart(canvas, {
+    type: 'line',
+    data: { labels: data.labels, datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        y: { min: 0, max: 100, ticks: { callback: function (v) { return v + '%'; }, stepSize: 25 } },
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: function (ctx) { return ctx.dataset.label + ': ' + (ctx.parsed.y == null ? '—' : ctx.parsed.y + '%'); } } },
+      },
+    },
+  });
+})();
+</script>
+<% } %>

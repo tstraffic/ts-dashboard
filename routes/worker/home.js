@@ -137,12 +137,64 @@ router.get('/home', async (req, res) => {
     }
   } catch (e) { /* best effort */ }
 
+  // Job-Pack completion nudge: how many of the 5 checklists has this worker
+  // filed for shifts on the LAST 7 DAYS, vs how many were expected? Drives
+  // the "Your Job-Pack completion this week" card on home. Same data shape
+  // as the office Checklist Register so the office and the worker see the
+  // same compliance numbers.
+  let jobPackNudge = null;
+  try {
+    const JP = ['vehicle_prestart','risk_toolbox','tc_prestart','team_leader','post_shift_vehicle'];
+    const fromS = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const allocations = db.prepare(`
+      SELECT id, booking_id FROM crew_allocations
+      WHERE crew_member_id = ? AND status != 'cancelled'
+        AND date(allocation_date) >= date(?)
+    `).all(member.id, fromS);
+    const distinctBookings = new Set(allocations.map(a => a.booking_id).filter(Boolean));
+    const allocCount = allocations.length;
+    const bookingCount = distinctBookings.size || allocCount; // fallback when no booking_id
+    const expected = {
+      vehicle_prestart: bookingCount,
+      risk_toolbox: allocCount,
+      tc_prestart: allocCount,
+      team_leader: allocCount,
+      post_shift_vehicle: bookingCount,
+    };
+    const subRows = db.prepare(`
+      SELECT form_type, COUNT(*) AS c FROM safety_forms
+      WHERE crew_member_id = ? AND form_type IN (${JP.map(()=>'?').join(',')})
+        AND date(submitted_at) >= date(?)
+      GROUP BY form_type
+    `).all(member.id, ...JP, fromS);
+    const submitted = {};
+    for (const r of subRows) submitted[r.form_type] = r.c;
+
+    let totalExpected = 0, totalSubmitted = 0;
+    const breakdown = JP.map(t => {
+      const exp = expected[t] || 0;
+      const sub = submitted[t] || 0;
+      totalExpected += exp;
+      totalSubmitted += Math.min(sub, exp);
+      return { key: t, expected: exp, submitted: sub };
+    });
+    if (totalExpected > 0) {
+      jobPackNudge = {
+        pct: Math.round(totalSubmitted / totalExpected * 100),
+        submitted: totalSubmitted,
+        expected: totalExpected,
+        // Pick the most-missed checklist to call out by name in the card.
+        worstKey: breakdown.filter(b => b.expected > 0).sort((a, b) => (a.submitted / Math.max(a.expected,1)) - (b.submitted / Math.max(b.expected,1)))[0].key,
+      };
+    }
+  } catch (e) { console.error('[home] jobpack nudge failed:', e.message); }
+
   res.render('worker/home', {
     title: 'Home', currentPage: 'home',
     greeting, firstName, subtext,
     todaysShifts, upcomingShifts, weekDays, stats, onShift,
     recentClocks, compliance, member, employee, today,
-    cards, streaks, prefs, timeline, weather,
+    cards, streaks, prefs, timeline, weather, jobPackNudge,
   });
 });
 

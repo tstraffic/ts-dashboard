@@ -25,7 +25,7 @@
   // Default section order (manager card is inserted after the hero for managers only)
   // What the controller needs first: are they blocked, what's today, and
   // the shortcuts to act on it. Stats and weather drop below the fold.
-  const defaultOrder = ['hero','manager','compliance','today','actions','week','timeline','cards','weather','streaks','upcoming','activity'];
+  const defaultOrder = ['hero','manager','jobpack','compliance','today','actions','week','timeline','cards','weather','streaks','upcoming','activity'];
   const hidden = (prefs && prefs.hidden_sections) || [];
   const orderSource = (prefs && prefs.section_order && prefs.section_order.length) ? prefs.section_order : defaultOrder;
   // Preserve any new sections we added after the user saved their prefs
@@ -283,6 +283,43 @@
       </div>
     <% }); %>
   </div>
+<% } %>
+
+<% if (section === 'jobpack' && !hidden.includes('jobpack') && typeof jobPackNudge !== 'undefined' && jobPackNudge) {
+  var FORM_LABEL = {
+    vehicle_prestart: 'Vehicle Pre-Start',
+    risk_toolbox: 'Risk Assessment & Toolbox',
+    tc_prestart: 'TC Prestart Declaration',
+    team_leader: 'Team Leader Checklist',
+    post_shift_vehicle: 'Post-Shift Vehicle Checklist',
+  };
+  var pct = jobPackNudge.pct;
+  var tone = pct >= 90 ? 'emerald' : pct >= 60 ? 'amber' : 'red';
+  var toneFg = tone === 'emerald' ? '#34D399' : tone === 'amber' ? '#F59E0B' : '#F87171';
+  var toneBg = tone === 'emerald' ? 'rgba(16,185,129,0.12)' : tone === 'amber' ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)';
+  var headline = pct >= 90 ? 'On top of your checklists' : pct >= 60 ? 'Catch up on your checklists' : 'Several checklists outstanding';
+%>
+  <div class="wh-section-head"><span class="wh-section-title">Your checklist completion · last 7 days</span></div>
+  <a href="/w/forms" style="display:block;text-decoration:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-left:3px solid <%= toneFg %>;border-radius:14px;padding:14px 16px;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="width:54px;height:54px;border-radius:50%;background:<%= toneBg %>;color:<%= toneFg %>;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.95rem;flex-shrink:0;">
+        <%= pct %>%
+      </div>
+      <div style="flex:1;min-width:0;">
+        <p style="font-size:0.92rem;font-weight:700;color:#fff;line-height:1.2;"><%= headline %></p>
+        <p style="font-size:0.72rem;color:rgba(255,255,255,0.55);margin-top:2px;">
+          <%= jobPackNudge.submitted %> of <%= jobPackNudge.expected %> Job-Pack checklists filed.
+          <% if (pct < 95 && jobPackNudge.worstKey) { %>
+            Most missed: <span style="color:rgba(255,255,255,0.8);font-weight:600;"><%= FORM_LABEL[jobPackNudge.worstKey] || jobPackNudge.worstKey %></span>.
+          <% } %>
+        </p>
+      </div>
+      <svg style="width:16px;height:16px;color:rgba(255,255,255,0.4);flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+    </div>
+    <div style="margin-top:10px;height:5px;border-radius:3px;background:rgba(255,255,255,0.06);overflow:hidden;">
+      <div style="height:100%;background:<%= toneFg %>;width:<%= pct %>%;"></div>
+    </div>
+  </a>
 <% } %>
 
 <% if (section === 'streaks' && !hidden.includes('streaks') && streaks) { %>
