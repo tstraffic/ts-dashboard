@@ -498,7 +498,24 @@ router.get('/:id/edit', (req, res) => {
   const supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all();
   let contacts = []; try { contacts = db.prepare("SELECT id, full_name, company_id FROM client_contacts ORDER BY full_name").all(); } catch (e) {}
   let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name, role FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
-  res.render('bookings/form', { title: 'Edit Booking ' + booking.booking_number, booking, jobs, clients, supervisors, contacts, crewForSelect, depots: DEPOTS, user: req.session.user });
+  // Existing booking-level documents — feeds the Site Documents card on
+  // the edit page so allocators can review / delete / upload without
+  // bouncing back to the booking detail page.
+  let bookingDocuments = [];
+  try {
+    bookingDocuments = db.prepare(`
+      SELECT bd.id, bd.document_type, bd.title, bd.original_name, bd.file_size, bd.created_at,
+             u.full_name AS uploader_name
+      FROM booking_documents bd LEFT JOIN users u ON bd.uploaded_by_id = u.id
+      WHERE bd.booking_id = ? ORDER BY bd.created_at DESC
+    `).all(req.params.id);
+  } catch (e) { /* legacy DB without booking_documents */ }
+  res.render('bookings/form', {
+    title: 'Edit Booking ' + booking.booking_number,
+    booking, jobs, clients, supervisors, contacts, crewForSelect,
+    depots: DEPOTS, user: req.session.user,
+    bookingDocuments,
+  });
 });
 
 // POST /:id — Update
@@ -534,26 +551,42 @@ router.post('/:id', (req, res) => {
     }
   }
 
-  // Update crew assignments if crew_ids provided + auto-create allocations
-  const crewIds = Array.isArray(b.crew_ids) ? b.crew_ids : (b.crew_ids ? [b.crew_ids] : []);
-  if (crewIds.length > 0) {
+  // Update crew assignments — but ONLY when the form actually contained a
+  // crew picker. Without the explicit `crew_ids_present` flag we leave the
+  // existing booking_crew rows alone, because absence of crew_ids[] on a
+  // POST is ambiguous: it could mean "no crew picker on the form" (full
+  // edit page) OR "user removed every crew chip on the slide-in panel".
+  // The slide-in form sets crew_ids_present=1 unconditionally, the full
+  // edit page does not include a crew picker so the flag stays absent.
+  // Result: editing details on the full edit page no longer accidentally
+  // wipes the crew, AND clearing every chip on the slide-in still works.
+  const crewPickerSubmitted = b.crew_ids_present === '1' || b.crew_ids_present === 1 || b.crew_ids_present === true;
+  if (crewPickerSubmitted) {
+    const crewIds = Array.isArray(b.crew_ids) ? b.crew_ids : (b.crew_ids ? [b.crew_ids] : []);
     db.prepare("DELETE FROM booking_crew WHERE booking_id = ?").run(req.params.id);
     db.prepare("DELETE FROM crew_allocations WHERE booking_id = ?").run(req.params.id);
-    const insertCrew = db.prepare("INSERT OR IGNORE INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'assigned')");
-    const insertAlloc = db.prepare("INSERT OR IGNORE INTO crew_allocations (job_id, crew_member_id, allocation_date, start_time, end_time, role_on_site, status, booking_id, allocated_by_id) VALUES (?, ?, ?, ?, ?, ?, 'allocated', ?, ?)");
-    const updAllocDate = (b.start_date + 'T' + b.start_time + ':00').substring(0, 10);
-    const updAllocStart = b.start_time || '06:00';
-    const updAllocEnd = b.end_time || '15:00';
-    crewIds.forEach(cid => {
-      if (cid) {
-        const member = db.prepare("SELECT role FROM crew_members WHERE id = ?").get(cid);
-        const role = member ? member.role : '';
-        insertCrew.run(req.params.id, cid, role);
-        if (b.job_id) {
-          try { insertAlloc.run(b.job_id, cid, updAllocDate, updAllocStart, updAllocEnd, role, req.params.id, req.session.user.id); } catch (e) {}
+    if (crewIds.length > 0) {
+      const insertCrew = db.prepare("INSERT OR IGNORE INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'assigned')");
+      const insertAlloc = db.prepare("INSERT OR IGNORE INTO crew_allocations (job_id, crew_member_id, allocation_date, start_time, end_time, role_on_site, status, booking_id, allocated_by_id) VALUES (?, ?, ?, ?, ?, ?, 'allocated', ?, ?)");
+      const updAllocDate = (b.start_date + 'T' + b.start_time + ':00').substring(0, 10);
+      const updAllocStart = b.start_time || '06:00';
+      const updAllocEnd = b.end_time || '15:00';
+      crewIds.forEach(cid => {
+        if (!cid) return;
+        // Reject any id that isn't a real, active crew member to stop
+        // browser autofill or stale form state assigning shifts to people
+        // who aren't on roster.
+        const member = db.prepare("SELECT id, role, active FROM crew_members WHERE id = ?").get(cid);
+        if (!member || !member.active) {
+          console.warn('[bookings.update] ignoring crew_id', cid, 'on booking', req.params.id, '— no matching active crew_member');
+          return;
         }
-      }
-    });
+        insertCrew.run(req.params.id, cid, member.role || '');
+        if (b.job_id) {
+          try { insertAlloc.run(b.job_id, cid, updAllocDate, updAllocStart, updAllocEnd, member.role || '', req.params.id, req.session.user.id); } catch (e) {}
+        }
+      });
+    }
   }
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'booking', entityId: req.params.id, details: `Updated booking ${existing.booking_number}`, req });

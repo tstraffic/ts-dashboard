@@ -1243,6 +1243,10 @@ setInterval(function() {
     <div class="booking-modal-body">
       <form method="POST" action="/bookings" id="booking-slide-form">
         <%- include('../partials/csrf') %>
+        <!-- Tells the server "this submission contains the slide-in's crew
+             picker state". The full edit page (views/bookings/form.ejs)
+             omits this flag, so updating details there leaves crew alone. -->
+        <input type="hidden" name="crew_ids_present" value="1">
 
         <!-- BOOKING DEPOT -->
         <div class="modal-section">
@@ -2487,10 +2491,29 @@ function openBookingFormEdit(id) {
   const titleEl = document.getElementById('form-modal-title');
   const submitBtn = form.closest('.booking-modal').querySelector('.modal-footer-btn.primary');
 
+  // CRITICAL: reset before populating. Without this the chip-based crew
+  // picker carries stale `selectedCrew` from whichever booking was last
+  // opened — when the user saves, those stale crew_ids[] hidden inputs
+  // replace the actual booking's crew with someone unrelated.
+  resetBookingForm();
+
   // Switch to edit mode
   titleEl.textContent = 'Edit Booking';
   form.action = '/bookings/' + id;
   submitBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Update Booking';
+
+  // Surface a "Full edit page" link in the modal header so users can jump
+  // to the detailed form when they need every field instead of the slim
+  // slide-in. Inserted lazily so it survives form resets.
+  if (titleEl && !document.getElementById('form-modal-fulledit')) {
+    var fe = document.createElement('a');
+    fe.id = 'form-modal-fulledit';
+    fe.className = 'text-xs font-semibold text-brand-600 hover:underline ml-2';
+    fe.textContent = 'Open full edit page →';
+    titleEl.parentNode.appendChild(fe);
+  }
+  var feLink = document.getElementById('form-modal-fulledit');
+  if (feLink) { feLink.href = '/bookings/' + id + '/edit'; feLink.style.display = 'inline'; }
 
   // Fetch booking data and pre-fill
   fetch('/bookings/' + id, { headers: { 'Accept': 'application/json' } })
@@ -2571,9 +2594,13 @@ function openBookingFormEdit(id) {
         b.requirements.forEach(r => addPanelReqRow(r.resource_type, r.quantity_required));
       }
 
-      // Crew assignment pre-fill
-      if (window._setFormCrew && b.crew) {
-        window._setFormCrew(b.crew);
+      // Crew assignment pre-fill — always run, even when b.crew is empty,
+      // so the picker reflects exactly what's stored on this booking and
+      // doesn't inherit chips from a previous edit. Falls back to the
+      // existing `personnel` shape if `crew` isn't on the response.
+      if (window._setFormCrew) {
+        var crewSrc = b.crew || b.personnel || [];
+        window._setFormCrew(crewSrc);
       }
 
       // Special Instructions & Pool
