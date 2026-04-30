@@ -6458,6 +6458,76 @@ function runMigrations(db) {
     console.log('Migration 140 applied');
   }
 
+  // Migration 141: Pay runs — Traffio CSV import + Cash/TFN/ABN payroll page.
+  // Stores one pay_run per week, with one pay_run_line per worker. Hours are
+  // bucketed Mon..Sun and split Day/Night based on shift start time. Rates +
+  // allowances + BSB/account are snapshotted onto each line so historical
+  // runs are immutable even if the employee record changes later.
+  if (!isMigrationApplied.get(141)) {
+    // Operational BSB + account on employees (separate from secure bank_accounts).
+    // The office reads these straight off CommBank to pay workers; the secure
+    // table is for HR/super sync. Two different audiences, two different fields.
+    try { db.exec("ALTER TABLE employees ADD COLUMN payroll_bsb TEXT DEFAULT ''"); } catch (e) { /* exists */ }
+    try { db.exec("ALTER TABLE employees ADD COLUMN payroll_account TEXT DEFAULT ''"); } catch (e) { /* exists */ }
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS pay_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        period_start DATE NOT NULL,
+        period_end DATE NOT NULL,
+        label TEXT DEFAULT '',
+        csv_filename TEXT DEFAULT '',
+        csv_uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','finalized')),
+        created_by_id INTEGER REFERENCES users(id),
+        notes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_pay_runs_period ON pay_runs(period_start);
+
+      CREATE TABLE IF NOT EXISTS pay_run_lines (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pay_run_id INTEGER NOT NULL REFERENCES pay_runs(id) ON DELETE CASCADE,
+        employee_id INTEGER REFERENCES employees(id),
+        person_id TEXT DEFAULT '',
+        full_name TEXT NOT NULL,
+        payment_type TEXT DEFAULT '',
+        bsb TEXT DEFAULT '',
+        acc_number TEXT DEFAULT '',
+        day_hours_json TEXT DEFAULT '[0,0,0,0,0,0,0]',
+        night_hours_json TEXT DEFAULT '[0,0,0,0,0,0,0]',
+        total_day_hours REAL DEFAULT 0,
+        total_night_hours REAL DEFAULT 0,
+        total_hours REAL DEFAULT 0,
+        rate_day REAL DEFAULT 0,
+        rate_night REAL DEFAULT 0,
+        total_day_wages REAL DEFAULT 0,
+        total_night_wages REAL DEFAULT 0,
+        total_wages REAL DEFAULT 0,
+        travel_allowance REAL DEFAULT 0,
+        meal_allowance REAL DEFAULT 0,
+        other_allowance REAL DEFAULT 0,
+        total_allowance REAL DEFAULT 0,
+        grand_total REAL DEFAULT 0,
+        paid INTEGER DEFAULT 0,
+        paid_ref TEXT DEFAULT '',
+        paid_at DATETIME,
+        notes TEXT DEFAULT '',
+        shifts_json TEXT DEFAULT '[]',
+        sort_order INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_pay_run_lines_run ON pay_run_lines(pay_run_id);
+      CREATE INDEX IF NOT EXISTS idx_pay_run_lines_employee ON pay_run_lines(employee_id);
+      CREATE INDEX IF NOT EXISTS idx_pay_run_lines_payment_type ON pay_run_lines(payment_type);
+    `);
+
+    recordMigration.run(141, 'Pay runs + pay run lines + payroll BSB/account on employees');
+    console.log('Migration 141 applied: payroll schema');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

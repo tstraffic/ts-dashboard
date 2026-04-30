@@ -225,6 +225,7 @@ app.use('/hr', requireLogin, require('./routes/hr-secure'));
 app.use('/hr', requireLogin, require('./routes/hr'));
 app.use('/kudos-admin', requireLogin, require('./routes/kudos-admin'));
 app.use('/payroll', requireLogin, require('./routes/payslips-admin'));
+app.use('/payroll', requireLogin, require('./routes/payroll-runs'));
 app.use('/crm', requireLogin, requirePermission('crm'), require('./routes/crm'));
 app.use('/opportunities', requireLogin, requirePermission('crm'), require('./routes/opportunities'));
 app.use('/chat', requireLogin, require('./routes/chat'));
