@@ -197,6 +197,8 @@ app.use('/jobs', requireLogin, requirePermission('jobs'), require('./routes/jobs
 app.use('/tasks', requireLogin, requirePermission('tasks'), require('./routes/tasks'));
 app.use('/compliance', requireLogin, requirePermission('compliance'), require('./routes/compliance'));
 app.use('/audits', requireLogin, requirePermission('audits'), require('./routes/audits'));
+// Job-Pack submission review (workers fill at /w/forms/...; office opens here)
+app.use('/safety-forms', requireLogin, requirePermission('audits'), require('./routes/safety-forms'));
 app.use('/plans', requireLogin, requirePermission('compliance'), require('./routes/plans'));
 app.use('/incidents', requireLogin, requirePermission('incidents'), require('./routes/incidents'));
 app.use('/contacts', requireLogin, requirePermission('contacts'), require('./routes/contacts'));

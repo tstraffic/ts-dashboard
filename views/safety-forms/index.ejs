@@ -1,0 +1,107 @@
+<% locals.currentPage = 'safety-forms' %>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Job-Pack Submissions</h1>
+      <p class="text-sm text-gray-500 mt-0.5">Field-submitted Vehicle Pre-Start, Risk Assessment, TC Prestart, Team Leader & Post-Shift Vehicle checklists.</p>
+    </div>
+  </div>
+
+  <!-- Filter chips -->
+  <div class="flex flex-wrap items-center gap-2">
+    <a href="/safety-forms?scope=jobpack"
+       class="px-3 py-1.5 rounded-full text-xs font-semibold ring-1 transition <%= !formType && scope==='jobpack' ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-gray-700 ring-gray-300 hover:bg-gray-50' %>">
+      Job Pack
+    </a>
+    <% JOB_PACK_TYPES.forEach(function (t) { %>
+      <a href="/safety-forms?form_type=<%= t %>"
+         class="px-3 py-1.5 rounded-full text-xs font-semibold ring-1 transition <%= formType === t ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-gray-700 ring-gray-300 hover:bg-gray-50' %>">
+        <%= fmtLabel(t) %>
+        <% if (counts[t]) { %><span class="ml-1 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold <%= formType===t ? 'bg-white/20 text-white' : 'bg-brand-50 text-brand-700' %>"><%= counts[t] %></span><% } %>
+      </a>
+    <% }) %>
+    <a href="/safety-forms?scope=all"
+       class="px-3 py-1.5 rounded-full text-xs font-semibold ring-1 transition <%= scope==='all' && !formType ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-gray-500 ring-gray-300 hover:bg-gray-50' %>">
+      All forms (incl. legacy)
+    </a>
+  </div>
+
+  <!-- Search bar -->
+  <form method="GET" action="/safety-forms" class="flex flex-wrap items-end gap-2">
+    <input type="hidden" name="scope" value="<%= scope %>">
+    <% if (formType) { %><input type="hidden" name="form_type" value="<%= formType %>"><% } %>
+    <div class="flex-1 min-w-[200px]">
+      <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Search</label>
+      <input type="text" name="q" value="<%= search %>" placeholder="Worker, job number, client…"
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+    </div>
+    <div>
+      <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Submitted since</label>
+      <input type="date" name="since" value="<%= since %>"
+        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+    </div>
+    <button type="submit" class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">Apply</button>
+    <% if (search || since || crewId || jobId) { %>
+      <a href="/safety-forms" class="text-sm text-gray-500 hover:text-gray-700 ml-1">Clear</a>
+    <% } %>
+  </form>
+
+  <!-- Result table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <% if (rows.length === 0) { %>
+      <div class="px-5 py-12 text-center text-sm text-gray-500">
+        <p class="font-medium text-gray-700">No submissions match these filters.</p>
+        <p class="mt-1">Workers submit from <code class="text-xs">/w/forms/&lt;form-type&gt;</code> on the worker portal.</p>
+      </div>
+    <% } else { %>
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="text-left px-5 py-2.5">Submitted</th>
+            <th class="text-left px-3 py-2.5">Form</th>
+            <th class="text-left px-3 py-2.5">Worker</th>
+            <th class="text-left px-3 py-2.5 hidden md:table-cell">Job</th>
+            <th class="text-center px-3 py-2.5 hidden sm:table-cell">Photos</th>
+            <th class="text-center px-3 py-2.5 hidden sm:table-cell">Sig</th>
+            <th class="text-right px-5 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% rows.forEach(function (r) { %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-5 py-2.5 text-gray-600 whitespace-nowrap">
+                <%= new Date(r.submitted_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>
+              </td>
+              <td class="px-3 py-2.5">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-brand-50 text-brand-700 ring-1 ring-brand-600/10"><%= fmtLabel(r.form_type) %></span>
+              </td>
+              <td class="px-3 py-2.5 font-medium text-gray-900"><%= r.crew_name || '#' + r.crew_member_id %></td>
+              <td class="px-3 py-2.5 text-gray-700 hidden md:table-cell">
+                <% if (r.job_number) { %>
+                  <a href="/jobs/<%= r.job_id %>" class="font-medium text-brand-700 hover:underline"><%= r.job_number %></a>
+                  <% if (r.job_client) { %><span class="text-gray-500">— <%= r.job_client %></span><% } %>
+                <% } else { %>
+                  <span class="text-gray-400">—</span>
+                <% } %>
+              </td>
+              <td class="px-3 py-2.5 text-center text-gray-600 hidden sm:table-cell">
+                <% if (r.photo_count > 0) { %>
+                  <span class="inline-flex items-center gap-1 text-xs"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h2l2-3h10l2 3h2a1 1 0 011 1v11a1 1 0 01-1 1H3a1 1 0 01-1-1V8a1 1 0 011-1z"/><circle cx="12" cy="13" r="4"/></svg><%= r.photo_count %></span>
+                <% } else { %><span class="text-gray-300">—</span><% } %>
+              </td>
+              <td class="px-3 py-2.5 text-center hidden sm:table-cell">
+                <% if (r.has_sig) { %>
+                  <svg class="w-4 h-4 text-emerald-600 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                <% } else { %><span class="text-gray-300">—</span><% } %>
+              </td>
+              <td class="px-5 py-2.5 text-right">
+                <a href="/safety-forms/<%= r.id %>" class="text-sm text-brand-700 font-semibold hover:underline">Open</a>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+</div>
