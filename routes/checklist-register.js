@@ -23,6 +23,17 @@ router.get('/', (req, res) => {
   const workers = register.workerBreakdown(db, monthStart, monthEnd);
   const monthNotes = register.notesFromBreakdown(workers);
 
+  // Same notes per week — driven off a fresh workerBreakdown for each week
+  // window so the strings reflect ONLY the people on shift that week. Keys
+  // by weekData.weeks[i].n so the view can index notes by week number.
+  for (const w of monthData.weeks) {
+    const wkStart = new Date(w.start + 'T00:00:00');
+    const wkEnd = new Date(w.end + 'T00:00:00');
+    wkEnd.setDate(wkEnd.getDate() + 1); // workerBreakdown's end is exclusive
+    const wkWorkers = register.workerBreakdown(db, wkStart, wkEnd);
+    w.notes = register.notesFromBreakdown(wkWorkers);
+  }
+
   // Months selectable: the current month + 11 prior, so the office can
   // page back through history without typing dates.
   const months = [];

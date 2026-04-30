@@ -63,15 +63,25 @@ router.get('/', (req, res) => {
   // either a booking_documents row OR a job_documents row on the same job as
   // "covered" so re-using a job-level pack doesn't trigger a false alarm.
   let bookingsMissingDocs = 0;
+  let missingDocsList = [];
   try {
-    bookingsMissingDocs = db.prepare(`
-      SELECT COUNT(*) AS c
+    // Fetch the actual rows so the dashboard widget below can list them
+    // ("J-1234 — Acme Construction · Tue 13 May 07:00") instead of just the
+    // count. Cap at 5 — anything more is paginated through /bookings.
+    missingDocsList = db.prepare(`
+      SELECT b.id, b.booking_number, b.title, b.start_datetime, b.suburb,
+        j.job_number, j.client AS job_client
       FROM bookings b
+      LEFT JOIN jobs j ON b.job_id = j.id
       WHERE b.status IN ('confirmed','green_to_go','unconfirmed')
+        AND b.deleted_at IS NULL
         AND date(b.start_datetime) BETWEEN date('now') AND date('now','+1 day')
         AND NOT EXISTS (SELECT 1 FROM booking_documents bd WHERE bd.booking_id = b.id)
         AND NOT EXISTS (SELECT 1 FROM job_documents jd WHERE jd.job_id = b.job_id AND jd.archived_at IS NULL)
-    `).get().c;
+      ORDER BY b.start_datetime ASC
+      LIMIT 25
+    `).all();
+    bookingsMissingDocs = missingDocsList.length;
   } catch (e) { /* booking_documents or job_documents table may be missing on legacy DBs */ }
   if (bookingsMissingDocs > 0) {
     actionItems.push({
@@ -135,6 +145,7 @@ router.get('/', (req, res) => {
     complianceUrgent,
     actionItems,
     checklistSummary,
+    missingDocsList,
     jobStatusDist: charts.jobStatusDist,
     jobHealthDist: charts.jobHealthDist,
     crewHoursByDay: charts.crewHoursByDay,
