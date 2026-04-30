@@ -1,0 +1,109 @@
+<div class="space-y-4 pb-24">
+  <a href="<%= allocation ? ('/w/jobs/' + allocation.id + '?tab=forms') : '/w/forms' %>" class="inline-flex items-center text-sm text-brand-600 font-medium">
+    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back
+  </a>
+
+  <div>
+    <h1 class="text-xl font-bold text-gray-900">2. Risk Assessment &amp; Toolbox</h1>
+    <p class="text-xs text-gray-500 mt-1">Run through the toolbox with the crew before commencing work. Every section must be completed.</p>
+  </div>
+
+  <% if (allocation) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-sm font-bold text-gray-900"><%= allocation.client %></p>
+      <p class="text-xs text-gray-500"><%= allocation.job_number %> &middot; <%= allocation.site_address || allocation.suburb || '' %></p>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/w/forms/risk-assessment" id="ra-form">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <% if (allocation) { %><input type="hidden" name="allocation_id" value="<%= allocation.id %>"><% } %>
+
+    <div class="space-y-3">
+      <% questions.forEach(function (q) { %>
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-2">
+          <label class="block text-xs font-semibold text-gray-700">
+            <%= q.label %><% if (q.required) { %> <span class="text-red-500">*</span><% } %>
+          </label>
+
+          <% if (q.type === 'text') { %>
+            <input type="text" name="q_<%= q.key %>" <%= q.required ? 'required' : '' %>
+              <% if (q.placeholder) { %>placeholder="<%= q.placeholder %>"<% } %>
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <% } else if (q.type === 'textarea') { %>
+            <textarea name="q_<%= q.key %>" rows="2"
+              <% if (q.placeholder) { %>placeholder="<%= q.placeholder %>"<% } %>
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
+          <% } else if (q.type === 'number') { %>
+            <input type="number" name="q_<%= q.key %>" inputmode="numeric" min="0" step="1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <% } else if (q.type === 'radio') { %>
+            <div class="space-y-1.5">
+              <% q.options.forEach(function (opt, i) { %>
+                <label class="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 px-3 py-2 has-[:checked]:bg-brand-50 has-[:checked]:border-brand-300">
+                  <input type="radio" name="q_<%= q.key %>" value="<%= opt %>" <%= q.required ? 'required' : '' %>
+                    class="mt-0.5 h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-500">
+                  <span class="text-sm text-gray-800"><%= opt %></span>
+                </label>
+              <% }) %>
+            </div>
+          <% } else if (q.type === 'checkbox') { %>
+            <div class="grid grid-cols-1 gap-1.5">
+              <% q.options.forEach(function (opt, i) { %>
+                <label class="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 px-3 py-2 has-[:checked]:bg-brand-50 has-[:checked]:border-brand-300">
+                  <input type="checkbox" name="q_<%= q.key %>" value="<%= opt %>"
+                    class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+                  <span class="text-sm text-gray-800"><%= opt %></span>
+                </label>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+      <% }) %>
+
+      <!-- Final declaration -->
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 leading-relaxed">
+        <p>
+          I confirm that all TCs have been instructed to sign the prestart prior to commencement of implementation,
+          that there are sufficient resources to conduct work safely, that each crew member is wearing correct PPE,
+          and that all equipment prestart checks have been completed.
+        </p>
+      </div>
+
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Notes (optional)</label>
+        <textarea name="notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
+      </div>
+
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs font-semibold text-gray-500 uppercase">Toolbox Lead Signature</label>
+          <button type="button" onclick="clearSig()" class="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 px-2 py-1 rounded">Clear</button>
+        </div>
+        <div class="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 relative" style="height:160px;">
+          <canvas id="sig-canvas" class="w-full h-full rounded-lg" style="touch-action: none;"></canvas>
+        </div>
+        <input type="hidden" name="signature_data" id="sig-data">
+      </div>
+
+      <button type="submit" onclick="captureSig()" class="w-full py-3.5 bg-brand-600 text-white rounded-xl font-semibold text-sm hover:bg-brand-700" style="min-height:48px;">Submit Risk Assessment</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  var canvas = document.getElementById('sig-canvas');
+  var ctx = canvas.getContext('2d');
+  var drawing = false, hasDrawn = false;
+  function resize() { var rect = canvas.parentElement.getBoundingClientRect(); var data = hasDrawn ? canvas.toDataURL() : null; canvas.width = rect.width; canvas.height = rect.height; ctx.strokeStyle = '#1D6AE5'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; if (data && hasDrawn) { var img = new Image(); img.onload = function () { ctx.drawImage(img, 0, 0); }; img.src = data; } }
+  resize(); window.addEventListener('resize', resize);
+  canvas.addEventListener('pointerdown', function (e) { drawing = true; hasDrawn = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); e.preventDefault(); });
+  canvas.addEventListener('pointermove', function (e) { if (drawing) { ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); e.preventDefault(); } });
+  canvas.addEventListener('pointerup', function () { drawing = false; });
+  canvas.addEventListener('pointerleave', function () { drawing = false; });
+  window.clearSig = function () { ctx.clearRect(0, 0, canvas.width, canvas.height); hasDrawn = false; };
+  window.captureSig = function () { document.getElementById('sig-data').value = hasDrawn ? canvas.toDataURL('image/png') : ''; };
+})();
+</script>

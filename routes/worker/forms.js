@@ -475,10 +475,8 @@ router.post('/forms/vehicle-prestart', photoUpload.array('arrow_board_photos', 6
   return res.redirect('/w/forms');
 });
 
-// ============================================
-// TC PRESTART DECLARATION — Traffio "3. Traffic Controller Prestart Declaration"
-// ============================================
-
+// SWMS dropdown is shared between Risk Assessment & TC Prestart Declaration —
+// declared up here so RA_QUESTIONS (defined immediately below) can reference it.
 const SWMS_OPTIONS = [
   'SWMS 01 - National Generic SWMS',
   'SWMS 01 - T&S National Generic Traffic Operations SWMS',
@@ -487,6 +485,125 @@ const SWMS_OPTIONS = [
   'SWMS 04 - Manual Lane Closures',
   'Other',
 ];
+
+// ============================================
+// RISK ASSESSMENT & TOOLBOX — Traffio "2. Risk Assessment and Toolbox"
+// ============================================
+// Big multi-select form. Every multi-select question is keyed off the same
+// data shape: { key, label, options: [...], allowOther? }. Single-select
+// questions use { key, label, type: 'radio', options: [...], allowOther? }.
+// Free-text questions use type: 'text' or 'textarea'.
+// Keeping this declarative makes it easy to add/remove items without churning
+// the route or the view.
+const RA_QUESTIONS = [
+  { key: 'employee_name',  label: 'Name of Employee conducting the Toolbox',  type: 'text', required: true },
+  { key: 'works_at_address', label: 'Is works taking place at the address provided?', type: 'radio', options: ['Yes','No - see notes'], required: true },
+  { key: 'address_override', label: "If not, what's the actual location?", type: 'textarea' },
+  { key: 'scope_of_works', label: 'Scope of Works (select all that apply)', type: 'checkbox', options: ['Utility (Electric, Gas, Telecom, etc)','Civil','Asphalt','School Management','Construction','Telecommunications','Demolition','Other'] },
+  { key: 'road_hazards', label: 'Road Hazards', type: 'checkbox', options: ['Hills/Dips/Crests','High Speed Area','Sharp Bends','Roundabouts','Intersections','Schools / Pedestrian Areas','Wet/Slippery Surface','Reduced Visibility','None Identified'] },
+  { key: 'emergency_assembly', label: 'Where is the Emergency Assembly Point?', type: 'text', required: true, placeholder: 'e.g. Traffic Control Vehicle' },
+  { key: 'amenities', label: 'Closest amenities / toilets to the work site', type: 'text' },
+  { key: 'tcs_have_licence', label: 'Do all Traffic Controllers hold a current Safe Work NSW Licence (TCR & IMP)?', type: 'radio', options: ['Yes - Sighted and verified by Team Leader','No - notify supervisor'], required: true },
+  { key: 'swms', label: 'Select the relevant Safe Work Method Statement (SWMS)', type: 'radio', options: SWMS_OPTIONS, required: true },
+  { key: 'tc_activity', label: 'Traffic Control Activity (select all that apply)', type: 'checkbox', options: ['Lane Closure','Pedestrian Management','Mobile Works','Static Works','Stop/Slow','School Crossing','Pilot Vehicle','Other'] },
+  { key: 'traffic_volume', label: 'Traffic Volume', type: 'radio', options: ['Low Volume (eg. Local Road)','Moderate Volume (eg. Arterial Road)','High Volume (eg. Motorway/Highway)'] },
+  { key: 'speed_limit', label: 'Normal posted speed limit (km/h)', type: 'number' },
+  { key: 'speed_reduced_to', label: 'Speed being reduced to (km/h)', type: 'number' },
+  { key: 'struck_by_traffic_controls', label: 'Controls for being struck by traffic', type: 'checkbox', options: ['Buffer Vehicle','Clear visibility of control points','Clear visibility of signs','Escape Routes','Not turning back to traffic','Remain outside live traffic lanes'] },
+  { key: 'exclusion_zone_items', label: 'Items / machinery needing exclusion zones', type: 'checkbox', options: ['Open excavation, pits and manholes','Overhead Crane or EWP','Mobile Plant','None Identified'] },
+  { key: 'exclusion_zone_controls', label: 'Controls for exclusion zones', type: 'checkbox', options: ['Client mandated exclusion zone','Delineation (cones/Tiger Tails/Bollards/Tape)','Protected pedestrian corridors','Visible contact / confirmation with Plant operators'] },
+  { key: 'pedestrian_controls', label: 'Controls for pedestrians being struck by traffic', type: 'checkbox', options: ['Delineation (cones/tiger tails/bollards/tape)','Escort','Signs','Pedestrian corridor','None - no pedestrians on site'] },
+  { key: 'slip_trip_controls', label: 'Controls for slips, trips and falls', type: 'checkbox', options: ['Boot Safety - Laces tied and zips pulled up',"Don't rush tasks",'Isolate hazardous area','Cones around manholes/trip hazards'] },
+  { key: 'weather_conditions', label: 'Adverse weather conditions', type: 'checkbox', options: ['N/A - No adverse weather','Heat','Cold','Rain','Strong Wind','Reduced Visibility / Fog','Storm / Lightning'] },
+  { key: 'manual_handling_controls', label: 'Controls for manual handling', type: 'checkbox', options: ['N/A - Not stopping traffic','Two-person lifts','Use of trolley/dolly','Lifting techniques','PPE'] },
+  { key: 'queue_management', label: 'How are end-of-queue lengths being managed?', type: 'checkbox', options: ['N/A - Not stopping traffic','VMS / Arrow Board','Tail-end controller','Queue protection vehicle','Police support'] },
+  { key: 'other_hazards', label: 'Other hazards identified', type: 'textarea', placeholder: 'N/A - All hazards identified and controlled' },
+  { key: 'safe_to_proceed', label: 'With the selected controls in place, can the job be conducted safely?', type: 'radio', options: ['Yes','No - work must not commence'], required: true },
+  { key: 'communicated_items', label: 'Items communicated to all staff in the toolbox', type: 'checkbox', options: ['Breaks','Client Requirements','Emergency Procedures','Exclusion Zones','Golden Rules of Safety','Sequencing','Site Set Up and Pack Up'] },
+];
+
+router.get('/forms/risk-assessment', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const allocationId = req.query.allocationId ? Number(req.query.allocationId) : null;
+
+  let allocation = null;
+  if (allocationId) {
+    allocation = db.prepare(`
+      SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
+      FROM crew_allocations ca
+      JOIN jobs j ON ca.job_id = j.id
+      WHERE ca.id = ? AND ca.crew_member_id = ?
+    `).get(allocationId, worker.id);
+  }
+
+  res.render('worker/forms/risk-assessment', {
+    title: 'Risk Assessment & Toolbox',
+    currentPage: 'forms',
+    allocation,
+    questions: RA_QUESTIONS,
+    flash_success: req.flash('success'),
+    flash_error: req.flash('error'),
+  });
+});
+
+router.post('/forms/risk-assessment', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const body = req.body || {};
+  const allocationId = body.allocation_id ? Number(body.allocation_id) : null;
+
+  let allocation = null;
+  if (allocationId) {
+    allocation = db.prepare('SELECT id, job_id FROM crew_allocations WHERE id = ? AND crew_member_id = ?').get(allocationId, worker.id);
+    if (!allocation) {
+      req.flash('error', 'Allocation not found or not yours.');
+      return res.redirect('/w/forms/risk-assessment');
+    }
+  }
+
+  // Walk every declared question and pull the right answer shape out of the
+  // posted body. Multi-selects come through Express as either undefined,
+  // a single string, or an array — coerce to array consistently.
+  const answers = {};
+  for (const q of RA_QUESTIONS) {
+    const raw = body['q_' + q.key];
+    if (q.type === 'checkbox') {
+      answers[q.key] = raw == null ? [] : (Array.isArray(raw) ? raw : [raw]);
+    } else if (q.type === 'number') {
+      answers[q.key] = raw === '' || raw == null ? null : Number(raw);
+    } else {
+      answers[q.key] = (raw || '').toString().trim();
+    }
+  }
+
+  const data = {
+    answers,
+    notes: (body.notes || '').trim(),
+  };
+
+  db.prepare(`
+    INSERT INTO safety_forms (crew_member_id, form_type, job_id, allocation_id, data, signature_data, signed_name, status, submitted_at)
+    VALUES (?, 'risk_toolbox', ?, ?, ?, ?, ?, 'submitted', datetime('now'))
+  `).run(
+    worker.id,
+    allocation ? allocation.job_id : null,
+    allocation ? allocation.id : null,
+    JSON.stringify(data),
+    body.signature_data || null,
+    answers.employee_name || worker.full_name || null,
+  );
+
+  req.flash('success', 'Risk Assessment & Toolbox submitted.');
+  if (allocation) return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
+  return res.redirect('/w/forms');
+});
+
+// ============================================
+// TC PRESTART DECLARATION — Traffio "3. Traffic Controller Prestart Declaration"
+// ============================================
+// SWMS_OPTIONS is declared higher up (above RA_QUESTIONS) so both forms
+// share the same canonical list.
 
 router.get('/forms/tc-prestart', (req, res) => {
   const db = getDb();
