@@ -110,40 +110,108 @@
 
   <!-- DOCS TAB -->
   <% if (tab === 'docs') { %>
-  <div class="py-4 text-center">
-    <p class="text-sm text-gray-500">No documents attached to this booking yet.</p>
-    <p class="text-xs text-gray-600 mt-1">Site documents will appear here when uploaded by admin.</p>
-  </div>
+    <%
+      var DOC_TYPE_LABEL = {
+        tgs:'TGS', tmp:'TMP', ctmp:'CTMP', rol:'ROL', rol_day:'ROL — Day', rol_night:'ROL — Night',
+        stage_plan:'Stage Plan', swms:'SWMS', permit:'Permit', invoice:'Invoice', photo:'Photo', other:'Other',
+      };
+      function fmtSize(n) { if (!n) return ''; if (n < 1024) return n + ' B'; if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB'; return (n/1048576).toFixed(1) + ' MB'; }
+    %>
+    <div class="space-y-2">
+      <p class="text-xs text-gray-500 mb-1">Site documents — review before commencing work.</p>
+      <% if (!jobDocuments || jobDocuments.length === 0) { %>
+        <div class="py-6 text-center" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;">
+          <p class="text-sm font-medium" style="color:rgba(255,255,255,0.85);">No documents uploaded yet</p>
+          <p class="text-xs text-gray-500 mt-1">Your allocator hasn't attached site docs to this booking.</p>
+        </div>
+      <% } else { %>
+        <% jobDocuments.forEach(function (doc) { %>
+          <a href="<%= doc.download_url %>" target="_blank" class="flex items-center gap-3 px-3 py-2.5 rounded-lg" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(239,68,68,0.18);color:#F87171;">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6M9 14h6M9 18h6M9 10h2"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-white truncate"><%= doc.title || doc.original_name %></p>
+              <p class="text-[11px] text-gray-500">
+                <%= DOC_TYPE_LABEL[doc.doc_type] || doc.doc_type %>
+                <% if (doc.source === 'booking') { %><span class="ml-1 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold" style="background:rgba(43,127,255,0.18);color:#60A5FA;">THIS SHIFT</span><% } %>
+                <% if (doc.size_bytes) { %> · <%= fmtSize(doc.size_bytes) %><% } %>
+              </p>
+            </div>
+            <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          </a>
+        <% }) %>
+      <% } %>
+    </div>
   <% } %>
 
   <!-- FORMS TAB -->
   <% if (tab === 'forms') { %>
-  <div class="space-y-3">
-    <p class="text-xs text-gray-500">Shift-specific checklists and timesheets for this booking.</p>
+    <%
+      var JOB_PACK = [
+        { key: 'vehicle_prestart',   path: 'vehicle-prestart',   label: '1. Vehicle Pre-Start',           hint: 'Before starting the vehicle' },
+        { key: 'risk_toolbox',       path: 'risk-assessment',    label: '2. Risk Assessment & Toolbox',   hint: 'Run with the crew on site' },
+        { key: 'tc_prestart',        path: 'tc-prestart',        label: '3. TC Prestart Declaration',     hint: 'Per Traffic Controller' },
+        { key: 'team_leader',        path: 'team-leader',        label: '4. Team Leader Checklist',       hint: 'Team Leader only' },
+        { key: 'post_shift_vehicle', path: 'post-shift-vehicle', label: '5. Post-Shift Vehicle Checklist',hint: 'After clocking out' },
+      ];
+    %>
+    <div class="space-y-3">
+      <p class="text-xs text-gray-500 mb-1">Shift-specific checklists and the docket.</p>
 
-    <!-- Dockets -->
-    <div class="flex items-center justify-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
-      <span class="text-sm font-semibold" style="color:#00D2BE;">Dockets</span>
-      <span class="text-xs text-gray-500">Coming soon</span>
-    </div>
+      <% if (!allocation) { %>
+        <div class="py-3 px-3 rounded-lg" style="background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.20);">
+          <p class="text-xs" style="color:#FCD34D;">This booking isn't linked to a job yet — checklists will unlock once your allocator links it.</p>
+        </div>
+      <% } else { %>
+        <% JOB_PACK.forEach(function (jp) { var done = formStatus[jp.key]; %>
+          <a href="/w/forms/<%= jp.path %>?allocationId=<%= allocation.id %>"
+             class="flex items-center justify-between py-2.5 px-3 rounded-lg" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                   style="background: <%= done ? 'rgba(16,185,129,0.20)' : 'rgba(255,255,255,0.06)' %>; color: <%= done ? '#34D399' : 'rgba(255,255,255,0.45)' %>;">
+                <% if (done) { %>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                <% } else { %>
+                  <span class="text-xs font-bold"><%= jp.label.charAt(0) %></span>
+                <% } %>
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-white truncate"><%= jp.label %></p>
+                <% if (done) { %>
+                  <p class="text-[11px]" style="color:#34D399;">Submitted <%= new Date(done.submitted_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></p>
+                <% } else { %>
+                  <p class="text-[11px] text-gray-500"><%= jp.hint %></p>
+                <% } %>
+              </div>
+            </div>
+            <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          </a>
+        <% }) %>
 
-    <!-- Pre-Start Checklist -->
-    <div class="flex items-center justify-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
-      <span class="text-sm font-semibold" style="color:#00D2BE;">Pre-Start Checklist</span>
-      <span class="text-xs text-gray-500">Coming soon</span>
+        <!-- Docket -->
+        <a href="/w/dockets/sign/<%= allocation.id %>"
+           class="flex items-center justify-between py-2.5 px-3 rounded-lg mt-2" style="background:linear-gradient(135deg, rgba(43,127,255,0.18), rgba(43,127,255,0.06));border:1px solid rgba(43,127,255,0.35);">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="background:rgba(43,127,255,0.22);color:#60A5FA;">
+              <% if (docket) { %>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+              <% } else { %>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><path d="M9 5a2 2 0 002 2h2a2 2 0 002-2"/><path d="M9 13h6M9 17h4"/></svg>
+              <% } %>
+            </div>
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-white">Docket</p>
+              <% if (docket) { %>
+                <p class="text-[11px]" style="color:#60A5FA;">Signed · <%= docket.total_hours || 0 %> h · <%= new Date(docket.signed_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></p>
+              <% } else { %>
+                <p class="text-[11px] text-gray-500">Sign at end of shift — proof of hours.</p>
+              <% } %>
+            </div>
+          </div>
+          <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </a>
+      <% } %>
     </div>
-
-    <!-- Team Leader Checklist -->
-    <div class="flex items-center justify-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
-      <span class="text-sm font-semibold" style="color:#00D2BE;">Team Leader Checklist</span>
-      <span class="text-xs text-gray-500">Coming soon</span>
-    </div>
-
-    <!-- Vehicle Checklist -->
-    <div class="flex items-center justify-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
-      <span class="text-sm font-semibold" style="color:#00D2BE;">Vehicle Checklist</span>
-      <span class="text-xs text-gray-500">Coming soon</span>
-    </div>
-  </div>
   <% } %>
 </div>

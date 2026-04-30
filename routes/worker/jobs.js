@@ -412,6 +412,38 @@ router.get('/booking-shift/:bookingId', (req, res) => {
   const myAssignment = db.prepare('SELECT * FROM booking_crew WHERE booking_id = ? AND crew_member_id = ?').get(booking.id, worker.id);
   if (!myAssignment) { req.flash('error', 'You are not assigned to this booking.'); return res.redirect('/w/jobs'); }
 
+  // Lazy-bind a crew_allocations row to this booking_crew assignment so the
+  // Job-Pack form flow (which keys off allocation_id) works for booking-only
+  // shifts. If the allocator didn't create one when they assigned the worker,
+  // create one here on first detail visit. Allocator-confirmed work surfaces
+  // as a 'confirmed' allocation; pending work as 'allocated' so the worker
+  // can accept/decline.
+  let allocation = db.prepare(`
+    SELECT * FROM crew_allocations
+    WHERE booking_id = ? AND crew_member_id = ? LIMIT 1
+  `).get(booking.id, worker.id);
+  if (!allocation && booking.job_id) {
+    try {
+      const allocStatus = myAssignment.status === 'confirmed' ? 'confirmed' : 'allocated';
+      const startTimeFromDt = booking.start_datetime ? booking.start_datetime.substring(11, 16) : '';
+      const endTimeFromDt   = booking.end_datetime   ? booking.end_datetime.substring(11, 16)   : '';
+      const allocDate       = booking.start_datetime ? booking.start_datetime.substring(0, 10)  : new Date().toISOString().slice(0, 10);
+      const allocBy = booking.created_by_id || (req.session.user && req.session.user.id) || null;
+      const ins = db.prepare(`
+        INSERT INTO crew_allocations
+          (job_id, crew_member_id, allocation_date, start_time, end_time,
+           role_on_site, status, allocated_by_id, booking_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `).run(booking.job_id, worker.id, allocDate, startTimeFromDt, endTimeFromDt,
+             myAssignment.role_on_site || '', allocStatus, allocBy, booking.id);
+      allocation = db.prepare('SELECT * FROM crew_allocations WHERE id = ?').get(ins.lastInsertRowid);
+    } catch (e) {
+      // Allocator-managed bookings without job_id can't auto-bind — surface
+      // the problem in the log rather than the worker UI.
+      console.error('[booking-shift] failed to lazy-bind allocation:', e.message);
+    }
+  }
+
   // Get all crew on this booking
   const crew = db.prepare(`
     SELECT bc.*, cm.full_name, cm.phone, cm.role
@@ -435,6 +467,57 @@ router.get('/booking-shift/:bookingId', (req, res) => {
   const startTime = booking.start_datetime ? booking.start_datetime.substring(11, 16) : '';
   const endTime = booking.end_datetime ? booking.end_datetime.substring(11, 16) : '';
 
+  // Job-Pack completion + docket status — only when we have an allocation
+  // to hang submissions off (so a booking with no job_id stays informational).
+  const JP_TYPES = ['vehicle_prestart','risk_toolbox','tc_prestart','team_leader','post_shift_vehicle'];
+  let formStatus = {}, docket = null, jobDocuments = [];
+  if (allocation) {
+    const subs = db.prepare(`
+      SELECT id, form_type, submitted_at FROM safety_forms
+      WHERE crew_member_id = ? AND allocation_id = ?
+        AND form_type IN (${JP_TYPES.map(()=>'?').join(',')})
+    `).all(worker.id, allocation.id, ...JP_TYPES);
+    for (const t of JP_TYPES) {
+      const hit = subs.find(s => s.form_type === t);
+      formStatus[t] = hit ? { id: hit.id, submitted_at: hit.submitted_at } : null;
+    }
+    docket = db.prepare(`
+      SELECT id, signed_at, total_hours FROM docket_signatures
+      WHERE crew_member_id = ? AND allocation_id = ? ORDER BY signed_at DESC LIMIT 1
+    `).get(worker.id, allocation.id);
+
+    // Site documents — same shape as the allocation detail page so the view
+    // can reuse the rendering. Job-level docs + booking-level docs merged
+    // and sorted by doc-type priority.
+    try {
+      const jobLevel = booking.job_id ? db.prepare(`
+        SELECT id, doc_type, title, original_name, mime_type, size_bytes, uploaded_at
+        FROM job_documents WHERE job_id = ? AND archived_at IS NULL
+      `).all(booking.job_id).map(d => ({
+        id: d.id, source: 'job', doc_type: d.doc_type, title: d.title,
+        original_name: d.original_name, mime_type: d.mime_type,
+        size_bytes: d.size_bytes, uploaded_at: d.uploaded_at,
+        download_url: `/w/job-documents/${d.id}`,
+      })) : [];
+      const bookingLevel = db.prepare(`
+        SELECT id, document_type, title, original_name, file_size, created_at
+        FROM booking_documents WHERE booking_id = ?
+      `).all(booking.id).map(d => ({
+        id: d.id, source: 'booking', doc_type: d.document_type, title: d.title,
+        original_name: d.original_name, mime_type: null,
+        size_bytes: d.file_size, uploaded_at: d.created_at,
+        download_url: `/w/booking-documents/${d.id}`,
+      }));
+      const DOC_PRIORITY = { tgs:1, tmp:2, ctmp:2, rol_day:3, rol_night:4, rol:3, stage_plan:5, swms:6, permit:7, other:8, photo:9, invoice:10 };
+      jobDocuments = [...jobLevel, ...bookingLevel].sort((a, b) => {
+        const pa = DOC_PRIORITY[a.doc_type] || 99;
+        const pb = DOC_PRIORITY[b.doc_type] || 99;
+        if (pa !== pb) return pa - pb;
+        return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime();
+      });
+    } catch (e) { console.error('[booking-shift] doc fetch:', e.message); }
+  }
+
   res.render('worker/booking-detail', {
     title: booking.title || booking.booking_number,
     currentPage: 'shifts',
@@ -443,6 +526,7 @@ router.get('/booking-shift/:bookingId', (req, res) => {
     crew,
     myStatus: myAssignment.status,
     startDay, startDate, startTime, endTime,
+    allocation, formStatus, docket, jobDocuments,
   });
 });
 
