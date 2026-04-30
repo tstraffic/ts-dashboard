@@ -907,6 +907,28 @@ router.post('/forms/team-leader', photoUpload.fields([
   return res.redirect('/w/forms');
 });
 
+// GET /w/forms/history/:id/pdf — Worker re-downloads their own submission as
+// the same branded PDF the office gets. Auth: must be the submitter.
+router.get('/forms/history/:id/pdf', async (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const owns = db.prepare('SELECT 1 FROM safety_forms WHERE id = ? AND crew_member_id = ?').get(req.params.id, worker.id);
+  if (!owns) return res.status(404).send('Not found');
+  try {
+    const { renderSubmissionPdf } = require('../../services/jobPackPdf');
+    const buf = await renderSubmissionPdf(db, req.params.id);
+    const meta = db.prepare('SELECT form_type, submitted_at FROM safety_forms WHERE id = ?').get(req.params.id);
+    const date = meta ? new Date(meta.submitted_at).toISOString().slice(0, 10) : 'submission';
+    const slug = (meta && meta.form_type) ? meta.form_type : 'submission';
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="TSTC_${slug}_${date}_${req.params.id}.pdf"`);
+    res.send(buf);
+  } catch (e) {
+    console.error('[w/forms/history pdf] render failed:', e.message);
+    res.status(500).send('PDF render failed');
+  }
+});
+
 // GET /w/forms/photos/:photoId — Stream a safety-form photo back to the worker
 // who submitted it (or to the crew member that the form belongs to).
 router.get('/forms/photos/:photoId', (req, res) => {
