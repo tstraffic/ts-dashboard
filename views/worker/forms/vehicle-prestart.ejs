@@ -1,0 +1,131 @@
+<div class="space-y-4 pb-24">
+  <a href="<%= allocation ? ('/w/jobs/' + allocation.id + '?tab=forms') : '/w/forms' %>" class="inline-flex items-center text-sm text-brand-600 font-medium">
+    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back
+  </a>
+
+  <div>
+    <h1 class="text-xl font-bold text-gray-900">1. T&S Vehicle Pre-Start</h1>
+    <p class="text-xs text-gray-500 mt-1">Complete before commencing your shift. Tag out and notify a supervisor if any safety-critical item fails.</p>
+  </div>
+
+  <% if (allocation) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-sm font-bold text-gray-900"><%= allocation.client %></p>
+      <p class="text-xs text-gray-500"><%= allocation.job_number %> &middot; <%= allocation.site_address || allocation.suburb || '' %></p>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/w/forms/vehicle-prestart" enctype="multipart/form-data" id="vehicle-prestart-form">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <% if (allocation) { %><input type="hidden" name="allocation_id" value="<%= allocation.id %>"><% } %>
+
+    <div class="space-y-4">
+
+      <!-- Vehicle + ODO -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Select Vehicle</label>
+          <input type="text" name="vehicle" list="vehicle-options" required placeholder="e.g. TSTC004"
+            value="<%= recentVehicles[0] || '' %>"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <datalist id="vehicle-options">
+            <% recentVehicles.forEach(function(v){ %><option value="<%= v %>"><% }) %>
+          </datalist>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">ODO at start of shift (km)</label>
+          <input type="number" name="odo_start_km" min="0" step="1" inputmode="numeric"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+      </div>
+
+      <!-- 22 OK/Not OK/N/A items -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
+        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Vehicle Inspection</h3>
+        <p class="text-[11px] text-gray-500">Tap one option per item. Items marked "Not OK" require a supervisor notification.</p>
+        <div class="divide-y divide-gray-100">
+          <% items.forEach(function(it) { %>
+            <div class="py-2.5 flex items-center justify-between gap-3">
+              <span class="text-sm text-gray-800 flex-1"><%= it.label %></span>
+              <div class="flex gap-1 text-xs font-semibold">
+                <label class="cursor-pointer">
+                  <input type="radio" name="item_<%= it.key %>" value="ok" class="peer sr-only" checked>
+                  <span class="px-2.5 py-1.5 rounded-md border border-gray-300 text-gray-600 peer-checked:bg-emerald-600 peer-checked:text-white peer-checked:border-emerald-600">OK</span>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="radio" name="item_<%= it.key %>" value="not_ok" class="peer sr-only">
+                  <span class="px-2.5 py-1.5 rounded-md border border-gray-300 text-gray-600 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600">Not OK</span>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="radio" name="item_<%= it.key %>" value="na" class="peer sr-only">
+                  <span class="px-2.5 py-1.5 rounded-md border border-gray-300 text-gray-600 peer-checked:bg-gray-700 peer-checked:text-white peer-checked:border-gray-700">N/A</span>
+                </label>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <!-- Arrow board photos (3 angles) -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-2">
+        <label class="block text-xs font-semibold text-gray-500 uppercase">Arrow Board Photos</label>
+        <p class="text-[11px] text-gray-500">Upload 3 photos: actuator (driver side), front-on, passenger side.</p>
+        <input type="file" name="arrow_board_photos" accept="image/*" capture="environment" multiple
+          class="block w-full text-xs text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-brand-50 file:text-brand-700 file:text-xs file:font-semibold">
+      </div>
+
+      <!-- Notes -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Notes (optional)</label>
+        <textarea name="notes" rows="2" placeholder="Anything else worth flagging…"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
+      </div>
+
+      <!-- Driver signature -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs font-semibold text-gray-500 uppercase">Driver Signature</label>
+          <button type="button" onclick="clearSig()" class="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 px-2 py-1 rounded">Clear</button>
+        </div>
+        <input type="text" name="signed_name" placeholder="Print name" required
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-2 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        <div class="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 relative" style="height:160px;">
+          <canvas id="sig-canvas" class="w-full h-full rounded-lg" style="touch-action: none;"></canvas>
+        </div>
+        <input type="hidden" name="signature_data" id="sig-data">
+        <p class="text-[10px] text-gray-400 mt-1 text-center">Sign above with your finger</p>
+      </div>
+
+      <button type="submit" onclick="captureSig()" class="w-full py-3.5 bg-brand-600 text-white rounded-xl font-semibold text-sm hover:bg-brand-700 active:bg-brand-800 transition" style="min-height:48px;">
+        Submit Pre-Start
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  var canvas = document.getElementById('sig-canvas');
+  var ctx = canvas.getContext('2d');
+  var drawing = false;
+  var hasDrawn = false;
+  function resize() {
+    var rect = canvas.parentElement.getBoundingClientRect();
+    var data = hasDrawn ? canvas.toDataURL() : null;
+    canvas.width = rect.width; canvas.height = rect.height;
+    ctx.strokeStyle = '#1D6AE5'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (data && hasDrawn) {
+      var img = new Image(); img.onload = function () { ctx.drawImage(img, 0, 0); }; img.src = data;
+    }
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  canvas.addEventListener('pointerdown', function (e) { drawing = true; hasDrawn = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); e.preventDefault(); });
+  canvas.addEventListener('pointermove', function (e) { if (drawing) { ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); e.preventDefault(); } });
+  canvas.addEventListener('pointerup', function () { drawing = false; });
+  canvas.addEventListener('pointerleave', function () { drawing = false; });
+  window.clearSig = function () { ctx.clearRect(0, 0, canvas.width, canvas.height); hasDrawn = false; };
+  window.captureSig = function () { document.getElementById('sig-data').value = hasDrawn ? canvas.toDataURL('image/png') : ''; };
+})();
+</script>

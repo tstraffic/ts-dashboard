@@ -1,6 +1,70 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const sharp = require('sharp');
 const { getDb } = require('../../db/database');
+
+// Photos uploaded against a safety_forms submission live under
+// data/uploads/job-forms/<safety_form_id>/<filename>. We don't know the form
+// id at upload time so multer drops files into a per-allocation tmp dir and
+// the route handler moves them into the right place after the row is inserted.
+const JOB_FORMS_DIR = path.join(__dirname, '..', '..', 'data', 'uploads', 'job-forms');
+const TMP_FORMS_DIR = path.join(JOB_FORMS_DIR, '_tmp');
+
+const photoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(TMP_FORMS_DIR, `w${req.session.worker.id}_${Date.now()}`);
+    fs.mkdirSync(dir, { recursive: true });
+    req._formUploadDir = dir; // capture so handler can find files after upload
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = (path.extname(file.originalname || '.jpg') || '.jpg').toLowerCase();
+    cb(null, `photo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+  },
+});
+const photoUpload = multer({
+  storage: photoStorage,
+  limits: { fileSize: 8 * 1024 * 1024, files: 12 }, // 12 photos × 8 MB ceiling
+  fileFilter: (req, file, cb) => {
+    if (!/^image\//i.test(file.mimetype)) return cb(new Error('Images only'));
+    cb(null, true);
+  },
+});
+
+// Move every uploaded photo from the request's tmp dir into the form's home
+// dir (data/uploads/job-forms/<safety_form_id>/), resize to a sane max size,
+// and write a row into safety_form_photos for each.
+async function persistFormPhotos(db, safetyFormId, files, tagFor) {
+  if (!files || !files.length) return;
+  const homeDir = path.join(JOB_FORMS_DIR, String(safetyFormId));
+  fs.mkdirSync(homeDir, { recursive: true });
+  const insert = db.prepare(`
+    INSERT INTO safety_form_photos (safety_form_id, tag, file_path, original_name, mime_type, size_bytes, width, height)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const f of files) {
+    const finalName = path.basename(f.path);
+    const finalPath = path.join(homeDir, finalName);
+    try {
+      // Resize down to max 1600px on the long edge to keep storage sane.
+      const buf = await sharp(f.path).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer();
+      const meta = await sharp(buf).metadata();
+      fs.writeFileSync(finalPath, buf);
+      fs.unlinkSync(f.path);
+      insert.run(safetyFormId, tagFor(f.fieldname), path.relative(path.join(__dirname, '..', '..'), finalPath), f.originalname || finalName, 'image/jpeg', buf.length, meta.width || null, meta.height || null);
+    } catch (e) {
+      console.error('[forms] photo resize failed, falling back to raw copy:', e.message);
+      try { fs.renameSync(f.path, finalPath); } catch (_) { /* already moved */ }
+      const stat = fs.existsSync(finalPath) ? fs.statSync(finalPath) : { size: 0 };
+      insert.run(safetyFormId, tagFor(f.fieldname), path.relative(path.join(__dirname, '..', '..'), finalPath), f.originalname || finalName, f.mimetype || null, stat.size, null, null);
+    }
+  }
+  // Best-effort tmp dir cleanup
+  try { fs.rmSync(path.dirname(files[0].path), { recursive: true, force: true }); } catch (_) {}
+}
 
 // GET /w/forms — Form type selector with today's status
 router.get('/forms', (req, res) => {
@@ -264,6 +328,170 @@ router.get('/forms/history', (req, res) => {
     currentPage: 'forms',
     forms,
   });
+});
+
+// ============================================
+// VEHICLE PRE-START — Traffio "1. T&S Vehicle Pre-Start"
+// ============================================
+
+// Canonical 22-item OK / Not OK / N/A check list. Order is the same as the
+// PDF so the rendered output sits side-by-side with the original.
+const VEHICLE_PRESTART_ITEMS = [
+  { key: 'jack_wrench',       label: 'Jack and Wrench' },
+  { key: 'steering',          label: 'Steering' },
+  { key: 'horn',              label: 'Horn' },
+  { key: 'vehicle_damage',    label: 'Vehicle Damage' },
+  { key: 'spare_wheel',       label: 'Spare Wheel' },
+  { key: 'windshield',        label: 'Windshield' },
+  { key: 'brakes',            label: 'Brakes' },
+  { key: 'headlights',        label: 'Headlights' },
+  { key: 'tail_lights',       label: 'Tail Lights' },
+  { key: 'mirrors',           label: 'Mirrors' },
+  { key: 'seatbelts',         label: 'Seatbelts' },
+  { key: 'tyre_wear',         label: 'Tyre Wear' },
+  { key: 'arrow_board',       label: 'Arrow Board' },
+  { key: 'vms_board',         label: 'VMS Board' },
+  { key: 'beacons_front',     label: 'Flashing Beacons (Front)' },
+  { key: 'beacons_rear',      label: 'Flashing Beacons (Rear)' },
+  { key: 'fluid_leaks',       label: 'Fluid Leaks' },
+  { key: 'reverse_squawker',  label: 'Reverse Squawker' },
+  { key: 'fire_extinguisher', label: 'Fire Extinguisher' },
+  { key: 'first_aid_kit',     label: 'Fully Stocked First Aid Kit' },
+  { key: 'cabin_clean',       label: 'Cabin/Tray Free From Litter/Rubbish' },
+  { key: 'load_restraint',    label: 'Load Restraint' },
+];
+
+// GET /w/forms/vehicle-prestart — Render the form
+router.get('/forms/vehicle-prestart', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const allocationId = req.query.allocationId ? Number(req.query.allocationId) : null;
+
+  // Caller may land here from a job detail (allocationId set) or from the
+  // generic forms launcher. When set, prefill the booking summary so the
+  // worker doesn't retype it.
+  let allocation = null;
+  if (allocationId) {
+    allocation = db.prepare(`
+      SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
+      FROM crew_allocations ca
+      JOIN jobs j ON ca.job_id = j.id
+      WHERE ca.id = ? AND ca.crew_member_id = ?
+    `).get(allocationId, worker.id);
+  }
+
+  // Vehicle suggestions: prefer the company_vehicle_assigned field on the
+  // worker's employee row, then anything they've used on previous vehicle
+  // pre-starts. crew_allocations has no vehicle column so we don't pull from
+  // there. Worst case the datalist is empty and the input behaves as plain text.
+  const seen = new Set();
+  const recentVehicles = [];
+  try {
+    const empVeh = db.prepare(`
+      SELECT e.company_vehicle_assigned AS v
+      FROM employees e
+      WHERE (e.linked_crew_member_id = ? OR e.id = (SELECT employee_id FROM crew_members WHERE id = ?))
+        AND e.company_vehicle_assigned IS NOT NULL AND e.company_vehicle_assigned != ''
+      LIMIT 1
+    `).get(worker.id, worker.id);
+    if (empVeh && empVeh.v) { seen.add(empVeh.v); recentVehicles.push(empVeh.v); }
+  } catch (_) { /* employees table or column may not exist on dev DBs */ }
+  try {
+    const prior = db.prepare(`
+      SELECT data FROM safety_forms
+      WHERE crew_member_id = ? AND form_type = 'vehicle_prestart' AND data IS NOT NULL
+      ORDER BY submitted_at DESC LIMIT 10
+    `).all(worker.id);
+    for (const row of prior) {
+      try {
+        const v = (JSON.parse(row.data) || {}).vehicle;
+        if (v && !seen.has(v)) { seen.add(v); recentVehicles.push(v); }
+      } catch (_) { /* malformed JSON — skip */ }
+    }
+  } catch (_) { /* table may be empty */ }
+
+  res.render('worker/forms/vehicle-prestart', {
+    title: 'Vehicle Pre-Start',
+    currentPage: 'forms',
+    items: VEHICLE_PRESTART_ITEMS,
+    allocation,
+    recentVehicles,
+    flash_success: req.flash('success'),
+    flash_error: req.flash('error'),
+  });
+});
+
+// POST /w/forms/vehicle-prestart — Submit
+router.post('/forms/vehicle-prestart', photoUpload.array('arrow_board_photos', 6), async (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const body = req.body || {};
+  const allocationId = body.allocation_id ? Number(body.allocation_id) : null;
+
+  // Validate allocation is owned by worker if supplied
+  let allocation = null;
+  if (allocationId) {
+    allocation = db.prepare('SELECT id, job_id FROM crew_allocations WHERE id = ? AND crew_member_id = ?').get(allocationId, worker.id);
+    if (!allocation) {
+      req.flash('error', 'Allocation not found or not yours.');
+      return res.redirect('/w/forms/vehicle-prestart');
+    }
+  }
+
+  // Collect the 22 OK/NotOK/NA answers under data.items[<key>]
+  const items = {};
+  for (const it of VEHICLE_PRESTART_ITEMS) {
+    const v = body['item_' + it.key];
+    items[it.key] = ['ok', 'not_ok', 'na'].includes(v) ? v : 'ok';
+  }
+  const data = {
+    vehicle: (body.vehicle || '').trim(),
+    odo_start_km: body.odo_start_km ? Number(body.odo_start_km) : null,
+    items,
+    notes: (body.notes || '').trim(),
+  };
+
+  const result = db.prepare(`
+    INSERT INTO safety_forms (crew_member_id, form_type, job_id, allocation_id, data, signature_data, signed_name, status, submitted_at)
+    VALUES (?, 'vehicle_prestart', ?, ?, ?, ?, ?, 'submitted', datetime('now'))
+  `).run(
+    worker.id,
+    allocation ? allocation.job_id : null,
+    allocation ? allocation.id : null,
+    JSON.stringify(data),
+    body.signature_data || null,
+    (body.signed_name || '').trim() || null,
+  );
+  const safetyFormId = result.lastInsertRowid;
+
+  try {
+    await persistFormPhotos(db, safetyFormId, req.files, () => 'arrow_board');
+  } catch (e) {
+    console.error('[vehicle-prestart] photo persist error:', e.message);
+  }
+
+  req.flash('success', 'Vehicle Pre-Start submitted.');
+  if (allocation) return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
+  return res.redirect('/w/forms');
+});
+
+// GET /w/forms/photos/:photoId — Stream a safety-form photo back to the worker
+// who submitted it (or to the crew member that the form belongs to).
+router.get('/forms/photos/:photoId', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const row = db.prepare(`
+    SELECT p.*, sf.crew_member_id
+    FROM safety_form_photos p
+    JOIN safety_forms sf ON p.safety_form_id = sf.id
+    WHERE p.id = ?
+  `).get(req.params.photoId);
+  if (!row || row.crew_member_id !== worker.id) return res.status(404).send('Not found');
+  const abs = path.join(__dirname, '..', '..', row.file_path);
+  if (!fs.existsSync(abs)) return res.status(404).send('File missing');
+  res.setHeader('Content-Type', row.mime_type || 'image/jpeg');
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  fs.createReadStream(abs).pipe(res);
 });
 
 module.exports = router;

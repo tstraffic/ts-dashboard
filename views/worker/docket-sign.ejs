@@ -39,22 +39,26 @@
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Start on site</label>
-            <input type="time" name="start_on_site" value="<%= allocation.start_time || '' %>"
+            <input type="time" name="start_on_site" value="<%= typeof prefillStart !== 'undefined' ? prefillStart : (allocation.start_time || '') %>"
               class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
               id="time-start">
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Finish on site</label>
-            <input type="time" name="finish_on_site" value="<%= allocation.end_time || '' %>"
+            <input type="time" name="finish_on_site" value="<%= typeof prefillFinish !== 'undefined' ? prefillFinish : (allocation.end_time || '') %>"
               class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
               id="time-finish">
           </div>
         </div>
 
+        <% if (typeof prefillStart !== 'undefined' && prefillStart && prefillStart !== (allocation.start_time || '')) { %>
+          <p class="text-[11px] text-brand-700 -mt-1">Prefilled from your clock in/out — adjust if the times need correcting.</p>
+        <% } %>
+
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Break (minutes)</label>
-            <input type="number" name="break_minutes" value="30" min="0" max="120" step="5"
+            <input type="number" name="break_minutes" value="<%= typeof prefillBreakMinutes !== 'undefined' ? prefillBreakMinutes : 30 %>" min="0" max="120" step="5"
               class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
               id="time-break">
           </div>
@@ -77,7 +81,19 @@
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
         <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Client Representative</label>
         <input type="text" name="client_name" placeholder="Name of person signing off"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500" id="client-name-input">
+
+        <label class="mt-3 flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" name="no_client_on_site" value="1" id="no-client-toggle"
+            class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+          <span>No client on site</span>
+        </label>
+
+        <div id="no-client-reason-wrap" class="mt-2 hidden">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Reason / comment</label>
+          <textarea name="no_client_reason" rows="2" placeholder="e.g. Client off site / not available to sign"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
+        </div>
       </div>
 
       <!-- Worker Signature -->
@@ -93,14 +109,14 @@
         <p class="text-[10px] text-gray-400 mt-1 text-center">Sign above with your finger</p>
       </div>
 
-      <!-- Client Signature -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <!-- Client Signature (hidden when "no client on site" is ticked) -->
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4" id="client-sig-block">
         <div class="flex items-center justify-between mb-2">
           <label class="text-xs font-semibold text-gray-500 uppercase">Client Signature</label>
           <button type="button" onclick="clearSig('client')" class="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 px-2 py-1 rounded">Clear</button>
         </div>
         <input type="text" name="client_signed_name" placeholder="Client printed name"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-2 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-2 focus:ring-2 focus:ring-brand-500 focus:border-brand-500" id="client-printed-name">
         <div class="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 relative" style="height: 160px;">
           <canvas id="client-sig-canvas" class="w-full h-full rounded-lg" style="touch-action: none;"></canvas>
         </div>
@@ -209,4 +225,30 @@ document.getElementById('time-finish').addEventListener('change', calcTotal);
 document.getElementById('time-break').addEventListener('input', calcTotal);
 document.getElementById('time-travel').addEventListener('input', calcTotal);
 calcTotal();
+
+// "No client on site" toggle: hide the client signature/name block when ticked
+// and reveal a free-text reason. We don't disable the inputs (so saved drafts
+// behave predictably) — the server clears their values when the flag is set.
+(function () {
+  var toggle = document.getElementById('no-client-toggle');
+  var sigBlock = document.getElementById('client-sig-block');
+  var clientNameInput = document.getElementById('client-name-input');
+  var reasonWrap = document.getElementById('no-client-reason-wrap');
+  if (!toggle) return;
+  function sync() {
+    if (toggle.checked) {
+      sigBlock.classList.add('hidden');
+      reasonWrap.classList.remove('hidden');
+      if (clientNameInput) clientNameInput.value = '';
+      clearSig('client');
+      var n = document.getElementById('client-printed-name');
+      if (n) n.value = '';
+    } else {
+      sigBlock.classList.remove('hidden');
+      reasonWrap.classList.add('hidden');
+    }
+  }
+  toggle.addEventListener('change', sync);
+  sync();
+})();
 </script>

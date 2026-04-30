@@ -6441,6 +6441,23 @@ function runMigrations(db) {
     console.log('Migration 139 applied');
   }
 
+  // Migration 140: Docket — explicit "no client on site" path + reason.
+  // Traffio's docket UX lets the worker toggle "no client on site" and add a
+  // free-text reason instead of capturing a client signature. Today the worker
+  // just leaves the client signature blank; admins can't tell whether the
+  // client refused / was off-site / wasn't asked. Make it explicit.
+  if (!isMigrationApplied.get(140)) {
+    const cols = db.prepare("PRAGMA table_info(docket_signatures)").all().map(c => c.name);
+    if (!cols.includes('no_client_on_site')) {
+      db.exec("ALTER TABLE docket_signatures ADD COLUMN no_client_on_site INTEGER NOT NULL DEFAULT 0");
+    }
+    if (!cols.includes('no_client_reason')) {
+      db.exec("ALTER TABLE docket_signatures ADD COLUMN no_client_reason TEXT DEFAULT ''");
+    }
+    recordMigration.run(140, 'docket_signatures.no_client_on_site + no_client_reason');
+    console.log('Migration 140 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
