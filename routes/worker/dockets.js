@@ -58,46 +58,12 @@ router.get('/dockets/sign/:allocationId', (req, res) => {
     return res.redirect('/w/dockets');
   }
 
-  // Prefill start/finish from clock_events on this allocation if the worker
-  // has clocked in (and out). Falls back to the rostered start/end times.
-  // toLocaleTimeString in en-AU returns "HH:MM" once we ask for 2-digit
-  // hours/minutes — exactly what the <input type="time"> field expects.
-  const clockedIn = db.prepare(`
-    SELECT event_time FROM clock_events
-    WHERE crew_member_id = ? AND allocation_id = ? AND event_type = 'clock_in'
-    ORDER BY event_time ASC LIMIT 1
-  `).get(worker.id, allocation.id);
-  const clockedOut = db.prepare(`
-    SELECT event_time FROM clock_events
-    WHERE crew_member_id = ? AND allocation_id = ? AND event_type = 'clock_out'
-    ORDER BY event_time DESC LIMIT 1
-  `).get(worker.id, allocation.id);
-  const toHHMM = (utcStr) => {
-    if (!utcStr) return '';
-    const d = new Date(utcStr.includes('T') ? utcStr : utcStr.replace(' ', 'T') + 'Z');
-    if (isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false });
-  };
-
-  const prefillStart = toHHMM(clockedIn && clockedIn.event_time) || allocation.start_time || '';
-  const prefillFinish = toHHMM(clockedOut && clockedOut.event_time) || allocation.end_time || '';
-
-  // Sum any break_start/break_end pairs into prefilled break minutes.
-  const breakEvents = db.prepare(`
-    SELECT event_type, event_time FROM clock_events
-    WHERE crew_member_id = ? AND allocation_id = ? AND event_type IN ('break_start','break_end')
-    ORDER BY event_time ASC
-  `).all(worker.id, allocation.id);
-  let prefillBreakMinutes = 0;
-  let openBreakStart = null;
-  for (const ev of breakEvents) {
-    if (ev.event_type === 'break_start') openBreakStart = new Date(ev.event_time);
-    else if (ev.event_type === 'break_end' && openBreakStart) {
-      prefillBreakMinutes += Math.max(0, Math.round((new Date(ev.event_time) - openBreakStart) / 60000));
-      openBreakStart = null;
-    }
-  }
-  if (!prefillBreakMinutes) prefillBreakMinutes = 30; // sensible default
+  // T&S crews don't use clock in/out — the docket itself is the source of
+  // truth for shift hours. Default prefill is the rostered start/end and a
+  // sensible 30-minute break which the worker can edit.
+  const prefillStart = allocation.start_time || '';
+  const prefillFinish = allocation.end_time || '';
+  const prefillBreakMinutes = 30;
 
   res.render('worker/docket-sign', {
     title: 'Sign Docket',
@@ -127,22 +93,49 @@ router.post('/dockets/sign/:allocationId', (req, res) => {
     return res.redirect('/w/dockets');
   }
 
-  // Gate: docket can't be signed until both the Vehicle Pre-Start AND the TC
-  // Prestart Declaration have been filed for this shift. Catches the most
-  // common compliance gap (worker rolls up, drives out, signs the docket
-  // without ever touching the prestarts) without blocking workers who
-  // genuinely don't need a vehicle pre-start (no allocation = no gating).
-  const requiredForms = ['vehicle_prestart','tc_prestart'];
-  const got = db.prepare(`
-    SELECT form_type FROM safety_forms
-    WHERE crew_member_id = ? AND allocation_id = ? AND form_type IN (${requiredForms.map(() => '?').join(',')})
-  `).all(worker.id, allocation.id, ...requiredForms).map(r => r.form_type);
-  const missing = requiredForms.filter(t => !got.includes(t));
-  if (missing.length) {
-    const friendly = { vehicle_prestart: 'Vehicle Pre-Start', tc_prestart: 'TC Prestart Declaration' };
-    req.flash('error', 'Complete your ' + missing.map(m => friendly[m]).join(' and ') + ' before signing the docket.');
-    return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
+  // Soft gate: T&S crews don't clock in/out — proof of attendance is the
+  // pre-start toolbox + the docket itself. The rule the office wants:
+  //
+  //   - Allow the docket as soon as the worker has filed a MAJORITY of the
+  //     five Job-Pack checklists for this shift (3+ of 5).
+  //   - Below that, warn the worker and bounce them back to Forms. After
+  //     two warnings, let them through so a stuck worker can still close
+  //     out the day. The session counter resets on a successful sign so
+  //     accidentally-warned workers don't get locked out next time.
+  const JOB_PACK_TYPES = ['vehicle_prestart','risk_toolbox','tc_prestart','team_leader','post_shift_vehicle'];
+  const submittedTypes = db.prepare(`
+    SELECT DISTINCT form_type FROM safety_forms
+    WHERE crew_member_id = ? AND allocation_id = ? AND form_type IN (${JOB_PACK_TYPES.map(() => '?').join(',')})
+  `).all(worker.id, allocation.id, ...JOB_PACK_TYPES).map(r => r.form_type);
+  const missingTypes = JOB_PACK_TYPES.filter(t => !submittedTypes.includes(t));
+  const FRIENDLY = {
+    vehicle_prestart: 'Vehicle Pre-Start',
+    risk_toolbox: 'Risk Assessment & Toolbox',
+    tc_prestart: 'TC Prestart Declaration',
+    team_leader: 'Team Leader Checklist',
+    post_shift_vehicle: 'Post-Shift Vehicle Checklist',
+  };
+  const majority = submittedTypes.length >= 3;
+
+  if (!majority) {
+    req.session.docketWarnings = req.session.docketWarnings || {};
+    const key = String(allocation.id);
+    const seen = req.session.docketWarnings[key] || 0;
+    if (seen < 2) {
+      req.session.docketWarnings[key] = seen + 1;
+      const missingList = missingTypes.map(m => FRIENDLY[m]).slice(0, 3).join(', ');
+      const left = 2 - seen; // attempts remaining before we let them through
+      req.flash('error',
+        `You’ve only completed ${submittedTypes.length} of 5 Job-Pack checklists. Missing: ${missingList}. ` +
+        `${left === 1 ? 'One more attempt and the docket will save anyway, but please complete the outstanding checklists.' : `You can save the docket after ${left} more confirmations, but please complete the outstanding checklists first.`}`);
+      return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
+    }
+    // Third try: let the docket through but log the override so admins can
+    // see who's been bypassing the gate.
+    console.warn('[dockets] forced-through under-majority docket', { worker: worker.id, allocation: allocation.id, submitted: submittedTypes, missing: missingTypes });
   }
+  // Reset the warning counter once the docket actually saves.
+  if (req.session.docketWarnings) delete req.session.docketWarnings[String(allocation.id)];
 
   // Calculate total hours
   let totalHours = 0;
