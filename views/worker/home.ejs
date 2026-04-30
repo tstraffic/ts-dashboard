@@ -161,18 +161,81 @@
   .wh-alert h4 { font-size: 0.8rem; font-weight: 700; color: #F59E0B; }
   .wh-alert ul { margin-top: 4px; font-size: 0.75rem; color: #FCD34D; line-height: 1.4; }
 
-  /* Shift card */
-  .wh-shift { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; overflow: hidden; }
-  .wh-shift-header { padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(90deg, #EFF6FF, #F8FAFC); border-bottom: 1px solid #E5E7EB; }
-  .wh-shift-body { padding: 14px; color: #111827; }
-  .wh-shift-client { font-size: 1rem; font-weight: 700; color: #111827; }
-  .wh-shift-job { font-size: 0.7rem; color: #6B7280; font-family: ui-monospace, SFMono-Regular, monospace; }
-  .wh-meta-row { display: flex; align-items: flex-start; gap: 8px; font-size: 0.82rem; color: #374151; }
+  /* Shift card — dark-theme tinted card so it doesn't look like a stray
+     light surface dropped onto the rest of the worker home. Brand-blue
+     accent strip down the left, glassy navy fill behind, rgba whites for
+     text + borders. Allocated shifts get a faint amber tint so they read
+     as "needs your attention" without the harsh full-white treatment. */
+  .wh-shift {
+    background: linear-gradient(155deg, rgba(43,127,255,0.08), rgba(10,22,40,0.6) 60%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+  }
+  .wh-shift::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: linear-gradient(180deg, #2B7FFF, #00D2BE);
+  }
+  .wh-shift.is-allocated::before {
+    background: linear-gradient(180deg, #F59E0B, #F97316);
+  }
+  .wh-shift-header {
+    padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .wh-shift-body { padding: 14px; color: rgba(255,255,255,0.9); }
+  .wh-shift-client { font-size: 1.05rem; font-weight: 700; color: #fff; line-height: 1.2; }
+  .wh-shift-job {
+    font-size: 0.7rem; color: rgba(255,255,255,0.5);
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    letter-spacing: 0.02em; margin-top: 2px;
+  }
+  .wh-meta-row {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 0.82rem; color: rgba(255,255,255,0.78);
+  }
   .wh-meta-row + .wh-meta-row { margin-top: 8px; }
-  .wh-meta-row svg { width: 16px; height: 16px; color: #9CA3AF; flex-shrink: 0; margin-top: 1px; }
-  .wh-shift-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 14px; background: #F9FAFB; border-top: 1px solid #E5E7EB; }
-  .wh-act-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 9px; font-size: 0.8rem; font-weight: 600; border-radius: 10px; background: #fff; color: #374151; border: 1px solid #E5E7EB; }
-  .wh-act-btn.primary { background: #1D6AE5; color: #fff; border-color: #1D6AE5; box-shadow: 0 2px 6px rgba(29,106,229,0.3); }
+  .wh-meta-row svg {
+    width: 16px; height: 16px; color: rgba(255,255,255,0.4);
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .wh-meta-row strong { color: #fff; font-weight: 600; }
+  .wh-shift-actions {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.02);
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .wh-act-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 4px; padding: 10px; font-size: 0.82rem; font-weight: 600;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.85);
+    border: 1px solid rgba(255,255,255,0.08);
+    text-decoration: none;
+  }
+  .wh-act-btn:active { background: rgba(255,255,255,0.10); }
+  .wh-act-btn.primary {
+    background: linear-gradient(135deg, #2B7FFF, #1D6AE5);
+    color: #fff; border-color: rgba(43,127,255,0.6);
+    box-shadow: 0 6px 18px rgba(43,127,255,0.30);
+  }
+  .wh-act-btn.primary:active { background: linear-gradient(135deg, #1D6AE5, #1453B8); }
+  /* Status pill (the "ALLOCATED" / "CONFIRMED" badge in the header) */
+  .wh-shift-status {
+    display: inline-flex; align-items: center; padding: 3px 9px;
+    border-radius: 999px; font-size: 0.62rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.07em;
+  }
+  .wh-shift-status.allocated { background: rgba(245,158,11,0.18); color: #FCD34D; border: 1px solid rgba(245,158,11,0.35); }
+  .wh-shift-status.confirmed { background: rgba(16,185,129,0.18); color: #6EE7B7; border: 1px solid rgba(16,185,129,0.35); }
+  .wh-shift-meta-time { font-size: 0.7rem; color: rgba(255,255,255,0.55); font-weight: 600; }
 
   .wh-empty { text-align: center; padding: 24px 12px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08); border-radius: 12px; }
   .wh-empty-ic { width: 40px; height: 40px; border-radius: 999px; margin: 0 auto 8px; background: rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.3); }
@@ -444,10 +507,10 @@
     </div>
   <% } else { %>
     <% todaysShifts.forEach(shift => { %>
-      <div class="wh-shift">
+      <div class="wh-shift <%= shift.status === 'allocated' ? 'is-allocated' : '' %>">
         <div class="wh-shift-header">
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide <%= shift.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' : shift.status === 'completed' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700' %>"><%= shift.status %></span>
-          <span class="text-[10px] text-gray-500 font-semibold"><%= (shift.shift_type || 'day').toUpperCase() %> SHIFT · <%= fmtTime(shift.start_time) %> – <%= fmtTime(shift.end_time) %></span>
+          <span class="wh-shift-status <%= shift.status === 'confirmed' ? 'confirmed' : 'allocated' %>"><%= shift.status %></span>
+          <span class="wh-shift-meta-time"><%= (shift.shift_type || 'day').toUpperCase() %> · <%= fmtTime(shift.start_time) %> – <%= fmtTime(shift.end_time) %></span>
         </div>
         <div class="wh-shift-body">
           <p class="wh-shift-client"><%= shift.client %></p>
