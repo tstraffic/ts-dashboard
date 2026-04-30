@@ -462,9 +462,24 @@
             <div class="wh-meta-row"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg><span>Supervisor: <strong><%= shift.supervisor_name %></strong></span></div>
           <% } %>
         </div>
+        <%
+          // T&S crews don't clock in/out — the prestart toolbox is proof of
+          // attendance, the docket is proof of hours. Surface those two as
+          // the primary CTA on the shift card instead. Pick the next
+          // outstanding step: Pre-Start checklists if not all done, then
+          // Sign Docket. Falls back to "Open shift" once everything is in.
+          var jpDone = (typeof formStatus !== 'undefined' && formStatus) ? Object.values(formStatus).filter(function(v){return v && !Array.isArray(v);}).length : 0;
+          var nextHref, nextLabel;
+          var shiftLink = (shift.source === 'booking') ? ('/w/booking-shift/' + shift.booking_id) : ('/w/jobs/' + (shift.id || shift.job_id));
+          if (jpDone < 3) { nextHref = shiftLink + '?tab=forms'; nextLabel = 'Open checklists'; }
+          else { nextHref = '/w/dockets/sign/' + shift.id; nextLabel = 'Fill docket'; }
+        %>
         <div class="wh-shift-actions">
-          <a href="/w/clock" class="wh-act-btn primary"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><%= onShift ? 'Clock out' : 'Clock in' %></a>
-          <a href="/w/jobs/<%= shift.job_id %>" class="wh-act-btn">Details ›</a>
+          <a href="<%= nextHref %>" class="wh-act-btn primary">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            <%= nextLabel %>
+          </a>
+          <a href="<%= shiftLink %>" class="wh-act-btn">Details ›</a>
         </div>
       </div>
     <% }) %>
@@ -519,7 +534,7 @@
 <!-- FAB -->
 <div class="wh-fab" id="wh-fab">
   <div class="wh-fab-menu">
-    <a href="/w/clock" class="wh-fab-action"><span class="wh-fab-action-ic" style="background: rgba(16,185,129,0.2); color: #34D399;"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span><%= onShift ? 'Clock off' : 'Clock on' %></a>
+    <a href="/w/jobs" class="wh-fab-action"><span class="wh-fab-action-ic" style="background: rgba(16,185,129,0.2); color: #34D399;"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></span>Open my shifts</a>
     <a href="/w/hr/leave" class="wh-fab-action"><span class="wh-fab-action-ic" style="background: rgba(245,158,11,0.2); color: #F59E0B;"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.5 19l19-7.5L2.5 4v7l13 .5-13 .5z"/></svg></span>Request leave</a>
     <a href="/w/forms/incident" class="wh-fab-action"><span class="wh-fab-action-ic" style="background: rgba(239,68,68,0.2); color: #F87171;"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg></span>Submit hazard</a>
     <a href="/w/feed/new" class="wh-fab-action"><span class="wh-fab-action-ic" style="background: rgba(236,72,153,0.2); color: #F472B6;"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.6.6-5 4.5 1.5 6.8L12 17l-6 3.2 1.5-6.8-5-4.5 6.6-.6L12 2z"/></svg></span>Send kudos</a>

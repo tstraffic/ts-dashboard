@@ -97,8 +97,16 @@ function getTodayTotalHours(db, crewMemberId) {
   return totalMs;
 }
 
-// GET /w/clock — Clock page
+// GET /w/clock — Retired. T&S crews don't run a clock in/out flow; the
+// pre-start toolbox + the docket are the source of truth for attendance
+// and hours. The page used to live here; we redirect to /w/jobs so any
+// older link or PWA shortcut still lands somewhere useful.
 router.get('/clock', (req, res) => {
+  return res.redirect(301, '/w/jobs');
+});
+
+// (Original handler retained below for reference — never runs.)
+router.get('/_clock_legacy', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
   const today = new Date().toISOString().split('T')[0];
