@@ -143,6 +143,23 @@ router.get('/:id', (req, res) => {
   });
 });
 
+// GET /safety-forms/:id/pdf — render submission as a branded T&S PDF
+router.get('/:id/pdf', async (req, res) => {
+  try {
+    const { renderSubmissionPdf } = require('../services/jobPackPdf');
+    const buf = await renderSubmissionPdf(getDb(), req.params.id);
+    const meta = getDb().prepare('SELECT form_type, submitted_at FROM safety_forms WHERE id = ?').get(req.params.id);
+    const date = meta ? new Date(meta.submitted_at).toISOString().slice(0, 10) : 'submission';
+    const slug = (meta && meta.form_type) ? meta.form_type : 'submission';
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="TSTC_${slug}_${date}_${req.params.id}.pdf"`);
+    res.send(buf);
+  } catch (e) {
+    console.error('[safety-forms] PDF render failed:', e.message);
+    res.status(500).send('PDF render failed: ' + e.message);
+  }
+});
+
 // GET /safety-forms/:id/photos/:photoId — stream a stored photo to the admin
 router.get('/:id/photos/:photoId', (req, res) => {
   const db = getDb();
