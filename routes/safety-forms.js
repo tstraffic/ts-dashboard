@@ -99,6 +99,62 @@ router.get('/', (req, res) => {
   });
 });
 
+// GET /safety-forms/export.zip?since=YYYY-MM-DD&until=YYYY-MM-DD&form_type=…
+// Declared BEFORE /:id so Express matches the literal 'export.zip' first.
+router.get('/export.zip', async (req, res) => {
+  const archiver = require('archiver');
+  const { renderSubmissionPdf } = require('../services/jobPackPdf');
+  const db = getDb();
+  const since = (req.query.since || '').trim();
+  const until = (req.query.until || '').trim();
+  const formType = (req.query.form_type || '').trim();
+
+  const where = ['1=1'];
+  const params = [];
+  if (formType) { where.push('sf.form_type = ?'); params.push(formType); }
+  if (since)    { where.push('date(sf.submitted_at) >= date(?)'); params.push(since); }
+  if (until)    { where.push('date(sf.submitted_at) <= date(?)'); params.push(until); }
+
+  const rows = db.prepare(`
+    SELECT sf.id, sf.form_type, sf.submitted_at
+    FROM safety_forms sf
+    WHERE ${where.join(' AND ')}
+    ORDER BY sf.submitted_at ASC
+    LIMIT 500
+  `).all(...params);
+
+  if (!rows.length) {
+    req.flash('error', 'No submissions match those filters.');
+    return res.redirect('/safety-forms');
+  }
+
+  const labelStart = since || (rows[0] && new Date(rows[0].submitted_at).toISOString().slice(0,10)) || 'all';
+  const labelEnd   = until || (rows[rows.length-1] && new Date(rows[rows.length-1].submitted_at).toISOString().slice(0,10)) || 'all';
+  const zipName = `TSTC_jobpack_${labelStart}_to_${labelEnd}.zip`;
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
+
+  const archive = archiver('zip', { zlib: { level: 6 } });
+  archive.on('error', err => {
+    console.error('[safety-forms] zip error:', err.message);
+    try { res.status(500).end(); } catch (_) {}
+  });
+  archive.pipe(res);
+
+  for (const r of rows) {
+    try {
+      const buf = await renderSubmissionPdf(db, r.id);
+      const date = new Date(r.submitted_at).toISOString().slice(0, 10);
+      archive.append(buf, { name: `TSTC_${r.form_type}_${date}_${r.id}.pdf` });
+    } catch (e) {
+      console.error('[safety-forms] skipping submission', r.id, e.message);
+      archive.append(`Failed to render submission ${r.id}: ${e.message}\n`, { name: `errors/${r.id}.txt` });
+    }
+  }
+  archive.finalize();
+});
+
 // GET /safety-forms/:id — submission detail
 router.get('/:id', (req, res) => {
   const db = getDb();

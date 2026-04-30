@@ -402,6 +402,65 @@ router.get('/:id', (req, res) => {
   }
 
   const allCrew = db.prepare("SELECT id, full_name, role, employee_id FROM crew_members WHERE active = 1 ORDER BY full_name").all();
+
+  // Per-worker Job-Pack completion grid: for every crew member on this
+  // booking, which of the five Job-Pack checklists have they filed against
+  // any of THEIR allocations on this booking. We resolve "the worker's
+  // allocations on this booking" via crew_allocations.booking_id (set when
+  // the booking flow generates an allocation per crew row).
+  const JP_TYPES = ['vehicle_prestart','risk_toolbox','tc_prestart','team_leader','post_shift_vehicle'];
+  let jobPackGrid = [];
+  try {
+    const allocations = db.prepare(`
+      SELECT id, crew_member_id FROM crew_allocations WHERE booking_id = ? AND status != 'cancelled'
+    `).all(booking.id);
+    const allocByCrew = {};
+    for (const a of allocations) (allocByCrew[a.crew_member_id] = allocByCrew[a.crew_member_id] || []).push(a.id);
+
+    const crewIds = (booking.crew || []).map(c => c.crew_member_id);
+    if (crewIds.length) {
+      const subs = db.prepare(`
+        SELECT id, crew_member_id, form_type, allocation_id, submitted_at
+        FROM safety_forms
+        WHERE crew_member_id IN (${crewIds.map(() => '?').join(',')})
+          AND form_type IN (${JP_TYPES.map(() => '?').join(',')})
+          AND (allocation_id IS NULL OR allocation_id IN (${
+            allocations.length ? allocations.map(() => '?').join(',') : 'SELECT NULL'
+          }))
+      `).all(...crewIds, ...JP_TYPES, ...allocations.map(a => a.id));
+      const byCrew = {};
+      for (const s of subs) (byCrew[s.crew_member_id] = byCrew[s.crew_member_id] || []).push(s);
+
+      // Also pull the docket signed for each (worker, allocation) pair.
+      const dockets = allocations.length ? db.prepare(`
+        SELECT id, crew_member_id, allocation_id, signed_at
+        FROM docket_signatures
+        WHERE allocation_id IN (${allocations.map(() => '?').join(',')})
+      `).all(...allocations.map(a => a.id)) : [];
+      const docketByCrew = {};
+      for (const d of dockets) docketByCrew[d.crew_member_id] = d;
+
+      jobPackGrid = (booking.crew || []).map(c => {
+        const submissions = byCrew[c.crew_member_id] || [];
+        const formStatus = {};
+        for (const t of JP_TYPES) {
+          const hit = submissions.find(s => s.form_type === t);
+          formStatus[t] = hit ? { id: hit.id, submitted_at: hit.submitted_at } : null;
+        }
+        return {
+          crew_member_id: c.crew_member_id,
+          name: c.full_name || ('#' + c.crew_member_id),
+          role: c.role_on_site || c.crew_role || '',
+          forms: formStatus,
+          docket: docketByCrew[c.crew_member_id] || null,
+          submitted_count: JP_TYPES.filter(t => formStatus[t]).length,
+        };
+      });
+    }
+  } catch (e) {
+    console.error('[bookings.show] job-pack grid error:', e.message);
+  }
+
   res.render('bookings/show', {
     title: 'Booking ' + booking.booking_number,
     booking: { ...booking, supervisor: booking.supervisor_name, requester_name: requesterName, planner_name: plannerName, site_contact_names: siteContactNames, tags_list: tagsList,
@@ -417,6 +476,8 @@ router.get('/:id', (req, res) => {
     allCrew,
     allEquipment: (() => { try { return getDb().prepare("SELECT id, name as asset_name, category FROM equipment WHERE active = 1 ORDER BY name").all(); } catch(e) { return []; } })(),
     user: req.session.user,
+    jobPackGrid,
+    jobPackTypes: JP_TYPES,
   });
 });
 

@@ -199,6 +199,79 @@
   <!-- Left column: Crew + Notes -->
   <div class="lg:col-span-2 space-y-5">
 
+    <!-- Job-Pack completion grid -->
+    <% if (typeof jobPackGrid !== 'undefined' && jobPackGrid && jobPackGrid.length) { %>
+      <%
+        var JP_LABEL = {
+          vehicle_prestart: '1. Vehicle Pre-Start',
+          risk_toolbox: '2. Risk Assessment & Toolbox',
+          tc_prestart: '3. TC Prestart Declaration',
+          team_leader: '4. Team Leader Checklist',
+          post_shift_vehicle: '5. Post-Shift Vehicle Checklist',
+        };
+        var JP_SHORT = {
+          vehicle_prestart: 'VP-S', risk_toolbox: 'RA&T', tc_prestart: 'TPD',
+          team_leader: 'TLC', post_shift_vehicle: 'PSV',
+        };
+        var totalSlots = jobPackGrid.length * jobPackTypes.length;
+        var totalDone  = jobPackGrid.reduce(function (a, w) { return a + w.submitted_count; }, 0);
+        var totalPct = totalSlots ? Math.round(totalDone / totalSlots * 100) : 0;
+      %>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Job-Pack completion</h2>
+          <span class="text-xs font-semibold <%= totalPct >= 95 ? 'text-emerald-700 bg-emerald-50' : totalPct >= 60 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50' %> px-2 py-0.5 rounded">
+            <%= totalDone %> / <%= totalSlots %> · <%= totalPct %>%
+          </span>
+        </div>
+        <div class="overflow-x-auto -mx-5 px-5">
+          <table class="w-full text-sm">
+            <thead class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+              <tr class="border-b border-gray-100">
+                <th class="text-left pb-2">Worker</th>
+                <% jobPackTypes.forEach(function (t) { %>
+                  <th class="text-center pb-2 px-1" title="<%= JP_LABEL[t] %>"><%= JP_SHORT[t] %></th>
+                <% }) %>
+                <th class="text-center pb-2">Docket</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <% jobPackGrid.forEach(function (w) { %>
+                <tr>
+                  <td class="py-2 font-medium text-gray-900">
+                    <%= w.name %>
+                    <% if (w.role) { %><span class="text-xs text-gray-400 ml-1">· <%= w.role %></span><% } %>
+                  </td>
+                  <% jobPackTypes.forEach(function (t) { var f = w.forms[t]; %>
+                    <td class="py-2 px-1 text-center">
+                      <% if (f) { %>
+                        <a href="/safety-forms/<%= f.id %>" title="Submitted <%= new Date(f.submitted_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>">
+                          <svg class="w-4 h-4 text-emerald-600 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        </a>
+                      <% } else { %>
+                        <span class="inline-block w-3.5 h-3.5 rounded-full border border-gray-300"></span>
+                      <% } %>
+                    </td>
+                  <% }) %>
+                  <td class="py-2 text-center">
+                    <% if (w.docket) { %>
+                      <a href="/dockets/<%= w.docket.id %>" title="Signed <%= new Date(w.docket.signed_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>" class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-brand-50 text-brand-700">SIGNED</a>
+                    <% } else { %>
+                      <span class="text-[10px] font-bold text-gray-400">—</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-[10px] text-gray-400 mt-3 leading-relaxed">
+          Codes:
+          <% jobPackTypes.forEach(function (t, i) { %><% if (i > 0) { %> · <% } %><span class="font-semibold text-gray-600"><%= JP_SHORT[t] %></span> = <%= JP_LABEL[t].replace(/^\d\.\s*/, '') %><% }) %>
+        </p>
+      </div>
+    <% } %>
+
     <!-- Crew / Personnel -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
       <div class="flex items-center justify-between mb-4">
