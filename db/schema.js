@@ -6528,6 +6528,74 @@ function runMigrations(db) {
     console.log('Migration 141 applied: payroll schema');
   }
 
+  // Migration 142: Make crew_allocations.job_id nullable.
+  //
+  // Bookings can exist without a job_id (ad-hoc shifts). Workers on those
+  // bookings should still get the full Job-Pack flow — checklists, docket,
+  // documents — which all hang off a crew_allocations row. The existing
+  // NOT NULL on job_id forced us to refuse to lazy-create allocations for
+  // job-less bookings, which surfaced as "checklists will unlock once your
+  // allocator links it" in the worker portal. Drop the constraint.
+  //
+  // SQLite can't ALTER COLUMN to drop NOT NULL — rebuild the table.
+  if (!isMigrationApplied.get(142)) {
+    try {
+      const sqlRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='crew_allocations'").get();
+      const alreadyNullable = sqlRow && /job_id INTEGER REFERENCES jobs\(id\) ON DELETE/i.test(sqlRow.sql) && !/job_id INTEGER NOT NULL/i.test(sqlRow.sql);
+      if (sqlRow && !alreadyNullable) {
+        db.pragma('foreign_keys = OFF');
+        db.exec(`
+          CREATE TABLE crew_allocations_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+            crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+            allocation_date DATE NOT NULL,
+            start_time TEXT DEFAULT '06:00',
+            end_time TEXT DEFAULT '14:30',
+            shift_type TEXT NOT NULL DEFAULT 'day' CHECK(shift_type IN ('day','night','split')),
+            role_on_site TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'allocated' CHECK(status IN ('allocated','confirmed','declined','completed','cancelled')),
+            notes TEXT DEFAULT '',
+            allocated_by_id INTEGER REFERENCES users(id),
+            confirmed_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL
+          );
+        `);
+        // Copy every existing row across. The booking_id column is from
+        // an earlier migration; guard against legacy DBs that never
+        // picked it up.
+        const oldCols = db.prepare("PRAGMA table_info(crew_allocations)").all().map(c => c.name);
+        const has = (c) => oldCols.includes(c) ? c : 'NULL';
+        db.exec(`
+          INSERT INTO crew_allocations_new
+            (id, job_id, crew_member_id, allocation_date, start_time, end_time,
+             shift_type, role_on_site, status, notes, allocated_by_id, confirmed_at,
+             created_at, booking_id)
+          SELECT id, job_id, crew_member_id, allocation_date, start_time, end_time,
+                 shift_type, role_on_site, status, notes, allocated_by_id, confirmed_at,
+                 created_at, ${has('booking_id')}
+          FROM crew_allocations;
+        `);
+        db.exec('DROP TABLE crew_allocations;');
+        db.exec('ALTER TABLE crew_allocations_new RENAME TO crew_allocations;');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_crew_alloc_date ON crew_allocations(allocation_date);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_crew_alloc_job ON crew_allocations(job_id);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_crew_alloc_crew ON crew_allocations(crew_member_id);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_crew_alloc_status ON crew_allocations(status);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_crew_alloc_booking ON crew_allocations(booking_id);');
+        db.pragma('foreign_keys = ON');
+        console.log('Migration 142: crew_allocations.job_id is now nullable');
+      } else {
+        console.log('Migration 142: crew_allocations.job_id already nullable, nothing to rebuild');
+      }
+    } catch (e) {
+      console.error('Migration 142 error:', e.message);
+    }
+    recordMigration.run(142, 'crew_allocations.job_id nullable for job-less bookings');
+    console.log('Migration 142 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

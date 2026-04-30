@@ -413,16 +413,14 @@ router.get('/booking-shift/:bookingId', (req, res) => {
   if (!myAssignment) { req.flash('error', 'You are not assigned to this booking.'); return res.redirect('/w/jobs'); }
 
   // Lazy-bind a crew_allocations row to this booking_crew assignment so the
-  // Job-Pack form flow (which keys off allocation_id) works for booking-only
-  // shifts. If the allocator didn't create one when they assigned the worker,
-  // create one here on first detail visit. Allocator-confirmed work surfaces
-  // as a 'confirmed' allocation; pending work as 'allocated' so the worker
-  // can accept/decline.
+  // Job-Pack form flow (which keys off allocation_id) works for every shift,
+  // including ad-hoc bookings without a job_id. Migration 141 made
+  // crew_allocations.job_id nullable so this works for both.
   let allocation = db.prepare(`
     SELECT * FROM crew_allocations
     WHERE booking_id = ? AND crew_member_id = ? LIMIT 1
   `).get(booking.id, worker.id);
-  if (!allocation && booking.job_id) {
+  if (!allocation) {
     try {
       const allocStatus = myAssignment.status === 'confirmed' ? 'confirmed' : 'allocated';
       const startTimeFromDt = booking.start_datetime ? booking.start_datetime.substring(11, 16) : '';
@@ -434,12 +432,10 @@ router.get('/booking-shift/:bookingId', (req, res) => {
           (job_id, crew_member_id, allocation_date, start_time, end_time,
            role_on_site, status, allocated_by_id, booking_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      `).run(booking.job_id, worker.id, allocDate, startTimeFromDt, endTimeFromDt,
+      `).run(booking.job_id || null, worker.id, allocDate, startTimeFromDt, endTimeFromDt,
              myAssignment.role_on_site || '', allocStatus, allocBy, booking.id);
       allocation = db.prepare('SELECT * FROM crew_allocations WHERE id = ?').get(ins.lastInsertRowid);
     } catch (e) {
-      // Allocator-managed bookings without job_id can't auto-bind — surface
-      // the problem in the log rather than the worker UI.
       console.error('[booking-shift] failed to lazy-bind allocation:', e.message);
     }
   }

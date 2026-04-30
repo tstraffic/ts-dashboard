@@ -160,8 +160,13 @@
       <p class="text-xs text-gray-500 mb-1">Shift-specific checklists and the docket.</p>
 
       <% if (!allocation) { %>
-        <div class="py-3 px-3 rounded-lg" style="background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.20);">
-          <p class="text-xs" style="color:#FCD34D;">This booking isn't linked to a job yet — checklists will unlock once your allocator links it.</p>
+        <!-- This branch only fires if the lazy-allocation insert in
+             routes/worker/jobs.js failed for some unrecoverable reason
+             (e.g. the booking row was deleted between rendering and now).
+             Keep a soft fallback so the worker isn't staring at a dead
+             screen, but it should be unreachable in normal flow. -->
+        <div class="py-3 px-3 rounded-lg" style="background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.20);">
+          <p class="text-xs" style="color:#FCA5A5;">Couldn't load checklists for this shift — try refreshing or let the office know.</p>
         </div>
       <% } else { %>
         <% JOB_PACK.forEach(function (jp) { var done = formStatus[jp.key]; %>
