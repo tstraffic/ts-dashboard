@@ -6596,6 +6596,136 @@ function runMigrations(db) {
     console.log('Migration 142 applied');
   }
 
+  // Migration 143: Award-rate phase for payroll —
+  //   • employees gain rate_public_holiday + rate_fares_daily + award_classification_id
+  //   • new public_holidays table (NSW dates seed below)
+  //   • new award_classifications table (Fair Work classification rates,
+  //     effective-dated so historical pay runs stay locked)
+  //   • pay_run_lines gains buckets_json holding all 8 hour buckets
+  //     (day_normal/day_ot/day_dt, night_normal/night_ot/night_dt,
+  //      weekend, public_holiday). Backfills existing rows from the old
+  //      day_hours_json + night_hours_json pair.
+  if (!isMigrationApplied.get(143)) {
+    try { db.exec("ALTER TABLE employees ADD COLUMN rate_public_holiday REAL DEFAULT 0"); } catch (e) {}
+    try { db.exec("ALTER TABLE employees ADD COLUMN rate_fares_daily REAL DEFAULT 0"); } catch (e) {}
+    try { db.exec("ALTER TABLE employees ADD COLUMN award_classification_id INTEGER REFERENCES award_classifications(id) ON DELETE SET NULL"); } catch (e) {}
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS public_holidays (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date DATE NOT NULL UNIQUE,
+        label TEXT NOT NULL,
+        jurisdiction TEXT NOT NULL DEFAULT 'NSW',
+        notes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_public_holidays_date ON public_holidays(date);
+
+      CREATE TABLE IF NOT EXISTS award_classifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        award_name TEXT NOT NULL DEFAULT '',
+        classification TEXT NOT NULL,
+        effective_from DATE NOT NULL DEFAULT '2024-07-01',
+        effective_to DATE,
+        rate_day REAL DEFAULT 0,
+        rate_day_ot REAL DEFAULT 0,
+        rate_day_dt REAL DEFAULT 0,
+        rate_night REAL DEFAULT 0,
+        rate_night_ot REAL DEFAULT 0,
+        rate_night_dt REAL DEFAULT 0,
+        rate_weekend REAL DEFAULT 0,
+        rate_public_holiday REAL DEFAULT 0,
+        rate_meal REAL DEFAULT 0,
+        rate_fares_daily REAL DEFAULT 0,
+        notes TEXT DEFAULT '',
+        active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_award_class_active ON award_classifications(active);
+      CREATE INDEX IF NOT EXISTS idx_award_class_effective ON award_classifications(effective_from);
+    `);
+
+    // pay_run_lines.buckets_json — initialise to an empty 8-bucket shape
+    try {
+      db.exec("ALTER TABLE pay_run_lines ADD COLUMN buckets_json TEXT DEFAULT ''");
+    } catch (e) { /* column exists */ }
+
+    // Backfill: convert the legacy day_hours_json + night_hours_json pair into
+    // the new buckets_json shape. day_hours → day_normal, night_hours → night_normal.
+    try {
+      const empty = (rate) => ({ hours: [0, 0, 0, 0, 0, 0, 0], total_hours: 0, rate: rate || 0, total_wages: 0 });
+      const parse = (s, fb) => { try { const v = JSON.parse(s); return Array.isArray(v) && v.length === 7 ? v : fb; } catch (e) { return fb; } };
+      const legacy = db.prepare("SELECT id, day_hours_json, night_hours_json, total_day_hours, total_night_hours, total_day_wages, total_night_wages, rate_day, rate_night FROM pay_run_lines WHERE COALESCE(buckets_json, '') = ''").all();
+      const update = db.prepare("UPDATE pay_run_lines SET buckets_json = ? WHERE id = ?");
+      let n = 0;
+      for (const row of legacy) {
+        const day = parse(row.day_hours_json, [0, 0, 0, 0, 0, 0, 0]);
+        const night = parse(row.night_hours_json, [0, 0, 0, 0, 0, 0, 0]);
+        const buckets = {
+          day_normal:    { hours: day,                          total_hours: row.total_day_hours || 0,   rate: row.rate_day || 0,   total_wages: row.total_day_wages || 0 },
+          day_ot:        empty(0),
+          day_dt:        empty(0),
+          night_normal:  { hours: night,                        total_hours: row.total_night_hours || 0, rate: row.rate_night || 0, total_wages: row.total_night_wages || 0 },
+          night_ot:      empty(0),
+          night_dt:      empty(0),
+          weekend:       empty(0),
+          public_holiday: empty(0),
+        };
+        update.run(JSON.stringify(buckets), row.id);
+        n++;
+      }
+      if (n) console.log(`Migration 143: backfilled buckets_json on ${n} pay_run_lines`);
+    } catch (e) { console.error('Migration 143 backfill error:', e.message); }
+
+    // Seed NSW public holidays for 2025–2027 (close to operational use). Idempotent.
+    const seed = db.prepare("INSERT OR IGNORE INTO public_holidays (date, label, jurisdiction) VALUES (?, ?, 'NSW')");
+    [
+      // 2025
+      ['2025-01-01', "New Year's Day"],
+      ['2025-01-27', 'Australia Day (observed)'],
+      ['2025-04-18', 'Good Friday'],
+      ['2025-04-19', 'Easter Saturday'],
+      ['2025-04-20', 'Easter Sunday'],
+      ['2025-04-21', 'Easter Monday'],
+      ['2025-04-25', 'ANZAC Day'],
+      ['2025-06-09', "King's Birthday"],
+      ['2025-10-06', 'Labour Day'],
+      ['2025-12-25', 'Christmas Day'],
+      ['2025-12-26', 'Boxing Day'],
+      // 2026
+      ['2026-01-01', "New Year's Day"],
+      ['2026-01-26', 'Australia Day'],
+      ['2026-04-03', 'Good Friday'],
+      ['2026-04-04', 'Easter Saturday'],
+      ['2026-04-05', 'Easter Sunday'],
+      ['2026-04-06', 'Easter Monday'],
+      ['2026-04-25', 'ANZAC Day'],
+      ['2026-06-08', "King's Birthday"],
+      ['2026-10-05', 'Labour Day'],
+      ['2026-12-25', 'Christmas Day'],
+      ['2026-12-26', 'Boxing Day'],
+      ['2026-12-28', 'Boxing Day (observed)'],
+      // 2027
+      ['2027-01-01', "New Year's Day"],
+      ['2027-01-26', 'Australia Day'],
+      ['2027-03-26', 'Good Friday'],
+      ['2027-03-27', 'Easter Saturday'],
+      ['2027-03-28', 'Easter Sunday'],
+      ['2027-03-29', 'Easter Monday'],
+      ['2027-04-25', 'ANZAC Day'],
+      ['2027-04-26', 'ANZAC Day (observed)'],
+      ['2027-06-14', "King's Birthday"],
+      ['2027-10-04', 'Labour Day'],
+      ['2027-12-25', 'Christmas Day'],
+      ['2027-12-27', 'Christmas Day (observed)'],
+      ['2027-12-28', 'Boxing Day (observed)'],
+    ].forEach(([d, l]) => { try { seed.run(d, l); } catch (e) {} });
+
+    recordMigration.run(143, 'Award-rate payroll phase: PH + classifications + buckets_json + NSW PH seed');
+    console.log('Migration 143 applied: award-rate payroll schema + NSW public holidays seeded');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
