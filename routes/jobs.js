@@ -710,4 +710,105 @@ router.post('/:id/diary/:entryId/delete', (req, res) => {
   res.redirect(`/jobs/${req.params.id}#diary`);
 });
 
+// =============================================
+// Job-Pack Site Documents (TGS / TMP / ROL / Stage Plan / SWMS / Permit)
+// Surfaced on the worker portal under each shift's DOCS tab.
+// =============================================
+
+const JOB_DOC_DIR = pathLib.join(__dirname, '..', 'data', 'uploads', 'job-docs');
+const jobDocStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = pathLib.join(JOB_DOC_DIR, String(req.params.id));
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = (pathLib.extname(file.originalname || '.pdf') || '.pdf').toLowerCase();
+    cb(null, `doc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+  },
+});
+const jobDocUpload = multer({
+  storage: jobDocStorage,
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    // Site-document pack is almost always PDFs but allow common image/doc
+    // formats so allocators don't have to re-export.
+    const allowed = /\.(pdf|doc|docx|png|jpg|jpeg|tiff)$/i;
+    cb(null, allowed.test(pathLib.extname(file.originalname || '')));
+  },
+});
+const ALLOWED_DOC_TYPES = new Set(['tgs','tmp','rol_day','rol_night','stage_plan','swms','permit','other']);
+
+// GET /jobs/:id/documents — admin list + upload form (very small standalone
+// page; the existing job/project show pages link here from a sidebar).
+router.get('/:id/documents', (req, res) => {
+  const db = getDb();
+  const job = db.prepare('SELECT id, job_number, job_name, client FROM jobs WHERE id = ?').get(req.params.id);
+  if (!job) {
+    req.flash('error', 'Job not found.');
+    return res.redirect('/jobs');
+  }
+  const docs = db.prepare(`
+    SELECT jd.*, u.full_name AS uploaded_by_name
+    FROM job_documents jd
+    LEFT JOIN users u ON jd.uploaded_by_id = u.id
+    WHERE jd.job_id = ? AND jd.archived_at IS NULL
+    ORDER BY uploaded_at DESC
+  `).all(job.id);
+  res.render('job-documents', {
+    title: 'Site Documents — ' + (job.job_number || job.job_name),
+    job,
+    docs,
+    flash_success: req.flash('success'),
+    flash_error: req.flash('error'),
+  });
+});
+
+// POST /jobs/:id/documents — upload one or more files
+router.post('/:id/documents', jobDocUpload.array('files', 10), (req, res) => {
+  const db = getDb();
+  const job = db.prepare('SELECT id FROM jobs WHERE id = ?').get(req.params.id);
+  if (!job) return res.redirect('/jobs');
+  const docType = ALLOWED_DOC_TYPES.has(req.body.doc_type) ? req.body.doc_type : 'other';
+  const title = (req.body.title || '').trim();
+  const files = req.files || [];
+  if (!files.length) {
+    req.flash('error', 'Pick at least one file to upload.');
+    return res.redirect(`/jobs/${job.id}/documents`);
+  }
+  const ins = db.prepare(`
+    INSERT INTO job_documents (job_id, doc_type, title, file_path, original_name, mime_type, size_bytes, uploaded_by_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const f of files) {
+    const relPath = pathLib.relative(pathLib.join(__dirname, '..'), f.path);
+    // If multiple files share one upload, fall back to the file's original name
+    // for the title; otherwise honour the typed title.
+    const useTitle = files.length === 1 && title ? title : (f.originalname || 'Document');
+    ins.run(job.id, docType, useTitle, relPath, f.originalname || null, f.mimetype || null, f.size || 0, req.session.user.id);
+  }
+  req.flash('success', `${files.length} document(s) uploaded.`);
+  res.redirect(`/jobs/${job.id}/documents`);
+});
+
+// POST /jobs/:id/documents/:docId/archive — soft-archive (workers stop seeing it)
+router.post('/:id/documents/:docId/archive', (req, res) => {
+  const db = getDb();
+  db.prepare('UPDATE job_documents SET archived_at = datetime(\'now\') WHERE id = ? AND job_id = ?').run(req.params.docId, req.params.id);
+  req.flash('success', 'Document archived.');
+  res.redirect(`/jobs/${req.params.id}/documents`);
+});
+
+// GET /jobs/:id/documents/:docId/download — open / download the file
+router.get('/:id/documents/:docId/download', (req, res) => {
+  const db = getDb();
+  const doc = db.prepare('SELECT * FROM job_documents WHERE id = ? AND job_id = ?').get(req.params.docId, req.params.id);
+  if (!doc) return res.status(404).send('Not found');
+  const abs = pathLib.isAbsolute(doc.file_path) ? doc.file_path : pathLib.join(__dirname, '..', doc.file_path);
+  if (!fs.existsSync(abs)) return res.status(404).send('File missing');
+  res.setHeader('Content-Type', doc.mime_type || 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${(doc.original_name || doc.title || 'document').replace(/[^\w. -]/g, '_')}"`);
+  fs.createReadStream(abs).pipe(res);
+});
+
 module.exports = router;

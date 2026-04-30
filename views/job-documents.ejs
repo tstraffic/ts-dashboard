@@ -1,0 +1,124 @@
+<% locals.currentPage = 'jobs' %>
+
+<%
+  var DOC_TYPE_LABEL = { tgs:'TGS', tmp:'TMP', rol_day:'ROL — Day', rol_night:'ROL — Night', stage_plan:'Stage Plan', swms:'SWMS', permit:'Permit', other:'Other' };
+  function fmtSize(n) { if (!n) return ''; if (n < 1024) return n + ' B'; if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB'; return (n/1048576).toFixed(1) + ' MB'; }
+%>
+
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+  <div class="flex items-center justify-between gap-4 flex-wrap">
+    <div>
+      <a href="/jobs/<%= job.id %>" class="text-sm text-brand-600 font-medium inline-flex items-center gap-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        Back to <%= job.job_number %>
+      </a>
+      <h1 class="mt-1 text-2xl font-bold text-gray-900">Site Documents</h1>
+      <p class="text-sm text-gray-500"><%= job.job_number %> &middot; <%= job.client %></p>
+      <p class="text-xs text-gray-400 mt-1">These documents are visible to every worker allocated to this job under their shift's DOCS tab.</p>
+    </div>
+  </div>
+
+  <% if (flash_success && flash_success.length) { %>
+    <div class="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 text-sm"><%= flash_success[0] %></div>
+  <% } %>
+  <% if (flash_error && flash_error.length) { %>
+    <div class="rounded-lg bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm"><%= flash_error[0] %></div>
+  <% } %>
+
+  <!-- Upload form -->
+  <form method="POST" action="/jobs/<%= job.id %>/documents" enctype="multipart/form-data"
+    class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 space-y-4">
+    <h2 class="text-sm font-semibold text-gray-900">Upload new document(s)</h2>
+
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">Document type</label>
+        <select name="doc_type" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <option value="tgs">TGS</option>
+          <option value="tmp">TMP</option>
+          <option value="rol_day">ROL — Day</option>
+          <option value="rol_night">ROL — Night</option>
+          <option value="stage_plan">Stage Plan</option>
+          <option value="swms">SWMS</option>
+          <option value="permit">Permit</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">Title (optional)</label>
+        <input type="text" name="title" placeholder="e.g. TGS Stage 2.1 — Naremburn"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        <p class="text-[11px] text-gray-400 mt-1">If left blank, the file name is used. Ignored when uploading multiple files at once.</p>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs font-semibold text-gray-600 mb-1">Files (PDF preferred)</label>
+      <input type="file" name="files" multiple required accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.tiff"
+        class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-brand-50 file:text-brand-700 file:text-sm file:font-semibold">
+      <p class="text-[11px] text-gray-400 mt-1">Up to 25 MB each.</p>
+    </div>
+
+    <div class="flex justify-end">
+      <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        Upload
+      </button>
+    </div>
+  </form>
+
+  <!-- Existing documents -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-gray-900">Active documents <span class="text-gray-400 font-normal">(<%= docs.length %>)</span></h2>
+    </div>
+
+    <% if (docs.length === 0) { %>
+      <div class="px-5 py-10 text-center text-sm text-gray-500">
+        <p class="font-medium text-gray-700">No documents yet.</p>
+        <p class="mt-1">Upload the TGS, TMP, ROL day/night and any stage plans for this job above.</p>
+      </div>
+    <% } else { %>
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="text-left px-5 py-2.5">Title</th>
+            <th class="text-left px-3 py-2.5">Type</th>
+            <th class="text-left px-3 py-2.5 hidden sm:table-cell">Size</th>
+            <th class="text-left px-3 py-2.5 hidden md:table-cell">Uploaded</th>
+            <th class="text-right px-5 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% docs.forEach(function (d) { %>
+            <tr>
+              <td class="px-5 py-2.5">
+                <a href="/jobs/<%= job.id %>/documents/<%= d.id %>/download" target="_blank" class="text-brand-700 font-medium hover:underline">
+                  <%= d.title || d.original_name %>
+                </a>
+                <% if (d.original_name && d.title && d.original_name !== d.title) { %>
+                  <span class="block text-[11px] text-gray-400"><%= d.original_name %></span>
+                <% } %>
+              </td>
+              <td class="px-3 py-2.5">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-brand-50 text-brand-700 ring-1 ring-brand-600/10">
+                  <%= DOC_TYPE_LABEL[d.doc_type] || d.doc_type %>
+                </span>
+              </td>
+              <td class="px-3 py-2.5 hidden sm:table-cell text-gray-600"><%= fmtSize(d.size_bytes) %></td>
+              <td class="px-3 py-2.5 hidden md:table-cell text-gray-600">
+                <%= new Date(d.uploaded_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) %>
+                <% if (d.uploaded_by_name) { %><span class="text-gray-400">· <%= d.uploaded_by_name %></span><% } %>
+              </td>
+              <td class="px-5 py-2.5 text-right">
+                <form method="POST" action="/jobs/<%= job.id %>/documents/<%= d.id %>/archive" class="inline" onsubmit="return confirm('Archive this document? Workers will stop seeing it.');">
+                  <button type="submit" class="text-xs text-gray-500 hover:text-red-600 font-medium">Archive</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+</div>
