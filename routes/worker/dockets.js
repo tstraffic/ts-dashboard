@@ -93,21 +93,20 @@ router.post('/dockets/sign/:allocationId', (req, res) => {
     return res.redirect('/w/dockets');
   }
 
-  // Soft gate: T&S crews don't clock in/out — proof of attendance is the
-  // pre-start toolbox + the docket itself. The rule the office wants:
+  // Docket gating — two layers, matching the worker UI's split:
   //
-  //   - Allow the docket as soon as the worker has filed a MAJORITY of the
-  //     five Job-Pack checklists for this shift (3+ of 5).
-  //   - Below that, warn the worker and bounce them back to Forms. After
-  //     two warnings, let them through so a stuck worker can still close
-  //     out the day. The session counter resets on a successful sign so
-  //     accidentally-warned workers don't get locked out next time.
-  const JOB_PACK_TYPES = ['vehicle_prestart','risk_toolbox','tc_prestart','team_leader','post_shift_vehicle'];
-  const submittedTypes = db.prepare(`
-    SELECT DISTINCT form_type FROM safety_forms
-    WHERE crew_member_id = ? AND allocation_id = ? AND form_type IN (${JOB_PACK_TYPES.map(() => '?').join(',')})
-  `).all(worker.id, allocation.id, ...JOB_PACK_TYPES).map(r => r.form_type);
-  const missingTypes = JOB_PACK_TYPES.filter(t => !submittedTypes.includes(t));
+  //   - REQUIRED: Risk Assessment & Toolbox + Team Leader Checklist must
+  //     both be filed before the docket can be signed. These run for
+  //     every shift regardless of role / vehicle.
+  //   - RECOMMENDED: Vehicle Pre-Start, TC Prestart Declaration, Post-
+  //     Shift Vehicle Checklist. Missing one of these triggers a
+  //     warning and bounces the worker back to /w/jobs/:id?tab=forms.
+  //     After two warnings the docket saves anyway so a stuck worker
+  //     (e.g. no vehicle on shift) isn't permanently blocked. The
+  //     session counter resets on a successful sign.
+  const REQUIRED_TYPES = ['risk_toolbox','team_leader'];
+  const RECOMMENDED_TYPES = ['vehicle_prestart','tc_prestart','post_shift_vehicle'];
+  const ALL_TYPES = [...REQUIRED_TYPES, ...RECOMMENDED_TYPES];
   const FRIENDLY = {
     vehicle_prestart: 'Vehicle Pre-Start',
     risk_toolbox: 'Risk Assessment & Toolbox',
@@ -115,26 +114,39 @@ router.post('/dockets/sign/:allocationId', (req, res) => {
     team_leader: 'Team Leader Checklist',
     post_shift_vehicle: 'Post-Shift Vehicle Checklist',
   };
-  const majority = submittedTypes.length >= 3;
+  const submittedTypes = db.prepare(`
+    SELECT DISTINCT form_type FROM safety_forms
+    WHERE crew_member_id = ? AND allocation_id = ? AND form_type IN (${ALL_TYPES.map(() => '?').join(',')})
+  `).all(worker.id, allocation.id, ...ALL_TYPES).map(r => r.form_type);
 
-  if (!majority) {
+  const missingRequired = REQUIRED_TYPES.filter(t => !submittedTypes.includes(t));
+  if (missingRequired.length) {
+    req.flash('error',
+      'You can\'t sign the docket yet — these are required first: ' +
+      missingRequired.map(m => FRIENDLY[m]).join(', ') + '.');
+    return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
+  }
+
+  const missingRecommended = RECOMMENDED_TYPES.filter(t => !submittedTypes.includes(t));
+  if (missingRecommended.length) {
     req.session.docketWarnings = req.session.docketWarnings || {};
     const key = String(allocation.id);
     const seen = req.session.docketWarnings[key] || 0;
     if (seen < 2) {
       req.session.docketWarnings[key] = seen + 1;
-      const missingList = missingTypes.map(m => FRIENDLY[m]).slice(0, 3).join(', ');
-      const left = 2 - seen; // attempts remaining before we let them through
+      const left = 2 - seen;
       req.flash('error',
-        `You’ve only completed ${submittedTypes.length} of 5 Job-Pack checklists. Missing: ${missingList}. ` +
-        `${left === 1 ? 'One more attempt and the docket will save anyway, but please complete the outstanding checklists.' : `You can save the docket after ${left} more confirmations, but please complete the outstanding checklists first.`}`);
+        'Heads up — these recommended checklists are missing: ' +
+        missingRecommended.map(m => FRIENDLY[m]).join(', ') + '. ' +
+        (left === 1
+          ? 'Tap "Sign & Submit" once more and the docket will save anyway.'
+          : `Tap "Sign & Submit" ${left} more times to confirm you don\'t need them, or fill them in now.`));
       return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
     }
-    // Third try: let the docket through but log the override so admins can
-    // see who's been bypassing the gate.
-    console.warn('[dockets] forced-through under-majority docket', { worker: worker.id, allocation: allocation.id, submitted: submittedTypes, missing: missingTypes });
+    console.warn('[dockets] forced-through with missing recommended', {
+      worker: worker.id, allocation: allocation.id, missing: missingRecommended,
+    });
   }
-  // Reset the warning counter once the docket actually saves.
   if (req.session.docketWarnings) delete req.session.docketWarnings[String(allocation.id)];
 
   // Calculate total hours
