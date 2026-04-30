@@ -16,6 +16,9 @@ router.get('/home', async (req, res) => {
 
   // ---- Kick off parallel work where it helps ----
   // Synchronous DB queries first (SQLite is sync) — all very fast
+  // Booking statuses worth showing on home (everything except cancelled).
+  const VISIBLE_BOOKING_STATUSES = ['unconfirmed','confirmed','green_to_go','in_progress','completed','on_hold'];
+
   const todaysShifts = db.prepare(`
     SELECT ca.*, j.job_number, j.job_name, j.client, j.site_address, j.suburb, j.status as job_status,
       u.full_name as supervisor_name
@@ -25,6 +28,35 @@ router.get('/home', async (req, res) => {
     WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
     ORDER BY ca.start_time ASC
   `).all(worker.id, today);
+
+  // Fallback: if the worker is on a booking via booking_crew but no
+  // crew_allocations row was generated, surface it on home anyway. We
+  // shape the row to look like an allocation so downstream code (timeline,
+  // weather lookup, on-shift detection) keeps working without a branch.
+  let todaysFromBooking = [];
+  try {
+    todaysFromBooking = db.prepare(`
+      SELECT bc.id, bc.booking_id, bc.role_on_site,
+        CASE WHEN bc.status = 'assigned' THEN 'allocated' ELSE bc.status END AS status,
+        b.booking_number AS job_number, b.title AS job_name, b.title AS client,
+        b.site_address, b.suburb, b.status AS job_status,
+        DATE(b.start_datetime) AS allocation_date,
+        SUBSTR(b.start_datetime, 12, 5) AS start_time,
+        SUBSTR(b.end_datetime, 12, 5) AS end_time,
+        b.title AS project_name,
+        '' AS supervisor_name
+      FROM booking_crew bc
+      JOIN bookings b ON bc.booking_id = b.id
+      WHERE bc.crew_member_id = ?
+        AND DATE(b.start_datetime) = ?
+        AND bc.status IN ('assigned','confirmed')
+        AND b.deleted_at IS NULL
+        AND b.status IN (${VISIBLE_BOOKING_STATUSES.map(() => '?').join(',')})
+        AND NOT EXISTS (SELECT 1 FROM crew_allocations ca WHERE ca.booking_id = bc.booking_id AND ca.crew_member_id = bc.crew_member_id)
+      ORDER BY b.start_datetime ASC
+    `).all(worker.id, today, ...VISIBLE_BOOKING_STATUSES);
+  } catch (e) { /* booking_crew may not exist on legacy DBs */ }
+  todaysShifts.push(...todaysFromBooking);
 
   const inTwoWeeks = new Date(todayDate); inTwoWeeks.setDate(inTwoWeeks.getDate() + 14);
   const upcomingShifts = db.prepare(`
@@ -36,6 +68,32 @@ router.get('/home', async (req, res) => {
       AND ca.allocation_date <= ? AND ca.status != 'cancelled'
     ORDER BY ca.allocation_date ASC, ca.start_time ASC LIMIT 5
   `).all(worker.id, today, localIso(inTwoWeeks));
+
+  // Same fallback for upcoming.
+  let upcomingFromBooking = [];
+  try {
+    upcomingFromBooking = db.prepare(`
+      SELECT
+        DATE(b.start_datetime) AS allocation_date,
+        SUBSTR(b.start_datetime, 12, 5) AS start_time,
+        SUBSTR(b.end_datetime, 12, 5) AS end_time,
+        '' AS shift_type,
+        CASE WHEN bc.status = 'assigned' THEN 'allocated' ELSE bc.status END AS status,
+        NULL AS job_id, b.booking_number AS job_number, b.title AS client,
+        b.site_address, b.suburb
+      FROM booking_crew bc
+      JOIN bookings b ON bc.booking_id = b.id
+      WHERE bc.crew_member_id = ?
+        AND DATE(b.start_datetime) > ? AND DATE(b.start_datetime) <= ?
+        AND bc.status IN ('assigned','confirmed')
+        AND b.deleted_at IS NULL
+        AND b.status IN (${VISIBLE_BOOKING_STATUSES.map(() => '?').join(',')})
+        AND NOT EXISTS (SELECT 1 FROM crew_allocations ca WHERE ca.booking_id = bc.booking_id AND ca.crew_member_id = bc.crew_member_id)
+      ORDER BY b.start_datetime ASC LIMIT 5
+    `).all(worker.id, today, localIso(inTwoWeeks), ...VISIBLE_BOOKING_STATUSES);
+  } catch (e) { /* table missing */ }
+  upcomingShifts.push(...upcomingFromBooking);
+  upcomingShifts.sort((a, b) => (a.allocation_date + (a.start_time || '')).localeCompare(b.allocation_date + (b.start_time || '')));
 
   // Week strip
   const weekStart = new Date(todayDate);

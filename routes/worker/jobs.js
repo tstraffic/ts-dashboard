@@ -20,8 +20,16 @@ router.get('/jobs', (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   const tab = req.query.tab || 'upcoming';
 
+  // The bookings table CHECK uses these literal status values:
+  //   'unconfirmed','confirmed','green_to_go','in_progress','completed',
+  //   'cancelled','late_cancellation','on_hold'
+  // Worker-visible bookings = anything that's not cancelled / late-cancelled.
+  // Including 'unconfirmed' so a newly-assigned shift surfaces as a Pending
+  // request the worker can accept/decline before the allocator confirms.
+  const VISIBLE_BOOKING_STATUSES = ['unconfirmed','confirmed','green_to_go','in_progress','completed','on_hold'];
+
   // Upcoming from crew_allocations (job-linked shifts)
-  // Exclude allocations linked to cancelled/deleted/unconfirmed bookings
+  // Exclude allocations linked to cancelled/deleted bookings.
   const allocUpcoming = db.prepare(`
     SELECT ca.*, j.job_number, j.job_name, j.client, j.site_address, j.suburb,
       j.notes as job_notes, j.project_name, j.client_project_number, j.state,
@@ -33,9 +41,11 @@ router.get('/jobs', (req, res) => {
     WHERE ca.crew_member_id = ?
       AND ca.allocation_date >= ?
       AND ca.status IN ('allocated', 'confirmed')
-      AND (ca.booking_id IS NULL OR (b.status IN ('confirmed', 'gtg', 'complete') AND b.deleted_at IS NULL))
+      AND (ca.booking_id IS NULL OR (
+        b.status IN (${VISIBLE_BOOKING_STATUSES.map(() => '?').join(',')})
+        AND b.deleted_at IS NULL))
     ORDER BY ca.allocation_date ASC, ca.start_time ASC
-  `).all(worker.id, today);
+  `).all(worker.id, today, ...VISIBLE_BOOKING_STATUSES);
 
   // Upcoming from booking_crew (bookings without job allocations — fallback)
   let bookingUpcoming = [];
@@ -54,12 +64,11 @@ router.get('/jobs', (req, res) => {
       WHERE bc.crew_member_id = ?
         AND DATE(b.start_datetime) >= ?
         AND bc.status IN ('assigned', 'confirmed')
-        AND b.status NOT IN ('cancelled', 'late_cancellation', 'deleted')
         AND b.deleted_at IS NULL
-        AND b.status IN ('confirmed', 'gtg', 'complete')
+        AND b.status IN (${VISIBLE_BOOKING_STATUSES.map(() => '?').join(',')})
         AND NOT EXISTS (SELECT 1 FROM crew_allocations ca WHERE ca.booking_id = bc.booking_id AND ca.crew_member_id = bc.crew_member_id)
       ORDER BY b.start_datetime ASC
-    `).all(worker.id, today);
+    `).all(worker.id, today, ...VISIBLE_BOOKING_STATUSES);
   } catch (e) { /* booking_crew may not have matching columns */ }
 
   // Merge and deduplicate
@@ -365,7 +374,7 @@ router.post('/jobs/:id/respond', (req, res) => {
       if (totalCrew && confirmedCrew && totalCrew.c > 0 && confirmedCrew.c >= totalCrew.c) {
         const booking = db.prepare("SELECT status FROM bookings WHERE id = ?").get(fullAlloc.booking_id);
         if (booking && booking && (booking.status === 'confirmed' || booking.status === 'unconfirmed')) {
-          db.prepare("UPDATE bookings SET status = 'gtg', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(fullAlloc.booking_id);
+          db.prepare("UPDATE bookings SET status = 'green_to_go', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(fullAlloc.booking_id);
         }
       }
     }
@@ -462,7 +471,7 @@ router.post('/bookings/:id/respond', (req, res) => {
     if (total && conf && total.c > 0 && conf.c >= total.c) {
       const booking = db.prepare("SELECT status FROM bookings WHERE id = ?").get(req.params.id);
       if (booking && booking && (booking.status === 'confirmed' || booking.status === 'unconfirmed')) {
-        db.prepare("UPDATE bookings SET status = 'gtg', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+        db.prepare("UPDATE bookings SET status = 'green_to_go', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
       }
     }
     req.flash('success', 'Shift accepted!');
