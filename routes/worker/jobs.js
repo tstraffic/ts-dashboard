@@ -188,20 +188,51 @@ router.get('/jobs/:id', (req, res) => {
     post_shift_vehicle: allForms.find(f => f.form_type === 'post_shift_vehicle') || null,
   };
 
-  // Admin-uploaded site documents for this job (TGS / TMP / ROL day-night /
-  // stage plans / SWMS / permits). Workers see the list on the DOCS tab and
-  // can tap to view/download the PDF.
-  const jobDocuments = db.prepare(`
-    SELECT id, doc_type, title, file_path, original_name, mime_type, size_bytes, uploaded_at
+  // Documents the worker should see on the DOCS tab — drawn from two places:
+  //
+  //   1. job_documents (admin uploads via /jobs/:id/documents) — scoped to a
+  //      job, visible to every shift/booking on it.
+  //   2. booking_documents (allocator uploads in the booking detail page when
+  //      they put the crew on a shift) — scoped to a single booking, visible
+  //      only to the workers allocated to that booking.
+  //
+  // Both shapes are different tables with different columns, so we normalise
+  // them into a single { id, source, doc_type, title, original_name,
+  // size_bytes, mime_type, uploaded_at, download_url } shape before sending to
+  // the view. The download URL points at the right per-source streamer below.
+  const jobLevel = db.prepare(`
+    SELECT id, doc_type, title, original_name, mime_type, size_bytes, uploaded_at
     FROM job_documents
     WHERE job_id = ? AND archived_at IS NULL
-    ORDER BY
-      CASE doc_type
-        WHEN 'tgs' THEN 1 WHEN 'tmp' THEN 2 WHEN 'rol_day' THEN 3 WHEN 'rol_night' THEN 4
-        WHEN 'stage_plan' THEN 5 WHEN 'swms' THEN 6 WHEN 'permit' THEN 7 ELSE 8
-      END,
-      uploaded_at DESC
-  `).all(allocation.job_id);
+  `).all(allocation.job_id).map(d => ({
+    id: d.id, source: 'job', doc_type: d.doc_type, title: d.title,
+    original_name: d.original_name, mime_type: d.mime_type,
+    size_bytes: d.size_bytes, uploaded_at: d.uploaded_at,
+    download_url: `/w/job-documents/${d.id}`,
+  }));
+
+  let bookingLevel = [];
+  if (allocation.booking_id) {
+    bookingLevel = db.prepare(`
+      SELECT id, document_type, title, original_name, file_size, created_at
+      FROM booking_documents WHERE booking_id = ?
+    `).all(allocation.booking_id).map(d => ({
+      id: d.id, source: 'booking', doc_type: d.document_type, title: d.title,
+      original_name: d.original_name, mime_type: null,
+      size_bytes: d.file_size, uploaded_at: d.created_at,
+      download_url: `/w/booking-documents/${d.id}`,
+    }));
+  }
+
+  // Sort by doc_type priority then most-recent first. Booking docs sit
+  // alongside job docs — same priority weights, same chip in the view.
+  const DOC_PRIORITY = { tgs:1, tmp:2, ctmp:2, rol_day:3, rol_night:4, rol:3, stage_plan:5, swms:6, permit:7, other:8, photo:9, invoice:10 };
+  const jobDocuments = [...jobLevel, ...bookingLevel].sort((a, b) => {
+    const pa = DOC_PRIORITY[a.doc_type] || 99;
+    const pb = DOC_PRIORITY[b.doc_type] || 99;
+    if (pa !== pb) return pa - pb;
+    return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime();
+  });
 
   // Get docket for this allocation
   const docket = db.prepare(`
@@ -221,6 +252,40 @@ router.get('/jobs/:id', (req, res) => {
     docket,
     jobDocuments,
   });
+});
+
+// GET /w/booking-documents/:id — Stream a booking-level document. Auth check:
+// the worker must have a non-cancelled allocation on the same booking. We
+// don't expose the doc to anyone whose shift was reassigned away.
+router.get('/booking-documents/:id', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const path = require('path');
+  const fs = require('fs');
+
+  const doc = db.prepare(`
+    SELECT bd.* FROM booking_documents bd WHERE bd.id = ?
+  `).get(req.params.id);
+  if (!doc) return res.status(404).send('Not found');
+
+  const linked = db.prepare(`
+    SELECT 1 FROM crew_allocations
+    WHERE crew_member_id = ? AND booking_id = ? AND status != 'cancelled' LIMIT 1
+  `).get(worker.id, doc.booking_id);
+  if (!linked) return res.status(403).send('Forbidden');
+
+  const abs = path.isAbsolute(doc.file_path) ? doc.file_path : path.join(__dirname, '..', '..', doc.file_path);
+  if (!fs.existsSync(abs)) return res.status(404).send('File missing');
+
+  // booking_documents has no mime_type column — guess from extension to keep
+  // PDFs inline and other formats downloadable.
+  const ext = (path.extname(doc.original_name || '').toLowerCase() || '');
+  const mt = ext === '.pdf' ? 'application/pdf'
+           : (ext === '.png' || ext === '.jpg' || ext === '.jpeg') ? `image/${ext.slice(1).replace('jpg','jpeg')}`
+           : 'application/octet-stream';
+  res.setHeader('Content-Type', mt);
+  res.setHeader('Content-Disposition', `inline; filename="${(doc.original_name || doc.title || 'document').replace(/[^\w. -]/g, '_')}"`);
+  fs.createReadStream(abs).pipe(res);
 });
 
 // GET /w/job-documents/:id — Stream an admin-uploaded job document to the

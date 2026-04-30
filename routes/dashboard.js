@@ -57,6 +57,31 @@ router.get('/', (req, res) => {
   if (urgency.pendingTimesheets > 0) actionItems.push({ icon: 'clock', color: 'orange', text: `${urgency.pendingTimesheets} pending timesheet${urgency.pendingTimesheets !== 1 ? 's' : ''}`, link: '/timesheets?approved=0' });
   if (urgency.crewGaps > 0) actionItems.push({ icon: 'crew', color: 'red', text: `${urgency.crewGaps} crew gap${urgency.crewGaps !== 1 ? 's' : ''} today`, link: '/allocations' });
 
+  // Bookings about to start (today / tomorrow) that don't have any site
+  // documents attached yet. Workers landing on a shift expect at least a TGS;
+  // this nudges allocators to upload one before the crew rolls up. We treat
+  // either a booking_documents row OR a job_documents row on the same job as
+  // "covered" so re-using a job-level pack doesn't trigger a false alarm.
+  let bookingsMissingDocs = 0;
+  try {
+    bookingsMissingDocs = db.prepare(`
+      SELECT COUNT(*) AS c
+      FROM bookings b
+      WHERE b.status IN ('confirmed','green_to_go','unconfirmed')
+        AND date(b.start_datetime) BETWEEN date('now') AND date('now','+1 day')
+        AND NOT EXISTS (SELECT 1 FROM booking_documents bd WHERE bd.booking_id = b.id)
+        AND NOT EXISTS (SELECT 1 FROM job_documents jd WHERE jd.job_id = b.job_id AND jd.archived_at IS NULL)
+    `).get().c;
+  } catch (e) { /* booking_documents or job_documents table may be missing on legacy DBs */ }
+  if (bookingsMissingDocs > 0) {
+    actionItems.push({
+      icon: 'doc',
+      color: 'orange',
+      text: `${bookingsMissingDocs} booking${bookingsMissingDocs !== 1 ? 's' : ''} starting soon with no site docs`,
+      link: '/bookings?missing_docs=1',
+    });
+  }
+
   // Onboarding checklist
   let onboarding = null;
   try {

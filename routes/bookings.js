@@ -201,6 +201,18 @@ router.get('/', (req, res) => {
   if (status && view !== 'requests') { where += " AND b.status = ?"; params.push(status); }
   if (search) { where += " AND (b.title LIKE ? OR b.booking_number LIKE ? OR b.site_address LIKE ? OR b.suburb LIKE ?)"; const s = '%' + search + '%'; params.push(s, s, s, s); }
 
+  // Dashboard "missing site docs" alert links here with ?missing_docs=1.
+  // Filter the list to upcoming bookings (today + tomorrow) that have no
+  // booking_documents AND no job_documents on the same job.
+  if (req.query.missing_docs === '1') {
+    where += `
+      AND date(b.start_datetime) BETWEEN date('now') AND date('now','+1 day')
+      AND b.status IN ('confirmed','green_to_go','unconfirmed')
+      AND NOT EXISTS (SELECT 1 FROM booking_documents bd WHERE bd.booking_id = b.id)
+      AND NOT EXISTS (SELECT 1 FROM job_documents jd WHERE jd.job_id = b.job_id AND jd.archived_at IS NULL)
+    `;
+  }
+
   const orderDir = (view === 'archive') ? 'DESC' : 'ASC';
   const rows = db.prepare(`SELECT b.* FROM bookings b ${where} ORDER BY b.start_datetime ${orderDir} LIMIT ${view === 'archive' ? 200 : 500}`).all(...params);
   const bookings = rows.map(r => transformBooking(db, r));
