@@ -85,13 +85,15 @@
     <%- body %>
   </main>
 
-  <!-- Bottom Tab Navigation: Home, Jobs, Clock, Feed, More.
-       Clock takes the centre slot — it's the most-used field action.
+  <!-- Bottom Tab Navigation: Home, Jobs, Forms, Feed, More.
+       Traffic control crews don't use a clock in/out flow — proof of
+       attendance is the pre-start toolbox checklist + the docket. So the
+       centre slot is "Forms", which is the busiest field action.
        Wallet / Leave / Profile / Settings collapse into More. -->
   <nav class="fixed bottom-0 left-0 right-0 safe-area-bottom z-50" style="background: rgba(10,22,40,0.96); border-top: 1px solid rgba(255,255,255,0.06);">
     <div class="flex items-center justify-around h-16 px-1 max-w-[520px] mx-auto">
       <% const cp = typeof currentPage !== 'undefined' ? currentPage : ''; %>
-      <% const moreActive = ['more','profile','hr','wallet','leave','timesheets','availability','dockets','forms','customise','chat'].includes(cp); %>
+      <% const moreActive = ['more','profile','hr','wallet','leave','timesheets','availability','dockets','customise','chat','clock'].includes(cp); %>
 
       <!-- Home -->
       <a href="/w/home" class="flex flex-col items-center justify-center gap-0.5 flex-1 max-w-[72px] py-1.5 transition-colors <%= cp === 'home' ? 'text-[#00D2BE]' : 'text-gray-500' %>">
@@ -109,12 +111,12 @@
         <span class="text-[10px] font-medium">Jobs</span>
       </a>
 
-      <!-- Clock -->
-      <a href="/w/clock" class="flex flex-col items-center justify-center gap-0.5 flex-1 max-w-[72px] py-1.5 transition-colors <%= cp === 'clock' ? 'text-[#00D2BE]' : 'text-gray-500' %>">
+      <!-- Forms (centre, replaces Clock — see comment above the nav). -->
+      <a href="/w/forms" class="flex flex-col items-center justify-center gap-0.5 flex-1 max-w-[72px] py-1.5 transition-colors <%= cp === 'forms' ? 'text-[#00D2BE]' : 'text-gray-500' %>">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
         </svg>
-        <span class="text-[10px] font-medium">Clock</span>
+        <span class="text-[10px] font-medium">Forms</span>
       </a>
 
       <!-- Feed -->

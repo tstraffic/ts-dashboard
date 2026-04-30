@@ -1,0 +1,128 @@
+<% locals.currentPage = 'dockets-admin' %>
+
+<%
+  var FORM_LABEL = {
+    vehicle_prestart: '1. Vehicle Pre-Start',
+    risk_toolbox: '2. Risk Assessment & Toolbox',
+    tc_prestart: '3. TC Prestart Declaration',
+    team_leader: '4. Team Leader Checklist',
+    post_shift_vehicle: '5. Post-Shift Vehicle Checklist',
+  };
+  var ALL_TYPES = Object.keys(FORM_LABEL);
+  var submittedTypes = (companionForms || []).map(function (f) { return f.form_type; });
+  var missingTypes = ALL_TYPES.filter(function (t) { return submittedTypes.indexOf(t) === -1; });
+%>
+
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+  <div>
+    <a href="/dockets" class="text-sm text-brand-600 font-medium inline-flex items-center gap-1">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+      Back to dockets
+    </a>
+    <h1 class="mt-1 text-2xl font-bold text-gray-900">
+      Docket — <%= docket.crew_name || ('#' + docket.crew_member_id) %>
+    </h1>
+    <p class="text-sm text-gray-500">
+      Signed <%= new Date(docket.signed_at).toLocaleString('en-AU', { weekday:'short', day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) %>
+      <% if (docket.docket_type) { %> · <%= docket.docket_type.replace(/_/g, ' ') %><% } %>
+    </p>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+    <div>
+      <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Worker</p>
+      <p class="font-medium text-gray-900"><%= docket.crew_name || '#' + docket.crew_member_id %></p>
+      <% if (docket.employee_code) { %><p class="text-xs text-gray-500"><%= docket.employee_code %></p><% } %>
+      <% if (docket.crew_phone) { %><p class="text-xs text-gray-500"><%= docket.crew_phone %></p><% } %>
+    </div>
+    <div>
+      <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Job</p>
+      <% if (docket.job_id) { %>
+        <a href="/jobs/<%= docket.job_id %>" class="font-medium text-brand-700 hover:underline"><%= docket.job_number %></a>
+        <p class="text-xs text-gray-500"><%= docket.job_client || docket.job_name || '' %></p>
+        <% if (docket.site_address) { %><p class="text-xs text-gray-500"><%= docket.site_address %></p><% } %>
+      <% } else { %><p class="text-gray-400">—</p><% } %>
+    </div>
+    <div>
+      <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Shift</p>
+      <p class="font-medium text-gray-900"><%= docket.allocation_date || '—' %></p>
+      <p class="text-xs text-gray-500"><%= docket.shift_start || '' %><% if (docket.shift_end) { %> – <%= docket.shift_end %><% } %></p>
+      <% if (docket.role_on_site) { %><p class="text-xs text-gray-500">Role: <%= docket.role_on_site.replace(/_/g, ' ') %></p><% } %>
+    </div>
+  </div>
+
+  <!-- Hours block -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+    <h2 class="text-sm font-semibold text-gray-900 mb-3">Hours</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+      <div><p class="text-[11px] text-gray-500 uppercase tracking-wide">Start on site</p><p class="font-medium text-gray-900"><%= docket.start_on_site || '—' %></p></div>
+      <div><p class="text-[11px] text-gray-500 uppercase tracking-wide">Finish on site</p><p class="font-medium text-gray-900"><%= docket.finish_on_site || '—' %></p></div>
+      <div><p class="text-[11px] text-gray-500 uppercase tracking-wide">Break (min)</p><p class="font-medium text-gray-900"><%= docket.break_minutes || 0 %></p></div>
+      <div><p class="text-[11px] text-gray-500 uppercase tracking-wide">Travel (h)</p><p class="font-medium text-gray-900"><%= docket.travel_hours || 0 %></p></div>
+    </div>
+    <div class="mt-3 inline-flex items-center px-3 py-1 rounded bg-brand-50 text-brand-800 text-xs font-bold">Total <%= docket.total_hours || 0 %> h</div>
+  </div>
+
+  <!-- Client + signatures -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 space-y-4">
+    <div>
+      <h2 class="text-sm font-semibold text-gray-900 mb-2">Client</h2>
+      <% if (docket.no_client_on_site) { %>
+        <p class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-amber-600/10">No client on site</p>
+        <% if (docket.no_client_reason) { %>
+          <p class="text-sm text-gray-700 mt-2"><span class="text-xs text-gray-500">Reason: </span><%= docket.no_client_reason %></p>
+        <% } %>
+      <% } else { %>
+        <p class="text-sm"><span class="text-xs text-gray-500">Rep: </span><%= docket.client_name || '—' %></p>
+        <% if (docket.client_signed_name) { %><p class="text-sm"><span class="text-xs text-gray-500">Printed name: </span><%= docket.client_signed_name %></p><% } %>
+        <% if (docket.client_signed_at) { %><p class="text-xs text-gray-500 mt-1">Signed at <%= new Date(docket.client_signed_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></p><% } %>
+      <% } %>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <% if (docket.signature_data) { %>
+        <div>
+          <p class="text-[11px] text-gray-500 uppercase tracking-wide mb-1">Worker signature</p>
+          <img src="<%= docket.signature_data %>" alt="Worker signature" class="max-h-32 border border-gray-200 rounded-lg bg-gray-50 p-2">
+        </div>
+      <% } %>
+      <% if (docket.client_signature) { %>
+        <div>
+          <p class="text-[11px] text-gray-500 uppercase tracking-wide mb-1">Client signature</p>
+          <img src="<%= docket.client_signature %>" alt="Client signature" class="max-h-32 border border-gray-200 rounded-lg bg-gray-50 p-2">
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (docket.notes) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+      <h2 class="text-sm font-semibold text-gray-900 mb-2">Notes</h2>
+      <p class="text-sm text-gray-700 whitespace-pre-line"><%= docket.notes %></p>
+    </div>
+  <% } %>
+
+  <!-- Companion Job-Pack forms -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="text-sm font-semibold text-gray-900">Job-Pack checklists for this shift</h2>
+      <span class="text-xs text-gray-500"><%= submittedTypes.length %>/<%= ALL_TYPES.length %> submitted</span>
+    </div>
+    <ul class="space-y-1.5 text-sm">
+      <% companionForms.forEach(function (f) { %>
+        <li class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          <a href="/safety-forms/<%= f.id %>" class="text-brand-700 font-medium hover:underline"><%= FORM_LABEL[f.form_type] || f.form_type %></a>
+          <span class="text-xs text-gray-500">· <%= new Date(f.submitted_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></span>
+        </li>
+      <% }) %>
+      <% missingTypes.forEach(function (t) { %>
+        <li class="flex items-center gap-2 text-gray-500">
+          <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+          <span><%= FORM_LABEL[t] || t %></span>
+          <span class="text-[10px] font-bold uppercase tracking-wide text-amber-600">Missing</span>
+        </li>
+      <% }) %>
+    </ul>
+  </div>
+</div>

@@ -201,6 +201,8 @@ app.use('/audits', requireLogin, requirePermission('audits'), require('./routes/
 app.use('/safety-forms', requireLogin, requirePermission('audits'), require('./routes/safety-forms'));
 // Automated Checklist Register (replaces the manual office spreadsheet)
 app.use('/checklist-register', requireLogin, requirePermission('audits'), require('./routes/checklist-register'));
+// Worker-signed dockets (review-only — workers create them at /w/dockets/sign)
+app.use('/dockets', requireLogin, requirePermission('audits'), require('./routes/dockets-admin'));
 app.use('/plans', requireLogin, requirePermission('compliance'), require('./routes/plans'));
 app.use('/incidents', requireLogin, requirePermission('incidents'), require('./routes/incidents'));
 app.use('/contacts', requireLogin, requirePermission('contacts'), require('./routes/contacts'));
