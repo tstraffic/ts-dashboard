@@ -747,6 +747,18 @@ router.post('/forms/post-shift-vehicle', photoUpload.fields([
       req.flash('error', 'Allocation not found or not yours.');
       return res.redirect('/w/forms/post-shift-vehicle');
     }
+
+    // Gate: post-shift vehicle checklist only makes sense after the worker
+    // has clocked out of the shift. If we can find a clock_in but no
+    // matching clock_out, ask the worker to clock out first. (Workers
+    // without an allocation skip this — they're filling on a vehicle that
+    // isn't tied to a specific shift, which is a legitimate path.)
+    const clockedIn  = db.prepare("SELECT 1 FROM clock_events WHERE crew_member_id = ? AND allocation_id = ? AND event_type = 'clock_in'  LIMIT 1").get(worker.id, allocation.id);
+    const clockedOut = db.prepare("SELECT 1 FROM clock_events WHERE crew_member_id = ? AND allocation_id = ? AND event_type = 'clock_out' LIMIT 1").get(worker.id, allocation.id);
+    if (clockedIn && !clockedOut) {
+      req.flash('error', 'Clock out of your shift before submitting the post-shift vehicle checklist.');
+      return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
+    }
   }
 
   const data = {

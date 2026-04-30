@@ -127,6 +127,23 @@ router.post('/dockets/sign/:allocationId', (req, res) => {
     return res.redirect('/w/dockets');
   }
 
+  // Gate: docket can't be signed until both the Vehicle Pre-Start AND the TC
+  // Prestart Declaration have been filed for this shift. Catches the most
+  // common compliance gap (worker rolls up, drives out, signs the docket
+  // without ever touching the prestarts) without blocking workers who
+  // genuinely don't need a vehicle pre-start (no allocation = no gating).
+  const requiredForms = ['vehicle_prestart','tc_prestart'];
+  const got = db.prepare(`
+    SELECT form_type FROM safety_forms
+    WHERE crew_member_id = ? AND allocation_id = ? AND form_type IN (${requiredForms.map(() => '?').join(',')})
+  `).all(worker.id, allocation.id, ...requiredForms).map(r => r.form_type);
+  const missing = requiredForms.filter(t => !got.includes(t));
+  if (missing.length) {
+    const friendly = { vehicle_prestart: 'Vehicle Pre-Start', tc_prestart: 'TC Prestart Declaration' };
+    req.flash('error', 'Complete your ' + missing.map(m => friendly[m]).join(' and ') + ' before signing the docket.');
+    return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
+  }
+
   // Calculate total hours
   let totalHours = 0;
   if (start_on_site && finish_on_site) {
