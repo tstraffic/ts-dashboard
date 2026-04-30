@@ -1,0 +1,115 @@
+<div class="space-y-4 pb-24">
+  <a href="<%= allocation ? ('/w/jobs/' + allocation.id + '?tab=forms') : '/w/forms' %>" class="inline-flex items-center text-sm text-brand-600 font-medium">
+    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back
+  </a>
+
+  <div>
+    <h1 class="text-xl font-bold text-gray-900">3. TC Prestart Declaration</h1>
+    <p class="text-xs text-gray-500 mt-1">Complete this before starting work on site.</p>
+  </div>
+
+  <% if (allocation) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+      <p class="text-sm font-bold text-gray-900"><%= allocation.client %></p>
+      <p class="text-xs text-gray-500"><%= allocation.job_number %> &middot; <%= allocation.site_address || allocation.suburb || '' %></p>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/w/forms/tc-prestart" id="tc-prestart-form">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <% if (allocation) { %><input type="hidden" name="allocation_id" value="<%= allocation.id %>"><% } %>
+
+    <div class="space-y-4">
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">SWMS that applies to your site</label>
+          <select name="swms" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+            <option value="">Select SWMS…</option>
+            <% swmsOptions.forEach(function(s){ %><option value="<%= s %>"><%= s %></option><% }) %>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Were you part of the toolbox?</label>
+          <div class="grid grid-cols-2 gap-2 text-sm font-semibold">
+            <label class="cursor-pointer"><input type="radio" name="confirm_toolbox" value="yes" class="peer sr-only" required><span class="block text-center px-3 py-2.5 rounded-lg border border-gray-300 text-gray-600 peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600">Yes</span></label>
+            <label class="cursor-pointer"><input type="radio" name="confirm_toolbox" value="no" class="peer sr-only"><span class="block text-center px-3 py-2.5 rounded-lg border border-gray-300 text-gray-600 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600">No</span></label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Confirm radio channel?</label>
+          <div class="grid grid-cols-2 gap-2 text-sm font-semibold mb-2">
+            <label class="cursor-pointer"><input type="radio" name="confirm_radio" value="yes" class="peer sr-only" required><span class="block text-center px-3 py-2.5 rounded-lg border border-gray-300 text-gray-600 peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600">Yes</span></label>
+            <label class="cursor-pointer"><input type="radio" name="confirm_radio" value="no" class="peer sr-only"><span class="block text-center px-3 py-2.5 rounded-lg border border-gray-300 text-gray-600 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600">No</span></label>
+          </div>
+          <input type="text" name="radio_channel" placeholder="Channel number (e.g. 26)" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Confirm Emergency Assembly Point?</label>
+          <div class="grid grid-cols-2 gap-2 text-sm font-semibold mb-2">
+            <label class="cursor-pointer"><input type="radio" name="confirm_assembly" value="yes" class="peer sr-only" required><span class="block text-center px-3 py-2.5 rounded-lg border border-gray-300 text-gray-600 peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600">Yes</span></label>
+            <label class="cursor-pointer"><input type="radio" name="confirm_assembly" value="no" class="peer sr-only"><span class="block text-center px-3 py-2.5 rounded-lg border border-gray-300 text-gray-600 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600">No</span></label>
+          </div>
+          <input type="text" name="assembly_point" placeholder="Where is the assembly point? (e.g. Tc ute)" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+      </div>
+
+      <!-- Declaration text — must tick to proceed -->
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 leading-relaxed space-y-2">
+        <p class="font-semibold">By signing, I declare that:</p>
+        <ol class="list-decimal pl-5 space-y-1">
+          <li>I am fit for duty, understand the site-specific hazards and controls, and will follow the SWMS.</li>
+          <li>I will comply with the Golden Rules of Safety.</li>
+          <li>I am attending free of any trace of alcohol or illicit drugs.</li>
+          <li>I will drive to conditions and follow safe driving laws.</li>
+          <li>I will maintain established exclusion and drop zones around mobile plant.</li>
+          <li>I will not use phones whilst performing Stop / Slow duties.</li>
+          <li>I will minimise exposure to live traffic.</li>
+          <li>I will follow all SWMS, SOPs and work instructions.</li>
+        </ol>
+        <label class="flex items-start gap-2 mt-3 pt-2 border-t border-amber-200">
+          <input type="checkbox" name="declaration_acknowledged" value="1" required class="mt-0.5 h-4 w-4 rounded border-amber-400 text-brand-600 focus:ring-brand-500">
+          <span class="font-semibold">I have read and agree to the declaration above.</span>
+        </label>
+      </div>
+
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Notes (optional)</label>
+        <textarea name="notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
+      </div>
+
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs font-semibold text-gray-500 uppercase">Your Signature</label>
+          <button type="button" onclick="clearSig()" class="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 px-2 py-1 rounded">Clear</button>
+        </div>
+        <input type="text" name="signed_name" placeholder="Print name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-2 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        <div class="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 relative" style="height:160px;">
+          <canvas id="sig-canvas" class="w-full h-full rounded-lg" style="touch-action: none;"></canvas>
+        </div>
+        <input type="hidden" name="signature_data" id="sig-data">
+      </div>
+
+      <button type="submit" onclick="captureSig()" class="w-full py-3.5 bg-brand-600 text-white rounded-xl font-semibold text-sm hover:bg-brand-700" style="min-height:48px;">Submit Declaration</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  var canvas = document.getElementById('sig-canvas');
+  var ctx = canvas.getContext('2d');
+  var drawing = false, hasDrawn = false;
+  function resize() { var rect = canvas.parentElement.getBoundingClientRect(); var data = hasDrawn ? canvas.toDataURL() : null; canvas.width = rect.width; canvas.height = rect.height; ctx.strokeStyle = '#1D6AE5'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; if (data && hasDrawn) { var img = new Image(); img.onload = function () { ctx.drawImage(img, 0, 0); }; img.src = data; } }
+  resize(); window.addEventListener('resize', resize);
+  canvas.addEventListener('pointerdown', function (e) { drawing = true; hasDrawn = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); e.preventDefault(); });
+  canvas.addEventListener('pointermove', function (e) { if (drawing) { ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); e.preventDefault(); } });
+  canvas.addEventListener('pointerup', function () { drawing = false; });
+  canvas.addEventListener('pointerleave', function () { drawing = false; });
+  window.clearSig = function () { ctx.clearRect(0, 0, canvas.width, canvas.height); hasDrawn = false; };
+  window.captureSig = function () { document.getElementById('sig-data').value = hasDrawn ? canvas.toDataURL('image/png') : ''; };
+})();
+</script>

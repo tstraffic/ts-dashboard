@@ -475,6 +475,300 @@ router.post('/forms/vehicle-prestart', photoUpload.array('arrow_board_photos', 6
   return res.redirect('/w/forms');
 });
 
+// ============================================
+// TC PRESTART DECLARATION — Traffio "3. Traffic Controller Prestart Declaration"
+// ============================================
+
+const SWMS_OPTIONS = [
+  'SWMS 01 - National Generic SWMS',
+  'SWMS 01 - T&S National Generic Traffic Operations SWMS',
+  'SWMS 02 - Mobile Plant Spotting',
+  'SWMS 03 - Pedestrian Management',
+  'SWMS 04 - Manual Lane Closures',
+  'Other',
+];
+
+router.get('/forms/tc-prestart', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const allocationId = req.query.allocationId ? Number(req.query.allocationId) : null;
+
+  let allocation = null;
+  if (allocationId) {
+    allocation = db.prepare(`
+      SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
+      FROM crew_allocations ca
+      JOIN jobs j ON ca.job_id = j.id
+      WHERE ca.id = ? AND ca.crew_member_id = ?
+    `).get(allocationId, worker.id);
+  }
+
+  res.render('worker/forms/tc-prestart', {
+    title: 'TC Prestart Declaration',
+    currentPage: 'forms',
+    allocation,
+    swmsOptions: SWMS_OPTIONS,
+    flash_success: req.flash('success'),
+    flash_error: req.flash('error'),
+  });
+});
+
+router.post('/forms/tc-prestart', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const body = req.body || {};
+  const allocationId = body.allocation_id ? Number(body.allocation_id) : null;
+
+  let allocation = null;
+  if (allocationId) {
+    allocation = db.prepare('SELECT id, job_id FROM crew_allocations WHERE id = ? AND crew_member_id = ?').get(allocationId, worker.id);
+    if (!allocation) {
+      req.flash('error', 'Allocation not found or not yours.');
+      return res.redirect('/w/forms/tc-prestart');
+    }
+  }
+
+  const data = {
+    swms: (body.swms || '').trim(),
+    confirm_toolbox: body.confirm_toolbox === 'yes',
+    confirm_radio: body.confirm_radio === 'yes',
+    radio_channel: (body.radio_channel || '').trim(),
+    confirm_assembly: body.confirm_assembly === 'yes',
+    assembly_point: (body.assembly_point || '').trim(),
+    declaration_acknowledged: body.declaration_acknowledged === '1',
+    notes: (body.notes || '').trim(),
+  };
+
+  db.prepare(`
+    INSERT INTO safety_forms (crew_member_id, form_type, job_id, allocation_id, data, signature_data, signed_name, status, submitted_at)
+    VALUES (?, 'tc_prestart', ?, ?, ?, ?, ?, 'submitted', datetime('now'))
+  `).run(
+    worker.id,
+    allocation ? allocation.job_id : null,
+    allocation ? allocation.id : null,
+    JSON.stringify(data),
+    body.signature_data || null,
+    (body.signed_name || worker.full_name || '').trim() || null,
+  );
+
+  req.flash('success', 'TC Prestart Declaration submitted.');
+  if (allocation) return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
+  return res.redirect('/w/forms');
+});
+
+// ============================================
+// POST-SHIFT VEHICLE CHECKLIST — Traffio "5. Post Shift Vehicle Checklist"
+// ============================================
+
+router.get('/forms/post-shift-vehicle', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const allocationId = req.query.allocationId ? Number(req.query.allocationId) : null;
+
+  let allocation = null;
+  if (allocationId) {
+    allocation = db.prepare(`
+      SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
+      FROM crew_allocations ca
+      JOIN jobs j ON ca.job_id = j.id
+      WHERE ca.id = ? AND ca.crew_member_id = ?
+    `).get(allocationId, worker.id);
+  }
+
+  // Suggest the vehicle the worker used on their most recent vehicle pre-start
+  // today — most workers stay on the same vehicle for the day.
+  let suggestedVehicle = '';
+  try {
+    const recent = db.prepare(`
+      SELECT data FROM safety_forms
+      WHERE crew_member_id = ? AND form_type = 'vehicle_prestart'
+        AND date(submitted_at) = date('now')
+      ORDER BY submitted_at DESC LIMIT 1
+    `).get(worker.id);
+    if (recent && recent.data) suggestedVehicle = (JSON.parse(recent.data) || {}).vehicle || '';
+  } catch (_) { /* best effort */ }
+
+  res.render('worker/forms/post-shift-vehicle', {
+    title: 'Post-Shift Vehicle Checklist',
+    currentPage: 'forms',
+    allocation,
+    suggestedVehicle,
+    flash_success: req.flash('success'),
+    flash_error: req.flash('error'),
+  });
+});
+
+router.post('/forms/post-shift-vehicle', photoUpload.fields([
+  { name: 'fuel_gauge_photos',  maxCount: 2 },
+  { name: 'interior_photos',    maxCount: 6 },
+  { name: 'equipment_photos',   maxCount: 6 },
+  { name: 'arrow_board_photos', maxCount: 6 },
+]), async (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const body = req.body || {};
+  const allocationId = body.allocation_id ? Number(body.allocation_id) : null;
+
+  let allocation = null;
+  if (allocationId) {
+    allocation = db.prepare('SELECT id, job_id FROM crew_allocations WHERE id = ? AND crew_member_id = ?').get(allocationId, worker.id);
+    if (!allocation) {
+      req.flash('error', 'Allocation not found or not yours.');
+      return res.redirect('/w/forms/post-shift-vehicle');
+    }
+  }
+
+  const data = {
+    vehicle: (body.vehicle || '').trim(),
+    driver_name: (body.driver_name || worker.full_name || '').trim(),
+    odo_end_km: body.odo_end_km ? Number(body.odo_end_km) : null,
+    signs_left_behind: (body.signs_left_behind || '').trim(),
+    equipment_damaged_lost: (body.equipment_damaged_lost || '').trim(),
+    vehicle_issues: (body.vehicle_issues || '').trim(),
+  };
+
+  const result = db.prepare(`
+    INSERT INTO safety_forms (crew_member_id, form_type, job_id, allocation_id, data, status, submitted_at)
+    VALUES (?, 'post_shift_vehicle', ?, ?, ?, 'submitted', datetime('now'))
+  `).run(
+    worker.id,
+    allocation ? allocation.job_id : null,
+    allocation ? allocation.id : null,
+    JSON.stringify(data),
+  );
+  const safetyFormId = result.lastInsertRowid;
+
+  // Flatten { fuel_gauge_photos: [...], interior_photos: [...], ... } into
+  // one [{ ...file, fieldname }] array so persistFormPhotos can tag each.
+  const allFiles = [];
+  for (const key of Object.keys(req.files || {})) {
+    for (const f of req.files[key]) allFiles.push({ ...f, fieldname: key });
+  }
+  try {
+    await persistFormPhotos(db, safetyFormId, allFiles, (field) => {
+      if (field === 'fuel_gauge_photos') return 'fuel_gauge';
+      if (field === 'interior_photos') return 'interior';
+      if (field === 'equipment_photos') return 'equipment_cage';
+      if (field === 'arrow_board_photos') return 'arrow_board';
+      return 'other';
+    });
+  } catch (e) {
+    console.error('[post-shift-vehicle] photo persist error:', e.message);
+  }
+
+  req.flash('success', 'Post-Shift Vehicle Checklist submitted.');
+  if (allocation) return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
+  return res.redirect('/w/forms');
+});
+
+// ============================================
+// TEAM LEADER CHECKLIST — Traffio "4. Team Leader Checklist"
+// ============================================
+
+const PPE_ITEMS = [
+  { key: 'hi_vis_pants', label: 'Double Stripe Hi Vis Pants (Navy day / White night)' },
+  { key: 'hi_vis_shirt', label: 'Double Stripe Hi Vis Shirt / Jacket' },
+  { key: 'steel_cap',    label: 'Steel Cap Boots' },
+  { key: 'hard_hat',     label: 'Hard Hat' },
+  { key: 'radio',        label: 'Radio' },
+  { key: 'night_wands',  label: 'Night Wands (Nights only — N/A for day shift)' },
+];
+
+router.get('/forms/team-leader', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const allocationId = req.query.allocationId ? Number(req.query.allocationId) : null;
+
+  // Soft check: a member must be flagged as a manager (or supervisor on the
+  // allocation) to file a Team Leader Checklist. We don't hard-block in case
+  // the data hasn't been backfilled yet — surface a warning to the worker
+  // instead and let admins audit.
+  const me = db.prepare('SELECT is_manager FROM crew_members WHERE id = ?').get(worker.id);
+  const isManager = !!(me && me.is_manager);
+
+  let allocation = null;
+  if (allocationId) {
+    allocation = db.prepare(`
+      SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
+      FROM crew_allocations ca
+      JOIN jobs j ON ca.job_id = j.id
+      WHERE ca.id = ? AND ca.crew_member_id = ?
+    `).get(allocationId, worker.id);
+  }
+
+  res.render('worker/forms/team-leader', {
+    title: 'Team Leader Checklist',
+    currentPage: 'forms',
+    allocation,
+    ppeItems: PPE_ITEMS,
+    isManager,
+    flash_success: req.flash('success'),
+    flash_error: req.flash('error'),
+  });
+});
+
+router.post('/forms/team-leader', photoUpload.fields([
+  { name: 'team_photos',  maxCount: 8 },
+  { name: 'setup_photos', maxCount: 10 },
+]), async (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const body = req.body || {};
+  const allocationId = body.allocation_id ? Number(body.allocation_id) : null;
+
+  let allocation = null;
+  if (allocationId) {
+    allocation = db.prepare('SELECT id, job_id FROM crew_allocations WHERE id = ? AND crew_member_id = ?').get(allocationId, worker.id);
+    if (!allocation) {
+      req.flash('error', 'Allocation not found or not yours.');
+      return res.redirect('/w/forms/team-leader');
+    }
+  }
+
+  const ppe = {};
+  for (const it of PPE_ITEMS) ppe[it.key] = body['ppe_' + it.key] === 'yes';
+
+  const data = {
+    team_leader_name: (body.team_leader_name || worker.full_name || '').trim(),
+    workers_present: body.workers_present === 'yes',
+    late_notes: (body.late_notes || '').trim(),
+    ppe,
+    setup_correct: body.setup_correct === 'yes',
+    notes: (body.notes || '').trim(),
+  };
+
+  const result = db.prepare(`
+    INSERT INTO safety_forms (crew_member_id, form_type, job_id, allocation_id, data, signature_data, signed_name, status, submitted_at)
+    VALUES (?, 'team_leader', ?, ?, ?, ?, ?, 'submitted', datetime('now'))
+  `).run(
+    worker.id,
+    allocation ? allocation.job_id : null,
+    allocation ? allocation.id : null,
+    JSON.stringify(data),
+    body.signature_data || null,
+    data.team_leader_name || null,
+  );
+  const safetyFormId = result.lastInsertRowid;
+
+  const allFiles = [];
+  for (const key of Object.keys(req.files || {})) {
+    for (const f of req.files[key]) allFiles.push({ ...f, fieldname: key });
+  }
+  try {
+    await persistFormPhotos(db, safetyFormId, allFiles, (field) => {
+      if (field === 'team_photos') return 'team';
+      if (field === 'setup_photos') return 'setup';
+      return 'other';
+    });
+  } catch (e) {
+    console.error('[team-leader] photo persist error:', e.message);
+  }
+
+  req.flash('success', 'Team Leader Checklist submitted.');
+  if (allocation) return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
+  return res.redirect('/w/forms');
+});
+
 // GET /w/forms/photos/:photoId — Stream a safety-form photo back to the worker
 // who submitted it (or to the crew member that the form belongs to).
 router.get('/forms/photos/:photoId', (req, res) => {
