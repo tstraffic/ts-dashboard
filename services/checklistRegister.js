@@ -168,4 +168,97 @@ function dashboardSummary(db) {
   };
 }
 
-module.exports = { FORM_TYPES, registerForMonth, dashboardSummary };
+// Per-worker breakdown for a window. For each crew member with at least one
+// non-cancelled allocation in [from, to), how many of each form_type did they
+// submit vs how many they were "expected" to file.
+//
+// Expected counts per worker:
+//   - per='allocation' forms (Risk, TC Prestart, Team Leader): one expected
+//     submission for every allocation the worker had in the window.
+//   - per='booking' forms (Vehicle Pre-Start, Post-Shift Vehicle): one
+//     expected submission for every distinct booking_id the worker was on
+//     (not every allocation — a worker doing two slots on one booking still
+//     drives one ute, fills out one pre-start). Allocations without a
+//     booking_id fall back to the allocation count.
+function workerBreakdown(db, from, to) {
+  const fromS = ymd(from);
+  const toS = ymd(to);
+
+  // 1. Worker → allocation count + distinct booking count in the window.
+  const allocRows = db.prepare(`
+    SELECT ca.crew_member_id AS id, cm.full_name AS name,
+      COUNT(*) AS allocations,
+      COUNT(DISTINCT COALESCE(ca.booking_id, -ca.id)) AS bookings
+    FROM crew_allocations ca
+    LEFT JOIN crew_members cm ON ca.crew_member_id = cm.id
+    LEFT JOIN bookings b ON ca.booking_id = b.id
+    WHERE date(ca.allocation_date) >= date(?) AND date(ca.allocation_date) < date(?)
+      AND ca.status != 'cancelled'
+      AND (b.id IS NULL OR (b.deleted_at IS NULL AND b.status NOT IN ('cancelled','late_cancellation')))
+    GROUP BY ca.crew_member_id, cm.full_name
+  `).all(fromS, toS);
+
+  // 2. Worker → form_type → submitted count
+  const subRows = db.prepare(`
+    SELECT crew_member_id, form_type, COUNT(*) AS c
+    FROM safety_forms
+    WHERE date(submitted_at) >= date(?) AND date(submitted_at) < date(?)
+    GROUP BY crew_member_id, form_type
+  `).all(fromS, toS);
+  const subBy = {};
+  for (const r of subRows) {
+    (subBy[r.crew_member_id] = subBy[r.crew_member_id] || {})[r.form_type] = r.c;
+  }
+
+  return allocRows.map(w => {
+    const forms = FORM_TYPES.map(form => {
+      const expected = form.per === 'booking' ? w.bookings : w.allocations;
+      const submitted = (subBy[w.id] && subBy[w.id][form.key]) || 0;
+      const pct = expected > 0 ? Math.round((Math.min(submitted, expected) / expected) * 100) : 0;
+      return { key: form.key, label: form.label, expected, submitted, pct };
+    });
+    // Overall = capped sum / sum of expected, weighted by expected.
+    const totalExpected = forms.reduce((a, f) => a + f.expected, 0);
+    const totalSubmitted = forms.reduce((a, f) => a + Math.min(f.submitted, f.expected), 0);
+    const overall = totalExpected > 0 ? Math.round((totalSubmitted / totalExpected) * 100) : 0;
+    return {
+      id: w.id,
+      name: w.name || '#' + w.id,
+      allocations: w.allocations,
+      bookings: w.bookings,
+      forms,
+      overall,
+    };
+  }).sort((a, b) => b.overall - a.overall || b.allocations - a.allocations);
+}
+
+// Auto-generate spreadsheet-style "Notes" for each form type given a worker
+// breakdown — highest / lowest completion + names of anyone who missed every
+// expected submission. Returns { [form_type]: 'note string' }.
+function notesFromBreakdown(workers) {
+  const notes = {};
+  for (const form of FORM_TYPES) {
+    const eligible = workers.filter(w => w.forms.find(f => f.key === form.key && f.expected > 0));
+    if (!eligible.length) { notes[form.key] = ''; continue; }
+    const ranked = eligible.map(w => {
+      const f = w.forms.find(x => x.key === form.key);
+      return { name: w.name, pct: f.pct, expected: f.expected, submitted: f.submitted };
+    }).sort((a, b) => b.pct - a.pct || b.submitted - a.submitted);
+    const top = ranked.filter(r => r.pct === ranked[0].pct).slice(0, 3).map(r => r.name);
+    const bottom = ranked.filter(r => r.pct === ranked[ranked.length - 1].pct && r.pct < ranked[0].pct).slice(0, 3).map(r => r.name);
+    const missed = ranked.filter(r => r.submitted === 0).slice(0, 5).map(r => r.name);
+
+    const parts = [];
+    if (ranked[0].pct === 100 && ranked[ranked.length - 1].pct === 100) {
+      parts.push('All workers at 100%.');
+    } else {
+      if (top.length) parts.push('Highest: ' + top.join(', ') + '.');
+      if (bottom.length) parts.push('Lowest: ' + bottom.join(', ') + '.');
+    }
+    if (missed.length && missed.length < eligible.length) parts.push('Missing: ' + missed.join(', ') + '.');
+    notes[form.key] = parts.join(' ');
+  }
+  return notes;
+}
+
+module.exports = { FORM_TYPES, registerForMonth, dashboardSummary, workerBreakdown, notesFromBreakdown };

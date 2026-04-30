@@ -15,6 +15,14 @@ router.get('/', (req, res) => {
   const month = req.query.month ? Math.max(1, Math.min(12, Number(req.query.month))) : (now.getMonth() + 1);
   const monthData = register.registerForMonth(db, year, month - 1);
 
+  // Per-worker breakdown for the WHOLE month — feeds the "Highest / Lowest /
+  // Missing" notes column on the rows + powers the per-worker drill-down
+  // table at the bottom.
+  const monthStart = new Date(year, month - 1, 1);
+  const monthEnd = new Date(year, month, 1);
+  const workers = register.workerBreakdown(db, monthStart, monthEnd);
+  const monthNotes = register.notesFromBreakdown(workers);
+
   // Months selectable: the current month + 11 prior, so the office can
   // page back through history without typing dates.
   const months = [];
@@ -29,6 +37,8 @@ router.get('/', (req, res) => {
     month,
     monthLabel: new Date(year, month - 1, 1).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }),
     monthData,
+    monthNotes,
+    workers,
     months,
   });
 });
