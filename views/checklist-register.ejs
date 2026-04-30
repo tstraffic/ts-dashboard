@@ -1,0 +1,130 @@
+<% locals.currentPage = 'checklist-register' %>
+
+<%
+  function pctClass(p, required) {
+    if (!required) return 'text-gray-400';
+    if (p >= 95) return 'text-emerald-700 bg-emerald-50';
+    if (p >= 75) return 'text-amber-700 bg-amber-50';
+    return 'text-red-700 bg-red-50';
+  }
+  function bar(p, required) {
+    if (!required) return 'bg-gray-200';
+    if (p >= 95) return 'bg-emerald-500';
+    if (p >= 75) return 'bg-amber-400';
+    return 'bg-red-500';
+  }
+%>
+
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Checklist Register</h1>
+      <p class="text-sm text-gray-500 mt-0.5">Required vs completed for the five Job-Pack checklists, broken down by week.</p>
+    </div>
+    <form method="GET" action="/checklist-register" class="flex items-center gap-2">
+      <select name="year"
+        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+        onchange="this.form.submit()">
+        <% for (var y = year - 2; y <= year + 1; y++) { %>
+          <option value="<%= y %>" <%= y === year ? 'selected' : '' %>><%= y %></option>
+        <% } %>
+      </select>
+      <select name="month"
+        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+        onchange="this.form.submit()">
+        <% var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December']; %>
+        <% for (var m = 1; m <= 12; m++) { %>
+          <option value="<%= m %>" <%= m === month ? 'selected' : '' %>><%= monthNames[m-1] %></option>
+        <% } %>
+      </select>
+    </form>
+  </div>
+
+  <!-- Month roll-up -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 flex items-baseline justify-between">
+      <h2 class="text-base font-semibold text-gray-900"><%= monthLabel %></h2>
+      <span class="text-xs text-gray-500">Month total</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="text-left px-5 py-2.5">Checklist</th>
+            <th class="text-right px-3 py-2.5">Required</th>
+            <th class="text-right px-3 py-2.5">Completed</th>
+            <th class="text-left px-3 py-2.5 w-1/3">Completion</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% monthData.total.forEach(function (row) { %>
+            <tr>
+              <td class="px-5 py-2.5 font-medium text-gray-900"><%= row.label %></td>
+              <td class="px-3 py-2.5 text-right text-gray-700"><%= row.required %></td>
+              <td class="px-3 py-2.5 text-right font-semibold <%= row.over ? 'text-amber-600' : 'text-gray-900' %>"><%= row.completed %></td>
+              <td class="px-3 py-2.5">
+                <div class="flex items-center gap-2">
+                  <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div class="h-full <%= bar(row.completion_pct, row.required) %>" style="width: <%= row.required ? row.completion_pct : 0 %>%"></div>
+                  </div>
+                  <span class="text-xs font-bold <%= pctClass(row.completion_pct, row.required) %> px-2 py-0.5 rounded">
+                    <%= row.required ? row.completion_pct + '%' : '—' %>
+                  </span>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Per week -->
+  <% if (monthData.weeks.length === 0) { %>
+    <div class="text-center text-sm text-gray-500 py-8">No weeks fall inside this month yet.</div>
+  <% } %>
+  <% monthData.weeks.forEach(function (w) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-baseline justify-between">
+        <h3 class="text-sm font-semibold text-gray-900">Week <%= w.n %></h3>
+        <span class="text-xs text-gray-500"><%= w.start %> → <%= w.end %></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="text-left px-5 py-2">Checklist</th>
+              <th class="text-right px-3 py-2">Required</th>
+              <th class="text-right px-3 py-2">Completed</th>
+              <th class="text-left px-3 py-2 w-1/3">Completion</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% w.rows.forEach(function (row) { %>
+              <tr>
+                <td class="px-5 py-2 text-gray-800"><%= row.label %></td>
+                <td class="px-3 py-2 text-right text-gray-700"><%= row.required %></td>
+                <td class="px-3 py-2 text-right font-semibold <%= row.over ? 'text-amber-600' : 'text-gray-900' %>"><%= row.completed %></td>
+                <td class="px-3 py-2">
+                  <div class="flex items-center gap-2">
+                    <div class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div class="h-full <%= bar(row.completion_pct, row.required) %>" style="width: <%= row.required ? row.completion_pct : 0 %>%"></div>
+                    </div>
+                    <span class="text-[11px] font-bold <%= pctClass(row.completion_pct, row.required) %> px-1.5 py-0.5 rounded">
+                      <%= row.required ? row.completion_pct + '%' : '—' %>
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% }) %>
+
+  <p class="text-[11px] text-gray-400 leading-relaxed">
+    "Required" counts come from non-cancelled bookings (Vehicle Pre-start, Post-shift Vehicle Checklist) and non-cancelled crew allocations (Risk Assessment, TC Pre-start, Team Leader). "Completed" counts safety_forms submissions inside each window, by form type.
+  </p>
+</div>

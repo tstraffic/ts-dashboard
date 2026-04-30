@@ -82,6 +82,15 @@ router.get('/', (req, res) => {
     });
   }
 
+  // Checklist Register summary for the dashboard widget. Whole computation
+  // lives in services/checklistRegister.js — this is just the cheap pull.
+  let checklistSummary = null;
+  try {
+    checklistSummary = require('../services/checklistRegister').dashboardSummary(db);
+  } catch (e) {
+    console.error('[dashboard] checklist register summary failed:', e.message);
+  }
+
   // Onboarding checklist
   let onboarding = null;
   try {
@@ -125,6 +134,7 @@ router.get('/', (req, res) => {
     overdueTasksList: myWork.overdueTasksList,
     complianceUrgent,
     actionItems,
+    checklistSummary,
     jobStatusDist: charts.jobStatusDist,
     jobHealthDist: charts.jobHealthDist,
     crewHoursByDay: charts.crewHoursByDay,
