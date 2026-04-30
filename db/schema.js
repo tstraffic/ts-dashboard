@@ -3210,6 +3210,10 @@ function runMigrations(db) {
       CREATE TABLE IF NOT EXISTS safety_forms (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        -- form_type is widened to the full Job-Pack list in migration 139;
+        -- the old CHECK ('prestart','take5','incident','hazard','equipment') is
+        -- kept here so existing prod databases (which have it) line up exactly,
+        -- then 139 rebuilds the table once with the expanded list.
         form_type TEXT NOT NULL CHECK(form_type IN ('prestart', 'take5', 'incident', 'hazard', 'equipment')),
         job_id INTEGER REFERENCES jobs(id),
         allocation_id INTEGER REFERENCES crew_allocations(id),
@@ -6327,6 +6331,114 @@ function runMigrations(db) {
     }
     recordMigration.run(138, 'Expand clock_events event_type to include break_start/break_end');
     console.log('Migration 138 applied');
+  }
+
+  // Migration 139: Job-pack foundation — extend safety_forms.form_type to cover
+  // the five Traffio-equivalent checklists, plus add photo + admin-document tables.
+  //
+  // Existing safety_forms.form_type CHECK only allows
+  // ('prestart','take5','incident','hazard','equipment'). We need to add
+  // ('vehicle_prestart','risk_toolbox','tc_prestart','team_leader','post_shift_vehicle')
+  // which means rebuilding the table (SQLite can't ALTER a CHECK).
+  //
+  // Also add:
+  //   - safety_form_photos: many photos per submission (arrow board ×3, setup ×5, etc)
+  //   - job_documents: TGS, TMP, ROL day/night, stage plans uploaded by allocators
+  if (!isMigrationApplied.get(139)) {
+    try {
+      const sqlRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='safety_forms'").get();
+      const hasNewTypes = sqlRow && sqlRow.sql.includes("'vehicle_prestart'");
+      if (sqlRow && !hasNewTypes) {
+        db.pragma('foreign_keys = OFF');
+        db.exec(`
+          CREATE TABLE safety_forms_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+            form_type TEXT NOT NULL CHECK(form_type IN (
+              'prestart','take5','incident','hazard','equipment',
+              'vehicle_prestart','risk_toolbox','tc_prestart','team_leader','post_shift_vehicle'
+            )),
+            job_id INTEGER REFERENCES jobs(id),
+            allocation_id INTEGER REFERENCES crew_allocations(id),
+            data TEXT,
+            status TEXT DEFAULT 'submitted' CHECK(status IN ('draft','submitted','reviewed')),
+            submitted_at DATETIME DEFAULT (datetime('now')),
+            reviewed_by_id INTEGER REFERENCES users(id),
+            reviewed_at DATETIME,
+            latitude REAL,
+            longitude REAL,
+            signature_data TEXT,
+            signed_name TEXT,
+            created_at DATETIME DEFAULT (datetime('now'))
+          );
+        `);
+        const oldCols = db.prepare("PRAGMA table_info(safety_forms)").all().map(c => c.name);
+        const has = (c) => oldCols.includes(c) ? c : 'NULL';
+        db.exec(`
+          INSERT INTO safety_forms_new (id, crew_member_id, form_type, job_id, allocation_id, data, status, submitted_at, reviewed_by_id, reviewed_at, latitude, longitude, signature_data, signed_name, created_at)
+          SELECT id, crew_member_id, form_type, job_id, allocation_id, data, status, submitted_at, reviewed_by_id, reviewed_at, latitude, longitude, ${has('signature_data')}, ${has('signed_name')}, created_at
+          FROM safety_forms;
+        `);
+        db.exec('DROP TABLE safety_forms;');
+        db.exec('ALTER TABLE safety_forms_new RENAME TO safety_forms;');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_safety_forms_crew ON safety_forms(crew_member_id, form_type);');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_safety_forms_allocation ON safety_forms(allocation_id, form_type);');
+        db.pragma('foreign_keys = ON');
+        console.log('Migration 139: rebuilt safety_forms with expanded form_type CHECK + signature columns');
+      } else if (!sqlRow) {
+        // Fresh DB: the inline CREATE earlier in this file made the table with
+        // the OLD CHECK list. Force-rebuild so the CHECK matches the new list.
+        // (No data to copy — table absent.)
+        console.log('Migration 139: safety_forms missing — earlier migration will create it; nothing to rebuild');
+      } else {
+        console.log('Migration 139: safety_forms already has expanded form_type CHECK');
+      }
+
+      // Photos attached to a safety_form submission (arrow board ×3, setup ×5,
+      // worker portrait, fuel gauge, equipment cage, interior, etc).
+      // tag identifies which question slot the photo belongs to so the admin PDF
+      // can render them under the right heading.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS safety_form_photos (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          safety_form_id INTEGER NOT NULL REFERENCES safety_forms(id) ON DELETE CASCADE,
+          tag TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          original_name TEXT,
+          mime_type TEXT,
+          size_bytes INTEGER DEFAULT 0,
+          width INTEGER,
+          height INTEGER,
+          created_at DATETIME DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_safety_form_photos_form ON safety_form_photos(safety_form_id);
+      `);
+
+      // Admin-uploaded documents bound to a job (TGS, TMP, ROL day/night, stage
+      // plans). Workers see these on the DOCS tab; admins manage uploads.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS job_documents (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+          doc_type TEXT NOT NULL DEFAULT 'other' CHECK(doc_type IN (
+            'tgs','tmp','rol_day','rol_night','stage_plan','swms','permit','other'
+          )),
+          title TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          original_name TEXT,
+          mime_type TEXT,
+          size_bytes INTEGER DEFAULT 0,
+          uploaded_by_id INTEGER REFERENCES users(id),
+          uploaded_at DATETIME DEFAULT (datetime('now')),
+          archived_at DATETIME
+        );
+        CREATE INDEX IF NOT EXISTS idx_job_documents_job ON job_documents(job_id, doc_type);
+      `);
+    } catch (e) {
+      console.error('Migration 139 error:', e.message);
+    }
+    recordMigration.run(139, 'Job-pack: expand safety_forms form_type + safety_form_photos + job_documents');
+    console.log('Migration 139 applied');
   }
 
   console.log('All migrations checked/applied.');
