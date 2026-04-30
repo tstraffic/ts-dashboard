@@ -1,0 +1,143 @@
+<%
+  // Map section accent → tailwind classes (kept inline so JIT picks them up safely)
+  const ACCENT = {
+    amber:   { ring: 'ring-amber-200',   chip: 'bg-amber-100 text-amber-800',     headBg: 'bg-amber-50',   headText: 'text-amber-900',   gst: true  },
+    emerald: { ring: 'ring-emerald-200', chip: 'bg-emerald-100 text-emerald-800', headBg: 'bg-emerald-50', headText: 'text-emerald-900', gst: false },
+    sky:     { ring: 'ring-sky-200',     chip: 'bg-sky-100 text-sky-800',         headBg: 'bg-sky-50',     headText: 'text-sky-900',     gst: false },
+    gray:    { ring: 'ring-gray-300',    chip: 'bg-gray-200 text-gray-800',       headBg: 'bg-gray-50',    headText: 'text-gray-900',    gst: false },
+  };
+  const a = ACCENT[accent] || ACCENT.gray;
+  const showGst = accent === 'amber'; // Cash only
+%>
+
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ring-1 <%= a.ring %>">
+  <!-- Section header -->
+  <div class="<%= a.headBg %> px-4 py-3 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
+    <div class="flex items-center gap-2">
+      <h2 class="text-base font-bold <%= a.headText %> uppercase tracking-wider"><%= section.label %> Workers</h2>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold <%= a.chip %>"><%= lines.length %></span>
+    </div>
+    <div class="flex items-center gap-3 text-xs <%= a.headText %>">
+      <span><%= sectTotals.hours.toFixed(2) %> hrs</span>
+      <span class="opacity-50">·</span>
+      <span class="font-bold tabular-nums">$<%= fmtMoney(sectTotals.total) %></span>
+      <% if (showGst) { %>
+        <span class="opacity-50">·</span>
+        <span class="opacity-80 tabular-nums">+ GST $<%= fmtMoney(sectTotals.gst) %></span>
+        <span class="opacity-50">·</span>
+        <span class="font-bold tabular-nums">= $<%= fmtMoney(sectTotals.with_gst) %></span>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest sticky left-0 bg-gray-50 z-10">Worker</th>
+          <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">BSB / Acc</th>
+          <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Time</th>
+          <% dowLabels.forEach(d => { %>
+            <th class="px-1 py-2 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest"><%= d %></th>
+          <% }) %>
+          <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Hrs</th>
+          <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Rate</th>
+          <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Sub</th>
+          <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Wages</th>
+          <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Allow.</th>
+          <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Total</th>
+          <th class="px-2 py-2 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">Paid</th>
+          <th class="px-2 py-2"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        <% lines.forEach(l => { %>
+          <% const dayHrs = l.day_hours || [0,0,0,0,0,0,0]; %>
+          <% const nightHrs = l.night_hours || [0,0,0,0,0,0,0]; %>
+          <% const hasDay = l.total_day_hours > 0; %>
+          <% const hasNight = l.total_night_hours > 0; %>
+          <!-- Day row -->
+          <tr class="<%= l.paid ? 'opacity-60' : '' %>">
+            <td rowspan="2" class="px-3 py-2 align-top sticky left-0 bg-white z-[5] <%= l.paid ? 'opacity-100' : '' %>">
+              <p class="font-semibold text-gray-900 text-sm leading-tight"><%= l.full_name %></p>
+              <% if (l.employee_code) { %>
+                <p class="text-[10px] text-gray-400 font-mono mt-0.5"><%= l.employee_code %></p>
+              <% } else if (!l.employee_id) { %>
+                <button onclick="openMatch(<%= l.id %>)" class="text-[10px] font-semibold text-amber-600 hover:underline mt-0.5">⚠ Link to employee</button>
+              <% } %>
+              <% if (l.paid_ref) { %>
+                <p class="text-[10px] text-emerald-600 font-mono mt-0.5"><%= l.paid_ref %></p>
+              <% } %>
+            </td>
+            <td rowspan="2" class="px-2 py-2 align-top text-[11px] font-mono text-gray-600 leading-tight">
+              <% if (l.bsb || l.acc_number) { %>
+                <%= l.bsb || '—' %><br><%= l.acc_number || '—' %>
+              <% } else { %>
+                <span class="text-gray-300">—</span>
+              <% } %>
+            </td>
+            <td class="px-2 py-1.5 text-xs text-gray-600 font-semibold">Day</td>
+            <% for (let i=0;i<7;i++) { %>
+              <td class="px-1 py-1.5 text-center text-xs tabular-nums <%= hasDay && dayHrs[i] ? 'text-gray-900' : 'text-gray-300' %>"><%= dayHrs[i] ? dayHrs[i] : '·' %></td>
+            <% } %>
+            <td class="px-2 py-1.5 text-right text-xs font-semibold tabular-nums <%= hasDay ? 'text-gray-900' : 'text-gray-300' %>"><%= l.total_day_hours || 0 %></td>
+            <td class="px-2 py-1.5 text-right text-xs tabular-nums text-gray-700">$<%= fmtMoney(l.rate_day) %></td>
+            <td class="px-2 py-1.5 text-right text-xs tabular-nums <%= hasDay ? 'text-gray-900' : 'text-gray-300' %>">$<%= fmtMoney(l.total_day_wages) %></td>
+            <td rowspan="2" class="px-2 py-2 text-right text-xs font-semibold tabular-nums text-gray-900 align-middle">$<%= fmtMoney(l.total_wages) %></td>
+            <td rowspan="2" class="px-2 py-2 text-right text-xs tabular-nums text-gray-700 align-middle">
+              <% if (l.total_allowance > 0) { %>
+                $<%= fmtMoney(l.total_allowance) %>
+                <p class="text-[9px] text-gray-400 font-normal mt-0.5">
+                  <% if (l.travel_allowance) { %>T $<%= l.travel_allowance %><% } %>
+                  <% if (l.meal_allowance) { %> M $<%= l.meal_allowance %><% } %>
+                  <% if (l.other_allowance) { %> O $<%= l.other_allowance %><% } %>
+                </p>
+              <% } else { %>
+                <span class="text-gray-300">—</span>
+              <% } %>
+            </td>
+            <td rowspan="2" class="px-2 py-2 text-right text-sm font-bold tabular-nums text-gray-900 align-middle">$<%= fmtMoney(l.grand_total) %></td>
+            <td rowspan="2" class="px-2 py-2 text-center align-middle">
+              <input type="checkbox" <%= l.paid ? 'checked' : '' %> onchange="togglePaid(<%= l.id %>, this.checked)" class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+            </td>
+            <td rowspan="2" class="px-2 py-2 text-right align-middle">
+              <button onclick="openEdit(<%= l.id %>)" class="px-2 py-1 text-[11px] font-semibold text-brand-600 hover:bg-brand-50 rounded">Edit</button>
+            </td>
+          </tr>
+          <!-- Night row -->
+          <tr class="<%= l.paid ? 'opacity-60' : '' %>">
+            <td class="px-2 py-1.5 text-xs text-indigo-600 font-semibold">Night</td>
+            <% for (let i=0;i<7;i++) { %>
+              <td class="px-1 py-1.5 text-center text-xs tabular-nums <%= hasNight && nightHrs[i] ? 'text-indigo-900' : 'text-gray-300' %>"><%= nightHrs[i] ? nightHrs[i] : '·' %></td>
+            <% } %>
+            <td class="px-2 py-1.5 text-right text-xs font-semibold tabular-nums <%= hasNight ? 'text-indigo-900' : 'text-gray-300' %>"><%= l.total_night_hours || 0 %></td>
+            <td class="px-2 py-1.5 text-right text-xs tabular-nums text-gray-700">$<%= fmtMoney(l.rate_night) %></td>
+            <td class="px-2 py-1.5 text-right text-xs tabular-nums <%= hasNight ? 'text-gray-900' : 'text-gray-300' %>">$<%= fmtMoney(l.total_night_wages) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+      <tfoot class="bg-gray-50 border-t-2 border-gray-300">
+        <tr>
+          <td colspan="11" class="px-3 py-2 text-right text-xs font-bold text-gray-700 uppercase tracking-widest">
+            <%= section.label %> Total
+          </td>
+          <td class="px-2 py-2 text-right text-sm font-bold tabular-nums text-gray-900">$<%= fmtMoney(sectTotals.total) %></td>
+          <td colspan="2"></td>
+        </tr>
+        <% if (showGst) { %>
+          <tr>
+            <td colspan="11" class="px-3 py-1.5 text-right text-xs text-gray-600 uppercase tracking-widest">GST 10%</td>
+            <td class="px-2 py-1.5 text-right text-xs tabular-nums text-gray-700">$<%= fmtMoney(sectTotals.gst) %></td>
+            <td colspan="2"></td>
+          </tr>
+          <tr class="bg-amber-50">
+            <td colspan="11" class="px-3 py-2 text-right text-xs font-bold text-amber-900 uppercase tracking-widest">Total + GST</td>
+            <td class="px-2 py-2 text-right text-sm font-bold tabular-nums text-amber-900">$<%= fmtMoney(sectTotals.with_gst) %></td>
+            <td colspan="2"></td>
+          </tr>
+        <% } %>
+      </tfoot>
+    </table>
+  </div>
+</div>

@@ -1,0 +1,336 @@
+<% locals.currentPage = 'pay-runs' %>
+<%
+  function fmtDate(s) { if (!s) return ''; return new Date(s + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }); }
+%>
+
+<div class="space-y-5">
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-3 flex-wrap">
+    <div>
+      <a href="/payroll/runs" class="text-sm text-brand-600 hover:underline">← Pay Runs</a>
+      <h1 class="text-2xl font-bold text-gray-900 mt-1"><%= run.label || periodLabel(run.period_start, run.period_end) %></h1>
+      <p class="text-sm text-gray-500 mt-0.5 tabular-nums"><%= fmtDate(run.period_start) %> → <%= fmtDate(run.period_end) %></p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/payroll/runs/<%= run.id %>/export.xlsx" class="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Export xlsx
+      </a>
+      <form method="POST" action="/payroll/runs/<%= run.id %>/delete" onsubmit="return confirm('Delete pay run <%= run.label %>? This cannot be undone.')">
+        <%- include('../partials/csrf') %>
+        <button type="submit" class="px-3 py-2 bg-white border border-gray-300 hover:bg-red-50 hover:border-red-300 hover:text-red-600 text-gray-700 text-sm font-semibold rounded-lg">Delete</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Top totals strip -->
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Workers</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1 tabular-nums"><%= grand.line_count %></p>
+    </div>
+    <div class="bg-white border border-amber-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Cash</p>
+      <p class="text-xl font-bold text-amber-700 mt-1 tabular-nums">$<%= fmtMoney(totals.cash.total) %></p>
+      <p class="text-[10px] text-gray-400 mt-0.5"><%= buckets.cash.length %> workers · +GST $<%= fmtMoney(totals.cash.with_gst) %></p>
+    </div>
+    <div class="bg-white border border-emerald-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">TFN</p>
+      <p class="text-xl font-bold text-emerald-700 mt-1 tabular-nums">$<%= fmtMoney(totals.tfn.total) %></p>
+      <p class="text-[10px] text-gray-400 mt-0.5"><%= buckets.tfn.length %> workers</p>
+    </div>
+    <div class="bg-white border border-sky-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-sky-500 uppercase tracking-widest">ABN</p>
+      <p class="text-xl font-bold text-sky-700 mt-1 tabular-nums">$<%= fmtMoney(totals.abn.total) %></p>
+      <p class="text-[10px] text-gray-400 mt-0.5"><%= buckets.abn.length %> workers</p>
+    </div>
+    <div class="bg-gradient-to-br from-brand-600 to-brand-700 text-white rounded-xl p-4">
+      <p class="text-[10px] font-bold text-white/80 uppercase tracking-widest">Grand Total</p>
+      <p class="text-xl font-bold mt-1 tabular-nums">$<%= fmtMoney(grand.total) %></p>
+      <p class="text-[10px] text-white/80 mt-0.5"><%= grand.paid_count %>/<%= grand.line_count %> paid · $<%= fmtMoney(grand.paid) %></p>
+    </div>
+  </div>
+
+  <!-- Unclassified warning -->
+  <% if (buckets.unclassified.length > 0) { %>
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+      <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      <div class="flex-1">
+        <p class="text-sm font-semibold text-amber-900"><%= buckets.unclassified.length %> worker<%= buckets.unclassified.length !== 1 ? 's' : '' %> need classification</p>
+        <p class="text-xs text-amber-800 mt-0.5">These didn't match any employee, or the matched employee has no <span class="font-mono">payment_type</span> set. Scroll down to assign Cash / TFN / ABN.</p>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Sections -->
+  <% sections.forEach(section => {
+    const lines = buckets[section.key];
+    const sectTotals = totals[section.key];
+    if (!lines || lines.length === 0) return;
+    const accent = section.accent;
+  %>
+    <%- include('partials/_section', { section, lines, sectTotals, accent, dowLabels, run, employees, fmtMoney }) %>
+  <% }) %>
+
+  <!-- Unclassified -->
+  <% if (buckets.unclassified.length > 0) { %>
+    <%- include('partials/_section', {
+      section: { key: 'unclassified', label: 'Unclassified', accent: 'gray' },
+      lines: buckets.unclassified,
+      sectTotals: totals.unclassified,
+      accent: 'gray',
+      dowLabels, run, employees, fmtMoney,
+    }) %>
+  <% } %>
+</div>
+
+<!-- Edit modal -->
+<div id="editModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm overflow-y-auto" onclick="if(event.target===this)closeEditModal()">
+  <div class="min-h-full flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl">
+      <form id="editForm" method="POST">
+        <%- include('../partials/csrf') %>
+
+        <div class="p-5 border-b border-gray-200 flex items-center justify-between">
+          <h2 class="text-lg font-bold text-gray-900" id="editTitle">Edit worker</h2>
+          <button type="button" onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="p-5 space-y-4">
+          <!-- Classification + identity -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Section</label>
+              <select name="payment_type" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm">
+                <option value="">Unclassified</option>
+                <option value="cash">Cash</option>
+                <option value="tfn">TFN</option>
+                <option value="abn">ABN</option>
+              </select>
+            </div>
+            <div class="col-span-1">
+              <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">BSB</label>
+              <input type="text" name="bsb" placeholder="000-000" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm font-mono">
+            </div>
+            <div class="col-span-2">
+              <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Account number</label>
+              <input type="text" name="acc_number" placeholder="000000000" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm font-mono">
+            </div>
+          </div>
+
+          <!-- Hours grid -->
+          <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Hours</label>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+              <table class="min-w-full text-sm">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Time</th>
+                    <% dowLabels.forEach(d => { %>
+                      <th class="px-2 py-2 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest"><%= d %></th>
+                    <% }) %>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="px-2 py-2 font-semibold text-gray-700">Day</td>
+                    <% for (let i=0;i<7;i++) { %>
+                      <td class="px-1 py-1.5 text-center"><input type="number" step="0.25" min="0" name="day_hours[]" class="w-16 text-center px-1 py-1 border border-gray-300 rounded text-sm tabular-nums" data-edit="day-<%=i%>"></td>
+                    <% } %>
+                  </tr>
+                  <tr class="bg-indigo-50/40">
+                    <td class="px-2 py-2 font-semibold text-gray-700">Night</td>
+                    <% for (let i=0;i<7;i++) { %>
+                      <td class="px-1 py-1.5 text-center"><input type="number" step="0.25" min="0" name="night_hours[]" class="w-16 text-center px-1 py-1 border border-gray-300 rounded text-sm tabular-nums" data-edit="night-<%=i%>"></td>
+                    <% } %>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Rates -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Day rate ($/hr)</label>
+              <input type="number" step="0.01" min="0" name="rate_day" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm tabular-nums">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Night rate ($/hr)</label>
+              <input type="number" step="0.01" min="0" name="rate_night" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm tabular-nums">
+            </div>
+          </div>
+
+          <!-- Allowances -->
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Travel ($)</label>
+              <input type="number" step="0.01" min="0" name="travel_allowance" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm tabular-nums">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Meal ($)</label>
+              <input type="number" step="0.01" min="0" name="meal_allowance" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm tabular-nums">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Other ($)</label>
+              <input type="number" step="0.01" min="0" name="other_allowance" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm tabular-nums">
+            </div>
+          </div>
+
+          <!-- Paid -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Paid?</label>
+              <select name="paid" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm">
+                <option value="0">Not paid</option>
+                <option value="1">Paid</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Payment ref (Inv-014)</label>
+              <input type="text" name="paid_ref" placeholder="Inv-014" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm font-mono">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Notes</label>
+            <textarea name="notes" rows="2" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+          </div>
+
+          <!-- Save back to employee -->
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1.5">
+            <p class="text-[11px] font-semibold text-blue-900">Also save to employee record?</p>
+            <label class="flex items-center gap-2 text-xs text-blue-900"><input type="checkbox" name="save_rates_to_employee" value="1"> Save rates as new defaults</label>
+            <label class="flex items-center gap-2 text-xs text-blue-900"><input type="checkbox" name="save_bsb_to_employee" value="1"> Save BSB / account as new defaults</label>
+            <label class="flex items-center gap-2 text-xs text-blue-900"><input type="checkbox" name="save_payment_type_to_employee" value="1"> Save section as new default</label>
+          </div>
+        </div>
+
+        <div class="p-5 border-t border-gray-200 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Match modal (Unclassified) -->
+<div id="matchModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm overflow-y-auto" onclick="if(event.target===this)closeMatchModal()">
+  <div class="min-h-full flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <form id="matchForm" method="POST">
+        <%- include('../partials/csrf') %>
+        <div class="p-5 border-b border-gray-200">
+          <h2 class="text-lg font-bold text-gray-900">Link to employee</h2>
+          <p class="text-xs text-gray-500 mt-0.5" id="matchSubtitle"></p>
+        </div>
+        <div class="p-5">
+          <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Pick employee</label>
+          <select name="employee_id" required class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm">
+            <option value="">— Select —</option>
+            <% employees.forEach(e => { %>
+              <option value="<%= e.id %>" data-pt="<%= e.payment_type %>" data-rd="<%= e.rate_day %>" data-rn="<%= e.rate_night %>"><%= e.full_name %><%= e.employee_code ? ' — ' + e.employee_code : '' %><%= e.payment_type ? ' (' + e.payment_type.toUpperCase() + ')' : '' %></option>
+            <% }) %>
+          </select>
+          <p class="text-xs text-gray-500 mt-2">This pulls the employee's <span class="font-mono">payment_type</span> + rates onto the line.</p>
+        </div>
+        <div class="p-5 border-t border-gray-200 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeMatchModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">Link</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  const RUN_ID = <%= run.id %>;
+  // Stash all line data on the page for modal hydration
+  const LINES = {};
+  <% [...buckets.cash, ...buckets.tfn, ...buckets.abn, ...buckets.unclassified].forEach(l => { %>
+    LINES[<%= l.id %>] = {
+      id: <%= l.id %>,
+      full_name: <%- JSON.stringify(l.full_name) %>,
+      payment_type: <%- JSON.stringify(l.payment_type || '') %>,
+      bsb: <%- JSON.stringify(l.bsb || '') %>,
+      acc_number: <%- JSON.stringify(l.acc_number || '') %>,
+      day_hours: <%- JSON.stringify(l.day_hours) %>,
+      night_hours: <%- JSON.stringify(l.night_hours) %>,
+      rate_day: <%= l.rate_day || 0 %>,
+      rate_night: <%= l.rate_night || 0 %>,
+      travel_allowance: <%= l.travel_allowance || 0 %>,
+      meal_allowance: <%= l.meal_allowance || 0 %>,
+      other_allowance: <%= l.other_allowance || 0 %>,
+      paid: <%= l.paid ? 1 : 0 %>,
+      paid_ref: <%- JSON.stringify(l.paid_ref || '') %>,
+      notes: <%- JSON.stringify(l.notes || '') %>,
+    };
+  <% }) %>
+
+  function openEdit(lineId) {
+    const l = LINES[lineId];
+    if (!l) return;
+    const form = document.getElementById('editForm');
+    form.action = '/payroll/runs/' + RUN_ID + '/lines/' + lineId;
+    document.getElementById('editTitle').textContent = 'Edit ' + l.full_name;
+    form.querySelector('select[name="payment_type"]').value = l.payment_type;
+    form.querySelector('input[name="bsb"]').value = l.bsb;
+    form.querySelector('input[name="acc_number"]').value = l.acc_number;
+    form.querySelector('input[name="rate_day"]').value = l.rate_day;
+    form.querySelector('input[name="rate_night"]').value = l.rate_night;
+    form.querySelector('input[name="travel_allowance"]').value = l.travel_allowance;
+    form.querySelector('input[name="meal_allowance"]').value = l.meal_allowance;
+    form.querySelector('input[name="other_allowance"]').value = l.other_allowance;
+    form.querySelector('select[name="paid"]').value = l.paid;
+    form.querySelector('input[name="paid_ref"]').value = l.paid_ref;
+    form.querySelector('textarea[name="notes"]').value = l.notes;
+    for (let i = 0; i < 7; i++) {
+      form.querySelector('input[data-edit="day-' + i + '"]').value = l.day_hours[i] || 0;
+      form.querySelector('input[data-edit="night-' + i + '"]').value = l.night_hours[i] || 0;
+    }
+    // uncheck save-to-employee
+    form.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    document.getElementById('editModal').classList.remove('hidden');
+  }
+  function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
+
+  function openMatch(lineId) {
+    const l = LINES[lineId];
+    if (!l) return;
+    const form = document.getElementById('matchForm');
+    form.action = '/payroll/runs/' + RUN_ID + '/lines/' + lineId + '/match';
+    document.getElementById('matchSubtitle').textContent = 'CSV name: ' + l.full_name;
+    form.querySelector('select[name="employee_id"]').value = '';
+    document.getElementById('matchModal').classList.remove('hidden');
+  }
+  function closeMatchModal() { document.getElementById('matchModal').classList.add('hidden'); }
+
+  // Quick mark-as-paid via inline checkbox (no modal)
+  function togglePaid(lineId, checked) {
+    const fd = new FormData();
+    fd.set('paid', checked ? '1' : '0');
+    fd.set('_csrf', document.querySelector('input[name="_csrf"]').value);
+    fetch('/payroll/runs/' + RUN_ID + '/lines/' + lineId, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      body: fd,
+    }).then(r => r.ok ? r.json() : Promise.reject(r.statusText))
+      .then(() => { window.location.reload(); })
+      .catch(err => alert('Save failed: ' + err));
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeEditModal(); closeMatchModal(); }
+  });
+</script>
+
+<% if (flash_success && flash_success.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-semibold shadow-lg z-50" id="flash"><%= flash_success[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flash')?.remove(), 2800);</script>
+<% } %>
+<% if (flash_error && flash_error.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold shadow-lg z-50" id="flasherr"><%= flash_error[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flasherr')?.remove(), 4000);</script>
+<% } %>
