@@ -144,13 +144,17 @@
   .wh-timeline { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 14px; }
   .wh-timeline-head { font-size: 0.8rem; font-weight: 700; color: #fff; }
   .wh-timeline-sub { font-size: 0.7rem; color: rgba(255,255,255,0.55); margin-top: 2px; }
-  .wh-timeline-track { position: relative; height: 64px; margin-top: 12px; background: rgba(255,255,255,0.04); border-radius: 8px; overflow: hidden; }
-  .wh-timeline-fill { position: absolute; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(43,127,255,0.35), rgba(0,210,190,0.35)); border-radius: 8px; }
-  .wh-timeline-block { position: absolute; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .wh-timeline-block-dot { width: 12px; height: 12px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.12); }
-  .wh-timeline-block-lbl { font-size: 0.58rem; font-weight: 700; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
-  .wh-timeline-now { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #F59E0B; box-shadow: 0 0 8px rgba(245,158,11,0.6); z-index: 2; transition: left 1s linear; }
-  .wh-timeline-now::before { content: ''; position: absolute; top: -6px; left: -5px; width: 12px; height: 12px; border-radius: 999px; background: #F59E0B; box-shadow: 0 0 10px rgba(245,158,11,0.8); }
+  .wh-timeline-hint { display: inline-flex; align-items: center; gap: 4px; font-size: 0.6rem; font-weight: 600; color: rgba(255,205,84,0.85); background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.18); border-radius: 999px; padding: 3px 8px; margin-top: 8px; }
+  .wh-timeline-track { position: relative; height: 14px; margin-top: 14px; background: rgba(255,255,255,0.04); border-radius: 999px; overflow: visible; }
+  .wh-timeline-fill { position: absolute; top: 0; bottom: 0; left: 0; right: 0; background: linear-gradient(90deg, rgba(43,127,255,0.55), rgba(0,210,190,0.55)); border-radius: 999px; }
+  .wh-timeline-block-dot { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.18); z-index: 1; }
+  .wh-timeline-now { position: absolute; top: -6px; bottom: -6px; width: 2px; background: #F59E0B; box-shadow: 0 0 8px rgba(245,158,11,0.6); z-index: 2; transition: left 1s linear; }
+  .wh-timeline-now::before { content: ''; position: absolute; top: -5px; left: -5px; width: 12px; height: 12px; border-radius: 999px; background: #F59E0B; box-shadow: 0 0 10px rgba(245,158,11,0.8); }
+  .wh-timeline-legend { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .wh-timeline-legend-row { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; color: rgba(255,255,255,0.85); }
+  .wh-timeline-legend-time { width: 60px; font-weight: 700; color: #fff; flex-shrink: 0; tabular-nums: 1; font-variant-numeric: tabular-nums; }
+  .wh-timeline-legend-lbl { font-weight: 500; color: rgba(255,255,255,0.65); }
+  .wh-timeline-legend-pip { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.7); flex-shrink: 0; }
 
   /* Alert banner */
   .wh-alert { padding: 12px; border-radius: 12px; background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.05)); border: 1px solid rgba(245,158,11,0.25); color: #FDE68A; }
@@ -390,20 +394,30 @@
   <div class="wh-timeline">
     <p class="wh-timeline-head"><%= timeline.shiftLabel %></p>
     <p class="wh-timeline-sub"><%= fmtTime((Math.floor(timeline.startMin/60).toString().padStart(2,'0'))+':'+((timeline.startMin%60).toString().padStart(2,'0'))) %> – <%= fmtTime((Math.floor(timeline.endMin/60).toString().padStart(2,'0'))+':'+((timeline.endMin%60).toString().padStart(2,'0'))) %></p>
+    <span class="wh-timeline-hint">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2" stroke-linecap="round"/></svg>
+      Recommended timeline only — actual times go on your docket
+    </span>
     <div class="wh-timeline-track" data-start="<%= timeline.startMin %>" data-end="<%= timeline.endMin %>">
-      <div class="wh-timeline-fill" style="left: 0; right: 0;"></div>
+      <div class="wh-timeline-fill"></div>
       <div class="wh-timeline-now" id="wh-timeline-now"></div>
       <% timeline.blocks.forEach(function(b) {
         const [bh, bm] = (b.at || '00:00').split(':').map(Number);
         const pm = (bh*60) + (bm||0);
         const pct = Math.min(100, Math.max(0, ((pm - timeline.startMin) / Math.max(1, timeline.endMin - timeline.startMin)) * 100));
       %>
-        <div class="wh-timeline-block" style="left: <%= pct %>%;">
-          <span class="wh-timeline-block-dot"></span>
-          <span class="wh-timeline-block-lbl"><%= b.label %> · <%= fmtTime(b.at) %></span>
-        </div>
+        <span class="wh-timeline-block-dot" style="left: <%= pct %>%;"></span>
       <% }) %>
     </div>
+    <ul class="wh-timeline-legend">
+      <% timeline.blocks.forEach(function(b) { %>
+        <li class="wh-timeline-legend-row">
+          <span class="wh-timeline-legend-pip"></span>
+          <span class="wh-timeline-legend-time"><%= fmtTime(b.at) %></span>
+          <span class="wh-timeline-legend-lbl"><%= b.label %></span>
+        </li>
+      <% }) %>
+    </ul>
   </div>
 <% } %>
 
