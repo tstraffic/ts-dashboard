@@ -5,6 +5,16 @@ const fs = require('fs');
 const multer = require('multer');
 const sharp = require('sharp');
 const { getDb } = require('../../db/database');
+const { notifySubmission } = require('../../services/jobPackNotify');
+
+// Fire-and-forget email-the-PDF-to-ops on every Job-Pack submission.
+// The email send happens off the request path so a slow / failed Resend
+// call doesn't make the worker think their submission didn't go through.
+function fireOpsNotification(db, submissionId) {
+  Promise.resolve()
+    .then(() => notifySubmission(db, submissionId))
+    .catch(err => console.error('[jobPackNotify] failed for submission', submissionId, err.message));
+}
 
 // Photos uploaded against a safety_forms submission live under
 // data/uploads/job-forms/<safety_form_id>/<filename>. We don't know the form
@@ -470,6 +480,8 @@ router.post('/forms/vehicle-prestart', photoUpload.array('arrow_board_photos', 6
     console.error('[vehicle-prestart] photo persist error:', e.message);
   }
 
+  fireOpsNotification(db, safetyFormId);
+
   req.flash('success', 'Vehicle Pre-Start submitted.');
   if (allocation) return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
   return res.redirect('/w/forms');
@@ -582,7 +594,7 @@ router.post('/forms/risk-assessment', (req, res) => {
     notes: (body.notes || '').trim(),
   };
 
-  db.prepare(`
+  const raResult = db.prepare(`
     INSERT INTO safety_forms (crew_member_id, form_type, job_id, allocation_id, data, signature_data, signed_name, status, submitted_at)
     VALUES (?, 'risk_toolbox', ?, ?, ?, ?, ?, 'submitted', datetime('now'))
   `).run(
@@ -593,6 +605,7 @@ router.post('/forms/risk-assessment', (req, res) => {
     body.signature_data || null,
     answers.employee_name || worker.full_name || null,
   );
+  fireOpsNotification(db, raResult.lastInsertRowid);
 
   req.flash('success', 'Risk Assessment & Toolbox submitted.');
   if (allocation) return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
@@ -656,7 +669,7 @@ router.post('/forms/tc-prestart', (req, res) => {
     notes: (body.notes || '').trim(),
   };
 
-  db.prepare(`
+  const tcResult = db.prepare(`
     INSERT INTO safety_forms (crew_member_id, form_type, job_id, allocation_id, data, signature_data, signed_name, status, submitted_at)
     VALUES (?, 'tc_prestart', ?, ?, ?, ?, ?, 'submitted', datetime('now'))
   `).run(
@@ -667,6 +680,7 @@ router.post('/forms/tc-prestart', (req, res) => {
     body.signature_data || null,
     (body.signed_name || worker.full_name || '').trim() || null,
   );
+  fireOpsNotification(db, tcResult.lastInsertRowid);
 
   req.flash('success', 'TC Prestart Declaration submitted.');
   if (allocation) return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
@@ -772,6 +786,8 @@ router.post('/forms/post-shift-vehicle', photoUpload.fields([
   } catch (e) {
     console.error('[post-shift-vehicle] photo persist error:', e.message);
   }
+
+  fireOpsNotification(db, safetyFormId);
 
   req.flash('success', 'Post-Shift Vehicle Checklist submitted.');
   if (allocation) return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');
@@ -880,6 +896,8 @@ router.post('/forms/team-leader', photoUpload.fields([
   } catch (e) {
     console.error('[team-leader] photo persist error:', e.message);
   }
+
+  fireOpsNotification(db, safetyFormId);
 
   req.flash('success', 'Team Leader Checklist submitted.');
   if (allocation) return res.redirect('/w/jobs/' + allocation.id + '?tab=forms');

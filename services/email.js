@@ -108,18 +108,35 @@ function isConfigured() {
 /**
  * Send an email. Uses Resend HTTP API if key starts with re_, otherwise SMTP.
  */
-async function sendEmail(to, subject, html) {
+async function sendEmail(to, subject, html, opts) {
+  // opts: { attachments: [{ filename, content: Buffer|Base64 }], cc, bcc, replyTo }
+  const attachments = (opts && opts.attachments) || null;
+  const cc = (opts && opts.cc) || undefined;
+  const bcc = (opts && opts.bcc) || undefined;
+  const replyTo = (opts && opts.replyTo) || undefined;
+
   // Try Resend HTTP API first
   const resendConfig = getResendConfig();
   if (resendConfig) {
     try {
       const client = getResendClient();
-      const { data, error } = await client.emails.send({
+      // Resend wants base64 strings for attachment content. Coerce Buffers
+      // up here so callers can hand us either form.
+      const resendAttachments = attachments && attachments.map(a => ({
+        filename: a.filename,
+        content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : a.content,
+      }));
+      const payload = {
         from: `${resendConfig.fromName} <${resendConfig.fromEmail}>`,
         to: Array.isArray(to) ? to : [to],
         subject,
         html,
-      });
+      };
+      if (resendAttachments && resendAttachments.length) payload.attachments = resendAttachments;
+      if (cc) payload.cc = Array.isArray(cc) ? cc : [cc];
+      if (bcc) payload.bcc = Array.isArray(bcc) ? bcc : [bcc];
+      if (replyTo) payload.reply_to = replyTo;
+      const { data, error } = await client.emails.send(payload);
       if (error) {
         console.error('[Email/Resend] API error:', error.message || JSON.stringify(error));
         return null;
@@ -143,6 +160,8 @@ async function sendEmail(to, subject, html) {
     const info = await transporter.sendMail({
       from: `"${smtpConfig.fromName}" <${smtpConfig.fromEmail}>`,
       to, subject, html,
+      attachments: attachments || undefined,
+      cc, bcc, replyTo,
     });
     console.log('[Email/SMTP] Sent:', subject, '→', to);
     return info;
