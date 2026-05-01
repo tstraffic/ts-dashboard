@@ -6816,6 +6816,25 @@ function runMigrations(db) {
     console.log('Migration 146 applied');
   }
 
+  // Migration 147: Compliance invoice workflow — track who invoiced each item
+  // and when. The `invoiced` flag and `invoice_number` already exist (from
+  // earlier migrations) but there was no audit trail for when accounts marked
+  // it. Adds invoiced_at + invoiced_by_id so the Plans & Approvals page can
+  // show a proper "Invoiced 4 May 2026 by Jane" line.
+  if (!isMigrationApplied.get(147)) {
+    const cols = db.prepare("PRAGMA table_info(compliance)").all().map(c => c.name);
+    if (!cols.includes('invoiced_at')) {
+      try { db.exec("ALTER TABLE compliance ADD COLUMN invoiced_at DATETIME"); } catch (e) {}
+    }
+    if (!cols.includes('invoiced_by_id')) {
+      try { db.exec("ALTER TABLE compliance ADD COLUMN invoiced_by_id INTEGER REFERENCES users(id)"); } catch (e) {}
+    }
+    // Backfill: any row already marked invoiced gets updated_at as the stamp
+    try { db.exec("UPDATE compliance SET invoiced_at = updated_at WHERE invoiced = 1 AND invoiced_at IS NULL"); } catch (e) {}
+    recordMigration.run(147, 'compliance: invoiced_at + invoiced_by_id audit columns');
+    console.log('Migration 147 applied: compliance invoice audit columns');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
