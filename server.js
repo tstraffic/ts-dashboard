@@ -203,6 +203,8 @@ app.use('/safety-forms', requireLogin, requirePermission('audits'), require('./r
 app.use('/checklist-register', requireLogin, requirePermission('audits'), require('./routes/checklist-register'));
 // Worker-signed dockets (review-only — workers create them at /w/dockets/sign)
 app.use('/dockets', requireLogin, requirePermission('audits'), require('./routes/dockets-admin'));
+// Operations Tasks Board — assign per-shift or general tasks to crew
+app.use('/shift-tasks', requireLogin, requirePermission('tasks'), require('./routes/shift-tasks-admin'));
 app.use('/plans', requireLogin, requirePermission('compliance'), require('./routes/plans'));
 app.use('/incidents', requireLogin, requirePermission('incidents'), require('./routes/incidents'));
 app.use('/contacts', requireLogin, requirePermission('contacts'), require('./routes/contacts'));

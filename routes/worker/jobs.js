@@ -547,32 +547,51 @@ router.get('/booking-shift/:bookingId', (req, res) => {
     } catch (e) { console.error('[booking-shift] doc fetch:', e.message); }
   }
 
-  // Shift tasks — the worker's own + (when they're TL/Supervisor) every
-  // task assigned to other crew on the same booking. For the office's
-  // sake, tasks are scoped to allocation_id so a re-allocation doesn't
-  // bleed tasks across shifts.
+  // Shift tasks — own + (when TL/Supervisor) every task for the rest of
+  // the crew on this shift. Tasks come in two flavours:
+  //   - shift-bound: booking_id (or allocation_id) matches this shift
+  //   - general:     no booking_id / allocation_id; standing tasks the
+  //                  worker carries across shifts
+  // The worker sees both buckets on every shift detail; TLs+Supervisors
+  // see both buckets for every crew member on the shift.
   let myTasks = [], teamTasks = [];
   try {
     const me = db.prepare('SELECT portal_role FROM crew_members WHERE id = ?').get(worker.id);
     const isTL = !!(me && (me.portal_role === 'team_leader' || me.portal_role === 'supervisor'));
     myTasks = db.prepare(`
-      SELECT st.*, cm.full_name AS assignee_name
+      SELECT st.*, cm.full_name AS assignee_name,
+        CASE WHEN st.booking_id IS NULL AND st.allocation_id IS NULL THEN 1 ELSE 0 END AS is_general
       FROM shift_tasks st JOIN crew_members cm ON st.crew_member_id = cm.id
       WHERE st.crew_member_id = ?
-        AND (st.allocation_id = ? OR st.booking_id = ?)
+        AND (
+          st.allocation_id = ?
+          OR st.booking_id = ?
+          OR (st.booking_id IS NULL AND st.allocation_id IS NULL)
+        )
       ORDER BY CASE st.status WHEN 'pending' THEN 0 ELSE 1 END,
                CASE st.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,
                st.due_at ASC, st.created_at ASC
     `).all(worker.id, allocation ? allocation.id : null, booking.id);
     if (isTL) {
-      teamTasks = db.prepare(`
-        SELECT st.*, cm.full_name AS assignee_name, cm.portal_role AS assignee_portal_role
-        FROM shift_tasks st JOIN crew_members cm ON st.crew_member_id = cm.id
-        WHERE st.booking_id = ? AND st.crew_member_id != ?
-        ORDER BY CASE st.status WHEN 'pending' THEN 0 ELSE 1 END,
-                 CASE st.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,
-                 st.due_at ASC, st.created_at ASC
-      `).all(booking.id, worker.id);
+      // Crew on this booking (so TL+Supervisor only see tasks for the
+      // people they're working alongside, not the entire roster).
+      const crewIds = db.prepare("SELECT crew_member_id FROM booking_crew WHERE booking_id = ? AND crew_member_id != ?").all(booking.id, worker.id).map(r => r.crew_member_id);
+      if (crewIds.length) {
+        const placeholders = crewIds.map(() => '?').join(',');
+        teamTasks = db.prepare(`
+          SELECT st.*, cm.full_name AS assignee_name, cm.portal_role AS assignee_portal_role,
+            CASE WHEN st.booking_id IS NULL AND st.allocation_id IS NULL THEN 1 ELSE 0 END AS is_general
+          FROM shift_tasks st JOIN crew_members cm ON st.crew_member_id = cm.id
+          WHERE st.crew_member_id IN (${placeholders})
+            AND (
+              st.booking_id = ?
+              OR (st.booking_id IS NULL AND st.allocation_id IS NULL)
+            )
+          ORDER BY CASE st.status WHEN 'pending' THEN 0 ELSE 1 END,
+                   CASE st.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,
+                   st.due_at ASC, st.created_at ASC
+        `).all(...crewIds, booking.id);
+      }
     }
   } catch (e) { console.error('[booking-shift] tasks fetch error:', e.message); }
 
@@ -660,9 +679,10 @@ router.post('/shift-tasks/:id/done', (req, res) => {
 });
 
 // POST /w/shift-tasks (TL+ only) — create a quick task for a teammate
-// from the worker portal (Operations also has the full UI on the booking
-// detail page; this is the on-the-fly version for the field). Body:
-// crew_member_id, booking_id, allocation_id?, title, priority?
+// from the worker portal. Two scopes:
+//   - shift-bound: booking_id set (the task lives against this shift)
+//   - general:     scope=general (booking_id ignored, task is standing
+//                  work the assignee carries across shifts)
 router.post('/shift-tasks', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
@@ -672,24 +692,36 @@ router.post('/shift-tasks', (req, res) => {
     req.flash('error', 'Team Leader access only.');
     return res.redirect('back');
   }
-  const { crew_member_id, booking_id, allocation_id, title, priority } = req.body;
-  if (!crew_member_id || !booking_id || !title || !title.trim()) {
+  const { crew_member_id, booking_id, allocation_id, title, priority, scope } = req.body;
+  if (!crew_member_id || !title || !title.trim()) {
     req.flash('error', 'Title and assignee are required.');
     return res.redirect('back');
   }
-  // Assignee must be on this booking too (no cross-booking task drops).
-  const ok = db.prepare('SELECT 1 FROM booking_crew WHERE booking_id = ? AND crew_member_id = ?').get(booking_id, crew_member_id);
-  if (!ok) {
-    req.flash('error', "That worker isn't on this shift.");
-    return res.redirect('back');
+  const isGeneral = scope === 'general';
+  let bookingScope = null;
+  let allocScope = null;
+  if (!isGeneral) {
+    if (!booking_id) {
+      req.flash('error', 'Pick a shift or mark the task as general.');
+      return res.redirect('back');
+    }
+    // Assignee must be on this booking too (no cross-booking task drops).
+    const ok = db.prepare('SELECT 1 FROM booking_crew WHERE booking_id = ? AND crew_member_id = ?').get(booking_id, crew_member_id);
+    if (!ok) {
+      req.flash('error', "That worker isn't on this shift.");
+      return res.redirect('back');
+    }
+    bookingScope = booking_id;
+    allocScope = allocation_id || null;
   }
   db.prepare(`
     INSERT INTO shift_tasks (allocation_id, booking_id, crew_member_id, title, priority, created_by_crew_id)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(allocation_id || null, booking_id, crew_member_id, title.trim(),
+  `).run(allocScope, bookingScope, crew_member_id, title.trim(),
          ['low','normal','high'].includes(priority) ? priority : 'normal', worker.id);
-  req.flash('success', 'Task added.');
-  return res.redirect('/w/booking-shift/' + booking_id + '?tab=tasks');
+  req.flash('success', isGeneral ? 'General task added.' : 'Shift task added.');
+  if (bookingScope) return res.redirect('/w/booking-shift/' + bookingScope + '?tab=tasks');
+  return res.redirect('/w/home');
 });
 
 module.exports = router;

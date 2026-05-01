@@ -210,6 +210,7 @@
               <% } %>
               <div class="flex items-center gap-1.5 flex-wrap mt-1">
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold" style="background:<%= pr.bg %>;color:<%= pr.color %>;"><%= pr.label %></span>
+                <% if (t.is_general) { %><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold" style="background:rgba(43,127,255,0.18);color:#60A5FA;">GENERAL</span><% } else { %><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold" style="background:rgba(0,210,190,0.18);color:#5EEAD4;">THIS SHIFT</span><% } %>
                 <% if (t.due_at) { %><span class="text-[10px]" style="color:rgba(255,255,255,0.4);">Due <%= new Date(t.due_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></span><% } %>
               </div>
             </div>
@@ -241,6 +242,7 @@
                   <span class="text-[11px] font-medium" style="color:rgba(255,255,255,0.75);"><%= t.assignee_name %></span>
                   <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold" style="background:<%= rp.bg %>;color:<%= rp.color %>;"><%= rp.label %></span>
                   <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold" style="background:<%= pr.bg %>;color:<%= pr.color %>;"><%= pr.label %></span>
+                  <% if (t.is_general) { %><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold" style="background:rgba(43,127,255,0.18);color:#60A5FA;">GENERAL</span><% } %>
                   <% if (t.due_at) { %><span class="text-[10px]" style="color:rgba(255,255,255,0.4);">Due <%= new Date(t.due_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></span><% } %>
                 </div>
               </div>
@@ -266,6 +268,19 @@
             </select>
             <input type="text" name="title" placeholder="What needs doing?" required maxlength="200"
               class="w-full px-3 py-2 text-sm rounded-lg" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;">
+            <!-- Scope toggle — pill-style 2-up. Sends scope=general
+                 when the right pill is selected; otherwise the task
+                 binds to this shift (booking_id hidden above). -->
+            <div class="grid grid-cols-2 gap-1 text-[11px] font-semibold rounded-lg p-0.5" style="background:rgba(255,255,255,0.05);">
+              <label class="cursor-pointer">
+                <input type="radio" name="scope" value="shift" class="peer sr-only" checked>
+                <span class="block text-center py-1.5 rounded-md text-gray-400 peer-checked:text-white peer-checked:bg-emerald-500/20">For this shift</span>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="scope" value="general" class="peer sr-only">
+                <span class="block text-center py-1.5 rounded-md text-gray-400 peer-checked:text-white peer-checked:bg-blue-500/20">General task</span>
+              </label>
+            </div>
             <div class="flex items-center gap-2">
               <select name="priority" class="px-3 py-2 text-sm rounded-lg" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;">
                 <option value="normal" style="color:#000;">Normal</option>
