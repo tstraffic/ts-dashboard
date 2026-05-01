@@ -377,8 +377,14 @@
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="px-3 py-2">
-                  <span class="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full <%= sc.color %>"><%= sc.label %></span>
+                <td class="px-3 py-2 status-cell" data-id="<%= item.id %>" data-status="<%= item.status %>">
+                  <button type="button"
+                    onclick="event.stopPropagation(); openStatusPopover(event, <%= item.id %>, '<%= item.status %>')"
+                    class="status-pill inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full <%= sc.color %> hover:ring-1 hover:ring-gray-300 transition cursor-pointer"
+                    title="Click to change status">
+                    <%= sc.label %>
+                    <svg class="w-2.5 h-2.5 opacity-60" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                  </button>
                 </td>
                 <td class="hidden sm:table-cell px-3 py-2 whitespace-nowrap">
                   <% if (item.due_date) { %>
@@ -712,6 +718,101 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// Status quick-change popover --------------------------------------------
+// Mirror of EJS STATUS_CONFIG, used to repaint the pill in-place.
+const STATUS_CONFIG_JS = {
+  not_started: { label: 'Not Started', color: 'bg-gray-100 text-gray-600' },
+  started:     { label: 'Started',     color: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20' },
+  submitted:   { label: 'Submitted',   color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' },
+  approved:    { label: 'Approved',    color: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' },
+  rejected:    { label: 'Rejected',    color: 'bg-red-50 text-red-700 ring-1 ring-red-600/20' },
+  expired:     { label: 'Expired',     color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' },
+};
+let statusPopoverState = { id: null, currentStatus: null };
+
+function openStatusPopover(event, id, currentStatus) {
+  statusPopoverState = { id, currentStatus };
+  const pop = document.getElementById('statusPopover');
+  // Mark the current option with a check
+  pop.querySelectorAll('[data-status]').forEach(btn => {
+    const check = btn.querySelector('.popover-check');
+    if (btn.dataset.status === currentStatus) check.classList.remove('hidden');
+    else check.classList.add('hidden');
+  });
+  // Show first so we can measure
+  pop.classList.remove('hidden');
+  // Position next to the clicked pill, clamped to viewport
+  const trigger = event.currentTarget.getBoundingClientRect();
+  const popRect = pop.getBoundingClientRect();
+  let top = trigger.bottom + 6;
+  let left = trigger.left;
+  if (left + popRect.width > window.innerWidth - 8) left = window.innerWidth - popRect.width - 8;
+  if (top + popRect.height > window.innerHeight - 8) top = trigger.top - popRect.height - 6;
+  pop.style.top = top + 'px';
+  pop.style.left = Math.max(8, left) + 'px';
+}
+function closeStatusPopover() {
+  document.getElementById('statusPopover').classList.add('hidden');
+  statusPopoverState = { id: null, currentStatus: null };
+}
+function selectStatus(newStatus) {
+  if (!statusPopoverState.id) return;
+  const id = statusPopoverState.id;
+  const oldStatus = statusPopoverState.currentStatus;
+  closeStatusPopover();
+  if (newStatus === oldStatus) return; // no-op
+  // Optimistic update
+  updateStatusCell(id, newStatus);
+  fetch('/compliance/bulk-status', {
+    method: 'POST',
+    headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ ids: [String(id)], status: newStatus })
+  }).then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Status changed to ' + (STATUS_CONFIG_JS[newStatus]?.label || newStatus), 'success', {
+      undo: () => {
+        updateStatusCell(id, oldStatus);
+        fetch('/compliance/bulk-status', {
+          method: 'POST',
+          headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ ids: [String(id)], status: oldStatus })
+        }).catch(() => showToast('Failed to undo', 'error'));
+      }
+    });
+  }).catch(() => {
+    // Revert on failure
+    updateStatusCell(id, oldStatus);
+    showToast('Failed to change status', 'error');
+  });
+}
+function updateStatusCell(id, status) {
+  const td = document.querySelector('.status-cell[data-id="' + id + '"]');
+  if (!td) return;
+  const cfg = STATUS_CONFIG_JS[status] || { label: status, color: 'bg-gray-100 text-gray-600' };
+  td.dataset.status = status;
+  // Repaint the existing button so onclick handler stays intact
+  const btn = td.querySelector('.status-pill');
+  if (!btn) return;
+  btn.className = 'status-pill inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full ' + cfg.color + ' hover:ring-1 hover:ring-gray-300 transition cursor-pointer';
+  // Replace text node, keep the chevron svg
+  const svg = btn.querySelector('svg');
+  btn.textContent = cfg.label + ' ';
+  if (svg) btn.appendChild(svg);
+  // Update onclick to capture the new status
+  btn.onclick = function(e) { e.stopPropagation(); openStatusPopover(e, parseInt(id, 10), status); };
+}
+// Close on outside click / Escape
+document.addEventListener('click', e => {
+  const pop = document.getElementById('statusPopover');
+  if (!pop.classList.contains('hidden') && !pop.contains(e.target) && !e.target.closest('.status-pill')) {
+    closeStatusPopover();
+  }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeStatusPopover(); });
+// Reposition on scroll/resize so it stays anchored
+window.addEventListener('scroll', () => closeStatusPopover(), true);
+window.addEventListener('resize', () => closeStatusPopover());
+
 // Toast helper -------------------------------------------------------------
 function showToast(message, type, options) {
   const container = document.getElementById('toastContainer');
@@ -749,6 +850,28 @@ function showToast(message, type, options) {
 
 <!-- Toast container for in-place feedback (no jarring reloads) -->
 <div id="toastContainer" class="fixed bottom-4 right-4 space-y-2 z-50 max-w-sm"></div>
+
+<!-- Status quick-change popover. Anchored next to whichever pill the user clicks -->
+<div id="statusPopover" class="hidden fixed z-50 bg-white border border-gray-200 rounded-xl shadow-2xl p-2 min-w-[180px]"
+  onclick="event.stopPropagation()">
+  <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 px-2 pt-1">Change status</div>
+  <div class="grid gap-1" id="statusPopoverOptions">
+    <% [
+      { value: 'not_started', label: 'Not Started', cls: 'bg-gray-100 text-gray-700' },
+      { value: 'started',     label: 'Started',     cls: 'bg-purple-50 text-purple-700' },
+      { value: 'submitted',   label: 'Submitted',   cls: 'bg-blue-50 text-blue-700' },
+      { value: 'approved',    label: 'Approved',    cls: 'bg-emerald-50 text-emerald-700' },
+      { value: 'rejected',    label: 'Rejected',    cls: 'bg-red-50 text-red-700' },
+      { value: 'expired',     label: 'Expired',     cls: 'bg-amber-50 text-amber-700' },
+    ].forEach(function(opt) { %>
+      <button type="button" data-status="<%= opt.value %>" onclick="selectStatus('<%= opt.value %>')"
+        class="flex items-center justify-between w-full px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:bg-gray-100 transition text-left">
+        <span class="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full <%= opt.cls %>"><%= opt.label %></span>
+        <svg class="popover-check w-4 h-4 text-emerald-600 hidden" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+      </button>
+    <% }) %>
+  </div>
+</div>
 
 <!-- Invoice number modal (single or bulk) -->
 <div id="invoiceModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm" onclick="if(event.target===this)closeInvoiceModal()">
