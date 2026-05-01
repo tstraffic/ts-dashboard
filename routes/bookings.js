@@ -29,6 +29,32 @@ const uploadDoc = multer({ storage: bookingStorage, limits: { fileSize: 50 * 102
 const DEPOTS = ['Villawood', 'Penrith', 'Campbelltown', 'Parramatta'];
 const VALID_STATUSES = ['client_booking', 'unconfirmed', 'confirmed', 'locked', 'conflict', 'green_to_go', 'in_progress', 'complete', 'finalised', 'cancelled', 'late_cancellation', 'on_hold'];
 
+// Auto-vehicle sync — every "Nx TC Crew" booking_requirement row carries
+// 1 ute. After requirements are saved we make sure booking_vehicles has
+// at least that many ute-role rows (placeholder rows the allocator can
+// assign from the fleet register). Existing utes the office added by
+// hand are kept; we only top up the difference. Never deletes rows the
+// allocator assigned a driver to.
+function syncTCCrewVehicles(db, bookingId) {
+  try {
+    const reqs = db.prepare("SELECT resource_type, quantity_required FROM booking_requirements WHERE booking_id = ?").all(bookingId);
+    let target = 0;
+    for (const r of reqs) {
+      // Match "Nx TC Crew" — 1 ute per package, multiplied by qty.
+      const m = /^(\d+)x TC Crew$/.exec(r.resource_type || '');
+      if (m) target += (parseInt(r.quantity_required) || 0); // 1 ute per package, ignore N
+    }
+    if (target <= 0) return;
+    const existing = db.prepare("SELECT COUNT(*) AS c FROM booking_vehicles WHERE booking_id = ? AND vehicle_role = 'ute'").get(bookingId).c;
+    const missing = target - existing;
+    if (missing <= 0) return;
+    const ins = db.prepare("INSERT INTO booking_vehicles (booking_id, vehicle_name, registration, vehicle_role) VALUES (?, '', '', 'ute')");
+    for (let i = 0; i < missing; i++) ins.run(bookingId);
+  } catch (e) {
+    console.error('[syncTCCrewVehicles]', e.message);
+  }
+}
+
 function generateBookingNumber(db) {
   const last = db.prepare("SELECT booking_number FROM bookings ORDER BY id DESC LIMIT 1").get();
   let nextNum = 1;
@@ -310,6 +336,7 @@ router.post('/', (req, res) => {
       insertReq.run(bookingId, reqTypes[i], parseInt(reqQtys[i]));
     }
   }
+  syncTCCrewVehicles(db, bookingId);
 
   // Assign crew from form crew selector + auto-create allocations for worker portal
   const crewIds = Array.isArray(b.crew_ids) ? b.crew_ids : (b.crew_ids ? [b.crew_ids] : []);
@@ -565,6 +592,7 @@ router.post('/:id', (req, res) => {
       insertReq.run(req.params.id, reqTypes[i], parseInt(reqQtys[i]));
     }
   }
+  syncTCCrewVehicles(db, req.params.id);
 
   // Update crew assignments — but ONLY when the form actually contained a
   // crew picker. Without the explicit `crew_ids_present` flag we leave the
@@ -949,6 +977,7 @@ router.post('/:id/requirements', (req, res) => {
   if (!resource_type) { req.flash('error', 'Select a resource type.'); return res.redirect('/bookings/' + req.params.id); }
   db.prepare("INSERT INTO booking_requirements (booking_id, resource_type, quantity_required) VALUES (?, ?, ?)")
     .run(req.params.id, resource_type, parseInt(quantity_required) || 1);
+  syncTCCrewVehicles(db, req.params.id);
   req.flash('success', 'Requirement added.');
   res.redirect('/bookings/' + req.params.id);
 });
