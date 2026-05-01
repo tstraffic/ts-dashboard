@@ -39,16 +39,20 @@ function toDateStr(d) { return d.toISOString().split('T')[0]; }
 
 router.get('/', (req, res) => {
   const db = getDb();
-  const { status, job_id, client_id, item_type, view = 'all', ref, date_from, date_to } = req.query;
+  const { status, job_id, client_id, item_type, view = 'all', ref, date_from, date_to, invoice_state } = req.query;
 
   let query = `SELECT c.*, j.job_number, j.client as job_client,
     cl.company_name as client_name,
-    u.full_name as approver_name, a.full_name as assigned_name
+    u.full_name as approver_name, a.full_name as assigned_name,
+    rfi.full_name as ready_for_invoice_by_name,
+    inv.full_name as invoiced_by_name
     FROM compliance c
     LEFT JOIN jobs j ON c.job_id = j.id
     LEFT JOIN clients cl ON c.client_id = cl.id
     LEFT JOIN users u ON c.internal_approver_id = u.id
     LEFT JOIN users a ON c.assigned_to_id = a.id
+    LEFT JOIN users rfi ON c.ready_for_invoice_by = rfi.id
+    LEFT JOIN users inv ON c.invoiced_by_id = inv.id
     WHERE 1=1`;
   const params = [];
 
@@ -58,6 +62,11 @@ router.get('/', (req, res) => {
   if (item_type && item_type !== 'all') { query += ` AND (c.item_type = ? OR c.item_types LIKE ?)`; params.push(item_type, `%${item_type}%`); }
   if (date_from) { query += ` AND c.due_date >= ?`; params.push(date_from); }
   if (date_to)   { query += ` AND c.due_date <= ?`; params.push(date_to); }
+
+  // Invoice workflow filter — pending / ready / invoiced
+  if (invoice_state === 'pending')  query += ` AND COALESCE(c.ready_for_invoice, 0) = 0 AND COALESCE(c.invoiced, 0) = 0`;
+  if (invoice_state === 'ready')    query += ` AND COALESCE(c.ready_for_invoice, 0) = 1 AND COALESCE(c.invoiced, 0) = 0`;
+  if (invoice_state === 'invoiced') query += ` AND COALESCE(c.invoiced, 0) = 1`;
 
   const today = new Date();
   let prevRef = null, nextRef = null, periodLabel = null;
@@ -94,21 +103,29 @@ router.get('/', (req, res) => {
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
 
-  const allItems = db.prepare('SELECT status, due_date, expiry_date FROM compliance').all();
+  const allItems = db.prepare('SELECT status, due_date, expiry_date, ready_for_invoice, invoiced, invoiced_at, charge_amount, costs FROM compliance').all();
   const todayStr = toDateStr(today);
   const soonStr = toDateStr(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
+  const cutoff30Str = toDateStr(new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000));
   const summary = {
     total: allItems.length,
     approved: allItems.filter(i => i.status === 'approved').length,
     pending: allItems.filter(i => ['not_started', 'submitted'].includes(i.status)).length,
     overdue: allItems.filter(i => i.due_date && i.due_date < todayStr && i.status !== 'approved' && i.status !== 'expired').length,
     expiringSoon: allItems.filter(i => i.status === 'approved' && i.expiry_date && i.expiry_date >= todayStr && i.expiry_date <= soonStr).length,
+    // Invoice workflow stats
+    readyForInvoice: allItems.filter(i => i.ready_for_invoice && !i.invoiced).length,
+    readyForInvoiceValue: allItems.filter(i => i.ready_for_invoice && !i.invoiced)
+      .reduce((sum, i) => sum + (parseFloat(i.charge_amount) || parseFloat(i.costs) || 0), 0),
+    invoicedLast30: allItems.filter(i => i.invoiced && i.invoiced_at && i.invoiced_at >= cutoff30Str).length,
+    invoicedLast30Value: allItems.filter(i => i.invoiced && i.invoiced_at && i.invoiced_at >= cutoff30Str)
+      .reduce((sum, i) => sum + (parseFloat(i.charge_amount) || parseFloat(i.costs) || 0), 0),
   };
 
   res.render('compliance/index', {
     title: 'Plans & Approvals',
     items, jobs, clients, users,
-    filters: { status: status || '', job_id: job_id || '', client_id: client_id || '', item_type: item_type || '', view, ref: ref || '', date_from: date_from || '', date_to: date_to || '' },
+    filters: { status: status || '', job_id: job_id || '', client_id: client_id || '', item_type: item_type || '', view, ref: ref || '', date_from: date_from || '', date_to: date_to || '', invoice_state: invoice_state || '' },
     view, periodLabel, prevRef, nextRef, summary,
     user: req.session.user
   });
@@ -320,13 +337,61 @@ router.post('/bulk-ready-invoice', (req, res) => {
 
 router.post('/bulk-invoiced', (req, res) => {
   const db = getDb();
-  const { ids } = req.body;
+  const { ids, invoice_number } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No items' });
   // Only admin/finance/accounts can mark as invoiced
   if (!['admin', 'finance', 'accounts'].includes(req.session.user.role)) return res.status(403).json({ error: 'Only admin/accounts can mark as invoiced' });
   const placeholders = ids.map(() => '?').join(',');
-  db.prepare(`UPDATE compliance SET invoiced = 1, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`).run(...ids);
+  const invNum = (invoice_number || '').toString().trim();
+  if (invNum) {
+    db.prepare(`UPDATE compliance SET invoiced = 1, invoice_number = ?, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`)
+      .run(invNum, req.session.user.id, ...ids);
+  } else {
+    db.prepare(`UPDATE compliance SET invoiced = 1, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`)
+      .run(req.session.user.id, ...ids);
+  }
   res.json({ success: true });
+});
+
+// Mark a single item as invoiced (with optional invoice number)
+router.post('/:id/mark-invoiced', (req, res) => {
+  const db = getDb();
+  if (!['admin', 'finance', 'accounts'].includes(req.session.user.role)) {
+    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(403).json({ error: 'Only admin/accounts can mark as invoiced' });
+    req.flash('error', 'Only admin or accounts can mark items as invoiced.');
+    return res.redirect(req.body.return_to || '/compliance');
+  }
+  const item = db.prepare('SELECT id, title, job_id FROM compliance WHERE id = ?').get(req.params.id);
+  if (!item) {
+    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Item not found' });
+    req.flash('error', 'Item not found.');
+    return res.redirect('/compliance');
+  }
+  const invNum = (req.body.invoice_number || '').toString().trim();
+  if (invNum) {
+    db.prepare(`UPDATE compliance SET invoiced = 1, invoice_number = ?, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+      .run(invNum, req.session.user.id, item.id);
+  } else {
+    db.prepare(`UPDATE compliance SET invoiced = 1, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+      .run(req.session.user.id, item.id);
+  }
+  if (req.xhr || (req.headers.accept || '').includes('json')) return res.json({ success: true, invoice_number: invNum });
+  req.flash('success', `Marked invoiced${invNum ? ' (' + invNum + ')' : ''}.`);
+  res.redirect(req.body.return_to || '/compliance');
+});
+
+// Undo invoiced state (admin only)
+router.post('/:id/unmark-invoiced', (req, res) => {
+  const db = getDb();
+  if (!['admin', 'finance', 'accounts'].includes(req.session.user.role)) {
+    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(403).json({ error: 'Forbidden' });
+    req.flash('error', 'Only admin or accounts can undo this.');
+    return res.redirect(req.body.return_to || '/compliance');
+  }
+  db.prepare('UPDATE compliance SET invoiced = 0, invoiced_at = NULL, invoiced_by_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.id);
+  if (req.xhr || (req.headers.accept || '').includes('json')) return res.json({ success: true });
+  req.flash('success', 'Invoiced mark removed.');
+  res.redirect(req.body.return_to || '/compliance');
 });
 
 router.get('/:id/edit', (req, res) => {
