@@ -294,16 +294,14 @@
          Risk Assessment & Toolbox in Required; the Team Leader Checklist
          only appears for team_leader+ (TLs and supervisors). -->
     <%
+      // Required for every worker on the shift — both checklists are visible
+      // to all roles. The Team Leader Checklist itself notes inside the form
+      // that it's normally filled by the TL; non-TLs can still submit when
+      // they're acting as TL for the day.
       var JOB_PACK_REQUIRED = [
-        { key: 'risk_toolbox',  path: 'risk-assessment', label: '2. Risk Assessment & Toolbox', hint: 'Run with the crew on site', tlOnly: false },
+        { key: 'risk_toolbox', path: 'risk-assessment', label: '2. Risk Assessment & Toolbox', hint: 'Run with the crew on site' },
+        { key: 'team_leader',  path: 'team-leader',     label: '4. Team Leader Checklist',     hint: 'Crew lead / acting TL' },
       ];
-      if (typeof isTeamLeader !== 'undefined' && isTeamLeader) {
-        JOB_PACK_REQUIRED.push({
-          key: 'team_leader', path: 'team-leader',
-          label: '4. Team Leader Checklist',
-          hint: 'Team Leader only', tlOnly: true,
-        });
-      }
       var JOB_PACK_RECOMMENDED = [
         { key: 'vehicle_prestart',   path: 'vehicle-prestart',   label: '1. Vehicle Pre-Start',           hint: 'Before starting the vehicle' },
         { key: 'tc_prestart',        path: 'tc-prestart',        label: '3. TC Prestart Declaration',     hint: 'Per Traffic Controller' },

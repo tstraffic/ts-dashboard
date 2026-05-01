@@ -148,17 +148,16 @@
   <!-- FORMS TAB -->
   <% if (tab === 'forms') { %>
     <%
-      // Hide the Team Leader Checklist from TC-only workers — only TLs +
-      // supervisors should see it on their shift detail Forms tab.
+      // Show the full Job-Pack to every worker on the shift. Team Leader
+      // Checklist is the responsibility of the TL but anyone acting as TL
+      // for the shift can still submit it.
       var JOB_PACK = [
         { key: 'vehicle_prestart',   path: 'vehicle-prestart',   label: '1. Vehicle Pre-Start',           hint: 'Before starting the vehicle' },
         { key: 'risk_toolbox',       path: 'risk-assessment',    label: '2. Risk Assessment & Toolbox',   hint: 'Run with the crew on site' },
         { key: 'tc_prestart',        path: 'tc-prestart',        label: '3. TC Prestart Declaration',     hint: 'Per Traffic Controller' },
+        { key: 'team_leader',        path: 'team-leader',        label: '4. Team Leader Checklist',       hint: 'Crew lead / acting TL' },
+        { key: 'post_shift_vehicle', path: 'post-shift-vehicle', label: '5. Post-Shift Vehicle Checklist',hint: 'At end of shift' },
       ];
-      if (typeof isTeamLeader !== 'undefined' && isTeamLeader) {
-        JOB_PACK.push({ key: 'team_leader', path: 'team-leader', label: '4. Team Leader Checklist', hint: 'Team Leader only' });
-      }
-      JOB_PACK.push({ key: 'post_shift_vehicle', path: 'post-shift-vehicle', label: '5. Post-Shift Vehicle Checklist', hint: 'At end of shift' });
     %>
     <div class="space-y-3">
       <p class="text-xs text-gray-500 mb-1">Shift-specific checklists and the docket.</p>

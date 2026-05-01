@@ -794,22 +794,18 @@ const PPE_ITEMS = [
   { key: 'night_wands',  label: 'Night Wands (Nights only — N/A for day shift)' },
 ];
 
-// Team Leader Checklist is only fillable by team_leader+ workers. Lower
-// tiers get bounced with a flash explaining the gap. requirePortalRole
-// uses a hierarchical check, so supervisors pass too.
-const { requirePortalRole, hasPortalRole } = require('../../middleware/workerAuth');
-function requireTeamLeader(req, res, next) {
-  return requirePortalRole('team_leader')(req, res, next);
-}
+// Team Leader Checklist is open to every worker on the shift — anyone can
+// be acting as TL on the day. The form itself shows an amber "you're not
+// flagged as TL" hint when a non-TL opens it (see the isManager flag in
+// views/worker/forms/team-leader.ejs).
+const { hasPortalRole } = require('../../middleware/workerAuth');
 
-router.get('/forms/team-leader', requireTeamLeader, (req, res) => {
+router.get('/forms/team-leader', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
   const allocation = requireAllocation(req, res);
   if (!allocation) return;
 
-  // requirePortalRole already enforced TL+; this flag is just for the
-  // "you're acting as TL today" hint in the view.
   const me = db.prepare('SELECT portal_role FROM crew_members WHERE id = ?').get(worker.id);
   const isManager = !!(me && hasPortalRole(me.portal_role, 'team_leader'));
 
@@ -824,7 +820,7 @@ router.get('/forms/team-leader', requireTeamLeader, (req, res) => {
   });
 });
 
-router.post('/forms/team-leader', requireTeamLeader, photoUpload.fields([
+router.post('/forms/team-leader', photoUpload.fields([
   { name: 'team_photos',  maxCount: 8 },
   { name: 'setup_photos', maxCount: 10 },
 ]), async (req, res) => {
