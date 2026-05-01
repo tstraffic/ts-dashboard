@@ -48,7 +48,7 @@ function transformBooking(db, row) {
     FROM booking_crew bc LEFT JOIN crew_members cm ON cm.id = bc.crew_member_id
     WHERE bc.booking_id = ?
   `).all(row.id);
-  const vehicles = db.prepare("SELECT id, vehicle_name, registration FROM booking_vehicles WHERE booking_id = ?").all(row.id);
+  const vehicles = db.prepare("SELECT id, vehicle_name, registration, vehicle_role, crew_member_id FROM booking_vehicles WHERE booking_id = ?").all(row.id);
   const noteCount = db.prepare("SELECT COUNT(*) as c FROM booking_notes WHERE booking_id = ?").get(row.id).c;
 
   let supervisorName = '';
@@ -726,12 +726,39 @@ router.post('/:id/notes', (req, res) => {
 router.post('/:id/notes/:noteId/delete', (req, res) => { getDb().prepare("DELETE FROM booking_notes WHERE id=? AND booking_id=?").run(req.params.noteId, req.params.id); req.flash('success', 'Deleted.'); res.redirect('/bookings/' + req.params.id); });
 
 // Vehicles
+// POST /:id/vehicles/:vehicleId/driver — assign or clear the driver
+router.post('/:id/vehicles/:vehicleId/driver', (req, res) => {
+  const db = getDb();
+  const cid = req.body.crew_member_id || null;
+  if (cid) {
+    // Driver must be on this booking — block stray assignments.
+    const ok = db.prepare("SELECT 1 FROM booking_crew WHERE booking_id=? AND crew_member_id=?").get(req.params.id, cid);
+    if (!ok) {
+      req.flash('error', "Driver isn't on the booking crew.");
+      return res.redirect('/bookings/' + req.params.id);
+    }
+  }
+  db.prepare("UPDATE booking_vehicles SET crew_member_id = ? WHERE id = ? AND booking_id = ?")
+    .run(cid, req.params.vehicleId, req.params.id);
+  req.flash('success', cid ? 'Driver assigned.' : 'Driver cleared.');
+  res.redirect('/bookings/' + req.params.id);
+});
+
 router.post('/:id/vehicles', (req, res) => {
   const db = getDb();
   if (!db.prepare("SELECT id FROM bookings WHERE id=?").get(req.params.id)) { req.flash('error', 'Not found.'); return res.redirect('/bookings'); }
   const { vehicle_name, registration } = req.body;
   if (!vehicle_name && !registration) { req.flash('error', 'Name or rego required.'); return res.redirect('/bookings/' + req.params.id); }
-  db.prepare("INSERT INTO booking_vehicles (booking_id, vehicle_name, registration) VALUES (?, ?, ?)").run(req.params.id, vehicle_name || '', registration || '');
+  // crew_member_id only persists when the worker is on this booking.
+  let driverId = null;
+  if (req.body.crew_member_id) {
+    const ok = db.prepare("SELECT 1 FROM booking_crew WHERE booking_id=? AND crew_member_id=?").get(req.params.id, req.body.crew_member_id);
+    if (ok) driverId = req.body.crew_member_id;
+  }
+  db.prepare(`
+    INSERT INTO booking_vehicles (booking_id, vehicle_name, registration, vehicle_role, crew_member_id)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(req.params.id, vehicle_name || '', registration || '', req.body.vehicle_role || '', driverId);
   req.flash('success', 'Vehicle added.'); res.redirect('/bookings/' + req.params.id);
 });
 router.post('/:id/vehicles/:vehicleId/remove', (req, res) => { getDb().prepare("DELETE FROM booking_vehicles WHERE id=? AND booking_id=?").run(req.params.vehicleId, req.params.id); req.flash('success', 'Removed.'); res.redirect('/bookings/' + req.params.id); });

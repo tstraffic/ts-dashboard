@@ -6795,6 +6795,27 @@ function runMigrations(db) {
     console.log('Migration 145 applied');
   }
 
+  // Migration 146: booking_vehicles.crew_member_id — nominate the driver
+  // for each vehicle on a booking. The office wants every vehicle on the
+  // shift assignable to a specific worker so checklists / fuel cards /
+  // accountability tie back to a person. Nullable: a vehicle can sit
+  // unassigned until the allocator picks the driver.
+  if (!isMigrationApplied.get(146)) {
+    const cols = db.prepare("PRAGMA table_info(booking_vehicles)").all().map(c => c.name);
+    if (!cols.includes('crew_member_id')) {
+      db.exec("ALTER TABLE booking_vehicles ADD COLUMN crew_member_id INTEGER REFERENCES crew_members(id)");
+    }
+    if (!cols.includes('vehicle_role')) {
+      // Free-text label for the vehicle's role on the shift (e.g. "ute",
+      // "VMS ute", "TMA"). Defaults to empty so existing rows aren't
+      // touched.
+      db.exec("ALTER TABLE booking_vehicles ADD COLUMN vehicle_role TEXT DEFAULT ''");
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_booking_vehicles_driver ON booking_vehicles(crew_member_id)");
+    recordMigration.run(146, 'booking_vehicles.crew_member_id + vehicle_role');
+    console.log('Migration 146 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

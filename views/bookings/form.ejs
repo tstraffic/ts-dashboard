@@ -38,12 +38,17 @@
     { val: 'on_hold', label: 'On Hold' },
   ];
 
+  // Resource picker options. "Nx TC Crew" ships N traffic controllers + 1
+  // ute automatically (see peopleCounts and the auto-totals JS below).
+  // Standalone "TMP" and "Traffic Guidance Scheme" entries dropped at the
+  // office's request — TMP is captured via "TMP with Traffic Management"
+  // and the TGS document lives on Site Documents now.
   const requirementTypes = [
     '1x TC Crew', '2x TC Crew', '3x TC Crew', '4x TC Crew', '5x TC Crew',
-    '6x TC Crew', '7x TC Crew', '8x TC Crew', '9x TC Crew', '10x TC Crew',
-    'Arrow Board', 'Hoist Operator', 'IP', 'Pilot Vehicle', 'Pilot Vehicle Lead',
-    'Portable Traffic Lights', 'Ute', 'TL 2x TC Crew', 'TL 3x TC Crew',
-    'TL 4x TC Crew', 'TL 5x TC Crew', 'VMS Board', 'VMS Ute', 'Water Cart', 'Truck'
+    'Arrow Board', 'Hoist Operator', 'Labour', 'Light Tower', 'Permit',
+    'Pod Truck', 'Portaboom', 'Security', 'Speed Advisory Sign', 'Spotter',
+    'TMA (dry hire)', 'TMA (wet hire)', 'TMP with Traffic Management',
+    'Traffic Controller', 'Trainee', 'VMS Board', 'VMS Ute', 'Vehicle',
   ];
 %>
 
@@ -619,13 +624,23 @@
   // Requirements grid — add/remove rows
   const reqTypes = <%- JSON.stringify(requirementTypes) %>;
 
-  // Categorize requirement types for totals
-  const peopleTypes = ['1x TC Crew','2x TC Crew','3x TC Crew','4x TC Crew','5x TC Crew','6x TC Crew','7x TC Crew','8x TC Crew','9x TC Crew','10x TC Crew','Hoist Operator','IP','TL 2x TC Crew','TL 3x TC Crew','TL 4x TC Crew','TL 5x TC Crew'];
-  const vehicleTypes = ['Pilot Vehicle','Pilot Vehicle Lead','Ute','VMS Ute','Water Cart','Truck'];
-  const equipmentTypes = ['Arrow Board','Portable Traffic Lights','VMS Board'];
+  // Categorize requirement types for totals.
+  //   - "Nx TC Crew" packages = N traffic controllers + 1 ute (auto-vehicle)
+  //   - Other people types: Hoist Operator / Labour / Security / Spotter
+  //     / Traffic Controller (single) / Trainee — count as 1 person each
+  //   - VMS Ute, Vehicle, Pod Truck, TMA (dry/wet hire) = vehicle counters
+  const peopleTypes = ['1x TC Crew','2x TC Crew','3x TC Crew','4x TC Crew','5x TC Crew',
+    'Hoist Operator','Labour','Security','Spotter','Traffic Controller','Trainee'];
+  const vehicleTypes = ['Pod Truck','TMA (dry hire)','TMA (wet hire)','VMS Ute','Vehicle'];
+  const equipmentTypes = ['Arrow Board','Light Tower','Portaboom','Speed Advisory Sign','VMS Board'];
 
-  // People count mapping: how many people per item type
-  const peopleCounts = {'1x TC Crew':1,'2x TC Crew':2,'3x TC Crew':3,'4x TC Crew':4,'5x TC Crew':5,'6x TC Crew':6,'7x TC Crew':7,'8x TC Crew':8,'9x TC Crew':9,'10x TC Crew':10,'Hoist Operator':1,'IP':1,'TL 2x TC Crew':3,'TL 3x TC Crew':4,'TL 4x TC Crew':5,'TL 5x TC Crew':6};
+  // Per-row people / auto-vehicle counts. "Nx TC Crew" ships N TCs + 1 ute.
+  const peopleCounts  = { '1x TC Crew':1,'2x TC Crew':2,'3x TC Crew':3,'4x TC Crew':4,'5x TC Crew':5,
+    'Hoist Operator':1,'Labour':1,'Security':1,'Spotter':1,'Traffic Controller':1,'Trainee':1 };
+  // Items that AUTO-include a vehicle (one ute) when added. Displayed in
+  // the totals as part of the vehicles count, so the office sees the
+  // resulting head count + vehicle count without manually adding a Ute row.
+  const autoVehicleCounts = { '1x TC Crew':1,'2x TC Crew':1,'3x TC Crew':1,'4x TC Crew':1,'5x TC Crew':1 };
 
   function createReqRow(type, qty) {
     const tr = document.createElement('tr');
@@ -653,8 +668,9 @@
       const type = row.querySelector('select[name="req_resource_type"]').value;
       const qty = parseInt(row.querySelector('input[name="req_quantity"]').value) || 0;
       if (peopleTypes.includes(type)) people += (peopleCounts[type] || 1) * qty;
-      else if (vehicleTypes.includes(type)) vehicles += qty;
-      else if (equipmentTypes.includes(type)) equipment += qty;
+      if (autoVehicleCounts[type]) vehicles += autoVehicleCounts[type] * qty;
+      if (vehicleTypes.includes(type)) vehicles += qty;
+      if (equipmentTypes.includes(type)) equipment += qty;
     });
     document.getElementById('total-people').textContent = people;
     document.getElementById('total-vehicles').textContent = vehicles;

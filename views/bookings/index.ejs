@@ -1223,12 +1223,15 @@ setInterval(function() {
     { val: 'late_cancellation', label: 'Late Cancellation' },
     { val: 'on_hold', label: 'On Hold' },
   ];
+  // Match the full edit page's resource list (views/bookings/form.ejs).
+  // "Nx TC Crew" rows ship N TCs + 1 ute automatically; standalone TMP /
+  // Traffic Guidance Scheme entries are intentionally absent.
   const formReqTypes = [
     '1x TC Crew','2x TC Crew','3x TC Crew','4x TC Crew','5x TC Crew',
-    '6x TC Crew','7x TC Crew','8x TC Crew','9x TC Crew','10x TC Crew',
-    'Arrow Board','Hoist Operator','IP','Pilot Vehicle','Pilot Vehicle Lead',
-    'Portable Traffic Lights','Ute','TL 2x TC Crew','TL 3x TC Crew',
-    'TL 4x TC Crew','TL 5x TC Crew','VMS Board','VMS Ute','Water Cart','Truck'
+    'Arrow Board','Hoist Operator','Labour','Light Tower','Permit',
+    'Pod Truck','Portaboom','Security','Speed Advisory Sign','Spotter',
+    'TMA (dry hire)','TMA (wet hire)','TMP with Traffic Management',
+    'Traffic Controller','Trainee','VMS Board','VMS Ute','Vehicle'
   ];
 %>
 <div class="booking-modal-backdrop" id="booking-form-backdrop" style="display:none;">

@@ -570,31 +570,14 @@
         <div class="flex-1">
           <select name="resource_type" required class="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="">-- Type --</option>
-            <option value="1x TC Crew">1x TC Crew</option>
-            <option value="2x TC Crew">2x TC Crew</option>
-            <option value="3x TC Crew">3x TC Crew</option>
-            <option value="4x TC Crew">4x TC Crew</option>
-            <option value="5x TC Crew">5x TC Crew</option>
-            <option value="6x TC Crew">6x TC Crew</option>
-            <option value="7x TC Crew">7x TC Crew</option>
-            <option value="8x TC Crew">8x TC Crew</option>
-            <option value="9x TC Crew">9x TC Crew</option>
-            <option value="10x TC Crew">10x TC Crew</option>
-            <option value="Arrow Board">Arrow Board</option>
-            <option value="Hoist Operator">Hoist Operator</option>
-            <option value="IP">IP</option>
-            <option value="Pilot Vehicle">Pilot Vehicle</option>
-            <option value="Pilot Vehicle Lead">Pilot Vehicle Lead</option>
-            <option value="Portable Traffic Lights">Portable Traffic Lights</option>
-            <option value="Ute">Ute</option>
-            <option value="TL 2x TC Crew">TL 2x TC Crew</option>
-            <option value="TL 3x TC Crew">TL 3x TC Crew</option>
-            <option value="TL 4x TC Crew">TL 4x TC Crew</option>
-            <option value="TL 5x TC Crew">TL 5x TC Crew</option>
-            <option value="VMS Board">VMS Board</option>
-            <option value="VMS Ute">VMS Ute</option>
-            <option value="Water Cart">Water Cart</option>
-            <option value="Truck">Truck</option>
+            <% var SHOW_RES_TYPES = ['1x TC Crew','2x TC Crew','3x TC Crew','4x TC Crew','5x TC Crew',
+              'Arrow Board','Hoist Operator','Labour','Light Tower','Permit',
+              'Pod Truck','Portaboom','Security','Speed Advisory Sign','Spotter',
+              'TMA (dry hire)','TMA (wet hire)','TMP with Traffic Management',
+              'Traffic Controller','Trainee','VMS Board','VMS Ute','Vehicle']; %>
+            <% SHOW_RES_TYPES.forEach(function (t) { %>
+              <option value="<%= t %>"><%= t %></option>
+            <% }) %>
           </select>
         </div>
         <input type="number" name="quantity_required" min="1" value="1" class="w-14 px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs text-center focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -689,20 +672,39 @@
       </div>
     </div>
 
-    <!-- Vehicles -->
+    <!-- Vehicles — every vehicle can be assigned to a worker on the
+         shift so accountability (fuel, vehicle pre-start, post-shift
+         checklist) ties back to a person. -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
       <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Vehicles</h2>
       <% if (b.allVehicles && b.allVehicles.length > 0) { %>
         <div class="space-y-2 mb-3">
           <% b.allVehicles.forEach(v => { %>
-            <div class="flex items-center justify-between p-2 rounded-lg bg-gray-50">
-              <div>
-                <span class="text-sm font-medium text-gray-900"><%= v.vehicle_name || v.registration %></span>
-                <% if (v.vehicle_name && v.registration) { %><span class="text-xs text-gray-400 ml-2"><%= v.registration %></span><% } %>
+            <div class="p-2 rounded-lg bg-gray-50">
+              <div class="flex items-center justify-between gap-2">
+                <div class="min-w-0 flex-1">
+                  <span class="text-sm font-medium text-gray-900"><%= v.vehicle_name || v.registration %></span>
+                  <% if (v.vehicle_name && v.registration) { %><span class="text-xs text-gray-400 ml-2"><%= v.registration %></span><% } %>
+                  <% if (v.vehicle_role) { %><span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand-50 text-brand-700"><%= v.vehicle_role %></span><% } %>
+                </div>
+                <form method="POST" action="/bookings/<%= b.id %>/vehicles/<%= v.id %>/remove" class="inline shrink-0">
+                  <%- include('../partials/csrf') %>
+                  <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="Remove">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </form>
               </div>
-              <form method="POST" action="/bookings/<%= b.id %>/vehicles/<%= v.id %>/remove" class="inline">
+              <!-- Driver assignment — pick from crew on this booking. -->
+              <form method="POST" action="/bookings/<%= b.id %>/vehicles/<%= v.id %>/driver" class="flex items-center gap-2 mt-2">
                 <%- include('../partials/csrf') %>
-                <button type="submit" class="text-gray-300 hover:text-red-500 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Driver</span>
+                <select name="crew_member_id" onchange="this.form.submit()"
+                  class="flex-1 px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  <option value="">— Unassigned —</option>
+                  <% (b.personnel || []).forEach(function (p) { %>
+                    <option value="<%= p.id %>" <%= v.crew_member_id == p.id ? 'selected' : '' %>><%= p.name %></option>
+                  <% }) %>
+                </select>
               </form>
             </div>
           <% }); %>
@@ -725,15 +727,32 @@
             </select>
           </div>
         </div>
-        <div class="flex items-end gap-2">
-          <div class="flex-1">
+        <div class="grid grid-cols-12 gap-2 items-end">
+          <div class="col-span-5">
             <input type="text" name="vehicle_name" id="vn" placeholder="Vehicle name" class="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
           </div>
-          <div>
-            <input type="text" name="registration" id="vr" placeholder="Rego" class="w-20 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <div class="col-span-3">
+            <input type="text" name="registration" id="vr" placeholder="Rego" class="w-full px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
           </div>
-          <button type="submit" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition">Add</button>
+          <div class="col-span-3">
+            <select name="vehicle_role" class="w-full px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs">
+              <option value="">Role</option>
+              <option value="ute">Ute</option>
+              <option value="vms_ute">VMS Ute</option>
+              <option value="tma">TMA</option>
+              <option value="pod_truck">Pod Truck</option>
+              <option value="pilot">Pilot</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <button type="submit" class="col-span-1 px-2 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition">Add</button>
         </div>
+        <select name="crew_member_id" class="w-full px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-xs">
+          <option value="">Driver — unassigned (pick later)</option>
+          <% (b.personnel || []).forEach(function (p) { %>
+            <option value="<%= p.id %>"><%= p.name %></option>
+          <% }) %>
+        </select>
       </form>
     </div>
 
