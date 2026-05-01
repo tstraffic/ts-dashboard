@@ -45,6 +45,32 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
+        <!-- Status — prominent, colour-coded, top of the form so it's the
+             first thing you see when opening an item. Submitting via the
+             radio that backs the buttons keeps the existing POST handler
+             happy with no route changes. -->
+        <div class="md:col-span-2">
+          <div class="bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2.5">
+              <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</label>
+              <span class="text-[10px] text-gray-400 hidden sm:inline">Click to change</span>
+            </div>
+            <div class="grid grid-cols-3 sm:grid-cols-6 gap-2" id="statusButtonRow">
+              <% statusOptions.forEach(function(opt) { %>
+                <% const selected = (isEdit ? item.status : 'not_started') === opt.value; %>
+                <label class="cursor-pointer">
+                  <input type="radio" name="status" value="<%= opt.value %>" <%= selected ? 'checked' : '' %>
+                    class="sr-only" onchange="updateStatusButtons()">
+                  <div class="status-btn px-2 py-2 text-center text-xs sm:text-sm font-semibold rounded-lg border-2 transition select-none"
+                    data-status="<%= opt.value %>">
+                    <%= opt.label %>
+                  </div>
+                </label>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+
         <!-- Item Type(s) - Multi-select checkboxes -->
         <div class="md:col-span-2">
           <label class="block text-sm font-medium text-gray-600 mb-2">Type(s) <span class="text-red-600">*</span></label>
@@ -222,15 +248,7 @@
             placeholder="https://...">
         </div>
 
-        <!-- Status -->
-        <div>
-          <label for="status" class="block text-sm font-medium text-gray-600 mb-1">Status</label>
-          <select id="status" name="status" class="w-full bg-white border border-gray-300 text-gray-900 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <% statusOptions.forEach(function(opt) { %>
-              <option value="<%= opt.value %>" <%= (isEdit ? item.status : 'not_started') === opt.value ? 'selected' : '' %>><%= opt.label %></option>
-            <% }) %>
-          </select>
-        </div>
+        <!-- (Status moved to a prominent segmented control at the top of the form) -->
 
         <!-- Received Date (TGS/CTMP only) -->
         <div id="received-date-field" class="hidden">
@@ -673,6 +691,28 @@
 </div>
 
 <script>
+// Status segmented control — paint colour on the active button so you
+// always know what state the item is in at a glance. The radio inputs
+// behind the buttons are what actually post.
+const STATUS_BTN_COLORS = {
+  not_started: { active: 'border-gray-700 bg-gray-100 text-gray-900',         inactive: 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50' },
+  started:     { active: 'border-purple-500 bg-purple-50 text-purple-700',    inactive: 'border-gray-200 bg-white text-gray-500 hover:border-purple-300 hover:bg-purple-50/40' },
+  submitted:   { active: 'border-blue-500 bg-blue-50 text-blue-700',          inactive: 'border-gray-200 bg-white text-gray-500 hover:border-blue-300 hover:bg-blue-50/40' },
+  approved:    { active: 'border-emerald-500 bg-emerald-50 text-emerald-700', inactive: 'border-gray-200 bg-white text-gray-500 hover:border-emerald-300 hover:bg-emerald-50/40' },
+  rejected:    { active: 'border-red-500 bg-red-50 text-red-700',             inactive: 'border-gray-200 bg-white text-gray-500 hover:border-red-300 hover:bg-red-50/40' },
+  expired:     { active: 'border-amber-500 bg-amber-50 text-amber-700',       inactive: 'border-gray-200 bg-white text-gray-500 hover:border-amber-300 hover:bg-amber-50/40' },
+};
+function updateStatusButtons() {
+  document.querySelectorAll('#statusButtonRow .status-btn').forEach(btn => {
+    const status = btn.dataset.status;
+    const radio = btn.parentElement.querySelector('input[type="radio"]');
+    const colors = STATUS_BTN_COLORS[status] || STATUS_BTN_COLORS.not_started;
+    const base = 'status-btn px-2 py-2 text-center text-xs sm:text-sm font-semibold rounded-lg border-2 transition select-none';
+    btn.className = base + ' ' + (radio.checked ? colors.active : colors.inactive);
+  });
+}
+document.addEventListener('DOMContentLoaded', updateStatusButtons);
+
 function validateAssignment() {
   const jobId = document.getElementById('job_id').value;
   const clientId = document.getElementById('client_id').value;
