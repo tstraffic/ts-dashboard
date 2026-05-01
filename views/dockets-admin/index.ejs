@@ -1,10 +1,10 @@
 <% locals.currentPage = 'dockets-admin' %>
+<%- include('../partials/job-pack-tabs') %>
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
   <div class="flex items-center justify-between flex-wrap gap-3">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">Signed Dockets</h1>
-      <p class="text-sm text-gray-500 mt-0.5">Worker-signed dockets coming off the field.</p>
+      <p class="text-sm text-gray-500 -mt-2">Worker-signed dockets coming off the field.</p>
     </div>
     <div class="text-xs text-gray-500"><%= counts.total || 0 %> in last 30 days · <%= counts.no_client || 0 %> with no client on site</div>
   </div>

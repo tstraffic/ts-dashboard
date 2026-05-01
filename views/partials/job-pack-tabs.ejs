@@ -1,0 +1,30 @@
+<%
+  // Shared Job-Pack header. Three tools (Forms / Register / Dockets) live
+  // under one "Job Pack" sidebar entry; this strip lets the office bounce
+  // between them without losing context. The active tab is decided by the
+  // caller's currentPage local — set by each landing page (e.g.
+  // 'safety-forms', 'checklist-register', 'dockets-admin').
+  var active = (typeof currentPage !== 'undefined') ? currentPage : '';
+  var jpTabs = [
+    { key: 'safety-forms',       href: '/safety-forms',       label: 'Forms',              hint: 'Submitted Job-Pack checklists' },
+    { key: 'checklist-register', href: '/checklist-register', label: 'Checklist Register', hint: 'Required vs completed by week' },
+    { key: 'dockets-admin',      href: '/dockets',            label: 'Signed Dockets',     hint: 'Worker-signed dockets' },
+  ];
+%>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+  <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+    <div>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-brand-600">Job Pack</p>
+      <h1 class="text-lg font-bold text-gray-900 mt-0.5"><%= (jpTabs.find(function (t) { return t.key === active; }) || {}).label || 'Job Pack' %></h1>
+    </div>
+  </div>
+  <nav class="flex flex-wrap gap-1.5 border-b border-gray-200 -mb-px">
+    <% jpTabs.forEach(function (t) { %>
+      <a href="<%= t.href %>"
+         class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition <%= active === t.key ? 'border-brand-600 text-brand-700 bg-brand-50/40' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' %>">
+        <%= t.label %>
+        <span class="text-[10px] font-normal text-gray-400 hidden sm:inline">· <%= t.hint %></span>
+      </a>
+    <% }) %>
+  </nav>
+</div>
