@@ -28,14 +28,27 @@ router.get('/jobs', (req, res) => {
   // request the worker can accept/decline before the allocator confirms.
   const VISIBLE_BOOKING_STATUSES = ['unconfirmed','confirmed','green_to_go','in_progress','completed','on_hold'];
 
-  // Upcoming from crew_allocations (job-linked shifts)
-  // Exclude allocations linked to cancelled/deleted bookings.
+  // Upcoming from crew_allocations. Falls back to booking columns when the
+  // allocation isn't linked to a job (ad-hoc bookings post-migration 142),
+  // so the worker UI never shows a row with NULL client/job_number. The
+  // 'source' column flips to 'booking' when there's no job + a booking,
+  // which routes the click to /w/booking-shift/:bookingId where the
+  // booking-only flow lives.
   const allocUpcoming = db.prepare(`
-    SELECT ca.*, j.job_number, j.job_name, j.client, j.site_address, j.suburb,
-      j.notes as job_notes, j.project_name, j.client_project_number, j.state,
-      u.full_name as supervisor_name, 'allocation' as source
+    SELECT ca.*,
+      COALESCE(j.job_number, b.booking_number) AS job_number,
+      COALESCE(j.job_name, b.title)            AS job_name,
+      COALESCE(j.client, b.title)              AS client,
+      COALESCE(j.site_address, b.site_address) AS site_address,
+      COALESCE(j.suburb, b.suburb)             AS suburb,
+      COALESCE(j.notes, b.notes)               AS job_notes,
+      COALESCE(j.project_name, b.title)        AS project_name,
+      COALESCE(j.client_project_number, '')    AS client_project_number,
+      COALESCE(j.state, b.state)               AS state,
+      u.full_name AS supervisor_name,
+      CASE WHEN ca.job_id IS NULL AND ca.booking_id IS NOT NULL THEN 'booking' ELSE 'allocation' END AS source
     FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN jobs j ON ca.job_id = j.id
     LEFT JOIN users u ON j.ops_supervisor_id = u.id
     LEFT JOIN bookings b ON ca.booking_id = b.id
     WHERE ca.crew_member_id = ?
@@ -86,7 +99,7 @@ router.get('/jobs', (req, res) => {
       j.notes as job_notes, j.project_name, j.client_project_number, j.state,
       u.full_name as supervisor_name
     FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN jobs j ON ca.job_id = j.id
     LEFT JOIN users u ON j.ops_supervisor_id = u.id
     WHERE ca.crew_member_id = ?
       AND ca.status != 'cancelled'
@@ -133,7 +146,7 @@ router.get('/jobs/:id', (req, res) => {
       j.project_name, j.client_project_number, j.state, j.crew_size,
       u.full_name as supervisor_name, u.email as supervisor_email
     FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN jobs j ON ca.job_id = j.id
     LEFT JOIN users u ON j.ops_supervisor_id = u.id
     WHERE ca.id = ? AND ca.crew_member_id = ?
   `).get(req.params.id, worker.id);

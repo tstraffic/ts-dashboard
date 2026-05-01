@@ -90,7 +90,7 @@ router.get('/forms', (req, res) => {
     SELECT ca.id, ca.allocation_date, ca.start_time, ca.end_time, ca.job_id,
       j.job_number, j.client, j.suburb
     FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN jobs j ON ca.job_id = j.id
     WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
   `).all(worker.id, today);
 
@@ -138,7 +138,7 @@ router.get('/forms/prestart', (req, res) => {
 
   const todaysShifts = db.prepare(`
     SELECT ca.id, j.job_number, j.client FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN jobs j ON ca.job_id = j.id
     WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
   `).all(worker.id, today);
 
@@ -186,7 +186,7 @@ router.get('/forms/take5', (req, res) => {
 
   const todaysShifts = db.prepare(`
     SELECT ca.id, j.job_number, j.client FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN jobs j ON ca.job_id = j.id
     WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
   `).all(worker.id, today);
 
@@ -387,7 +387,7 @@ function requireAllocation(req, res) {
   const allocation = db.prepare(`
     SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
     FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN jobs j ON ca.job_id = j.id
     WHERE ca.id = ? AND ca.crew_member_id = ?
   `).get(allocationId, worker.id);
   if (!allocation) {

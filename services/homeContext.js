@@ -194,7 +194,7 @@ function buildSmartCards(db, worker, member, employee) {
   const tomIso = localIso(tomorrow);
   const tomorrowShift = db.prepare(`
     SELECT ca.start_time, ca.end_time, ca.shift_type, j.client, j.suburb
-    FROM crew_allocations ca JOIN jobs j ON ca.job_id = j.id
+    FROM crew_allocations ca LEFT JOIN jobs j ON ca.job_id = j.id
     WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
     ORDER BY ca.start_time ASC LIMIT 1
   `).get(worker.id, tomIso);

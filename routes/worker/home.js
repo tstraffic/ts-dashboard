@@ -23,7 +23,7 @@ router.get('/home', async (req, res) => {
     SELECT ca.*, j.job_number, j.job_name, j.client, j.site_address, j.suburb, j.status as job_status,
       u.full_name as supervisor_name
     FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN jobs j ON ca.job_id = j.id
     LEFT JOIN users u ON j.ops_supervisor_id = u.id
     WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
     ORDER BY ca.start_time ASC
@@ -63,7 +63,7 @@ router.get('/home', async (req, res) => {
     SELECT ca.allocation_date, ca.start_time, ca.end_time, ca.shift_type, ca.status,
            j.id as job_id, j.job_number, j.client, j.site_address, j.suburb
     FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN jobs j ON ca.job_id = j.id
     WHERE ca.crew_member_id = ? AND ca.allocation_date > ?
       AND ca.allocation_date <= ? AND ca.status != 'cancelled'
     ORDER BY ca.allocation_date ASC, ca.start_time ASC LIMIT 5
