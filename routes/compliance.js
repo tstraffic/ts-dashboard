@@ -353,17 +353,31 @@ router.post('/bulk-invoiced', (req, res) => {
   res.json({ success: true });
 });
 
+// Helper: return the columns the front-end needs to re-render the invoice cell
+function freshInvoiceState(db, id) {
+  return db.prepare(`
+    SELECT c.id, c.ready_for_invoice, c.ready_for_invoice_at, c.invoiced, c.invoice_number, c.invoiced_at,
+      rfi.full_name AS ready_for_invoice_by_name,
+      inv.full_name AS invoiced_by_name
+    FROM compliance c
+    LEFT JOIN users rfi ON c.ready_for_invoice_by = rfi.id
+    LEFT JOIN users inv ON c.invoiced_by_id = inv.id
+    WHERE c.id = ?
+  `).get(id);
+}
+
 // Mark a single item as invoiced (with optional invoice number)
 router.post('/:id/mark-invoiced', (req, res) => {
   const db = getDb();
+  const wantsJson = req.xhr || (req.headers.accept || '').includes('json');
   if (!['admin', 'finance', 'accounts'].includes(req.session.user.role)) {
-    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(403).json({ error: 'Only admin/accounts can mark as invoiced' });
+    if (wantsJson) return res.status(403).json({ error: 'Only admin/accounts can mark as invoiced' });
     req.flash('error', 'Only admin or accounts can mark items as invoiced.');
     return res.redirect(req.body.return_to || '/compliance');
   }
   const item = db.prepare('SELECT id, title, job_id FROM compliance WHERE id = ?').get(req.params.id);
   if (!item) {
-    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Item not found' });
+    if (wantsJson) return res.status(404).json({ error: 'Item not found' });
     req.flash('error', 'Item not found.');
     return res.redirect('/compliance');
   }
@@ -375,21 +389,24 @@ router.post('/:id/mark-invoiced', (req, res) => {
     db.prepare(`UPDATE compliance SET invoiced = 1, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
       .run(req.session.user.id, item.id);
   }
-  if (req.xhr || (req.headers.accept || '').includes('json')) return res.json({ success: true, invoice_number: invNum });
+  if (wantsJson) return res.json({ success: true, item: freshInvoiceState(db, item.id) });
   req.flash('success', `Marked invoiced${invNum ? ' (' + invNum + ')' : ''}.`);
   res.redirect(req.body.return_to || '/compliance');
 });
 
-// Undo invoiced state (admin only)
+// Undo invoiced state (admin only) — does NOT touch invoice_number, so a
+// later "Mark invoiced" on the same row keeps the previous number unless
+// explicitly changed.
 router.post('/:id/unmark-invoiced', (req, res) => {
   const db = getDb();
+  const wantsJson = req.xhr || (req.headers.accept || '').includes('json');
   if (!['admin', 'finance', 'accounts'].includes(req.session.user.role)) {
-    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(403).json({ error: 'Forbidden' });
+    if (wantsJson) return res.status(403).json({ error: 'Forbidden' });
     req.flash('error', 'Only admin or accounts can undo this.');
     return res.redirect(req.body.return_to || '/compliance');
   }
   db.prepare('UPDATE compliance SET invoiced = 0, invoiced_at = NULL, invoiced_by_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.id);
-  if (req.xhr || (req.headers.accept || '').includes('json')) return res.json({ success: true });
+  if (wantsJson) return res.json({ success: true, item: freshInvoiceState(db, req.params.id) });
   req.flash('success', 'Invoiced mark removed.');
   res.redirect(req.body.return_to || '/compliance');
 });
@@ -558,7 +575,11 @@ router.post('/:id/delete', (req, res) => {
 router.post('/:id/ready-for-invoice', (req, res) => {
   const db = getDb();
   const item = db.prepare('SELECT c.*, j.job_number FROM compliance c LEFT JOIN jobs j ON c.job_id = j.id WHERE c.id = ?').get(req.params.id);
-  if (!item) { req.flash('error', 'Item not found.'); return res.redirect('/compliance'); }
+  const wantsJson = req.xhr || (req.headers.accept || '').includes('application/json');
+  if (!item) {
+    if (wantsJson) return res.status(404).json({ error: 'Item not found' });
+    req.flash('error', 'Item not found.'); return res.redirect('/compliance');
+  }
 
   db.prepare('UPDATE compliance SET ready_for_invoice = 1, ready_for_invoice_at = CURRENT_TIMESTAMP, ready_for_invoice_by = ? WHERE id = ?')
     .run(req.session.user.id, req.params.id);
@@ -578,14 +599,28 @@ router.post('/:id/ready-for-invoice', (req, res) => {
     });
   } catch(e) { console.error('[Compliance] Notification error:', e.message); }
 
+  if (wantsJson) {
+    const fresh = db.prepare(`
+      SELECT c.id, c.ready_for_invoice, c.ready_for_invoice_at, c.invoiced, c.invoice_number, c.invoiced_at,
+        rfi.full_name AS ready_for_invoice_by_name,
+        inv.full_name AS invoiced_by_name
+      FROM compliance c
+      LEFT JOIN users rfi ON c.ready_for_invoice_by = rfi.id
+      LEFT JOIN users inv ON c.invoiced_by_id = inv.id
+      WHERE c.id = ?
+    `).get(req.params.id);
+    return res.json({ success: true, item: fresh });
+  }
   req.flash('success', 'Marked as ready for invoice. Admin/accounts team notified.');
   res.redirect(req.body.return_to || '/compliance/' + req.params.id + '/edit');
 });
 
-// Unmark ready for invoice
+// Unmark ready for invoice (revert to pending)
 router.post('/:id/unmark-invoice', (req, res) => {
   const db = getDb();
+  const wantsJson = req.xhr || (req.headers.accept || '').includes('application/json');
   db.prepare('UPDATE compliance SET ready_for_invoice = 0, ready_for_invoice_at = NULL, ready_for_invoice_by = NULL WHERE id = ?').run(req.params.id);
+  if (wantsJson) return res.json({ success: true });
   req.flash('success', 'Invoice mark removed.');
   res.redirect(req.body.return_to || '/compliance/' + req.params.id + '/edit');
 });
