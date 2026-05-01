@@ -289,15 +289,21 @@
   <!-- ==================== FORMS TAB ==================== -->
   <div id="dpanel-forms" class="dtab-panel space-y-4" style="display:none;">
 
-    <!-- Job-Pack: the 5 Traffio-equivalent shift checklists, split into the
-         two that are mandatory for every shift (Risk Assessment & Toolbox,
-         Team Leader Checklist) and the three that fire a warning when
-         skipped but don't block the docket on their own. -->
+    <!-- Job-Pack: the 5 Traffio-equivalent shift checklists, split by both
+         mandatory/optional AND by portal role. Traffic Controllers only see
+         Risk Assessment & Toolbox in Required; the Team Leader Checklist
+         only appears for team_leader+ (TLs and supervisors). -->
     <%
       var JOB_PACK_REQUIRED = [
-        { key: 'risk_toolbox',  path: 'risk-assessment', label: '2. Risk Assessment & Toolbox', hint: 'Run with the crew on site' },
-        { key: 'team_leader',   path: 'team-leader',     label: '4. Team Leader Checklist',     hint: 'Team Leader only' },
+        { key: 'risk_toolbox',  path: 'risk-assessment', label: '2. Risk Assessment & Toolbox', hint: 'Run with the crew on site', tlOnly: false },
       ];
+      if (typeof isTeamLeader !== 'undefined' && isTeamLeader) {
+        JOB_PACK_REQUIRED.push({
+          key: 'team_leader', path: 'team-leader',
+          label: '4. Team Leader Checklist',
+          hint: 'Team Leader only', tlOnly: true,
+        });
+      }
       var JOB_PACK_RECOMMENDED = [
         { key: 'vehicle_prestart',   path: 'vehicle-prestart',   label: '1. Vehicle Pre-Start',           hint: 'Before starting the vehicle' },
         { key: 'tc_prestart',        path: 'tc-prestart',        label: '3. TC Prestart Declaration',     hint: 'Per Traffic Controller' },

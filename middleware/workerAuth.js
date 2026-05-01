@@ -51,6 +51,56 @@ function blockWorkerFromAdmin(req, res, next) {
   next();
 }
 
+// Portal-role hierarchy. Higher tier inherits everything below it.
+//   traffic_controller (1) — baseline
+//   team_leader        (2) — TC + Team Leader Checklist + audit own crew
+//   supervisor         (3) — TL + sign off other workers / stand-in office
+const PORTAL_ROLE_RANK = { traffic_controller: 1, team_leader: 2, supervisor: 3 };
+
+/**
+ * Returns true if the given crew_member (or just their portal_role string)
+ * has at least the required tier. Always true for supervisor when asking
+ * for tc/tl/supervisor; always true for team_leader when asking for tc/tl.
+ */
+function hasPortalRole(memberOrRole, requiredRole) {
+  const role = (memberOrRole && typeof memberOrRole === 'object')
+    ? memberOrRole.portal_role
+    : memberOrRole;
+  const have = PORTAL_ROLE_RANK[role] || 0;
+  const need = PORTAL_ROLE_RANK[requiredRole] || 0;
+  // Need rank 0 (unknown role) means "no requirement" — pass.
+  if (need === 0) return true;
+  return have >= need;
+}
+
+/**
+ * Express middleware: refuse to continue unless req.session.worker has
+ * the required portal_role tier or higher. Falls back to /w/home with a
+ * flash explaining the gap. Use on routes that should only be reachable
+ * by team_leader+ or supervisor only.
+ */
+function requirePortalRole(requiredRole) {
+  return (req, res, next) => {
+    if (!req.session || !req.session.worker) return res.redirect('/w/login');
+    // Pull the live role from the DB on each request — small (<1ms) and
+    // means promotions/demotions take effect without a re-login.
+    let portalRole = req.session.worker.portal_role;
+    if (!portalRole) {
+      try {
+        const { getDb } = require('../db/database');
+        const row = getDb().prepare('SELECT portal_role FROM crew_members WHERE id = ?').get(req.session.worker.id);
+        portalRole = row && row.portal_role;
+      } catch (_) {}
+    }
+    if (!hasPortalRole(portalRole, requiredRole)) {
+      const friendly = requiredRole === 'team_leader' ? 'Team Leader' : requiredRole === 'supervisor' ? 'Supervisor' : 'higher';
+      req.flash('error', `${friendly} access only.`);
+      return res.redirect('/w/home');
+    }
+    next();
+  };
+}
+
 /**
  * Set worker-specific template locals.
  * Sets res.locals.worker and overrides layout to worker/layout.
@@ -61,7 +111,21 @@ function workerLocals(req, res, next) {
   // Also set flash messages for worker views
   res.locals.flash_success = req.flash('success');
   res.locals.flash_error = req.flash('error');
+  // Portal role helpers — pulled fresh from DB so promotions take effect
+  // without the worker logging out and back in.
+  let portalRole = 'traffic_controller';
+  if (req.session && req.session.worker) {
+    try {
+      const { getDb } = require('../db/database');
+      const row = getDb().prepare('SELECT portal_role FROM crew_members WHERE id = ?').get(req.session.worker.id);
+      if (row && row.portal_role) portalRole = row.portal_role;
+    } catch (_) {}
+  }
+  res.locals.portalRole = portalRole;
+  res.locals.isTeamLeader = hasPortalRole(portalRole, 'team_leader');
+  res.locals.isSupervisor = hasPortalRole(portalRole, 'supervisor');
+  res.locals.hasPortalRole = (r) => hasPortalRole(portalRole, r);
   next();
 }
 
-module.exports = { requireWorker, requireOwnData, blockWorkerFromAdmin, workerLocals };
+module.exports = { requireWorker, requireOwnData, blockWorkerFromAdmin, workerLocals, requirePortalRole, hasPortalRole, PORTAL_ROLE_RANK };

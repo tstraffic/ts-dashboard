@@ -794,18 +794,24 @@ const PPE_ITEMS = [
   { key: 'night_wands',  label: 'Night Wands (Nights only — N/A for day shift)' },
 ];
 
-router.get('/forms/team-leader', (req, res) => {
+// Team Leader Checklist is only fillable by team_leader+ workers. Lower
+// tiers get bounced with a flash explaining the gap. requirePortalRole
+// uses a hierarchical check, so supervisors pass too.
+const { requirePortalRole, hasPortalRole } = require('../../middleware/workerAuth');
+function requireTeamLeader(req, res, next) {
+  return requirePortalRole('team_leader')(req, res, next);
+}
+
+router.get('/forms/team-leader', requireTeamLeader, (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
   const allocation = requireAllocation(req, res);
   if (!allocation) return;
 
-  // Soft check: a member must be flagged as a manager (or supervisor on the
-  // allocation) to file a Team Leader Checklist. We don't hard-block in case
-  // the data hasn't been backfilled yet — surface a warning to the worker
-  // instead and let admins audit.
-  const me = db.prepare('SELECT is_manager FROM crew_members WHERE id = ?').get(worker.id);
-  const isManager = !!(me && me.is_manager);
+  // requirePortalRole already enforced TL+; this flag is just for the
+  // "you're acting as TL today" hint in the view.
+  const me = db.prepare('SELECT portal_role FROM crew_members WHERE id = ?').get(worker.id);
+  const isManager = !!(me && hasPortalRole(me.portal_role, 'team_leader'));
 
   res.render('worker/forms/team-leader', {
     title: 'Team Leader Checklist',
@@ -818,7 +824,7 @@ router.get('/forms/team-leader', (req, res) => {
   });
 });
 
-router.post('/forms/team-leader', photoUpload.fields([
+router.post('/forms/team-leader', requireTeamLeader, photoUpload.fields([
   { name: 'team_photos',  maxCount: 8 },
   { name: 'setup_photos', maxCount: 10 },
 ]), async (req, res) => {

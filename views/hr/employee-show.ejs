@@ -817,6 +817,25 @@
                     </button>
                   </form>
                 </div>
+
+                <!-- Portal role tier — TC < TL < Supervisor. Hierarchy means
+                     a Supervisor sees everything a TL sees, plus extras;
+                     a TL sees everything a TC sees, plus the Team Leader
+                     Checklist. -->
+                <div class="mt-3 pt-3 border-t border-gray-100">
+                  <p class="text-xs font-semibold text-gray-700">Portal role</p>
+                  <p class="text-[11px] text-gray-500 mt-0.5 mb-2">Each tier inherits the powers below it. Supervisor = full access; Team Leader = TC + Team Leader Checklist; TC = baseline.</p>
+                  <form method="POST" action="/hr/employees/<%= employee.id %>/portal-role" class="flex items-center gap-2">
+                    <%- include('../partials/csrf') %>
+                    <select name="portal_role" class="flex-1 px-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white text-gray-900">
+                      <% var pr = crewMember.portal_role || 'traffic_controller'; %>
+                      <option value="traffic_controller" <%= pr === 'traffic_controller' ? 'selected' : '' %>>Traffic Controller</option>
+                      <option value="team_leader"        <%= pr === 'team_leader'        ? 'selected' : '' %>>Team Leader</option>
+                      <option value="supervisor"         <%= pr === 'supervisor'         ? 'selected' : '' %>>Supervisor</option>
+                    </select>
+                    <button type="submit" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition whitespace-nowrap">Save</button>
+                  </form>
+                </div>
               </div>
             </div>
           <% } %>

@@ -909,6 +909,35 @@ router.post('/employees/:id/toggle-manager', requirePermission('hr_employees'), 
   res.redirect(`/hr/employees/${employee.id}#workforce`);
 });
 
+// POST /employees/:id/portal-role — Set the worker's portal_role tier.
+// Hierarchy: traffic_controller (default) ⊂ team_leader ⊂ supervisor.
+router.post('/employees/:id/portal-role', requirePermission('hr_employees'), (req, res) => {
+  const data = loadEmployeeWithCrew(req, res, { autoCreate: true });
+  if (!data) return res.redirect(`/hr/employees/${req.params.id}#workforce`);
+  const { employee, crewMember } = data;
+
+  const role = req.body.portal_role;
+  const allowed = ['traffic_controller','team_leader','supervisor'];
+  if (!allowed.includes(role)) {
+    req.flash('error', 'Invalid portal role.');
+    return res.redirect(`/hr/employees/${employee.id}#workforce`);
+  }
+  const db = getDb();
+  db.prepare('UPDATE crew_members SET portal_role = ? WHERE id = ?').run(role, crewMember.id);
+  // Keep the legacy is_manager flag in sync so any code still reading it
+  // (older routes, dashboards) treats team_leader+ as managers without
+  // needing a wider refactor.
+  db.prepare('UPDATE crew_members SET is_manager = ? WHERE id = ?').run(role === 'traffic_controller' ? 0 : 1, crewMember.id);
+  const friendly = { traffic_controller: 'Traffic Controller', team_leader: 'Team Leader', supervisor: 'Supervisor' }[role];
+  logActivity({
+    user: req.session.user, action: 'update', entityType: 'crew_member',
+    entityId: crewMember.id, entityLabel: crewMember.full_name,
+    details: `Portal role set to ${friendly}`, ip: req.ip,
+  });
+  req.flash('success', `${crewMember.full_name} is now ${friendly}.`);
+  res.redirect(`/hr/employees/${employee.id}#workforce`);
+});
+
 // POST /employees/:id/send-invite — Send email invitation for worker portal
 router.post('/employees/:id/send-invite', requirePermission('hr_employees'), async (req, res) => {
   const data = loadEmployeeWithCrew(req, res, { autoCreate: true });

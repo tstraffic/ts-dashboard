@@ -6726,6 +6726,44 @@ function runMigrations(db) {
     console.log('Migration 143 applied: award-rate payroll schema + NSW public holidays seeded');
   }
 
+  // Migration 144: portal_role on crew_members — hierarchical role for the
+  // worker portal. Three tiers, each inheriting the powers below it:
+  //
+  //   traffic_controller   (TC)  — baseline. Can fill TC Prestart, Risk
+  //                                Assessment, Vehicle Pre-Start, sign
+  //                                their own docket, etc.
+  //   team_leader          (TL)  — TC + can fill the Team Leader
+  //                                Checklist + audit other TCs on the
+  //                                same shift.
+  //   supervisor           (S)   — TL + see / sign off other workers'
+  //                                checklists, manage shifts as a
+  //                                stand-in office user.
+  //
+  // We keep the legacy crew_members.role column (job descriptor, used for
+  // payroll + scheduling) untouched. portal_role is a separate concept.
+  if (!isMigrationApplied.get(144)) {
+    const cols = db.prepare("PRAGMA table_info(crew_members)").all().map(c => c.name);
+    if (!cols.includes('portal_role')) {
+      db.exec(`
+        ALTER TABLE crew_members ADD COLUMN portal_role TEXT NOT NULL
+          DEFAULT 'traffic_controller'
+          CHECK(portal_role IN ('traffic_controller','team_leader','supervisor'));
+      `);
+    }
+    // Backfill: anyone already flagged is_manager bumps to team_leader by
+    // default. The legacy descriptor role='supervisor' bumps straight to
+    // supervisor. Office can promote / demote individuals from the crew
+    // profile screen afterwards.
+    try {
+      const n1 = db.prepare("UPDATE crew_members SET portal_role = 'team_leader' WHERE is_manager = 1 AND portal_role = 'traffic_controller'").run().changes;
+      const n2 = db.prepare("UPDATE crew_members SET portal_role = 'supervisor'  WHERE role = 'supervisor' AND portal_role != 'supervisor'").run().changes;
+      if (n1) console.log(`Migration 144: backfilled ${n1} crew_members → team_leader (was is_manager)`);
+      if (n2) console.log(`Migration 144: backfilled ${n2} crew_members → supervisor (was role='supervisor')`);
+    } catch (e) { console.error('Migration 144 backfill error:', e.message); }
+    recordMigration.run(144, 'crew_members.portal_role hierarchy (TC / TL / Supervisor)');
+    console.log('Migration 144 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
