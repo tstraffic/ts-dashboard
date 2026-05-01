@@ -248,16 +248,27 @@
       <% } %>
 
       <!-- Other Crew -->
+      <%
+        // Portal-role tier drives the visible badge so workers can see at
+        // a glance who the Team Leader / Supervisor is on this shift.
+        function portalTitle(pr) {
+          if (pr === 'supervisor') return { label: 'Supervisor',     bg: 'bg-violet-50',  fg: 'text-violet-700',  ring: 'ring-violet-600/20' };
+          if (pr === 'team_leader') return { label: 'Team Leader',   bg: 'bg-amber-50',   fg: 'text-amber-700',   ring: 'ring-amber-600/20'  };
+          return                          { label: 'Traffic Controller', bg: 'bg-gray-100', fg: 'text-gray-600',  ring: 'ring-gray-500/20'   };
+        }
+      %>
       <% if (otherCrew.length > 0) { %>
-        <% otherCrew.forEach(function(c) { %>
+        <% otherCrew.forEach(function(c) { var t = portalTitle(c.portal_role); %>
           <div class="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-            <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 shrink-0">
                 <%= c.full_name.split(' ').map(function(n){return n[0]}).join('').slice(0,2).toUpperCase() %>
               </div>
-              <div>
-                <p class="text-sm font-semibold text-gray-900"><%= c.full_name %></p>
-                <p class="text-xs text-gray-500"><%= c.role_on_site ? c.role_on_site.replace(/_/g, ' ') : c.crew_role.replace(/_/g, ' ') %></p>
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <p class="text-sm font-semibold text-gray-900 truncate"><%= c.full_name %></p>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide <%= t.bg %> <%= t.fg %> ring-1 <%= t.ring %>"><%= t.label %></span>
+                </div>
                 <p class="text-xs text-gray-400"><%= c.start_time %> at depot</p>
               </div>
             </div>

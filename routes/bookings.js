@@ -478,6 +478,21 @@ router.get('/:id', (req, res) => {
     user: req.session.user,
     jobPackGrid,
     jobPackTypes: JP_TYPES,
+    shiftTasks: (() => {
+      try {
+        return db.prepare(`
+          SELECT st.*, cm.full_name AS assignee_name, cm.portal_role AS assignee_portal_role,
+                 u.full_name AS created_by_name
+          FROM shift_tasks st
+          JOIN crew_members cm ON st.crew_member_id = cm.id
+          LEFT JOIN users u ON st.created_by_user_id = u.id
+          WHERE st.booking_id = ?
+          ORDER BY CASE st.status WHEN 'pending' THEN 0 ELSE 1 END,
+                   CASE st.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,
+                   st.due_at ASC, st.created_at ASC
+        `).all(booking.id);
+      } catch (e) { return []; }
+    })(),
   });
 });
 
@@ -988,6 +1003,69 @@ router.post('/:id/clone', (req, res) => {
   logActivity({ user: req.session.user, action: 'create', entityType: 'booking', entityId: newId, details: `Cloned ${source.booking_number} → ${bookingNumber}`, req });
   if (isJson) return res.json({ ok: true, id: newId, booking_number: bookingNumber });
   req.flash('success', `Cloned as ${bookingNumber}.`); res.redirect('/bookings/' + newId);
+});
+
+// =============================================
+// Shift Tasks (Operations)
+// Allocators add per-crew tasks to a booking. Workers see them on their
+// shift detail page; TLs / Supervisors see the whole crew's tasks.
+// =============================================
+
+// POST /:id/tasks — create
+router.post('/:id/tasks', (req, res) => {
+  const db = getDb();
+  if (!db.prepare("SELECT id FROM bookings WHERE id=?").get(req.params.id)) {
+    req.flash('error', 'Booking not found.');
+    return res.redirect('/bookings');
+  }
+  const { crew_member_id, title, description, priority, due_at } = req.body;
+  if (!crew_member_id || !title || !title.trim()) {
+    req.flash('error', 'Title and assignee are required.');
+    return res.redirect('/bookings/' + req.params.id);
+  }
+  // Assignee must be on this booking — block cross-booking task drops.
+  const ok = db.prepare("SELECT 1 FROM booking_crew WHERE booking_id=? AND crew_member_id=?").get(req.params.id, crew_member_id);
+  if (!ok) {
+    req.flash('error', "Worker isn't on this booking.");
+    return res.redirect('/bookings/' + req.params.id);
+  }
+  // Use the matching crew_allocations row (if one exists) so the task
+  // survives if the booking gets unbound from a worker later.
+  const alloc = db.prepare("SELECT id FROM crew_allocations WHERE booking_id=? AND crew_member_id=? LIMIT 1").get(req.params.id, crew_member_id);
+  db.prepare(`
+    INSERT INTO shift_tasks (allocation_id, booking_id, crew_member_id, title, description, priority, due_at, created_by_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    alloc ? alloc.id : null,
+    req.params.id,
+    crew_member_id,
+    title.trim(),
+    (description || '').trim(),
+    ['low','normal','high'].includes(priority) ? priority : 'normal',
+    due_at || null,
+    req.session.user.id
+  );
+  req.flash('success', 'Task added.');
+  res.redirect('/bookings/' + req.params.id + '#tasks');
+});
+
+// POST /:id/tasks/:taskId/delete
+router.post('/:id/tasks/:taskId/delete', (req, res) => {
+  getDb().prepare("DELETE FROM shift_tasks WHERE id=? AND booking_id=?").run(req.params.taskId, req.params.id);
+  req.flash('success', 'Task removed.');
+  res.redirect('/bookings/' + req.params.id + '#tasks');
+});
+
+// POST /:id/tasks/:taskId/status — toggle status (admin override)
+router.post('/:id/tasks/:taskId/status', (req, res) => {
+  const status = ['pending','done','cancelled'].includes(req.body.status) ? req.body.status : 'pending';
+  const completedAt = status === 'done' ? "datetime('now')" : 'NULL';
+  getDb().prepare(`
+    UPDATE shift_tasks
+    SET status = ?, completed_at = ${completedAt}, updated_at = datetime('now')
+    WHERE id = ? AND booking_id = ?
+  `).run(status, req.params.taskId, req.params.id);
+  res.redirect('/bookings/' + req.params.id + '#tasks');
 });
 
 module.exports = router;

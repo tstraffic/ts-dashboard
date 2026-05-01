@@ -6764,6 +6764,37 @@ function runMigrations(db) {
     console.log('Migration 144 applied');
   }
 
+  // Migration 145: shift_tasks — per-shift to-do list assigned to crew.
+  // Allocators (and TLs / supervisors on the worker portal) can attach
+  // tasks to a specific allocation; the assigned worker sees them on
+  // their shift detail Tasks section, TLs+Supervisors see every task on
+  // every crew member of the same shift.
+  if (!isMigrationApplied.get(145)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS shift_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        allocation_id INTEGER REFERENCES crew_allocations(id) ON DELETE CASCADE,
+        booking_id INTEGER REFERENCES bookings(id) ON DELETE CASCADE,
+        crew_member_id INTEGER NOT NULL REFERENCES crew_members(id),
+        title TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','done','cancelled')),
+        priority TEXT NOT NULL DEFAULT 'normal' CHECK(priority IN ('low','normal','high')),
+        due_at DATETIME,
+        completed_at DATETIME,
+        created_by_user_id INTEGER REFERENCES users(id),
+        created_by_crew_id INTEGER REFERENCES crew_members(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_shift_tasks_alloc   ON shift_tasks(allocation_id);
+      CREATE INDEX IF NOT EXISTS idx_shift_tasks_booking ON shift_tasks(booking_id);
+      CREATE INDEX IF NOT EXISTS idx_shift_tasks_crew    ON shift_tasks(crew_member_id, status);
+    `);
+    recordMigration.run(145, 'shift_tasks: per-shift to-do list assigned to crew');
+    console.log('Migration 145 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

@@ -46,6 +46,13 @@
       style="<%= tab === 'details' ? 'color:#00D2BE;border-color:#00D2BE;' : 'color:rgba(255,255,255,0.45);' %>">DETAILS</a>
     <a href="?tab=docs" class="px-4 py-2.5 text-sm font-semibold transition-colors <%= tab === 'docs' ? 'border-b-2' : '' %>"
       style="<%= tab === 'docs' ? 'color:#00D2BE;border-color:#00D2BE;' : 'color:rgba(255,255,255,0.45);' %>">DOCS</a>
+    <a href="?tab=tasks" class="px-4 py-2.5 text-sm font-semibold transition-colors <%= tab === 'tasks' ? 'border-b-2' : '' %>"
+      style="<%= tab === 'tasks' ? 'color:#00D2BE;border-color:#00D2BE;' : 'color:rgba(255,255,255,0.45);' %>">
+      TASKS
+      <% var pendingMine = (typeof myTasks !== 'undefined' ? myTasks : []).filter(function(t){return t.status==='pending';}).length; if (pendingMine) { %>
+        <span class="ml-1 inline-block px-1.5 py-0.5 rounded-full text-[10px] font-bold" style="background:rgba(245,158,11,0.20);color:#FCD34D;"><%= pendingMine %></span>
+      <% } %>
+    </a>
     <a href="?tab=forms" class="px-4 py-2.5 text-sm font-semibold transition-colors <%= tab === 'forms' ? 'border-b-2' : '' %>"
       style="<%= tab === 'forms' ? 'color:#00D2BE;border-color:#00D2BE;' : 'color:rgba(255,255,255,0.45);' %>">FORMS</a>
   </div>
@@ -82,18 +89,32 @@
     <% } %>
 
     <!-- Crew and Resources -->
+    <%
+      // Sort by tier so Supervisor → TL → TC reads naturally on the list.
+      var rolePriority = { supervisor: 0, team_leader: 1, traffic_controller: 2 };
+      var sortedCrew = crew.slice().sort(function (a, b) {
+        return (rolePriority[a.portal_role] || 9) - (rolePriority[b.portal_role] || 9);
+      });
+      function portalTitleDark(pr) {
+        if (pr === 'supervisor') return { label: 'Supervisor',         color: '#C4B5FD', bg: 'rgba(167,139,250,0.18)' };
+        if (pr === 'team_leader') return { label: 'Team Leader',       color: '#FCD34D', bg: 'rgba(245,158,11,0.18)' };
+        return                          { label: 'Traffic Controller', color: 'rgba(255,255,255,0.65)', bg: 'rgba(255,255,255,0.06)' };
+      }
+    %>
     <div class="mt-3">
       <h3 class="text-xs font-bold uppercase tracking-wider mb-2" style="color:#00D2BE;">Crew and resources</h3>
-      <% if (crew.length > 0) { %>
+      <% if (sortedCrew.length > 0) { %>
         <div class="space-y-2">
-          <% crew.forEach(function(c) { %>
+          <% sortedCrew.forEach(function(c) { var t = portalTitleDark(c.portal_role); %>
           <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
             <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);">
               <%= c.full_name.split(' ').map(n => n[0]).join('').slice(0,2) %>
             </div>
-            <div class="flex-1">
-              <p class="text-sm font-medium"><%= c.full_name %></p>
-              <p class="text-xs text-gray-500"><%= c.role || c.role_on_site || 'Traffic Controller' %></p>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <p class="text-sm font-medium truncate"><%= c.full_name %></p>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide" style="background:<%= t.bg %>;color:<%= t.color %>;"><%= t.label %></span>
+              </div>
             </div>
             <span class="text-[10px] font-medium px-2 py-0.5 rounded-full <%= c.status === 'confirmed' ? 'bg-emerald-500/20 text-emerald-400' : c.status === 'declined' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400' %>">
               <%= c.status === 'confirmed' ? 'Accepted' : c.status === 'declined' ? 'Declined' : 'Pending' %>
@@ -143,6 +164,120 @@
         <% }) %>
       <% } %>
     </div>
+  <% } %>
+
+  <!-- TASKS TAB -->
+  <% if (tab === 'tasks') { %>
+    <%
+      function priorityBadge(p) {
+        if (p === 'high')   return { color:'#FCA5A5', bg:'rgba(239,68,68,0.18)', label:'HIGH' };
+        if (p === 'low')    return { color:'rgba(255,255,255,0.55)', bg:'rgba(255,255,255,0.06)', label:'LOW' };
+        return { color:'#FCD34D', bg:'rgba(245,158,11,0.14)', label:'NORMAL' };
+      }
+      function rolePill(pr) {
+        if (pr === 'supervisor') return { label:'Supervisor', color:'#C4B5FD', bg:'rgba(167,139,250,0.18)' };
+        if (pr === 'team_leader') return { label:'Team Leader', color:'#FCD34D', bg:'rgba(245,158,11,0.18)' };
+        return { label:'TC', color:'rgba(255,255,255,0.55)', bg:'rgba(255,255,255,0.06)' };
+      }
+    %>
+
+    <!-- My Tasks -->
+    <div class="space-y-2">
+      <div class="flex items-center justify-between">
+        <p class="text-xs font-bold uppercase tracking-wider" style="color:#00D2BE;">My tasks for this shift</p>
+        <span class="text-[11px] text-gray-500"><%= (typeof myTasks !== 'undefined' ? myTasks : []).filter(function(t){return t.status==='pending';}).length %> pending</span>
+      </div>
+      <% if (!myTasks || myTasks.length === 0) { %>
+        <div class="py-5 text-center rounded-lg" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+          <p class="text-sm" style="color:rgba(255,255,255,0.65);">No tasks assigned to you for this shift.</p>
+        </div>
+      <% } else { %>
+        <% myTasks.forEach(function(t) { var pr = priorityBadge(t.priority); var done = t.status === 'done'; %>
+          <div class="flex items-start gap-3 px-3 py-2.5 rounded-lg <%= done ? 'opacity-60' : '' %>" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+            <form method="POST" action="/w/shift-tasks/<%= t.id %>/done" class="shrink-0 mt-0.5">
+              <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+              <% if (done) { %><input type="hidden" name="undo" value="1"><% } %>
+              <button type="submit" aria-label="<%= done ? 'Reopen task' : 'Mark done' %>"
+                class="w-5 h-5 rounded flex items-center justify-center"
+                style="border:1.5px solid <%= done ? '#34D399' : 'rgba(255,255,255,0.4)' %>;background:<%= done ? 'rgba(16,185,129,0.18)' : 'transparent' %>;">
+                <% if (done) { %><svg class="w-3 h-3" style="color:#34D399;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg><% } %>
+              </button>
+            </form>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium <%= done ? 'line-through text-gray-500' : 'text-white' %>"><%= t.title %></p>
+              <% if (t.description) { %>
+                <p class="text-[11px] mt-0.5" style="color:rgba(255,255,255,0.55);"><%= t.description %></p>
+              <% } %>
+              <div class="flex items-center gap-1.5 flex-wrap mt-1">
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold" style="background:<%= pr.bg %>;color:<%= pr.color %>;"><%= pr.label %></span>
+                <% if (t.due_at) { %><span class="text-[10px]" style="color:rgba(255,255,255,0.4);">Due <%= new Date(t.due_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></span><% } %>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+
+    <!-- Team Tasks (TL+ only) -->
+    <% if (typeof isTeamLeader !== 'undefined' && isTeamLeader) { %>
+      <div class="space-y-2 mt-5">
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-bold uppercase tracking-wider" style="color:#00D2BE;">Crew tasks · this shift</p>
+          <span class="text-[11px] text-gray-500"><%= (typeof teamTasks !== 'undefined' ? teamTasks : []).filter(function(t){return t.status==='pending';}).length %> pending</span>
+        </div>
+        <% if (!teamTasks || teamTasks.length === 0) { %>
+          <div class="py-4 text-center rounded-lg" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+            <p class="text-sm" style="color:rgba(255,255,255,0.65);">No tasks for the rest of the crew.</p>
+          </div>
+        <% } else { %>
+          <% teamTasks.forEach(function(t) { var pr = priorityBadge(t.priority); var rp = rolePill(t.assignee_portal_role); var done = t.status === 'done'; %>
+            <div class="flex items-start gap-3 px-3 py-2.5 rounded-lg <%= done ? 'opacity-60' : '' %>" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+              <div class="w-5 h-5 rounded shrink-0 mt-0.5 flex items-center justify-center" style="border:1.5px solid <%= done ? '#34D399' : 'rgba(255,255,255,0.25)' %>;background:<%= done ? 'rgba(16,185,129,0.18)' : 'transparent' %>;">
+                <% if (done) { %><svg class="w-3 h-3" style="color:#34D399;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg><% } %>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium <%= done ? 'line-through text-gray-500' : 'text-white' %>"><%= t.title %></p>
+                <div class="flex items-center gap-1.5 flex-wrap mt-1">
+                  <span class="text-[11px] font-medium" style="color:rgba(255,255,255,0.75);"><%= t.assignee_name %></span>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold" style="background:<%= rp.bg %>;color:<%= rp.color %>;"><%= rp.label %></span>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold" style="background:<%= pr.bg %>;color:<%= pr.color %>;"><%= pr.label %></span>
+                  <% if (t.due_at) { %><span class="text-[10px]" style="color:rgba(255,255,255,0.4);">Due <%= new Date(t.due_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></span><% } %>
+                </div>
+              </div>
+            </div>
+          <% }) %>
+        <% } %>
+
+        <!-- Quick add form for TLs -->
+        <details class="mt-3 rounded-lg" style="background:rgba(43,127,255,0.08);border:1px solid rgba(43,127,255,0.25);">
+          <summary class="cursor-pointer px-3 py-2 text-sm font-semibold flex items-center gap-2" style="color:#60A5FA;">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Assign a task
+          </summary>
+          <form method="POST" action="/w/shift-tasks" class="px-3 pb-3 pt-1 space-y-2">
+            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+            <input type="hidden" name="booking_id" value="<%= booking.id %>">
+            <% if (allocation) { %><input type="hidden" name="allocation_id" value="<%= allocation.id %>"><% } %>
+            <select name="crew_member_id" required class="w-full px-3 py-2 text-sm rounded-lg" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;">
+              <option value="" style="color:#000;">Assign to…</option>
+              <% (crew || []).forEach(function (c) { %>
+                <option value="<%= c.crew_member_id %>" style="color:#000;"><%= c.full_name %></option>
+              <% }) %>
+            </select>
+            <input type="text" name="title" placeholder="What needs doing?" required maxlength="200"
+              class="w-full px-3 py-2 text-sm rounded-lg" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;">
+            <div class="flex items-center gap-2">
+              <select name="priority" class="px-3 py-2 text-sm rounded-lg" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;">
+                <option value="normal" style="color:#000;">Normal</option>
+                <option value="high"   style="color:#000;">High</option>
+                <option value="low"    style="color:#000;">Low</option>
+              </select>
+              <button type="submit" class="flex-1 px-4 py-2 text-sm font-semibold rounded-lg" style="background:#2B7FFF;color:#fff;">Add task</button>
+            </div>
+          </form>
+        </details>
+      </div>
+    <% } %>
   <% } %>
 
   <!-- FORMS TAB -->

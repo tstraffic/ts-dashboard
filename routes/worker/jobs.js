@@ -157,14 +157,34 @@ router.get('/jobs/:id', (req, res) => {
   }
 
   // Get other crew on the same job & date
-  const otherCrew = db.prepare(`
-    SELECT ca.role_on_site, ca.shift_type, ca.start_time, ca.end_time, ca.status,
-      cm.full_name, cm.phone, cm.role as crew_role
-    FROM crew_allocations ca
-    JOIN crew_members cm ON ca.crew_member_id = cm.id
-    WHERE ca.job_id = ? AND ca.allocation_date = ? AND ca.crew_member_id != ? AND ca.status != 'cancelled'
-    ORDER BY cm.full_name ASC
-  `).all(allocation.job_id, allocation.allocation_date, worker.id);
+  // Pull cm.portal_role too so the view can render a "Team Leader" /
+  // "Supervisor" badge next to the crew member's name. Higher tiers float
+  // to the top of the crew list so workers see who's the lead at a glance.
+  // Falls back to a date+time match instead of job_id when this is a
+  // booking-only allocation (job_id NULL post-migration 142).
+  const otherCrew = allocation.job_id
+    ? db.prepare(`
+        SELECT ca.role_on_site, ca.shift_type, ca.start_time, ca.end_time, ca.status,
+          cm.full_name, cm.phone, cm.role as crew_role, cm.portal_role
+        FROM crew_allocations ca
+        JOIN crew_members cm ON ca.crew_member_id = cm.id
+        WHERE ca.job_id = ? AND ca.allocation_date = ? AND ca.crew_member_id != ? AND ca.status != 'cancelled'
+        ORDER BY
+          CASE cm.portal_role WHEN 'supervisor' THEN 0 WHEN 'team_leader' THEN 1 ELSE 2 END,
+          cm.full_name ASC
+      `).all(allocation.job_id, allocation.allocation_date, worker.id)
+    : (allocation.booking_id
+        ? db.prepare(`
+            SELECT ca.role_on_site, ca.shift_type, ca.start_time, ca.end_time, ca.status,
+              cm.full_name, cm.phone, cm.role as crew_role, cm.portal_role
+            FROM crew_allocations ca
+            JOIN crew_members cm ON ca.crew_member_id = cm.id
+            WHERE ca.booking_id = ? AND ca.crew_member_id != ? AND ca.status != 'cancelled'
+            ORDER BY
+              CASE cm.portal_role WHEN 'supervisor' THEN 0 WHEN 'team_leader' THEN 1 ELSE 2 END,
+              cm.full_name ASC
+          `).all(allocation.booking_id, worker.id)
+        : []);
 
   // Get supervisor phone
   let supervisorPhone = '';
@@ -455,7 +475,7 @@ router.get('/booking-shift/:bookingId', (req, res) => {
 
   // Get all crew on this booking
   const crew = db.prepare(`
-    SELECT bc.*, cm.full_name, cm.phone, cm.role
+    SELECT bc.*, cm.full_name, cm.phone, cm.role, cm.portal_role
     FROM booking_crew bc
     JOIN crew_members cm ON bc.crew_member_id = cm.id
     WHERE bc.booking_id = ?
@@ -527,6 +547,35 @@ router.get('/booking-shift/:bookingId', (req, res) => {
     } catch (e) { console.error('[booking-shift] doc fetch:', e.message); }
   }
 
+  // Shift tasks — the worker's own + (when they're TL/Supervisor) every
+  // task assigned to other crew on the same booking. For the office's
+  // sake, tasks are scoped to allocation_id so a re-allocation doesn't
+  // bleed tasks across shifts.
+  let myTasks = [], teamTasks = [];
+  try {
+    const me = db.prepare('SELECT portal_role FROM crew_members WHERE id = ?').get(worker.id);
+    const isTL = !!(me && (me.portal_role === 'team_leader' || me.portal_role === 'supervisor'));
+    myTasks = db.prepare(`
+      SELECT st.*, cm.full_name AS assignee_name
+      FROM shift_tasks st JOIN crew_members cm ON st.crew_member_id = cm.id
+      WHERE st.crew_member_id = ?
+        AND (st.allocation_id = ? OR st.booking_id = ?)
+      ORDER BY CASE st.status WHEN 'pending' THEN 0 ELSE 1 END,
+               CASE st.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,
+               st.due_at ASC, st.created_at ASC
+    `).all(worker.id, allocation ? allocation.id : null, booking.id);
+    if (isTL) {
+      teamTasks = db.prepare(`
+        SELECT st.*, cm.full_name AS assignee_name, cm.portal_role AS assignee_portal_role
+        FROM shift_tasks st JOIN crew_members cm ON st.crew_member_id = cm.id
+        WHERE st.booking_id = ? AND st.crew_member_id != ?
+        ORDER BY CASE st.status WHEN 'pending' THEN 0 ELSE 1 END,
+                 CASE st.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,
+                 st.due_at ASC, st.created_at ASC
+      `).all(booking.id, worker.id);
+    }
+  } catch (e) { console.error('[booking-shift] tasks fetch error:', e.message); }
+
   res.render('worker/booking-detail', {
     title: booking.title || booking.booking_number,
     currentPage: 'shifts',
@@ -536,6 +585,7 @@ router.get('/booking-shift/:bookingId', (req, res) => {
     myStatus: myAssignment.status,
     startDay, startDate, startTime, endTime,
     allocation, formStatus, docket, jobDocuments,
+    myTasks, teamTasks,
   });
 });
 
@@ -580,6 +630,66 @@ router.post('/bookings/:id/respond', (req, res) => {
     req.flash('error', 'Error: ' + err.message);
     res.redirect('/w/jobs');
   }
+});
+
+// POST /w/shift-tasks/:id/done — Mark a task done. Auth: must be the
+// assignee. Toggling back to pending uses the same endpoint with
+// ?undo=1 so the worker can undo a misclick without bouncing through
+// admin.
+router.post('/shift-tasks/:id/done', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const taskId = req.params.id;
+  const undo = req.body.undo === '1' || req.query.undo === '1';
+  const t = db.prepare('SELECT * FROM shift_tasks WHERE id = ?').get(taskId);
+  if (!t || t.crew_member_id !== worker.id) {
+    req.flash('error', 'Task not found or not yours.');
+    return res.redirect('back');
+  }
+  if (undo) {
+    db.prepare("UPDATE shift_tasks SET status = 'pending', completed_at = NULL, updated_at = datetime('now') WHERE id = ?").run(taskId);
+    req.flash('success', 'Task reopened.');
+  } else {
+    db.prepare("UPDATE shift_tasks SET status = 'done', completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(taskId);
+    req.flash('success', 'Task marked done.');
+  }
+  // Try to send the worker back to the shift detail.
+  if (t.booking_id) return res.redirect('/w/booking-shift/' + t.booking_id + '?tab=tasks');
+  if (t.allocation_id) return res.redirect('/w/jobs/' + t.allocation_id + '?tab=tasks');
+  res.redirect('/w/home');
+});
+
+// POST /w/shift-tasks (TL+ only) — create a quick task for a teammate
+// from the worker portal (Operations also has the full UI on the booking
+// detail page; this is the on-the-fly version for the field). Body:
+// crew_member_id, booking_id, allocation_id?, title, priority?
+router.post('/shift-tasks', (req, res) => {
+  const db = getDb();
+  const worker = req.session.worker;
+  const me = db.prepare('SELECT portal_role FROM crew_members WHERE id = ?').get(worker.id);
+  const isTL = !!(me && (me.portal_role === 'team_leader' || me.portal_role === 'supervisor'));
+  if (!isTL) {
+    req.flash('error', 'Team Leader access only.');
+    return res.redirect('back');
+  }
+  const { crew_member_id, booking_id, allocation_id, title, priority } = req.body;
+  if (!crew_member_id || !booking_id || !title || !title.trim()) {
+    req.flash('error', 'Title and assignee are required.');
+    return res.redirect('back');
+  }
+  // Assignee must be on this booking too (no cross-booking task drops).
+  const ok = db.prepare('SELECT 1 FROM booking_crew WHERE booking_id = ? AND crew_member_id = ?').get(booking_id, crew_member_id);
+  if (!ok) {
+    req.flash('error', "That worker isn't on this shift.");
+    return res.redirect('back');
+  }
+  db.prepare(`
+    INSERT INTO shift_tasks (allocation_id, booking_id, crew_member_id, title, priority, created_by_crew_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(allocation_id || null, booking_id, crew_member_id, title.trim(),
+         ['low','normal','high'].includes(priority) ? priority : 'normal', worker.id);
+  req.flash('success', 'Task added.');
+  return res.redirect('/w/booking-shift/' + booking_id + '?tab=tasks');
 });
 
 module.exports = router;
