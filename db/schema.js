@@ -6873,6 +6873,108 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 149: vehicle columns on equipment + seed T&S fleet
+  // =============================================
+  // Equipment table previously only stored asset_number/name/category. Vehicles
+  // need licence plate, make/model, VIN, engine, odometer, licence expiry,
+  // depot, billed-as classification, and an optional default driver. Add the
+  // columns idempotently then seed the 11 T&S vehicles from Traffio so the
+  // ute fleet is in the system without manual data entry.
+  if (!isMigrationApplied.get(149)) {
+    try {
+      const cols = db.prepare("PRAGMA table_info(equipment)").all().map(c => c.name);
+      const addCol = (name, ddl) => { if (!cols.includes(name)) try { db.exec(`ALTER TABLE equipment ADD COLUMN ${ddl}`); } catch (e) {} };
+      addCol('licence_plate',     'licence_plate TEXT DEFAULT \'\'');
+      addCol('licence_class',     'licence_class TEXT DEFAULT \'\'');
+      addCol('licence_expiry',    'licence_expiry DATE');
+      addCol('vehicle_category',  'vehicle_category TEXT DEFAULT \'\''); // Pod Truck / Ute / TMA / VMS Ute
+      addCol('vehicle_make',      'vehicle_make TEXT DEFAULT \'\'');
+      addCol('vehicle_model',     'vehicle_model TEXT DEFAULT \'\'');
+      addCol('vin',               'vin TEXT DEFAULT \'\'');
+      addCol('engine_number',     'engine_number TEXT DEFAULT \'\'');
+      addCol('odometer_km',       'odometer_km INTEGER');
+      addCol('odometer_read_at',  'odometer_read_at DATE');
+      addCol('billed_as',         'billed_as TEXT DEFAULT \'\'');
+      addCol('depot',             'depot TEXT DEFAULT \'\'');
+      addCol('default_driver_id', 'default_driver_id INTEGER REFERENCES crew_members(id) ON DELETE SET NULL');
+      db.exec("CREATE INDEX IF NOT EXISTS idx_equipment_licence_plate ON equipment(licence_plate)");
+
+      // Seed the T&S fleet. Asset numbers are the canonical "Name" column from
+      // Traffio; ON CONFLICT(asset_number) DO UPDATE keeps fields fresh on
+      // re-deploy without duplicating rows. ODO + licence dates are taken from
+      // the snapshot the user pasted on 4 May 2026.
+      const fleet = [
+        { asset:'DDV002',  plate:'CF94HW',  cls:'LR',  cat:'Pod Truck', make:'',       model:'',       vin:'',                engine:'',          odo:null,    odoAt:null,         lexp:null,         billed:'Pod Truck', depot:'Villawood', driver:null },
+        { asset:'DDV001',  plate:'CG56MC',  cls:'LR',  cat:'Pod Truck', make:'Isuzu',  model:'NPR400', vin:'JAANPR75HF7106878',engine:'4HK1444392',odo:245082,  odoAt:'2026-02-18', lexp:'2027-02-22', billed:'Pod Truck', depot:'Villawood', driver:null },
+        { asset:'PTM001',  plate:'DH90AD',  cls:'',    cat:'Ute',       make:'',       model:'',       vin:'',                engine:'',          odo:79835,   odoAt:'2026-04-24', lexp:null,         billed:'Ute',       depot:'Villawood', driver:null },
+        { asset:'TSTC003', plate:'ERU83U',  cls:'C',   cat:'Ute',       make:'Toyota', model:'Hilux',  vin:'MR0CX3CB304328000',engine:'',          odo:288430,  odoAt:'2026-03-13', lexp:'2027-02-10', billed:'Ute',       depot:'Villawood', driver:null },
+        { asset:'TCTC001', plate:'ETR82VC', cls:'C',   cat:'Ute',       make:'Toyota', model:'Hilux',  vin:'MR0CX3CBX04332688',engine:'',          odo:56770,   odoAt:'2026-03-20', lexp:'2026-06-19', billed:'Ute',       depot:'Villawood', driver:null },
+        { asset:'TSTC005', plate:'EUT88J',  cls:'C',   cat:'Ute',       make:'Toyota', model:'Hilux',  vin:'MR0CX3CB804336092',engine:'',          odo:135538,  odoAt:'2026-02-17', lexp:'2026-08-25', billed:'Ute',       depot:'Villawood', driver:null },
+        { asset:'TSTC006', plate:'EUT88K',  cls:'C',   cat:'Ute',       make:'Toyota', model:'Hilux',  vin:'MR0CX3CB504336082',engine:'',          odo:598837,  odoAt:'2026-02-12', lexp:'2026-08-25', billed:'Ute',       depot:'Villawood', driver:'Syed Ali' },
+        { asset:'TSTC004', plate:'FMG67Z',  cls:'C',   cat:'Ute',       make:'Toyota', model:'Hilux',  vin:'MR0EX3CB501103684',engine:'',          odo:139137,  odoAt:'2026-05-01', lexp:'2027-02-22', billed:'Ute',       depot:'Villawood', driver:null },
+        { asset:'TMA',     plate:'',        cls:'',    cat:'TMA',       make:'',       model:'',       vin:'',                engine:'',          odo:null,    odoAt:null,         lexp:null,         billed:'TMA',       depot:'T&S HQ',    driver:null },
+        { asset:'TSTC002', plate:'YLS85F',  cls:'C',   cat:'Ute',       make:'Toyota', model:'Hilux',  vin:'MR0CX3CB204334676',engine:'',          odo:74454,   odoAt:'2026-04-28', lexp:'2026-07-14', billed:'Ute',       depot:'Villawood', driver:null },
+        { asset:'TSTC007', plate:'YOV37G',  cls:'C',   cat:'Ute',       make:'Isuzu',  model:'D-Max',  vin:'MPATFR40JPT002189',engine:'',          odo:49000,   odoAt:'2026-03-13', lexp:'2026-07-02', billed:'VMS Ute',   depot:'Villawood', driver:null },
+      ];
+
+      const upsert = db.prepare(`
+        INSERT INTO equipment (
+          asset_number, name, category,
+          licence_plate, licence_class, licence_expiry,
+          vehicle_category, vehicle_make, vehicle_model, vin, engine_number,
+          odometer_km, odometer_read_at, billed_as, depot,
+          default_driver_id, current_condition, active, created_at, updated_at
+        )
+        VALUES (?, ?, 'vehicle', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'good', 1, datetime('now'), datetime('now'))
+        ON CONFLICT(asset_number) DO UPDATE SET
+          licence_plate    = excluded.licence_plate,
+          licence_class    = excluded.licence_class,
+          licence_expiry   = excluded.licence_expiry,
+          vehicle_category = excluded.vehicle_category,
+          vehicle_make     = excluded.vehicle_make,
+          vehicle_model    = excluded.vehicle_model,
+          vin              = excluded.vin,
+          engine_number    = excluded.engine_number,
+          odometer_km      = excluded.odometer_km,
+          odometer_read_at = excluded.odometer_read_at,
+          billed_as        = excluded.billed_as,
+          depot            = excluded.depot,
+          default_driver_id= excluded.default_driver_id,
+          updated_at       = datetime('now')
+      `);
+
+      // Resolve driver names → crew_members.id (best effort — if the name
+      // doesn't match, leave default_driver_id null).
+      function resolveDriver(name) {
+        if (!name) return null;
+        try {
+          const r = db.prepare("SELECT id FROM crew_members WHERE LOWER(full_name) = LOWER(?) LIMIT 1").get(name);
+          return r ? r.id : null;
+        } catch (e) { return null; }
+      }
+
+      let inserted = 0, updated = 0;
+      for (const v of fleet) {
+        const exists = db.prepare("SELECT id FROM equipment WHERE asset_number = ?").get(v.asset);
+        upsert.run(
+          v.asset,
+          [v.cat, v.asset, v.plate].filter(Boolean).join(' · ') || v.asset,
+          v.plate, v.cls, v.lexp,
+          v.cat, v.make, v.model, v.vin, v.engine,
+          v.odo, v.odoAt, v.billed, v.depot,
+          resolveDriver(v.driver)
+        );
+        if (exists) updated++; else inserted++;
+      }
+
+      recordMigration.run(149, 'equipment vehicle columns + T&S fleet seed');
+      console.log(`Migration 149 applied: equipment vehicle columns + seed (${inserted} new, ${updated} updated)`);
+    } catch (e) {
+      console.error('Migration 149 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
