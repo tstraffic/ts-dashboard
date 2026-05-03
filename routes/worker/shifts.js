@@ -2,37 +2,143 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../../db/database');
 
-// GET /w/shifts — My Shifts (today + upcoming 14 days)
+// GET /w/shifts — Week-paginated shift list (Mon → Sun).
+// `?week=YYYY-MM-DD` jumps to the week containing that ISO date. Without
+// it we land on the current week. Always-on "Requests" (allocated /
+// unconfirmed) render regardless of week so the worker can't miss
+// pending acceptances by flipping forward.
 router.get('/shifts', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const today = new Date().toISOString().split('T')[0];
-  const futureDate = new Date();
-  futureDate.setDate(futureDate.getDate() + 14);
-  const futureDateStr = futureDate.toISOString().split('T')[0];
 
-  const allocations = db.prepare(`
-    SELECT ca.*, j.job_number, j.job_name, j.client, j.site_address, j.suburb, j.status as job_status,
-      u.full_name as supervisor_name
+  function isoDate(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  const anchor = req.query.week ? new Date(req.query.week + 'T00:00:00') : new Date();
+  if (isNaN(anchor.getTime())) anchor.setTime(Date.now());
+  const dow = (anchor.getDay() + 6) % 7;
+  const monday = new Date(anchor); monday.setDate(monday.getDate() - dow); monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);  sunday.setDate(monday.getDate() + 6);
+  const prev = new Date(monday); prev.setDate(prev.getDate() - 7);
+  const next = new Date(monday); next.setDate(next.getDate() + 7);
+
+  const weekStartIso = isoDate(monday);
+  const weekEndIso   = isoDate(sunday);
+  const todayIso     = isoDate(new Date());
+
+  const VISIBLE_BOOKING_STATUSES = ['unconfirmed','confirmed','green_to_go','in_progress','completed','on_hold'];
+
+  // Allocations for this week — LEFT JOIN both jobs and bookings so
+  // booking-only allocations (post mig 142) still render full data.
+  const allocRows = db.prepare(`
+    SELECT ca.*,
+      COALESCE(j.job_number, b.booking_number) AS job_number,
+      COALESCE(j.job_name,   b.title)          AS job_name,
+      COALESCE(j.client,     b.title)          AS client,
+      COALESCE(j.site_address, b.site_address) AS site_address,
+      COALESCE(j.suburb,     b.suburb)         AS suburb,
+      j.status AS job_status,
+      u.full_name AS supervisor_name,
+      CASE WHEN ca.job_id IS NULL AND ca.booking_id IS NOT NULL
+           THEN 'booking' ELSE 'allocation' END AS source
     FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
-    LEFT JOIN users u ON j.ops_supervisor_id = u.id
-    WHERE ca.crew_member_id = ? AND ca.allocation_date >= ? AND ca.allocation_date <= ? AND ca.status != 'cancelled'
+    LEFT JOIN jobs j     ON ca.job_id = j.id
+    LEFT JOIN bookings b ON ca.booking_id = b.id
+    LEFT JOIN users u    ON j.ops_supervisor_id = u.id
+    WHERE ca.crew_member_id = ?
+      AND ca.allocation_date BETWEEN ? AND ?
+      AND ca.status != 'cancelled'
     ORDER BY ca.allocation_date ASC, ca.start_time ASC
-  `).all(worker.id, today, futureDateStr);
+  `).all(worker.id, weekStartIso, weekEndIso);
+
+  // Booking_crew fallback for bookings without an allocation row yet.
+  let bookingRows = [];
+  try {
+    bookingRows = db.prepare(`
+      SELECT bc.id, bc.booking_id, bc.role_on_site,
+        CASE WHEN bc.status = 'assigned' THEN 'allocated' ELSE bc.status END AS status,
+        b.booking_number AS job_number, b.title AS job_name, b.title AS client,
+        b.site_address, b.suburb,
+        DATE(b.start_datetime) AS allocation_date,
+        SUBSTR(b.start_datetime, 12, 5) AS start_time,
+        SUBSTR(b.end_datetime, 12, 5) AS end_time,
+        '' AS supervisor_name, 'booking' AS source
+      FROM booking_crew bc
+      JOIN bookings b ON bc.booking_id = b.id
+      WHERE bc.crew_member_id = ?
+        AND DATE(b.start_datetime) BETWEEN ? AND ?
+        AND bc.status IN ('assigned','confirmed')
+        AND b.deleted_at IS NULL
+        AND b.status IN (${VISIBLE_BOOKING_STATUSES.map(() => '?').join(',')})
+        AND NOT EXISTS (SELECT 1 FROM crew_allocations ca WHERE ca.booking_id = bc.booking_id AND ca.crew_member_id = bc.crew_member_id)
+      ORDER BY b.start_datetime ASC
+    `).all(worker.id, weekStartIso, weekEndIso, ...VISIBLE_BOOKING_STATUSES);
+  } catch (e) { /* legacy DB */ }
+
+  const weekShifts = [...allocRows, ...bookingRows]
+    .sort((a, b) => (a.allocation_date + (a.start_time || '')).localeCompare(b.allocation_date + (b.start_time || '')));
+
+  // Always-on requests (allocated/unconfirmed) — surface no matter
+  // which week the worker is viewing.
+  const allRequests = db.prepare(`
+    SELECT ca.*,
+      COALESCE(j.job_number, b.booking_number) AS job_number,
+      COALESCE(j.client,     b.title)          AS client,
+      COALESCE(j.suburb,     b.suburb)         AS suburb,
+      CASE WHEN ca.job_id IS NULL AND ca.booking_id IS NOT NULL
+           THEN 'booking' ELSE 'allocation' END AS source
+    FROM crew_allocations ca
+    LEFT JOIN jobs j     ON ca.job_id = j.id
+    LEFT JOIN bookings b ON ca.booking_id = b.id
+    WHERE ca.crew_member_id = ?
+      AND ca.allocation_date >= date('now','-1 day')
+      AND ca.status = 'allocated'
+    ORDER BY ca.allocation_date ASC, ca.start_time ASC
+  `).all(worker.id);
+
+  // Mon-Sun strip with shift count per day.
+  const countsByDate = {};
+  weekShifts.forEach(s => { countsByDate[s.allocation_date] = (countsByDate[s.allocation_date] || 0) + 1; });
+  const weekDays = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday); d.setDate(monday.getDate() + i);
+    const iso = isoDate(d);
+    weekDays.push({
+      iso,
+      letter: ['MON','TUE','WED','THU','FRI','SAT','SUN'][i],
+      day: d.getDate(),
+      isToday: iso === todayIso,
+      isPast: iso < todayIso,
+      count: countsByDate[iso] || 0,
+    });
+  }
 
   const groupedByDate = {};
-  allocations.forEach(a => {
-    if (!groupedByDate[a.allocation_date]) groupedByDate[a.allocation_date] = [];
-    groupedByDate[a.allocation_date].push(a);
+  weekShifts.forEach(s => {
+    if (!groupedByDate[s.allocation_date]) groupedByDate[s.allocation_date] = [];
+    groupedByDate[s.allocation_date].push(s);
   });
+
+  const startMon = monday.toLocaleDateString('en-AU', { month: 'short' });
+  const endMon   = sunday.toLocaleDateString('en-AU', { month: 'short' });
+  const monthLabel = (startMon === endMon ? startMon : startMon + ' / ' + endMon) + ' ' + sunday.getFullYear();
 
   res.render('worker/shifts', {
     title: 'My Shifts',
     currentPage: 'shifts',
-    allocations,
+    weekDays,
+    weekStartIso,
+    weekEndIso,
+    monthLabel,
+    prevWeek: isoDate(prev),
+    nextWeek: isoDate(next),
+    thisWeek: isoDate(new Date()),
+    weekShifts,
     groupedByDate,
-    today,
+    requests: allRequests,
+    today: todayIso,
+    isThisWeek: weekStartIso <= todayIso && todayIso <= weekEndIso,
   });
 });
 
