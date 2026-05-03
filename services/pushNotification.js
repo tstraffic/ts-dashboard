@@ -162,11 +162,60 @@ function sendPushForNotifications(db, newNotifications) {
   }
 }
 
+/**
+ * Worker push: save a subscription for a crew_member (worker portal)
+ */
+function saveWorkerSubscription(crewMemberId, subscription) {
+  const db = getDb();
+  const endpoint = subscription.endpoint;
+  const p256dh = subscription.keys ? subscription.keys.p256dh : '';
+  const auth = subscription.keys ? subscription.keys.auth : '';
+  db.prepare(`
+    INSERT INTO worker_push_subscriptions (crew_member_id, endpoint, p256dh, auth)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(endpoint) DO UPDATE SET crew_member_id=?, p256dh=?, auth=?, updated_at=CURRENT_TIMESTAMP
+  `).run(crewMemberId, endpoint, p256dh, auth, crewMemberId, p256dh, auth);
+}
+
+function removeWorkerSubscription(endpoint) {
+  const db = getDb();
+  db.prepare('DELETE FROM worker_push_subscriptions WHERE endpoint = ?').run(endpoint);
+}
+
+/**
+ * Send a push notification to a crew member (all their subscribed devices).
+ */
+async function sendPushToCrew(crewMemberId, payload) {
+  if (!vapidConfigured) return;
+  const db = getDb();
+  const subs = db.prepare('SELECT * FROM worker_push_subscriptions WHERE crew_member_id = ?').all(crewMemberId);
+  if (subs.length === 0) return;
+  const payloadStr = JSON.stringify(payload);
+  console.log('[Push] -> crew', crewMemberId, '(' + subs.length + ' device(s)):', payload.title);
+  const results = [];
+  for (const sub of subs) {
+    const pushSub = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };
+    results.push(
+      webpush.sendNotification(pushSub, payloadStr).catch(err => {
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          removeWorkerSubscription(sub.endpoint);
+        } else {
+          console.error('[Push] Crew send error', crewMemberId, ':', err.statusCode || err.message);
+        }
+      })
+    );
+  }
+  return Promise.allSettled(results);
+}
+
 module.exports = {
   initVapid,
   getVapidPublicKey,
   saveSubscription,
   removeSubscription,
   sendPushToUser,
-  sendPushForNotifications
+  sendPushForNotifications,
+  saveWorkerSubscription,
+  removeWorkerSubscription,
+  sendPushToCrew,
 };

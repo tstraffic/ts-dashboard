@@ -6835,6 +6835,44 @@ function runMigrations(db) {
     console.log('Migration 147 applied: compliance invoice audit columns');
   }
 
+  // Migration 148: Worker push subscriptions + shift reminder log
+  // Workers don't have a `users` row, so the existing push_subscriptions
+  // (FK -> users) table can't hold their subscriptions. Add a parallel
+  // table keyed on crew_member_id and a small log table so the shift
+  // reminder scanner can dedupe (only push once per shift, even though
+  // the scanner runs every 15 min).
+  if (!isMigrationApplied.get(148)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS worker_push_subscriptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          crew_member_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+          endpoint TEXT NOT NULL UNIQUE,
+          p256dh TEXT NOT NULL,
+          auth TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_worker_push_crew ON worker_push_subscriptions(crew_member_id)');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS shift_reminder_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          crew_member_id INTEGER NOT NULL,
+          shift_key TEXT NOT NULL,
+          kind TEXT NOT NULL DEFAULT '24h',
+          sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(crew_member_id, shift_key, kind)
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_shift_reminder_crew ON shift_reminder_log(crew_member_id, sent_at)');
+      recordMigration.run(148, 'worker_push_subscriptions + shift_reminder_log');
+      console.log('Migration 148 applied: worker push + shift reminder dedupe');
+    } catch (e) {
+      console.error('Migration 148 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

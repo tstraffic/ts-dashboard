@@ -15,6 +15,7 @@ const { settingsMiddleware } = require('./middleware/settings');
 const { sidebarBadges } = require('./middleware/sidebarBadges');
 const { chatUnreadCountMiddleware } = require('./middleware/chat');
 const { initVapid } = require('./services/pushNotification');
+const { sendUpcomingShiftReminders } = require('./services/shiftReminders');
 const { csrfProtection } = require('./middleware/csrf');
 
 // Initialize database and seed data
@@ -154,6 +155,7 @@ app.use('/w', requireWorker, workerLocals, managerLocals, require('./routes/work
 app.use('/w', requireWorker, workerLocals, managerLocals, require('./routes/worker/manage'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/profile'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/forms'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/notifications'));
 app.get('/w/more', requireWorker, workerLocals, (req, res) => {
   res.locals.isManager = require('./middleware/managerAuth').isManager(req.session.worker);
   res.render('worker/more', { title: 'More', currentPage: 'more' });
@@ -311,6 +313,12 @@ app.listen(PORT, () => {
   // Generate notifications on startup and every 15 minutes
   generateNotifications();
   setInterval(generateNotifications, 15 * 60 * 1000);
+
+  // 24-hour shift reminders for workers — push notifications fire ~24h
+  // before shift start so they can confirm/accept ahead of time. Runs
+  // every 15 min (matches the alloc / booking-roster cadence).
+  sendUpcomingShiftReminders();
+  setInterval(sendUpcomingShiftReminders, 15 * 60 * 1000);
 
   // Daily digest emails — check every 15 min, send at 7:00 AM
   setInterval(() => {

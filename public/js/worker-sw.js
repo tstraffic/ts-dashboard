@@ -1,5 +1,6 @@
-// Worker Portal — Service Worker (stub for PWA install)
-const CACHE_NAME = 'ts-worker-v1';
+// Worker Portal — Service Worker (PWA + push)
+// Bumped to v2 for push handler. Old caches are wiped in activate.
+const CACHE_NAME = 'ts-worker-v2';
 
 // Install — cache core assets
 self.addEventListener('install', function(event) {
@@ -47,6 +48,39 @@ self.addEventListener('fetch', function(event) {
     }).catch(function() {
       // Network failed — try cache
       return caches.match(event.request);
+    })
+  );
+});
+
+// Push — show shift reminder / generic notifications
+self.addEventListener('push', function(event) {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = { title: 'T&S Notification', body: event.data ? event.data.text() : '' }; }
+  const title = data.title || 'T&S Notification';
+  const options = {
+    body: data.body || '',
+    icon: '/images/logo-colour.jpg',
+    badge: '/images/logo-colour.jpg',
+    tag: data.type || 'general',
+    data: { url: data.url || '/w/home' },
+    vibrate: [180, 80, 180],
+    requireInteraction: data.type === 'shift_reminder_24h',
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Notification click — open or focus the worker portal at the right URL
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/w/home';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {
+      for (const c of list) {
+        if (c.url.indexOf(self.location.origin) === 0 && 'focus' in c) {
+          c.navigate(url); return c.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
     })
   );
 });

@@ -25,7 +25,10 @@
   // Default section order (manager card is inserted after the hero for managers only)
   // What the controller needs first: are they blocked, what's today, and
   // the shortcuts to act on it. Stats and weather drop below the fold.
-  const defaultOrder = ['hero','manager','jobpack','compliance','today','actions','week','timeline','cards','weather','streaks','upcoming','activity'];
+  // Upcoming shifts are the single most important thing on this page —
+  // lift them to right after Today's shift so workers see what's next
+  // without scrolling. Compliance + actions slot in below.
+  const defaultOrder = ['hero','manager','today','upcoming','compliance','actions','jobpack','week','timeline','cards','weather','streaks','activity'];
   const hidden = (prefs && prefs.hidden_sections) || [];
   const orderSource = (prefs && prefs.section_order && prefs.section_order.length) ? prefs.section_order : defaultOrder;
   // Preserve any new sections we added after the user saved their prefs
@@ -560,19 +563,81 @@
   </div>
 <% } %>
 
-<% if (section === 'upcoming' && !hidden.includes('upcoming') && upcomingShifts && upcomingShifts.length > 0) { %>
-  <div class="wh-section-head"><span class="wh-section-title">Upcoming shifts</span><a href="/w/shifts" class="wh-section-link">See all ›</a></div>
-  <% upcomingShifts.forEach(s => {
-    const d = new Date(s.allocation_date + 'T00:00:00');
-    const dNum = d.getDate(); const dMon = d.toLocaleDateString('en-AU', { month: 'short' });
-  %>
-    <a href="/w/jobs/<%= s.job_id %>" class="wh-up-item" style="text-decoration: none;">
-      <div class="wh-up-date"<%= s.shift_type === 'night' ? ' style="background: rgba(59,130,246,0.12); color: #93C5FD;"' : '' %>>
-        <span class="d"><%= dNum %></span><span class="m"><%= dMon %></span>
+<% if (section === 'upcoming' && !hidden.includes('upcoming') && upcomingShifts && upcomingShifts.length > 0) {
+  // The next shift gets a hero treatment so it can't be missed; the
+  // remainder render as a compact list underneath.
+  const nextShift = upcomingShifts[0];
+  const restShifts = upcomingShifts.slice(1);
+  const nd = new Date(nextShift.allocation_date + 'T00:00:00');
+  const ndNum = nd.getDate();
+  const ndMon = nd.toLocaleDateString('en-AU', { month: 'short' });
+  const ndDow = nd.toLocaleDateString('en-AU', { weekday: 'short' });
+  const nextLink = nextShift.job_id ? ('/w/jobs/' + nextShift.job_id) : '/w/shifts';
+  const isAllocated = (nextShift.status === 'allocated' || nextShift.status === 'assigned');
+%>
+  <div class="wh-section-head">
+    <span class="wh-section-title">
+      Coming up
+      <span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:rgba(43,127,255,0.18);color:#93C5FD;font-size:0.62rem;font-weight:800;letter-spacing:0;"><%= upcomingShifts.length %></span>
+    </span>
+    <a href="/w/shifts" class="wh-section-link">See all ›</a>
+  </div>
+
+  <!-- Hero: the next shift -->
+  <a href="<%= nextLink %>" style="display:block;text-decoration:none;position:relative;border-radius:16px;overflow:hidden;background:linear-gradient(155deg, rgba(43,127,255,0.14), rgba(0,210,190,0.06) 60%, rgba(10,22,40,0.7));border:1px solid rgba(96,165,250,0.28);box-shadow:0 6px 24px rgba(0,0,0,0.25);">
+    <span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,#2B7FFF,#00D2BE);"></span>
+    <div style="display:flex;gap:12px;padding:14px 14px 12px 16px;align-items:stretch;">
+      <div style="width:54px;flex-shrink:0;border-radius:12px;background:rgba(43,127,255,0.18);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 0;">
+        <span style="font-size:0.55rem;font-weight:700;color:#93C5FD;text-transform:uppercase;letter-spacing:0.08em;line-height:1;"><%= ndDow %></span>
+        <span style="font-size:1.5rem;font-weight:800;line-height:1;margin-top:3px;"><%= ndNum %></span>
+        <span style="font-size:0.55rem;font-weight:700;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;line-height:1;"><%= ndMon %></span>
       </div>
-      <div class="wh-up-body"><p class="wh-up-title"><%= s.client %></p><p class="wh-up-sub"><%= relDay(s.allocation_date) %> · <%= fmtTime(s.start_time) %>–<%= fmtTime(s.end_time) %><% if (s.suburb) { %> · <%= s.suburb %><% } %></p></div>
-    </a>
-  <% }) %>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:0.62rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#93C5FD;"><%= relDay(nextShift.allocation_date) %></span>
+          <% if (isAllocated) { %>
+            <span style="display:inline-flex;align-items:center;padding:2px 7px;border-radius:999px;font-size:0.58rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;background:rgba(245,158,11,0.18);color:#FCD34D;border:1px solid rgba(245,158,11,0.35);">Tap to confirm</span>
+          <% } else if (nextShift.status === 'confirmed') { %>
+            <span style="display:inline-flex;align-items:center;padding:2px 7px;border-radius:999px;font-size:0.58rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;background:rgba(16,185,129,0.18);color:#6EE7B7;border:1px solid rgba(16,185,129,0.35);">Accepted</span>
+          <% } %>
+        </div>
+        <p style="font-size:1rem;font-weight:700;color:#fff;line-height:1.2;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><%= nextShift.client %></p>
+        <p style="font-size:0.78rem;color:rgba(255,255,255,0.7);margin-top:2px;display:flex;align-items:center;gap:5px;">
+          <svg style="width:12px;height:12px;color:rgba(255,255,255,0.45);" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <%= fmtTime(nextShift.start_time) %> – <%= fmtTime(nextShift.end_time) %>
+          <% if (nextShift.suburb) { %>
+            <span style="color:rgba(255,255,255,0.35);">·</span>
+            <span style="color:rgba(255,255,255,0.6);"><%= nextShift.suburb %></span>
+          <% } %>
+        </p>
+      </div>
+      <svg style="width:14px;height:14px;color:rgba(255,255,255,0.4);align-self:center;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+    </div>
+  </a>
+
+  <!-- Compact list of the rest -->
+  <% if (restShifts.length > 0) { %>
+    <div style="margin-top:8px;">
+      <% restShifts.forEach(s => {
+        const d = new Date(s.allocation_date + 'T00:00:00');
+        const dNum = d.getDate(); const dMon = d.toLocaleDateString('en-AU', { month: 'short' });
+        const link = s.job_id ? ('/w/jobs/' + s.job_id) : '/w/shifts';
+      %>
+        <a href="<%= link %>" class="wh-up-item" style="text-decoration: none;">
+          <div class="wh-up-date"<%= s.shift_type === 'night' ? ' style="background: rgba(59,130,246,0.12); color: #93C5FD;"' : '' %>>
+            <span class="d"><%= dNum %></span><span class="m"><%= dMon %></span>
+          </div>
+          <div class="wh-up-body">
+            <p class="wh-up-title"><%= s.client %></p>
+            <p class="wh-up-sub"><%= relDay(s.allocation_date) %> · <%= fmtTime(s.start_time) %>–<%= fmtTime(s.end_time) %><% if (s.suburb) { %> · <%= s.suburb %><% } %></p>
+          </div>
+          <% if (s.status === 'allocated' || s.status === 'assigned') { %>
+            <span style="font-size:0.58rem;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:#FCD34D;background:rgba(245,158,11,0.15);padding:2px 6px;border-radius:999px;flex-shrink:0;">Confirm</span>
+          <% } %>
+        </a>
+      <% }) %>
+    </div>
+  <% } %>
 <% } %>
 
 <% if (section === 'activity' && !hidden.includes('activity') && recentClocks && recentClocks.length > 0) { %>
