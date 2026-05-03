@@ -46,24 +46,48 @@ router.get('/', (req, res) => {
     general: db.prepare("SELECT COUNT(*) AS c FROM shift_tasks WHERE booking_id IS NULL AND allocation_id IS NULL").get().c,
   };
 
-  // Form data — active crew + upcoming/recent bookings, so the create
-  // panel doesn't hit the DB on every dropdown render.
+  // Form data — active crew + a tight booking window so the picker is
+  // small enough to navigate without searching. Includes (a) bookings
+  // currently in progress (start ≤ now ≤ end) and (b) anything kicking
+  // off in the next 3 days. Older / further-out bookings are excluded;
+  // dispatch is the planning surface for those.
   const crew = db.prepare("SELECT id, full_name, portal_role FROM crew_members WHERE active = 1 ORDER BY portal_role DESC, full_name ASC").all();
   let bookings = [];
   try {
     bookings = db.prepare(`
-      SELECT id, booking_number, title, start_datetime
+      SELECT id, booking_number, title, suburb, start_datetime, end_datetime,
+        DATE(start_datetime) AS shift_date
       FROM bookings
       WHERE deleted_at IS NULL
         AND status NOT IN ('cancelled','late_cancellation','complete','finalised')
-        AND date(start_datetime) >= date('now','-1 day')
-      ORDER BY start_datetime ASC LIMIT 100
+        AND (
+          (datetime(start_datetime) <= datetime('now') AND datetime(end_datetime) >= datetime('now'))
+          OR (date(start_datetime) BETWEEN date('now') AND date('now','+3 days'))
+        )
+      ORDER BY start_datetime ASC
     `).all();
   } catch (e) { /* legacy DB */ }
 
+  // Bucket bookings into Today / Tomorrow / In N days / Ongoing — the EJS
+  // renders these as <optgroup>s and as visual day-pills above the select.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const nowMs = Date.now();
+  const bookingGroups = {
+    ongoing: [], today: [], tomorrow: [], later: [],
+  };
+  for (const b of bookings) {
+    const startMs = new Date(b.start_datetime).getTime();
+    const endMs   = new Date(b.end_datetime).getTime();
+    if (startMs <= nowMs && endMs >= nowMs) bookingGroups.ongoing.push(b);
+    else if (b.shift_date === todayIso)     bookingGroups.today.push(b);
+    else if (b.shift_date === tomorrow)     bookingGroups.tomorrow.push(b);
+    else                                     bookingGroups.later.push(b);
+  }
+
   res.render('shift-tasks/index', {
     title: 'Tasks Board',
-    rows, counts, status, scope, assignee, crew, bookings,
+    rows, counts, status, scope, assignee, crew, bookings, bookingGroups,
   });
 });
 

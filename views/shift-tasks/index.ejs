@@ -1,4 +1,5 @@
 <% locals.currentPage = 'shift-tasks' %>
+<meta name="color-scheme" content="light only">
 
 <%
   function rolePill(pr) {
@@ -11,30 +12,169 @@
     if (p === 'low')  return 'bg-gray-100 text-gray-600 ring-gray-500/10';
     return            'bg-amber-50 text-amber-700 ring-amber-600/10';
   }
+  // Format booking option label — terse, scannable, time-led.
+  function bkOpt(b) {
+    var d = new Date(b.start_datetime);
+    var t = d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+    var bits = [b.booking_number || ('#' + b.id), t];
+    if (b.title)  bits.push(b.title);
+    if (b.suburb) bits.push(b.suburb);
+    return bits.join(' · ');
+  }
+  function dayLabel(iso) {
+    var d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+  var totalBookingsInPicker =
+    (bookingGroups.ongoing.length || 0) +
+    (bookingGroups.today.length   || 0) +
+    (bookingGroups.tomorrow.length|| 0) +
+    (bookingGroups.later.length   || 0);
 %>
 
+<style>
+  /* Tasks Board — explicit light surfaces so user-agent dark mode doesn't
+     auto-invert inputs into unreadable navy slabs. */
+  .tb-input, .tb-select, .tb-textarea {
+    width: 100%;
+    background: #fff;
+    color: #0F172A;
+    border: 1px solid #D1D5DB;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    line-height: 1.25;
+    appearance: none;
+    color-scheme: light;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .tb-input::placeholder, .tb-textarea::placeholder { color: #9CA3AF; }
+  .tb-select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%236B7280' stroke-width='2' viewBox='0 0 24 24'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+  }
+  .tb-input:focus, .tb-select:focus, .tb-textarea:focus {
+    outline: none;
+    border-color: #2B7FFF;
+    box-shadow: 0 0 0 3px rgba(43,127,255,0.18);
+  }
+  .tb-textarea { resize: none; min-height: 60px; }
+  .tb-label {
+    display: block; font-size: 0.65rem; font-weight: 700; color: #6B7280;
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px;
+  }
+
+  /* Scope toggle (For a shift / General) — segmented pill */
+  .tb-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 3px;
+            background: #F3F4F6; border-radius: 10px; }
+  .tb-seg label { cursor: pointer; }
+  .tb-seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .tb-seg span {
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    text-align: center; padding: 8px 8px; border-radius: 8px;
+    font-size: 0.78rem; font-weight: 600; color: #6B7280;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  }
+  .tb-seg input:checked + span {
+    background: #fff; color: #1D4ED8;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .tb-seg.tb-seg-blue input:checked + span { color: #1D4ED8; }
+
+  /* Day-bucket pills above the booking <select> */
+  .tb-day-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+  .tb-day-pill {
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em;
+    padding: 3px 8px; border-radius: 999px;
+    background: #F3F4F6; color: #4B5563; text-transform: uppercase;
+    border: 1px solid transparent;
+  }
+  .tb-day-pill.live  { background: #DCFCE7; color: #166534; border-color: #86EFAC; }
+  .tb-day-pill.today { background: #DBEAFE; color: #1E40AF; border-color: #93C5FD; }
+  .tb-day-pill.tom   { background: #FEF3C7; color: #92400E; border-color: #FCD34D; }
+  .tb-day-pill .n { display: inline-block; min-width: 14px; padding: 0 4px; margin-left: 4px;
+                    background: rgba(0,0,0,0.08); border-radius: 999px; font-size: 0.6rem; }
+
+  /* Filter chips */
+  .tb-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 11px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600;
+    background: #fff; color: #4B5563;
+    border: 1px solid #E5E7EB;
+    text-decoration: none;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .tb-chip:hover { background: #F9FAFB; }
+  .tb-chip.active { background: #2B7FFF; color: #fff; border-color: #2B7FFF; }
+  .tb-chip.alt-active { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
+  .tb-chip-group { display: inline-flex; gap: 4px; padding: 3px;
+                   background: #F3F4F6; border-radius: 999px; }
+  .tb-chip-group .tb-chip { border-color: transparent; background: transparent; }
+  .tb-chip-group .tb-chip.active { background: #fff; color: #1D4ED8; border-color: #BFDBFE;
+                                   box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+
+  /* Stat strip in header */
+  .tb-stat { display: inline-flex; align-items: center; gap: 6px;
+             font-size: 0.72rem; color: #6B7280; }
+  .tb-stat-num { font-weight: 800; font-size: 0.85rem; }
+
+  /* Empty state */
+  .tb-empty {
+    padding: 36px 16px; text-align: center;
+    color: #6B7280; font-size: 0.85rem;
+  }
+  .tb-empty-ic {
+    width: 48px; height: 48px; border-radius: 999px;
+    margin: 0 auto 10px; display: flex; align-items: center; justify-content: center;
+    background: #F3F4F6; color: #9CA3AF;
+  }
+
+  /* Booking picker layout */
+  .tb-picker { position: relative; }
+  .tb-picker-search {
+    position: relative;
+  }
+  .tb-picker-search svg {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; color: #9CA3AF; pointer-events: none;
+  }
+  .tb-picker-search .tb-input { padding-left: 34px; }
+</style>
+
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
-  <div class="flex items-center justify-between flex-wrap gap-3">
+
+  <!-- ── Header ───────────────────────────────────────────────── -->
+  <div class="flex items-end justify-between flex-wrap gap-4">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">Tasks Board</h1>
-      <p class="text-sm text-gray-500 mt-0.5">Allocate tasks to TCs, Team Leaders, and Supervisors — bound to a specific shift or as standing work.</p>
+      <p class="text-sm text-gray-500 mt-0.5">Allocate tasks to TCs, Team Leaders &amp; Supervisors — bound to a specific shift or as standing work.</p>
     </div>
-    <div class="text-xs text-gray-500 flex items-center gap-3">
-      <span><span class="font-semibold text-amber-700"><%= counts.pending %></span> pending</span>
-      <span><span class="font-semibold text-emerald-700"><%= counts.done %></span> done</span>
-      <span><span class="font-semibold text-blue-700"><%= counts.general %></span> general</span>
+    <div class="flex items-center gap-4">
+      <span class="tb-stat"><span class="tb-stat-num text-amber-700"><%= counts.pending %></span> pending</span>
+      <span class="tb-stat"><span class="tb-stat-num text-emerald-700"><%= counts.done %></span> done</span>
+      <span class="tb-stat"><span class="tb-stat-num text-blue-700"><%= counts.general %></span> general</span>
     </div>
   </div>
 
-  <!-- Filters + create form -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-    <h2 class="text-sm font-semibold text-gray-900 mb-3">Create task</h2>
-    <form method="POST" action="/shift-tasks" class="space-y-3">
+  <!-- ── Create task ─────────────────────────────────────────── -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+      <span class="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+      </span>
+      <h2 class="text-sm font-semibold text-gray-900">Create task</h2>
+    </div>
+    <form method="POST" action="/shift-tasks" class="p-5 space-y-4">
       <%- include('../partials/csrf') %>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Assign to</label>
-          <select name="crew_member_id" required class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm">
+
+      <!-- Row 1: assignee + priority -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="sm:col-span-2">
+          <label class="tb-label">Assign to</label>
+          <select name="crew_member_id" required class="tb-select tb-input">
             <option value="">— Select crew member —</option>
             <% crew.forEach(function (c) { %>
               <option value="<%= c.id %>"><%= c.full_name %><% if (c.portal_role && c.portal_role !== 'traffic_controller') { %> · <%= c.portal_role.replace('_',' ') %><% } %></option>
@@ -42,8 +182,8 @@
           </select>
         </div>
         <div>
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Priority</label>
-          <select name="priority" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm">
+          <label class="tb-label">Priority</label>
+          <select name="priority" class="tb-select tb-input">
             <option value="normal">Normal</option>
             <option value="high">High</option>
             <option value="low">Low</option>
@@ -51,82 +191,181 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <!-- Scope toggle -->
-        <div>
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Scope</label>
-          <div class="grid grid-cols-2 gap-1 text-xs font-semibold rounded-lg p-0.5 bg-gray-100">
-            <label class="cursor-pointer">
-              <input type="radio" name="scope" value="shift" class="peer sr-only" checked
-                onchange="document.getElementById('booking-row').style.display='block'">
-              <span class="block text-center py-2 rounded-md text-gray-500 peer-checked:bg-white peer-checked:text-brand-700 peer-checked:shadow-sm">For a shift</span>
-            </label>
-            <label class="cursor-pointer">
-              <input type="radio" name="scope" value="general" class="peer sr-only"
-                onchange="document.getElementById('booking-row').style.display='none'">
-              <span class="block text-center py-2 rounded-md text-gray-500 peer-checked:bg-white peer-checked:text-blue-700 peer-checked:shadow-sm">General</span>
-            </label>
-          </div>
-        </div>
-        <div id="booking-row">
-          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Shift / booking</label>
-          <select name="booking_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm">
-            <option value="">— Pick a booking —</option>
-            <% bookings.forEach(function (b) { %>
-              <option value="<%= b.id %>">
-                <%= b.booking_number %> · <%= new Date(b.start_datetime).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>
-                <% if (b.title) { %> · <%= b.title %><% } %>
-              </option>
-            <% }) %>
-          </select>
+      <!-- Row 2: scope toggle -->
+      <div>
+        <label class="tb-label">Scope</label>
+        <div class="tb-seg" style="max-width: 360px;">
+          <label>
+            <input type="radio" name="scope" value="shift" id="scope-shift" checked>
+            <span>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              For a shift
+            </span>
+          </label>
+          <label>
+            <input type="radio" name="scope" value="general" id="scope-general">
+            <span>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+              General / standing
+            </span>
+          </label>
         </div>
       </div>
 
-      <input type="text" name="title" placeholder="Task title (e.g. Drop docket pack at office on the way back)" required maxlength="200"
-        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm">
-      <textarea name="description" rows="2" placeholder="Notes (optional)"
-        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm resize-none"></textarea>
-      <div class="flex items-center gap-2">
-        <input type="datetime-local" name="due_at"
-          class="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm">
-        <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+      <!-- Row 3: booking picker (collapses for general) -->
+      <div id="booking-row">
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="tb-label" style="margin-bottom:0;">Shift / booking</label>
+          <span class="text-[10px] text-gray-400 font-medium">Showing live + next 3 days · <%= totalBookingsInPicker %> total</span>
+        </div>
+
+        <% if (totalBookingsInPicker > 0) { %>
+          <!-- Quick day-bucket pills (visual only — actual selection is the <select>) -->
+          <div class="tb-day-pills">
+            <% if (bookingGroups.ongoing.length) { %>
+              <span class="tb-day-pill live">
+                <span style="display:inline-block;width:6px;height:6px;border-radius:999px;background:#10B981;margin-right:5px;"></span>
+                Live now <span class="n"><%= bookingGroups.ongoing.length %></span>
+              </span>
+            <% } %>
+            <% if (bookingGroups.today.length)     { %><span class="tb-day-pill today">Today <span class="n"><%= bookingGroups.today.length %></span></span><% } %>
+            <% if (bookingGroups.tomorrow.length)  { %><span class="tb-day-pill tom">Tomorrow <span class="n"><%= bookingGroups.tomorrow.length %></span></span><% } %>
+            <% if (bookingGroups.later.length)     { %><span class="tb-day-pill">Later <span class="n"><%= bookingGroups.later.length %></span></span><% } %>
+          </div>
+
+          <div class="tb-picker">
+            <!-- Type-to-filter — narrows the <select> options without
+                 needing a heavy combobox component. -->
+            <div class="tb-picker-search mb-2">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+              <input type="text" id="booking-search" placeholder="Filter by booking #, client, suburb…" class="tb-input" autocomplete="off">
+            </div>
+
+            <select name="booking_id" id="booking-select" class="tb-select tb-input" size="6"
+                    style="background-image:none;padding-right:12px;">
+              <option value="">— Pick a booking —</option>
+
+              <% if (bookingGroups.ongoing.length) { %>
+                <optgroup label="🟢  Live now">
+                  <% bookingGroups.ongoing.forEach(function (b) { %>
+                    <option value="<%= b.id %>" data-search="<%= (b.booking_number || '') + ' ' + (b.title || '') + ' ' + (b.suburb || '') %>">
+                      <%= bkOpt(b) %>
+                    </option>
+                  <% }) %>
+                </optgroup>
+              <% } %>
+
+              <% if (bookingGroups.today.length) { %>
+                <optgroup label="Today, <%= dayLabel(bookingGroups.today[0].shift_date) %>">
+                  <% bookingGroups.today.forEach(function (b) { %>
+                    <option value="<%= b.id %>" data-search="<%= (b.booking_number || '') + ' ' + (b.title || '') + ' ' + (b.suburb || '') %>">
+                      <%= bkOpt(b) %>
+                    </option>
+                  <% }) %>
+                </optgroup>
+              <% } %>
+
+              <% if (bookingGroups.tomorrow.length) { %>
+                <optgroup label="Tomorrow, <%= dayLabel(bookingGroups.tomorrow[0].shift_date) %>">
+                  <% bookingGroups.tomorrow.forEach(function (b) { %>
+                    <option value="<%= b.id %>" data-search="<%= (b.booking_number || '') + ' ' + (b.title || '') + ' ' + (b.suburb || '') %>">
+                      <%= bkOpt(b) %>
+                    </option>
+                  <% }) %>
+                </optgroup>
+              <% } %>
+
+              <% if (bookingGroups.later.length) {
+                // Sub-group "later" by date so each day reads on its own line.
+                var byDate = {};
+                bookingGroups.later.forEach(function (b) {
+                  (byDate[b.shift_date] = byDate[b.shift_date] || []).push(b);
+                });
+                Object.keys(byDate).sort().forEach(function (d) { %>
+                  <optgroup label="<%= dayLabel(d) %>">
+                    <% byDate[d].forEach(function (b) { %>
+                      <option value="<%= b.id %>" data-search="<%= (b.booking_number || '') + ' ' + (b.title || '') + ' ' + (b.suburb || '') %>">
+                        <%= bkOpt(b) %>
+                      </option>
+                    <% }) %>
+                  </optgroup>
+                <% })
+              } %>
+            </select>
+            <p class="text-[11px] text-gray-400 mt-1.5">Tip: type to filter. Need a booking further out? Allocate from the booking page directly.</p>
+          </div>
+        <% } else { %>
+          <div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center">
+            <p class="text-sm font-medium text-gray-700">No live or upcoming bookings in the next 3 days.</p>
+            <p class="text-xs text-gray-500 mt-1">Switch the scope to <strong>General / standing</strong> to assign work that isn't tied to a specific shift.</p>
+          </div>
+        <% } %>
+      </div>
+
+      <!-- Row 4: title + notes -->
+      <div>
+        <label class="tb-label">Task</label>
+        <input type="text" name="title" required maxlength="200" class="tb-input"
+               placeholder="e.g. Drop docket pack at office on the way back">
+      </div>
+      <div>
+        <label class="tb-label">Notes (optional)</label>
+        <textarea name="description" rows="2" class="tb-input tb-textarea"
+                  placeholder="Anything the worker needs to know…"></textarea>
+      </div>
+
+      <!-- Row 5: due-by + submit -->
+      <div class="flex items-end justify-between gap-3 flex-wrap">
+        <div class="flex-1 min-w-[200px]">
+          <label class="tb-label">Due by (optional)</label>
+          <input type="datetime-local" name="due_at" class="tb-input">
+        </div>
+        <button type="submit" class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 active:bg-brand-800 transition shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
           Add task
         </button>
       </div>
     </form>
   </div>
 
-  <!-- Filters strip -->
-  <form method="GET" class="flex flex-wrap items-center gap-2 text-xs">
-    <div class="flex rounded-lg overflow-hidden ring-1 ring-gray-200">
+  <!-- ── Filter strip ─────────────────────────────────────────── -->
+  <form method="GET" id="filters-form" class="flex flex-wrap items-center gap-2.5">
+    <div class="tb-chip-group">
       <% ['pending','done','all'].forEach(function (s) { %>
-        <button type="submit" name="status" value="<%= s %>"
-          class="px-3 py-1.5 font-semibold <%= status === s ? 'bg-brand-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' %>"><%= s.charAt(0).toUpperCase() + s.slice(1) %></button>
+        <button type="submit" name="status" value="<%= s %>" class="tb-chip <%= status === s ? 'active' : '' %>">
+          <%= s.charAt(0).toUpperCase() + s.slice(1) %>
+        </button>
       <% }) %>
     </div>
-    <div class="flex rounded-lg overflow-hidden ring-1 ring-gray-200">
+    <div class="tb-chip-group">
       <% [['all','All'],['shift','Shift-bound'],['general','General']].forEach(function (pair) { %>
-        <button type="submit" name="scope" value="<%= pair[0] %>"
-          class="px-3 py-1.5 font-semibold <%= scope === pair[0] ? 'bg-brand-50 text-brand-700' : 'bg-white text-gray-600 hover:bg-gray-50' %>"><%= pair[1] %></button>
+        <button type="submit" name="scope" value="<%= pair[0] %>" class="tb-chip <%= scope === pair[0] ? 'active' : '' %>">
+          <%= pair[1] %>
+        </button>
       <% }) %>
       <input type="hidden" name="status" value="<%= status %>">
     </div>
-    <select name="assignee" onchange="this.form.submit()" class="px-3 py-1.5 ring-1 ring-gray-200 rounded-lg bg-white text-gray-700 font-semibold">
+    <select name="assignee" onchange="this.form.submit()" class="tb-select tb-input" style="width:auto;min-width:160px;padding-top:7px;padding-bottom:7px;font-size:0.78rem;">
       <option value="">All assignees</option>
       <% crew.forEach(function (c) { %>
         <option value="<%= c.id %>" <%= assignee === c.id ? 'selected' : '' %>><%= c.full_name %></option>
       <% }) %>
     </select>
     <% if (status !== 'pending' || scope !== 'all' || assignee) { %>
-      <a href="/shift-tasks" class="text-gray-500 hover:text-gray-700 ml-1">Clear</a>
+      <a href="/shift-tasks" class="text-xs text-gray-500 hover:text-gray-700 ml-1">Clear filters</a>
     <% } %>
   </form>
 
-  <!-- Task list -->
+  <!-- ── Task list ───────────────────────────────────────────── -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
     <% if (rows.length === 0) { %>
-      <div class="px-5 py-12 text-center text-sm text-gray-500">No tasks match these filters.</div>
+      <div class="tb-empty">
+        <div class="tb-empty-ic">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        </div>
+        <p class="font-medium text-gray-700">No tasks match these filters.</p>
+        <p class="text-xs text-gray-500 mt-1">Use the form above to allocate one.</p>
+      </div>
     <% } else { %>
       <ul class="divide-y divide-gray-100">
         <% rows.forEach(function (t) { var rp = rolePill(t.assignee_portal_role); var done = t.status === 'done'; %>
@@ -171,3 +410,58 @@
     <% } %>
   </div>
 </div>
+
+<script>
+(function () {
+  // Scope toggle: collapse the booking row when the task is general.
+  var scopeShift = document.getElementById('scope-shift');
+  var scopeGeneral = document.getElementById('scope-general');
+  var bookingRow = document.getElementById('booking-row');
+  var bookingSelect = document.getElementById('booking-select');
+  function syncScope() {
+    if (scopeGeneral && scopeGeneral.checked) {
+      if (bookingRow) bookingRow.style.display = 'none';
+      if (bookingSelect) bookingSelect.value = '';
+    } else {
+      if (bookingRow) bookingRow.style.display = '';
+    }
+  }
+  if (scopeShift)   scopeShift.addEventListener('change', syncScope);
+  if (scopeGeneral) scopeGeneral.addEventListener('change', syncScope);
+  syncScope();
+
+  // Type-to-filter the booking picker. Hides any <option> whose data-search
+  // doesn't include the query, and hides empty <optgroup>s along with it.
+  var search = document.getElementById('booking-search');
+  if (search && bookingSelect) {
+    search.addEventListener('input', function () {
+      var q = search.value.trim().toLowerCase();
+      var groups = bookingSelect.querySelectorAll('optgroup');
+      var totalVisible = 0;
+
+      // Reset all if empty
+      if (!q) {
+        groups.forEach(function (g) { g.style.display = ''; });
+        bookingSelect.querySelectorAll('option').forEach(function (o) { o.hidden = false; });
+        return;
+      }
+
+      groups.forEach(function (g) {
+        var visible = 0;
+        g.querySelectorAll('option').forEach(function (o) {
+          var hay = ((o.dataset.search || '') + ' ' + o.textContent).toLowerCase();
+          var match = hay.indexOf(q) !== -1;
+          o.hidden = !match;
+          if (match) visible++;
+        });
+        g.style.display = visible ? '' : 'none';
+        totalVisible += visible;
+      });
+
+      // Always keep the placeholder option in the DOM
+      var placeholder = bookingSelect.querySelector('option[value=""]');
+      if (placeholder) placeholder.hidden = false;
+    });
+  }
+})();
+</script>
