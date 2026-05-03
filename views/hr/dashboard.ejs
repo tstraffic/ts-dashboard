@@ -17,173 +17,209 @@
     inactive:   'bg-gray-100 text-gray-500',
     offboarded: 'bg-gray-100 text-gray-500',
   };
+
+  // Carry the active filter so links to drill-down lists keep the user's
+  // scope (clicking "Casual" while filtered by Sydney stays on Sydney).
+  function withFilters(extra) {
+    var q = Object.assign({}, filters || {}, extra || {});
+    var parts = [];
+    Object.keys(q).forEach(function (k) {
+      if (q[k] !== undefined && q[k] !== null && q[k] !== '') parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(q[k]));
+    });
+    return parts.length ? '?' + parts.join('&') : '';
+  }
+
+  // Priority alerts — only the items that need someone's attention TODAY.
+  // Renders a single banner row at the very top; if every count is zero
+  // the banner collapses to a calm "all clear" state so the page doesn't
+  // feel noisy when there's nothing urgent.
+  var alerts = [
+    { count: stats.blocked,             label: 'Blocked',         tone: 'red',    href: '/hr/employees?blocked=1',                       hint: 'Cannot be allocated' },
+    { count: stats.expired,             label: 'Expired',         tone: 'red',    href: '/hr/competencies?view=expired',                  hint: 'Past expiry date' },
+    { count: stats.expiring7,           label: 'Due in 7 days',   tone: 'orange', href: '/hr/competencies?view=7days',                    hint: 'Renew this week' },
+    { count: stats.expiring30 - stats.expiring7, label: 'Due in 30 days',  tone: 'amber',  href: '/hr/competencies?view=30days',                   hint: 'Renew this month' },
+    { count: stats.pendingVerification, label: 'Pending docs',    tone: 'yellow', href: '/hr/documents?verification_status=pending',      hint: 'Awaiting verification' },
+  ].filter(function (a) { return (a.count || 0) > 0; });
+
+  var alertTone = {
+    red:    { bg:'bg-red-50',    text:'text-red-700',    ring:'ring-red-600/20',    dot:'bg-red-500' },
+    orange: { bg:'bg-orange-50', text:'text-orange-700', ring:'ring-orange-600/20', dot:'bg-orange-500' },
+    amber:  { bg:'bg-amber-50',  text:'text-amber-700',  ring:'ring-amber-600/20',  dot:'bg-amber-400' },
+    yellow: { bg:'bg-yellow-50', text:'text-yellow-700', ring:'ring-yellow-600/20', dot:'bg-yellow-400' },
+  };
 %>
 
-<div class="space-y-4">
+<div class="space-y-5">
 
-  <!-- Page Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-    <div>
-      <h1 class="text-2xl font-bold text-gray-900">HR Dashboard</h1>
-      <p class="text-sm text-gray-500 mt-1">Workforce overview, compliance tracking & reporting</p>
+  <!-- ========== Header + sticky action toolbar ========== -->
+  <div class="space-y-3">
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">HR Dashboard</h1>
+        <p class="text-sm text-gray-500 mt-0.5">Workforce, compliance and document health at a glance.</p>
+      </div>
     </div>
-    <a href="/hr/employees/new" class="inline-flex items-center justify-center px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition shadow-sm">
-      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-      Add Employee
-    </a>
+
+    <!-- Toolbar: search + quick actions. Sticky on desktop so it stays
+         reachable as you scroll the long page. -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 flex flex-col lg:flex-row lg:items-center gap-3">
+      <form method="GET" action="/hr/employees" class="flex-1 min-w-0" role="search" aria-label="Find an employee">
+        <label class="relative block">
+          <span class="sr-only">Find an employee</span>
+          <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+          <input type="text" name="search" placeholder="Find an employee — name, code, email, phone…"
+            class="w-full pl-10 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+            autocomplete="off">
+        </label>
+      </form>
+
+      <!-- Quick action chips -->
+      <div class="flex flex-wrap items-center gap-2">
+        <a href="/hr/employees/new" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold transition shadow-sm" aria-label="Add employee">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          Add Employee
+        </a>
+        <a href="/hr/roster" class="hr-toolbar-link" aria-label="Open roster">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          Roster
+        </a>
+        <a href="/hr/competencies" class="hr-toolbar-link" aria-label="Open competencies">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+          Competencies
+        </a>
+        <a href="/hr/documents" class="hr-toolbar-link" aria-label="Open documents">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Documents
+        </a>
+        <a href="/hr/reports" class="hr-toolbar-link" aria-label="Open reports">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+          Reports
+        </a>
+      </div>
+    </div>
   </div>
 
-  <!-- Filters -->
+  <!-- ========== Priority Alerts ========== -->
+  <% if (alerts.length > 0) { %>
+    <div role="region" aria-label="Items needing attention" class="rounded-xl border border-gray-200 bg-white p-3 sm:p-4 shadow-sm">
+      <div class="flex items-start gap-3 flex-wrap">
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+          </span>
+          <div>
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Needs attention</p>
+            <p class="text-sm font-semibold text-gray-900">Action required</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 flex-1">
+          <% alerts.forEach(function (a) { var t = alertTone[a.tone]; %>
+            <a href="<%= a.href %>" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full <%= t.bg %> <%= t.text %> ring-1 <%= t.ring %> hover:brightness-95 transition" aria-label="<%= a.count %> <%= a.label %> — <%= a.hint %>">
+              <span class="w-1.5 h-1.5 rounded-full <%= t.dot %>"></span>
+              <span class="text-sm font-bold tabular-nums"><%= a.count %></span>
+              <span class="text-xs font-semibold"><%= a.label %></span>
+            </a>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 sm:p-4 flex items-center gap-3" role="region" aria-label="No urgent items">
+      <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+      </span>
+      <p class="text-sm font-medium text-emerald-800">All clear — no urgent compliance items.</p>
+    </div>
+  <% } %>
+
+  <!-- ========== Scope filters ========== -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-    <form method="GET" action="/hr" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+    <form method="GET" action="/hr" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5">
       <%- include('../partials/csrf') %>
-      <select name="company" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <option value="">All Companies</option>
+      <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest pr-1">Scope</span>
+      <select name="company" class="hr-filter-select" aria-label="Filter by company">
+        <option value="">All companies</option>
         <% if (filterOptions && filterOptions.companies) { filterOptions.companies.forEach(c => { %>
           <option value="<%= c %>" <%= filters.company === c ? 'selected' : '' %>><%= c %></option>
         <% }); } %>
       </select>
-      <select name="division" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <option value="">All Divisions</option>
+      <select name="division" class="hr-filter-select" aria-label="Filter by division">
+        <option value="">All divisions</option>
         <% if (filterOptions && filterOptions.divisions) { filterOptions.divisions.forEach(d => { %>
           <option value="<%= d %>" <%= filters.division === d ? 'selected' : '' %>><%= d %></option>
         <% }); } %>
       </select>
-      <select name="region" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <option value="">All Regions</option>
+      <select name="region" class="hr-filter-select" aria-label="Filter by region">
+        <option value="">All regions</option>
         <% if (filterOptions && filterOptions.regions) { filterOptions.regions.forEach(r => { %>
           <option value="<%= r %>" <%= filters.region === r ? 'selected' : '' %>><%= r %></option>
         <% }); } %>
       </select>
-      <select name="employment_type" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <option value="">All Types</option>
+      <select name="employment_type" class="hr-filter-select" aria-label="Filter by employment type">
+        <option value="">All types</option>
         <option value="full_time" <%= filters.employment_type === 'full_time' ? 'selected' : '' %>>Full Time</option>
         <option value="part_time" <%= filters.employment_type === 'part_time' ? 'selected' : '' %>>Part Time</option>
         <option value="casual" <%= filters.employment_type === 'casual' ? 'selected' : '' %>>Casual</option>
         <option value="contractor" <%= filters.employment_type === 'contractor' ? 'selected' : '' %>>Contractor</option>
         <option value="subcontractor" <%= filters.employment_type === 'subcontractor' ? 'selected' : '' %>>Subcontractor</option>
       </select>
-      <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition">Apply</button>
+      <button type="submit" class="px-3 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-semibold rounded-lg border border-brand-200 transition">Apply</button>
       <% if (filters.company || filters.division || filters.region || filters.employment_type) { %>
         <a href="/hr" class="text-xs text-gray-500 hover:text-red-500 transition">Clear filters</a>
       <% } %>
     </form>
   </div>
 
-  <!-- ===================== HEADCOUNT STATS ===================== -->
+  <!-- ========== Headcount stats — clickable ========== -->
   <div>
     <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Headcount</p>
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      <div class="bg-white border border-gray-200 rounded-xl p-3 hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between">
-          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</p>
-          <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          </div>
+      <a href="/hr/employees<%= withFilters() %>" class="hr-stat" aria-label="<%= stats.total %> total employees">
+        <div class="hr-stat-row">
+          <p class="hr-stat-label text-gray-400">Total</p>
+          <span class="hr-stat-ic bg-gray-100 text-gray-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></span>
         </div>
-        <p class="text-2xl font-bold text-gray-900 mt-2"><%= stats.total %></p>
-      </div>
-      <div class="bg-white border border-gray-200 rounded-xl p-3 hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between">
-          <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Active</p>
-          <div class="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
-            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          </div>
+        <p class="hr-stat-num text-gray-900"><%= stats.total %></p>
+      </a>
+      <a href="/hr/employees<%= withFilters({ status: 'active' }) %>" class="hr-stat" aria-label="<%= stats.active %> active employees">
+        <div class="hr-stat-row">
+          <p class="hr-stat-label text-emerald-500">Active</p>
+          <span class="hr-stat-ic bg-emerald-50 text-emerald-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span>
         </div>
-        <p class="text-2xl font-bold text-emerald-600 mt-2"><%= stats.active %></p>
-      </div>
-      <div class="bg-white border border-gray-200 rounded-xl p-3 hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between">
-          <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Casual</p>
-          <div class="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          </div>
+        <p class="hr-stat-num text-emerald-600"><%= stats.active %></p>
+      </a>
+      <a href="/hr/employees<%= withFilters({ employment_type: 'casual' }) %>" class="hr-stat" aria-label="<%= stats.casual %> casual employees">
+        <div class="hr-stat-row">
+          <p class="hr-stat-label text-blue-400">Casual</p>
+          <span class="hr-stat-ic bg-blue-50 text-blue-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span>
         </div>
-        <p class="text-2xl font-bold text-blue-600 mt-2"><%= stats.casual %></p>
-      </div>
-      <div class="bg-white border border-gray-200 rounded-xl p-3 hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between">
-          <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Subcontractors</p>
-          <div class="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center">
-            <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-          </div>
+        <p class="hr-stat-num text-blue-600"><%= stats.casual %></p>
+      </a>
+      <a href="/hr/employees<%= withFilters({ employment_type: 'subcontractor' }) %>" class="hr-stat" aria-label="<%= stats.subcontractor %> subcontractors">
+        <div class="hr-stat-row">
+          <p class="hr-stat-label text-indigo-400">Subcontractors</p>
+          <span class="hr-stat-ic bg-indigo-50 text-indigo-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></span>
         </div>
-        <p class="text-2xl font-bold text-indigo-600 mt-2"><%= stats.subcontractor %></p>
-      </div>
-      <div class="bg-white border border-gray-200 rounded-xl p-3 hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between">
-          <p class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">On Leave</p>
-          <div class="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
-            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          </div>
+        <p class="hr-stat-num text-indigo-600"><%= stats.subcontractor %></p>
+      </a>
+      <a href="/hr/employees<%= withFilters({ status: 'on_leave' }) %>" class="hr-stat" aria-label="<%= stats.onLeave %> on leave">
+        <div class="hr-stat-row">
+          <p class="hr-stat-label text-amber-400">On Leave</p>
+          <span class="hr-stat-ic bg-amber-50 text-amber-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></span>
         </div>
-        <p class="text-2xl font-bold text-amber-600 mt-2"><%= stats.onLeave %></p>
-      </div>
-      <div class="bg-white border border-gray-200 rounded-xl p-3 hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between">
-          <p class="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Onboarding</p>
-          <div class="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
-            <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-          </div>
+        <p class="hr-stat-num text-amber-600"><%= stats.onLeave %></p>
+      </a>
+      <a href="/hr/employees<%= withFilters({ status: 'onboarding' }) %>" class="hr-stat" aria-label="<%= stats.onboarding %> onboarding">
+        <div class="hr-stat-row">
+          <p class="hr-stat-label text-purple-400">Onboarding</p>
+          <span class="hr-stat-ic bg-purple-50 text-purple-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg></span>
         </div>
-        <p class="text-2xl font-bold text-purple-600 mt-2"><%= stats.onboarding %></p>
-      </div>
+        <p class="hr-stat-num text-purple-600"><%= stats.onboarding %></p>
+      </a>
     </div>
   </div>
 
-  <!-- ===================== COMPLIANCE OVERVIEW ===================== -->
-  <div>
-    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Compliance Overview</p>
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-      <div class="bg-gradient-to-br from-orange-50 to-white border border-orange-200/60 rounded-xl p-3 hover:shadow-md transition-shadow">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-7 h-7 bg-orange-100 rounded-lg flex items-center justify-center">
-            <svg class="w-3.5 h-3.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-          </div>
-          <p class="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Expiring 7d</p>
-        </div>
-        <p class="text-2xl font-bold text-orange-600"><%= stats.expiring7 %></p>
-      </div>
-      <div class="bg-gradient-to-br from-amber-50 to-white border border-amber-200/60 rounded-xl p-3 hover:shadow-md transition-shadow">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-7 h-7 bg-amber-100 rounded-lg flex items-center justify-center">
-            <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          </div>
-          <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Expiring 30d</p>
-        </div>
-        <p class="text-2xl font-bold text-amber-600"><%= stats.expiring30 %></p>
-      </div>
-      <div class="bg-gradient-to-br from-red-50 to-white border border-red-200/60 rounded-xl p-3 hover:shadow-md transition-shadow">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-7 h-7 bg-red-100 rounded-lg flex items-center justify-center">
-            <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </div>
-          <p class="text-[10px] font-bold text-red-500 uppercase tracking-widest">Expired</p>
-        </div>
-        <p class="text-2xl font-bold text-red-600"><%= stats.expired %></p>
-      </div>
-      <div class="bg-gradient-to-br from-red-50 to-white border border-red-200/60 rounded-xl p-3 hover:shadow-md transition-shadow">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-7 h-7 bg-red-100 rounded-lg flex items-center justify-center">
-            <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
-          </div>
-          <p class="text-[10px] font-bold text-red-500 uppercase tracking-widest">Blocked</p>
-        </div>
-        <p class="text-2xl font-bold text-red-600"><%= stats.blocked %></p>
-      </div>
-      <div class="bg-gradient-to-br from-yellow-50 to-white border border-yellow-200/60 rounded-xl p-3 hover:shadow-md transition-shadow">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-7 h-7 bg-yellow-100 rounded-lg flex items-center justify-center">
-            <svg class="w-3.5 h-3.5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          </div>
-          <p class="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">Pending Docs</p>
-        </div>
-        <p class="text-2xl font-bold text-yellow-600"><%= stats.pendingVerification %></p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== COMPLIANCE RATIO BAR CHART ===================== -->
+  <!-- ========== Compliance Ratio bar ========== -->
   <%
     const compliantCount = Math.max(0, stats.active - stats.expired - stats.blocked);
     const nonCompliantCount = stats.expired + stats.blocked;
@@ -197,320 +233,357 @@
     <div class="flex items-center justify-between mb-4">
       <div>
         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Compliance Ratio</p>
-        <p class="text-xs text-gray-400 mt-0.5">Compliant vs non-compliant crew breakdown</p>
+        <p class="text-xs text-gray-400 mt-0.5">Active workforce, broken down by readiness state.</p>
       </div>
-      <span class="text-2xl font-bold <%= compliantPct >= 80 ? 'text-emerald-600' : compliantPct >= 60 ? 'text-amber-600' : 'text-red-600' %>"><%= compliantPct %>%</span>
+      <span class="text-2xl font-bold <%= compliantPct >= 80 ? 'text-emerald-600' : compliantPct >= 60 ? 'text-amber-600' : 'text-red-600' %>" aria-label="<%= compliantPct %>% compliant"><%= compliantPct %>%</span>
     </div>
     <!-- Stacked bar -->
-    <div class="flex h-8 rounded-lg overflow-hidden bg-gray-100 mb-3">
+    <div class="flex h-8 rounded-lg overflow-hidden bg-gray-100 mb-3" role="img" aria-label="Compliance breakdown">
       <% if (compliantCount > 0) { %>
-      <div class="bg-emerald-500 flex items-center justify-center transition-all" style="width: <%= Math.max(compliantPct, 2) %>%">
-        <% if (compliantPct > 15) { %><span class="text-[10px] font-bold text-white"><%= compliantCount %></span><% } %>
-      </div>
+        <div class="bg-emerald-500 flex items-center justify-center transition-all" style="width: <%= Math.max(compliantPct, 2) %>%">
+          <% if (compliantPct > 15) { %><span class="text-[10px] font-bold text-white"><%= compliantCount %></span><% } %>
+        </div>
       <% } %>
       <% if (nonCompliantCount > 0) { %>
-      <div class="bg-red-500 flex items-center justify-center transition-all" style="width: <%= Math.max(nonCompliantPct, 2) %>%">
-        <% if (nonCompliantPct > 15) { %><span class="text-[10px] font-bold text-white"><%= nonCompliantCount %></span><% } %>
-      </div>
+        <div class="bg-red-500 flex items-center justify-center transition-all" style="width: <%= Math.max(nonCompliantPct, 2) %>%">
+          <% if (nonCompliantPct > 15) { %><span class="text-[10px] font-bold text-white"><%= nonCompliantCount %></span><% } %>
+        </div>
       <% } %>
       <% if (pendingDocsCount > 0) { %>
-      <div class="bg-amber-400 flex items-center justify-center transition-all" style="width: <%= Math.max(pendingPct, 2) %>%">
-        <% if (pendingPct > 15) { %><span class="text-[10px] font-bold text-white"><%= pendingDocsCount %></span><% } %>
-      </div>
+        <div class="bg-amber-400 flex items-center justify-center transition-all" style="width: <%= Math.max(pendingPct, 2) %>%">
+          <% if (pendingPct > 15) { %><span class="text-[10px] font-bold text-white"><%= pendingDocsCount %></span><% } %>
+        </div>
       <% } %>
     </div>
-    <!-- Individual metric bars -->
-    <div class="space-y-2">
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-gray-600 w-28 shrink-0 font-medium">Compliant</span>
-        <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
-          <div class="bg-emerald-500 h-full rounded-full flex items-center justify-end pr-2 transition-all" style="width: <%= complianceTotal > 0 ? Math.max((compliantCount / complianceTotal) * 100, 4) : 100 %>%">
-            <span class="text-[10px] text-white font-bold"><%= compliantCount %></span>
-          </div>
-        </div>
-      </div>
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-gray-600 w-28 shrink-0 font-medium">Non-Compliant</span>
-        <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
-          <div class="bg-red-500 h-full rounded-full flex items-center justify-end pr-2 transition-all" style="width: <%= complianceTotal > 0 ? Math.max((nonCompliantCount / complianceTotal) * 100, 4) : 0 %>%">
-            <span class="text-[10px] text-white font-bold"><%= nonCompliantCount %></span>
-          </div>
-        </div>
-      </div>
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-gray-600 w-28 shrink-0 font-medium">Pending Docs</span>
-        <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
-          <div class="bg-amber-400 h-full rounded-full flex items-center justify-end pr-2 transition-all" style="width: <%= complianceTotal > 0 ? Math.max((pendingDocsCount / complianceTotal) * 100, 4) : 0 %>%">
-            <span class="text-[10px] text-white font-bold"><%= pendingDocsCount %></span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 pt-3 border-t border-gray-100">
-      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Compliant</span>
-      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span> Non-Compliant (Expired + Blocked)</span>
-      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span> Pending Documents</span>
+    <div class="flex flex-wrap gap-x-4 gap-y-1">
+      <span class="flex items-center gap-1.5 text-[11px] text-gray-600"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Compliant <span class="text-gray-400">·</span> <span class="font-semibold"><%= compliantCount %></span></span>
+      <span class="flex items-center gap-1.5 text-[11px] text-gray-600"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span> Non-compliant <span class="text-gray-400">·</span> <span class="font-semibold"><%= nonCompliantCount %></span></span>
+      <span class="flex items-center gap-1.5 text-[11px] text-gray-600"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span> Pending docs <span class="text-gray-400">·</span> <span class="font-semibold"><%= pendingDocsCount %></span></span>
     </div>
   </div>
 
-  <!-- ===================== TWO-COLUMN: LICENCES + WORKFORCE ===================== -->
+  <!-- ========== Two-column: Expiring + Workforce ========== -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-    <!-- Expiring Licences & Competencies -->
+    <!-- Expiring Licences -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-amber-50/50 to-white">
+      <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-amber-50/50 to-white">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
           </div>
           <div>
             <h2 class="text-sm font-bold text-gray-900">Expiring Licences</h2>
             <p class="text-[10px] text-gray-400">Next 30 days</p>
           </div>
         </div>
-        <a href="/hr/competencies?view=30days" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View All</a>
+        <a href="/hr/competencies?view=30days" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all ›</a>
       </div>
       <% if (expiringCompetencies && expiringCompetencies.length > 0) { %>
-      <div class="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
-        <% expiringCompetencies.forEach(comp => {
-          const daysLeft = Math.ceil((new Date(comp.expiry_date) - new Date()) / (1000*60*60*24));
-          const urgent = daysLeft <= 7;
-        %>
-        <div class="px-4 py-2 flex items-center justify-between hover:bg-gray-50/50 transition">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 <%= urgent ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600' %>">
-              <%= comp.full_name ? comp.full_name.split(' ').map(n => n[0]).join('').substring(0,2) : '?' %>
-            </div>
-            <div class="min-w-0">
-              <a href="/hr/employees/<%= comp.employee_id %>#competencies" class="text-sm font-medium text-gray-900 hover:text-brand-600 transition truncate block"><%= comp.full_name %></a>
-              <p class="text-[11px] text-gray-400 truncate"><%= formatType(comp.competency_type) %><% if (comp.competency_name) { %> &mdash; <%= comp.competency_name %><% } %></p>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 shrink-0 ml-3">
-            <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold <%= urgent ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' %>">
-              <%= daysLeft %>d left
-            </span>
-          </div>
-        </div>
-        <% }); %>
-      </div>
+        <ul class="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
+          <% expiringCompetencies.forEach(comp => {
+            const daysLeft = Math.ceil((new Date(comp.expiry_date) - new Date()) / (1000*60*60*24));
+            const urgent = daysLeft <= 7;
+          %>
+            <li>
+              <a href="/hr/employees/<%= comp.employee_id %>#competencies" class="px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 <%= urgent ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600' %>">
+                    <%= comp.full_name ? comp.full_name.split(' ').map(n => n[0]).join('').substring(0,2) : '?' %>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate"><%= comp.full_name %></p>
+                    <p class="text-[11px] text-gray-500 truncate"><%= formatType(comp.competency_type) %><% if (comp.competency_name) { %> &middot; <%= comp.competency_name %><% } %></p>
+                  </div>
+                </div>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ml-3 <%= urgent ? 'bg-red-50 text-red-700 ring-1 ring-red-600/20' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' %>">
+                  <%= daysLeft %>d
+                </span>
+              </a>
+            </li>
+          <% }); %>
+        </ul>
       <% } else { %>
-      <div class="p-5 text-center">
-        <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
-          <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="p-5 text-center">
+          <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <p class="text-sm text-gray-500">All licences are up to date</p>
         </div>
-        <p class="text-sm text-gray-500">All licences are up to date</p>
-      </div>
       <% } %>
     </div>
 
     <!-- Workforce Breakdown -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-2.5 bg-gradient-to-r from-brand-50/50 to-white">
+      <div class="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2.5 bg-gradient-to-r from-brand-50/50 to-white">
         <div class="w-8 h-8 bg-brand-100 rounded-lg flex items-center justify-center">
-          <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
         </div>
         <div>
           <h2 class="text-sm font-bold text-gray-900">Workforce Breakdown</h2>
-          <p class="text-[10px] text-gray-400">By type & division</p>
+          <p class="text-[10px] text-gray-400">By type &amp; division</p>
         </div>
       </div>
       <div class="p-5 space-y-5">
-        <!-- Employment Types -->
         <% if (employmentTypes && employmentTypes.length > 0) { %>
-        <div>
-          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">By Employment Type</p>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <% employmentTypes.forEach(t => {
-              const colors = { full_time: 'bg-emerald-50 text-emerald-700 border-emerald-200', part_time: 'bg-blue-50 text-blue-700 border-blue-200', casual: 'bg-cyan-50 text-cyan-700 border-cyan-200', contractor: 'bg-violet-50 text-violet-700 border-violet-200', subcontractor: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
-              const colorClass = colors[t.employment_type] || 'bg-gray-50 text-gray-700 border-gray-200';
-            %>
-            <div class="text-center p-3 rounded-lg border <%= colorClass %>">
-              <p class="text-xl font-bold"><%= t.count %></p>
-              <p class="text-[10px] mt-0.5 opacity-80"><%= formatType(t.employment_type) %></p>
+          <div>
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">By employment type</p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <% employmentTypes.forEach(t => {
+                const colors = { full_time: 'bg-emerald-50 text-emerald-700 border-emerald-200', part_time: 'bg-blue-50 text-blue-700 border-blue-200', casual: 'bg-cyan-50 text-cyan-700 border-cyan-200', contractor: 'bg-violet-50 text-violet-700 border-violet-200', subcontractor: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+                const colorClass = colors[t.employment_type] || 'bg-gray-50 text-gray-700 border-gray-200';
+              %>
+                <a href="/hr/employees?employment_type=<%= t.employment_type %>" class="block text-center p-3 rounded-lg border <%= colorClass %> hover:brightness-95 transition">
+                  <p class="text-xl font-bold"><%= t.count %></p>
+                  <p class="text-[10px] mt-0.5 opacity-80"><%= formatType(t.employment_type) %></p>
+                </a>
+              <% }); %>
             </div>
-            <% }); %>
           </div>
-        </div>
         <% } %>
 
-        <!-- Division Bars -->
         <% if (headcountByDivision && headcountByDivision.length > 0) { %>
-        <div>
-          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">By Division</p>
-          <div class="space-y-2">
-            <% const maxDiv = Math.max(...headcountByDivision.map(d => d.count), 1); %>
-            <% headcountByDivision.forEach(d => { %>
-            <div class="flex items-center gap-3">
-              <span class="text-xs text-gray-600 w-24 shrink-0 truncate font-medium"><%= formatType(d.division) %></span>
-              <div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
-                <div class="bg-gradient-to-r from-brand-500 to-brand-400 h-full rounded-full flex items-center justify-end pr-2.5 transition-all" style="width: <%= Math.max((d.count / maxDiv) * 100, 12) %>%">
-                  <span class="text-[10px] text-white font-bold"><%= d.count %></span>
-                </div>
-              </div>
+          <div>
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">By division</p>
+            <div class="space-y-2">
+              <% const maxDiv = Math.max(...headcountByDivision.map(d => d.count), 1); %>
+              <% headcountByDivision.forEach(d => { %>
+                <a href="/hr/employees?division=<%= encodeURIComponent(d.division) %>" class="flex items-center gap-3 hover:opacity-90 transition">
+                  <span class="text-xs text-gray-700 w-24 shrink-0 truncate font-medium"><%= formatType(d.division) %></span>
+                  <div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+                    <div class="bg-gradient-to-r from-brand-500 to-brand-400 h-full rounded-full flex items-center justify-end pr-2.5 transition-all" style="width: <%= Math.max((d.count / maxDiv) * 100, 12) %>%">
+                      <span class="text-[10px] text-white font-bold"><%= d.count %></span>
+                    </div>
+                  </div>
+                </a>
+              <% }); %>
             </div>
-            <% }); %>
           </div>
-        </div>
         <% } %>
 
         <% if ((!employmentTypes || employmentTypes.length === 0) && (!headcountByDivision || headcountByDivision.length === 0)) { %>
-        <div class="text-center py-4">
-          <p class="text-sm text-gray-400">No workforce data available yet.</p>
-        </div>
+          <div class="text-center py-4">
+            <p class="text-sm text-gray-400">No workforce data available yet.</p>
+          </div>
         <% } %>
       </div>
     </div>
 
   </div>
 
-  <!-- ===================== TWO-COLUMN: BLOCKED + MISSING DOCS ===================== -->
+  <!-- ========== Two-column: Blocked + Missing Docs ========== -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
     <!-- Blocked Workers -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-2.5 bg-gradient-to-r from-red-50/50 to-white">
-        <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-          <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+      <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-red-50/50 to-white">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-gray-900">Blocked Workers</h2>
+            <p class="text-[10px] text-gray-400">Cannot be allocated</p>
+          </div>
         </div>
-        <div>
-          <h2 class="text-sm font-bold text-gray-900">Blocked Workers</h2>
-          <p class="text-[10px] text-gray-400">Cannot be allocated</p>
-        </div>
+        <% if (blockedWorkers && blockedWorkers.length > 0) { %>
+          <a href="/hr/employees?blocked=1" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all ›</a>
+        <% } %>
       </div>
       <% if (blockedWorkers && blockedWorkers.length > 0) { %>
-      <div class="divide-y divide-gray-100 max-h-[300px] overflow-y-auto">
-        <% blockedWorkers.forEach(emp => { %>
-        <div class="px-4 py-2 flex items-center justify-between hover:bg-gray-50/50 transition">
-          <div class="min-w-0">
-            <a href="/hr/employees/<%= emp.id %>" class="text-sm font-medium text-gray-900 hover:text-brand-600 transition truncate block"><%= emp.full_name %></a>
-            <p class="text-[11px] text-gray-400"><%= emp.company || 'No company' %></p>
-          </div>
-          <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-red-50 text-red-600 ring-1 ring-red-500/20 shrink-0 ml-3 max-w-[150px] truncate">
-            <%= emp.block_reason || 'No reason' %>
-          </span>
-        </div>
-        <% }); %>
-      </div>
+        <ul class="divide-y divide-gray-100 max-h-[300px] overflow-y-auto">
+          <% blockedWorkers.forEach(emp => { %>
+            <li>
+              <a href="/hr/employees/<%= emp.id %>" class="px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-gray-900 truncate"><%= emp.full_name %></p>
+                  <p class="text-[11px] text-gray-400"><%= emp.company || 'No company' %></p>
+                </div>
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-red-50 text-red-600 ring-1 ring-red-500/20 shrink-0 ml-3 max-w-[170px] truncate">
+                  <%= emp.block_reason || 'No reason' %>
+                </span>
+              </a>
+            </li>
+          <% }); %>
+        </ul>
       <% } else { %>
-      <div class="p-5 text-center">
-        <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
-          <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="p-5 text-center">
+          <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <p class="text-sm text-gray-500">No workers are blocked</p>
         </div>
-        <p class="text-sm text-gray-500">No workers are blocked</p>
-      </div>
       <% } %>
     </div>
 
     <!-- Missing Mandatory Documents -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-yellow-50/50 to-white">
+      <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-yellow-50/50 to-white">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-            <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
           </div>
           <div>
             <h2 class="text-sm font-bold text-gray-900">Missing Documents</h2>
             <p class="text-[10px] text-gray-400">Unverified mandatory docs</p>
           </div>
         </div>
-        <a href="/hr/documents?mandatory=1&verification_status=pending" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View All</a>
+        <a href="/hr/documents?mandatory=1&verification_status=pending" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all ›</a>
       </div>
       <% if (missingDocs && missingDocs.length > 0) { %>
-      <div class="divide-y divide-gray-100 max-h-[300px] overflow-y-auto">
-        <% missingDocs.forEach(emp => { %>
-        <div class="px-4 py-2 flex items-center justify-between hover:bg-gray-50/50 transition">
-          <div class="min-w-0">
-            <a href="/hr/employees/<%= emp.id %>#documents" class="text-sm font-medium text-gray-900 hover:text-brand-600 transition truncate block"><%= emp.full_name %></a>
-            <p class="text-[11px] text-gray-400"><%= emp.company || 'No company' %></p>
-          </div>
-          <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold bg-yellow-50 text-yellow-700 ring-1 ring-yellow-500/20 shrink-0 ml-3">
-            <%= emp.unverified_count %> unverified
-          </span>
-        </div>
-        <% }); %>
-      </div>
+        <ul class="divide-y divide-gray-100 max-h-[300px] overflow-y-auto">
+          <% missingDocs.forEach(emp => { %>
+            <li>
+              <a href="/hr/employees/<%= emp.id %>#documents" class="px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-gray-900 truncate"><%= emp.full_name %></p>
+                  <p class="text-[11px] text-gray-400"><%= emp.company || 'No company' %></p>
+                </div>
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold bg-yellow-50 text-yellow-700 ring-1 ring-yellow-500/20 shrink-0 ml-3">
+                  <%= emp.unverified_count %> unverified
+                </span>
+              </a>
+            </li>
+          <% }); %>
+        </ul>
       <% } else { %>
-      <div class="p-5 text-center">
-        <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
-          <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="p-5 text-center">
+          <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <p class="text-sm text-gray-500">All mandatory documents verified</p>
         </div>
-        <p class="text-sm text-gray-500">All mandatory documents verified</p>
-      </div>
       <% } %>
     </div>
 
   </div>
 
-  <!-- ===================== RECENT EMPLOYEES ===================== -->
+  <!-- ========== Recent Employees ========== -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+    <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
       <div class="flex items-center gap-2.5">
         <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
         </div>
         <h2 class="text-sm font-bold text-gray-900">Recent Employees</h2>
       </div>
-      <a href="/hr/employees" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View All Employees</a>
+      <a href="/hr/employees" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all ›</a>
     </div>
     <% if (recentEmployees && recentEmployees.length > 0) { %>
-    <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead>
-          <tr class="border-b border-gray-200">
-            <th class="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
-            <th class="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Company</th>
-            <th class="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Role</th>
-            <th class="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-            <th class="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Start Date</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <% recentEmployees.forEach(emp => { %>
-          <tr class="hover:bg-gray-50/50 transition">
-            <td class="px-4 py-2">
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-bold shrink-0">
-                  <%= emp.first_name ? emp.first_name[0] : '' %><%= emp.last_name ? emp.last_name[0] : '' %>
-                </div>
-                <div>
-                  <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %> <%= emp.last_name %></a>
-                  <% if (emp.manager_name) { %>
-                    <p class="text-[10px] text-gray-400 mt-0.5">Manager: <%= emp.manager_name %></p>
-                  <% } %>
-                </div>
-              </div>
-            </td>
-            <td class="px-4 py-2 text-gray-500 text-xs hidden sm:table-cell"><%= emp.company || '-' %></td>
-            <td class="px-4 py-2 text-gray-600 text-xs hidden md:table-cell"><%= emp.role_title || '-' %></td>
-            <td class="px-4 py-2">
-              <% const badgeClass = statusBadge[emp.employment_status] || statusBadge.inactive; %>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= badgeClass %>">
-                <%= (emp.employment_status || 'unknown').replace(/_/g, ' ') %>
-              </span>
-            </td>
-            <td class="px-4 py-2 text-gray-500 text-xs tabular-nums hidden lg:table-cell"><%= formatDate(emp.start_date) %></td>
-          </tr>
-          <% }); %>
-        </tbody>
-      </table>
-    </div>
-    <div class="px-4 py-2 border-t border-gray-100 text-xs text-gray-400">
-      Showing <%= recentEmployees.length %> most recent
-    </div>
-    <% } else { %>
-    <div class="p-6 text-center">
-      <div class="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
-        <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th class="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
+              <th class="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Company</th>
+              <th class="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Role</th>
+              <th class="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+              <th class="px-4 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Start date</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% recentEmployees.forEach(emp => { %>
+              <tr class="hover:bg-gray-50/50 transition">
+                <td class="px-4 py-2">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-bold shrink-0">
+                      <%= emp.first_name ? emp.first_name[0] : '' %><%= emp.last_name ? emp.last_name[0] : '' %>
+                    </div>
+                    <div class="min-w-0">
+                      <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %> <%= emp.last_name %></a>
+                      <% if (emp.manager_name) { %>
+                        <p class="text-[10px] text-gray-400 mt-0.5">Manager: <%= emp.manager_name %></p>
+                      <% } %>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-4 py-2 text-gray-500 text-xs hidden sm:table-cell"><%= emp.company || '-' %></td>
+                <td class="px-4 py-2 text-gray-600 text-xs hidden md:table-cell"><%= emp.role_title || '-' %></td>
+                <td class="px-4 py-2">
+                  <% const badgeClass = statusBadge[emp.employment_status] || statusBadge.inactive; %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium <%= badgeClass %>">
+                    <%= (emp.employment_status || 'unknown').replace(/_/g, ' ') %>
+                  </span>
+                </td>
+                <td class="px-4 py-2 text-gray-500 text-xs tabular-nums hidden lg:table-cell"><%= formatDate(emp.start_date) %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
       </div>
-      <h3 class="text-gray-900 font-semibold text-base mb-1">No employees found</h3>
-      <p class="text-gray-500 text-sm mb-4">Get started by adding your first employee to the HR system.</p>
-      <a href="/hr/employees/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-        Add Employee
-      </a>
-    </div>
+      <div class="px-4 py-2 border-t border-gray-100 text-xs text-gray-400">
+        Showing <%= recentEmployees.length %> most recent
+      </div>
+    <% } else { %>
+      <div class="p-6 text-center">
+        <div class="w-10 h-10 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </div>
+        <h3 class="text-gray-900 font-semibold text-base mb-1">No employees found</h3>
+        <p class="text-gray-500 text-sm mb-4">Get started by adding your first employee.</p>
+        <a href="/hr/employees/new" class="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+          Add Employee
+        </a>
+      </div>
     <% } %>
   </div>
 
 </div>
+
+<style>
+  /* Reusable bits — keep the dashboard's many cards visually consistent. */
+  .hr-toolbar-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: #F9FAFB;
+    color: #374151;
+    border: 1px solid #E5E7EB;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .hr-toolbar-link:hover {
+    background: #F3F4F6;
+    color: #1F2937;
+    border-color: #D1D5DB;
+  }
+  .hr-filter-select {
+    padding: 7px 28px 7px 10px;
+    background: #fff;
+    border: 1px solid #D1D5DB;
+    border-radius: 8px;
+    color: #374151;
+    font-size: 0.78rem;
+    font-weight: 500;
+    appearance: none;
+    color-scheme: light;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236B7280' stroke-width='2' viewBox='0 0 24 24'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+  }
+  .hr-filter-select:focus {
+    outline: none;
+    border-color: #2B7FFF;
+    box-shadow: 0 0 0 3px rgba(43,127,255,0.18);
+  }
+
+  /* Clickable headcount stat tile */
+  .hr-stat {
+    display: block;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+    text-decoration: none;
+  }
+  .hr-stat:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateY(-1px); border-color: #D1D5DB; }
+  .hr-stat-row { display: flex; align-items: center; justify-content: space-between; }
+  .hr-stat-label { font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
+  .hr-stat-num { font-size: 1.5rem; font-weight: 800; line-height: 1.1; margin-top: 6px; letter-spacing: -0.02em; }
+  .hr-stat-ic { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+</style>
