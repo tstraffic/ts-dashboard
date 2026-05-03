@@ -180,29 +180,46 @@ router.get('/home', async (req, res) => {
   // Today timeline
   const timeline = buildTodayTimeline(todaysShifts);
 
-  // Weather for next shift site — or depot fallback when the worker has nothing scheduled.
+  // Weather — pick the most relevant location for the worker:
+  //   1. Today's first shift site (in-progress or upcoming today)
+  //   2. The NEXT CONFIRMED upcoming shift site (skipping unconfirmed/declined)
+  //   3. The next upcoming shift site (any status)
+  //   4. The depot (fallback)
+  // If geocoding the chosen site fails (rural address, typo, etc.) we
+  // automatically fall through to the depot so the card still renders —
+  // workers were getting a blank space instead of weather when the lookup
+  // failed silently.
   let weather = null;
   let weatherSource = null; // 'shift' | 'depot'
   try {
-    const shiftForWeather = todaysShifts[0] || upcomingShifts[0];
-    let q = null;
-    if (shiftForWeather) {
-      q = [shiftForWeather.suburb, shiftForWeather.site_address].filter(Boolean).join(', ');
-      weatherSource = 'shift';
-    } else {
-      q = (process.env.DEPOT_SUBURB || 'Villawood NSW').trim();
-      weatherSource = 'depot';
-    }
-    if (q) {
+    const nextConfirmed = upcomingShifts.find(s => s.status === 'confirmed');
+    const shiftForWeather = todaysShifts[0] || nextConfirmed || upcomingShifts[0];
+    const depotQ = (process.env.DEPOT_SUBURB || 'Villawood NSW').trim();
+
+    async function tryFetch(q) {
+      if (!q) return null;
       const geo = await geocodeAddress(q);
-      if (geo) weather = await getWeather(geo.lat, geo.lng);
+      if (!geo) return null;
+      const w = await getWeather(geo.lat, geo.lng);
+      if (!w) return null;
+      w.city = geo.city || '';
+      return w;
+    }
+
+    if (shiftForWeather) {
+      const shiftQ = [shiftForWeather.suburb, shiftForWeather.site_address].filter(Boolean).join(', ');
+      weather = await tryFetch(shiftQ);
       if (weather) {
-        weather.source = weatherSource;
-        weather.city = geo && geo.city ? geo.city : '';
-        if (shiftForWeather) weather.forShift = shiftForWeather;
+        weatherSource = 'shift';
+        weather.forShift = shiftForWeather;
       }
     }
-  } catch (e) { /* best effort */ }
+    if (!weather) {
+      weather = await tryFetch(depotQ);
+      if (weather) weatherSource = 'depot';
+    }
+    if (weather) weather.source = weatherSource;
+  } catch (e) { console.warn('[home] weather fetch failed:', e.message); }
 
   // Job-Pack completion nudge: how many of the 5 checklists has this worker
   // filed for shifts on the LAST 7 DAYS, vs how many were expected? Drives
