@@ -274,6 +274,25 @@ function buildSmartCards(db, worker, member, employee) {
     });
   }
 
+  // Prune stale "shift_<iso>" cards — the buildSmartCards run for
+  // tomorrow's shift writes a card keyed by tomorrow's ISO date. Once
+  // that date passes (or the next day's run swaps in a new key), the
+  // old card sticks around in the For-You feed reading "Shift tomorrow"
+  // even though that shift is now today's shift. Wipe any shift_* keys
+  // whose date is before today so they don't accumulate.
+  try {
+    const today = localIso(new Date());
+    // Use <= so the card generated yesterday (key = today's iso) gets
+    // wiped — at that point the shift is no longer "tomorrow", it's
+    // either today or in the past, and the Today timeline covers it.
+    db.prepare(`
+      DELETE FROM home_cards
+      WHERE crew_member_id = ?
+        AND card_type = 'shift_tomorrow'
+        AND card_key <= ?
+    `).run(worker.id, 'shift_' + today);
+  } catch (e) { /* ignore */ }
+
   // Upsert derived cards — keep existing dismissals/acks
   const upsert = db.prepare(`
     INSERT INTO home_cards (crew_member_id, card_type, card_key, priority, payload, shown_at)
