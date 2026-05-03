@@ -189,16 +189,28 @@ function buildSmartCards(db, worker, member, employee) {
     }
   }
 
-  // Shift tomorrow
+  // Shift tomorrow — pulls from crew_allocations and falls back through
+  // jobs → bookings so booking-only shifts (no job_id) still show a real
+  // place name in the card instead of "null".
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
   const tomIso = localIso(tomorrow);
   const tomorrowShift = db.prepare(`
-    SELECT ca.start_time, ca.end_time, ca.shift_type, j.client, j.suburb
-    FROM crew_allocations ca LEFT JOIN jobs j ON ca.job_id = j.id
+    SELECT ca.start_time, ca.end_time, ca.shift_type,
+           COALESCE(NULLIF(j.suburb, ''),       NULLIF(b.suburb, ''))       AS suburb,
+           COALESCE(NULLIF(j.site_address, ''), NULLIF(b.site_address, '')) AS site_address,
+           COALESCE(NULLIF(j.client, ''),       NULLIF(b.title, ''))        AS client
+    FROM crew_allocations ca
+    LEFT JOIN jobs j     ON ca.job_id = j.id
+    LEFT JOIN bookings b ON ca.booking_id = b.id
     WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
     ORDER BY ca.start_time ASC LIMIT 1
   `).get(worker.id, tomIso);
   if (tomorrowShift) {
+    // Title: prefer suburb, then street address, then client name. Body:
+    // skip the "with X" tail entirely if we have nothing meaningful — an
+    // empty suffix beats a literal "null".
+    const place = tomorrowShift.suburb || tomorrowShift.site_address || tomorrowShift.client || 'your shift';
+    const tail  = tomorrowShift.client && tomorrowShift.client !== place ? ` with ${tomorrowShift.client}` : '';
     derived.push({
       card_key: `shift_${tomIso}`,
       card_type: 'shift_tomorrow',
@@ -206,8 +218,8 @@ function buildSmartCards(db, worker, member, employee) {
       payload: {
         icon: 'calendar',
         tone: 'blue',
-        title: `Shift tomorrow at ${tomorrowShift.suburb || tomorrowShift.client}`,
-        body: `${formatTime(tomorrowShift.start_time)}–${formatTime(tomorrowShift.end_time)} with ${tomorrowShift.client}`,
+        title: `Shift tomorrow at ${place}`,
+        body: `${formatTime(tomorrowShift.start_time)}–${formatTime(tomorrowShift.end_time)}${tail}`,
         cta: 'Details',
         link: '/w/shifts',
       }
