@@ -21,6 +21,41 @@ router.get('/jobs', (req, res) => {
   const today = sydneyToday();
   const tab = req.query.tab || 'upcoming';
 
+  // Reconcile any drift between booking_crew and crew_allocations for
+  // this worker — a previous bug in the /w/booking-shift/:id/respond
+  // handler updated booking_crew but not the lazy-bound allocation, so
+  // existing accepted shifts can be stuck in Requests forever. Fix on
+  // read so the user sees the correct state without us having to ship
+  // a one-off migration.
+  try {
+    db.prepare(`
+      UPDATE crew_allocations
+      SET status = 'confirmed', confirmed_at = COALESCE(confirmed_at, CURRENT_TIMESTAMP)
+      WHERE crew_member_id = ?
+        AND status = 'allocated'
+        AND booking_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM booking_crew bc
+           WHERE bc.booking_id = crew_allocations.booking_id
+             AND bc.crew_member_id = crew_allocations.crew_member_id
+             AND bc.status = 'confirmed'
+        )
+    `).run(worker.id);
+    db.prepare(`
+      UPDATE crew_allocations
+      SET status = 'declined'
+      WHERE crew_member_id = ?
+        AND status IN ('allocated','confirmed')
+        AND booking_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM booking_crew bc
+           WHERE bc.booking_id = crew_allocations.booking_id
+             AND bc.crew_member_id = crew_allocations.crew_member_id
+             AND bc.status = 'declined'
+        )
+    `).run(worker.id);
+  } catch (e) { /* legacy DB without booking_crew — skip */ }
+
   // The bookings table CHECK uses these literal status values:
   //   'unconfirmed','confirmed','green_to_go','in_progress','completed',
   //   'cancelled','late_cancellation','on_hold'
@@ -707,6 +742,11 @@ router.post('/bookings/:id/respond', (req, res) => {
   if (action === 'accept') {
     db.prepare("UPDATE booking_crew SET status = 'confirmed', confirmed_at = CURRENT_TIMESTAMP WHERE booking_id = ? AND crew_member_id = ?")
       .run(req.params.id, worker.id);
+    // Mirror the confirmation onto the lazy-bound crew_allocations row so
+    // the worker shifts list (which filters on ca.status) flips this shift
+    // out of "Requests" and into "Confirmed" immediately.
+    db.prepare("UPDATE crew_allocations SET status = 'confirmed', confirmed_at = CURRENT_TIMESTAMP WHERE booking_id = ? AND crew_member_id = ? AND status = 'allocated'")
+      .run(req.params.id, worker.id);
 
     // Check if ALL crew confirmed → auto-GTG
     const total = db.prepare("SELECT COUNT(*) as c FROM booking_crew WHERE booking_id = ?").get(req.params.id);
@@ -720,6 +760,8 @@ router.post('/bookings/:id/respond', (req, res) => {
     req.flash('success', 'Shift accepted!');
   } else {
     db.prepare("UPDATE booking_crew SET status = 'declined' WHERE booking_id = ? AND crew_member_id = ?")
+      .run(req.params.id, worker.id);
+    db.prepare("UPDATE crew_allocations SET status = 'declined' WHERE booking_id = ? AND crew_member_id = ? AND status IN ('allocated','confirmed')")
       .run(req.params.id, worker.id);
     req.flash('success', 'Shift declined.');
   }
