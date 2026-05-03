@@ -138,16 +138,31 @@ router.get('/jobs/:id', (req, res) => {
   const worker = req.session.worker;
   const tab = req.query.tab || 'info';
 
-  // Get this allocation (must belong to this worker)
+  // Get this allocation (must belong to this worker). LEFT JOIN both
+  // jobs AND bookings — for ad-hoc bookings (job_id NULL post-mig 142)
+  // we COALESCE the booking columns into the same field names the
+  // EJS expects, so the detail page renders the same data set whether
+  // the worker arrived via /w/jobs/:allocId or /w/booking-shift/:id.
   const allocation = db.prepare(`
-    SELECT ca.*, j.job_number, j.job_name, j.client, j.site_address, j.suburb,
-      j.status as job_status, j.notes as job_notes,
-      j.start_date as job_start, j.end_date as job_end,
-      j.project_name, j.client_project_number, j.state, j.crew_size,
-      u.full_name as supervisor_name, u.email as supervisor_email
+    SELECT ca.*,
+      COALESCE(j.job_number, b.booking_number)        AS job_number,
+      COALESCE(j.job_name,   b.title)                 AS job_name,
+      COALESCE(j.client,     b.title)                 AS client,
+      COALESCE(j.site_address, b.site_address)        AS site_address,
+      COALESCE(j.suburb,     b.suburb)                AS suburb,
+      COALESCE(j.status,     b.status)                AS job_status,
+      COALESCE(j.notes,      b.notes)                 AS job_notes,
+      COALESCE(j.start_date, DATE(b.start_datetime))  AS job_start,
+      COALESCE(j.end_date,   DATE(b.end_datetime))    AS job_end,
+      COALESCE(j.project_name, b.title)               AS project_name,
+      COALESCE(j.client_project_number, '')           AS client_project_number,
+      COALESCE(j.state,      b.state)                 AS state,
+      j.crew_size                                     AS crew_size,
+      u.full_name AS supervisor_name, u.email AS supervisor_email
     FROM crew_allocations ca
-    LEFT JOIN jobs j ON ca.job_id = j.id
-    LEFT JOIN users u ON j.ops_supervisor_id = u.id
+    LEFT JOIN jobs j     ON ca.job_id = j.id
+    LEFT JOIN bookings b ON ca.booking_id = b.id
+    LEFT JOIN users u    ON j.ops_supervisor_id = u.id
     WHERE ca.id = ? AND ca.crew_member_id = ?
   `).get(req.params.id, worker.id);
 

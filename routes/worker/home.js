@@ -19,6 +19,12 @@ router.get('/home', async (req, res) => {
   // Booking statuses worth showing on home (everything except cancelled).
   const VISIBLE_BOOKING_STATUSES = ['unconfirmed','confirmed','green_to_go','in_progress','completed','on_hold'];
 
+  // Tag the source like /w/jobs does so the home card's "Open shift" /
+  // "Fill docket" buttons route correctly: booking-only allocations
+  // (job_id NULL) need /w/booking-shift/:bookingId to pick up the full
+  // detail set. Hardcoding source='allocation' here was sending those
+  // shifts to /w/jobs/:id which only LEFT JOINs jobs and so showed
+  // blanks for everything sourced from the booking.
   const todaysShifts = db.prepare(`
     SELECT ca.*,
            COALESCE(j.job_number, b.booking_number) AS job_number,
@@ -28,7 +34,8 @@ router.get('/home', async (req, res) => {
            COALESCE(j.suburb,     b.suburb)         AS suburb,
            j.status AS job_status,
            u.full_name AS supervisor_name,
-           'allocation' AS source
+           CASE WHEN ca.job_id IS NULL AND ca.booking_id IS NOT NULL
+                THEN 'booking' ELSE 'allocation' END AS source
     FROM crew_allocations ca
     LEFT JOIN jobs j     ON ca.job_id = j.id
     LEFT JOIN bookings b ON ca.booking_id = b.id
