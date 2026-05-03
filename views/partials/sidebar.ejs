@@ -95,21 +95,6 @@
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
       <span class="flex-1">Site Audits</span>
     </a>
-    <%
-      // Single "Job Pack" sidebar entry — Forms, Checklist Register and
-      // Signed Dockets all live as tabs inside one workspace, so the
-      // sidebar stays tidy. Highlights for any of the three sub-pages.
-      var jpActive = typeof currentPage !== 'undefined' &&
-        ['safety-forms','checklist-register','dockets-admin'].includes(currentPage);
-    %>
-    <a href="/safety-forms" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= jpActive ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
-      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path d="M9 11l3 3 5-5"/><path d="M21 12c0 6-4.5 9-9 10C7.5 21 3 18 3 12V6l9-3 9 3z"/></svg>
-      <span class="flex-1">Job Pack</span>
-    </a>
-    <a href="/shift-tasks" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'shift-tasks' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
-      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path d="M9 11l3 3 5-5"/><path d="M5 5h14v14H5z"/></svg>
-      <span class="flex-1">Tasks Board</span>
-    </a>
     <% } %>
     <% } %>
 
@@ -150,6 +135,21 @@
       <% if (b.allocations) { %><span class="sidebar-badge bg-blue-500 text-white"><%= b.allocations %></span><% } %>
     </a>
     <% } %>
+    <%
+      // Job Pack groups Forms, Checklist Register and Signed Dockets as
+      // tabs inside one workspace, so the sidebar stays tidy. Highlights
+      // for any of the three sub-pages.
+      var jpActive = typeof currentPage !== 'undefined' &&
+        ['safety-forms','checklist-register','dockets-admin'].includes(currentPage);
+    %>
+    <a href="/safety-forms" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= jpActive ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
+      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M9 11l3 3 5-5"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12c0 6-4.5 9-9 10C7.5 21 3 18 3 12V6l9-3 9 3z"/></svg>
+      <span class="flex-1">Job Pack</span>
+    </a>
+    <a href="/shift-tasks" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'shift-tasks' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
+      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7"><rect x="4" y="5" width="16" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 11l2 2 4-4"/></svg>
+      <span class="flex-1">Tasks Board</span>
+    </a>
     <% if (canAccess(user, 'incidents')) { %>
     <a href="/incidents" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'incidents' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
