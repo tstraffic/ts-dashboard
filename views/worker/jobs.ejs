@@ -113,31 +113,55 @@
   .ws-day-title.today { color: #FCD34D; }
   .ws-day-meta { font-size: 0.65rem; color: rgba(255,255,255,0.4); }
 
-  /* Shift card */
+  /* Shift card — three-row layout:
+       row 1: time chip + booking number (right)
+       row 2: title (large)
+       row 3: location with pin icon
+       row 4: status + role pills
+     Cleaner than the previous "6am at Greenacre to ~2:30pm" run-on line. */
   .ws-shift {
     display: flex; align-items: stretch; gap: 0;
     background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 12px;
+    border-radius: 14px;
     overflow: hidden;
     text-decoration: none;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
+  .ws-shift:active { transform: scale(0.995); background: rgba(255,255,255,0.05); }
   .ws-shift-bar { width: 3px; flex-shrink: 0; background: linear-gradient(180deg, #2B7FFF, #00D2BE); }
   .ws-shift.is-allocated .ws-shift-bar { background: linear-gradient(180deg, #F59E0B, #F97316); }
   .ws-shift.is-past .ws-shift-bar { background: rgba(255,255,255,0.15); }
-  .ws-shift-body { flex: 1; min-width: 0; padding: 11px 12px; }
-  .ws-shift-top {
-    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
-    margin-bottom: 3px;
+  .ws-shift-body { flex: 1; min-width: 0; padding: 12px 14px; }
+
+  /* Row 1: time chip + booking # */
+  .ws-shift-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ws-shift-time {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 0.78rem; font-weight: 700; color: #fff;
+    font-variant-numeric: tabular-nums; line-height: 1;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px;
+    padding: 5px 10px;
   }
-  .ws-shift-time { font-size: 0.85rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; line-height: 1.25; }
+  .ws-shift-time svg { width: 12px; height: 12px; color: rgba(255,255,255,0.55); }
+  .ws-shift.is-allocated .ws-shift-time { background: rgba(245,158,11,0.10); border-color: rgba(245,158,11,0.32); color: #FCD34D; }
+  .ws-shift.is-allocated .ws-shift-time svg { color: rgba(252,211,77,0.7); }
   .ws-shift.is-past .ws-shift-time { color: rgba(255,255,255,0.55); }
-  .ws-shift-num { font-size: 0.65rem; font-weight: 600; color: rgba(255,255,255,0.4); font-family: ui-monospace, SFMono-Regular, monospace; flex-shrink: 0; }
-  .ws-shift-client { font-size: 0.85rem; font-weight: 600; color: rgba(255,255,255,0.85); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ws-shift.is-past .ws-shift-client { color: rgba(255,255,255,0.55); }
-  .ws-shift-meta { font-size: 0.7rem; color: rgba(255,255,255,0.45); margin-top: 2px; }
-  .ws-shift-pills { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .ws-shift-num { font-size: 0.65rem; font-weight: 600; color: rgba(255,255,255,0.4); font-family: ui-monospace, SFMono-Regular, monospace; flex-shrink: 0; letter-spacing: 0.02em; }
+
+  /* Row 2: title */
+  .ws-shift-client { font-size: 1.02rem; font-weight: 700; color: #fff; line-height: 1.2; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.005em; }
+  .ws-shift.is-past .ws-shift-client { color: rgba(255,255,255,0.6); }
+
+  /* Row 3: location */
+  .ws-shift-loc { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: rgba(255,255,255,0.55); margin-top: 3px; }
+  .ws-shift-loc svg { width: 12px; height: 12px; color: rgba(255,255,255,0.4); flex-shrink: 0; }
+
+  /* Row 4: pills */
+  .ws-shift-pills { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
   .ws-pill {
     font-size: 0.58rem; font-weight: 800; letter-spacing: 0.06em;
     text-transform: uppercase; padding: 2px 7px; border-radius: 999px;
@@ -228,17 +252,19 @@
             <span class="ws-shift-bar"></span>
             <div class="ws-shift-body">
               <div class="ws-shift-top">
-                <div style="min-width:0;">
-                  <p class="ws-shift-time">
-                    <%= fmtTime(s.start_time) %><% if (s.suburb) { %> at <%= s.suburb %><% } %><% if (s.end_time) { %> to ~<%= fmtTime(s.end_time) %><% } %>
-                  </p>
-                  <p class="ws-shift-client"><%= s.client || s.job_name %><% if (s.project_name && s.project_name !== s.client) { %>, <%= s.project_name %><% } %></p>
-                  <% if (s.suburb || s.state) { %>
-                    <p class="ws-shift-meta"><%= s.suburb %><% if (s.state) { %>, <%= s.state %><% } %></p>
-                  <% } %>
-                </div>
+                <span class="ws-shift-time">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2" stroke-linecap="round"/></svg>
+                  <%= fmtTime(s.start_time) %><% if (s.end_time) { %> – <%= fmtTime(s.end_time) %><% } %>
+                </span>
                 <span class="ws-shift-num"><%= s.job_number %></span>
               </div>
+              <p class="ws-shift-client"><%= s.client || s.job_name %><% if (s.project_name && s.project_name !== s.client) { %> · <%= s.project_name %><% } %></p>
+              <% if (s.suburb || s.state) { %>
+                <p class="ws-shift-loc">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  <%= s.suburb %><% if (s.state) { %>, <%= s.state %><% } %>
+                </p>
+              <% } %>
               <div class="ws-shift-pills">
                 <span class="ws-pill allocated">Pending</span>
                 <% if (s.role_on_site) { %>
@@ -280,17 +306,19 @@
             <span class="ws-shift-bar"></span>
             <div class="ws-shift-body">
               <div class="ws-shift-top">
-                <div style="min-width:0;">
-                  <p class="ws-shift-time">
-                    <%= fmtTime(s.start_time) %><% if (s.suburb) { %> at <%= s.suburb %><% } %><% if (s.end_time) { %> to ~<%= fmtTime(s.end_time) %><% } %>
-                  </p>
-                  <p class="ws-shift-client"><%= s.client || s.job_name %><% if (s.project_name && s.project_name !== s.client) { %>, <%= s.project_name %><% } %></p>
-                  <% if (s.suburb || s.state) { %>
-                    <p class="ws-shift-meta"><%= s.suburb %><% if (s.state) { %>, <%= s.state %><% } %></p>
-                  <% } %>
-                </div>
+                <span class="ws-shift-time">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2" stroke-linecap="round"/></svg>
+                  <%= fmtTime(s.start_time) %><% if (s.end_time) { %> – <%= fmtTime(s.end_time) %><% } %>
+                </span>
                 <span class="ws-shift-num"><%= s.job_number %></span>
               </div>
+              <p class="ws-shift-client"><%= s.client || s.job_name %><% if (s.project_name && s.project_name !== s.client) { %> · <%= s.project_name %><% } %></p>
+              <% if (s.suburb || s.state) { %>
+                <p class="ws-shift-loc">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  <%= s.suburb %><% if (s.state) { %>, <%= s.state %><% } %>
+                </p>
+              <% } %>
               <div class="ws-shift-pills">
                 <span class="ws-pill confirmed">Accepted</span>
                 <% if (s.role_on_site) { %>
@@ -347,14 +375,19 @@
             <span class="ws-shift-bar"></span>
             <div class="ws-shift-body">
               <div class="ws-shift-top">
-                <div style="min-width:0;">
-                  <p class="ws-shift-time">
-                    <%= fmtTime(s.start_time) %><% if (s.suburb) { %> at <%= s.suburb %><% } %><% if (s.end_time) { %> to ~<%= fmtTime(s.end_time) %><% } %>
-                  </p>
-                  <p class="ws-shift-client"><%= s.client || s.job_name %><% if (s.project_name && s.project_name !== s.client) { %>, <%= s.project_name %><% } %></p>
-                </div>
+                <span class="ws-shift-time">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2" stroke-linecap="round"/></svg>
+                  <%= fmtTime(s.start_time) %><% if (s.end_time) { %> – <%= fmtTime(s.end_time) %><% } %>
+                </span>
                 <span class="ws-shift-num"><%= s.job_number %></span>
               </div>
+              <p class="ws-shift-client"><%= s.client || s.job_name %><% if (s.project_name && s.project_name !== s.client) { %> · <%= s.project_name %><% } %></p>
+              <% if (s.suburb || s.state) { %>
+                <p class="ws-shift-loc">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  <%= s.suburb %><% if (s.state) { %>, <%= s.state %><% } %>
+                </p>
+              <% } %>
               <div class="ws-shift-pills">
                 <% if (s.status === 'completed') { %>
                   <span class="ws-pill completed">Completed</span>
