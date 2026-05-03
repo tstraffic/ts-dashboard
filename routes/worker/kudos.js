@@ -7,7 +7,7 @@ const { getDb } = require('../../db/database');
 const {
   sendKudos, getFeed, getKudosWithComments, toggleReaction, addComment,
   generateMilestones, getRecentMilestones, getLeaderboard, getProfileSummary,
-  hideKudos, reportKudos, blockUser, unblockUser, getActiveValues,
+  hideKudos, reportKudos, blockUser, unblockUser, deleteKudos, getActiveValues,
   containsProfanity, isQuietHours, RATE_LIMIT_PER_DAY,
 } = require('../../services/kudos');
 
@@ -189,6 +189,21 @@ router.get('/feed/:id', (req, res) => {
     k, viewerCrewId: req.session.worker.id,
     flash_success: req.flash('success'), flash_error: req.flash('error'),
   });
+});
+
+// ====================================================
+// POST /w/feed/:id/delete — Sender retracts their own kudos
+// ====================================================
+router.post('/feed/:id/delete', (req, res) => {
+  try {
+    deleteKudos({ kudosId: parseInt(req.params.id, 10), crewId: req.session.worker.id });
+    if (wantsJson(req)) return res.json({ ok: true });
+    req.flash('success', 'Kudos deleted.');
+  } catch (e) {
+    if (wantsJson(req)) return res.status(400).json({ ok: false, error: e.message });
+    req.flash('error', e.message);
+  }
+  res.redirect('/w/feed');
 });
 
 // ====================================================

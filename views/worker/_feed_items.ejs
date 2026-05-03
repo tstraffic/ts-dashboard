@@ -27,11 +27,16 @@
           <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
         </button>
         <div class="kd-menu">
-          <form method="POST" action="/w/feed/<%= k.id %>/report">
-            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-            <button type="submit" class="danger">Report</button>
-          </form>
-          <% if (k.sender_crew_id !== viewerCrewId) { %>
+          <% if (k.sender_crew_id === viewerCrewId) { %>
+            <form method="POST" action="/w/feed/<%= k.id %>/delete" onsubmit="return confirm('Delete this kudos? This cannot be undone.');">
+              <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+              <button type="submit" class="danger">Delete</button>
+            </form>
+          <% } else { %>
+            <form method="POST" action="/w/feed/<%= k.id %>/report">
+              <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+              <button type="submit" class="danger">Report</button>
+            </form>
             <form method="POST" action="/w/feed/block">
               <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
               <input type="hidden" name="crew_id" value="<%= k.sender_crew_id %>">

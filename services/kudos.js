@@ -341,6 +341,20 @@ function unblockUser({ blockerCrewId, blockedCrewId }) {
   db.prepare(`DELETE FROM kudos_blocks WHERE blocker_crew_id = ? AND blocked_crew_id = ?`).run(blockerCrewId, blockedCrewId);
 }
 
+// ---- Delete (sender-only) ----
+// Allow the original sender to take their kudos down — useful when it
+// was sent to the wrong person, contained a typo, or the sender wants
+// to retract for any reason. ON DELETE CASCADE on kudos_recipients,
+// kudos_reactions, kudos_comments, kudos_reports cleans those up.
+function deleteKudos({ kudosId, crewId }) {
+  const db = getDb();
+  const k = db.prepare('SELECT id, sender_crew_id FROM kudos WHERE id = ?').get(kudosId);
+  if (!k) throw new Error('Kudos not found');
+  if (k.sender_crew_id !== crewId) throw new Error('Only the sender can delete their kudos');
+  db.prepare('DELETE FROM kudos WHERE id = ?').run(kudosId);
+  return { ok: true };
+}
+
 // ---- Values ----
 function getActiveValues() {
   const db = getDb();
@@ -355,5 +369,6 @@ module.exports = {
   generateMilestones, getRecentMilestones,
   getLeaderboard, getProfileSummary,
   hideKudos, reportKudos, blockUser, unblockUser,
+  deleteKudos,
   getActiveValues,
 };
