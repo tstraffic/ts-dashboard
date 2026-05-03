@@ -16,8 +16,16 @@
         Needs Signing
       </h2>
       <div class="space-y-2">
-        <% unsignedShifts.forEach(s => { %>
-          <a href="/w/dockets/sign/<%= s.id %>" class="block bg-amber-50 border border-amber-200 rounded-xl p-4 active:bg-amber-100 transition">
+        <% unsignedShifts.forEach(s => {
+          // Booking-fallback rows don't have a crew_allocations.id yet —
+          // route through /w/booking-shift/:bookingId which lazy-creates
+          // the allocation, then the worker can tap Docket from the
+          // shift detail page.
+          var href = (s.source === 'booking')
+            ? ('/w/booking-shift/' + s.booking_id + '?tab=forms')
+            : ('/w/dockets/sign/' + s.id);
+        %>
+          <a href="<%= href %>" class="block bg-amber-50 border border-amber-200 rounded-xl p-4 active:bg-amber-100 transition">
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-sm font-semibold text-gray-900"><%= s.client %></p>

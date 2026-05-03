@@ -7,34 +7,83 @@ router.get('/dockets', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
 
+  // Past dockets — LEFT JOIN jobs so booking-only allocations still show.
+  // For those rows we COALESCE the booking title/number into client/job_number
+  // so the UI doesn't render blanks.
   const dockets = db.prepare(`
-    SELECT ds.*, ca.allocation_date, ca.job_id, j.job_number, j.client
+    SELECT ds.*, ca.allocation_date, ca.job_id,
+           COALESCE(j.job_number, b.booking_number) AS job_number,
+           COALESCE(j.client, b.title) AS client
     FROM docket_signatures ds
     LEFT JOIN crew_allocations ca ON ds.allocation_id = ca.id
     LEFT JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN bookings b ON ca.booking_id = b.id
     WHERE ds.crew_member_id = ?
     ORDER BY ds.signed_at DESC LIMIT 30
   `).all(worker.id);
 
-  // Get today's allocations that might need dockets
   const today = new Date().toISOString().split('T')[0];
+
+  // Today's allocations (job-bound or booking-bound). LEFT JOIN jobs so a
+  // booking-only allocation (job_id IS NULL) still surfaces, with COALESCE
+  // pulling the booking's title / number / address / suburb in.
   const todaysShifts = db.prepare(`
-    SELECT ca.*, j.job_number, j.client, j.site_address, j.suburb
+    SELECT ca.id, ca.allocation_date, ca.start_time, ca.end_time, ca.status,
+           ca.booking_id, ca.job_id,
+           COALESCE(j.job_number, b.booking_number) AS job_number,
+           COALESCE(j.client, b.title)             AS client,
+           COALESCE(j.site_address, b.site_address) AS site_address,
+           COALESCE(j.suburb, b.suburb)             AS suburb,
+           'allocation' AS source
     FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN bookings b ON ca.booking_id = b.id
     WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
   `).all(worker.id, today);
 
-  // Check which of today's shifts already have dockets
+  // Booking-only fallback: workers assigned to a booking via booking_crew
+  // who haven't yet hit /w/booking-shift/:id (which lazy-creates the alloc
+  // row) won't have a crew_allocations row. Surface those here so they can
+  // see "needs signing" — clicking the row routes to /w/booking-shift/...
+  // which creates the alloc and then they can sign the docket from there.
+  const VISIBLE_BOOKING_STATUSES = ['unconfirmed','confirmed','green_to_go','in_progress','completed','on_hold'];
+  let bookingFallback = [];
+  try {
+    bookingFallback = db.prepare(`
+      SELECT
+        bc.id AS bc_id,
+        bc.booking_id,
+        b.booking_number AS job_number,
+        b.title AS client,
+        b.site_address, b.suburb,
+        DATE(b.start_datetime) AS allocation_date,
+        SUBSTR(b.start_datetime, 12, 5) AS start_time,
+        SUBSTR(b.end_datetime, 12, 5) AS end_time,
+        bc.status,
+        'booking' AS source
+      FROM booking_crew bc
+      JOIN bookings b ON bc.booking_id = b.id
+      WHERE bc.crew_member_id = ?
+        AND DATE(b.start_datetime) = ?
+        AND bc.status IN ('assigned','confirmed')
+        AND b.deleted_at IS NULL
+        AND b.status IN (${VISIBLE_BOOKING_STATUSES.map(() => '?').join(',')})
+        AND NOT EXISTS (SELECT 1 FROM crew_allocations ca WHERE ca.booking_id = bc.booking_id AND ca.crew_member_id = bc.crew_member_id)
+    `).all(worker.id, today, ...VISIBLE_BOOKING_STATUSES);
+  } catch (e) { /* booking_crew may not exist on legacy DBs */ }
+
+  const allTodayShifts = todaysShifts.concat(bookingFallback);
+
+  // Which of today's allocations are already signed?
   const signedAllocIds = new Set(dockets.filter(d => d.allocation_date === today).map(d => d.allocation_id));
-  const unsignedShifts = todaysShifts.filter(s => !signedAllocIds.has(s.id));
-  const signedShifts = todaysShifts.filter(s => signedAllocIds.has(s.id));
+  const unsignedShifts = allTodayShifts.filter(s => s.source === 'booking' || !signedAllocIds.has(s.id));
+  const signedShifts   = allTodayShifts.filter(s => s.source === 'allocation' && signedAllocIds.has(s.id));
 
   res.render('worker/dockets', {
     title: 'Dockets',
     currentPage: 'forms',
     dockets,
-    todaysShifts,
+    todaysShifts: allTodayShifts,
     unsignedShifts,
     signedShifts,
     today,
@@ -46,10 +95,19 @@ router.get('/dockets/sign/:allocationId', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
 
+  // LEFT JOIN both jobs and bookings — for booking-only allocations
+  // (job_id IS NULL) we COALESCE the booking title/number/address into
+  // the same fields the docket UI expects.
   const allocation = db.prepare(`
-    SELECT ca.*, j.job_number, j.job_name, j.client, j.site_address, j.suburb
+    SELECT ca.*,
+           COALESCE(j.job_number, b.booking_number) AS job_number,
+           COALESCE(j.job_name,   b.title)          AS job_name,
+           COALESCE(j.client,     b.title)          AS client,
+           COALESCE(j.site_address, b.site_address) AS site_address,
+           COALESCE(j.suburb,     b.suburb)         AS suburb
     FROM crew_allocations ca
-    JOIN jobs j ON ca.job_id = j.id
+    LEFT JOIN jobs j     ON ca.job_id = j.id
+    LEFT JOIN bookings b ON ca.booking_id = b.id
     WHERE ca.id = ? AND ca.crew_member_id = ?
   `).get(req.params.allocationId, worker.id);
 

@@ -20,11 +20,19 @@ router.get('/home', async (req, res) => {
   const VISIBLE_BOOKING_STATUSES = ['unconfirmed','confirmed','green_to_go','in_progress','completed','on_hold'];
 
   const todaysShifts = db.prepare(`
-    SELECT ca.*, j.job_number, j.job_name, j.client, j.site_address, j.suburb, j.status as job_status,
-      u.full_name as supervisor_name
+    SELECT ca.*,
+           COALESCE(j.job_number, b.booking_number) AS job_number,
+           COALESCE(j.job_name,   b.title)          AS job_name,
+           COALESCE(j.client,     b.title)          AS client,
+           COALESCE(j.site_address, b.site_address) AS site_address,
+           COALESCE(j.suburb,     b.suburb)         AS suburb,
+           j.status AS job_status,
+           u.full_name AS supervisor_name,
+           'allocation' AS source
     FROM crew_allocations ca
-    LEFT JOIN jobs j ON ca.job_id = j.id
-    LEFT JOIN users u ON j.ops_supervisor_id = u.id
+    LEFT JOIN jobs j     ON ca.job_id = j.id
+    LEFT JOIN bookings b ON ca.booking_id = b.id
+    LEFT JOIN users u    ON j.ops_supervisor_id = u.id
     WHERE ca.crew_member_id = ? AND ca.allocation_date = ? AND ca.status != 'cancelled'
     ORDER BY ca.start_time ASC
   `).all(worker.id, today);
@@ -44,7 +52,8 @@ router.get('/home', async (req, res) => {
         SUBSTR(b.start_datetime, 12, 5) AS start_time,
         SUBSTR(b.end_datetime, 12, 5) AS end_time,
         b.title AS project_name,
-        '' AS supervisor_name
+        '' AS supervisor_name,
+        'booking' AS source
       FROM booking_crew bc
       JOIN bookings b ON bc.booking_id = b.id
       WHERE bc.crew_member_id = ?

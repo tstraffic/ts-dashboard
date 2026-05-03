@@ -537,7 +537,12 @@
           var jpDone = (typeof formStatus !== 'undefined' && formStatus) ? Object.values(formStatus).filter(function(v){return v && !Array.isArray(v);}).length : 0;
           var nextHref, nextLabel;
           var shiftLink = (shift.source === 'booking') ? ('/w/booking-shift/' + shift.booking_id) : ('/w/jobs/' + (shift.id || shift.job_id));
+          // For booking shifts shift.id is the booking_crew row id, NOT a
+          // crew_allocations.id — we can't link straight to /w/dockets/sign.
+          // Route through the shift detail forms tab; booking-shift lazy-
+          // creates the allocation, then they tap Docket from there.
           if (jpDone < 3) { nextHref = shiftLink + '?tab=forms'; nextLabel = 'Open checklists'; }
+          else if (shift.source === 'booking') { nextHref = shiftLink + '?tab=forms'; nextLabel = 'Fill docket'; }
           else { nextHref = '/w/dockets/sign/' + shift.id; nextLabel = 'Fill docket'; }
         %>
         <div class="wh-shift-actions">
