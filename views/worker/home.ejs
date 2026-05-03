@@ -28,8 +28,12 @@
   // Upcoming shifts are the single most important thing on this page —
   // lift them to right after Today's shift so workers see what's next
   // without scrolling. Compliance + actions slot in below.
-  const defaultOrder = ['hero','manager','today','upcoming','compliance','actions','jobpack','week','timeline','cards','weather','streaks','activity'];
-  const hidden = (prefs && prefs.hidden_sections) || [];
+  const defaultOrder = ['hero','manager','today','upcoming','weather','compliance','actions','week','jobpack','timeline','cards','streaks','activity'];
+  // Weather was previously buried near the bottom and a few users hid it
+  // via Customise Home before realising it covered their next site.
+  // Force it back into view: lift in the default order AND scrub it out
+  // of hidden_sections so the section actually renders again.
+  const hidden = ((prefs && prefs.hidden_sections) || []).filter(function (s) { return s !== 'weather'; });
   const orderSource = (prefs && prefs.section_order && prefs.section_order.length) ? prefs.section_order : defaultOrder;
   // Preserve any new sections we added after the user saved their prefs
   const order = [...orderSource, ...defaultOrder.filter(s => !orderSource.includes(s))];
