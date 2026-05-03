@@ -728,4 +728,40 @@
       inp.value = validateTime(pasted);
     });
   });
+
+  // ── Auto end-time = start + 8 hours ──
+  // When the user picks a start time we default end_time to 8h later
+  // (and roll end_date forward if it crosses midnight). The end fields
+  // remain editable — once the user touches end_time/end_date manually
+  // we stop auto-overwriting them.
+  (function () {
+    var sd = document.querySelector('[name="start_date"]');
+    var st = document.querySelector('[name="start_time"]');
+    var ed = document.querySelector('[name="end_date"]');
+    var et = document.querySelector('[name="end_time"]');
+    if (!st || !et) return;
+    var endUserEdited = false;
+    function markEdited() { endUserEdited = true; }
+    et.addEventListener('input', markEdited);
+    if (ed) ed.addEventListener('input', markEdited);
+
+    function applyAutoEnd() {
+      if (endUserEdited) return;
+      if (!st.value) return;
+      var parts = st.value.split(':');
+      var h = parseInt(parts[0], 10), m = parseInt(parts[1] || '0', 10);
+      if (isNaN(h) || isNaN(m)) return;
+      var startDate = (sd && sd.value) ? sd.value : null;
+      var d = startDate ? new Date(startDate + 'T00:00:00') : new Date();
+      d.setHours(h, m, 0, 0);
+      d.setHours(d.getHours() + 8);
+      var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+      et.value = pad(d.getHours()) + ':' + pad(d.getMinutes());
+      if (ed && startDate) {
+        ed.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+      }
+    }
+    st.addEventListener('change', applyAutoEnd);
+    if (sd) sd.addEventListener('change', applyAutoEnd);
+  })();
 </script>

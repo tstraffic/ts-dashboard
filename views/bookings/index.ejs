@@ -2641,7 +2641,50 @@ function resetBookingForm() {
   const endTime = form.querySelector('[name="end_time"]');
   if (startTime) startTime.value = '06:00';
   if (endTime) endTime.value = '14:30';
+  // Reset the "user has manually edited end time" flag so auto-end
+  // (start + 8h) takes over again on the next start_time pick.
+  if (window._bookingEndAutoReset) window._bookingEndAutoReset();
 }
+
+// ── Auto end-time = start + 8 hours (slide-in modal) ──
+// When the user picks a start time we default end_time to 8h later
+// (rolling end_date forward if it crosses midnight). The end fields
+// stay editable; once the user touches end_time/end_date manually we
+// stop overwriting. The flag resets every time resetBookingForm()
+// runs so each new/edit open starts fresh.
+(function () {
+  const form = document.getElementById('booking-slide-form');
+  if (!form) return;
+  const sd = form.querySelector('[name="start_date"]');
+  const st = form.querySelector('[name="start_time"]');
+  const ed = form.querySelector('[name="end_date"]');
+  const et = form.querySelector('[name="end_time"]');
+  if (!st || !et) return;
+  let endUserEdited = false;
+  window._bookingEndAutoReset = function () { endUserEdited = false; };
+  function markEdited() { endUserEdited = true; }
+  et.addEventListener('input', markEdited);
+  if (ed) ed.addEventListener('input', markEdited);
+
+  function applyAutoEnd() {
+    if (endUserEdited) return;
+    if (!st.value) return;
+    const parts = st.value.split(':');
+    const h = parseInt(parts[0], 10), m = parseInt(parts[1] || '0', 10);
+    if (isNaN(h) || isNaN(m)) return;
+    const startDateStr = (sd && sd.value) ? sd.value : null;
+    const d = startDateStr ? new Date(startDateStr + 'T00:00:00') : new Date();
+    d.setHours(h, m, 0, 0);
+    d.setHours(d.getHours() + 8);
+    const pad = (n) => (n < 10 ? '0' + n : '' + n);
+    et.value = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    if (ed && startDateStr) {
+      ed.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
+  }
+  st.addEventListener('change', applyAutoEnd);
+  if (sd) sd.addEventListener('change', applyAutoEnd);
+})();
 
 function addPanelReqRow(type, qty) {
   const container = document.getElementById('panel-req-rows');
