@@ -1,21 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../../db/database');
+const { sydneyToday } = require('../../lib/sydney');
 
 // GET /w/availability — Show availability calendar/form
 router.get('/availability', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
 
-  // Get next 14 days
+  // Get next 14 days, anchored on Sydney calendar so the strip starts
+  // from "today in Sydney", not "today in UTC".
   const days = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = new Date(sydneyToday() + 'T00:00:00');
 
   for (let i = 0; i < 14; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() + i);
-    const dateStr = d.toISOString().split('T')[0];
+    const dateStr = sydneyToday(d);
     days.push({
       date: dateStr,
       dayName: d.toLocaleDateString('en-AU', { weekday: 'short' }),
@@ -91,7 +92,7 @@ router.post('/availability', (req, res) => {
   }
 
   // Don't allow setting availability for past dates
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
   if (date < today) {
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
       return res.status(400).json({ error: 'Cannot set availability for past dates' });

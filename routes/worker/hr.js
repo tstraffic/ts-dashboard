@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../../db/database');
+const { sydneyToday } = require('../../lib/sydney');
 
 // GET /w/hr — HR hub
 router.get('/hr', (req, res) => {
@@ -201,7 +202,7 @@ router.get('/hr/leave', (req, res) => {
     prevM,
     nextM,
     currentM: `${year}-${pad(month + 1)}`,
-    todayIso: new Date().toISOString().split('T')[0],
+    todayIso: sydneyToday(),
     recentLeave,
   });
 });

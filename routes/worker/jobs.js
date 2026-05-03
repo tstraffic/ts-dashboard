@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../../db/database');
+const { sydneyToday, TZ: SYD_TZ } = require('../../lib/sydney');
 
 // GET /w/shifts — Alias, redirect to /w/jobs (preserving query params)
 router.get('/shifts', (req, res) => {
@@ -17,7 +18,7 @@ router.get('/shifts/:id', (req, res) => {
 router.get('/jobs', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
   const tab = req.query.tab || 'upcoming';
 
   // The bookings table CHECK uses these literal status values:
@@ -124,7 +125,12 @@ router.get('/jobs', (req, res) => {
   function isoDate(d) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
-  const anchor = req.query.week ? new Date(req.query.week + 'T00:00:00') : new Date();
+  // Anchor on Sydney local date, not the server's UTC clock — Railway is
+  // UTC so `new Date()` lands on the previous calendar day for several
+  // hours every Sydney evening, which would put the strip on the wrong week.
+  const anchor = req.query.week
+    ? new Date(req.query.week + 'T00:00:00')
+    : new Date(sydneyToday() + 'T00:00:00');
   if (isNaN(anchor.getTime())) anchor.setTime(Date.now());
   const dow = (anchor.getDay() + 6) % 7;
   const monday = new Date(anchor); monday.setDate(monday.getDate() - dow); monday.setHours(0, 0, 0, 0);
@@ -533,7 +539,7 @@ router.get('/booking-shift/:bookingId', (req, res) => {
       const allocStatus = myAssignment.status === 'confirmed' ? 'confirmed' : 'allocated';
       const startTimeFromDt = booking.start_datetime ? booking.start_datetime.substring(11, 16) : '';
       const endTimeFromDt   = booking.end_datetime   ? booking.end_datetime.substring(11, 16)   : '';
-      const allocDate       = booking.start_datetime ? booking.start_datetime.substring(0, 10)  : new Date().toISOString().slice(0, 10);
+      const allocDate       = booking.start_datetime ? booking.start_datetime.substring(0, 10)  : sydneyToday();
       const allocBy = booking.created_by_id || (req.session.user && req.session.user.id) || null;
       const ins = db.prepare(`
         INSERT INTO crew_allocations

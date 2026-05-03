@@ -3,11 +3,11 @@
 
 const https = require('https');
 
+// Date in Sydney timezone (YYYY-MM-DD). Railway containers run on UTC so
+// using the JS Date getters lands on the previous day for several hours
+// every Sydney evening. Everything worker-facing keys off this.
 function localIso(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return (d || new Date()).toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
 }
 
 // Priority order per spec (lower = higher priority)

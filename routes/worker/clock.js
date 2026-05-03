@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../../db/database');
+const { sydneyToday } = require('../../lib/sydney');
 
 // Helper: get current clock status for a worker
 function getClockStatus(db, crewMemberId) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
 
   // Get the last clock event for today
   const lastEvent = db.prepare(`
@@ -54,7 +55,7 @@ function getClockStatus(db, crewMemberId) {
 
 // Helper: calculate total hours worked today (excluding breaks)
 function getTodayTotalHours(db, crewMemberId) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
   const events = db.prepare(`
     SELECT event_type, event_time FROM clock_events
     WHERE crew_member_id = ? AND date(event_time) = ?
@@ -109,7 +110,7 @@ router.get('/clock', (req, res) => {
 router.get('/_clock_legacy', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
 
   const clockStatus = getClockStatus(db, worker.id);
 
@@ -249,9 +250,7 @@ router.get('/clock/history', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
 
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+  const sevenDaysAgoStr = sydneyToday(new Date(Date.now() - 7 * 86400000));
 
   const events = db.prepare(`
     SELECT ce.*, ca.allocation_date, j.job_number, j.job_name, j.client

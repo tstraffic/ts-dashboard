@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../../db/database');
+const { sydneyToday } = require('../../lib/sydney');
 
 // GET /w/dockets — My Dockets
 router.get('/dockets', (req, res) => {
@@ -22,7 +23,7 @@ router.get('/dockets', (req, res) => {
     ORDER BY ds.signed_at DESC LIMIT 30
   `).all(worker.id);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
 
   // Today's allocations (job-bound or booking-bound). LEFT JOIN jobs so a
   // booking-only allocation (job_id IS NULL) still surfaces, with COALESCE

@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { getDb } = require('../../db/database');
+const { sydneyToday } = require('../../lib/sydney');
 
 // Multer config for incident photo uploads
 const incidentUploadsDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'incidents');
@@ -75,7 +76,7 @@ router.get('/incidents/new', (req, res) => {
     ORDER BY ca.allocation_date DESC
   `).all(crewMemberId);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
   const now = new Date().toTimeString().slice(0, 5);
 
   res.render('worker/incident-form', {
@@ -146,7 +147,7 @@ router.post('/incidents', upload.array('photos', 5), (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reported', ?, CURRENT_TIMESTAMP)
     `).run(
       job_id, incidentNumber, incident_type, severity, title, description,
-      fullLocation, incident_date || new Date().toISOString().split('T')[0],
+      fullLocation, incident_date || sydneyToday(),
       incident_time || '', reportedById,
       weather_conditions ? `Weather: ${weather_conditions}` : '',
       photoPath

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../../db/database');
+const { sydneyToday } = require('../../lib/sydney');
 
 // GET /w/timesheets — My Timesheets
 router.get('/timesheets', (req, res) => {
@@ -17,10 +18,11 @@ router.get('/timesheets', (req, res) => {
     LIMIT 50
   `).all(worker.id);
 
-  // Calculate stats
-  const thisWeekStart = new Date();
+  // Calculate stats — anchor on Sydney calendar so the "this week" total
+  // doesn't snap to the wrong week every Sydney evening (Railway = UTC).
+  const thisWeekStart = new Date(sydneyToday() + 'T00:00:00');
   thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay() + 1);
-  const thisWeekStr = thisWeekStart.toISOString().split('T')[0];
+  const thisWeekStr = sydneyToday(thisWeekStart);
 
   const weekHours = timesheets
     .filter(t => t.work_date >= thisWeekStr)
@@ -43,7 +45,7 @@ router.get('/timesheets', (req, res) => {
 router.get('/timesheets/new', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
 
   // Get recent allocations to pre-populate
   const recentAllocations = db.prepare(`

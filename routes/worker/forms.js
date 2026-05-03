@@ -6,6 +6,7 @@ const multer = require('multer');
 const sharp = require('sharp');
 const { getDb } = require('../../db/database');
 const { notifySubmission } = require('../../services/jobPackNotify');
+const { sydneyToday } = require('../../lib/sydney');
 
 // Fire-and-forget email-the-PDF-to-ops on every Job-Pack submission.
 // The email send happens off the request path so a slow / failed Resend
@@ -80,7 +81,7 @@ async function persistFormPhotos(db, safetyFormId, files, tagFor) {
 router.get('/forms', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
 
   // Count recent submissions
   const recentCount = db.prepare('SELECT COUNT(*) as c FROM safety_forms WHERE crew_member_id = ? AND submitted_at >= datetime(\'now\', \'-7 days\')').get(worker.id).c;
@@ -134,7 +135,7 @@ router.get('/forms', (req, res) => {
 router.get('/forms/prestart', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
 
   const todaysShifts = db.prepare(`
     SELECT ca.id, j.job_number, j.client FROM crew_allocations ca
@@ -182,7 +183,7 @@ router.post('/forms/prestart', (req, res) => {
 router.get('/forms/take5', (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
 
   const todaysShifts = db.prepare(`
     SELECT ca.id, j.job_number, j.client FROM crew_allocations ca

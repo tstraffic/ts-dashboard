@@ -11,8 +11,11 @@ const {
 router.get('/home', async (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
-  const todayDate = new Date();
-  const today = localIso(todayDate);
+  // Anchor everything on Sydney local date — Railway runs UTC so a raw
+  // `new Date()` lands on the previous calendar day every Sydney evening,
+  // putting the week strip and "today" highlight on the wrong day.
+  const today = localIso(new Date());
+  const todayDate = new Date(today + 'T00:00:00');
 
   // ---- Kick off parallel work where it helps ----
   // Synchronous DB queries first (SQLite is sync) — all very fast
@@ -172,7 +175,10 @@ router.get('/home', async (req, res) => {
   const compliance = member ? getComplianceStatus(member, today) : null;
 
   // Greeting + subtext
-  const hour = todayDate.getHours();
+  // Greeting hour is in Sydney too — todayDate is anchored to midnight,
+  // so use a fresh Sydney-local hour instead of getHours() which would
+  // always be 00.
+  const hour = parseInt(new Date().toLocaleString('en-AU', { timeZone: 'Australia/Sydney', hour: '2-digit', hour12: false }), 10);
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = worker.full_name.split(' ')[0];
   const subtext = buildGreetingSubtext(db, worker, member, employee, todaysShifts);
@@ -236,7 +242,7 @@ router.get('/home', async (req, res) => {
   let jobPackNudge = null;
   try {
     const JP = ['vehicle_prestart','risk_toolbox','tc_prestart','team_leader','post_shift_vehicle'];
-    const fromS = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const fromS = localIso(new Date(Date.now() - 7 * 86400000));
     const allocations = db.prepare(`
       SELECT id, booking_id FROM crew_allocations
       WHERE crew_member_id = ? AND status != 'cancelled'
