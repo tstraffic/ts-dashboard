@@ -263,7 +263,7 @@ router.get('/', (req, res) => {
   let clients = []; try { clients = db.prepare("SELECT id, company_name FROM clients ORDER BY company_name").all(); } catch (e) {}
   let supervisors = []; try { supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
   let contacts = []; try { contacts = db.prepare("SELECT id, full_name, company_id FROM client_contacts ORDER BY full_name").all(); } catch (e) {}
-  let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name, role FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
+  let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name, role, portal_role FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
 
   res.render('bookings/index', { title: 'Bookings Board', bookings, stats, depots: DEPOTS, currentView: view, currentDate: dateStr, currentDepot: depot, currentStatus: status, currentSearch: search, currentDeleted: deletedFilter, user: req.session.user, jobs, clients, supervisors, contacts, crewForSelect });
 });
@@ -276,7 +276,7 @@ router.get('/new', (req, res) => {
     let clients = []; try { clients = db.prepare("SELECT id, company_name FROM clients ORDER BY company_name").all(); } catch (e) {}
     let supervisors = []; try { supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
     let contacts = []; try { contacts = db.prepare("SELECT id, full_name, company_id FROM client_contacts ORDER BY full_name").all(); } catch (e) {}
-    let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name, role FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
+    let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name, role, portal_role FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
     res.render('bookings/form', { title: 'New Booking', booking: null, jobs, clients, supervisors, contacts, crewForSelect, depots: DEPOTS, user: req.session.user });
   } catch (err) {
     console.error('Bookings /new error:', err);
@@ -338,8 +338,18 @@ router.post('/', (req, res) => {
   }
   syncTCCrewVehicles(db, bookingId);
 
-  // Assign crew from form crew selector + auto-create allocations for worker portal
+  // Assign crew from form crew selector + auto-create allocations for worker portal.
+  // Per-crew on-site role comes from `crew_role_<id>` (TC / TL / Supervisor —
+  // the three portal roles), validated against an allow-list. Falls back to
+  // the worker's stored portal_role, then their crew_members.role.
   const crewIds = Array.isArray(b.crew_ids) ? b.crew_ids : (b.crew_ids ? [b.crew_ids] : []);
+  const VALID_SITE_ROLES = ['traffic_controller','team_leader','supervisor'];
+  function pickSiteRole(cid, fallback) {
+    const raw = b['crew_role_' + cid];
+    if (raw && VALID_SITE_ROLES.includes(raw)) return raw;
+    if (fallback && VALID_SITE_ROLES.includes(fallback)) return fallback;
+    return 'traffic_controller';
+  }
   const insertCrew = db.prepare("INSERT OR IGNORE INTO booking_crew (booking_id, crew_member_id, role_on_site, status) VALUES (?, ?, ?, 'assigned')");
   const insertAlloc = db.prepare("INSERT OR IGNORE INTO crew_allocations (job_id, crew_member_id, allocation_date, start_time, end_time, role_on_site, status, booking_id, allocated_by_id) VALUES (?, ?, ?, ?, ?, ?, 'allocated', ?, ?)");
   const allocDate = (b.start_date + 'T' + b.start_time + ':00').substring(0, 10);
@@ -347,11 +357,11 @@ router.post('/', (req, res) => {
   const allocEnd = b.end_time || '15:00';
   crewIds.forEach(cid => {
     if (cid) {
-      const member = db.prepare("SELECT role FROM crew_members WHERE id = ?").get(cid);
-      const role = member ? member.role : '';
-      insertCrew.run(bookingId, cid, role);
+      const member = db.prepare("SELECT role, portal_role FROM crew_members WHERE id = ?").get(cid);
+      const siteRole = pickSiteRole(cid, member && member.portal_role);
+      insertCrew.run(bookingId, cid, siteRole);
       if (b.job_id) {
-        try { insertAlloc.run(b.job_id, cid, allocDate, allocStart, allocEnd, role, bookingId, req.session.user.id); } catch (e) {}
+        try { insertAlloc.run(b.job_id, cid, allocDate, allocStart, allocEnd, siteRole, bookingId, req.session.user.id); } catch (e) {}
       }
     }
   });
@@ -539,7 +549,7 @@ router.get('/:id/edit', (req, res) => {
   let clients = []; try { clients = db.prepare("SELECT id, company_name FROM clients ORDER BY company_name").all(); } catch (e) {}
   const supervisors = db.prepare("SELECT id, full_name FROM crew_members WHERE active = 1 ORDER BY full_name").all();
   let contacts = []; try { contacts = db.prepare("SELECT id, full_name, company_id FROM client_contacts ORDER BY full_name").all(); } catch (e) {}
-  let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name, role FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
+  let crewForSelect = []; try { crewForSelect = db.prepare("SELECT id, full_name, role, portal_role FROM crew_members WHERE active = 1 ORDER BY full_name").all(); } catch (e) {}
   // Existing booking-level documents — feeds the Site Documents card on
   // the edit page so allocators can review / delete / upload without
   // bouncing back to the booking detail page.
@@ -614,19 +624,27 @@ router.post('/:id', (req, res) => {
       const updAllocDate = (b.start_date + 'T' + b.start_time + ':00').substring(0, 10);
       const updAllocStart = b.start_time || '06:00';
       const updAllocEnd = b.end_time || '15:00';
+      const VALID_SITE_ROLES = ['traffic_controller','team_leader','supervisor'];
+      function pickSiteRole(cid, fallback) {
+        const raw = b['crew_role_' + cid];
+        if (raw && VALID_SITE_ROLES.includes(raw)) return raw;
+        if (fallback && VALID_SITE_ROLES.includes(fallback)) return fallback;
+        return 'traffic_controller';
+      }
       crewIds.forEach(cid => {
         if (!cid) return;
         // Reject any id that isn't a real, active crew member to stop
         // browser autofill or stale form state assigning shifts to people
         // who aren't on roster.
-        const member = db.prepare("SELECT id, role, active FROM crew_members WHERE id = ?").get(cid);
+        const member = db.prepare("SELECT id, role, portal_role, active FROM crew_members WHERE id = ?").get(cid);
         if (!member || !member.active) {
           console.warn('[bookings.update] ignoring crew_id', cid, 'on booking', req.params.id, '— no matching active crew_member');
           return;
         }
-        insertCrew.run(req.params.id, cid, member.role || '');
+        const siteRole = pickSiteRole(cid, member.portal_role);
+        insertCrew.run(req.params.id, cid, siteRole);
         if (b.job_id) {
-          try { insertAlloc.run(b.job_id, cid, updAllocDate, updAllocStart, updAllocEnd, member.role || '', req.params.id, req.session.user.id); } catch (e) {}
+          try { insertAlloc.run(b.job_id, cid, updAllocDate, updAllocStart, updAllocEnd, siteRole, req.params.id, req.session.user.id); } catch (e) {}
         }
       });
     }

@@ -2717,8 +2717,24 @@ if (panelStartDate && panelEndDate) {
 
 // ===== Crew Search Multi-Select =====
 (function() {
-  var crewList = <%- JSON.stringify(formCrew.map(c => ({ id: c.id, name: c.full_name, role: c.role || '' }))) %>;
+  var crewList = <%- JSON.stringify(formCrew.map(c => ({ id: c.id, name: c.full_name, role: c.role || '', portal_role: c.portal_role || 'traffic_controller' }))) %>;
   var selectedCrew = {};
+
+  // The three on-shift roles — drives the chip's inline role <select>.
+  // Stays narrow on purpose so the chip doesn't blow out on small screens.
+  var ROLE_OPTIONS = [
+    { value: 'traffic_controller', label: 'TC' },
+    { value: 'team_leader',        label: 'Team Leader' },
+    { value: 'supervisor',         label: 'Supervisor' },
+  ];
+  function normaliseRole(r) {
+    if (!r) return 'traffic_controller';
+    var k = String(r).toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+    if (k === 'tc' || k === 'traffic_controller') return 'traffic_controller';
+    if (k === 'tl' || k === 'team_leader' || k === 'leading_hand') return 'team_leader';
+    if (k === 'supervisor' || k === 'site_supervisor') return 'supervisor';
+    return 'traffic_controller';
+  }
   var searchInput = document.getElementById('crew-search-input');
   var dropdown = document.getElementById('crew-dropdown');
   var dropdownList = document.getElementById('crew-dropdown-list');
@@ -2743,20 +2759,33 @@ if (panelStartDate && panelEndDate) {
     Object.keys(selectedCrew).forEach(function(id) {
       var c = selectedCrew[id];
       var color = getRoleColor(c.role);
+      var siteRole = normaliseRole(c.site_role || c.role);
       html += '<div class="crew-chip" data-id="' + id + '" style="border-left-color:' + color + '">';
       html += '<span>' + c.name + '</span>';
+      html += '<select class="crew-chip-role role-' + siteRole + '" data-id="' + id + '" onchange="window._setCrewRole(' + id + ', this.value)">';
+      ROLE_OPTIONS.forEach(function (o) {
+        html += '<option value="' + o.value + '"' + (o.value === siteRole ? ' selected' : '') + '>' + o.label + '</option>';
+      });
+      html += '</select>';
       html += '<button type="button" class="crew-chip-x" onclick="window._removeCrewChip(' + id + ')">&times;</button>';
       html += '</div>';
     });
     chipsContainer.innerHTML = html;
-    // Update hidden inputs
+    // Update hidden inputs — both the id list AND the per-id role.
     formEl.querySelectorAll('input[name="crew_ids[]"]').forEach(function(el) { el.remove(); });
+    formEl.querySelectorAll('input[data-crew-role]').forEach(function(el) { el.remove(); });
     Object.keys(selectedCrew).forEach(function(id) {
       var inp = document.createElement('input');
       inp.type = 'hidden';
       inp.name = 'crew_ids[]';
       inp.value = id;
       formEl.appendChild(inp);
+      var roleInp = document.createElement('input');
+      roleInp.type = 'hidden';
+      roleInp.name = 'crew_role_' + id;
+      roleInp.value = normaliseRole(selectedCrew[id].site_role || selectedCrew[id].role);
+      roleInp.setAttribute('data-crew-role', '1');
+      formEl.appendChild(roleInp);
     });
   }
 
@@ -2797,7 +2826,10 @@ if (panelStartDate && panelEndDate) {
   window._selectCrew = function(id) {
     var c = crewList.find(function(x) { return x.id === id; });
     if (c && !selectedCrew[id]) {
-      selectedCrew[id] = c;
+      // Default the on-site role to the worker's portal role so the chip
+      // pre-selects sensibly (a Team Leader gets "Team Leader", etc.). The
+      // admin can change it inline before saving.
+      selectedCrew[id] = { id: c.id, name: c.name, role: c.role, site_role: normaliseRole(c.portal_role) };
       renderChips();
       searchInput.value = '';
       renderDropdown('');
@@ -2810,11 +2842,36 @@ if (panelStartDate && panelEndDate) {
     renderChips();
   };
 
+  // Inline role-change handler — invoked by the chip's <select>. Updates
+  // the in-memory state and re-renders to refresh the role pill colour.
+  window._setCrewRole = function(id, role) {
+    if (!selectedCrew[id]) return;
+    selectedCrew[id].site_role = normaliseRole(role);
+    renderChips();
+  };
+
   // Expose for edit mode pre-fill
   window._setFormCrew = function(crewArray) {
     selectedCrew = {};
     (crewArray || []).forEach(function(c) {
-      selectedCrew[c.id || c.crew_member_id] = { id: c.id || c.crew_member_id, name: c.full_name || c.name || 'Unknown', role: c.role_on_site || c.role || '' };
+      var cid = c.id || c.crew_member_id;
+      // Prefer the explicit role_on_site stored on booking_crew; if it's
+      // blank fall back to the worker's portal_role so the chip lands on
+      // a sensible value rather than empty.
+      // role_on_site is the canonical column on booking_crew; the
+      // /bookings/:id JSON also exposes a flatter `role` on the
+      // personnel shape, so check both before falling back to portal_role.
+      var siteRole = c.role_on_site || c.site_role || c.role || '';
+      if (!siteRole) {
+        var match = crewList.find(function (x) { return x.id === cid; });
+        siteRole = match ? match.portal_role : 'traffic_controller';
+      }
+      selectedCrew[cid] = {
+        id: cid,
+        name: c.full_name || c.name || 'Unknown',
+        role: c.role_on_site || c.role || '',
+        site_role: normaliseRole(siteRole),
+      };
     });
     renderChips();
   };

@@ -3088,8 +3088,8 @@ textarea.modal-input { resize: vertical; min-height: 48px; }
 .crew-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px 3px 10px;
+  gap: 6px;
+  padding: 3px 6px 3px 10px;
   background: #f3f4f6;
   border-radius: 6px;
   font-size: 0.7rem;
@@ -3098,6 +3098,31 @@ textarea.modal-input { resize: vertical; min-height: 48px; }
   border-left: 3px solid #6b7280;
   animation: fade-in-up 0.2s ease both;
 }
+
+/* Inline portal-role picker on each crew chip — stays visually small but
+   gives the admin a quick way to allocate TC / TL / Supervisor on the
+   roster without leaving the booking form. */
+.crew-chip-role {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #4b5563;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  padding: 2px 4px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' stroke='%236b7280' stroke-width='2' viewBox='0 0 24 24'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+  padding-right: 18px;
+  color-scheme: light;
+}
+.crew-chip-role.role-supervisor  { background-color: #ede9fe; color: #6d28d9; border-color: #c4b5fd; }
+.crew-chip-role.role-team_leader { background-color: #fef3c7; color: #b45309; border-color: #fcd34d; }
+.crew-chip-role.role-traffic_controller { background-color: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
 
 .crew-chip-x {
   background: none;
