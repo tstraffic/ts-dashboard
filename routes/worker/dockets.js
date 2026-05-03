@@ -151,6 +151,20 @@ router.post('/dockets/sign/:allocationId', (req, res) => {
     return res.redirect('/w/dockets');
   }
 
+  // Server-side enforcement of the same required fields the UI flags. We
+  // can't trust the client alone — direct POSTs (or stale tabs) could skip
+  // validation. Bounce the worker back with an error message if anything
+  // mandatory is missing.
+  const missing = [];
+  if (!start_on_site)            missing.push('start time');
+  if (!finish_on_site)           missing.push('finish time');
+  if (!signature_data)           missing.push('your signature');
+  if (!noClient && !client_signature) missing.push('client signature (or tick "no client on site")');
+  if (missing.length) {
+    req.flash('error', 'Missing: ' + missing.join(', ') + '.');
+    return res.redirect('/w/dockets/sign/' + req.params.allocationId);
+  }
+
   // Docket gating — two layers, matching the worker UI's split:
   //
   //   - REQUIRED: Risk Assessment & Toolbox + Team Leader Checklist must

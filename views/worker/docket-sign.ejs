@@ -1,146 +1,275 @@
-<div class="space-y-4">
-  <a href="/w/jobs/<%= allocation.id %>?tab=docket" class="inline-flex items-center text-sm text-brand-600 font-medium">
-    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+<meta name="color-scheme" content="light only">
+
+<style>
+  /* Dark-theme docket page that actually reads. The previous version used
+     light-theme cards inside the dark worker layout, so labels disappeared
+     into the bg and the inputs rendered as solid white slabs. */
+  .ds-wrap   { padding: 0.5rem; padding-bottom: 6rem; }
+  .ds-back   { display: inline-flex; align-items: center; gap: 4px; color: #00D2BE; font-size: 0.85rem; font-weight: 600; }
+  .ds-h1     { font-size: 1.5rem; font-weight: 800; color: #fff; letter-spacing: -0.01em; margin-top: 0.25rem; }
+
+  .ds-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 14px 14px 16px;
+    margin-top: 12px;
+  }
+  .ds-card-title {
+    font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #00D2BE; margin-bottom: 10px;
+  }
+  .ds-summary {
+    background: linear-gradient(155deg, rgba(43,127,255,0.12), rgba(0,210,190,0.05) 60%, rgba(10,22,40,0.6));
+    border: 1px solid rgba(96,165,250,0.25);
+  }
+  .ds-summary-client { font-size: 1rem; font-weight: 700; color: #fff; line-height: 1.2; }
+  .ds-summary-meta   { font-size: 0.72rem; color: rgba(255,255,255,0.55); margin-top: 2px; }
+  .ds-summary-date   { font-size: 0.72rem; font-weight: 600; color: rgba(255,255,255,0.55); }
+
+  /* Form labels + helper text, in colors that read on the dark card */
+  .ds-label   { display: block; font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.65); margin-bottom: 4px; letter-spacing: 0.02em; }
+  .ds-label .req { color: #FCA5A5; margin-left: 2px; }
+  .ds-help    { font-size: 0.7rem; color: rgba(255,255,255,0.45); margin-top: 4px; }
+  .ds-error-text { font-size: 0.72rem; font-weight: 600; color: #FCA5A5; margin-top: 4px; display: none; }
+  .ds-error-text.show { display: block; }
+
+  /* Inputs — solid light fill so iOS doesn't dark-mode-invert them; text
+     and placeholders explicit for the same reason. color-scheme:light only
+     also keeps the native time pickers light. */
+  .ds-input, .ds-select, .ds-textarea {
+    width: 100%;
+    background: #fff;
+    color: #0F172A;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 10px;
+    padding: 11px 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    line-height: 1.2;
+    appearance: none;
+    color-scheme: light;
+    box-shadow: 0 0 0 0 transparent;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .ds-input::placeholder, .ds-textarea::placeholder { color: #9CA3AF; }
+  .ds-input:focus, .ds-select:focus, .ds-textarea:focus {
+    outline: none;
+    border-color: #2B7FFF;
+    box-shadow: 0 0 0 3px rgba(43,127,255,0.25);
+  }
+  .ds-input.ds-error, .ds-textarea.ds-error { border-color: #F87171; box-shadow: 0 0 0 3px rgba(239,68,68,0.18); }
+  .ds-textarea { resize: none; min-height: 64px; }
+  .ds-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* Total-hours pill inside the Time card */
+  .ds-total {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(43,127,255,0.18), rgba(0,210,190,0.1));
+    border: 1px solid rgba(43,127,255,0.35);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ds-total-label { font-size: 0.78rem; font-weight: 600; color: rgba(255,255,255,0.85); letter-spacing: 0.02em; }
+  .ds-total-value { font-size: 1.5rem; font-weight: 800; color: #fff; letter-spacing: -0.02em; tabular-nums: 1; font-variant-numeric: tabular-nums; }
+
+  /* "No client on site" toggle */
+  .ds-toggle { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; cursor: pointer; }
+  .ds-toggle input { width: 18px; height: 18px; accent-color: #2B7FFF; }
+  .ds-toggle span  { font-size: 0.85rem; color: rgba(255,255,255,0.85); font-weight: 500; }
+
+  /* Signature pads — light surface, dashed border, with a "required" hint */
+  .ds-sig-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .ds-sig-clear {
+    font-size: 0.7rem; font-weight: 600; color: rgba(255,255,255,0.65);
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+    padding: 4px 10px; border-radius: 6px;
+  }
+  .ds-sig-pad {
+    border: 2px dashed rgba(255,255,255,0.18);
+    border-radius: 12px;
+    background: #F8FAFC;
+    height: 160px;
+    position: relative;
+    overflow: hidden;
+  }
+  .ds-sig-pad.ds-error { border-color: #F87171; background: #FEF2F2; }
+  .ds-sig-pad canvas { width: 100%; height: 100%; touch-action: none; display: block; }
+  .ds-sig-pad.signed { border-style: solid; border-color: rgba(16,185,129,0.45); background: #F0FDF4; }
+  .ds-sig-hint { font-size: 0.68rem; color: rgba(255,255,255,0.4); text-align: center; margin-top: 6px; }
+  .ds-sig-hint.signed { color: #34D399; font-weight: 600; }
+
+  /* Submit button — sticks to the bottom of the viewport so it's reachable
+     while signing on a phone. Larger, clearer, with disabled-state styling. */
+  .ds-submit-bar {
+    position: sticky; bottom: 0;
+    background: linear-gradient(180deg, transparent, rgba(10,22,40,0.95) 35%);
+    padding: 16px 0 calc(16px + env(safe-area-inset-bottom, 0px));
+    margin-top: 16px;
+  }
+  .ds-submit {
+    width: 100%;
+    padding: 16px;
+    border-radius: 14px;
+    font-size: 1rem; font-weight: 700; letter-spacing: 0.01em;
+    color: #fff;
+    background: linear-gradient(135deg, #2B7FFF, #1D6AE5);
+    border: none;
+    box-shadow: 0 8px 24px rgba(29,106,229,0.45);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 56px;
+  }
+  .ds-submit:active { transform: scale(0.99); }
+  .ds-submit-summary {
+    text-align: center; font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-top: 8px;
+  }
+</style>
+
+<div class="ds-wrap">
+  <a href="/w/jobs/<%= allocation.id %>?tab=docket" class="ds-back">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
     Back
   </a>
 
-  <h1 class="text-xl font-bold text-gray-900">Sign Docket</h1>
+  <h1 class="ds-h1">Sign Docket</h1>
 
-  <!-- Job Summary -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-    <div class="flex items-start justify-between">
-      <div>
-        <p class="text-sm font-bold text-gray-900"><%= allocation.client %></p>
-        <p class="text-xs text-gray-500"><%= allocation.job_number %> &middot; <%= allocation.site_address || allocation.suburb %></p>
+  <!-- Job summary -->
+  <div class="ds-card ds-summary">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+      <div style="min-width:0;">
+        <p class="ds-summary-client"><%= allocation.client %></p>
+        <p class="ds-summary-meta">
+          <%= allocation.job_number %><% if (allocation.site_address || allocation.suburb) { %> &middot; <%= allocation.site_address || allocation.suburb %><% } %>
+        </p>
       </div>
-      <span class="text-xs font-medium text-gray-400"><%= new Date(allocation.allocation_date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) %></span>
+      <span class="ds-summary-date">
+        <%= new Date(allocation.allocation_date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) %>
+      </span>
     </div>
   </div>
 
-  <form method="POST" action="/w/dockets/sign/<%= allocation.id %>" id="docket-form">
+  <form method="POST" action="/w/dockets/sign/<%= allocation.id %>" id="docket-form" novalidate>
     <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <!-- All dockets are daily — type is fixed on the server side. -->
+    <input type="hidden" name="docket_type" value="daily_docket">
 
-    <div class="space-y-4">
+    <!-- Time & Hours -->
+    <div class="ds-card">
+      <p class="ds-card-title">Time &amp; Hours</p>
 
-      <!-- Docket Type -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-        <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Docket Type</label>
-        <select name="docket_type" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
-          <option value="daily_docket">Daily Docket</option>
-          <option value="completion">Completion</option>
-          <option value="delivery">Delivery</option>
-        </select>
+      <div class="ds-grid-2">
+        <div>
+          <label class="ds-label" for="time-start">Start on site<span class="req">*</span></label>
+          <input type="time" name="start_on_site" id="time-start" required
+            value="<%= typeof prefillStart !== 'undefined' ? prefillStart : (allocation.start_time || '') %>"
+            class="ds-input">
+          <p class="ds-error-text" id="err-start">Start time is required.</p>
+        </div>
+        <div>
+          <label class="ds-label" for="time-finish">Finish on site<span class="req">*</span></label>
+          <input type="time" name="finish_on_site" id="time-finish" required
+            value="<%= typeof prefillFinish !== 'undefined' ? prefillFinish : (allocation.end_time || '') %>"
+            class="ds-input">
+          <p class="ds-error-text" id="err-finish">Finish time is required.</p>
+        </div>
       </div>
+      <p class="ds-help">Prefilled from your rostered start/finish — edit if the actual times differed.</p>
 
-      <!-- Time Entries -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
-        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Time & Hours</h3>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Start on site</label>
-            <input type="time" name="start_on_site" value="<%= typeof prefillStart !== 'undefined' ? prefillStart : (allocation.start_time || '') %>"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-              id="time-start">
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Finish on site</label>
-            <input type="time" name="finish_on_site" value="<%= typeof prefillFinish !== 'undefined' ? prefillFinish : (allocation.end_time || '') %>"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-              id="time-finish">
-          </div>
+      <div class="ds-grid-2" style="margin-top:14px;">
+        <div>
+          <label class="ds-label" for="time-break">Break (minutes)</label>
+          <input type="number" name="break_minutes" id="time-break" min="0" max="120" step="5"
+            value="<%= typeof prefillBreakMinutes !== 'undefined' ? prefillBreakMinutes : 30 %>"
+            class="ds-input" inputmode="numeric">
         </div>
-
-        <p class="text-[11px] text-gray-500 -mt-1">Prefilled from your rostered start/finish — edit if the actual times differed.</p>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Break (minutes)</label>
-            <input type="number" name="break_minutes" value="<%= typeof prefillBreakMinutes !== 'undefined' ? prefillBreakMinutes : 30 %>" min="0" max="120" step="5"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-              id="time-break">
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Travel (hours)</label>
-            <input type="number" name="travel_hours" value="0" min="0" max="8" step="0.25"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-              id="time-travel">
-          </div>
-        </div>
-
-        <!-- Calculated Total -->
-        <div class="bg-brand-50 rounded-lg px-4 py-3 flex items-center justify-between">
-          <span class="text-sm font-medium text-brand-800">Total Hours</span>
-          <span class="text-lg font-bold text-brand-700" id="total-hours">0.00</span>
+        <div>
+          <label class="ds-label" for="time-travel">Travel (hours)</label>
+          <input type="number" name="travel_hours" id="time-travel" min="0" max="8" step="0.25" value="0"
+            class="ds-input" inputmode="decimal">
         </div>
       </div>
 
-      <!-- Client Info -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-        <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Client Representative</label>
-        <input type="text" name="client_name" placeholder="Name of person signing off"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500" id="client-name-input">
-
-        <label class="mt-3 flex items-center gap-2 text-sm text-gray-700">
-          <input type="checkbox" name="no_client_on_site" value="1" id="no-client-toggle"
-            class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
-          <span>No client on site</span>
-        </label>
-
-        <div id="no-client-reason-wrap" class="mt-2 hidden">
-          <label class="block text-xs font-medium text-gray-600 mb-1">Reason / comment</label>
-          <textarea name="no_client_reason" rows="2" placeholder="e.g. Client off site / not available to sign"
-            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
-        </div>
+      <div class="ds-total">
+        <span class="ds-total-label">Total hours</span>
+        <span class="ds-total-value" id="total-hours">0.00</span>
       </div>
+    </div>
 
-      <!-- Worker Signature -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-        <div class="flex items-center justify-between mb-2">
-          <label class="text-xs font-semibold text-gray-500 uppercase">Worker Signature</label>
-          <button type="button" onclick="clearSig('worker')" class="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 px-2 py-1 rounded">Clear</button>
-        </div>
-        <div class="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 relative" style="height: 160px;">
-          <canvas id="worker-sig-canvas" class="w-full h-full rounded-lg" style="touch-action: none;"></canvas>
-        </div>
-        <input type="hidden" name="signature_data" id="worker-sig-data">
-        <p class="text-[10px] text-gray-400 mt-1 text-center">Sign above with your finger</p>
+    <!-- Client -->
+    <div class="ds-card">
+      <p class="ds-card-title">Client representative</p>
+      <input type="text" name="client_name" id="client-name-input"
+        placeholder="Name of the person signing off"
+        class="ds-input">
+
+      <label class="ds-toggle">
+        <input type="checkbox" name="no_client_on_site" value="1" id="no-client-toggle">
+        <span>No client on site</span>
+      </label>
+
+      <div id="no-client-reason-wrap" style="margin-top:10px; display:none;">
+        <label class="ds-label" for="no-client-reason">Reason</label>
+        <textarea name="no_client_reason" id="no-client-reason" rows="2"
+          placeholder="e.g. Client off site / not available to sign"
+          class="ds-textarea"></textarea>
       </div>
+    </div>
 
-      <!-- Client Signature (hidden when "no client on site" is ticked) -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4" id="client-sig-block">
-        <div class="flex items-center justify-between mb-2">
-          <label class="text-xs font-semibold text-gray-500 uppercase">Client Signature</label>
-          <button type="button" onclick="clearSig('client')" class="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 px-2 py-1 rounded">Clear</button>
-        </div>
-        <input type="text" name="client_signed_name" placeholder="Client printed name"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-2 focus:ring-2 focus:ring-brand-500 focus:border-brand-500" id="client-printed-name">
-        <div class="border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 relative" style="height: 160px;">
-          <canvas id="client-sig-canvas" class="w-full h-full rounded-lg" style="touch-action: none;"></canvas>
-        </div>
-        <input type="hidden" name="client_signature" id="client-sig-data">
-        <p class="text-[10px] text-gray-400 mt-1 text-center">Client signs above</p>
+    <!-- Worker signature -->
+    <div class="ds-card">
+      <div class="ds-sig-head">
+        <p class="ds-card-title" style="margin-bottom:0;">Worker signature<span class="req" style="color:#FCA5A5;">*</span></p>
+        <button type="button" onclick="clearSig('worker')" class="ds-sig-clear">Clear</button>
       </div>
-
-      <!-- Notes -->
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Notes (optional)</label>
-        <textarea name="notes" rows="2" placeholder="Any additional notes..."
-          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
+      <div class="ds-sig-pad" id="worker-sig-pad">
+        <canvas id="worker-sig-canvas"></canvas>
       </div>
+      <input type="hidden" name="signature_data" id="worker-sig-data">
+      <p class="ds-sig-hint" id="worker-sig-hint">Sign above with your finger</p>
+      <p class="ds-error-text" id="err-worker-sig">Your signature is required.</p>
+    </div>
 
-      <!-- Submit -->
-      <button type="submit" onclick="saveSigs()" class="w-full py-3.5 bg-brand-600 text-white rounded-xl font-semibold text-sm hover:bg-brand-700 active:bg-brand-800 transition" style="min-height:48px;">
-        Sign & Submit Docket
+    <!-- Client signature (hidden when "no client on site" is ticked) -->
+    <div class="ds-card" id="client-sig-block">
+      <div class="ds-sig-head">
+        <p class="ds-card-title" style="margin-bottom:0;">Client signature<span class="req" style="color:#FCA5A5;">*</span></p>
+        <button type="button" onclick="clearSig('client')" class="ds-sig-clear">Clear</button>
+      </div>
+      <input type="text" name="client_signed_name" id="client-printed-name"
+        placeholder="Client printed name"
+        class="ds-input" style="margin-bottom:10px;">
+      <div class="ds-sig-pad" id="client-sig-pad">
+        <canvas id="client-sig-canvas"></canvas>
+      </div>
+      <input type="hidden" name="client_signature" id="client-sig-data">
+      <p class="ds-sig-hint" id="client-sig-hint">Client signs above</p>
+      <p class="ds-error-text" id="err-client-sig">Client signature is required (or tick "No client on site").</p>
+    </div>
+
+    <!-- Notes -->
+    <div class="ds-card">
+      <p class="ds-card-title">Notes (optional)</p>
+      <textarea name="notes" rows="2" placeholder="Anything worth flagging…" class="ds-textarea"></textarea>
+    </div>
+
+    <!-- Sticky submit -->
+    <div class="ds-submit-bar">
+      <button type="submit" class="ds-submit" id="ds-submit-btn">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        Sign &amp; Submit Docket
       </button>
+      <p class="ds-submit-summary" id="ds-submit-summary">Start, finish, your signature and a client signature are required.</p>
     </div>
   </form>
 </div>
 
 <script>
-// Signature pad setup for both canvases
-function setupSigPad(canvasId) {
+// ===== Signature pad =====
+function setupSigPad(canvasId, padId) {
   var canvas = document.getElementById(canvasId);
+  var pad = document.getElementById(padId);
   var ctx = canvas.getContext('2d');
   var drawing = false;
   var hasDrawn = false;
@@ -150,8 +279,8 @@ function setupSigPad(canvasId) {
     var data = hasDrawn ? canvas.toDataURL() : null;
     canvas.width = rect.width;
     canvas.height = rect.height;
-    ctx.strokeStyle = '#1D6AE5';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#0F172A';
+    ctx.lineWidth = 2.4;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     if (data && hasDrawn) {
@@ -163,51 +292,73 @@ function setupSigPad(canvasId) {
   resize();
   window.addEventListener('resize', resize);
 
+  function getPos(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: (e.clientX - rect.left), y: (e.clientY - rect.top) };
+  }
+
   canvas.addEventListener('pointerdown', function(e) {
-    drawing = true;
-    hasDrawn = true;
-    ctx.beginPath();
-    ctx.moveTo(e.offsetX, e.offsetY);
+    drawing = true; hasDrawn = true;
+    pad.classList.add('signed'); pad.classList.remove('ds-error');
+    var p = getPos(e);
+    ctx.beginPath(); ctx.moveTo(p.x, p.y);
     e.preventDefault();
   });
   canvas.addEventListener('pointermove', function(e) {
-    if (drawing) {
-      ctx.lineTo(e.offsetX, e.offsetY);
-      ctx.stroke();
-      e.preventDefault();
-    }
+    if (!drawing) return;
+    var p = getPos(e);
+    ctx.lineTo(p.x, p.y); ctx.stroke();
+    e.preventDefault();
   });
-  canvas.addEventListener('pointerup', function() { drawing = false; });
+  canvas.addEventListener('pointerup',    function() { drawing = false; });
   canvas.addEventListener('pointerleave', function() { drawing = false; });
 
   return {
-    clear: function() { ctx.clearRect(0, 0, canvas.width, canvas.height); hasDrawn = false; },
+    clear: function() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      hasDrawn = false; pad.classList.remove('signed');
+    },
     getData: function() { return hasDrawn ? canvas.toDataURL('image/png') : ''; },
-    hasDrawn: function() { return hasDrawn; }
+    hasDrawn: function() { return hasDrawn; },
   };
 }
 
-var workerPad = setupSigPad('worker-sig-canvas');
-var clientPad = setupSigPad('client-sig-canvas');
+var workerPad = setupSigPad('worker-sig-canvas', 'worker-sig-pad');
+var clientPad = setupSigPad('client-sig-canvas', 'client-sig-pad');
 
 function clearSig(which) {
-  if (which === 'worker') workerPad.clear();
-  else clientPad.clear();
+  if (which === 'worker') {
+    workerPad.clear();
+    document.getElementById('worker-sig-hint').classList.remove('signed');
+    document.getElementById('worker-sig-hint').textContent = 'Sign above with your finger';
+  } else {
+    clientPad.clear();
+    document.getElementById('client-sig-hint').classList.remove('signed');
+    document.getElementById('client-sig-hint').textContent = 'Client signs above';
+  }
 }
 
-function saveSigs() {
-  document.getElementById('worker-sig-data').value = workerPad.getData();
-  document.getElementById('client-sig-data').value = clientPad.getData();
-}
+// Mark signature as "signed" visually as soon as the worker lifts the pen
+document.getElementById('worker-sig-canvas').addEventListener('pointerup', function() {
+  if (workerPad.hasDrawn()) {
+    var h = document.getElementById('worker-sig-hint');
+    h.classList.add('signed'); h.textContent = '✓ Signed';
+  }
+});
+document.getElementById('client-sig-canvas').addEventListener('pointerup', function() {
+  if (clientPad.hasDrawn()) {
+    var h = document.getElementById('client-sig-hint');
+    h.classList.add('signed'); h.textContent = '✓ Signed';
+  }
+});
 
-// Time calculation
+// ===== Time totals =====
 function calcTotal() {
   var start = document.getElementById('time-start').value;
   var finish = document.getElementById('time-finish').value;
   var breakMin = parseInt(document.getElementById('time-break').value) || 0;
   var travel = parseFloat(document.getElementById('time-travel').value) || 0;
   var el = document.getElementById('total-hours');
-
   if (!start || !finish) { el.textContent = '0.00'; return; }
   var sp = start.split(':').map(Number);
   var fp = finish.split(':').map(Number);
@@ -217,16 +368,14 @@ function calcTotal() {
   var total = Math.max(0, (worked - breakMin) / 60) + travel;
   el.textContent = total.toFixed(2);
 }
-
-document.getElementById('time-start').addEventListener('change', calcTotal);
-document.getElementById('time-finish').addEventListener('change', calcTotal);
-document.getElementById('time-break').addEventListener('input', calcTotal);
-document.getElementById('time-travel').addEventListener('input', calcTotal);
+['time-start','time-finish','time-break','time-travel'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('input', calcTotal);
+  if (el) el.addEventListener('change', calcTotal);
+});
 calcTotal();
 
-// "No client on site" toggle: hide the client signature/name block when ticked
-// and reveal a free-text reason. We don't disable the inputs (so saved drafts
-// behave predictably) — the server clears their values when the flag is set.
+// ===== "No client on site" toggle =====
 (function () {
   var toggle = document.getElementById('no-client-toggle');
   var sigBlock = document.getElementById('client-sig-block');
@@ -235,18 +384,62 @@ calcTotal();
   if (!toggle) return;
   function sync() {
     if (toggle.checked) {
-      sigBlock.classList.add('hidden');
-      reasonWrap.classList.remove('hidden');
+      sigBlock.style.display = 'none';
+      reasonWrap.style.display = 'block';
       if (clientNameInput) clientNameInput.value = '';
       clearSig('client');
       var n = document.getElementById('client-printed-name');
       if (n) n.value = '';
     } else {
-      sigBlock.classList.remove('hidden');
-      reasonWrap.classList.add('hidden');
+      sigBlock.style.display = '';
+      reasonWrap.style.display = 'none';
     }
   }
   toggle.addEventListener('change', sync);
   sync();
 })();
+
+// ===== Submit validation =====
+document.getElementById('docket-form').addEventListener('submit', function (e) {
+  var ok = true;
+  function setErr(id, errId, bad) {
+    var el = document.getElementById(id);
+    var err = document.getElementById(errId);
+    if (bad) { el.classList.add('ds-error'); if (err) err.classList.add('show'); ok = false; }
+    else     { el.classList.remove('ds-error'); if (err) err.classList.remove('show'); }
+  }
+  function setSigErr(padId, errId, bad) {
+    var pad = document.getElementById(padId);
+    var err = document.getElementById(errId);
+    if (bad) { pad.classList.add('ds-error'); if (err) err.classList.add('show'); ok = false; }
+    else     { pad.classList.remove('ds-error'); if (err) err.classList.remove('show'); }
+  }
+
+  var start  = document.getElementById('time-start').value;
+  var finish = document.getElementById('time-finish').value;
+  setErr('time-start',  'err-start',  !start);
+  setErr('time-finish', 'err-finish', !finish);
+
+  setSigErr('worker-sig-pad', 'err-worker-sig', !workerPad.hasDrawn());
+
+  var noClient = document.getElementById('no-client-toggle').checked;
+  if (!noClient) {
+    setSigErr('client-sig-pad', 'err-client-sig', !clientPad.hasDrawn());
+  } else {
+    setSigErr('client-sig-pad', 'err-client-sig', false);
+  }
+
+  if (!ok) {
+    e.preventDefault();
+    // Scroll to the first error so the worker sees what's missing.
+    var firstErr = document.querySelector('.ds-error, .ds-error-text.show');
+    if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  // Stamp the signature data into the hidden inputs just before the
+  // form actually submits so the latest pen strokes are captured.
+  document.getElementById('worker-sig-data').value = workerPad.getData();
+  document.getElementById('client-sig-data').value = noClient ? '' : clientPad.getData();
+});
 </script>
