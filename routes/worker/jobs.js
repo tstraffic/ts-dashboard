@@ -118,6 +118,58 @@ router.get('/jobs', (req, res) => {
     return groups;
   }
 
+  // === Week pagination for the calendar strip ===
+  // ?week=YYYY-MM-DD anchors the visible week. Without it we land on the
+  // current week. Mon → Sun layout (en-AU convention).
+  function isoDate(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  const anchor = req.query.week ? new Date(req.query.week + 'T00:00:00') : new Date();
+  if (isNaN(anchor.getTime())) anchor.setTime(Date.now());
+  const dow = (anchor.getDay() + 6) % 7;
+  const monday = new Date(anchor); monday.setDate(monday.getDate() - dow); monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  const prev = new Date(monday); prev.setDate(prev.getDate() - 7);
+  const next = new Date(monday); next.setDate(next.getDate() + 7);
+  const weekStartIso = isoDate(monday);
+  const weekEndIso   = isoDate(sunday);
+
+  // Filter confirmed shifts down to the visible week — Requests stay
+  // unfiltered (always visible across all weeks) so workers don't miss
+  // a pending acceptance by flipping forward.
+  const confirmedThisWeek = confirmed.filter(s =>
+    s.allocation_date >= weekStartIso && s.allocation_date <= weekEndIso
+  );
+
+  // Day-by-day count for the strip indicators.
+  const countsByDate = {};
+  confirmedThisWeek.forEach(s => { countsByDate[s.allocation_date] = (countsByDate[s.allocation_date] || 0) + 1; });
+  // Requests that fall inside the visible week add to the dot too — so a
+  // pending shift on Wed shows up as "something happening Wed".
+  requests.forEach(s => {
+    if (s.allocation_date >= weekStartIso && s.allocation_date <= weekEndIso) {
+      countsByDate[s.allocation_date] = (countsByDate[s.allocation_date] || 0) + 1;
+    }
+  });
+
+  const weekDays = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday); d.setDate(monday.getDate() + i);
+    const iso = isoDate(d);
+    weekDays.push({
+      iso,
+      letter: ['MON','TUE','WED','THU','FRI','SAT','SUN'][i],
+      day: d.getDate(),
+      isToday: iso === today,
+      isPast: iso < today,
+      count: countsByDate[iso] || 0,
+    });
+  }
+
+  const startMon = monday.toLocaleDateString('en-AU', { month: 'short' });
+  const endMon   = sunday.toLocaleDateString('en-AU', { month: 'short' });
+  const monthLabel = (startMon === endMon ? startMon : startMon + ' / ' + endMon) + ' ' + sunday.getFullYear();
+
   res.render('worker/jobs', {
     title: 'My Shifts',
     currentPage: 'shifts',
@@ -127,8 +179,16 @@ router.get('/jobs', (req, res) => {
     confirmed,
     finished,
     requestsByDate: groupByDate(requests),
-    confirmedByDate: groupByDate(confirmed),
+    confirmedByDate: groupByDate(confirmedThisWeek),
     finishedByDate: groupByDate(finished),
+    // Week-strip metadata
+    weekDays,
+    weekStartIso,
+    weekEndIso,
+    monthLabel,
+    prevWeek: isoDate(prev),
+    nextWeek: isoDate(next),
+    isThisWeek: weekStartIso <= today && today <= weekEndIso,
   });
 });
 
