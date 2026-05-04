@@ -347,6 +347,20 @@ router.get('/forms/history', (req, res) => {
 
 // Canonical 22-item OK / Not OK / N/A check list. Order is the same as the
 // PDF so the rendered output sits side-by-side with the original.
+// Hardcoded fallbacks below — used until an admin publishes a revision
+// of the matching system template. After mig 151 ships, migration 151
+// auto-publishes revision 1 mirroring these arrays, so by default the
+// worker portal still renders the same items the workers are used to.
+// Admin edits + republishes change this content live.
+const { getSystemItems } = require('../../services/systemChecklists');
+
+// Map a system-template item back to the shape the existing EJS expects
+// for the simple OK/Not OK/N/A and Yes/No/N/A forms. They only need
+// { key, label }.
+function toSimpleItem(it) {
+  return { key: it.item_key, label: it.question };
+}
+
 const VEHICLE_PRESTART_ITEMS = [
   { key: 'jack_wrench',       label: 'Jack and Wrench' },
   { key: 'steering',          label: 'Steering' },
@@ -436,10 +450,16 @@ router.get('/forms/vehicle-prestart', (req, res) => {
     }
   } catch (_) { /* table may be empty */ }
 
+  // Resolve items from the latest published revision of the
+  // 'vehicle_prestart' system template. Falls back to the hardcoded
+  // array if no revision exists yet (legacy DB / pre-mig 151).
+  const sysItems = getSystemItems('vehicle_prestart', VEHICLE_PRESTART_ITEMS.map(i => ({ item_key: i.key, question: i.label, response_type: 'ok_notok_na' })));
+  const items = sysItems.map(toSimpleItem);
+
   res.render('worker/forms/vehicle-prestart', {
     title: 'Vehicle Pre-Start',
     currentPage: 'forms',
-    items: VEHICLE_PRESTART_ITEMS,
+    items,
     allocation,
     recentVehicles,
     flash_success: req.flash('success'),
@@ -464,11 +484,16 @@ router.post('/forms/vehicle-prestart', photoUpload.array('arrow_board_photos', 6
     }
   }
 
-  // Collect the 22 OK/NotOK/NA answers under data.items[<key>]
+  // Collect OK/NotOK/NA answers from whatever item set was rendered —
+  // could be the hardcoded list OR an admin-published revision with
+  // extra/different keys. Read from the live items so a renamed
+  // question still saves cleanly.
+  const liveItems = getSystemItems('vehicle_prestart',
+    VEHICLE_PRESTART_ITEMS.map(i => ({ item_key: i.key })));
   const items = {};
-  for (const it of VEHICLE_PRESTART_ITEMS) {
-    const v = body['item_' + it.key];
-    items[it.key] = ['ok', 'not_ok', 'na'].includes(v) ? v : 'ok';
+  for (const it of liveItems) {
+    const v = body['item_' + it.item_key];
+    items[it.item_key] = ['ok', 'not_ok', 'na'].includes(v) ? v : 'ok';
   }
   const data = {
     vehicle: (body.vehicle || '').trim(),
@@ -554,11 +579,27 @@ router.get('/forms/risk-assessment', (req, res) => {
   const allocation = requireAllocation(req, res);
   if (!allocation) return;
 
+  // Resolve questions from the system template, falling back to
+  // the hardcoded RA_QUESTIONS array. The system template snapshot
+  // has shape { item_key, question, response_type, options, required }
+  // so we map back to the EJS's expected shape { key, label, type, options, required }.
+  const sysQ = getSystemItems('risk_toolbox', RA_QUESTIONS.map(q => ({
+    item_key: q.key, question: q.label, response_type: q.type, options: q.options, required: q.required ? 1 : 0,
+  })));
+  const questions = sysQ.map(it => ({
+    key: it.item_key,
+    label: it.question,
+    type: (it.response_type === 'checkbox' || it.response_type === 'radio' || it.response_type === 'textarea')
+            ? it.response_type : 'checkbox',
+    options: it.options || [],
+    required: !!it.required,
+  }));
+
   res.render('worker/forms/risk-assessment', {
     title: 'Risk Assessment & Toolbox',
     currentPage: 'forms',
     allocation,
-    questions: RA_QUESTIONS,
+    questions,
     flash_success: req.flash('success'),
     flash_error: req.flash('error'),
   });
@@ -579,11 +620,13 @@ router.post('/forms/risk-assessment', (req, res) => {
     }
   }
 
-  // Walk every declared question and pull the right answer shape out of the
-  // posted body. Multi-selects come through Express as either undefined,
-  // a single string, or an array — coerce to array consistently.
+  // Walk every declared question. Pull from the live system template
+  // so admin-added/renamed questions still save cleanly.
+  const liveQ = getSystemItems('risk_toolbox', RA_QUESTIONS.map(q => ({
+    item_key: q.key, response_type: q.type,
+  }))).map(it => ({ key: it.item_key, type: it.response_type }));
   const answers = {};
-  for (const q of RA_QUESTIONS) {
+  for (const q of liveQ) {
     const raw = body['q_' + q.key];
     if (q.type === 'checkbox') {
       answers[q.key] = raw == null ? [] : (Array.isArray(raw) ? raw : [raw]);
@@ -810,11 +853,17 @@ router.get('/forms/team-leader', (req, res) => {
   const me = db.prepare('SELECT portal_role FROM crew_members WHERE id = ?').get(worker.id);
   const isManager = !!(me && hasPortalRole(me.portal_role, 'team_leader'));
 
+  // Resolve from system template; fall back to PPE_ITEMS so the form
+  // always renders even if migration 151 hasn't run yet.
+  const sysPPE = getSystemItems('team_leader',
+    PPE_ITEMS.map(i => ({ item_key: i.key, question: i.label })));
+  const ppeItems = sysPPE.map(toSimpleItem);
+
   res.render('worker/forms/team-leader', {
     title: 'Team Leader Checklist',
     currentPage: 'forms',
     allocation,
-    ppeItems: PPE_ITEMS,
+    ppeItems,
     isManager,
     flash_success: req.flash('success'),
     flash_error: req.flash('error'),
@@ -840,7 +889,11 @@ router.post('/forms/team-leader', photoUpload.fields([
   }
 
   const ppe = {};
-  for (const it of PPE_ITEMS) ppe[it.key] = body['ppe_' + it.key] === 'yes';
+  // Pull PPE list from the live system template so admin-renamed
+  // items still capture cleanly. Falls back to hardcoded PPE_ITEMS.
+  const livePPE = getSystemItems('team_leader',
+    PPE_ITEMS.map(i => ({ item_key: i.key })));
+  for (const it of livePPE) ppe[it.item_key] = body['ppe_' + it.item_key] === 'yes';
 
   const data = {
     team_leader_name: (body.team_leader_name || worker.full_name || '').trim(),

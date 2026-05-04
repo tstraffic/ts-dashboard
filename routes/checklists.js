@@ -6,12 +6,16 @@ const { logActivity } = require('../middleware/audit');
 // GET / — List all checklist templates
 router.get('/', (req, res) => {
   const db = getDb();
+  // System templates (system_key NOT NULL) sort to the top of the list
+  // because they're the operationally-critical ones the worker portal
+  // actually depends on. Among system templates we order by name; the
+  // rest fall back to sort_order / created_at as before.
   const templates = db.prepare(`
     SELECT ct.*, u.full_name as creator_name,
       (SELECT COUNT(*) FROM checklist_template_items WHERE template_id = ct.id) as item_count
     FROM checklist_templates ct
     LEFT JOIN users u ON ct.created_by_id = u.id
-    ORDER BY ct.sort_order ASC, ct.created_at DESC
+    ORDER BY (ct.system_key IS NULL) ASC, ct.system_key ASC, ct.sort_order ASC, ct.created_at DESC
   `).all();
 
   res.render('checklists/index', {
@@ -199,11 +203,17 @@ router.post('/:id/reorder', express.json(), (req, res) => {
   res.json({ success: true });
 });
 
-// POST /:id/archive — Toggle archive/active
+// POST /:id/archive — Toggle archive/active. System templates can't be
+// archived because the worker portal Job-Pack flow depends on them
+// resolving to a published revision.
 router.post('/:id/archive', (req, res) => {
   const db = getDb();
-  const template = db.prepare('SELECT status FROM checklist_templates WHERE id = ?').get(req.params.id);
+  const template = db.prepare('SELECT status, system_key FROM checklist_templates WHERE id = ?').get(req.params.id);
   if (!template) { req.flash('error', 'Template not found.'); return res.redirect('/checklists'); }
+  if (template.system_key) {
+    req.flash('error', 'System templates can\'t be archived — they power the worker portal Job-Pack.');
+    return res.redirect('/checklists');
+  }
 
   const newStatus = template.status === 'archived' ? 'active' : 'archived';
   db.prepare('UPDATE checklist_templates SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStatus, req.params.id);
