@@ -26,7 +26,18 @@
           <div class="p-5">
             <div class="flex items-start justify-between mb-3">
               <div>
-                <h3 class="text-base font-bold text-gray-900"><%= t.name %></h3>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h3 class="text-base font-bold text-gray-900"><%= t.name %></h3>
+                  <% if (t.system_key) { %>
+                    <span title="Built-in worker portal checklist — edit + publish to push changes live" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20">
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                      System
+                    </span>
+                  <% } %>
+                  <% if (t.worker_visible && t.published_revision) { %>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Live · rev <%= t.published_revision %></span>
+                  <% } %>
+                </div>
                 <% if (t.description) { %>
                   <p class="text-sm text-gray-500 mt-1 line-clamp-2"><%= t.description %></p>
                 <% } %>

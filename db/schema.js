@@ -7033,14 +7033,185 @@ function runMigrations(db) {
   }
 
   // =============================================
-  // Migration 151: Realign compliance reference_number prefixes with
+  // Migration 151: Promote the 5 hard-coded Job-Pack checklists into
+  // editable system templates so admins can revise + publish new
+  // versions from /checklists, and the worker portal renders the
+  // latest published revision's questions instead of a hardcoded JS
+  // array. system_key is the stable handle the worker routes use to
+  // look up "the Vehicle Pre-Start template" regardless of name
+  // changes; options_json + item_key on checklist_template_items hold
+  // the extra fields some forms need (radio/checkbox options, the
+  // POST input key like `item_jack_wrench`).
+  // =============================================
+  if (!isMigrationApplied.get(151)) {
+    try {
+      // Schema additions
+      const ctCols2 = db.prepare("PRAGMA table_info(checklist_templates)").all().map(c => c.name);
+      if (!ctCols2.includes('system_key')) try { db.exec("ALTER TABLE checklist_templates ADD COLUMN system_key TEXT"); } catch (e) {}
+      db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_ct_system_key ON checklist_templates(system_key) WHERE system_key IS NOT NULL");
+      const ctiCols = db.prepare("PRAGMA table_info(checklist_template_items)").all().map(c => c.name);
+      if (!ctiCols.includes('item_key'))   try { db.exec("ALTER TABLE checklist_template_items ADD COLUMN item_key TEXT"); }   catch (e) {}
+      if (!ctiCols.includes('options_json'))try { db.exec("ALTER TABLE checklist_template_items ADD COLUMN options_json TEXT"); }catch (e) {}
+
+      // Seed each system template if not present.
+      const systemTemplates = [
+        {
+          system_key: 'vehicle_prestart',
+          name: 'Vehicle Pre-Start',
+          description: 'Pre-shift inspection of the assigned vehicle. 22 OK / Not OK / N/A items. Failed items must be reported to a supervisor.',
+          require_signature: 1,
+          items: [
+            'jack_wrench:Jack and Wrench','steering:Steering','horn:Horn','vehicle_damage:Vehicle Damage',
+            'spare_wheel:Spare Wheel','windshield:Windshield','brakes:Brakes','headlights:Headlights',
+            'tail_lights:Tail Lights','mirrors:Mirrors','seatbelts:Seatbelts','tyre_wear:Tyre Wear',
+            'arrow_board:Arrow Board','vms_board:VMS Board','beacons_front:Flashing Beacons (Front)',
+            'beacons_rear:Flashing Beacons (Rear)','fluid_leaks:Fluid Leaks','reverse_squawker:Reverse Squawker',
+            'fire_extinguisher:Fire Extinguisher','first_aid_kit:Fully Stocked First Aid Kit',
+            'cabin_clean:Cabin/Tray Free From Litter/Rubbish','load_restraint:Load Restraint',
+          ].map(s => { const [k, l] = s.split(':'); return { item_key: k, question: l, response_type: 'ok_notok_na', section: 'Inspection', required: 1 }; }),
+        },
+        {
+          system_key: 'risk_toolbox',
+          name: 'Risk Assessment & Toolbox',
+          description: 'On-site toolbox / risk assessment run with the crew before work commences.',
+          require_signature: 1,
+          items: [
+            { item_key: 'struck_by_traffic_controls', question: 'Controls for being struck by traffic', response_type: 'checkbox',
+              options: ['Buffer Vehicle','Clear visibility of control points','Clear visibility of signs','Escape Routes','Not turning back to traffic','Remain outside live traffic lanes'], required: 1 },
+            { item_key: 'exclusion_zone_items', question: 'Items / machinery needing exclusion zones', response_type: 'checkbox',
+              options: ['Open excavation, pits and manholes','Overhead Crane or EWP','Mobile Plant','None Identified'], required: 0 },
+            { item_key: 'exclusion_zone_controls', question: 'Controls for exclusion zones', response_type: 'checkbox',
+              options: ['Client mandated exclusion zone','Delineation (cones/Tiger Tails/Bollards/Tape)','Protected pedestrian corridors','Visible contact / confirmation with Plant operators'], required: 0 },
+            { item_key: 'pedestrian_controls', question: 'Controls for pedestrians being struck by traffic', response_type: 'checkbox',
+              options: ['Delineation (cones/tiger tails/bollards/tape)','Escort','Signs','Pedestrian corridor','None - no pedestrians on site'], required: 0 },
+            { item_key: 'slip_trip_controls', question: 'Controls for slips, trips and falls', response_type: 'checkbox',
+              options: ['Boot Safety - Laces tied and zips pulled up',"Don't rush tasks",'Isolate hazardous area','Cones around manholes/trip hazards'], required: 0 },
+            { item_key: 'weather_conditions', question: 'Adverse weather conditions', response_type: 'checkbox',
+              options: ['N/A - No adverse weather','Heat','Cold','Rain','Strong Wind','Reduced Visibility / Fog','Storm / Lightning'], required: 0 },
+            { item_key: 'manual_handling_controls', question: 'Controls for manual handling', response_type: 'checkbox',
+              options: ['N/A - Not stopping traffic','Two-person lifts','Use of trolley/dolly','Lifting techniques','PPE'], required: 0 },
+            { item_key: 'queue_management', question: 'How are end-of-queue lengths being managed?', response_type: 'checkbox',
+              options: ['N/A - Not stopping traffic','VMS / Arrow Board','Tail-end controller','Queue protection vehicle','Police support'], required: 0 },
+            { item_key: 'other_hazards', question: 'Other hazards identified', response_type: 'textarea', required: 0 },
+            { item_key: 'safe_to_proceed', question: 'With the selected controls in place, can the job be conducted safely?', response_type: 'radio',
+              options: ['Yes','No - work must not commence'], required: 1 },
+            { item_key: 'communicated_items', question: 'Items communicated to all staff in the toolbox', response_type: 'checkbox',
+              options: ['Breaks','Client Requirements','Emergency Procedures','Exclusion Zones','Golden Rules of Safety','Sequencing','Site Set Up and Pack Up'], required: 0 },
+          ],
+        },
+        {
+          system_key: 'tc_prestart',
+          name: 'TC Prestart Declaration',
+          description: 'Per-Traffic-Controller declaration filed before commencing controlled traffic work.',
+          require_signature: 1,
+          items: [
+            { item_key: 'inducted',           question: 'I have been inducted onto site for this job',                                response_type: 'yes_no_na', required: 1, section: 'Declaration' },
+            { item_key: 'reviewed_swms',      question: 'I have reviewed the SWMS for this job',                                     response_type: 'yes_no_na', required: 1, section: 'Declaration' },
+            { item_key: 'reviewed_tcp',       question: 'I have reviewed the TCP / TGS for this job',                                response_type: 'yes_no_na', required: 1, section: 'Declaration' },
+            { item_key: 'fit_for_work',       question: 'I am physically and mentally fit for work',                                 response_type: 'yes_no_na', required: 1, section: 'Declaration' },
+            { item_key: 'free_of_substances', question: 'I am free of drugs, alcohol and impairing substances',                       response_type: 'yes_no_na', required: 1, section: 'Declaration' },
+            { item_key: 'tickets_current',    question: 'My tickets and certifications are current',                                  response_type: 'yes_no_na', required: 1, section: 'Declaration' },
+            { item_key: 'ppe_compliant',      question: 'My PPE is compliant and in good condition',                                  response_type: 'yes_no_na', required: 1, section: 'Declaration' },
+          ],
+        },
+        {
+          system_key: 'team_leader',
+          name: 'Team Leader Checklist',
+          description: 'Crew lead / acting TL checklist — includes per-worker PPE check.',
+          require_signature: 1,
+          items: [
+            { item_key: 'site_briefing',      question: 'Site briefing delivered to all crew',                       response_type: 'yes_no_na', required: 1, section: 'Briefing' },
+            { item_key: 'tcp_displayed',      question: 'TCP/TGS available and displayed on site',                   response_type: 'yes_no_na', required: 1, section: 'Briefing' },
+            { item_key: 'emergency_plan',     question: 'Emergency procedures discussed (escape routes, contacts)',   response_type: 'yes_no_na', required: 1, section: 'Briefing' },
+            { item_key: 'hi_vis',             question: 'Hi-Vis vest / shirt',                                        response_type: 'yes_no_na', required: 1, section: 'PPE Check' },
+            { item_key: 'safety_boots',       question: 'Safety boots',                                               response_type: 'yes_no_na', required: 1, section: 'PPE Check' },
+            { item_key: 'hard_hat',           question: 'Hard hat',                                                   response_type: 'yes_no_na', required: 1, section: 'PPE Check' },
+            { item_key: 'eye_protection',     question: 'Eye protection',                                             response_type: 'yes_no_na', required: 1, section: 'PPE Check' },
+            { item_key: 'sun_protection',     question: 'Sun protection (hat, sunscreen)',                            response_type: 'yes_no_na', required: 0, section: 'PPE Check' },
+            { item_key: 'night_wands',        question: 'Night Wands (Nights only — N/A for day shift)',              response_type: 'yes_no_na', required: 0, section: 'PPE Check' },
+            { item_key: 'crew_fit_for_work',  question: 'All crew confirm fit for work',                              response_type: 'yes_no_na', required: 1, section: 'Crew' },
+            { item_key: 'comms_check',        question: 'Two-way / phone comms check completed',                      response_type: 'yes_no_na', required: 1, section: 'Crew' },
+          ],
+        },
+        {
+          system_key: 'post_shift_vehicle',
+          name: 'Post-Shift Vehicle Checklist',
+          description: 'End-of-shift vehicle return inspection. Records ODO close + any new defects.',
+          require_signature: 1,
+          items: [
+            { item_key: 'vehicle_clean',     question: 'Vehicle returned clean (cabin + tray)',     response_type: 'yes_no_na', required: 1, section: 'Return Condition' },
+            { item_key: 'no_new_damage',     question: 'No new damage from this shift',             response_type: 'yes_no_na', required: 1, section: 'Return Condition' },
+            { item_key: 'fuel_topped_up',    question: 'Fuel topped up if required',                 response_type: 'yes_no_na', required: 0, section: 'Return Condition' },
+            { item_key: 'arrow_board_off',   question: 'Arrow board powered off and secured',       response_type: 'yes_no_na', required: 0, section: 'Equipment' },
+            { item_key: 'beacons_off',       question: 'Beacons / VMS powered off',                 response_type: 'yes_no_na', required: 0, section: 'Equipment' },
+            { item_key: 'load_secured',      question: 'Tray load fully secured',                   response_type: 'yes_no_na', required: 1, section: 'Equipment' },
+            { item_key: 'keys_returned',     question: 'Keys returned / parked at depot',           response_type: 'yes_no_na', required: 1, section: 'Handover' },
+            { item_key: 'defects_logged',    question: 'New defects logged in notes',               response_type: 'yes_no_na', required: 0, section: 'Handover' },
+          ],
+        },
+      ];
+
+      const adminId = (db.prepare("SELECT id FROM users WHERE LOWER(role) IN ('admin','management') ORDER BY id ASC LIMIT 1").get() || {}).id || null;
+
+      const findByKey = db.prepare("SELECT id FROM checklist_templates WHERE system_key = ?");
+      const insertTemplate = db.prepare(`
+        INSERT INTO checklist_templates (system_key, name, description, status, worker_visible, require_signature, created_by_id)
+        VALUES (?, ?, ?, 'active', 1, ?, ?)
+      `);
+      const insertItem = db.prepare(`
+        INSERT INTO checklist_template_items (template_id, item_order, section, item_key, question, response_type, required, options_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const insertRev = db.prepare(`
+        INSERT INTO checklist_template_revisions (template_id, revision_number, name, description, require_signature, items_json, published_by_id)
+        VALUES (?, 1, ?, ?, ?, ?, ?)
+      `);
+      const setPublished = db.prepare(`
+        UPDATE checklist_templates SET published_revision = 1, published_at = datetime('now'), published_by_id = ? WHERE id = ?
+      `);
+
+      let created = 0;
+      for (const tpl of systemTemplates) {
+        if (findByKey.get(tpl.system_key)) continue;
+        const tx = db.transaction(() => {
+          const r = insertTemplate.run(tpl.system_key, tpl.name, tpl.description, tpl.require_signature || 0, adminId);
+          const tplId = r.lastInsertRowid;
+          const itemRows = [];
+          tpl.items.forEach((it, idx) => {
+            const optionsJson = it.options ? JSON.stringify(it.options) : null;
+            insertItem.run(tplId, idx, it.section || '', it.item_key, it.question, it.response_type, it.required ? 1 : 0, optionsJson);
+            itemRows.push({
+              item_order: idx, section: it.section || '', item_key: it.item_key,
+              question: it.question, response_type: it.response_type,
+              required: it.required ? 1 : 0,
+              options: it.options || null,
+            });
+          });
+          // Auto-publish revision 1 so the worker portal can resolve it immediately.
+          insertRev.run(tplId, tpl.name, tpl.description, tpl.require_signature ? 1 : 0,
+                        JSON.stringify(itemRows), adminId);
+          setPublished.run(adminId, tplId);
+        });
+        tx();
+        created++;
+      }
+
+      recordMigration.run(151, 'system Job-Pack templates seeded as editable + auto-published rev 1');
+      console.log(`Migration 151 applied: seeded ${created} system Job-Pack templates`);
+    } catch (e) {
+      console.error('Migration 151 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 152: Realign compliance reference_number prefixes with
   // item_type. Council rows that ended up with TSTGS, free-text refs
   // like 'Council Approval', etc. get a fresh prefix that matches the
   // type. Numbering continues from the highest existing suffix —
   // monotonically upwards, no resets — so a system already at
   // TSTGS3099 produces TSCA3100, TSCA3101, … as fixes land.
   // =============================================
-  if (!isMigrationApplied.get(151)) {
+  if (!isMigrationApplied.get(152)) {
     try {
       const prefixMap = {
         traffic_guidance: 'TSTGS',
@@ -7082,10 +7253,10 @@ function runMigrations(db) {
         }
       });
 
-      recordMigration.run(151, 'compliance refs: realign prefix to item_type, continue numbering from current max');
-      console.log(`Migration 151 applied: realigned ${fixed} compliance reference number(s) to match item_type`);
+      recordMigration.run(152, 'compliance refs: realign prefix to item_type, continue numbering from current max');
+      console.log(`Migration 152 applied: realigned ${fixed} compliance reference number(s) to match item_type`);
     } catch (e) {
-      console.error('Migration 151 error:', e.message);
+      console.error('Migration 152 error:', e.message);
     }
   }
 
