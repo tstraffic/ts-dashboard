@@ -1,15 +1,27 @@
 <% locals.currentPage = 'checklists' %>
 <%
   var typeBadges = {
-    yes_no_na:    { bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', label: 'Yes / No / N/A' },
-    ok_notok_na:  { bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', label: 'OK / Not OK / N/A' },
-    pass_fail:    { bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',          label: 'Pass / Fail' },
-    text:         { bg: 'bg-gray-100 text-gray-600',                                 label: 'Text' },
-    textarea:     { bg: 'bg-gray-100 text-gray-600',                                 label: 'Long text' },
-    number:       { bg: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',    label: 'Number' },
-    radio:        { bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',          label: 'Single choice' },
-    checkbox:     { bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',          label: 'Multi-select' },
-    signature:    { bg: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',       label: 'Signature' }
+    // Display
+    heading:        { bg: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20',  label: 'Heading' },
+    information:    { bg: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20',  label: 'Info block' },
+    hyperlink:      { bg: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20',  label: 'Hyperlink' },
+    media:          { bg: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20',  label: 'Media' },
+    // Inputs
+    text:           { bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',        label: 'Question' },
+    textarea:       { bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',        label: 'Long question' },
+    number:         { bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',        label: 'Number' },
+    datetime:       { bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',        label: 'Date / Time' },
+    measurement:    { bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',        label: 'Measurement' },
+    // Special
+    checklist:      { bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', label: 'Checklist' },
+    yes_no_na:      { bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', label: 'Yes / No / N/A' },
+    ok_notok_na:    { bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', label: 'OK / Not OK / N/A' },
+    pass_fail:      { bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', label: 'Pass / Fail' },
+    multiple_choice:{ bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', label: 'Multiple choice' },
+    radio:          { bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', label: 'Single choice' },
+    checkbox:       { bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', label: 'Multi-select' },
+    media_upload:   { bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20', label: 'Media upload' },
+    signature:      { bg: 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',       label: 'Signature' }
   };
 %>
 
@@ -242,40 +254,134 @@
       </div>
     <% } %>
 
-    <!-- Add Question Form -->
-    <div id="addItemForm" class="<%= items.length === 0 ? '' : 'hidden' %> p-4 bg-blue-50/50 border-t border-gray-200">
-      <form method="POST" action="/checklists/<%= template.id %>/items" class="space-y-3">
+    <!-- ── Insert form element — picker + config form ──
+         Stage 1: a 3-column grid (Display / Inputs / Special) of element
+         tiles. Click one → stage 2 reveals a config form pre-loaded for
+         that element type, with type-specific extra fields shown only
+         when relevant (URL for Hyperlink, Unit for Measurement, etc.). -->
+    <div id="addItemForm" class="<%= items.length === 0 ? '' : 'hidden' %> p-4 bg-blue-50/30 border-t border-gray-200">
+
+      <!-- Stage 1 — picker -->
+      <div id="element-picker">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-xs font-bold text-gray-700 uppercase tracking-widest">Insert form element</p>
+          <button type="button" onclick="document.getElementById('addItemForm').classList.add('hidden')" class="text-xs text-gray-400 hover:text-gray-600">Close</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <% [
+            ['display', 'Display', 'Read-only blocks shown to the worker.', [
+              ['heading',     'Heading',     'H',  '#6366F1'],
+              ['information', 'Information', 'i',  '#6366F1'],
+              ['hyperlink',   'Hyperlink',   '↗',  '#6366F1'],
+              ['media',       'Media',       '🖼', '#6366F1'],
+            ]],
+            ['input',   'Inputs',  'What the worker fills in.', [
+              ['text',         'Question',     'Q', '#2563EB'],
+              ['textarea',     'Long question','¶', '#2563EB'],
+              ['datetime',     'Date / Time',  '◷', '#2563EB'],
+              ['measurement',  'Measurement',  '#', '#2563EB'],
+              ['number',       'Number',       '0', '#2563EB'],
+            ]],
+            ['special', 'Special', 'Richer worker inputs.', [
+              ['checklist',       'Checklist',       '☑', '#059669'],
+              ['multiple_choice', 'Multiple choice', '◉', '#059669'],
+              ['media_upload',    'Media upload',    '📷', '#059669'],
+              ['signature',       'Signature',       '✍', '#059669'],
+            ]],
+          ].forEach(function (group) { %>
+            <div>
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1"><%= group[1] %></p>
+              <p class="text-[11px] text-gray-400 mb-2"><%= group[2] %></p>
+              <div class="grid grid-cols-2 gap-2">
+                <% group[3].forEach(function (el) { %>
+                  <button type="button" onclick="window._pickElement('<%= el[0] %>')"
+                          class="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 bg-white hover:border-brand-400 hover:bg-brand-50 text-left transition">
+                    <span class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white" style="background:<%= el[3] %>;"><%= el[2] %></span>
+                    <span class="text-xs font-semibold text-gray-700"><%= el[1] %></span>
+                  </button>
+                <% }) %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <!-- Stage 2 — config form for the picked element -->
+      <form id="elementConfigForm" method="POST" action="/checklists/<%= template.id %>/items" class="hidden mt-3 space-y-3">
         <%- include('../partials/csrf') %>
+        <input type="hidden" name="response_type" id="cfgType" value="">
+
+        <div class="flex items-center gap-2 pb-2 border-b border-gray-200">
+          <button type="button" onclick="window._unpickElement()" class="text-xs text-gray-400 hover:text-gray-600 inline-flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            Pick a different element
+          </button>
+          <span class="text-xs text-gray-400">·</span>
+          <span class="text-xs font-semibold text-gray-700" id="cfgTypeLabel">Question</span>
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="sm:col-span-2">
-            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Question <span class="text-red-500">*</span></label>
-            <input type="text" name="question" required placeholder="e.g. Is all PPE worn correctly?"
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1" id="cfgQuestionLabel">Question text <span class="text-red-500">*</span></label>
+            <input type="text" name="question" id="cfgQuestion" placeholder="e.g. Is all PPE worn correctly?"
               class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Response Type</label>
-            <select name="response_type" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-              <option value="ok_notok_na">OK / Not OK / N/A</option>
-              <option value="yes_no_na">Yes / No / N/A</option>
-              <option value="pass_fail">Pass / Fail</option>
-              <option value="text">Text (free form)</option>
-              <option value="textarea">Long text</option>
-              <option value="number">Number</option>
-              <option value="signature">Signature</option>
-            </select>
           </div>
           <div>
             <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Section (optional)</label>
-            <input type="text" name="section" placeholder="e.g. Site Setup, Vehicle, PPE..."
+            <input type="text" name="section" placeholder="e.g. Site Setup, Vehicle, PPE…"
               class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
           </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Item key (optional)</label>
+            <input type="text" name="item_key" placeholder="auto-generated"
+              class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <p class="text-[10px] text-gray-400 mt-1">Stable handle for this row. Lowercase + underscores. Leave blank to auto-name.</p>
+          </div>
         </div>
-        <div class="flex items-center justify-between">
-          <label class="flex items-center gap-2 cursor-pointer">
+
+        <!-- Type-specific extra fields. Each block is shown only when its
+             data-show-when matches the picked element type. -->
+        <div data-show-when="hyperlink" class="hidden">
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Link URL <span class="text-red-500">*</span></label>
+          <input type="url" name="opt_url" placeholder="https://…" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div data-show-when="media" class="hidden">
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Image / file URL <span class="text-red-500">*</span></label>
+          <input type="url" name="opt_url" placeholder="https://…" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-3 mb-1">Alt text</label>
+          <input type="text" name="opt_alt" placeholder="Describe the image" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div data-show-when="information" class="hidden">
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Body</label>
+          <textarea name="opt_body" rows="3" placeholder="Notes / instructions for the worker." class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+        </div>
+        <div data-show-when="measurement" class="hidden">
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Unit</label>
+          <input type="text" name="opt_unit" placeholder="km, kg, °C, %…" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div data-show-when="checklist" class="hidden">
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Answer scheme</label>
+          <select name="opt_scheme" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="ok_notok_na">OK / Not OK / N/A</option>
+            <option value="yes_no_na">Yes / No / N/A</option>
+            <option value="pass_fail">Pass / Fail</option>
+          </select>
+        </div>
+        <div data-show-when="multiple_choice" class="hidden">
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Options (one per line) <span class="text-red-500">*</span></label>
+          <textarea name="opt_options" rows="4" placeholder="Option 1&#10;Option 2&#10;Option 3" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+          <label class="inline-flex items-center gap-2 mt-2 cursor-pointer">
+            <input type="checkbox" name="opt_multi" value="1" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+            <span class="text-sm text-gray-700">Allow multiple selections</span>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-gray-200">
+          <label class="flex items-center gap-2 cursor-pointer" id="cfgRequiredWrap">
             <input type="checkbox" name="required" value="1" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
             <span class="text-sm text-gray-600">Required</span>
           </label>
-          <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Add Question</button>
+          <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Add element</button>
         </div>
       </form>
     </div>
@@ -359,6 +465,63 @@ function editItem(itemId) {
   var qText = row.querySelector('.text-gray-900.font-medium');
   if (qText) form.querySelector('input[name="question"]').value = qText.textContent.trim();
 }
+
+// ── Insert form element picker → config form wiring ──
+(function () {
+  // Drives stage 2 of the Add UI: which fields to show, what labels to
+  // use, and whether Required is even meaningful (display elements
+  // aren't filled in by the worker so Required doesn't apply).
+  var ELEMENT_META = {
+    heading:        { label: 'Heading',        questionLabel: 'Heading text *',     placeholder: 'Section heading shown to the worker', requiresQuestion: true,  showRequired: false },
+    information:    { label: 'Information',    questionLabel: 'Title (optional)',   placeholder: 'Optional title above the body',       requiresQuestion: false, showRequired: false },
+    hyperlink:      { label: 'Hyperlink',      questionLabel: 'Link text *',        placeholder: 'e.g. View site map',                  requiresQuestion: true,  showRequired: false },
+    media:          { label: 'Media',          questionLabel: 'Caption (optional)', placeholder: 'Optional caption',                    requiresQuestion: false, showRequired: false },
+    text:           { label: 'Question',       questionLabel: 'Question text *',    placeholder: 'e.g. Is all PPE worn correctly?',     requiresQuestion: true,  showRequired: true  },
+    textarea:       { label: 'Long question',  questionLabel: 'Question text *',    placeholder: 'e.g. Describe the site setup',        requiresQuestion: true,  showRequired: true  },
+    number:         { label: 'Number',         questionLabel: 'Question text *',    placeholder: 'e.g. How many cones deployed?',       requiresQuestion: true,  showRequired: true  },
+    datetime:       { label: 'Date / Time',    questionLabel: 'Question text *',    placeholder: 'e.g. When did the shift start?',      requiresQuestion: true,  showRequired: true  },
+    measurement:    { label: 'Measurement',    questionLabel: 'Question text *',    placeholder: 'e.g. ODO at start of shift',          requiresQuestion: true,  showRequired: true  },
+    checklist:      { label: 'Checklist',      questionLabel: 'Question text *',    placeholder: 'e.g. Brakes',                         requiresQuestion: true,  showRequired: true  },
+    multiple_choice:{ label: 'Multiple choice',questionLabel: 'Question text *',    placeholder: 'e.g. Which weather conditions apply?', requiresQuestion: true, showRequired: true  },
+    media_upload:   { label: 'Media upload',   questionLabel: 'Question text *',    placeholder: 'e.g. Upload arrow board photos',      requiresQuestion: true,  showRequired: true  },
+    signature:      { label: 'Signature',      questionLabel: 'Label *',            placeholder: 'e.g. Driver signature',               requiresQuestion: true,  showRequired: true  },
+    ok_notok_na:    { label: 'OK / Not OK / N/A', questionLabel: 'Question text *', placeholder: 'e.g. Brakes',                         requiresQuestion: true,  showRequired: true  },
+    yes_no_na:      { label: 'Yes / No / N/A', questionLabel: 'Question text *',    placeholder: 'e.g. PPE compliant',                  requiresQuestion: true,  showRequired: true  },
+    pass_fail:      { label: 'Pass / Fail',    questionLabel: 'Question text *',    placeholder: 'e.g. Tyre tread acceptable',          requiresQuestion: true,  showRequired: true  },
+  };
+
+  var picker = document.getElementById('element-picker');
+  var cfgForm = document.getElementById('elementConfigForm');
+  if (!picker || !cfgForm) return;
+
+  window._pickElement = function (type) {
+    var meta = ELEMENT_META[type] || ELEMENT_META.text;
+    document.getElementById('cfgType').value = type;
+    document.getElementById('cfgTypeLabel').textContent = meta.label;
+    var qInput = document.getElementById('cfgQuestion');
+    var qLabel = document.getElementById('cfgQuestionLabel');
+    qLabel.innerHTML = meta.questionLabel.replace('*', '<span class="text-red-500">*</span>');
+    qInput.placeholder = meta.placeholder;
+    qInput.required = !!meta.requiresQuestion;
+    var rWrap = document.getElementById('cfgRequiredWrap');
+    rWrap.style.display = meta.showRequired ? '' : 'none';
+    rWrap.querySelector('input[type="checkbox"]').checked = false;
+    // Show only this element's extra-config block.
+    document.querySelectorAll('[data-show-when]').forEach(function (el) {
+      el.classList.toggle('hidden', el.getAttribute('data-show-when') !== type);
+    });
+    picker.classList.add('hidden');
+    cfgForm.classList.remove('hidden');
+    setTimeout(function () { qInput.focus(); }, 50);
+  };
+
+  window._unpickElement = function () {
+    cfgForm.classList.add('hidden');
+    picker.classList.remove('hidden');
+    cfgForm.reset();
+    document.querySelectorAll('[data-show-when]').forEach(function (el) { el.classList.add('hidden'); });
+  };
+})();
 
 // ── Bulk-edit toolbar wiring ──
 (function () {

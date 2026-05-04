@@ -55,6 +55,18 @@ router.get('/forms/custom/:id', (req, res) => {
   }
   let items = [];
   try { items = JSON.parse(rev.items_json || '[]'); } catch (e) { items = []; }
+  // Each row's options_json is stored as a string in the snapshot.
+  // Parse it into an `options` object so the view doesn't have to.
+  items.forEach(function (it) {
+    if (it.options_json && typeof it.options_json === 'string') {
+      try { it.options = JSON.parse(it.options_json); } catch (e) { it.options = null; }
+    } else if (it.options && typeof it.options === 'object') {
+      // already an object — leave it
+    } else if (Array.isArray(it.options)) {
+      // legacy seed shape — wrap into the new structure
+      it.options = { options: it.options };
+    }
+  });
 
   // Group items by section so the form reads as a structured doc.
   const sections = [];

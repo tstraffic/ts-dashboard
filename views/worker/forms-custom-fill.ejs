@@ -64,13 +64,42 @@
       <div class="cf-card">
         <% if (s.name) { %><p class="cf-section-title"><%= s.name %></p><% } %>
         <% s.items.forEach(function (it) { %>
+          <%
+            // Display elements render as read-only blocks. Inputs +
+            // Special render the answer controls. The legacy types
+            // (ok_notok_na, yes_no_na, pass_fail) keep working as
+            // before; the new "checklist" type reads its scheme out of
+            // options and routes to the matching three-button row.
+            var isDisplay = ['heading','information','hyperlink','media'].indexOf(it.response_type) !== -1;
+            var rt = it.response_type;
+            if (rt === 'checklist') {
+              var scheme = (it.options && it.options.scheme) || 'ok_notok_na';
+              rt = scheme;
+            }
+          %>
+          <% if (rt === 'heading') { %>
+            <h3 style="font-size:1rem;font-weight:800;color:#fff;margin-top:6px;letter-spacing:-0.005em;"><%= it.question %></h3>
+          <% } else if (rt === 'information') { %>
+            <% if (it.question) { %><p style="font-size:0.85rem;font-weight:700;color:#fff;"><%= it.question %></p><% } %>
+            <% if (it.options && it.options.body) { %><p style="font-size:0.78rem;color:rgba(255,255,255,0.7);line-height:1.45;margin-top:4px;white-space:pre-line;"><%= it.options.body %></p><% } %>
+          <% } else if (rt === 'hyperlink') { %>
+            <a href="<%= (it.options && it.options.url) || '#' %>" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:600;color:#60A5FA;text-decoration:underline;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+              <%= it.question || (it.options && it.options.url) || 'Open link' %>
+            </a>
+          <% } else if (rt === 'media') { %>
+            <% if (it.question) { %><p style="font-size:0.78rem;color:rgba(255,255,255,0.65);margin-bottom:6px;"><%= it.question %></p><% } %>
+            <% if (it.options && it.options.url) { %>
+              <img src="<%= it.options.url %>" alt="<%= it.options.alt || it.question || '' %>" style="max-width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.10);">
+            <% } %>
+          <% } else { %>
           <div class="cf-q">
             <p class="cf-q-text">
               <%= it.question %>
               <% if (it.required) { %><span class="cf-q-required">*</span><% } %>
             </p>
             <div class="cf-q-row">
-              <% if (it.response_type === 'yes_no_na') { %>
+              <% if (rt === 'yes_no_na') { %>
                 <% ['yes','no','na'].forEach(function (v) { %>
                   <label class="cf-radio">
                     <input type="radio" name="answer_<%= it.id %>" value="<%= v %>" <%= it.required ? 'required' : '' %>>
@@ -84,16 +113,37 @@
                     <span class="<%= v[2] %>"><%= v[1] %></span>
                   </label>
                 <% }) %>
-              <% } else if (it.response_type === 'pass_fail') { %>
+              <% } else if (rt === 'pass_fail') { %>
                 <% ['pass','fail'].forEach(function (v) { %>
                   <label class="cf-radio">
                     <input type="radio" name="answer_<%= it.id %>" value="<%= v %>" <%= it.required ? 'required' : '' %>>
                     <span class="<%= v === 'fail' ? 'fail' : '' %>"><%= v.charAt(0).toUpperCase() + v.slice(1) %></span>
                   </label>
                 <% }) %>
-              <% } else if (it.response_type === 'number') { %>
+              <% } else if (rt === 'number') { %>
                 <input type="number" name="answer_<%= it.id %>" class="cf-input" step="any" <%= it.required ? 'required' : '' %>>
-              <% } else if (it.response_type === 'signature') { %>
+              <% } else if (rt === 'datetime') { %>
+                <input type="datetime-local" name="answer_<%= it.id %>" class="cf-input" <%= it.required ? 'required' : '' %>>
+              <% } else if (rt === 'measurement') { %>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <input type="number" name="answer_<%= it.id %>" class="cf-input" step="any" style="flex:1;" <%= it.required ? 'required' : '' %>>
+                  <% if (it.options && it.options.unit) { %>
+                    <span style="font-size:0.85rem;font-weight:600;color:rgba(255,255,255,0.8);padding:0 6px;"><%= it.options.unit %></span>
+                  <% } %>
+                </div>
+              <% } else if (rt === 'multiple_choice') { %>
+                <% var mcOpts = (it.options && Array.isArray(it.options.options)) ? it.options.options : []; var mcMulti = !!(it.options && it.options.multi); %>
+                <div style="display:flex;flex-direction:column;gap:6px;width:100%;">
+                  <% mcOpts.forEach(function (opt, idx) { %>
+                    <label class="cf-radio" style="justify-content:flex-start;">
+                      <input type="<%= mcMulti ? 'checkbox' : 'radio' %>" name="answer_<%= it.id %><%= mcMulti ? '[]' : '' %>" value="<%= opt %>" <%= (it.required && !mcMulti && idx === 0) ? 'required' : '' %>>
+                      <span><%= opt %></span>
+                    </label>
+                  <% }) %>
+                </div>
+              <% } else if (rt === 'media_upload') { %>
+                <input type="file" name="answer_<%= it.id %>" accept="image/*" class="cf-input" <%= it.required ? 'required' : '' %>>
+              <% } else if (rt === 'signature') { %>
                 <div class="cf-sig-pad" id="sig-<%= it.id %>">
                   <canvas data-itemid="<%= it.id %>"></canvas>
                 </div>
@@ -101,11 +151,14 @@
                 <div style="margin-top:6px;display:flex;justify-content:flex-end;">
                   <button type="button" class="cf-sig-clear" onclick="cfClearSig(<%= it.id %>)">Clear</button>
                 </div>
+              <% } else if (rt === 'textarea') { %>
+                <textarea name="answer_<%= it.id %>" class="cf-textarea" rows="3" <%= it.required ? 'required' : '' %>></textarea>
               <% } else { %>
-                <textarea name="answer_<%= it.id %>" class="cf-textarea" rows="2" <%= it.required ? 'required' : '' %>></textarea>
+                <input type="text" name="answer_<%= it.id %>" class="cf-input" <%= it.required ? 'required' : '' %>>
               <% } %>
             </div>
           </div>
+          <% } %>
         <% }) %>
       </div>
     <% }) %>

@@ -93,6 +93,7 @@ router.get('/:id', (req, res) => {
     title: `Template: ${template.name}`,
     currentPage: 'checklists',
     template, items, revisions, dirty, responseCount,
+    elementTypes: ELEMENT_TYPES,
     user: req.session.user
   });
 });
@@ -146,30 +147,92 @@ router.post('/:id', (req, res) => {
   res.redirect(`/checklists/${req.params.id}`);
 });
 
+// Allow-list of element types. Grouped here for the show view's
+// Display / Inputs / Special picker; each entry knows its category +
+// human label so the EJS doesn't have to repeat itself.
+const ELEMENT_TYPES = {
+  // Display — read-only blocks the worker can see but doesn't fill in
+  heading:        { category: 'display', label: 'Heading' },
+  information:    { category: 'display', label: 'Information' },
+  hyperlink:      { category: 'display', label: 'Hyperlink' },
+  media:          { category: 'display', label: 'Media' },
+  // Inputs — the worker fills these in
+  text:           { category: 'input',   label: 'Question' },
+  textarea:       { category: 'input',   label: 'Long question' },
+  number:         { category: 'input',   label: 'Number' },
+  datetime:       { category: 'input',   label: 'Date / Time' },
+  measurement:    { category: 'input',   label: 'Measurement' },
+  // Special — richer worker inputs
+  checklist:      { category: 'special', label: 'Checklist (OK / Yes / Pass)' },
+  ok_notok_na:    { category: 'special', label: 'OK / Not OK / N/A' },
+  yes_no_na:      { category: 'special', label: 'Yes / No / N/A' },
+  pass_fail:      { category: 'special', label: 'Pass / Fail' },
+  multiple_choice:{ category: 'special', label: 'Multiple choice' },
+  radio:          { category: 'special', label: 'Single choice' },
+  checkbox:       { category: 'special', label: 'Multi-select' },
+  media_upload:   { category: 'special', label: 'Media upload' },
+  signature:      { category: 'special', label: 'Signature' },
+};
+const VALID_TYPES = Object.keys(ELEMENT_TYPES);
+
+// Pull element-specific config fields off the body and serialise to
+// options_json so each element can carry the bits it needs (URL for
+// hyperlink, unit for measurement, options for multiple choice, etc.).
+function buildOptionsJson(body, rType) {
+  const opts = {};
+  if (rType === 'hyperlink' || rType === 'media') {
+    if (body.opt_url) opts.url = String(body.opt_url).trim();
+    if (body.opt_alt) opts.alt = String(body.opt_alt).trim();
+  }
+  if (rType === 'measurement') {
+    if (body.opt_unit) opts.unit = String(body.opt_unit).trim();
+  }
+  if (rType === 'checklist') {
+    const scheme = body.opt_scheme;
+    opts.scheme = ['ok_notok_na','yes_no_na','pass_fail'].includes(scheme) ? scheme : 'ok_notok_na';
+  }
+  if (rType === 'multiple_choice') {
+    const raw = String(body.opt_options || '').trim();
+    opts.options = raw ? raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [];
+    opts.multi   = body.opt_multi === '1' || body.opt_multi === 'on';
+  }
+  if (rType === 'information') {
+    if (body.opt_body) opts.body = String(body.opt_body);
+  }
+  return Object.keys(opts).length > 0 ? JSON.stringify(opts) : null;
+}
+
 // POST /:id/items — Add item
 router.post('/:id/items', (req, res) => {
   const db = getDb();
   const { question, response_type, section, required } = req.body;
-  if (!question || !question.trim()) { req.flash('error', 'Question text is required.'); return res.redirect(`/checklists/${req.params.id}`); }
 
-  // ok_notok_na powers the Vehicle Pre-Start style 22-row inspections
-  // (each row is one click: OK / Not OK / N/A). Same shape as yes_no_na
-  // but with the inspector-friendly OK wording, since that's the
-  // language used on every paper Pre-Start docket workers fill in.
-  const validTypes = ['yes_no_na', 'ok_notok_na', 'pass_fail', 'text', 'number', 'signature', 'checkbox', 'radio', 'textarea'];
-  const rType = validTypes.includes(response_type) ? response_type : 'yes_no_na';
+  const rType = VALID_TYPES.includes(response_type) ? response_type : 'text';
+  // Display elements (heading/info/hyperlink/media) don't need a
+  // "question" — but every row needs SOME label string. For those we
+  // accept the question field as the heading/link text/alt; for inputs
+  // it's still required as the question text.
+  const isDisplay = ELEMENT_TYPES[rType] && ELEMENT_TYPES[rType].category === 'display';
+  if (!question || !question.trim()) {
+    if (!isDisplay || rType === 'heading' || rType === 'hyperlink') {
+      req.flash('error', 'Title / question text is required.');
+      return res.redirect(`/checklists/${req.params.id}`);
+    }
+  }
 
-  // Get next order number
+  const optionsJson = buildOptionsJson(req.body, rType);
+  const itemKey = (req.body.item_key || '').trim() || null;
+
   const maxOrder = db.prepare('SELECT MAX(item_order) as mx FROM checklist_template_items WHERE template_id = ?').get(req.params.id);
   const nextOrder = (maxOrder && maxOrder.mx != null) ? maxOrder.mx + 1 : 0;
 
   db.prepare(`
-    INSERT INTO checklist_template_items (template_id, item_order, section, question, response_type, required)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(req.params.id, nextOrder, section || '', question.trim(), rType, required ? 1 : 0);
+    INSERT INTO checklist_template_items (template_id, item_order, section, item_key, question, response_type, required, options_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(req.params.id, nextOrder, section || '', itemKey, (question || '').trim(), rType, required ? 1 : 0, optionsJson);
 
   db.prepare('UPDATE checklist_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.id);
-  req.flash('success', 'Question added.');
+  req.flash('success', `${ELEMENT_TYPES[rType].label} added.`);
   res.redirect(`/checklists/${req.params.id}`);
 });
 
@@ -192,8 +255,7 @@ router.post('/:id/items/bulk', (req, res) => {
     return res.redirect(`/checklists/${req.params.id}`);
   }
 
-  const validTypes = ['yes_no_na', 'ok_notok_na', 'pass_fail', 'text', 'number', 'signature', 'checkbox', 'radio', 'textarea'];
-  const newType = req.body.response_type && validTypes.includes(req.body.response_type) ? req.body.response_type : null;
+  const newType = req.body.response_type && VALID_TYPES.includes(req.body.response_type) ? req.body.response_type : null;
   const newReq  = req.body.required === '1' ? 1 : req.body.required === '0' ? 0 : null;
   const newSec  = (req.body.section || '').trim();
   const setSec  = newSec.length > 0;
@@ -241,12 +303,14 @@ router.post('/:id/items/bulk', (req, res) => {
 router.post('/:id/items/:itemId', (req, res) => {
   const db = getDb();
   const { question, response_type, section, required } = req.body;
+  const rType = VALID_TYPES.includes(response_type) ? response_type : 'text';
+  const optionsJson = buildOptionsJson(req.body, rType);
 
-  db.prepare('UPDATE checklist_template_items SET question = ?, response_type = ?, section = ?, required = ? WHERE id = ? AND template_id = ?')
-    .run(question || '', response_type || 'yes_no_na', section || '', required ? 1 : 0, req.params.itemId, req.params.id);
+  db.prepare('UPDATE checklist_template_items SET question = ?, response_type = ?, section = ?, required = ?, options_json = ? WHERE id = ? AND template_id = ?')
+    .run(question || '', rType, section || '', required ? 1 : 0, optionsJson, req.params.itemId, req.params.id);
 
   db.prepare('UPDATE checklist_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.id);
-  req.flash('success', 'Question updated.');
+  req.flash('success', 'Element updated.');
   res.redirect(`/checklists/${req.params.id}`);
 });
 
