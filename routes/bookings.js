@@ -413,6 +413,45 @@ router.get('/resources', (req, res) => {
   }
 });
 
+// GET /bookings/map — Operations map view. MUST be declared above the
+// `/:id` route below or Express matches `/map` against `:id = "map"`,
+// fails the booking lookup, and flashes "Booking not found".
+// Plots every non-cancelled booking with coordinates from the last day
+// through the configurable upcoming window, with pins linking back to
+// the detail page.
+router.get('/map', (req, res) => {
+  const db = getDb();
+  const days = Math.max(1, Math.min(30, parseInt(req.query.days, 10) || 7));
+  const since = new Date(); since.setDate(since.getDate() - 1);
+  const until = new Date(); until.setDate(until.getDate() + days);
+  const rows = db.prepare(`
+    SELECT id, booking_number, title, status, start_datetime, end_datetime,
+           site_address, suburb, latitude, longitude
+    FROM bookings
+    WHERE deleted_at IS NULL
+      AND status NOT IN ('cancelled','late_cancellation')
+      AND latitude IS NOT NULL AND longitude IS NOT NULL
+      AND start_datetime BETWEEN ? AND ?
+    ORDER BY start_datetime ASC
+  `).all(since.toISOString().slice(0, 19).replace('T', ' '), until.toISOString().slice(0, 19).replace('T', ' '));
+
+  const markers = rows.map(r => ({
+    lat: r.latitude,
+    lng: r.longitude,
+    label: (r.booking_number || '#' + r.id) + ' · ' + (r.title || '')
+         + ' · ' + new Date(r.start_datetime).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
+         + (r.suburb ? ' · ' + r.suburb : ''),
+    href: '/bookings/' + r.id,
+  }));
+
+  res.render('bookings/map', {
+    title: 'Bookings Map',
+    currentPage: 'bookings-map',
+    markers, rows, days,
+    user: req.session.user,
+  });
+});
+
 // GET /:id — Detail (JSON or show page)
 router.get('/:id', (req, res) => {
   const db = getDb(); const booking = loadBookingDetail(db, req.params.id);
@@ -667,44 +706,6 @@ router.post('/:id', (req, res) => {
   // helper is conservative: if a user-pinned marker is set, it
   // leaves the coords alone.
   setImmediate(() => { geocodeBookingIfNeeded(req.params.id).catch(() => {}); });
-});
-
-// GET /bookings/map — Operations map view. Every non-cancelled active
-// booking with coords gets a pin on a single Leaflet map; clicking
-// a pin pops a label with the booking number / title / time and a
-// link to its detail page. Useful for ops dispatch — see at a glance
-// where everyone's working today.
-router.get('/map', (req, res) => {
-  const db = getDb();
-  const days = Math.max(1, Math.min(30, parseInt(req.query.days, 10) || 7));
-  const since = new Date(); since.setDate(since.getDate() - 1);
-  const until = new Date(); until.setDate(until.getDate() + days);
-  const rows = db.prepare(`
-    SELECT id, booking_number, title, status, start_datetime, end_datetime,
-           site_address, suburb, latitude, longitude
-    FROM bookings
-    WHERE deleted_at IS NULL
-      AND status NOT IN ('cancelled','late_cancellation')
-      AND latitude IS NOT NULL AND longitude IS NOT NULL
-      AND start_datetime BETWEEN ? AND ?
-    ORDER BY start_datetime ASC
-  `).all(since.toISOString().slice(0, 19).replace('T', ' '), until.toISOString().slice(0, 19).replace('T', ' '));
-
-  const markers = rows.map(r => ({
-    lat: r.latitude,
-    lng: r.longitude,
-    label: (r.booking_number || '#' + r.id) + ' · ' + (r.title || '')
-         + ' · ' + new Date(r.start_datetime).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
-         + (r.suburb ? ' · ' + r.suburb : ''),
-    href: '/bookings/' + r.id,
-  }));
-
-  res.render('bookings/map', {
-    title: 'Bookings Map',
-    currentPage: 'bookings',
-    markers, rows, days,
-    user: req.session.user,
-  });
 });
 
 // POST /:id/geocode — Force re-geocode of a single booking. Useful
