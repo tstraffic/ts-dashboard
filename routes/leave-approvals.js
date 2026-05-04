@@ -89,32 +89,41 @@ router.get('/', requirePermission('leave_approvals'), (req, res) => {
 router.post('/:id/:action', requirePermission('leave_approvals'), (req, res) => {
   const db = getDb();
   const action = req.params.action;
-  if (!['approve', 'reject'].includes(action)) {
+  if (!['approve', 'reject', 'cancel'].includes(action)) {
     req.flash('error', 'Invalid action.');
     return res.redirect('/leave-approvals');
   }
-  const newStatus = action === 'approve' ? 'approved' : 'rejected';
+  const newStatus = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'cancelled';
 
   const row = db.prepare('SELECT * FROM employee_leave WHERE id = ?').get(req.params.id);
   if (!row) { req.flash('error', 'Leave not found.'); return res.redirect('/leave-approvals'); }
 
+  // Cancel is a "second-decision" override — the leave was already
+  // approved (or pending) but ops needs to retract it (worker recalled,
+  // shift came up, mistake on submission, etc.). Allowed from any
+  // current state; we just stamp the new status + actor.
   db.prepare(`
     UPDATE employee_leave
     SET status = ?, approved_by_id = ?, approved_at = datetime('now')
     WHERE id = ?
   `).run(newStatus, req.session.user.id, req.params.id);
 
+  const verbMap = { approve: 'approved', reject: 'rejected', cancel: 'cancelled' };
   logActivity({
     user: req.session.user,
-    action: action === 'approve' ? 'approve' : 'reject',
+    action,
     entityType: 'employee_leave', entityId: row.id,
     entityLabel: `${row.start_date} → ${row.end_date} leave`,
-    details: `Leave ${newStatus} from admin dashboard`,
+    details: `Leave ${verbMap[action]} from admin dashboard (was ${row.status})`,
     ip: req.ip,
   });
 
-  req.flash('success', action === 'approve' ? 'Leave approved.' : 'Leave rejected.');
-  // Bounce back preserving filters.
+  const flashMap = {
+    approve: 'Leave approved.',
+    reject: 'Leave rejected.',
+    cancel: 'Leave cancelled — the worker can re-submit if they need to.',
+  };
+  req.flash('success', flashMap[action]);
   const ref = req.get('referrer') || '/leave-approvals';
   res.redirect(ref.includes('/leave-approvals') ? ref : '/leave-approvals');
 });

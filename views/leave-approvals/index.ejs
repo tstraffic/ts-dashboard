@@ -351,7 +351,7 @@
           <span class="la-section-icon done"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></span>
           <div>
             <p class="la-section-title"><%= status === 'approved' ? 'Approved' : status === 'rejected' ? 'Rejected' : 'Decided' %></p>
-            <p class="la-section-sub">Past decisions — read-only</p>
+            <p class="la-section-sub">Use Cancel on an approved row if the worker is needed back on shift</p>
           </div>
         </div>
         <span class="la-section-count"><%= buckets.decided.length %></span>
@@ -380,12 +380,29 @@
                     <span class="la-pill ring-1 bg-emerald-50 text-emerald-700 ring-emerald-600/20">✓ Approved</span>
                   <% } else if (l.status === 'rejected') { %>
                     <span class="la-pill ring-1 bg-red-50 text-red-700 ring-red-600/20">✕ Rejected</span>
+                  <% } else if (l.status === 'cancelled') { %>
+                    <span class="la-pill ring-1 bg-gray-100 text-gray-600 ring-gray-600/15">⊘ Cancelled</span>
                   <% } %>
                   <% if (l.approver_name) { %>
                     <span class="la-meta-text">by <%= l.approver_name %> · <%= daysAgo(l.approved_at) %></span>
                   <% } %>
                 </div>
               </div>
+              <% if (l.status === 'approved') { %>
+                <!-- Approved leave can still be retracted from this row —
+                     useful when ops needs the worker back (illness recovery,
+                     shift came up, mistake) without making them resubmit. -->
+                <div class="la-actions">
+                  <form method="POST" action="/leave-approvals/<%= l.id %>/cancel"
+                        onsubmit="return confirm('Cancel <%= (l.crew_name || 'this worker') %>’s approved leave on <%= fmtRange(l.start_date, l.end_date) %>? They’ll be free to be rostered again.');">
+                    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                    <button type="submit" class="la-btn la-reject" aria-label="Cancel <%= l.crew_name %>'s approved leave">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                      Cancel
+                    </button>
+                  </form>
+                </div>
+              <% } %>
             </div>
           <% }) %>
         </div>
