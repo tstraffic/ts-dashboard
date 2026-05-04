@@ -173,23 +173,15 @@ router.post('/:id/items', (req, res) => {
   res.redirect(`/checklists/${req.params.id}`);
 });
 
-// POST /:id/items/:itemId — Update item
-router.post('/:id/items/:itemId', (req, res) => {
-  const db = getDb();
-  const { question, response_type, section, required } = req.body;
-
-  db.prepare('UPDATE checklist_template_items SET question = ?, response_type = ?, section = ?, required = ? WHERE id = ? AND template_id = ?')
-    .run(question || '', response_type || 'yes_no_na', section || '', required ? 1 : 0, req.params.itemId, req.params.id);
-
-  db.prepare('UPDATE checklist_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.id);
-  req.flash('success', 'Question updated.');
-  res.redirect(`/checklists/${req.params.id}`);
-});
-
 // POST /:id/items/bulk — Apply a single change (response_type / required /
 // section) to a set of items in one transaction. Lets admin retype a
 // pile of questions (e.g. flip 22 vehicle inspection rows from
 // yes_no_na to ok_notok_na) without touching each one.
+//
+// MUST be declared BEFORE the /:id/items/:itemId catch-all below — if
+// the routes were the other way round Express would match /items/bulk
+// against /items/:itemId with itemId="bulk", run an UPDATE WHERE
+// id = 'bulk' (matches nothing), and silently do nothing.
 router.post('/:id/items/bulk', (req, res) => {
   const db = getDb();
   let ids = req.body.ids;
@@ -241,6 +233,20 @@ router.post('/:id/items/bulk', (req, res) => {
     logActivity({ user: req.session.user, action: 'update', entityType: 'checklist_template_items', entityId: req.params.id, details: `Bulk update ${n} items: ${bits.join('; ')}`, ip: req.ip });
   }
   req.flash('success', `Updated ${n} question${n === 1 ? '' : 's'}.`);
+  res.redirect(`/checklists/${req.params.id}`);
+});
+
+// POST /:id/items/:itemId — Update a single item. Declared after /items/bulk
+// so /items/bulk doesn't get hijacked by this catch-all route.
+router.post('/:id/items/:itemId', (req, res) => {
+  const db = getDb();
+  const { question, response_type, section, required } = req.body;
+
+  db.prepare('UPDATE checklist_template_items SET question = ?, response_type = ?, section = ?, required = ? WHERE id = ? AND template_id = ?')
+    .run(question || '', response_type || 'yes_no_na', section || '', required ? 1 : 0, req.params.itemId, req.params.id);
+
+  db.prepare('UPDATE checklist_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.id);
+  req.flash('success', 'Question updated.');
   res.redirect(`/checklists/${req.params.id}`);
 });
 
