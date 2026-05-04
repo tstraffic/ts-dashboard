@@ -323,14 +323,32 @@ router.post('/:id/items/:itemId/delete', (req, res) => {
   res.redirect(`/checklists/${req.params.id}`);
 });
 
-// POST /:id/reorder — Reorder items (AJAX)
+// POST /:id/reorder — Reorder items (AJAX). Accepts either:
+//   { order: [id, id, ...] }                          — legacy, order only
+//   { items: [{ id, section }, { id, section }, ...] } — new, order + section
+// The richer form lets the drag-and-drop UI move items between sections
+// in the same gesture (dropping a row under a different section header
+// updates both item_order AND section in one transaction).
 router.post('/:id/reorder', express.json(), (req, res) => {
   const db = getDb();
-  const { order } = req.body; // array of item IDs in new order
-  if (!Array.isArray(order)) return res.json({ success: false });
+  const items = Array.isArray(req.body.items) ? req.body.items : null;
+  const order = Array.isArray(req.body.order) ? req.body.order : null;
+  if (!items && !order) return res.json({ success: false });
 
-  const stmt = db.prepare('UPDATE checklist_template_items SET item_order = ? WHERE id = ? AND template_id = ?');
-  order.forEach((itemId, idx) => { stmt.run(idx, itemId, req.params.id); });
+  const stmtBoth = db.prepare('UPDATE checklist_template_items SET item_order = ?, section = ? WHERE id = ? AND template_id = ?');
+  const stmtOrd  = db.prepare('UPDATE checklist_template_items SET item_order = ? WHERE id = ? AND template_id = ?');
+  const tx = db.transaction(() => {
+    if (items) {
+      items.forEach((it, idx) => {
+        const id = parseInt(it && it.id, 10);
+        if (isNaN(id)) return;
+        stmtBoth.run(idx, (it.section || ''), id, req.params.id);
+      });
+    } else {
+      order.forEach((id, idx) => { stmtOrd.run(idx, id, req.params.id); });
+    }
+  });
+  tx();
   db.prepare('UPDATE checklist_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });

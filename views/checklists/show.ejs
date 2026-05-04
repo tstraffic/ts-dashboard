@@ -210,41 +210,74 @@
     <% } %>
 
     <% if (items.length > 0) { %>
+      <p class="px-4 py-2 text-[11px] text-gray-400 italic bg-gray-50 border-b border-gray-100">
+        <svg class="w-3 h-3 inline-block mr-0.5 align-middle" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        Drag the grip handle to reorder. Drop a row under a different section header to move it across.
+      </p>
       <div id="itemsList">
-        <% var currentSection = ''; %>
-        <% items.forEach(function(item, idx) { %>
-          <% if (item.section && item.section !== currentSection) { currentSection = item.section; %>
-            <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
-              <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><%= currentSection %></span>
+        <%
+          // Build a list of section names to render as drop-target headers,
+          // even for items without a section (which fall under "(No section)").
+          var sectionGroups = [];
+          var seen = {};
+          items.forEach(function (it) {
+            var s = it.section || '';
+            if (!seen[s]) { seen[s] = true; sectionGroups.push(s); }
+          });
+        %>
+        <% sectionGroups.forEach(function (sec) { %>
+          <div class="cl-section" data-section-name="<%= sec %>">
+            <div class="cl-section-header px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-2">
+              <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><%= sec || '(No section)' %></span>
+              <span class="text-[9px] text-gray-300">drop zone</span>
             </div>
-          <% } %>
-          <div class="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition" data-item-id="<%= item.id %>">
-            <div class="flex items-start gap-3">
-              <input type="checkbox" class="bulk-row-check mt-1 rounded border-gray-300 text-brand-600 focus:ring-brand-500 flex-shrink-0" data-item-id="<%= item.id %>">
-              <span class="text-gray-300 text-sm font-mono mt-0.5 w-6 text-center flex-shrink-0"><%= idx + 1 %></span>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <p class="text-sm text-gray-900 font-medium"><%= item.question %></p>
-                  <% if (item.required) { %><span class="text-[9px] font-bold text-red-500 uppercase">Required</span><% } %>
-                </div>
-                <div class="flex items-center gap-2 mt-1">
-                  <% var badge = typeBadges[item.response_type] || typeBadges.text; %>
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium <%= badge.bg %>"><%= badge.label %></span>
-                  <% if (item.section) { %><span class="text-[10px] text-gray-400"><%= item.section %></span><% } %>
+            <% items.filter(function (it) { return (it.section || '') === sec; }).forEach(function(item) {
+              // Parse options_json so the edit form can pre-fill type-
+              // specific fields (url, unit, options, scheme, body, alt).
+              var opts = {};
+              if (item.options_json) { try { opts = JSON.parse(item.options_json) || {}; } catch (e) { opts = {}; } }
+              // Whole row data the JS picker uses to populate the edit form.
+              var rowData = {
+                id: item.id,
+                question: item.question || '',
+                response_type: item.response_type || 'text',
+                section: item.section || '',
+                item_key: item.item_key || '',
+                required: item.required ? 1 : 0,
+                options: opts,
+              };
+            %>
+              <div class="cl-row px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition" data-item-id="<%= item.id %>" data-row='<%- JSON.stringify(rowData) %>' draggable="true">
+                <div class="flex items-start gap-2">
+                  <span class="cl-grip cursor-grab text-gray-300 hover:text-gray-500 select-none mt-1.5" title="Drag to reorder" aria-hidden="true">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                  </span>
+                  <input type="checkbox" class="bulk-row-check mt-1 rounded border-gray-300 text-brand-600 focus:ring-brand-500 flex-shrink-0" data-item-id="<%= item.id %>">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <p class="text-sm text-gray-900 font-medium"><%= item.question %></p>
+                      <% if (item.required) { %><span class="text-[9px] font-bold text-red-500 uppercase">Required</span><% } %>
+                    </div>
+                    <div class="flex items-center gap-2 mt-1">
+                      <% var badge = typeBadges[item.response_type] || typeBadges.text; %>
+                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium <%= badge.bg %>"><%= badge.label %></span>
+                      <% if (item.item_key) { %><span class="text-[10px] text-gray-300 font-mono">·  <%= item.item_key %></span><% } %>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1 flex-shrink-0">
+                    <button type="button" onclick="window._editItemViaPicker(<%= item.id %>)" class="p-1.5 text-gray-400 hover:text-brand-600 transition" title="Edit">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </button>
+                    <form method="POST" action="/checklists/<%= template.id %>/items/<%= item.id %>/delete" class="inline" onsubmit="return confirm('Remove this question?')">
+                      <%- include('../partials/csrf') %>
+                      <button type="submit" class="p-1.5 text-gray-400 hover:text-red-600 transition" title="Delete">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      </button>
+                    </form>
+                  </div>
                 </div>
               </div>
-              <div class="flex items-center gap-1 flex-shrink-0">
-                <button type="button" onclick="editItem(<%= item.id %>)" class="p-1.5 text-gray-400 hover:text-brand-600 transition" title="Edit">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                </button>
-                <form method="POST" action="/checklists/<%= template.id %>/items/<%= item.id %>/delete" class="inline" onsubmit="return confirm('Remove this question?')">
-                  <%- include('../partials/csrf') %>
-                  <button type="submit" class="p-1.5 text-gray-400 hover:text-red-600 transition" title="Delete">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
-                </form>
-              </div>
-            </div>
+            <% }); %>
           </div>
         <% }); %>
       </div>
@@ -444,27 +477,128 @@
 </div>
 
 <script>
-function editItem(itemId) {
-  // Simple inline edit — toggle a form for this item
-  var row = document.querySelector('[data-item-id="' + itemId + '"]');
+// ── Edit-via-picker ──
+// Reuses the same Insert-form-element config form (with all the
+// type-specific fields like URL / Unit / Options / Scheme / Body / Alt)
+// pre-loaded with the row's current values. Pencil click loads the
+// row data → shows the picker config in edit mode → submits to the
+// per-item update endpoint.
+window._editItemViaPicker = function (itemId) {
+  var row = document.querySelector('.cl-row[data-item-id="' + itemId + '"]');
   if (!row) return;
-  var existing = row.querySelector('.edit-form');
-  if (existing) { existing.remove(); return; }
+  var data;
+  try { data = JSON.parse(row.getAttribute('data-row') || '{}'); } catch (e) { data = {}; }
 
-  var form = document.createElement('div');
-  form.className = 'edit-form mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200';
-  form.innerHTML = '<form method="POST" action="/checklists/<%= template.id %>/items/' + itemId + '" class="grid grid-cols-1 sm:grid-cols-2 gap-2">' +
-    '<input type="hidden" name="_csrf" value="<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>">' +
-    '<input type="text" name="question" value="" placeholder="Question text" class="sm:col-span-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">' +
-    '<select name="response_type" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm"><option value="ok_notok_na">OK/Not OK/N/A</option><option value="yes_no_na">Yes/No/N/A</option><option value="pass_fail">Pass/Fail</option><option value="text">Text</option><option value="textarea">Long text</option><option value="number">Number</option><option value="signature">Signature</option></select>' +
-    '<input type="text" name="section" placeholder="Section" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">' +
-    '<div class="sm:col-span-2 flex items-center justify-between"><label class="flex items-center gap-2 text-sm"><input type="checkbox" name="required" value="1" class="rounded border-gray-300"> Required</label><button type="submit" class="px-3 py-1.5 bg-brand-600 text-white text-sm rounded-lg">Update</button></div></form>';
+  var form = document.getElementById('elementConfigForm');
+  var picker = document.getElementById('element-picker');
+  var addWrap = document.getElementById('addItemForm');
+  if (!form || !picker || !addWrap) return;
 
-  row.appendChild(form);
-  // Pre-fill question text
-  var qText = row.querySelector('.text-gray-900.font-medium');
-  if (qText) form.querySelector('input[name="question"]').value = qText.textContent.trim();
-}
+  // Repoint the form at the per-item update endpoint.
+  form.action = '/checklists/<%= template.id %>/items/' + itemId;
+
+  // Use the same picker meta to swap labels + show only the relevant
+  // type-specific section. _pickElement is defined just above.
+  var rt = data.response_type || 'text';
+  if (typeof window._pickElement === 'function') window._pickElement(rt);
+
+  // Pre-fill the standard fields.
+  form.querySelector('input[name="question"]').value = data.question || '';
+  form.querySelector('input[name="section"]').value = data.section || '';
+  form.querySelector('input[name="item_key"]').value = data.item_key || '';
+  var reqWrap = document.getElementById('cfgRequiredWrap');
+  if (reqWrap) {
+    var reqInp = reqWrap.querySelector('input[type="checkbox"]');
+    if (reqInp) reqInp.checked = !!data.required;
+  }
+  // Pre-fill type-specific fields from data.options.
+  var opts = data.options || {};
+  function setVal(name, val) { var el = form.querySelector('[name="' + name + '"]'); if (el && val != null) el.value = val; }
+  setVal('opt_url',   opts.url || '');
+  setVal('opt_alt',   opts.alt || '');
+  setVal('opt_unit',  opts.unit || '');
+  setVal('opt_body',  opts.body || '');
+  setVal('opt_scheme', opts.scheme || 'ok_notok_na');
+  if (Array.isArray(opts.options)) setVal('opt_options', opts.options.join('\n'));
+  var multiInp = form.querySelector('[name="opt_multi"]');
+  if (multiInp) multiInp.checked = !!opts.multi;
+
+  // Swap the submit button label so it's clearly an edit.
+  var submitBtn = form.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.textContent = 'Save changes';
+
+  // Make sure the panel is visible + scroll the form into view.
+  addWrap.classList.remove('hidden');
+  form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+
+// ── Drag-to-reorder (cross-section) ──
+// Each row is draggable; each .cl-section block is a drop zone. On
+// drop, scan the DOM, infer each row's new section from the section
+// block it now lives under, and POST to /reorder with [{id, section}].
+(function () {
+  var list = document.getElementById('itemsList');
+  if (!list) return;
+
+  var dragId = null;
+  function rowsInOrder() {
+    var out = [];
+    list.querySelectorAll('.cl-section').forEach(function (sec) {
+      var section = sec.getAttribute('data-section-name') || '';
+      sec.querySelectorAll('.cl-row').forEach(function (r) {
+        out.push({ id: parseInt(r.dataset.itemId, 10), section: section });
+      });
+    });
+    return out;
+  }
+
+  function postOrder() {
+    var items = rowsInOrder().filter(function (r) { return !isNaN(r.id); });
+    fetch('/checklists/<%= template.id %>/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-csrf-token': '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>' },
+      body: JSON.stringify({ items: items }),
+    }).catch(function () {});
+  }
+
+  list.querySelectorAll('.cl-row').forEach(function (row) {
+    row.addEventListener('dragstart', function (e) {
+      dragId = row.dataset.itemId;
+      row.classList.add('opacity-50');
+      try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', row.dataset.itemId); } catch (_) {}
+    });
+    row.addEventListener('dragend', function () {
+      row.classList.remove('opacity-50');
+      dragId = null;
+    });
+    row.addEventListener('dragover', function (e) {
+      if (!dragId) return;
+      e.preventDefault();
+      var rect = row.getBoundingClientRect();
+      var before = (e.clientY - rect.top) < (rect.height / 2);
+      var dragged = list.querySelector('.cl-row[data-item-id="' + dragId + '"]');
+      if (!dragged || dragged === row) return;
+      row.parentNode.insertBefore(dragged, before ? row : row.nextSibling);
+    });
+    row.addEventListener('drop', function (e) { e.preventDefault(); postOrder(); });
+  });
+
+  // Section header is itself a drop target — drop into the empty
+  // space at the top of the section to land an item there.
+  list.querySelectorAll('.cl-section').forEach(function (sec) {
+    var header = sec.querySelector('.cl-section-header');
+    if (!header) return;
+    header.addEventListener('dragover', function (e) {
+      if (!dragId) return;
+      e.preventDefault();
+      var dragged = list.querySelector('.cl-row[data-item-id="' + dragId + '"]');
+      if (!dragged) return;
+      // Insert as the first item of this section (right after the header).
+      sec.insertBefore(dragged, header.nextSibling);
+    });
+    header.addEventListener('drop', function (e) { e.preventDefault(); postOrder(); });
+  });
+})();
 
 // ── Insert form element picker → config form wiring ──
 (function () {
@@ -520,6 +654,13 @@ function editItem(itemId) {
     picker.classList.remove('hidden');
     cfgForm.reset();
     document.querySelectorAll('[data-show-when]').forEach(function (el) { el.classList.add('hidden'); });
+    // Reset the form back to "Add" mode in case it was switched into
+    // edit mode by _editItemViaPicker (action repointed at /:itemId,
+    // submit label changed). Without this, picking a new element after
+    // editing one would still post to the edit endpoint.
+    cfgForm.action = '/checklists/<%= template.id %>/items';
+    var submitBtn = cfgForm.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.textContent = 'Add element';
   };
 })();
 
