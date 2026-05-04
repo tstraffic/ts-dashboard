@@ -376,16 +376,20 @@
       </div>
     </div>
 
-    <!-- Recurring -->
+    <!-- Recurring — required attrs make HTML5 validation block submit
+         when start / until are blank, instead of submitting empty
+         and bouncing with a "no dates resolved" flash. The required
+         attr is only enforced when the panel is visible (the inputs
+         get disabled by lvSetMode in single/multiple mode below). -->
     <div id="lv-mode-recurring" class="lv-mode-panel space-y-3" style="display:none;">
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="lv-label">Starts</label>
-          <input type="date" class="lv-input" name="recur_start" min="<%= todayIso %>">
+          <input type="date" class="lv-input" name="recur_start" min="<%= todayIso %>" required disabled>
         </div>
         <div>
           <label class="lv-label">Until</label>
-          <input type="date" class="lv-input" name="recur_until" min="<%= todayIso %>">
+          <input type="date" class="lv-input" name="recur_until" min="<%= todayIso %>" required disabled>
         </div>
       </div>
       <div>
@@ -484,13 +488,16 @@
       modeInput.value = mode;
       document.querySelectorAll('.lv-mode-panel').forEach(function (p) { p.style.display = 'none'; });
       document.getElementById('lv-mode-' + mode).style.display = 'block';
-      // The single-date input has name="dates" so the form submits
-      // natively even without JS — but in multiple/recurring modes we
-      // don't want a leftover single-date value piggy-backing on the
-      // submission, so disable it (the disabled attr stops it from
-      // being included in form data).
+      // Disable inputs that aren't part of the active mode so leftover
+      // values can't piggy-back on the wrong submission AND so HTML5
+      // `required` validation only runs against the visible mode.
       var single = document.getElementById('lv-single-date');
       if (single) single.disabled = (mode !== 'single');
+      var recurStart = document.querySelector('input[name="recur_start"]');
+      var recurUntil = document.querySelector('input[name="recur_until"]');
+      var recurDisabled = (mode !== 'recurring');
+      if (recurStart) recurStart.disabled = recurDisabled;
+      if (recurUntil) recurUntil.disabled = recurDisabled;
     };
     window.lvAddDate = function () {
       var inp = document.getElementById('lv-multi-add');
