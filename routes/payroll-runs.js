@@ -95,6 +95,85 @@ function hydrateLine(line) {
   return line;
 }
 
+// Creates a Management pay run + auto-seeds one Salary line per employee
+// flagged with on_management_payroll. Used by POST /runs when the form
+// posts pay_run_type=management.
+function createManagementRun(req, res) {
+  try {
+    const db = getDb();
+    const period_start = (req.body.period_start || '').trim();
+    const period_end = (req.body.period_end || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(period_start) || !/^\d{4}-\d{2}-\d{2}$/.test(period_end)) {
+      req.flash('error', 'Period start + end dates are required (YYYY-MM-DD).');
+      return res.redirect('/payroll/runs/new?type=management');
+    }
+    const label = (req.body.label || '').trim() || ('Management — ' + periodLabel(period_start, period_end));
+    const notes = (req.body.notes || '').trim();
+
+    let runId;
+    let seeded = 0;
+    const tx = db.transaction(() => {
+      const r = db.prepare(`
+        INSERT INTO pay_runs (period_start, period_end, label, csv_filename, status, created_by_id, notes, pay_run_type)
+        VALUES (?, ?, ?, '', 'draft', ?, ?, 'management')
+      `).run(period_start, period_end, label, req.session.user.id, notes);
+      runId = r.lastInsertRowid;
+
+      const staff = db.prepare(`
+        SELECT id, employee_code, first_name, last_name, payment_type,
+          COALESCE(weekly_salary, 0) AS weekly_salary,
+          COALESCE(super_rate, 0.115) AS super_rate,
+          COALESCE(payroll_bsb, '') AS payroll_bsb,
+          COALESCE(payroll_account, '') AS payroll_account
+        FROM employees
+        WHERE on_management_payroll = 1 AND deleted_at IS NULL
+        ORDER BY LOWER(first_name), LOWER(last_name)
+      `).all();
+
+      const insertLine = db.prepare(`
+        INSERT INTO pay_run_lines (
+          pay_run_id, employee_id, full_name, payment_type, bsb, acc_number,
+          salary_amount, super_amount, income_label,
+          total_wages, grand_total, sort_order
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Salary', ?, ?, ?)
+      `);
+      let order = 0;
+      for (const e of staff) {
+        const fullName = ((e.first_name || '') + ' ' + (e.last_name || '')).trim() || ('Employee #' + e.id);
+        const salary = round2(toNum(e.weekly_salary));
+        const superAmt = round2(salary * toNum(e.super_rate));
+        insertLine.run(
+          runId, e.id, fullName, e.payment_type || '',
+          e.payroll_bsb, e.payroll_account,
+          salary, superAmt,
+          salary, salary,   // total_wages and grand_total mirror salary for management lines
+          order++,
+        );
+        seeded++;
+      }
+    });
+    tx();
+
+    try {
+      logActivity({
+        user: req.session.user, action: 'create', entityType: 'pay_run',
+        entityId: runId, entityLabel: label,
+        details: `Created Management pay run — ${seeded} starter line(s)`,
+        ip: req.ip,
+      });
+    } catch (e) { /* audit shouldn't block */ }
+
+    req.flash('success', seeded > 0
+      ? `Created Management pay run with ${seeded} starter line(s).`
+      : 'Created Management pay run. No staff are flagged for management payroll yet — tick "On management payroll" on an employee record to populate it.');
+    return res.redirect('/payroll/runs/' + runId);
+  } catch (err) {
+    console.error('[payroll/runs] createManagementRun:', err);
+    req.flash('error', 'Failed to create Management pay run: ' + (err && err.message ? err.message : 'unknown error'));
+    return res.redirect('/payroll/runs/new?type=management');
+  }
+}
+
 function sectionTotal(arr) {
   let hours = 0, wages = 0, allow = 0, total = 0;
   for (const l of arr) {
@@ -112,10 +191,18 @@ function sectionTotal(arr) {
 // ============================================================================
 // GET /payroll/runs — list
 // ============================================================================
-router.get('/runs', requirePermission('hr_employees'), (req, res) => {
+router.get('/runs', requirePermission('payroll'), (req, res) => {
   const db = getDb();
+  const VALID_TYPES = ['traffic_control', 'management'];
+  const typeFilter = VALID_TYPES.includes(req.query.type) ? req.query.type : null;
+
+  let where = '1=1';
+  const params = [];
+  if (typeFilter) { where += ' AND COALESCE(pr.pay_run_type, \'traffic_control\') = ?'; params.push(typeFilter); }
+
   const runs = db.prepare(`
     SELECT pr.*, u.full_name AS created_by_name,
+      COALESCE(pr.pay_run_type, 'traffic_control') AS pay_run_type,
       (SELECT COUNT(*) FROM pay_run_lines WHERE pay_run_id = pr.id) AS line_count,
       (SELECT COALESCE(SUM(grand_total), 0) FROM pay_run_lines WHERE pay_run_id = pr.id) AS grand_total,
       (SELECT COALESCE(SUM(grand_total), 0) FROM pay_run_lines WHERE pay_run_id = pr.id AND payment_type = 'cash') AS cash_total,
@@ -125,28 +212,57 @@ router.get('/runs', requirePermission('hr_employees'), (req, res) => {
       (SELECT COUNT(*) FROM pay_run_lines WHERE pay_run_id = pr.id AND paid = 1) AS paid_count
     FROM pay_runs pr
     LEFT JOIN users u ON u.id = pr.created_by_id
+    WHERE ${where}
     ORDER BY pr.period_end DESC, pr.id DESC
     LIMIT 200
-  `).all();
+  `).all(...params);
+
+  // Per-type counts for the tab badges (computed independent of the filter)
+  const counts = db.prepare(`
+    SELECT COALESCE(pay_run_type, 'traffic_control') AS t, COUNT(*) AS n
+    FROM pay_runs GROUP BY 1
+  `).all().reduce((acc, r) => { acc[r.t] = r.n; return acc; }, {});
 
   res.render('payroll-runs/index', {
     title: 'Pay Runs',
     currentPage: 'pay-runs',
     runs, fmtMoney, periodLabel,
+    typeFilter,
+    counts: { traffic_control: counts.traffic_control || 0, management: counts.management || 0 },
   });
 });
 
 // ============================================================================
 // GET /payroll/runs/new
+// Renders a type picker. Management runs skip CSV; TC runs upload it.
 // ============================================================================
-router.get('/runs/new', requirePermission('hr_employees'), (req, res) => {
-  res.render('payroll-runs/new', { title: 'Import Pay Run', currentPage: 'pay-runs' });
+router.get('/runs/new', requirePermission('payroll'), (req, res) => {
+  const db = getDb();
+  // Show how many staff would be auto-pre-filled if they pick Management
+  let mgmtCount = 0;
+  try { mgmtCount = db.prepare("SELECT COUNT(*) AS c FROM employees WHERE on_management_payroll = 1 AND deleted_at IS NULL").get().c; } catch (e) {}
+  res.render('payroll-runs/new', {
+    title: 'New Pay Run',
+    currentPage: 'pay-runs',
+    runType: req.query.type === 'management' ? 'management' : 'traffic_control',
+    mgmtCount,
+  });
 });
 
 // ============================================================================
-// POST /payroll/runs — handle CSV upload
+// POST /payroll/runs — branch on pay_run_type
+//   - 'management': create the parent row + auto-seed one Salary line per
+//     employee with on_management_payroll = 1.
+//   - default ('traffic_control'): existing CSV import path.
 // ============================================================================
-router.post('/runs', requirePermission('hr_employees'), (req, res) => {
+router.post('/runs', requirePermission('payroll'), (req, res) => {
+  // Management branch: no CSV, just period dates. Detect via the
+  // pay_run_type form field. multipart/form-data isn't required, so
+  // we sniff before invoking multer.
+  const requestedType = (req.body && req.body.pay_run_type) || '';
+  if (requestedType === 'management') {
+    return createManagementRun(req, res);
+  }
   upload.single('csv')(req, res, function (err) {
     if (err) { req.flash('error', err.message); return res.redirect('/payroll/runs/new'); }
     if (!req.file) { req.flash('error', 'CSV file is required.'); return res.redirect('/payroll/runs/new'); }
@@ -187,8 +303,8 @@ router.post('/runs', requirePermission('hr_employees'), (req, res) => {
     let runId;
     try {
       const insertRun = db.prepare(`
-        INSERT INTO pay_runs (period_start, period_end, label, csv_filename, status, created_by_id, notes)
-        VALUES (?, ?, ?, ?, 'draft', ?, ?)
+        INSERT INTO pay_runs (period_start, period_end, label, csv_filename, status, created_by_id, notes, pay_run_type)
+        VALUES (?, ?, ?, ?, 'draft', ?, ?, 'traffic_control')
       `);
       const insertLine = db.prepare(`
         INSERT INTO pay_run_lines (
@@ -244,12 +360,48 @@ router.post('/runs', requirePermission('hr_employees'), (req, res) => {
 });
 
 // ============================================================================
-// GET /payroll/runs/:id — main detail page
+// GET /payroll/runs/:id — main detail page. Branches view on pay_run_type.
 // ============================================================================
-router.get('/runs/:id', requirePermission('hr_employees'), (req, res) => {
+router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
   if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+  run.pay_run_type = run.pay_run_type || 'traffic_control';
+
+  // Management runs use a salary-grid view: one row per income line,
+  // grouped by employee, with inline-editable salary/super.
+  if (run.pay_run_type === 'management') {
+    const lines = db.prepare(`
+      SELECT prl.*, e.employee_code, e.first_name, e.last_name,
+        COALESCE(e.weekly_salary, 0) AS emp_weekly_salary,
+        COALESCE(e.super_rate, 0.115) AS emp_super_rate
+      FROM pay_run_lines prl
+      LEFT JOIN employees e ON e.id = prl.employee_id
+      WHERE prl.pay_run_id = ?
+      ORDER BY LOWER(prl.full_name) ASC, prl.id ASC
+    `).all(run.id);
+
+    // All on-management staff, so the "+ Add line" picker has every
+    // option even if a particular run hasn't seeded a row for them yet.
+    const eligibleStaff = db.prepare(`
+      SELECT id, first_name, last_name, employee_code,
+        COALESCE(weekly_salary, 0) AS weekly_salary,
+        COALESCE(super_rate, 0.115) AS super_rate
+      FROM employees
+      WHERE on_management_payroll = 1 AND deleted_at IS NULL
+      ORDER BY LOWER(first_name), LOWER(last_name)
+    `).all();
+
+    let totalSalary = 0, totalSuper = 0;
+    for (const l of lines) { totalSalary += toNum(l.salary_amount); totalSuper += toNum(l.super_amount); }
+    return res.render('payroll-runs/management-show', {
+      title: run.label || 'Management Pay Run',
+      currentPage: 'pay-runs',
+      run, lines, eligibleStaff,
+      totals: { salary: round2(totalSalary), super: round2(totalSuper), grand: round2(totalSalary + totalSuper) },
+      fmtMoney, periodLabel,
+    });
+  }
 
   const lines = db.prepare(`
     SELECT prl.*, e.employee_code, e.payment_type AS emp_payment_type,
@@ -309,7 +461,7 @@ router.get('/runs/:id', requirePermission('hr_employees'), (req, res) => {
 //   - Else if `buckets[]` is present → use those edits
 //   - Always recompute totals + apply allowance edits
 // ============================================================================
-router.post('/runs/:id/lines/:lineId', requirePermission('hr_employees'), (req, res) => {
+router.post('/runs/:id/lines/:lineId', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
   if (!run) return res.status(404).json({ error: 'Pay run not found' });
@@ -425,7 +577,7 @@ router.post('/runs/:id/lines/:lineId', requirePermission('hr_employees'), (req, 
 // ============================================================================
 // POST /payroll/runs/:id/lines/:lineId/match — link to employee + recategorize
 // ============================================================================
-router.post('/runs/:id/lines/:lineId/match', requirePermission('hr_employees'), (req, res) => {
+router.post('/runs/:id/lines/:lineId/match', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
   if (!line) { req.flash('error', 'Line not found'); return res.redirect('/payroll/runs/' + req.params.id); }
@@ -469,7 +621,7 @@ router.post('/runs/:id/lines/:lineId/match', requirePermission('hr_employees'), 
 // POST /payroll/runs/:id/refresh — re-categorize ALL lines from shifts_json
 //   Useful after editing rates / classifications / public holidays.
 // ============================================================================
-router.post('/runs/:id/refresh', requirePermission('hr_employees'), (req, res) => {
+router.post('/runs/:id/refresh', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
   if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
@@ -513,9 +665,132 @@ router.post('/runs/:id/refresh', requirePermission('hr_employees'), (req, res) =
 });
 
 // ============================================================================
+// Management pay run line endpoints — separate from the TC line editor
+// because the column shape is different (salary/super/income_label vs
+// hours buckets) and we want the cleaner per-row try/catch pattern.
+// ============================================================================
+
+// Loads a line and confirms it lives on a Management run.
+function getManagementLine(db, runId, lineId) {
+  return db.prepare(`
+    SELECT prl.*, COALESCE(pr.pay_run_type, 'traffic_control') AS pay_run_type
+    FROM pay_run_lines prl
+    JOIN pay_runs pr ON pr.id = prl.pay_run_id
+    WHERE prl.pay_run_id = ? AND prl.id = ? AND COALESCE(pr.pay_run_type, 'traffic_control') = 'management'
+  `).get(runId, lineId);
+}
+
+// POST /payroll/runs/:id/management-lines — add a new income line to a Management run.
+router.post('/runs/:id/management-lines', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const run = db.prepare("SELECT id, COALESCE(pay_run_type, 'traffic_control') AS pay_run_type FROM pay_runs WHERE id = ?").get(req.params.id);
+    if (!run || run.pay_run_type !== 'management') {
+      req.flash('error', 'Management pay run not found.');
+      return res.redirect('/payroll/runs');
+    }
+    const empId = parseInt(req.body.employee_id, 10);
+    if (!empId) {
+      req.flash('error', 'Employee is required.');
+      return res.redirect('/payroll/runs/' + run.id);
+    }
+    const emp = db.prepare(`
+      SELECT id, first_name, last_name, payment_type,
+        COALESCE(weekly_salary, 0) AS weekly_salary,
+        COALESCE(super_rate, 0.115) AS super_rate,
+        COALESCE(payroll_bsb, '') AS payroll_bsb,
+        COALESCE(payroll_account, '') AS payroll_account
+      FROM employees WHERE id = ?
+    `).get(empId);
+    if (!emp) {
+      req.flash('error', 'Employee not found.');
+      return res.redirect('/payroll/runs/' + run.id);
+    }
+    const incomeLabel = String(req.body.income_label || 'Salary').trim().slice(0, 80) || 'Salary';
+    const salary = round2(toNum(req.body.salary_amount));
+    // If super amount blank, default to salary × employee's super_rate
+    const superAmt = req.body.super_amount === '' || req.body.super_amount == null
+      ? round2(salary * toNum(emp.super_rate))
+      : round2(toNum(req.body.super_amount));
+    const fullName = ((emp.first_name || '') + ' ' + (emp.last_name || '')).trim() || ('Employee #' + emp.id);
+
+    db.prepare(`
+      INSERT INTO pay_run_lines (
+        pay_run_id, employee_id, full_name, payment_type, bsb, acc_number,
+        salary_amount, super_amount, income_label,
+        total_wages, grand_total, sort_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(run.id, emp.id, fullName, emp.payment_type || '',
+      emp.payroll_bsb, emp.payroll_account,
+      salary, superAmt, incomeLabel,
+      salary, salary,
+      999);
+
+    req.flash('success', `Added "${incomeLabel}" line for ${fullName}.`);
+    return res.redirect('/payroll/runs/' + run.id);
+  } catch (err) {
+    console.error('[payroll/runs] add management line:', err);
+    req.flash('error', 'Failed to add line: ' + (err && err.message ? err.message : 'unknown error'));
+    return res.redirect('/payroll/runs/' + req.params.id);
+  }
+});
+
+// POST /payroll/runs/:id/management-lines/:lineId — edit a single line.
+// Accepts partial body: any of income_label, salary_amount, super_amount.
+router.post('/runs/:id/management-lines/:lineId', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const line = getManagementLine(db, req.params.id, req.params.lineId);
+    if (!line) {
+      if (req.headers.accept && req.headers.accept.includes('json')) return res.status(404).json({ error: 'Line not found' });
+      req.flash('error', 'Management pay run line not found.');
+      return res.redirect('/payroll/runs/' + req.params.id);
+    }
+    const incomeLabel = req.body.income_label != null ? String(req.body.income_label).trim().slice(0, 80) : line.income_label;
+    const salary = req.body.salary_amount != null ? round2(toNum(req.body.salary_amount)) : toNum(line.salary_amount);
+    const superAmt = req.body.super_amount != null ? round2(toNum(req.body.super_amount)) : toNum(line.super_amount);
+    db.prepare(`
+      UPDATE pay_run_lines
+      SET income_label = ?, salary_amount = ?, super_amount = ?,
+          total_wages = ?, grand_total = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(incomeLabel, salary, superAmt, salary, salary, line.id);
+    if (req.headers.accept && req.headers.accept.includes('json')) {
+      return res.json({ success: true, income_label: incomeLabel, salary_amount: salary, super_amount: superAmt });
+    }
+    req.flash('success', 'Line updated.');
+    return res.redirect('/payroll/runs/' + req.params.id);
+  } catch (err) {
+    console.error('[payroll/runs] edit management line:', err);
+    if (req.headers.accept && req.headers.accept.includes('json')) return res.status(500).json({ error: err.message });
+    req.flash('error', 'Failed to update line: ' + (err && err.message ? err.message : 'unknown error'));
+    return res.redirect('/payroll/runs/' + req.params.id);
+  }
+});
+
+// POST /payroll/runs/:id/management-lines/:lineId/delete — drop a line.
+router.post('/runs/:id/management-lines/:lineId/delete', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const line = getManagementLine(db, req.params.id, req.params.lineId);
+    if (!line) {
+      req.flash('error', 'Management pay run line not found.');
+      return res.redirect('/payroll/runs/' + req.params.id);
+    }
+    db.prepare('DELETE FROM pay_run_lines WHERE id = ?').run(line.id);
+    req.flash('success', `Removed "${line.income_label || 'line'}" for ${line.full_name}.`);
+    return res.redirect('/payroll/runs/' + req.params.id);
+  } catch (err) {
+    console.error('[payroll/runs] delete management line:', err);
+    req.flash('error', 'Failed to delete line: ' + (err && err.message ? err.message : 'unknown error'));
+    return res.redirect('/payroll/runs/' + req.params.id);
+  }
+});
+
+// ============================================================================
 // POST /payroll/runs/:id/delete
 // ============================================================================
-router.post('/runs/:id/delete', requirePermission('hr_employees'), (req, res) => {
+router.post('/runs/:id/delete', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
   if (!run) { req.flash('error', 'Pay run not found'); return res.redirect('/payroll/runs'); }
@@ -536,7 +811,7 @@ router.post('/runs/:id/delete', requirePermission('hr_employees'), (req, res) =>
 // ============================================================================
 // GET /payroll/runs/:id/export.xlsx
 // ============================================================================
-router.get('/runs/:id/export.xlsx', requirePermission('hr_employees'), (req, res) => {
+router.get('/runs/:id/export.xlsx', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
   if (!run) return res.status(404).send('Pay run not found');
@@ -729,7 +1004,7 @@ function buildSheetXml(section, run) {
 // ============================================================================
 // GET /payroll/rates — section-tabbed bulk rate editor
 // ============================================================================
-router.get('/rates', requirePermission('hr_employees'), (req, res) => {
+router.get('/rates', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const employees = db.prepare(`
     SELECT id, employee_code, full_name, payment_type,
@@ -762,7 +1037,7 @@ router.get('/rates', requirePermission('hr_employees'), (req, res) => {
 // stale deploy (missing column, FK mismatch, anything else) lands as a
 // red flash banner instead of an Express 500. Inspect the server log
 // for the original error text — it's printed there with a stack trace.
-router.post('/rates', requirePermission('hr_employees'), (req, res) => {
+router.post('/rates', requirePermission('payroll'), (req, res) => {
   try {
     const db = getDb();
     const data = req.body && req.body.rows;
@@ -872,7 +1147,7 @@ router.post('/rates', requirePermission('hr_employees'), (req, res) => {
 // ============================================================================
 // /payroll/award-rates — Fair Work classification rates
 // ============================================================================
-router.get('/award-rates', requirePermission('hr_employees'), (req, res) => {
+router.get('/award-rates', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const classifications = db.prepare(`
     SELECT * FROM award_classifications ORDER BY active DESC, classification ASC
@@ -884,7 +1159,7 @@ router.get('/award-rates', requirePermission('hr_employees'), (req, res) => {
   });
 });
 
-router.post('/award-rates', requirePermission('hr_employees'), (req, res) => {
+router.post('/award-rates', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const b = req.body || {};
   const id = parseInt(b.id, 10) || null;
@@ -928,7 +1203,7 @@ router.post('/award-rates', requirePermission('hr_employees'), (req, res) => {
   res.redirect('/payroll/award-rates');
 });
 
-router.post('/award-rates/:id/delete', requirePermission('hr_employees'), (req, res) => {
+router.post('/award-rates/:id/delete', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const cls = db.prepare('SELECT * FROM award_classifications WHERE id = ?').get(req.params.id);
   if (!cls) { req.flash('error', 'Classification not found.'); return res.redirect('/payroll/award-rates'); }
@@ -941,7 +1216,7 @@ router.post('/award-rates/:id/delete', requirePermission('hr_employees'), (req, 
 // ============================================================================
 // /payroll/holidays — public holidays (NSW seeded for 2025–2027)
 // ============================================================================
-router.get('/holidays', requirePermission('hr_employees'), (req, res) => {
+router.get('/holidays', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const holidays = db.prepare('SELECT * FROM public_holidays ORDER BY date ASC').all();
   res.render('payroll-runs/holidays', {
@@ -951,7 +1226,7 @@ router.get('/holidays', requirePermission('hr_employees'), (req, res) => {
   });
 });
 
-router.post('/holidays', requirePermission('hr_employees'), (req, res) => {
+router.post('/holidays', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const b = req.body || {};
   const date = String(b.date || '').trim();
@@ -970,7 +1245,7 @@ router.post('/holidays', requirePermission('hr_employees'), (req, res) => {
   res.redirect('/payroll/holidays');
 });
 
-router.post('/holidays/:id/delete', requirePermission('hr_employees'), (req, res) => {
+router.post('/holidays/:id/delete', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   db.prepare('DELETE FROM public_holidays WHERE id = ?').run(req.params.id);
   req.flash('success', 'Holiday removed.');

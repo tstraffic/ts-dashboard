@@ -1,0 +1,175 @@
+<% locals.currentPage = 'pay-runs' %>
+<%
+  function fmtDate(s) { if (!s) return ''; return new Date(s + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }); }
+
+  // Group lines by employee so multi-source rows (Salary + Director fee
+  // + Bonus on the same person) sit together with a shared header.
+  const groups = new Map();
+  (lines || []).forEach(l => {
+    const key = l.employee_id || ('name:' + (l.full_name || ''));
+    if (!groups.has(key)) groups.set(key, { employee_id: l.employee_id, full_name: l.full_name, employee_code: l.employee_code, lines: [] });
+    groups.get(key).lines.push(l);
+  });
+%>
+
+<div class="space-y-5">
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-3 flex-wrap">
+    <div>
+      <a href="/payroll/runs" class="text-sm text-brand-600 hover:underline">← Pay Runs</a>
+      <h1 class="text-2xl font-bold text-gray-900 mt-1 flex items-center gap-2">
+        <%= run.label || ('Management — ' + periodLabel(run.period_start, run.period_end)) %>
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-violet-50 text-violet-700 ring-1 ring-violet-600/20">MGMT</span>
+        <% if (run.status === 'finalized') { %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Finalized</span>
+        <% } else { %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 ring-1 ring-gray-300">Draft</span>
+        <% } %>
+      </h1>
+      <p class="text-sm text-gray-500 mt-1 tabular-nums"><%= fmtDate(run.period_start) %> → <%= fmtDate(run.period_end) %></p>
+      <% if (run.notes) { %><p class="text-xs text-gray-500 mt-1"><%= run.notes %></p><% } %>
+    </div>
+    <form method="POST" action="/payroll/runs/<%= run.id %>/delete" onsubmit="return confirm('Delete this Management pay run? This is permanent.')">
+      <%- include('../partials/csrf') %>
+      <button type="submit" class="px-3 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 ring-1 ring-rose-200 rounded-lg">Delete run</button>
+    </form>
+  </div>
+
+  <!-- Totals strip -->
+  <div class="grid grid-cols-3 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Salary</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1 tabular-nums">$<%= fmtMoney(totals.salary) %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Total Super</p>
+      <p class="text-2xl font-bold text-amber-700 mt-1 tabular-nums">$<%= fmtMoney(totals.super) %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Salary + Super</p>
+      <p class="text-2xl font-bold text-emerald-700 mt-1 tabular-nums">$<%= fmtMoney(totals.grand) %></p>
+    </div>
+  </div>
+
+  <!-- Salary lines, grouped by employee -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <% if (groups.size === 0) { %>
+      <div class="p-10 text-center">
+        <p class="text-sm text-gray-500 font-semibold">No staff on management payroll</p>
+        <p class="text-xs text-gray-400 mt-1">Tick "On management payroll" on an employee record, then add a line below.</p>
+      </div>
+    <% } else { %>
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Employee</th>
+            <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Income</th>
+            <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Salary</th>
+            <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Super</th>
+            <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% Array.from(groups.values()).forEach(g => { %>
+            <% g.lines.forEach((line, idx) => { %>
+              <tr class="<%= idx === 0 ? '' : 'bg-gray-50/30' %>">
+                <td class="px-4 py-2 align-top">
+                  <% if (idx === 0) { %>
+                    <p class="font-semibold text-gray-900 text-sm"><%= g.full_name %></p>
+                    <% if (g.employee_code) { %><p class="text-[10px] text-gray-400 font-mono"><%= g.employee_code %></p><% } %>
+                  <% } else { %>
+                    <span class="text-[11px] text-gray-400 italic">↳ same person</span>
+                  <% } %>
+                </td>
+                <td class="px-4 py-2">
+                  <form method="POST" action="/payroll/runs/<%= run.id %>/management-lines/<%= line.id %>" class="inline">
+                    <%- include('../partials/csrf') %>
+                    <input type="text" name="income_label" value="<%= line.income_label || 'Salary' %>"
+                      onblur="if(this.value!==this.defaultValue) this.form.submit()"
+                      class="w-40 px-2 py-1 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  </form>
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <form method="POST" action="/payroll/runs/<%= run.id %>/management-lines/<%= line.id %>" class="inline">
+                    <%- include('../partials/csrf') %>
+                    <input type="number" step="0.01" min="0" name="salary_amount" value="<%= (parseFloat(line.salary_amount) || 0).toFixed(2) %>"
+                      onblur="if(this.value!==this.defaultValue) this.form.submit()"
+                      class="w-24 px-2 py-1 text-sm text-right tabular-nums bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  </form>
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <form method="POST" action="/payroll/runs/<%= run.id %>/management-lines/<%= line.id %>" class="inline">
+                    <%- include('../partials/csrf') %>
+                    <input type="number" step="0.01" min="0" name="super_amount" value="<%= (parseFloat(line.super_amount) || 0).toFixed(2) %>"
+                      onblur="if(this.value!==this.defaultValue) this.form.submit()"
+                      class="w-24 px-2 py-1 text-sm text-right tabular-nums bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  </form>
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <form method="POST" action="/payroll/runs/<%= run.id %>/management-lines/<%= line.id %>/delete" class="inline" onsubmit="return confirm('Remove this income line?')">
+                    <%- include('../partials/csrf') %>
+                    <button type="submit" title="Remove line" class="p-1.5 text-gray-400 hover:text-rose-600 rounded-md">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          <% }) %>
+        </tbody>
+        <tfoot class="bg-gray-50">
+          <tr>
+            <td colspan="2" class="px-4 py-2 text-sm font-bold text-gray-700">Plan totals</td>
+            <td class="px-4 py-2 text-right text-sm font-bold text-gray-900 tabular-nums">$<%= fmtMoney(totals.salary) %></td>
+            <td class="px-4 py-2 text-right text-sm font-bold text-amber-700 tabular-nums">$<%= fmtMoney(totals.super) %></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    <% } %>
+  </div>
+
+  <!-- Add an income line -->
+  <details class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 group">
+    <summary class="cursor-pointer inline-flex items-center text-sm font-semibold text-brand-600 hover:text-brand-700 list-none">
+      <svg class="w-4 h-4 mr-1 transition-transform group-open:rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Add income line
+    </summary>
+    <form method="POST" action="/payroll/runs/<%= run.id %>/management-lines" class="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-2 items-end">
+      <%- include('../partials/csrf') %>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Employee</label>
+        <select name="employee_id" required class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md">
+          <option value="">— Pick someone —</option>
+          <% (eligibleStaff || []).forEach(e => { %>
+            <option value="<%= e.id %>"><%= e.first_name %> <%= e.last_name %><% if (e.employee_code) { %> · <%= e.employee_code %><% } %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Income label</label>
+        <input type="text" name="income_label" value="Salary" required class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Amount</label>
+        <input type="number" step="0.01" min="0" name="salary_amount" placeholder="0.00" required class="w-28 px-2 py-1.5 text-sm text-right tabular-nums border border-gray-300 rounded-md">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Super (auto if blank)</label>
+        <div class="flex items-center gap-2">
+          <input type="number" step="0.01" min="0" name="super_amount" placeholder="auto" class="w-24 px-2 py-1.5 text-sm text-right tabular-nums border border-gray-300 rounded-md">
+          <button type="submit" class="px-3 py-1.5 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 rounded-md">Add</button>
+        </div>
+      </div>
+    </form>
+  </details>
+</div>
+
+<% if (flash_success && flash_success.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-semibold shadow-lg z-50" id="flash"><%= flash_success[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flash')?.remove(), 2800);</script>
+<% } %>
+<% if (flash_error && flash_error.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold shadow-lg z-50" id="flasherr"><%= flash_error[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flasherr')?.remove(), 4000);</script>
+<% } %>

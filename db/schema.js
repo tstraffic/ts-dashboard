@@ -7375,6 +7375,49 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 156: Management pay run support.
+  //   - pay_runs.pay_run_type discriminator: 'traffic_control' (default)
+  //     vs 'management'. CHECK constraint enforced in app code rather
+  //     than schema (SQLite can't add CHECK to existing columns without
+  //     a table rebuild, and the existing pay_runs table is large).
+  //   - employees.on_management_payroll: orthogonal to payment_type so
+  //     a salaried director can also be on a Traffic Control run for
+  //     ad-hoc cash work.
+  //   - employees.weekly_salary + super_rate: pay parameters for each
+  //     management employee.
+  //   - pay_run_lines.salary_amount + super_amount + income_label:
+  //     one line per income source (Salary, Director fee, Bonus, …).
+  // =============================================
+  if (!isMigrationApplied.get(156)) {
+    try {
+      const prCols = db.prepare("PRAGMA table_info(pay_runs)").all().map(c => c.name);
+      if (!prCols.includes('pay_run_type')) {
+        try { db.exec("ALTER TABLE pay_runs ADD COLUMN pay_run_type TEXT NOT NULL DEFAULT 'traffic_control'"); } catch (e) {}
+      }
+
+      const empCols = db.prepare("PRAGMA table_info(employees)").all().map(c => c.name);
+      const addEmp = (name, ddl) => { if (!empCols.includes(name)) try { db.exec(`ALTER TABLE employees ADD COLUMN ${ddl}`); } catch (e) {} };
+      addEmp('on_management_payroll', "on_management_payroll INTEGER NOT NULL DEFAULT 0");
+      addEmp('weekly_salary',         "weekly_salary REAL DEFAULT 0");
+      addEmp('super_rate',            "super_rate REAL DEFAULT 0.115");
+
+      const lineCols = db.prepare("PRAGMA table_info(pay_run_lines)").all().map(c => c.name);
+      const addLine = (name, ddl) => { if (!lineCols.includes(name)) try { db.exec(`ALTER TABLE pay_run_lines ADD COLUMN ${ddl}`); } catch (e) {} };
+      addLine('salary_amount', "salary_amount REAL DEFAULT 0");
+      addLine('super_amount',  "super_amount REAL DEFAULT 0");
+      addLine('income_label',  "income_label TEXT DEFAULT ''");
+
+      // Partial index to make "who's on management payroll?" lookups fast
+      try { db.exec("CREATE INDEX IF NOT EXISTS idx_employees_management ON employees(on_management_payroll) WHERE on_management_payroll = 1"); } catch (e) {}
+
+      recordMigration.run(156, 'pay_runs: management type + employee salaried fields + per-line salary/super/income_label');
+      console.log('Migration 156 applied: management pay-run schema');
+    } catch (e) {
+      console.error('Migration 156 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
