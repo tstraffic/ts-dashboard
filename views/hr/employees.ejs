@@ -175,7 +175,7 @@
                   %>
                   <form method="POST" action="/hr/employees/<%= emp.id %>/payment-type" class="inline">
                     <%- include('../partials/csrf') %>
-                    <select name="payment_type" onchange="this.form.submit()" title="Payment type"
+                    <select name="payment_type" data-inline-pill="payment_type" title="Payment type"
                       class="text-[9px] font-bold uppercase tracking-wide ring-1 rounded cursor-pointer <%= ptCls2 %>"
                       style="appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%228%22 height=%228%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22 viewBox=%220 0 24 24%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 4px center;padding:2px 14px 2px 6px;">
                       <option value=""    <%= ptVal2 === ''    ? 'selected' : '' %>>—</option>
@@ -315,5 +315,60 @@
   window.confirmDelete = confirmDelete;
   window.closeDeleteModal = closeDeleteModal;
   window.submitDelete = submitDelete;
+})();
+
+// Inline pill selects (payment-type). Same fetch-based handler as the
+// roster page so changing a row's payment type doesn't reload the page
+// or jump scroll back to the top.
+(function() {
+  var COLOR_MAPS = {
+    payment_type: {
+      '':     'bg-gray-50 text-gray-400 ring-gray-300/40',
+      cash:   'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+      tfn:    'bg-blue-50 text-blue-700 ring-blue-600/20',
+      abn:    'bg-purple-50 text-purple-700 ring-purple-600/20',
+    },
+  };
+  function swapColors(sel) {
+    var map = COLOR_MAPS[sel.dataset.inlinePill] || {};
+    var newCls = map[sel.value] || '';
+    var keep = sel.className.split(/\s+/).filter(function(c) {
+      return c && !/^(bg|text|ring)-/.test(c);
+    });
+    sel.className = keep.concat(newCls.split(/\s+/)).join(' ');
+  }
+  document.addEventListener('change', function(e) {
+    var sel = e.target;
+    if (!sel || !sel.matches || !sel.matches('select[data-inline-pill]')) return;
+    var form = sel.closest('form');
+    if (!form) return;
+    // urlencoded so Express's body parser sees the fields. FormData
+    // would send multipart and the route doesn't have multer.
+    var params = new URLSearchParams();
+    new FormData(form).forEach(function(v, k) { params.append(k, v); });
+    var prev = sel.dataset.previousValue || '';
+    sel.dataset.previousValue = sel.value;
+    sel.disabled = true;
+    fetch(form.action, {
+      method: 'POST', body: params, credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
+    }).then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function() {
+      swapColors(sel);
+      sel.style.transition = 'box-shadow 0.4s';
+      sel.style.boxShadow = '0 0 0 3px rgba(16,185,129,0.35)';
+      setTimeout(function() { sel.style.boxShadow = ''; }, 600);
+    }).catch(function() {
+      sel.value = prev;
+      alert('Failed to save — please try again.');
+    }).finally(function() {
+      sel.disabled = false;
+    });
+  });
 })();
 </script>
