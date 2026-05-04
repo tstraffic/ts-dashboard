@@ -802,18 +802,50 @@
                   </form>
                 <% } %>
               </div>
-              <!-- Manager toggle -->
+              <!-- Manager toggle — button label spells out what pressing it
+                   will do (Grant / Revoke), and a state pill on the left
+                   shows the current value at a glance. Avoids the old
+                   "✓ Manager" label which was ambiguous about whether
+                   tapping it would turn it on or off. -->
               <div class="pt-3 mt-3 border-t border-gray-100">
-                <div class="flex items-center justify-between gap-2">
-                  <div>
-                    <p class="text-xs font-semibold text-gray-700">Manager portal access</p>
-                    <p class="text-[11px] text-gray-500 mt-0.5">Unlocks shift board, leave approvals and kudos moderation in the worker portal.</p>
+                <div class="flex items-start justify-between gap-3 flex-wrap">
+                  <div class="flex-1 min-w-[180px]">
+                    <div class="flex items-center gap-2">
+                      <p class="text-xs font-semibold text-gray-700">Manager portal access</p>
+                      <% if (crewMember.is_manager) { %>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">
+                          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          On
+                        </span>
+                      <% } else { %>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-gray-100 text-gray-500 ring-1 ring-gray-400/20">
+                          <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                          Off
+                        </span>
+                      <% } %>
+                    </div>
+                    <p class="text-[11px] text-gray-500 mt-1">Unlocks shift board, leave approvals and kudos moderation in the worker portal.</p>
+                    <p class="text-[10px] text-gray-400 mt-1">
+                      <% if (crewMember.is_manager) { %>
+                        Currently on. Pressing the button will <strong class="text-red-600">revoke</strong> manager access.
+                      <% } else { %>
+                        Currently off. Pressing the button will <strong class="text-emerald-700">grant</strong> manager access.
+                      <% } %>
+                    </p>
                   </div>
-                  <form method="POST" action="/hr/employees/<%= employee.id %>/toggle-manager">
+                  <form method="POST" action="/hr/employees/<%= employee.id %>/toggle-manager"
+                        onsubmit="return confirm('<%= crewMember.is_manager ? "Revoke manager access for " + crewMember.full_name + "? They’ll lose the shift board, leave approvals and kudos moderation tabs." : "Grant manager access to " + crewMember.full_name + "? They’ll get the shift board, leave approvals and kudos moderation tabs in the worker portal." %>');">
                     <%- include('../partials/csrf') %>
                     <input type="hidden" name="enable" value="<%= crewMember.is_manager ? '0' : '1' %>">
-                    <button type="submit" class="px-3 py-1.5 <%= crewMember.is_manager ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700' %> text-xs font-semibold rounded-lg transition whitespace-nowrap">
-                      <%= crewMember.is_manager ? '✓ Manager' : 'Grant access' %>
+                    <button type="submit"
+                      class="inline-flex items-center gap-1.5 px-3 py-2 <%= crewMember.is_manager ? 'bg-red-50 hover:bg-red-100 text-red-700 ring-1 ring-red-200' : 'bg-emerald-600 hover:bg-emerald-700 text-white' %> text-xs font-semibold rounded-lg transition whitespace-nowrap">
+                      <% if (crewMember.is_manager) { %>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                        Revoke access
+                      <% } else { %>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Grant access
+                      <% } %>
                     </button>
                   </form>
                 </div>
