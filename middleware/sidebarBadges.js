@@ -70,6 +70,9 @@ function sidebarBadges(req, res, next) {
       // every day past is money the supplier might still be charging.
       hireOverdue: safeCount(db, "SELECT COUNT(*) as c FROM hire_dockets WHERE status = 'picked_up' AND hire_end_date IS NOT NULL AND hire_end_date < ? AND deleted_at IS NULL", [today]),
 
+      // Pending leave requests waiting on an approver decision.
+      leavePending: safeCount(db, "SELECT COUNT(*) as c FROM employee_leave WHERE status = 'pending'"),
+
       // Crew — expiring certs within 30 days
       crew: safeCount(db, `
         SELECT COUNT(*) as c FROM crew_members WHERE active = 1 AND (

@@ -81,6 +81,8 @@ const PERMISSIONS = {
   // ── HR modules ──
   hr_dashboard:       ['admin', 'hr'],
   hr_employees:       ['admin', 'hr'],
+  // Leave approvals — ops + HR + admin can approve/reject worker leave.
+  leave_approvals:    ['admin', 'operations', 'hr', 'management'],
   hr_documents:       ['admin', 'hr'],
   hr_competencies:    ['admin', 'hr'],
   hr_reports:         ['admin', 'hr'],
