@@ -935,6 +935,9 @@ router.post('/employees/:id/payment-type', requirePermission('hr_employees'), (r
     entityId: employee.id, entityLabel: fullName,
     details: `Payment type set to ${friendly}`, ip: req.ip,
   });
+  if (req.xhr || (req.headers.accept || '').includes('application/json')) {
+    return res.json({ success: true, payment_type: pt });
+  }
   req.flash('success', `${fullName} payment type set to ${friendly}.`);
   return res.redirect(req.headers.referer || '/hr/roster');
 });
@@ -964,6 +967,9 @@ router.post('/employees/:id/portal-role', requirePermission('hr_employees'), (re
     entityId: crewMember.id, entityLabel: crewMember.full_name,
     details: `Portal role set to ${friendly}`, ip: req.ip,
   });
+  if (req.xhr || (req.headers.accept || '').includes('application/json')) {
+    return res.json({ success: true, portal_role: role });
+  }
   req.flash('success', `${crewMember.full_name} is now ${friendly}.`);
   // Bounce back to wherever the form was submitted from — roster page,
   // dashboard, or the employee detail itself — instead of always
