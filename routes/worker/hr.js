@@ -191,7 +191,10 @@ router.get('/hr/leave', (req, res) => {
   }
 
   // Also load ALL recent leave for history list
-  const recentLeave = db.prepare('SELECT * FROM employee_leave WHERE crew_member_id = ? ORDER BY start_date DESC LIMIT 30').all(worker.id);
+  // Pull a wider history (was 30) — the view buckets it into Pending /
+  // Upcoming / Recent past / Archived, so we'd rather have the archive
+  // tab show real depth than truncate it at the SQL layer.
+  const recentLeave = db.prepare('SELECT * FROM employee_leave WHERE crew_member_id = ? ORDER BY start_date DESC LIMIT 100').all(worker.id);
 
   // Flashes are already exposed via res.locals by workerLocals — DON'T
   // pass them again here, that would consume req.flash() a second time

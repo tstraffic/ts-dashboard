@@ -294,32 +294,89 @@
     </div>
   </div>
 
-  <!-- Upcoming / History -->
-  <% if (recentLeave && recentLeave.length > 0) { %>
-    <h3 class="text-[11px] font-bold text-white/50 uppercase tracking-wider mt-5 mb-2 px-1">Your leave</h3>
-    <% recentLeave.forEach(l => {
-      const stColor = l.status === 'approved' ? '#10B981' : l.status === 'rejected' ? '#EF4444' : l.status === 'cancelled' ? '#64748B' : '#F59E0B';
+  <!-- ── Your leave — bucketed so the list doesn't snowball ──
+       Pending          → action items (worker can still cancel)
+       Upcoming         → approved leave whose end date is today or later
+       Recent past      → approved leave that's already finished
+       Archived         → cancelled + rejected (hidden by default in a
+                          <details> so the list stays short on screen) -->
+  <%
+    function leaveItem(l, csrfToken) {
+      const stColor = l.status === 'approved' ? '#10B981'
+                    : l.status === 'rejected' ? '#EF4444'
+                    : l.status === 'cancelled' ? '#64748B'
+                    : '#F59E0B';
       const stLabel = (l.status || 'pending').charAt(0).toUpperCase() + (l.status || 'pending').slice(1);
       const periodLabel = l.shift_period === 'day' ? '6am–6pm' : l.shift_period === 'night' ? '6pm–6am' : 'Full day';
-    %>
-      <div class="lv-history-item">
-        <div class="min-w-0 flex-1 pr-2">
-          <div class="flex items-center gap-2">
-            <span class="lv-status-dot" style="background: <%= stColor %>;"></span>
-            <p class="text-sm font-semibold text-white"><%= fmtDate(l.start_date) %><% if (l.start_date !== l.end_date) { %> – <%= fmtDate(l.end_date) %><% } %></p>
-          </div>
-          <p class="text-[11px] text-white/55 mt-0.5">
-            <%= (l.leave_type || 'annual').charAt(0).toUpperCase() + (l.leave_type || 'annual').slice(1) %> · <%= periodLabel %> · <%= stLabel %>
-          </p>
-        </div>
-        <% if (l.status === 'pending') { %>
-          <form method="POST" action="/w/hr/leave/<%= l.id %>/cancel" onsubmit="return confirm('Cancel this leave?')">
-            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-            <button type="submit" class="text-[11px] font-semibold text-red-400 px-2 py-1 rounded-md hover:bg-red-500/10">Cancel</button>
-          </form>
-        <% } %>
+      const dateRange = fmtDate(l.start_date) + (l.start_date !== l.end_date ? ' – ' + fmtDate(l.end_date) : '');
+      let html = '<div class="lv-history-item">';
+      html += '<div class="min-w-0 flex-1 pr-2">';
+      html += '<div class="flex items-center gap-2"><span class="lv-status-dot" style="background:' + stColor + ';"></span>';
+      html += '<p class="text-sm font-semibold text-white">' + dateRange + '</p></div>';
+      html += '<p class="text-[11px] text-white/55 mt-0.5">' + ((l.leave_type || 'annual').charAt(0).toUpperCase() + (l.leave_type || 'annual').slice(1)) + ' · ' + periodLabel + ' · ' + stLabel + '</p>';
+      if (l.reason) html += '<p class="text-[11px] text-white/45 mt-1 italic">' + l.reason + '</p>';
+      html += '</div>';
+      if (l.status === 'pending') {
+        html += '<form method="POST" action="/w/hr/leave/' + l.id + '/cancel" onsubmit="return confirm(\'Cancel this leave?\')">';
+        html += '<input type="hidden" name="_csrf" value="' + (csrfToken || '') + '">';
+        html += '<button type="submit" class="text-[11px] font-semibold text-red-400 px-2 py-1 rounded-md hover:bg-red-500/10">Cancel</button>';
+        html += '</form>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    const _today = todayIso;
+    const pending  = (recentLeave || []).filter(l => l.status === 'pending').sort((a, b) => a.start_date.localeCompare(b.start_date));
+    const upcoming = (recentLeave || []).filter(l => l.status === 'approved' && l.end_date >= _today).sort((a, b) => a.start_date.localeCompare(b.start_date));
+    const past     = (recentLeave || []).filter(l => l.status === 'approved' && l.end_date <  _today).sort((a, b) => b.start_date.localeCompare(a.start_date));
+    const archived = (recentLeave || []).filter(l => l.status === 'cancelled' || l.status === 'rejected').sort((a, b) => b.start_date.localeCompare(a.start_date));
+  %>
+
+  <% function sectionHead(title, count, accent) { %>
+    <div class="flex items-center justify-between mt-5 mb-2 px-1">
+      <h3 class="text-[11px] font-bold uppercase tracking-wider" style="color:<%= accent %>;"><%= title %></h3>
+      <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.55);"><%= count %></span>
+    </div>
+  <% } %>
+
+  <% if (pending.length > 0) { %>
+    <% sectionHead('Pending approval', pending.length, '#FCD34D') %>
+    <% pending.forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
+  <% } %>
+
+  <% if (upcoming.length > 0) { %>
+    <% sectionHead('Upcoming approved leave', upcoming.length, '#6EE7B7') %>
+    <% upcoming.forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
+  <% } %>
+
+  <% if (past.length > 0) { %>
+    <% sectionHead('Recent past', Math.min(past.length, 5), 'rgba(255,255,255,0.5)') %>
+    <% past.slice(0, 5).forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
+    <% if (past.length > 5) { %>
+      <details class="mt-1">
+        <summary style="cursor:pointer;font-size:0.7rem;color:rgba(255,255,255,0.45);padding:6px 4px;list-style:none;">
+          Show <%= past.length - 5 %> older approved leave<%= past.length - 5 === 1 ? '' : 's' %> ›
+        </summary>
+        <% past.slice(5).forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
+      </details>
+    <% } %>
+  <% } %>
+
+  <% if (archived.length > 0) { %>
+    <details class="mt-5">
+      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;padding:6px 4px;">
+        <h3 class="text-[11px] font-bold uppercase tracking-wider" style="color:rgba(255,255,255,0.4);">Archived (cancelled &amp; rejected)</h3>
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);"><%= archived.length %></span>
+      </summary>
+      <div class="opacity-70 mt-1">
+        <% archived.forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
       </div>
-    <% }) %>
+    </details>
+  <% } %>
+
+  <% if (pending.length === 0 && upcoming.length === 0 && past.length === 0 && archived.length === 0) { %>
+    <p class="text-xs text-white/35 italic mt-5 px-1 text-center">No leave on record yet — use Quick add above to file your first request.</p>
   <% } %>
 </div>
 
