@@ -77,6 +77,13 @@
                     <span class="<%= v === 'no' ? 'fail' : v === 'na' ? 'na' : '' %>"><%= v === 'na' ? 'N/A' : v.charAt(0).toUpperCase() + v.slice(1) %></span>
                   </label>
                 <% }) %>
+              <% } else if (it.response_type === 'ok_notok_na') { %>
+                <% [['ok','OK',''],['not_ok','Not OK','fail'],['na','N/A','na']].forEach(function (v) { %>
+                  <label class="cf-radio">
+                    <input type="radio" name="answer_<%= it.id %>" value="<%= v[0] %>" <%= it.required ? 'required' : '' %>>
+                    <span class="<%= v[2] %>"><%= v[1] %></span>
+                  </label>
+                <% }) %>
               <% } else if (it.response_type === 'pass_fail') { %>
                 <% ['pass','fail'].forEach(function (v) { %>
                   <label class="cf-radio">

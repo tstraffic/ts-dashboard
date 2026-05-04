@@ -152,7 +152,11 @@ router.post('/:id/items', (req, res) => {
   const { question, response_type, section, required } = req.body;
   if (!question || !question.trim()) { req.flash('error', 'Question text is required.'); return res.redirect(`/checklists/${req.params.id}`); }
 
-  const validTypes = ['yes_no_na', 'pass_fail', 'text', 'number', 'signature'];
+  // ok_notok_na powers the Vehicle Pre-Start style 22-row inspections
+  // (each row is one click: OK / Not OK / N/A). Same shape as yes_no_na
+  // but with the inspector-friendly OK wording, since that's the
+  // language used on every paper Pre-Start docket workers fill in.
+  const validTypes = ['yes_no_na', 'ok_notok_na', 'pass_fail', 'text', 'number', 'signature', 'checkbox', 'radio', 'textarea'];
   const rType = validTypes.includes(response_type) ? response_type : 'yes_no_na';
 
   // Get next order number
