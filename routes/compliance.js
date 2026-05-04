@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { getDb } = require('../db/database');
 const { autoLogDiary, logStatusChange } = require('../lib/diary');
+const planStatus = require('../lib/planStatus');
 
 // Multer config for compliance document uploads
 const complianceStorage = multer.diskStorage({
@@ -26,6 +27,101 @@ const complianceUpload = multer({
     cb(null, allowed.test(path.extname(file.originalname)));
   }
 });
+
+// Sub-plan uploads land under compliance/<subPlanId>/ — same shape as the
+// parent compliance dirs, just keyed on req.params.subId.
+const subPlanStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'data', 'uploads', 'compliance', req.params.subId || 'new');
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const subPlanUpload = multer({
+  storage: subPlanStorage,
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /\.(pdf|doc|docx|xls|xlsx|csv|txt|jpg|jpeg|png|gif|webp|dwg|dxf)$/i;
+    cb(null, allowed.test(path.extname(file.originalname)));
+  }
+});
+
+// Loads a row and confirms it's a sub-plan (parent_id IS NOT NULL).
+function getSubPlan(db, subId) {
+  return db.prepare("SELECT * FROM compliance WHERE id = ? AND parent_id IS NOT NULL").get(subId);
+}
+
+// Sub-plan types the count grid offers on the create form.
+const SUB_PLAN_TYPES = [
+  'traffic_guidance', 'tmp_approval', 'spa', 'sza', 'rol',
+  'council_permit', 'bus_approval', 'police_notification',
+  'letter_drop', 'other',
+];
+
+// Creates a parent Plan + N pre-numbered Sub-Plans atomically. Body shape:
+//   title, job_id, client_id, client_request_date,
+//   count_<type>=N for each ticked type
+function createParentPlan(req, res, db, b) {
+  const title = (b.title || '').trim();
+  if (!title) {
+    req.flash('error', 'Title is required.');
+    return res.redirect('back');
+  }
+  const planNumber = planStatus.nextPlanNumber(db);
+  const jobId = b.job_id || null;
+  const clientId = b.client_id || null;
+  const clientRequestDate = b.client_request_date || null;
+
+  let parentId = null;
+  let subPlanCount = 0;
+  try {
+    const tx = db.transaction(() => {
+      // item_type is NOT NULL + CHECK in legacy schema; use 'other' as a
+      // benign placeholder. Parent rows are distinguished from regular
+      // 'other'-typed legacy rows by plan_number IS NOT NULL.
+      const parentRes = db.prepare(`
+        INSERT INTO compliance (parent_id, plan_number, item_type, item_types, job_id, client_id, title, status, client_request_date, notes)
+        VALUES (NULL, ?, 'other', '', ?, ?, ?, 'not_started', ?, ?)
+      `).run(planNumber, jobId, clientId, title, clientRequestDate, b.notes || '');
+      parentId = parentRes.lastInsertRowid;
+
+      const insertSub = db.prepare(`
+        INSERT INTO compliance (parent_id, job_id, client_id, item_type, item_types, title, status, reference_number, description)
+        VALUES (?, ?, ?, ?, ?, ?, 'not_started', ?, '')
+      `);
+
+      SUB_PLAN_TYPES.forEach(type => {
+        const raw = b['count_' + type];
+        const count = parseInt(raw, 10);
+        if (!Number.isFinite(count) || count <= 0) return;
+        for (let seq = 1; seq <= count; seq++) {
+          const ref = planStatus.buildSubPlanRef(planNumber, type, seq);
+          insertSub.run(parentId, jobId, clientId, type, type, ref, ref);
+          subPlanCount += 1;
+        }
+      });
+    });
+    tx();
+    planStatus.syncParentStatus(db, parentId);
+
+    autoLogDiary(db, {
+      jobId, complianceItemId: parentId,
+      summary: `[${req.session.user.full_name}] Created Plan ${title} (#${planNumber}) with ${subPlanCount} sub-plan(s).`,
+      userId: req.session.user.id
+    });
+
+    req.flash('success', `Plan #${planNumber} created with ${subPlanCount} sub-plan slot(s).`);
+    return res.redirect('/compliance/' + parentId + '/edit');
+  } catch (err) {
+    console.error('[Compliance] createParentPlan error:', err.message);
+    req.flash('error', 'Failed to create Plan: ' + err.message);
+    return res.redirect('/compliance/new');
+  }
+}
 
 function weekStart(date) {
   const d = new Date(date);
@@ -53,7 +149,9 @@ router.get('/', (req, res) => {
     LEFT JOIN users a ON c.assigned_to_id = a.id
     LEFT JOIN users rfi ON c.ready_for_invoice_by = rfi.id
     LEFT JOIN users inv ON c.invoiced_by_id = inv.id
-    WHERE 1=1`;
+    WHERE c.parent_id IS NULL`;
+  // ^ Sub-plans live nested under their parent on the page; the top-level
+  // list shows parents + legacy flat rows only.
   const params = [];
 
   if (status && status !== 'all')       { query += ` AND c.status = ?`;     params.push(status); }
@@ -99,6 +197,23 @@ router.get('/', (req, res) => {
 
   query += ` ORDER BY c.id DESC`;
   const items = db.prepare(query).all(...params);
+
+  // Pull all sub-plans for visible parents in one shot, grouped by parent_id
+  // for the inline expansion. Pre-bucketing here keeps the EJS simple.
+  const parentIds = items.filter(i => i.parent_id == null && i.plan_number != null).map(i => i.id);
+  const subPlansByParent = {};
+  if (parentIds.length > 0) {
+    const placeholders = parentIds.map(() => '?').join(',');
+    const subs = db.prepare(`SELECT id, parent_id, item_type, reference_number, description, status, expiry_date, extension_required FROM compliance WHERE parent_id IN (${placeholders}) ORDER BY item_type, reference_number`).all(...parentIds);
+    const docCounts = db.prepare(`SELECT compliance_id, COUNT(*) as c FROM compliance_documents WHERE compliance_id IN (SELECT id FROM compliance WHERE parent_id IN (${placeholders})) GROUP BY compliance_id`).all(...parentIds);
+    const dcMap = {};
+    docCounts.forEach(r => { dcMap[r.compliance_id] = r.c; });
+    subs.forEach(s => {
+      s.doc_count = dcMap[s.id] || 0;
+      (subPlansByParent[s.parent_id] = subPlansByParent[s.parent_id] || []).push(s);
+    });
+  }
+
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
@@ -127,6 +242,7 @@ router.get('/', (req, res) => {
     items, jobs, clients, users,
     filters: { status: status || '', job_id: job_id || '', client_id: client_id || '', item_type: item_type || '', view, ref: ref || '', date_from: date_from || '', date_to: date_to || '', invoice_state: invoice_state || '' },
     view, periodLabel, prevRef, nextRef, summary,
+    subPlansByParent,
     user: req.session.user
   });
 });
@@ -189,21 +305,237 @@ router.get('/api/check-ref', (req, res) => {
   res.json({ exists: !!existing, title: existing ? existing.title : '' });
 });
 
+// ============================================================
+// Plans → Sub-Plans endpoints
+//
+// A "Plan" is a parent compliance row (parent_id IS NULL,
+// item_type IS NULL, plan_number set). Its Sub-Plans are
+// compliance rows with parent_id pointing back at it.
+//
+// Routes here handle add/remove of sub-plans from an existing
+// parent, plus the per-sub-plan status transitions. Upload-and-
+// submit is a single combined action: uploading files locks in
+// submitted_date / expiry_date / notes and flips the sub-plan's
+// status to 'submitted'.
+// ============================================================
+
+// Add a sub-plan to an existing parent. Body: { item_type }.
+router.post('/:id/sub-plans', (req, res) => {
+  const db = getDb();
+  const parent = db.prepare("SELECT id, plan_number, job_id, client_id FROM compliance WHERE id = ? AND parent_id IS NULL AND plan_number IS NOT NULL").get(req.params.id);
+  if (!parent) {
+    if (req.headers.accept && req.headers.accept.includes('json')) return res.status(404).json({ error: 'Parent Plan not found' });
+    req.flash('error', 'Parent Plan not found.');
+    return res.redirect('/compliance');
+  }
+  const itemType = (req.body.item_type || '').trim();
+  if (!itemType) {
+    if (req.headers.accept && req.headers.accept.includes('json')) return res.status(400).json({ error: 'item_type required' });
+    req.flash('error', 'Sub-plan type required.');
+    return res.redirect('/compliance/' + parent.id + '/edit');
+  }
+  const seq = planStatus.nextSubPlanSeq(db, parent.id, itemType);
+  const ref = planStatus.buildSubPlanRef(parent.plan_number, itemType, seq);
+  const result = db.prepare(`
+    INSERT INTO compliance (parent_id, job_id, client_id, item_type, item_types, title, status, reference_number, description)
+    VALUES (?, ?, ?, ?, ?, ?, 'not_started', ?, '')
+  `).run(parent.id, parent.job_id || null, parent.client_id || null, itemType, itemType, ref, ref);
+  planStatus.syncParentStatus(db, parent.id);
+  if (req.headers.accept && req.headers.accept.includes('json')) {
+    return res.json({ success: true, id: result.lastInsertRowid, reference_number: ref });
+  }
+  req.flash('success', `Sub-plan ${ref} added.`);
+  res.redirect('/compliance/' + parent.id + '/edit');
+});
+
+// Inline description update for a sub-plan.
+router.post('/sub-plans/:subId/description', (req, res) => {
+  const db = getDb();
+  const sub = getSubPlan(db, req.params.subId);
+  if (!sub) {
+    if (req.headers.accept && req.headers.accept.includes('json')) return res.status(404).json({ error: 'Sub-plan not found' });
+    req.flash('error', 'Sub-plan not found.');
+    return res.redirect('/compliance');
+  }
+  const desc = (req.body.description || '').trim();
+  db.prepare("UPDATE compliance SET description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(desc, sub.id);
+  if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true, description: desc });
+  res.redirect('/compliance/' + sub.parent_id + '/edit');
+});
+
+// Toggle the ROL extension flag on a sub-plan.
+router.post('/sub-plans/:subId/extension', (req, res) => {
+  const db = getDb();
+  const sub = getSubPlan(db, req.params.subId);
+  if (!sub) {
+    if (req.headers.accept && req.headers.accept.includes('json')) return res.status(404).json({ error: 'Sub-plan not found' });
+    req.flash('error', 'Sub-plan not found.');
+    return res.redirect('/compliance');
+  }
+  const flag = (req.body.extension_required === '1' || req.body.extension_required === 1 || req.body.extension_required === true) ? 1 : 0;
+  db.prepare("UPDATE compliance SET extension_required = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(flag, sub.id);
+  if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true, extension_required: flag });
+  res.redirect('/compliance/' + sub.parent_id + '/edit');
+});
+
+// Combined upload + submit. Files are required (≥1); submitted_date
+// defaults to today if blank; expiry_date is optional. Notes are
+// stored on the sub-plan's `notes` column. Status flips to
+// 'submitted' as a side-effect of a successful upload.
+router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 10), (req, res) => {
+  const db = getDb();
+  const sub = getSubPlan(db, req.params.subId);
+  if (!sub) {
+    req.flash('error', 'Sub-plan not found.');
+    return res.redirect('/compliance');
+  }
+  const files = req.files || [];
+  const desc = (req.body.description || sub.description || '').trim();
+  if (!desc) {
+    req.flash('error', 'Description is required before submitting.');
+    return res.redirect('/compliance/' + sub.parent_id + '/edit');
+  }
+  if (files.length === 0) {
+    // No files attached AND no existing files = can't submit.
+    const existingDocs = db.prepare('SELECT COUNT(*) as c FROM compliance_documents WHERE compliance_id = ?').get(sub.id).c;
+    if (existingDocs === 0) {
+      req.flash('error', 'At least one file is required to submit.');
+      return res.redirect('/compliance/' + sub.parent_id + '/edit');
+    }
+  }
+  try {
+    const insDoc = db.prepare('INSERT INTO compliance_documents (compliance_id, filename, original_name, file_path, file_size, mime_type, uploaded_by_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    files.forEach(f => {
+      const relPath = '/data/uploads/compliance/' + sub.id + '/' + f.filename;
+      insDoc.run(sub.id, f.filename, f.originalname, relPath, f.size, f.mimetype || '', req.session.user.id);
+    });
+
+    const today = new Date().toISOString().split('T')[0];
+    const submittedDate = req.body.submitted_date || today;
+    const expiryDate = req.body.expiry_date || null;
+    const notes = req.body.notes || sub.notes || '';
+
+    db.prepare(`
+      UPDATE compliance
+      SET description = ?, status = 'submitted', submitted_date = ?, expiry_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(desc, submittedDate, expiryDate, notes, sub.id);
+
+    planStatus.syncParentStatus(db, sub.parent_id);
+
+    // Audit trail
+    if (sub.job_id || req.session.user) {
+      autoLogDiary(db, {
+        jobId: sub.job_id, complianceItemId: sub.id,
+        summary: `[${req.session.user.full_name}] Submitted ${sub.reference_number}: ${desc}. ${files.length} file(s) uploaded.${expiryDate ? ' Expires ' + expiryDate + '.' : ''}`,
+        userId: req.session.user.id
+      });
+    }
+
+    req.flash('success', `${sub.reference_number} submitted (${files.length} file(s) uploaded).`);
+  } catch (err) {
+    console.error('[Compliance] Sub-plan upload-submit error:', err.message);
+    req.flash('error', 'Submission failed: ' + err.message);
+  }
+  res.redirect('/compliance/' + sub.parent_id + '/edit');
+});
+
+// Mark a sub-plan approved. Gated: must be 'submitted' first.
+router.post('/sub-plans/:subId/approve', (req, res) => {
+  const db = getDb();
+  const sub = getSubPlan(db, req.params.subId);
+  if (!sub) {
+    if (req.headers.accept && req.headers.accept.includes('json')) return res.status(404).json({ error: 'Sub-plan not found' });
+    req.flash('error', 'Sub-plan not found.');
+    return res.redirect('/compliance');
+  }
+  if (sub.status !== 'submitted') {
+    if (req.headers.accept && req.headers.accept.includes('json')) return res.status(400).json({ error: 'Sub-plan must be submitted before approval' });
+    req.flash('error', 'Sub-plan must be submitted before it can be approved.');
+    return res.redirect('/compliance/' + sub.parent_id + '/edit');
+  }
+  const today = new Date().toISOString().split('T')[0];
+  db.prepare("UPDATE compliance SET status = 'approved', approved_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(today, sub.id);
+  planStatus.syncParentStatus(db, sub.parent_id);
+  if (sub.job_id) {
+    autoLogDiary(db, { jobId: sub.job_id, complianceItemId: sub.id,
+      summary: `[${req.session.user.full_name}] Approved ${sub.reference_number}.`, userId: req.session.user.id });
+  }
+  if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true });
+  req.flash('success', `${sub.reference_number} approved.`);
+  res.redirect('/compliance/' + sub.parent_id + '/edit');
+});
+
+// Mark a sub-plan rejected. Allowed from any status.
+router.post('/sub-plans/:subId/reject', (req, res) => {
+  const db = getDb();
+  const sub = getSubPlan(db, req.params.subId);
+  if (!sub) {
+    if (req.headers.accept && req.headers.accept.includes('json')) return res.status(404).json({ error: 'Sub-plan not found' });
+    req.flash('error', 'Sub-plan not found.');
+    return res.redirect('/compliance');
+  }
+  db.prepare("UPDATE compliance SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(sub.id);
+  planStatus.syncParentStatus(db, sub.parent_id);
+  if (sub.job_id) {
+    autoLogDiary(db, { jobId: sub.job_id, complianceItemId: sub.id,
+      summary: `[${req.session.user.full_name}] Rejected ${sub.reference_number}.`, userId: req.session.user.id });
+  }
+  if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true });
+  req.flash('success', `${sub.reference_number} marked rejected.`);
+  res.redirect('/compliance/' + sub.parent_id + '/edit');
+});
+
+// Delete a sub-plan and its documents. Parent status re-synced after.
+router.post('/sub-plans/:subId/delete', (req, res) => {
+  const db = getDb();
+  const sub = getSubPlan(db, req.params.subId);
+  if (!sub) {
+    if (req.headers.accept && req.headers.accept.includes('json')) return res.status(404).json({ error: 'Sub-plan not found' });
+    req.flash('error', 'Sub-plan not found.');
+    return res.redirect('/compliance');
+  }
+  const parentId = sub.parent_id;
+  // Remove docs (rows + files on disk)
+  const docs = db.prepare('SELECT id, file_path FROM compliance_documents WHERE compliance_id = ?').all(sub.id);
+  docs.forEach(d => {
+    try { fs.unlinkSync(path.join(__dirname, '..', 'data', d.file_path)); } catch (e) {}
+  });
+  db.prepare('DELETE FROM compliance_documents WHERE compliance_id = ?').run(sub.id);
+  // site_diary_entries.compliance_item_id is ON DELETE NO ACTION; detach first.
+  try { db.prepare('UPDATE site_diary_entries SET compliance_item_id = NULL WHERE compliance_item_id = ?').run(sub.id); } catch (e) {}
+  db.prepare('DELETE FROM compliance WHERE id = ?').run(sub.id);
+  planStatus.syncParentStatus(db, parentId);
+  if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true });
+  req.flash('success', `Sub-plan ${sub.reference_number} removed.`);
+  res.redirect('/compliance/' + parentId + '/edit');
+});
+
 router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
   res.render('compliance/form', {
-    title: 'New Plan / Approval', item: null, jobs, clients, users,
+    title: 'New Plan', item: null, jobs, clients, users,
     user: req.session.user, prefillJobId: req.query.job_id || '', prefillClientId: req.query.client_id || '',
-    returnTo: req.query.return_to || '/compliance', linkedTask: null, revisions: []
+    returnTo: req.query.return_to || '/compliance', linkedTask: null, revisions: [],
+    isParent: true, subPlans: [], subPlanDocs: {}, subPlanTypes: SUB_PLAN_TYPES,
   });
 });
 
 router.post('/', (req, res) => {
   const db = getDb();
   const b = req.body;
+
+  // New-style Plan create: body has the count grid (count_<type> fields)
+  // and the is_parent flag. Inserts a parent row + N sub-plans atomically.
+  if (b.is_parent === '1' || b.is_parent === 1) {
+    return createParentPlan(req, res, db, b);
+  }
+
+  // Legacy flat-row create — preserved so existing /compliance/new flows
+  // (and anything that posts the old shape) keep working.
   // Handle multi-select item types
   const typesArr = b.item_types ? (Array.isArray(b.item_types) ? b.item_types : [b.item_types]) : (b.item_type ? [b.item_type] : []);
   const itemTypes = typesArr.join(',');
@@ -425,7 +757,33 @@ router.get('/:id/edit', (req, res) => {
   try { linkedTask = db.prepare('SELECT t.id, t.title, t.status, t.owner_id, u.full_name as owner_name FROM tasks t LEFT JOIN users u ON t.owner_id = u.id WHERE t.compliance_id = ? AND t.deleted_at IS NULL').get(item.id); } catch (e) { /* column may not exist yet */ }
   let revisions = [];
   try { revisions = db.prepare('SELECT * FROM compliance_revisions WHERE compliance_id = ? ORDER BY revision_number ASC').all(item.id); } catch (e) { /* table may not exist yet */ }
-  res.render('compliance/form', { title: 'Edit Plan / Approval', item, jobs, clients, users, user: req.session.user, prefillJobId: '', prefillClientId: '', returnTo, documents, linkedTask, revisions });
+
+  // Parent rows surface their sub-plans + each sub-plan's documents so
+  // the edit page renders the new grid. Legacy + sub-plan rows pass
+  // empty arrays through and fall back to the legacy form layout.
+  // Discriminator: parent_id IS NULL AND plan_number IS NOT NULL.
+  const isParent = item.parent_id == null && item.plan_number != null;
+  let subPlans = [];
+  let subPlanDocs = {};
+  if (isParent) {
+    subPlans = db.prepare("SELECT * FROM compliance WHERE parent_id = ? ORDER BY item_type, reference_number").all(item.id);
+    if (subPlans.length > 0) {
+      const ids = subPlans.map(s => s.id);
+      const placeholders = ids.map(() => '?').join(',');
+      const docRows = db.prepare(`SELECT cd.*, u.full_name as uploaded_by_name FROM compliance_documents cd LEFT JOIN users u ON cd.uploaded_by_id = u.id WHERE cd.compliance_id IN (${placeholders}) ORDER BY cd.created_at DESC`).all(...ids);
+      docRows.forEach(d => {
+        (subPlanDocs[d.compliance_id] = subPlanDocs[d.compliance_id] || []).push(d);
+      });
+    }
+  }
+
+  res.render('compliance/form', {
+    title: isParent ? 'Edit Plan' : 'Edit Plan / Approval',
+    item, jobs, clients, users, user: req.session.user,
+    prefillJobId: '', prefillClientId: '', returnTo,
+    documents, linkedTask, revisions,
+    isParent, subPlans, subPlanDocs, subPlanTypes: SUB_PLAN_TYPES,
+  });
 });
 
 router.post('/:id', (req, res) => {

@@ -109,6 +109,36 @@ function generateNotifications() {
       insertAndTrack(userId, 'expiring_compliance', title, c.title + ' on ' + c.job_number + ' is due soon.', '/jobs/' + c.job_id + '#compliance', c.job_id);
     }
 
+    // 2b. Sub-plan expiry within 7 days. Each approved/submitted sub-plan
+    // with an expiry_date in the next week pings whoever owns the parent
+    // Plan (internal_approver, falling back to PM). The link drops the
+    // user straight onto the parent's edit page so they can extend / re-
+    // submit / chase the authority.
+    const next7 = new Date(now + 7 * 86400000).toISOString().split('T')[0];
+    const expiringSubPlans = db.prepare(`
+      SELECT sub.id, sub.parent_id, sub.reference_number, sub.expiry_date,
+             sub.item_type, sub.extension_required,
+             p.title as parent_title, p.internal_approver_id as parent_approver_id,
+             j.id as job_id, j.job_number, j.project_manager_id
+      FROM compliance sub
+      JOIN compliance p ON sub.parent_id = p.id
+      LEFT JOIN jobs j ON p.job_id = j.id
+      WHERE sub.expiry_date IS NOT NULL
+        AND sub.expiry_date BETWEEN ? AND ?
+        AND sub.status IN ('submitted', 'approved')
+    `).all(today, next7);
+
+    for (const s of expiringSubPlans) {
+      const userId = s.parent_approver_id || s.project_manager_id;
+      if (!userId) continue;
+      const days = Math.max(0, Math.round((new Date(s.expiry_date) - new Date(today)) / 86400000));
+      const isROL = s.item_type === 'rol' || s.item_type === 'road_occupancy';
+      const extHint = isROL && !s.extension_required ? ' Extension may be needed.' : '';
+      const title = `Sub-plan expiring: ${s.reference_number}`;
+      const message = `${s.reference_number} (${s.parent_title}) expires in ${days} day${days === 1 ? '' : 's'}.${extHint}`;
+      insertAndTrack(userId, 'expiring_compliance', title, message, '/compliance/' + s.parent_id + '/edit#sub-' + s.id, s.job_id);
+    }
+
     // 3. Missing updates --> notify PM (no update in 7+ days)
     const missingUpdates = db.prepare(`
       SELECT j.id, j.job_number, j.project_manager_id

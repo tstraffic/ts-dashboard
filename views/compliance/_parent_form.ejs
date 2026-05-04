@@ -1,0 +1,200 @@
+<%
+  const isEdit = !!item;
+  const formAction = isEdit ? '/compliance/' + item.id : '/compliance';
+  const pageTitle = isEdit ? 'Edit Plan' : 'New Plan';
+  const cancelHref = (typeof returnTo !== 'undefined' && returnTo) ? returnTo : '/compliance';
+
+  const TYPE_LABELS = {
+    traffic_guidance:    'TGS (Traffic Guidance Scheme)',
+    tmp_approval:        'CTMP (Construction Traffic Mgmt Plan)',
+    spa:                 'SPA (Swept Path Analysis)',
+    sza:                 'SZA (Speed Zone Authorisation)',
+    rol:                 'ROL (Road Occupancy Licence)',
+    council_permit:      'Council Permit',
+    bus_approval:        'Bus Approval',
+    police_notification: 'Police Notification',
+    letter_drop:         'Letter Drop',
+    other:               'Other',
+  };
+
+  const STATUS_BADGE = {
+    not_started: 'bg-gray-100 text-gray-700 ring-gray-200',
+    started:     'bg-amber-50 text-amber-700 ring-amber-200',
+    submitted:   'bg-blue-50 text-blue-700 ring-blue-200',
+    approved:    'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    rejected:    'bg-rose-50 text-rose-700 ring-rose-200',
+    expired:     'bg-orange-50 text-orange-700 ring-orange-200',
+  };
+
+  // Group sub-plans by item_type so we can render a section per type.
+  const groupedSubPlans = {};
+  (subPlans || []).forEach(s => {
+    (groupedSubPlans[s.item_type] = groupedSubPlans[s.item_type] || []).push(s);
+  });
+
+  const planNumber = isEdit ? item.plan_number : null;
+%>
+
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="mb-6">
+    <a href="<%= cancelHref %>" class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-3">
+      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      Back
+    </a>
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold text-gray-900"><%= pageTitle %><% if (isEdit) { %> <span class="text-gray-400 font-mono text-lg">#<%= planNumber %></span><% } %></h1>
+      <% if (isEdit) { %>
+        <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ring-1 ring-inset <%= STATUS_BADGE[item.status] || STATUS_BADGE.not_started %>">
+          <%= (item.status || 'not_started').replace(/_/g, ' ') %>
+        </span>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Parent fields form -->
+  <form method="POST" action="<%= formAction %>" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="return_to" value="<%= cancelHref %>">
+    <% if (!isEdit) { %><input type="hidden" name="is_parent" value="1"><% } %>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="md:col-span-2">
+        <label for="title" class="block text-sm font-medium text-gray-700 mb-1.5">Plan Name <span class="text-rose-500">*</span></label>
+        <input type="text" id="title" name="title" required
+          value="<%= isEdit ? (item.title || '') : '' %>"
+          placeholder="e.g. Canterbury Road Project"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+      </div>
+
+      <div>
+        <label for="job_id" class="block text-sm font-medium text-gray-700 mb-1.5">Project / Job</label>
+        <select id="job_id" name="job_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <option value="">— None —</option>
+          <% jobs.forEach(j => { %>
+            <option value="<%= j.id %>" <%= (isEdit && item.job_id == j.id) || (!isEdit && prefillJobId == j.id) ? 'selected' : '' %>>
+              <%= j.job_number %> — <%= j.project_name || j.client || '' %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
+        <label for="client_id" class="block text-sm font-medium text-gray-700 mb-1.5">Client</label>
+        <select id="client_id" name="client_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <option value="">— None —</option>
+          <% clients.forEach(c => { %>
+            <option value="<%= c.id %>" <%= (isEdit && item.client_id == c.id) || (!isEdit && prefillClientId == c.id) ? 'selected' : '' %>>
+              <%= c.company_name %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
+        <label for="client_request_date" class="block text-sm font-medium text-gray-700 mb-1.5">Client Request Date</label>
+        <input type="date" id="client_request_date" name="client_request_date"
+          value="<%= isEdit ? (item.client_request_date || '') : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+      </div>
+
+      <div class="md:col-span-2">
+        <label for="notes" class="block text-sm font-medium text-gray-700 mb-1.5">Plan Notes</label>
+        <textarea id="notes" name="notes" rows="2"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"><%= isEdit ? (item.notes || '') : '' %></textarea>
+      </div>
+    </div>
+
+    <% if (!isEdit) { %>
+      <!-- Type & quantity grid (create only). Tick a type, set how many. -->
+      <div class="mt-6 pt-6 border-t border-gray-200">
+        <h2 class="text-sm font-semibold text-gray-900 mb-1">Sub-plans to generate</h2>
+        <p class="text-sm text-gray-500 mb-4">Tick each type you need, then enter how many. Each one becomes its own slot with a system reference (e.g. <code class="px-1.5 py-0.5 bg-gray-100 rounded">TSTGS3100-1</code>) you can name and upload to.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <% subPlanTypes.forEach(t => { %>
+            <label class="flex items-center justify-between gap-3 px-4 py-3 border border-gray-200 rounded-lg hover:border-brand-300 hover:bg-brand-50/40 cursor-pointer has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50">
+              <span class="flex items-center gap-2.5 text-sm text-gray-800">
+                <input type="checkbox" class="type-toggle w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" data-type="<%= t %>">
+                <%= TYPE_LABELS[t] || t %>
+              </span>
+              <input type="number" name="count_<%= t %>" min="1" max="20" value="1" disabled
+                class="count-input w-16 px-2 py-1 text-sm text-center border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
+            </label>
+          <% }) %>
+        </div>
+      </div>
+      <script>
+        // Tying each checkbox to its sibling number input — disabled inputs
+        // aren't submitted, so unticked types vanish from the payload.
+        document.querySelectorAll('.type-toggle').forEach(cb => {
+          cb.addEventListener('change', e => {
+            const input = e.target.closest('label').querySelector('.count-input');
+            input.disabled = !cb.checked;
+            if (cb.checked) input.focus();
+          });
+        });
+      </script>
+    <% } %>
+
+    <div class="mt-6 pt-6 border-t border-gray-200 flex items-center justify-end gap-3">
+      <a href="<%= cancelHref %>" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</a>
+      <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg">
+        <%= isEdit ? 'Update Plan' : 'Create Plan' %>
+      </button>
+    </div>
+  </form>
+
+  <% if (isEdit) { %>
+    <!-- Sub-plan grid (edit only) -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">Sub-plans</h2>
+          <p class="text-sm text-gray-500">Each sub-plan becomes "submitted" the moment you upload its files. Use the buttons after that to approve or reject.</p>
+        </div>
+      </div>
+
+      <% if (!subPlans || subPlans.length === 0) { %>
+        <div class="text-center py-8 text-sm text-gray-500 bg-gray-50 rounded-lg">No sub-plans yet. Add one below.</div>
+      <% } %>
+
+      <% subPlanTypes.forEach(t => { const list = groupedSubPlans[t] || []; %>
+        <% if (list.length > 0) { %>
+          <div class="mb-6">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-semibold text-gray-700"><%= TYPE_LABELS[t] || t %> <span class="text-gray-400">(<%= list.length %>)</span></h3>
+              <form method="POST" action="/compliance/<%= item.id %>/sub-plans" class="inline">
+                <%- include('../partials/csrf') %>
+                <input type="hidden" name="item_type" value="<%= t %>">
+                <button type="submit" class="text-xs font-medium text-brand-600 hover:text-brand-700">+ Add another</button>
+              </form>
+            </div>
+            <div class="space-y-3">
+              <% list.forEach(sub => { %>
+                <%- include('./_sub_plan_card', { sub, docs: (subPlanDocs && subPlanDocs[sub.id]) || [], parentId: item.id, statusBadge: STATUS_BADGE }) %>
+              <% }) %>
+            </div>
+          </div>
+        <% } %>
+      <% }) %>
+
+      <!-- Add a sub-plan of any type -->
+      <details class="mt-4 group">
+        <summary class="cursor-pointer inline-flex items-center text-sm font-medium text-brand-600 hover:text-brand-700 list-none">
+          <svg class="w-4 h-4 mr-1 transition-transform group-open:rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Add a sub-plan
+        </summary>
+        <form method="POST" action="/compliance/<%= item.id %>/sub-plans" class="mt-3 flex items-center gap-2">
+          <%- include('../partials/csrf') %>
+          <select name="item_type" required class="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+            <% subPlanTypes.forEach(t => { %>
+              <option value="<%= t %>"><%= TYPE_LABELS[t] || t %></option>
+            <% }) %>
+          </select>
+          <button type="submit" class="px-3 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg">Add</button>
+        </form>
+      </details>
+    </div>
+  <% } %>
+</div>
