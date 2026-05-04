@@ -62,6 +62,17 @@
     </a>
     <% } %>
 
+    <% if (canAccess(user, 'tasks')) { %>
+    <a href="/tasks" title="<%= (b.tasksPlanningOverdue || 0) %> planning · <%= (b.tasksOpsOverdue || 0) %> ops overdue" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'tasks' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
+      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+      <span class="flex-1">Tasks</span>
+      <% var tOver = (b.tasksPlanningOverdue || 0) + (b.tasksOpsOverdue || 0); %>
+      <% var tUp   = (b.tasksPlanning || 0)        + (b.tasksOps || 0); %>
+      <% if (tOver) { %><span class="sidebar-badge bg-red-500 text-white"><%= tOver %></span><% } %>
+      <% if (tUp)   { %><span class="sidebar-badge bg-blue-500 text-white"><%= tUp   %></span><% } %>
+    </a>
+    <% } %>
+
     <%/* ── PLANNING SECTION (planners + admin) ── */%>
     <% if (canAccess(user, 'planning_plans') || canAccess(user, 'projects')) { %>
     <div class="pt-3 mt-2 border-t border-white/10">
@@ -80,14 +91,6 @@
       <span class="flex-1">Plans & Approvals</span>
       <% if (b.complianceOverdue) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.complianceOverdue %></span><% } %>
       <% if (b.compliance) { %><span class="sidebar-badge bg-blue-500 text-white"><%= b.compliance %></span><% } %>
-    </a>
-    <% } %>
-    <% if (canAccess(user, 'tasks')) { %>
-    <a href="/tasks?division=planning" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'tasks' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
-      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-      <span class="flex-1">Tasks</span>
-      <% if (b.tasksPlanningOverdue) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.tasksPlanningOverdue %></span><% } %>
-      <% if (b.tasksPlanning) { %><span class="sidebar-badge bg-blue-500 text-white"><%= b.tasksPlanning %></span><% } %>
     </a>
     <% } %>
     <% if (canAccess(user, 'audits')) { %>
@@ -118,14 +121,6 @@
     <a href="/projects" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'projects' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
       <span class="flex-1">Jobs</span>
-    </a>
-    <% } %>
-    <% if (canAccess(user, 'tasks')) { %>
-    <a href="/tasks?division=ops" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'tasks' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
-      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-      <span class="flex-1">Tasks</span>
-      <% if (b.tasksOpsOverdue) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.tasksOpsOverdue %></span><% } %>
-      <% if (b.tasksOps) { %><span class="sidebar-badge bg-blue-500 text-white"><%= b.tasksOps %></span><% } %>
     </a>
     <% } %>
     <% if (canAccess(user, 'bookings')) { %>
