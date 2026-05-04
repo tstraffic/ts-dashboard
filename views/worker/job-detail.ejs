@@ -300,94 +300,11 @@
   <!-- ==================== FORMS TAB ==================== -->
   <div id="dpanel-forms" class="dtab-panel space-y-4" style="display:none;">
 
-    <!-- Job-Pack: the 5 shift checklists, split into Required (docket sign
-         enforces) vs Recommended (warns then lets through). Company policy
-         is that ALL FIVE are mandatory — that's noted in the small print on
-         each section, but we deliberately don't gate sign on the full set
-         so a stuck worker (e.g. no vehicle) isn't permanently blocked. -->
-    <%
-      var JOB_PACK_REQUIRED = [
-        { key: 'risk_toolbox', path: 'risk-assessment', label: '2. Risk Assessment & Toolbox', hint: 'Run with the crew on site' },
-        { key: 'team_leader',  path: 'team-leader',     label: '4. Team Leader Checklist',     hint: 'Crew lead / acting TL' },
-      ];
-      var JOB_PACK_RECOMMENDED = [
-        { key: 'vehicle_prestart',   path: 'vehicle-prestart',   label: '1. Vehicle Pre-Start',           hint: 'Before starting the vehicle' },
-        { key: 'tc_prestart',        path: 'tc-prestart',        label: '3. TC Prestart Declaration',     hint: 'Per Traffic Controller' },
-        { key: 'post_shift_vehicle', path: 'post-shift-vehicle', label: '5. Post-Shift Vehicle Checklist',hint: 'At end of shift' },
-      ];
-    %>
-
-    <p class="text-[11px] text-gray-500 italic px-1 -mt-1">Company policy: all five checklists are mandatory every shift.</p>
-
-    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <div class="px-4 pt-4 pb-2">
-        <h2 class="text-xs font-bold text-brand-600 uppercase tracking-wider">Required checklists</h2>
-        <p class="text-xs text-gray-400 mt-0.5">Must be filed before docket sign</p>
-      </div>
-      <% JOB_PACK_REQUIRED.forEach(function (jp) { var done = formStatus[jp.key]; %>
-        <div class="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 <%= done ? 'bg-emerald-50' : 'bg-amber-50' %>">
-              <% if (done) { %>
-                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-              <% } else { %>
-                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-              <% } %>
-            </div>
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-gray-900 truncate"><%= jp.label %></p>
-              <% if (done) { %>
-                <p class="text-xs text-emerald-600 font-medium">Submitted <%= new Date(done.created_at).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }) %></p>
-              <% } else { %>
-                <p class="text-xs text-amber-600 font-semibold">Required &middot; <span class="font-normal text-gray-500"><%= jp.hint %></span></p>
-              <% } %>
-            </div>
-          </div>
-          <% if (!done && (isToday || isFuture)) { %>
-            <a href="/w/forms/<%= jp.path %>?allocationId=<%= allocation.id %>" class="px-3 py-2 rounded-lg bg-brand-600 text-white text-xs font-semibold active:bg-brand-700 transition shrink-0" style="min-height:36px; display:flex; align-items:center;">
-              Start
-            </a>
-          <% } else if (done) { %>
-            <span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 px-2 py-1 rounded uppercase tracking-wide">Done</span>
-          <% } %>
-        </div>
-      <% }) %>
-    </div>
-
-    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <div class="px-4 pt-4 pb-2">
-        <h2 class="text-xs font-bold text-brand-600 uppercase tracking-wider">Recommended checklists</h2>
-        <p class="text-xs text-gray-400 mt-0.5">Mandatory by company policy — you'll get a warning before docket sign if missing</p>
-      </div>
-      <% JOB_PACK_RECOMMENDED.forEach(function (jp) { var done = formStatus[jp.key]; %>
-        <div class="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 <%= done ? 'bg-emerald-50' : 'bg-gray-50' %>">
-              <% if (done) { %>
-                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-              <% } else { %>
-                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              <% } %>
-            </div>
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-gray-900 truncate"><%= jp.label %></p>
-              <% if (done) { %>
-                <p class="text-xs text-emerald-600 font-medium">Submitted <%= new Date(done.created_at).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }) %></p>
-              <% } else { %>
-                <p class="text-xs text-gray-500"><%= jp.hint %></p>
-              <% } %>
-            </div>
-          </div>
-          <% if (!done && (isToday || isFuture)) { %>
-            <a href="/w/forms/<%= jp.path %>?allocationId=<%= allocation.id %>" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-xs font-semibold active:bg-gray-200 transition shrink-0" style="min-height:36px; display:flex; align-items:center;">
-              Start
-            </a>
-          <% } else if (done) { %>
-            <span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 px-2 py-1 rounded uppercase tracking-wide">Done</span>
-          <% } %>
-        </div>
-      <% }) %>
-    </div>
+    <!-- Shared partial — keeps this 1:1 with views/worker/booking-detail.ejs
+         so a worker who tapped a checklist (which can swap their entry
+         point between job-detail and booking-detail via the lazy-alloc
+         redirect) sees the exact same UI on the way back in. -->
+    <%- include('_shift_forms', { allocation: allocation, formStatus: formStatus, docket: typeof docket !== 'undefined' ? docket : null }) %>
 
     <!-- Reporting -->
     <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
