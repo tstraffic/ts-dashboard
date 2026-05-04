@@ -865,6 +865,16 @@
     <div class="flex items-center gap-3 ml-auto">
       <span id="wizard-progress-text2" class="text-xs text-gray-400 hidden sm:inline">Step 1 of <%= totalSteps %></span>
       <a href="<%= isEdit ? '/hr/employees/' + employee.id : '/hr/employees' %>" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+      <% if (isEdit) { %>
+        <!-- Save anywhere — edit mode only. All fields are already
+             pre-filled with the saved record, so submitting from any
+             step writes whatever the user just touched without forcing
+             a click-through to the last step. -->
+        <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition inline-flex items-center gap-2" title="Save without going through every step">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          Save
+        </button>
+      <% } %>
       <button type="button" id="wizard-next" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition inline-flex items-center gap-2">
         Next
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
