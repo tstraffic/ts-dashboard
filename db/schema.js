@@ -7261,7 +7261,70 @@ function runMigrations(db) {
   }
 
   // =============================================
-  // Migration 153: Plans → Sub-Plans hierarchy. Extend `compliance` so
+  // Migration 153: Promote the Vehicle Pre-Start system template from
+  // a flat 22-row inspection list into the full hand-built form the
+  // worker actually fills in — vehicle ID, ODO, the 22 rows, photo
+  // uploads, notes, and signature — all as editable elements. After
+  // this runs, the worker portal can render Vehicle Pre-Start straight
+  // from the published revision with no hardcoded EJS structure left.
+  // =============================================
+  if (!isMigrationApplied.get(153)) {
+    try {
+      const tpl = db.prepare("SELECT id FROM checklist_templates WHERE system_key = 'vehicle_prestart'").get();
+      if (tpl) {
+        const existing = db.prepare("SELECT COUNT(*) AS c FROM checklist_template_items WHERE template_id = ? AND item_key IN ('vehicle','odo_start_km','arrow_board_photos','notes','driver_signature')").get(tpl.id).c;
+        if (existing === 0) {
+          // Push every existing inspection row down by 4 to make room
+          // for the heading + vehicle + ODO + heading at the top.
+          const allItems = db.prepare("SELECT id, item_order FROM checklist_template_items WHERE template_id = ? ORDER BY item_order ASC").all(tpl.id);
+          const bump = db.prepare("UPDATE checklist_template_items SET item_order = ? WHERE id = ?");
+          allItems.forEach((row, idx) => { bump.run(idx + 4, row.id); });
+
+          const insertItem = db.prepare(`
+            INSERT INTO checklist_template_items (template_id, item_order, section, item_key, question, response_type, required, options_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          insertItem.run(tpl.id, 0, 'Vehicle',    'vehicle_heading',     'Vehicle',                                                     'heading',      0, null);
+          insertItem.run(tpl.id, 1, 'Vehicle',    'vehicle',             'Vehicle ID',                                                  'text',         1, null);
+          insertItem.run(tpl.id, 2, 'Vehicle',    'odo_start_km',        'ODO at start of shift',                                       'measurement',  1, JSON.stringify({ unit: 'km' }));
+          insertItem.run(tpl.id, 3, 'Inspection', 'inspection_heading',  'Inspection — 22 items',                                       'heading',      0, null);
+
+          const tailStart = 4 + allItems.length;
+          insertItem.run(tpl.id, tailStart + 0, 'Photos',   'photos_heading',     'Arrow Board Photos',                                                'heading',      0, null);
+          insertItem.run(tpl.id, tailStart + 1, 'Photos',   'photos_info',        'Upload 3 photos: actuator (driver side), front-on, passenger side.', 'information', 0, JSON.stringify({ body: 'Three photos required for QA.' }));
+          insertItem.run(tpl.id, tailStart + 2, 'Photos',   'arrow_board_photos', 'Arrow board photos',                                                'media_upload', 0, null);
+          insertItem.run(tpl.id, tailStart + 3, 'Sign off', 'notes',              'Notes (optional)',                                                  'textarea',     0, null);
+          insertItem.run(tpl.id, tailStart + 4, 'Sign off', 'driver_signature',   'Driver signature',                                                  'signature',    1, null);
+
+          // Snapshot a fresh published revision with the parsed options.
+          const items = db.prepare(`SELECT * FROM checklist_template_items WHERE template_id = ? ORDER BY item_order ASC, id ASC`).all(tpl.id);
+          const itemsForSnapshot = items.map(it => {
+            let opts = null;
+            if (it.options_json) { try { opts = JSON.parse(it.options_json); } catch (e) {} }
+            return Object.assign({}, it, { options: opts });
+          });
+          const adminId = (db.prepare("SELECT id FROM users WHERE LOWER(role) IN ('admin','management') ORDER BY id ASC LIMIT 1").get() || {}).id || null;
+          const next = (db.prepare('SELECT MAX(revision_number) AS m FROM checklist_template_revisions WHERE template_id = ?').get(tpl.id).m || 0) + 1;
+          db.prepare(`
+            INSERT INTO checklist_template_revisions (template_id, revision_number, name, description, require_signature, items_json, published_by_id)
+            VALUES (?, ?, 'Vehicle Pre-Start', 'Pre-shift inspection. Vehicle, ODO, 22 OK/Not OK/N/A items, photos, sign-off.', 1, ?, ?)
+          `).run(tpl.id, next, JSON.stringify(itemsForSnapshot), adminId);
+          db.prepare(`UPDATE checklist_templates SET published_revision = ?, published_at = datetime('now'), published_by_id = ? WHERE id = ?`).run(next, adminId, tpl.id);
+          console.log(`Migration 153: Vehicle Pre-Start extended to full form (rev ${next})`);
+        } else {
+          console.log('Migration 153: Vehicle Pre-Start already extended, skipping');
+        }
+      } else {
+        console.log('Migration 153: Vehicle Pre-Start template not found (mig 151 must run first)');
+      }
+      recordMigration.run(153, 'Vehicle Pre-Start template extended to full form');
+    } catch (e) {
+      console.error('Migration 153 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 154: Plans → Sub-Plans hierarchy. Extend `compliance` so
   // a parent Plan owns N typed Sub-Plans in the same table:
   //   - parent_id: NULL on parents + legacy rows; set on sub-plans
   //   - plan_number: shared base used in sub-plan refs (Plan 3100 →
@@ -7274,7 +7337,7 @@ function runMigrations(db) {
   // Existing flat rows stay as-is (parent_id NULL + item_type set);
   // they continue to render unchanged in the list view.
   // =============================================
-  if (!isMigrationApplied.get(153)) {
+  if (!isMigrationApplied.get(154)) {
     try {
       const cols = db.prepare("PRAGMA table_info(compliance)").all().map(c => c.name);
       const add = (name, ddl) => { if (!cols.includes(name)) try { db.exec(`ALTER TABLE compliance ADD COLUMN ${ddl}`); } catch (e) {} };
@@ -7285,10 +7348,10 @@ function runMigrations(db) {
       add('extension_required',   "extension_required INTEGER NOT NULL DEFAULT 0");
       db.exec("CREATE INDEX IF NOT EXISTS idx_compliance_parent ON compliance(parent_id)");
 
-      recordMigration.run(153, 'compliance: parent_id + plan_number + description + client_request_date + extension_required');
-      console.log('Migration 153 applied: compliance Plans → Sub-Plans columns + index');
+      recordMigration.run(154, 'compliance: parent_id + plan_number + description + client_request_date + extension_required');
+      console.log('Migration 154 applied: compliance Plans → Sub-Plans columns + index');
     } catch (e) {
-      console.error('Migration 153 error:', e.message);
+      console.error('Migration 154 error:', e.message);
     }
   }
 

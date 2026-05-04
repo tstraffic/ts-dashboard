@@ -450,16 +450,30 @@ router.get('/forms/vehicle-prestart', (req, res) => {
     }
   } catch (_) { /* table may be empty */ }
 
-  // Resolve items from the latest published revision of the
-  // 'vehicle_prestart' system template. Falls back to the hardcoded
-  // array if no revision exists yet (legacy DB / pre-mig 151).
-  const sysItems = getSystemItems('vehicle_prestart', VEHICLE_PRESTART_ITEMS.map(i => ({ item_key: i.key, question: i.label, response_type: 'ok_notok_na' })));
-  const items = sysItems.map(toSimpleItem);
+  // Pull the full element list from the latest published revision.
+  // Each element carries response_type + options + item_key, so the
+  // EJS renders the form 1:1 with what the admin published in
+  // /checklists. Falls back to the hardcoded 22-row inspection list
+  // when no system revision exists yet.
+  const items = getSystemItems('vehicle_prestart', VEHICLE_PRESTART_ITEMS.map(i => ({
+    item_key: i.key, question: i.label, response_type: 'ok_notok_na', section: 'Inspection', required: 1,
+  })));
+
+  // Group by section so the rendered form reads as a structured doc
+  // (Vehicle / Inspection / Photos / Sign off etc.) just like the
+  // admin's preview on /checklists/:id.
+  const sections = [];
+  const byKey = {};
+  items.forEach(function (it) {
+    const k = it.section || '';
+    if (!byKey[k]) { byKey[k] = { name: k, items: [] }; sections.push(byKey[k]); }
+    byKey[k].items.push(it);
+  });
 
   res.render('worker/forms/vehicle-prestart', {
     title: 'Vehicle Pre-Start',
     currentPage: 'forms',
-    items,
+    items, sections,
     allocation,
     recentVehicles,
     flash_success: req.flash('success'),
@@ -468,7 +482,7 @@ router.get('/forms/vehicle-prestart', (req, res) => {
 });
 
 // POST /w/forms/vehicle-prestart — Submit
-router.post('/forms/vehicle-prestart', photoUpload.array('arrow_board_photos', 6), async (req, res) => {
+router.post('/forms/vehicle-prestart', photoUpload.array('answer_arrow_board_photos', 6), async (req, res) => {
   const db = getDb();
   const worker = req.session.worker;
   const body = req.body || {};
@@ -484,23 +498,77 @@ router.post('/forms/vehicle-prestart', photoUpload.array('arrow_board_photos', 6
     }
   }
 
-  // Collect OK/NotOK/NA answers from whatever item set was rendered —
-  // could be the hardcoded list OR an admin-published revision with
-  // extra/different keys. Read from the live items so a renamed
-  // question still saves cleanly.
+  // Walk the live element list and pull the right answer shape per
+  // response_type. Storage shape is back-compat with the legacy hand-
+  // built form: { vehicle, odo_start_km, items, notes } stays at the
+  // top level so any reports / safety_forms readers downstream still
+  // find their fields, while the full keyed answer set lives under
+  // `answers` for any custom rows the admin adds.
   const liveItems = getSystemItems('vehicle_prestart',
-    VEHICLE_PRESTART_ITEMS.map(i => ({ item_key: i.key })));
+    VEHICLE_PRESTART_ITEMS.map(i => ({ item_key: i.key, response_type: 'ok_notok_na' })));
+  const answers = {};
   const items = {};
+  let driverSignature = null;
+  let signedName = null;
   for (const it of liveItems) {
-    const v = body['item_' + it.item_key];
-    items[it.item_key] = ['ok', 'not_ok', 'na'].includes(v) ? v : 'ok';
+    const k = it.item_key;
+    const raw = body['answer_' + k];
+    switch (it.response_type) {
+      case 'heading':
+      case 'information':
+      case 'hyperlink':
+      case 'media':
+        // Display elements — nothing to capture.
+        break;
+      case 'ok_notok_na':
+        answers[k] = ['ok','not_ok','na'].includes(raw) ? raw : 'ok';
+        items[k] = answers[k]; // legacy bucket
+        break;
+      case 'yes_no_na':
+        answers[k] = ['yes','no','na'].includes(raw) ? raw : null;
+        break;
+      case 'pass_fail':
+        answers[k] = ['pass','fail'].includes(raw) ? raw : null;
+        break;
+      case 'number':
+      case 'measurement':
+        answers[k] = (raw === '' || raw == null) ? null : Number(raw);
+        break;
+      case 'multiple_choice':
+        answers[k] = raw == null ? [] : (Array.isArray(raw) ? raw : [raw]);
+        break;
+      case 'signature':
+        answers[k] = raw || null;
+        if (k === 'driver_signature') driverSignature = raw || null;
+        break;
+      case 'media_upload':
+        // photos persisted below via photoUpload — just record
+        // that this slot existed so reports can verify.
+        answers[k] = (req.files && req.files.length) ? req.files.length : 0;
+        break;
+      case 'datetime':
+        answers[k] = (raw || '').toString().trim() || null;
+        break;
+      case 'textarea':
+      case 'text':
+      default:
+        answers[k] = (raw || '').toString().trim();
+        if (k === 'signed_name') signedName = answers[k];
+        break;
+    }
   }
   const data = {
-    vehicle: (body.vehicle || '').trim(),
-    odo_start_km: body.odo_start_km ? Number(body.odo_start_km) : null,
+    vehicle: (answers.vehicle || body.vehicle || '').toString().trim(),
+    odo_start_km: answers.odo_start_km != null ? Number(answers.odo_start_km) : null,
     items,
-    notes: (body.notes || '').trim(),
+    notes: (answers.notes || body.notes || '').toString().trim(),
+    answers, // full keyed map for any new admin-added elements
   };
+
+  // Prefer the dynamic-form signature (driver_signature element) if set,
+  // otherwise fall back to a top-level signature_data field for back-compat.
+  const sigBlob = driverSignature || body.signature_data || null;
+  const printedName = signedName || (body.signed_name || '').trim() || null;
 
   const result = db.prepare(`
     INSERT INTO safety_forms (crew_member_id, form_type, job_id, allocation_id, data, signature_data, signed_name, status, submitted_at)
@@ -510,8 +578,8 @@ router.post('/forms/vehicle-prestart', photoUpload.array('arrow_board_photos', 6
     allocation ? allocation.job_id : null,
     allocation ? allocation.id : null,
     JSON.stringify(data),
-    body.signature_data || null,
-    (body.signed_name || '').trim() || null,
+    sigBlob,
+    printedName,
   );
   const safetyFormId = result.lastInsertRowid;
 
