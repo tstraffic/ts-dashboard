@@ -692,6 +692,13 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
     set('rate_travel', parseFloat(b.rate_travel) || 0);
     set('rate_meal', parseFloat(b.rate_meal) || 0);
     set('rate_weekend', parseFloat(b.rate_weekend) || 0);
+
+    // Management payroll fields — gated to admin/finance because
+    // weekly_salary is sensitive. PRAGMA-guarded so a stale deploy
+    // missing the column doesn't crash the whole save.
+    set('on_management_payroll', (b.on_management_payroll === '1' || b.on_management_payroll === 'on') ? 1 : 0);
+    set('weekly_salary', parseFloat(b.weekly_salary) || 0);
+    set('super_rate', parseFloat(b.super_rate) || 0.115);
   }
 
   sets.push('updated_at = CURRENT_TIMESTAMP');
@@ -939,6 +946,34 @@ router.post('/employees/:id/payment-type', requirePermission('hr_employees'), (r
     return res.json({ success: true, payment_type: pt });
   }
   req.flash('success', `${fullName} payment type set to ${friendly}.`);
+  return res.redirect(req.headers.referer || '/hr/roster');
+});
+
+// POST /employees/:id/management-payroll — toggle on_management_payroll.
+// Gated to admin/finance/accounts because management salaries are
+// sensitive; HR users can't see this control. Mirrors the
+// payment-type/portal-role inline-edit pattern (JSON when xhr,
+// flash + redirect otherwise).
+router.post('/employees/:id/management-payroll', requirePermission('payroll'), (req, res) => {
+  const db = getDb();
+  const employee = db.prepare('SELECT id, first_name, last_name FROM employees WHERE id = ?').get(req.params.id);
+  if (!employee) {
+    if ((req.headers.accept || '').includes('application/json')) return res.status(404).json({ error: 'Employee not found' });
+    req.flash('error', 'Employee not found.');
+    return res.redirect('/hr/roster');
+  }
+  const flag = (req.body.on_management_payroll === '1' || req.body.on_management_payroll === 1 || req.body.on_management_payroll === true || req.body.on_management_payroll === 'on') ? 1 : 0;
+  db.prepare('UPDATE employees SET on_management_payroll = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(flag, employee.id);
+  const fullName = `${employee.first_name || ''} ${employee.last_name || ''}`.trim() || ('Employee #' + employee.id);
+  logActivity({
+    user: req.session.user, action: 'update', entityType: 'employee',
+    entityId: employee.id, entityLabel: fullName,
+    details: `Management payroll ${flag ? 'enabled' : 'disabled'}`, ip: req.ip,
+  });
+  if (req.xhr || (req.headers.accept || '').includes('application/json')) {
+    return res.json({ success: true, on_management_payroll: flag });
+  }
+  req.flash('success', `${fullName} management payroll ${flag ? 'enabled' : 'disabled'}.`);
   return res.redirect(req.headers.referer || '/hr/roster');
 });
 

@@ -837,6 +837,29 @@
         </div>
       </div>
     </div>
+
+    <!-- Management Payroll (Admin / Finance only) -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mt-4">
+      <h3 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-1">Management Payroll</h3>
+      <p class="text-xs text-gray-400 mb-4">Tick to add this employee to the Management pay run roster. Salary fields drive the auto-seeded line on each new run.</p>
+      <label class="inline-flex items-center gap-2 mb-4 cursor-pointer">
+        <input type="checkbox" name="on_management_payroll" value="1" <%= val('on_management_payroll') == 1 ? 'checked' : '' %>
+          class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+        <span class="text-sm font-semibold text-gray-700">On management payroll</span>
+      </label>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Weekly Salary ($)</label>
+          <input type="number" step="0.01" min="0" name="weekly_salary" value="<%= val('weekly_salary') || 0 %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Super Rate <span class="font-normal normal-case text-gray-300">(0.115 = 11.5%)</span></label>
+          <input type="number" step="0.001" min="0" max="1" name="super_rate" value="<%= val('super_rate') || 0.115 %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        </div>
+      </div>
+    </div>
     <% } %>
   </div>
 

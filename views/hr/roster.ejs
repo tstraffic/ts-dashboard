@@ -238,6 +238,22 @@
                       <option value="abn"  <%= ptVal === 'abn'  ? 'selected' : '' %>>ABN</option>
                     </select>
                   </form>
+                  <%
+                    // Management payroll pill — only visible to admin/finance/accounts.
+                    var mgmtOn = emp.on_management_payroll == 1;
+                    var mgmtCls = mgmtOn ? 'bg-violet-50 text-violet-700 ring-violet-600/20' : 'bg-gray-50 text-gray-400 ring-gray-300/40';
+                  %>
+                  <% if (typeof canAccess === 'function' && canAccess(user, 'payroll')) { %>
+                    <form method="POST" action="/hr/employees/<%= emp.id %>/management-payroll" class="inline">
+                      <%- include('../partials/csrf') %>
+                      <select name="on_management_payroll" data-inline-pill="on_management_payroll" title="Management payroll"
+                        class="text-[9px] font-bold uppercase tracking-wide ring-1 rounded cursor-pointer <%= mgmtCls %>"
+                        style="appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%228%22 height=%228%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22 viewBox=%220 0 24 24%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 4px center;padding:2px 14px 2px 6px;">
+                        <option value="0" <%= mgmtOn ? '' : 'selected' %>>MGMT —</option>
+                        <option value="1" <%= mgmtOn ? 'selected' : '' %>>MGMT ON</option>
+                      </select>
+                    </form>
+                  <% } %>
                 </div>
               </td>
               <td class="px-3 sm:px-4 py-3 text-gray-500 text-xs hidden sm:table-cell">
@@ -444,6 +460,10 @@ document.addEventListener('DOMContentLoaded', function() {
       traffic_controller: 'bg-gray-100 text-gray-600 ring-gray-600/15',
       team_leader:        'bg-amber-50 text-amber-700 ring-amber-600/20',
       supervisor:         'bg-violet-50 text-violet-700 ring-violet-600/20',
+    },
+    on_management_payroll: {
+      '0': 'bg-gray-50 text-gray-400 ring-gray-300/40',
+      '1': 'bg-violet-50 text-violet-700 ring-violet-600/20',
     },
   };
   function swapColors(sel) {

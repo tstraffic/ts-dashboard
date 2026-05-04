@@ -57,6 +57,13 @@ const PERMISSIONS = {
   checklists:    ['admin', 'operations', 'planning'],
 
   // ── Finance / Admin ──
+  // `finance` is the section gate — controls whether the Finance heading
+  // even shows in the sidebar. Individual links inside have their own
+  // gates so a user with only Timesheets access still sees the section
+  // (they just see one item in it).
+  finance:       ['admin', 'finance', 'accounts'],
+  payroll:       ['admin', 'finance', 'accounts'],   // pay runs list + management runs
+  payslips:      ['admin', 'finance', 'accounts'],   // payslips list (alias for clarity)
   budgets:       ['admin', 'finance'],
   crm:           ['admin'],
   admin:         ['admin'],
