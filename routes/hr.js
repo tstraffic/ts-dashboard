@@ -910,6 +910,35 @@ router.post('/employees/:id/toggle-manager', requirePermission('hr_employees'), 
   res.redirect(`/hr/employees/${employee.id}#workforce`);
 });
 
+// POST /employees/:id/payment-type — inline change to TFN / ABN / Cash
+// from the roster + employees lists. Mirrors the portal_role pattern
+// below so the office can flip an employee's pay arrangement without
+// drilling into the detail page.
+router.post('/employees/:id/payment-type', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const employee = db.prepare('SELECT id, first_name, last_name, payment_type FROM employees WHERE id = ?').get(req.params.id);
+  if (!employee) {
+    req.flash('error', 'Employee not found.');
+    return res.redirect('/hr/roster');
+  }
+  const pt = (req.body.payment_type || '').toLowerCase();
+  const allowed = ['', 'cash', 'tfn', 'abn'];
+  if (!allowed.includes(pt)) {
+    req.flash('error', 'Invalid payment type.');
+    return res.redirect(req.headers.referer || '/hr/roster');
+  }
+  db.prepare('UPDATE employees SET payment_type = ? WHERE id = ?').run(pt, employee.id);
+  const fullName = `${employee.first_name || ''} ${employee.last_name || ''}`.trim() || ('Employee #' + employee.id);
+  const friendly = pt ? pt.toUpperCase() : 'cleared';
+  logActivity({
+    user: req.session.user, action: 'update', entityType: 'employee',
+    entityId: employee.id, entityLabel: fullName,
+    details: `Payment type set to ${friendly}`, ip: req.ip,
+  });
+  req.flash('success', `${fullName} payment type set to ${friendly}.`);
+  return res.redirect(req.headers.referer || '/hr/roster');
+});
+
 // POST /employees/:id/portal-role — Set the worker's portal_role tier.
 // Hierarchy: traffic_controller (default) ⊂ team_leader ⊂ supervisor.
 router.post('/employees/:id/portal-role', requirePermission('hr_employees'), (req, res) => {

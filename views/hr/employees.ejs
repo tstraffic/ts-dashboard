@@ -166,10 +166,24 @@
               <td class="px-3 sm:px-4 py-3">
                 <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %><% if (emp.middle_name) { %> <%= emp.middle_name %><% } %> <%= emp.last_name %></a>
                 <div class="flex items-center gap-1.5 mt-0.5">
-                  <% if (emp.payment_type) { %>
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase
-                      <%= emp.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600' : emp.payment_type === 'tfn' ? 'bg-blue-50 text-blue-600' : emp.payment_type === 'abn' ? 'bg-purple-50 text-purple-600' : 'bg-gray-50 text-gray-500' %>"><%= emp.payment_type %></span>
-                  <% } %>
+                  <%
+                    var ptVal2 = emp.payment_type || '';
+                    var ptCls2 = ptVal2 === 'cash' ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+                               : ptVal2 === 'tfn'  ? 'bg-blue-50 text-blue-700 ring-blue-600/20'
+                               : ptVal2 === 'abn'  ? 'bg-purple-50 text-purple-700 ring-purple-600/20'
+                               : 'bg-gray-50 text-gray-400 ring-gray-300/40';
+                  %>
+                  <form method="POST" action="/hr/employees/<%= emp.id %>/payment-type" class="inline">
+                    <%- include('../partials/csrf') %>
+                    <select name="payment_type" onchange="this.form.submit()" title="Payment type"
+                      class="text-[9px] font-bold uppercase tracking-wide ring-1 rounded cursor-pointer <%= ptCls2 %>"
+                      style="appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%228%22 height=%228%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22 viewBox=%220 0 24 24%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 4px center;padding:2px 14px 2px 6px;">
+                      <option value=""    <%= ptVal2 === ''    ? 'selected' : '' %>>—</option>
+                      <option value="cash" <%= ptVal2 === 'cash' ? 'selected' : '' %>>CASH</option>
+                      <option value="tfn"  <%= ptVal2 === 'tfn'  ? 'selected' : '' %>>TFN</option>
+                      <option value="abn"  <%= ptVal2 === 'abn'  ? 'selected' : '' %>>ABN</option>
+                    </select>
+                  </form>
                   <span class="sm:hidden text-[10px] text-gray-400"><%= emp.company || '' %><% if (emp.role_title) { %> &middot; <%= emp.role_title %><% } %></span>
                 </div>
               </td>
