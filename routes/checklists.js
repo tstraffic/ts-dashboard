@@ -186,6 +186,64 @@ router.post('/:id/items/:itemId', (req, res) => {
   res.redirect(`/checklists/${req.params.id}`);
 });
 
+// POST /:id/items/bulk — Apply a single change (response_type / required /
+// section) to a set of items in one transaction. Lets admin retype a
+// pile of questions (e.g. flip 22 vehicle inspection rows from
+// yes_no_na to ok_notok_na) without touching each one.
+router.post('/:id/items/bulk', (req, res) => {
+  const db = getDb();
+  let ids = req.body.ids;
+  if (!Array.isArray(ids)) ids = ids ? [ids] : [];
+  ids = ids.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+  if (ids.length === 0) {
+    req.flash('error', 'Pick at least one question.');
+    return res.redirect(`/checklists/${req.params.id}`);
+  }
+
+  const validTypes = ['yes_no_na', 'ok_notok_na', 'pass_fail', 'text', 'number', 'signature', 'checkbox', 'radio', 'textarea'];
+  const newType = req.body.response_type && validTypes.includes(req.body.response_type) ? req.body.response_type : null;
+  const newReq  = req.body.required === '1' ? 1 : req.body.required === '0' ? 0 : null;
+  const newSec  = (req.body.section || '').trim();
+  const setSec  = newSec.length > 0;
+
+  if (!newType && newReq === null && !setSec) {
+    req.flash('error', 'Pick at least one field to change.');
+    return res.redirect(`/checklists/${req.params.id}`);
+  }
+
+  const setParts = [];
+  const setVals  = [];
+  if (newType)         { setParts.push('response_type = ?'); setVals.push(newType); }
+  if (newReq !== null) { setParts.push('required = ?');      setVals.push(newReq); }
+  if (setSec)          { setParts.push('section = ?');       setVals.push(newSec); }
+
+  // One UPDATE per id keeps the WHERE bound + parameterised cleanly.
+  const upd = db.prepare(`
+    UPDATE checklist_template_items
+    SET ${setParts.join(', ')}
+    WHERE id = ? AND template_id = ?
+  `);
+  let n = 0;
+  const tx = db.transaction(() => {
+    for (const id of ids) {
+      const r = upd.run(...setVals, id, req.params.id);
+      if (r.changes > 0) n++;
+    }
+  });
+  tx();
+
+  if (n > 0) {
+    db.prepare('UPDATE checklist_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.id);
+    const bits = [];
+    if (newType)         bits.push(`type → ${newType}`);
+    if (newReq !== null) bits.push(`required → ${newReq ? 'yes' : 'no'}`);
+    if (setSec)          bits.push(`section → ${newSec}`);
+    logActivity({ user: req.session.user, action: 'update', entityType: 'checklist_template_items', entityId: req.params.id, details: `Bulk update ${n} items: ${bits.join('; ')}`, ip: req.ip });
+  }
+  req.flash('success', `Updated ${n} question${n === 1 ? '' : 's'}.`);
+  res.redirect(`/checklists/${req.params.id}`);
+});
+
 // POST /:id/items/:itemId/delete — Remove item
 router.post('/:id/items/:itemId/delete', (req, res) => {
   const db = getDb();

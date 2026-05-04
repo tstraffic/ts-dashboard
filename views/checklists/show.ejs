@@ -146,10 +146,56 @@
 
   <!-- Questions List -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Questions</h2>
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
+      <div class="flex items-center gap-3">
+        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Questions</h2>
+        <% if (items.length > 0) { %>
+          <label class="inline-flex items-center gap-1.5 text-[11px] text-gray-500 font-medium cursor-pointer">
+            <input type="checkbox" id="bulk-select-all" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+            Select all
+          </label>
+        <% } %>
+      </div>
       <button type="button" onclick="document.getElementById('addItemForm').classList.toggle('hidden')" class="text-xs font-medium text-brand-600 hover:text-brand-700">+ Add Question</button>
     </div>
+
+    <!-- Bulk-edit toolbar — appears as soon as one row is checked. Lets
+         the admin re-type a batch of questions in one shot (e.g. flip
+         all 22 vehicle inspection rows from yes_no_na to ok_notok_na). -->
+    <% if (items.length > 0) { %>
+      <form id="bulk-edit-form" method="POST" action="/checklists/<%= template.id %>/items/bulk" class="hidden px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-center gap-3 flex-wrap">
+        <%- include('../partials/csrf') %>
+        <span class="text-xs font-semibold text-amber-800"><span id="bulk-count">0</span> selected</span>
+        <div class="flex items-center gap-2">
+          <label class="text-[10px] font-bold text-amber-800 uppercase tracking-widest">Set type</label>
+          <select name="response_type" class="px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="">— keep —</option>
+            <option value="ok_notok_na">OK / Not OK / N/A</option>
+            <option value="yes_no_na">Yes / No / N/A</option>
+            <option value="pass_fail">Pass / Fail</option>
+            <option value="text">Text</option>
+            <option value="textarea">Long text</option>
+            <option value="number">Number</option>
+            <option value="signature">Signature</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-[10px] font-bold text-amber-800 uppercase tracking-widest">Required</label>
+          <select name="required" class="px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="">— keep —</option>
+            <option value="1">Yes</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-[10px] font-bold text-amber-800 uppercase tracking-widest">Section</label>
+          <input type="text" name="section" placeholder="— keep —"
+            class="px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-gray-900 text-xs w-32 focus:outline-none focus:ring-2 focus:ring-amber-500">
+        </div>
+        <button type="submit" class="ml-auto px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition">Apply to selected</button>
+        <button type="button" id="bulk-clear" class="px-2 py-1 text-xs text-amber-700 hover:text-amber-900">Clear</button>
+      </form>
+    <% } %>
 
     <% if (items.length > 0) { %>
       <div id="itemsList">
@@ -162,6 +208,7 @@
           <% } %>
           <div class="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition" data-item-id="<%= item.id %>">
             <div class="flex items-start gap-3">
+              <input type="checkbox" class="bulk-row-check mt-1 rounded border-gray-300 text-brand-600 focus:ring-brand-500 flex-shrink-0" data-item-id="<%= item.id %>">
               <span class="text-gray-300 text-sm font-mono mt-0.5 w-6 text-center flex-shrink-0"><%= idx + 1 %></span>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
@@ -312,4 +359,65 @@ function editItem(itemId) {
   var qText = row.querySelector('.text-gray-900.font-medium');
   if (qText) form.querySelector('input[name="question"]').value = qText.textContent.trim();
 }
+
+// ── Bulk-edit toolbar wiring ──
+(function () {
+  var bulkForm = document.getElementById('bulk-edit-form');
+  var countEl  = document.getElementById('bulk-count');
+  var selectAll = document.getElementById('bulk-select-all');
+  var clearBtn  = document.getElementById('bulk-clear');
+  if (!bulkForm) return;
+
+  function selectedIds() {
+    return Array.from(document.querySelectorAll('.bulk-row-check:checked')).map(function (c) { return c.dataset.itemId; });
+  }
+  function refresh() {
+    var ids = selectedIds();
+    countEl.textContent = ids.length;
+    bulkForm.classList.toggle('hidden', ids.length === 0);
+    // Keep the master checkbox tri-state-ish — checked when every row is.
+    if (selectAll) {
+      var rows = document.querySelectorAll('.bulk-row-check');
+      selectAll.checked = ids.length > 0 && ids.length === rows.length;
+    }
+    // Sync hidden ids[] inputs into the form so submit picks them up.
+    bulkForm.querySelectorAll('input[name="ids[]"]').forEach(function (n) { n.remove(); });
+    ids.forEach(function (id) {
+      var inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = 'ids[]'; inp.value = id;
+      bulkForm.appendChild(inp);
+    });
+  }
+
+  document.querySelectorAll('.bulk-row-check').forEach(function (c) {
+    c.addEventListener('change', refresh);
+  });
+
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      var on = selectAll.checked;
+      document.querySelectorAll('.bulk-row-check').forEach(function (c) { c.checked = on; });
+      refresh();
+    });
+  }
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      document.querySelectorAll('.bulk-row-check').forEach(function (c) { c.checked = false; });
+      if (selectAll) selectAll.checked = false;
+      refresh();
+    });
+  }
+
+  bulkForm.addEventListener('submit', function (e) {
+    if (selectedIds().length === 0) { e.preventDefault(); return; }
+    // Require at least one of the change fields to be set.
+    var rType = bulkForm.querySelector('select[name="response_type"]').value;
+    var rReq  = bulkForm.querySelector('select[name="required"]').value;
+    var rSec  = bulkForm.querySelector('input[name="section"]').value.trim();
+    if (!rType && !rReq && !rSec) {
+      e.preventDefault();
+      alert('Pick at least one field to change (type, required, or section).');
+    }
+  });
+})();
 </script>
