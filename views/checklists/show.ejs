@@ -561,27 +561,52 @@ window._editItemViaPicker = function (itemId) {
     }).catch(function () {});
   }
 
-  // Edge auto-scroll while a drag is in flight — when the cursor sits
-  // within 80px of the top or bottom of the viewport, scroll the page
-  // so the user can keep dragging past the visible area instead of
-  // getting stuck. Activated on dragstart, torn down on dragend.
-  var scrollY = 0;          // latest pointer Y (viewport coords)
+  // Edge auto-scroll while a drag is in flight. Have to scroll the
+  // nearest *scrollable ancestor* of the items list, not window —
+  // the admin layout wraps content in <main class="overflow-auto">
+  // so the page itself doesn't scroll, that container does. Find it
+  // once on dragstart by walking up from the list looking for an
+  // element whose computed overflow-y is auto/scroll AND whose
+  // scrollHeight exceeds clientHeight.
+  var scrollY = 0;        // latest pointer Y (viewport coords)
   var scrollRaf = null;
+  var scrollEl = null;    // resolved scroll container
+  function findScrollContainer(el) {
+    var node = el;
+    while (node && node !== document.body && node !== document.documentElement) {
+      var s = window.getComputedStyle(node);
+      if (/(auto|scroll)/.test(s.overflowY) && node.scrollHeight > node.clientHeight) return node;
+      node = node.parentElement;
+    }
+    // Fall back to whichever of <body>/<html> is actually the scrolling element.
+    return document.scrollingElement || document.documentElement;
+  }
   function startEdgeScroll() {
     if (scrollRaf) return;
-    var EDGE = 80, MAX_PX = 18;
+    scrollEl = findScrollContainer(list);
+    var EDGE = 90, MAX_PX = 22;
     function tick() {
-      var h = window.innerHeight;
+      var rect = (scrollEl === document.scrollingElement || scrollEl === document.documentElement)
+        ? { top: 0, bottom: window.innerHeight }
+        : scrollEl.getBoundingClientRect();
+      var top = rect.top, bottom = rect.bottom;
       var dy = 0;
-      if (scrollY < EDGE)         dy = -((EDGE - scrollY) / EDGE) * MAX_PX;
-      else if (scrollY > h - EDGE) dy =  ((scrollY - (h - EDGE)) / EDGE) * MAX_PX;
-      if (dy !== 0) window.scrollBy(0, dy);
+      if (scrollY < top + EDGE)         dy = -((top + EDGE - scrollY) / EDGE) * MAX_PX;
+      else if (scrollY > bottom - EDGE) dy =  ((scrollY - (bottom - EDGE)) / EDGE) * MAX_PX;
+      if (dy !== 0) {
+        if (scrollEl === document.scrollingElement || scrollEl === document.documentElement) {
+          window.scrollBy(0, dy);
+        } else {
+          scrollEl.scrollTop += dy;
+        }
+      }
       scrollRaf = requestAnimationFrame(tick);
     }
     scrollRaf = requestAnimationFrame(tick);
   }
   function stopEdgeScroll() {
     if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
+    scrollEl = null;
   }
   // Capture the latest pointer Y from any dragover bubbling up.
   document.addEventListener('dragover', function (e) {
