@@ -193,6 +193,9 @@ router.get('/hr/leave', (req, res) => {
   // Also load ALL recent leave for history list
   const recentLeave = db.prepare('SELECT * FROM employee_leave WHERE crew_member_id = ? ORDER BY start_date DESC LIMIT 30').all(worker.id);
 
+  // Flashes are already exposed via res.locals by workerLocals — DON'T
+  // pass them again here, that would consume req.flash() a second time
+  // and the empty arrays would override the populated res.locals values.
   res.render('worker/hr-leave', {
     title: 'Leave',
     currentPage: 'leave',
@@ -204,11 +207,6 @@ router.get('/hr/leave', (req, res) => {
     currentM: `${year}-${pad(month + 1)}`,
     todayIso: sydneyToday(),
     recentLeave,
-    // Surface flashes from the submit redirect — without these the layout
-    // would silently swallow success/error toasts and the worker would
-    // think their submission disappeared into the void.
-    flash_success: req.flash('success'),
-    flash_error: req.flash('error'),
   });
 });
 
@@ -219,6 +217,20 @@ router.post('/hr/leave', (req, res) => {
   const leaveType = req.body.leave_type || 'annual';
   const shiftPeriod = ['day','night','full_day'].includes(req.body.shift_period) ? req.body.shift_period : 'full_day';
   const reason = req.body.reason || null;
+
+  // Loud trace on every leave submission — if the worker says the form
+  // didn't go through we want a server log to confirm whether the
+  // handler actually ran.
+  console.log('[leave] POST received', {
+    worker_id: worker && worker.id,
+    worker_name: worker && worker.full_name,
+    body_mode: req.body.mode,
+    body_dates: req.body.dates,
+    body_recur_start: req.body.recur_start,
+    body_recur_until: req.body.recur_until,
+    body_leave_type: req.body.leave_type,
+    body_shift_period: req.body.shift_period,
+  });
 
   const dates = expandLeaveDates(req.body);
   if (dates.length === 0) {
