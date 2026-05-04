@@ -186,6 +186,7 @@ router.get('/roster', requirePermission('hr_employees'), (req, res) => {
   const employees = db.prepare(`
     SELECT e.*, m.full_name as manager_name,
       cm.employee_id as worker_id, cm.pin_plain as worker_pin,
+      cm.portal_role as portal_role,
       CASE WHEN cm.pin_hash IS NOT NULL THEN 1 ELSE 0 END as has_pin,
       (SELECT MIN(ec.expiry_date) FROM employee_competencies ec WHERE ec.employee_id = e.id AND ec.expiry_date IS NOT NULL AND ec.expiry_date >= DATE('now')) as next_expiry
     FROM employees e
@@ -935,6 +936,12 @@ router.post('/employees/:id/portal-role', requirePermission('hr_employees'), (re
     details: `Portal role set to ${friendly}`, ip: req.ip,
   });
   req.flash('success', `${crewMember.full_name} is now ${friendly}.`);
+  // Bounce back to wherever the form was submitted from — roster page,
+  // dashboard, or the employee detail itself — instead of always
+  // dragging the user out of the list view.
+  const ref = req.get('referrer') || '';
+  if (ref.includes('/hr/roster')) return res.redirect('/hr/roster');
+  if (ref.includes('/hr') && !ref.includes('/employees/')) return res.redirect(ref);
   res.redirect(`/hr/employees/${employee.id}#workforce`);
 });
 
