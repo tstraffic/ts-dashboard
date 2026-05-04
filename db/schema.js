@@ -7323,6 +7323,58 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 154: Plans → Sub-Plans hierarchy. Extend `compliance` so
+  // a parent Plan owns N typed Sub-Plans in the same table:
+  //   - parent_id: NULL on parents + legacy rows; set on sub-plans
+  //   - plan_number: shared base used in sub-plan refs (Plan 3100 →
+  //     TSTGS3100-1, TSROL3100-1, …). Set on parents only.
+  //   - description: free-text suffix shown next to sub-plan ref
+  //     ("Northbound 2 lanes")
+  //   - client_request_date: replaces the multi-date cluster on the
+  //     parent (single date on create)
+  //   - extension_required: ROL-specific flag, sub-plan-level
+  // Existing flat rows stay as-is (parent_id NULL + item_type set);
+  // they continue to render unchanged in the list view.
+  // =============================================
+  if (!isMigrationApplied.get(154)) {
+    try {
+      const cols = db.prepare("PRAGMA table_info(compliance)").all().map(c => c.name);
+      const add = (name, ddl) => { if (!cols.includes(name)) try { db.exec(`ALTER TABLE compliance ADD COLUMN ${ddl}`); } catch (e) {} };
+      add('parent_id',            "parent_id INTEGER");
+      add('plan_number',          "plan_number INTEGER");
+      add('description',          "description TEXT DEFAULT ''");
+      add('client_request_date',  "client_request_date DATE");
+      add('extension_required',   "extension_required INTEGER NOT NULL DEFAULT 0");
+      db.exec("CREATE INDEX IF NOT EXISTS idx_compliance_parent ON compliance(parent_id)");
+
+      recordMigration.run(154, 'compliance: parent_id + plan_number + description + client_request_date + extension_required');
+      console.log('Migration 154 applied: compliance Plans → Sub-Plans columns + index');
+    } catch (e) {
+      console.error('Migration 154 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 155: hours_spent column on compliance — captured per
+  // sub-plan at upload-and-submit time so each Sub-Plan records the
+  // hours of effort that went into it. Cost / fee fields already exist
+  // (costs, charge_client, charge_amount, council_fee_paid,
+  // council_fee_amount); this just adds the time dimension.
+  // =============================================
+  if (!isMigrationApplied.get(155)) {
+    try {
+      const cols = db.prepare("PRAGMA table_info(compliance)").all().map(c => c.name);
+      if (!cols.includes('hours_spent')) {
+        try { db.exec("ALTER TABLE compliance ADD COLUMN hours_spent NUMERIC NOT NULL DEFAULT 0"); } catch (e) {}
+      }
+      recordMigration.run(155, 'compliance: hours_spent column for sub-plan effort tracking');
+      console.log('Migration 155 applied: compliance.hours_spent column');
+    } catch (e) {
+      console.error('Migration 155 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

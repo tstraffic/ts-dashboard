@@ -28,6 +28,10 @@
   ];
 %>
 
+<% if (typeof isParent !== 'undefined' && isParent) { %>
+  <%- include('./_parent_form') %>
+<% } else { %>
+
 <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <!-- Header -->
   <div class="mb-6">
@@ -1120,3 +1124,5 @@ function addRevision() {
   <% } %>
 }
 </script>
+
+<% } %>

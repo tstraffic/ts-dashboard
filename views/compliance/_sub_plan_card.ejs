@@ -1,0 +1,167 @@
+<%
+  const isROL = sub.item_type === 'rol' || sub.item_type === 'road_occupancy';
+  const isSubmitted = ['submitted', 'approved'].includes(sub.status);
+  const isApproved = sub.status === 'approved';
+  const isRejected = sub.status === 'rejected';
+  const docCount = (docs || []).length;
+%>
+
+<div id="sub-<%= sub.id %>" class="border border-gray-200 rounded-lg p-4 <%= isApproved ? 'bg-emerald-50/30' : isRejected ? 'bg-rose-50/30' : 'bg-white' %>">
+  <div class="flex items-start justify-between gap-3 mb-3">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 flex-wrap">
+        <code class="text-sm font-semibold text-gray-900"><%= sub.reference_number %></code>
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset <%= statusBadge[sub.status] || statusBadge.not_started %>">
+          <%= (sub.status || 'not_started').replace(/_/g, ' ') %>
+        </span>
+        <% if (sub.expiry_date) { %>
+          <span class="text-xs text-gray-500">expires <%= sub.expiry_date %></span>
+        <% } %>
+        <% if (isROL && sub.extension_required) { %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200">extension required</span>
+        <% } %>
+      </div>
+      <!-- Inline description (auto-saves on blur) -->
+      <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/description" class="mt-2">
+        <%- include('../partials/csrf') %>
+        <input type="text" name="description" value="<%= sub.description || '' %>"
+          placeholder="Description (e.g. Northbound 2 lanes)"
+          onblur="if (this.value !== this.defaultValue) this.form.submit()"
+          class="w-full px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+      </form>
+      <% if (isROL) { %>
+        <!-- ROL extension flag: always togglable, including post-approval -->
+        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extension" class="mt-2" id="ext-<%= sub.id %>">
+          <%- include('../partials/csrf') %>
+          <input type="hidden" name="extension_required" value="<%= sub.extension_required ? '0' : '1' %>">
+          <label class="inline-flex items-center text-xs text-gray-700 cursor-pointer">
+            <input type="checkbox" <%= sub.extension_required ? 'checked' : '' %>
+              onchange="document.getElementById('ext-<%= sub.id %>').submit()"
+              class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 mr-2">
+            ROL extension required
+          </label>
+        </form>
+      <% } %>
+    </div>
+    <div class="shrink-0 flex items-center gap-1">
+      <% if (isSubmitted && !isApproved) { %>
+        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/approve" class="inline">
+          <%- include('../partials/csrf') %>
+          <button type="submit" class="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 ring-1 ring-emerald-200 rounded-md">Approve</button>
+        </form>
+      <% } %>
+      <% if (!isApproved && !isRejected) { %>
+        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/reject" class="inline">
+          <%- include('../partials/csrf') %>
+          <button type="submit" class="px-2.5 py-1 text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 ring-1 ring-rose-200 rounded-md">Reject</button>
+        </form>
+      <% } %>
+      <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/delete" class="inline" onsubmit="return confirm('Remove this sub-plan and its files?')">
+        <%- include('../partials/csrf') %>
+        <button type="submit" title="Remove" class="p-1.5 text-gray-400 hover:text-rose-600 rounded-md">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 3h6a1 1 0 011 1v3H8V4a1 1 0 011-1z"/></svg>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Documents -->
+  <% if (docCount > 0) { %>
+    <div class="mb-3 space-y-1">
+      <% docs.forEach(d => { %>
+        <div class="flex items-center justify-between gap-2 px-2 py-1.5 bg-gray-50 rounded text-xs">
+          <a href="<%= d.file_path %>" target="_blank" class="flex-1 truncate text-brand-600 hover:text-brand-700">
+            <%= d.original_name %>
+          </a>
+          <span class="text-gray-400 shrink-0"><%= Math.round((d.file_size || 0) / 1024) %> KB</span>
+          <form method="POST" action="/compliance/<%= sub.id %>/documents/<%= d.id %>/delete" class="inline shrink-0" onsubmit="return confirm('Delete this file?')">
+            <%- include('../partials/csrf') %>
+            <input type="hidden" name="return_to" value="/compliance/<%= parentId %>/edit">
+            <button type="submit" class="text-gray-400 hover:text-rose-600 p-0.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </form>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <!-- Upload + submit (combined) -->
+  <% if (!isApproved && !isRejected) { %>
+    <details class="group">
+      <summary class="cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center list-none">
+        <svg class="w-3.5 h-3.5 mr-1 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        <%= docCount > 0 ? 'Add more files / re-submit' : 'Upload & submit' %>
+      </summary>
+      <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/upload-submit" enctype="multipart/form-data" class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-md">
+        <%- include('../partials/csrf') %>
+        <input type="hidden" name="description" value="<%= sub.description || '' %>">
+
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Files <span class="text-rose-500">*</span></label>
+          <input type="file" name="documents" multiple required
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.dwg,.dxf"
+            class="w-full text-xs text-gray-700 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+          <p class="mt-1 text-[11px] text-gray-500">PDF, Word, Excel, images, DWG/DXF — max 25MB / 10 files</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Submission date</label>
+          <input type="date" name="submitted_date" value="<%= sub.submitted_date || '' %>"
+            class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Expiry date</label>
+          <input type="date" name="expiry_date" value="<%= sub.expiry_date || '' %>"
+            class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Comments</label>
+          <textarea name="notes" rows="2"
+            class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"><%= sub.notes || '' %></textarea>
+        </div>
+
+        <!-- Effort + cost capture, all part of the same submission action. -->
+        <div class="sm:col-span-2 pt-3 border-t border-gray-200">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Hours spent</label>
+          <input type="number" name="hours_spent" min="0" step="0.25" value="<%= sub.hours_spent || '' %>"
+            placeholder="0"
+            class="w-32 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="inline-flex items-center text-xs font-medium text-gray-700 cursor-pointer mb-1">
+            <input type="checkbox" name="charge_client" value="1" <%= sub.charge_client ? 'checked' : '' %>
+              class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 mr-2 charge-toggle"
+              data-target="charge_amount_<%= sub.id %>">
+            Charge client
+          </label>
+          <input type="number" name="charge_amount" id="charge_amount_<%= sub.id %>" min="0" step="0.01" value="<%= sub.charge_amount || '' %>"
+            placeholder="Amount ($)"
+            <%= sub.charge_client ? '' : 'disabled' %>
+            class="ml-6 w-40 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="inline-flex items-center text-xs font-medium text-gray-700 cursor-pointer mb-1">
+            <input type="checkbox" name="council_fee_paid" value="1" <%= sub.council_fee_paid ? 'checked' : '' %>
+              class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 mr-2 charge-toggle"
+              data-target="council_fee_amount_<%= sub.id %>">
+            Council cost / fee
+          </label>
+          <input type="number" name="council_fee_amount" id="council_fee_amount_<%= sub.id %>" min="0" step="0.01" value="<%= sub.council_fee_amount || '' %>"
+            placeholder="Amount ($)"
+            <%= sub.council_fee_paid ? '' : 'disabled' %>
+            class="ml-6 w-40 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
+        </div>
+
+        <div class="sm:col-span-2 flex items-center justify-end">
+          <button type="submit" class="px-3 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-md">
+            Upload & Submit
+          </button>
+        </div>
+      </form>
+    </details>
+  <% } %>
+</div>
