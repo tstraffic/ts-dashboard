@@ -52,7 +52,7 @@
   </div>
 
   <!-- Parent fields form -->
-  <form method="POST" action="<%= formAction %>" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
+  <form method="POST" action="<%= formAction %>" id="planForm" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
     <%- include('../partials/csrf') %>
     <input type="hidden" name="return_to" value="<%= cancelHref %>">
     <% if (!isEdit) { %><input type="hidden" name="is_parent" value="1"><% } %>
@@ -93,6 +93,17 @@
       </div>
 
       <div>
+        <label for="pm_id" class="block text-sm font-medium text-gray-700 mb-1.5">Project PM</label>
+        <select id="pm_id" name="pm_id"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <option value="">— Unassigned —</option>
+          <% users.forEach(u => { %>
+            <option value="<%= u.id %>" <%= (isEdit && item.assigned_to_id == u.id) ? 'selected' : '' %>><%= u.full_name %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
         <label for="client_request_date" class="block text-sm font-medium text-gray-700 mb-1.5">Client Request Date</label>
         <input type="date" id="client_request_date" name="client_request_date"
           value="<%= isEdit ? (item.client_request_date || '') : '' %>"
@@ -107,45 +118,65 @@
     </div>
 
     <% if (!isEdit) { %>
-      <!-- Type & quantity grid (create only). Tick a type, set how many. -->
+      <!-- Type & quantity grid (create only). Tick a type, set how many,
+           and pick an owner — each sub-plan of that type lands assigned
+           to the chosen user. -->
       <div class="mt-6 pt-6 border-t border-gray-200">
         <h2 class="text-sm font-semibold text-gray-900 mb-1">Sub-plans to generate</h2>
-        <p class="text-sm text-gray-500 mb-4">Tick each type you need, then enter how many. Each one becomes its own slot with a system reference (e.g. <code class="px-1.5 py-0.5 bg-gray-100 rounded">TSTGS3100-1</code>) you can name and upload to.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <p class="text-sm text-gray-500 mb-4">Tick each type you need, set how many, and pick an owner for that type. Each one becomes its own slot with a system reference (e.g. <code class="px-1.5 py-0.5 bg-gray-100 rounded">TSTGS3100-1</code>) you can name and upload to.</p>
+        <div class="space-y-2.5">
           <% subPlanTypes.forEach(t => { %>
-            <label class="flex items-center justify-between gap-3 px-4 py-3 border border-gray-200 rounded-lg hover:border-brand-300 hover:bg-brand-50/40 cursor-pointer has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50">
+            <label class="grid grid-cols-[1fr_auto_minmax(0,200px)] items-center gap-3 px-4 py-3 border border-gray-200 rounded-lg hover:border-brand-300 hover:bg-brand-50/40 cursor-pointer has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50">
               <span class="flex items-center gap-2.5 text-sm text-gray-800">
                 <input type="checkbox" class="type-toggle w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" data-type="<%= t %>">
                 <%= TYPE_LABELS[t] || t %>
               </span>
               <input type="number" name="count_<%= t %>" min="1" max="20" value="1" disabled
                 class="count-input w-16 px-2 py-1 text-sm text-center border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
+              <select name="owner_<%= t %>" disabled
+                class="owner-input w-full px-2 py-1 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
+                <option value="">— Owner —</option>
+                <% users.forEach(u => { %><option value="<%= u.id %>"><%= u.full_name %></option><% }) %>
+              </select>
             </label>
           <% }) %>
         </div>
       </div>
       <script>
-        // Tying each checkbox to its sibling number input — disabled inputs
-        // aren't submitted, so unticked types vanish from the payload.
+        // Toggle: ticking a type enables its count + owner inputs.
+        // Disabled inputs aren't submitted, so unticked types vanish.
         document.querySelectorAll('.type-toggle').forEach(cb => {
           cb.addEventListener('change', e => {
-            const input = e.target.closest('label').querySelector('.count-input');
-            input.disabled = !cb.checked;
-            if (cb.checked) input.focus();
+            const row = e.target.closest('label');
+            row.querySelector('.count-input').disabled = !cb.checked;
+            row.querySelector('.owner-input').disabled = !cb.checked;
+            if (cb.checked) row.querySelector('.count-input').focus();
           });
         });
       </script>
     <% } %>
-
-    <div class="mt-6 pt-6 border-t border-gray-200 flex items-center justify-end gap-3">
-      <a href="<%= cancelHref %>" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</a>
-      <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg">
-        <%= isEdit ? 'Update Plan' : 'Create Plan' %>
-      </button>
-    </div>
+    <% if (!isEdit) { %>
+      <!-- Inline submit on create flow (edit flow shows buttons at the bottom of the page) -->
+      <div class="mt-6 pt-6 border-t border-gray-200 flex items-center justify-end gap-3">
+        <a href="<%= cancelHref %>" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</a>
+        <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg">Create Plan</button>
+      </div>
+    <% } %>
   </form>
 
-  <% if (isEdit) { %>
+  <% if (isEdit) {
+    // Plan-wide tallies — sums across every sub-plan, regardless of
+    // status, so the totals stay visible even before submission.
+    let totalHours = 0, totalCharge = 0, totalCouncilFee = 0, submittedCount = 0;
+    (subPlans || []).forEach(s => {
+      totalHours += parseFloat(s.hours_spent) || 0;
+      if (s.charge_client) totalCharge += parseFloat(s.charge_amount) || 0;
+      if (s.council_fee_paid) totalCouncilFee += parseFloat(s.council_fee_amount) || 0;
+      if (['submitted','approved'].includes(s.status)) submittedCount += 1;
+    });
+    const fmtMoney = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
+    const fmtHours = n => (Math.round(n * 100) / 100) + ' hr' + (n === 1 ? '' : 's');
+  %>
     <!-- Sub-plan grid (edit only) -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
       <div class="flex items-center justify-between mb-4">
@@ -154,6 +185,28 @@
           <p class="text-sm text-gray-500">Each sub-plan becomes "submitted" the moment you upload its files. Use the buttons after that to approve or reject.</p>
         </div>
       </div>
+
+      <% if (subPlans && subPlans.length > 0) { %>
+        <!-- Plan totals strip — rolls up hours and money across all sub-plans -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5 p-4 bg-gradient-to-br from-brand-50 to-blue-50 border border-brand-100 rounded-lg">
+          <div>
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Sub-plans</div>
+            <div class="text-lg font-bold text-gray-900 mt-0.5"><%= submittedCount %> / <%= subPlans.length %> <span class="text-xs font-normal text-gray-500">submitted</span></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Total hours</div>
+            <div class="text-lg font-bold text-gray-900 mt-0.5"><%= fmtHours(totalHours) %></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">To charge client</div>
+            <div class="text-lg font-bold text-emerald-700 mt-0.5"><%= fmtMoney(totalCharge) %></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Council fees</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5"><%= fmtMoney(totalCouncilFee) %></div>
+          </div>
+        </div>
+      <% } %>
 
       <% if (!subPlans || subPlans.length === 0) { %>
         <div class="text-center py-8 text-sm text-gray-500 bg-gray-50 rounded-lg">No sub-plans yet. Add one below.</div>
@@ -208,6 +261,15 @@
           <button type="submit" class="px-3 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg">Add</button>
         </form>
       </details>
+    </div>
+
+    <!-- Bottom-of-page submit row. Buttons sit outside #planForm but
+         submit it via the HTML5 form attribute, so the parent fields at
+         the top get saved together with whatever the user touched in
+         the sub-plan grid. -->
+    <div class="mt-6 flex items-center justify-end gap-3">
+      <a href="<%= cancelHref %>" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</a>
+      <button type="submit" form="planForm" class="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg">Update Plan</button>
     </div>
   <% } %>
 </div>

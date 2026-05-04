@@ -323,7 +323,16 @@
                 </td>
                 <td class="hidden md:table-cell px-3 py-2 whitespace-nowrap">
                   <% if ((item.parent_id == null) && (item.plan_number != null)) { %>
-                    <span class="text-xs font-mono font-semibold text-gray-700">#<%= item.plan_number %></span>
+                    <%
+                      const subCount = (subPlansByParent[item.id] || []).length;
+                    %>
+                    <button type="button" class="sub-plans-toggle inline-flex items-center gap-1.5 text-xs font-mono font-semibold text-brand-700 hover:text-brand-800"
+                      data-target="exp-<%= item.id %>" onclick="event.stopPropagation();"
+                      title="Click to see <%= subCount %> sub-plan<%= subCount === 1 ? '' : 's' %>">
+                      <svg class="w-3.5 h-3.5 chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                      #<%= item.plan_number %>
+                      <span class="text-[10px] font-sans font-normal text-gray-400">(<%= subCount %>)</span>
+                    </button>
                   <% } else if (item.reference_number) { %>
                     <span class="text-xs font-mono text-gray-600"><%= item.reference_number %></span>
                     <% if (item.item_type === 'traffic_guidance' && item.tgs_quantity > 1) { %>
@@ -470,26 +479,24 @@
                 </td>
 
                 <td class="px-3 py-2 text-right">
-                  <% const isParentRow = (item.parent_id == null) && (item.plan_number != null); %>
-                  <% if (isParentRow) { %>
-                    <button type="button" class="sub-plans-toggle inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-brand-50 hover:text-brand-700 rounded-lg transition"
-                      data-target="exp-<%= item.id %>" onclick="event.stopPropagation();">
-                      <svg class="w-3.5 h-3.5 chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                      <span class="hidden sm:inline"><%= (subPlansByParent[item.id] || []).length %> sub-plan<%= (subPlansByParent[item.id] || []).length === 1 ? '' : 's' %></span>
-                    </button>
-                  <% } else { %>
-                    <a href="/compliance/<%= item.id %>/edit?return_to=<%= encodeURIComponent(returnTo) %>"
-                      class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-brand-50 hover:text-brand-700 rounded-lg transition">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                      Edit
-                    </a>
-                  <% } %>
+                  <a href="/compliance/<%= item.id %>/edit?return_to=<%= encodeURIComponent(returnTo) %>"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-brand-50 hover:text-brand-700 rounded-lg transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    Edit
+                  </a>
                 </td>
               </tr>
               <% if ((item.parent_id == null) && (item.plan_number != null)) { %>
                 <%
                   const subList = subPlansByParent[item.id] || [];
                   const subBadge = { not_started:'bg-gray-100 text-gray-700', started:'bg-amber-50 text-amber-700', submitted:'bg-blue-50 text-blue-700', approved:'bg-emerald-50 text-emerald-700', rejected:'bg-rose-50 text-rose-700', expired:'bg-orange-50 text-orange-700' };
+                  let planHours = 0, planCharge = 0, planFee = 0;
+                  subList.forEach(s => {
+                    planHours += parseFloat(s.hours_spent) || 0;
+                    if (s.charge_client) planCharge += parseFloat(s.charge_amount) || 0;
+                    if (s.council_fee_paid) planFee += parseFloat(s.council_fee_amount) || 0;
+                  });
+                  const fmt$ = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
                 %>
                 <tr id="exp-<%= item.id %>" class="hidden bg-gray-50/50">
                   <td colspan="11" class="px-6 py-3 border-l-2 border-l-brand-300">
@@ -502,8 +509,12 @@
                           <tr class="text-left">
                             <th class="font-medium pb-1.5 pr-3">Reference</th>
                             <th class="font-medium pb-1.5 pr-3">Description</th>
+                            <th class="font-medium pb-1.5 pr-3">Owner</th>
                             <th class="font-medium pb-1.5 pr-3">Status</th>
                             <th class="font-medium pb-1.5 pr-3">Files</th>
+                            <th class="font-medium pb-1.5 pr-3">Hours</th>
+                            <th class="font-medium pb-1.5 pr-3">Charge</th>
+                            <th class="font-medium pb-1.5 pr-3">Council fee</th>
                             <th class="font-medium pb-1.5 pr-3">Expires</th>
                             <th class="font-medium pb-1.5 pr-3">Flags</th>
                           </tr>
@@ -513,10 +524,14 @@
                             <tr class="border-t border-gray-200">
                               <td class="py-1.5 pr-3 font-mono text-gray-700"><%= s.reference_number %></td>
                               <td class="py-1.5 pr-3 text-gray-700"><%= s.description || '—' %></td>
+                              <td class="py-1.5 pr-3 text-gray-600"><%= s.owner_name || '—' %></td>
                               <td class="py-1.5 pr-3">
                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold <%= subBadge[s.status] || subBadge.not_started %>"><%= (s.status || 'not_started').replace(/_/g, ' ') %></span>
                               </td>
                               <td class="py-1.5 pr-3 text-gray-600"><%= s.doc_count || 0 %></td>
+                              <td class="py-1.5 pr-3 text-gray-600"><%= parseFloat(s.hours_spent) ? (Math.round(s.hours_spent * 100) / 100) + 'h' : '—' %></td>
+                              <td class="py-1.5 pr-3 text-gray-700"><%= s.charge_client ? fmt$(parseFloat(s.charge_amount) || 0) : '—' %></td>
+                              <td class="py-1.5 pr-3 text-gray-700"><%= s.council_fee_paid ? fmt$(parseFloat(s.council_fee_amount) || 0) : '—' %></td>
                               <td class="py-1.5 pr-3 text-gray-600"><%= s.expiry_date || '—' %></td>
                               <td class="py-1.5 pr-3">
                                 <% if ((s.item_type === 'rol' || s.item_type === 'road_occupancy') && s.extension_required) { %>
@@ -525,6 +540,13 @@
                               </td>
                             </tr>
                           <% }) %>
+                          <tr class="border-t-2 border-gray-300 bg-brand-50/40">
+                            <td class="py-2 pr-3 font-semibold text-gray-700" colspan="5">Plan totals</td>
+                            <td class="py-2 pr-3 font-semibold text-gray-900"><%= (Math.round(planHours * 100) / 100) %>h</td>
+                            <td class="py-2 pr-3 font-semibold text-emerald-700"><%= fmt$(planCharge) %></td>
+                            <td class="py-2 pr-3 font-semibold text-amber-700"><%= fmt$(planFee) %></td>
+                            <td class="py-2 pr-3" colspan="2"></td>
+                          </tr>
                         </tbody>
                       </table>
                       <div class="mt-2">

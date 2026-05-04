@@ -75,6 +75,7 @@ function createParentPlan(req, res, db, b) {
   const jobId = b.job_id || null;
   const clientId = b.client_id || null;
   const clientRequestDate = b.client_request_date || null;
+  const pmId = b.pm_id || null;
 
   let parentId = null;
   let subPlanCount = 0;
@@ -84,23 +85,24 @@ function createParentPlan(req, res, db, b) {
       // benign placeholder. Parent rows are distinguished from regular
       // 'other'-typed legacy rows by plan_number IS NOT NULL.
       const parentRes = db.prepare(`
-        INSERT INTO compliance (parent_id, plan_number, item_type, item_types, job_id, client_id, title, status, client_request_date, notes)
-        VALUES (NULL, ?, 'other', '', ?, ?, ?, 'not_started', ?, ?)
-      `).run(planNumber, jobId, clientId, title, clientRequestDate, b.notes || '');
+        INSERT INTO compliance (parent_id, plan_number, item_type, item_types, job_id, client_id, title, status, client_request_date, notes, assigned_to_id)
+        VALUES (NULL, ?, 'other', '', ?, ?, ?, 'not_started', ?, ?, ?)
+      `).run(planNumber, jobId, clientId, title, clientRequestDate, b.notes || '', pmId);
       parentId = parentRes.lastInsertRowid;
 
       const insertSub = db.prepare(`
-        INSERT INTO compliance (parent_id, job_id, client_id, item_type, item_types, title, status, reference_number, description)
-        VALUES (?, ?, ?, ?, ?, ?, 'not_started', ?, '')
+        INSERT INTO compliance (parent_id, job_id, client_id, item_type, item_types, title, status, reference_number, description, assigned_to_id)
+        VALUES (?, ?, ?, ?, ?, ?, 'not_started', ?, '', ?)
       `);
 
       SUB_PLAN_TYPES.forEach(type => {
         const raw = b['count_' + type];
         const count = parseInt(raw, 10);
         if (!Number.isFinite(count) || count <= 0) return;
+        const typeOwnerId = b['owner_' + type] || null;
         for (let seq = 1; seq <= count; seq++) {
           const ref = planStatus.buildSubPlanRef(planNumber, type, seq);
-          insertSub.run(parentId, jobId, clientId, type, type, ref, ref);
+          insertSub.run(parentId, jobId, clientId, type, type, ref, ref, typeOwnerId);
           subPlanCount += 1;
         }
       });
@@ -204,7 +206,11 @@ router.get('/', (req, res) => {
   const subPlansByParent = {};
   if (parentIds.length > 0) {
     const placeholders = parentIds.map(() => '?').join(',');
-    const subs = db.prepare(`SELECT id, parent_id, item_type, reference_number, description, status, expiry_date, extension_required FROM compliance WHERE parent_id IN (${placeholders}) ORDER BY item_type, reference_number`).all(...parentIds);
+    const subs = db.prepare(`SELECT c.id, c.parent_id, c.item_type, c.reference_number, c.description, c.status, c.expiry_date, c.extension_required,
+      c.hours_spent, c.charge_client, c.charge_amount, c.council_fee_paid, c.council_fee_amount,
+      c.assigned_to_id, u.full_name AS owner_name
+      FROM compliance c LEFT JOIN users u ON c.assigned_to_id = u.id
+      WHERE c.parent_id IN (${placeholders}) ORDER BY c.item_type, c.reference_number`).all(...parentIds);
     const docCounts = db.prepare(`SELECT compliance_id, COUNT(*) as c FROM compliance_documents WHERE compliance_id IN (SELECT id FROM compliance WHERE parent_id IN (${placeholders})) GROUP BY compliance_id`).all(...parentIds);
     const dcMap = {};
     docCounts.forEach(r => { dcMap[r.compliance_id] = r.c; });
@@ -360,6 +366,21 @@ router.post('/sub-plans/:subId/description', (req, res) => {
   const desc = (req.body.description || '').trim();
   db.prepare("UPDATE compliance SET description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(desc, sub.id);
   if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true, description: desc });
+  res.redirect('/compliance/' + sub.parent_id + '/edit');
+});
+
+// Inline owner update for a sub-plan.
+router.post('/sub-plans/:subId/owner', (req, res) => {
+  const db = getDb();
+  const sub = getSubPlan(db, req.params.subId);
+  if (!sub) {
+    if (req.headers.accept && req.headers.accept.includes('json')) return res.status(404).json({ error: 'Sub-plan not found' });
+    req.flash('error', 'Sub-plan not found.');
+    return res.redirect('/compliance');
+  }
+  const ownerId = req.body.assigned_to_id || null;
+  db.prepare("UPDATE compliance SET assigned_to_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(ownerId, sub.id);
+  if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true, assigned_to_id: ownerId });
   res.redirect('/compliance/' + sub.parent_id + '/edit');
 });
 
@@ -804,6 +825,35 @@ router.post('/:id', (req, res) => {
   const b = req.body;
   // Load old item to detect changes for diary logging
   const oldItem = db.prepare('SELECT * FROM compliance WHERE id = ?').get(req.params.id);
+
+  // Parent rows (Plans → Sub-Plans hierarchy) update only the fields the
+  // parent form actually surfaces. The legacy multi-field UPDATE below
+  // would clobber item_type with empty string and trip the CHECK
+  // constraint, so branch early.
+  if (oldItem && oldItem.parent_id == null && oldItem.plan_number != null) {
+    try {
+      db.prepare(`
+        UPDATE compliance
+        SET title = ?, job_id = ?, client_id = ?, client_request_date = ?, notes = ?, assigned_to_id = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(
+        b.title || oldItem.title,
+        b.job_id || null,
+        b.client_id || null,
+        b.client_request_date || null,
+        b.notes || '',
+        b.pm_id || null,
+        req.params.id
+      );
+      req.flash('success', 'Plan updated.');
+    } catch (err) {
+      console.error('[Compliance] Parent Plan update error:', err.message);
+      req.flash('error', 'Failed to update Plan: ' + err.message);
+    }
+    const returnTo = b.return_to && b.return_to !== '/compliance' ? b.return_to : '/compliance/' + req.params.id + '/edit';
+    return res.redirect(returnTo);
+  }
+
   // Handle multi-select item types
   const typesArr = b.item_types ? (Array.isArray(b.item_types) ? b.item_types : [b.item_types]) : (b.item_type ? [b.item_type] : []);
   const itemTypes = typesArr.join(',');

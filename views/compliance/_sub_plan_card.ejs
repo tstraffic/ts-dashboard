@@ -21,14 +21,26 @@
           <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200">extension required</span>
         <% } %>
       </div>
-      <!-- Inline description (auto-saves on blur) -->
-      <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/description" class="mt-2">
-        <%- include('../partials/csrf') %>
-        <input type="text" name="description" value="<%= sub.description || '' %>"
-          placeholder="Description (e.g. Northbound 2 lanes)"
-          onblur="if (this.value !== this.defaultValue) this.form.submit()"
-          class="w-full px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
-      </form>
+      <!-- Inline description + owner. Both auto-save on change. -->
+      <div class="mt-2 grid grid-cols-1 sm:grid-cols-[1fr_220px] gap-2">
+        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/description">
+          <%- include('../partials/csrf') %>
+          <input type="text" name="description" value="<%= sub.description || '' %>"
+            placeholder="Description (e.g. Northbound 2 lanes)"
+            onblur="if (this.value !== this.defaultValue) this.form.submit()"
+            class="w-full px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </form>
+        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/owner">
+          <%- include('../partials/csrf') %>
+          <select name="assigned_to_id" onchange="this.form.submit()"
+            class="w-full px-2.5 py-1.5 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+            <option value="">— Owner —</option>
+            <% (typeof users !== 'undefined' ? users : []).forEach(u => { %>
+              <option value="<%= u.id %>" <%= sub.assigned_to_id == u.id ? 'selected' : '' %>><%= u.full_name %></option>
+            <% }) %>
+          </select>
+        </form>
+      </div>
       <% if (isROL) { %>
         <!-- ROL extension flag: always togglable, including post-approval -->
         <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extension" class="mt-2" id="ext-<%= sub.id %>">
