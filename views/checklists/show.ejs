@@ -24,6 +24,61 @@
     </div>
   </div>
 
+  <!-- Worker visibility + publish — admin authors a draft, then hits
+       Publish to snapshot a revision that workers can fill in. The
+       Publish button lights up amber when the draft has drifted from
+       the latest published revision. -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-4">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+      <div>
+        <h2 class="text-sm font-bold text-gray-900">Worker portal</h2>
+        <p class="text-xs text-gray-500 mt-0.5">
+          <% if (template.worker_visible && template.published_revision) { %>
+            Live · revision <%= template.published_revision %><% if (typeof responseCount !== 'undefined' && responseCount) { %> · <%= responseCount %> submission<%= responseCount === 1 ? '' : 's' %><% } %>
+          <% } else if (template.worker_visible) { %>
+            Visible to workers but no revision published yet — hit Publish below to make it fillable.
+          <% } else { %>
+            Hidden from workers. Tick the box and Save to make this template available to workers.
+          <% } %>
+        </p>
+      </div>
+      <% if (typeof dirty !== 'undefined' && dirty) { %>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-700 ring-1 ring-amber-600/20">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+          Unpublished changes
+        </span>
+      <% } %>
+    </div>
+    <form method="POST" action="/checklists/<%= template.id %>/visibility" class="flex flex-wrap items-center gap-4">
+      <%- include('../partials/csrf') %>
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" name="worker_visible" value="1" <%= template.worker_visible ? 'checked' : '' %> class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+        <span class="text-gray-700 font-medium">Visible to workers</span>
+      </label>
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" name="require_signature" value="1" <%= template.require_signature ? 'checked' : '' %> class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+        <span class="text-gray-700">Require signature</span>
+      </label>
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" name="require_photo" value="1" <%= template.require_photo ? 'checked' : '' %> class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+        <span class="text-gray-700">Photo prompt</span>
+      </label>
+      <button type="submit" class="ml-auto px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg">Save</button>
+    </form>
+    <form method="POST" action="/checklists/<%= template.id %>/publish" class="flex items-center gap-3" onsubmit="return confirm('Publish this draft as a new revision? Workers will see it from now on.');">
+      <%- include('../partials/csrf') %>
+      <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg <%= (typeof dirty !== 'undefined' && dirty) ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %> text-sm font-semibold">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+        <%= (template.published_revision || 0) === 0 ? 'Publish first revision' : 'Publish revision ' + ((template.published_revision || 0) + 1) %>
+      </button>
+      <% if (template.published_revision) { %>
+        <span class="text-xs text-gray-500">Live: rev <%= template.published_revision %>
+          <% if (template.published_at) { %>· <%= new Date(template.published_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %><% } %>
+        </span>
+      <% } %>
+    </form>
+  </div>
+
   <!-- Edit Template Details -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
     <form method="POST" action="/checklists/<%= template.id %>" class="flex flex-col sm:flex-row gap-3">
@@ -43,6 +98,33 @@
       </div>
     </form>
   </div>
+
+  <!-- Revision history -->
+  <% if (typeof revisions !== 'undefined' && revisions.length > 0) { %>
+    <details class="bg-white border border-gray-200 rounded-xl shadow-sm">
+      <summary class="px-4 py-3 cursor-pointer flex items-center justify-between">
+        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Revision history</h2>
+        <span class="text-xs text-gray-500"><%= revisions.length %> revision<%= revisions.length === 1 ? '' : 's' %></span>
+      </summary>
+      <div class="border-t border-gray-100">
+        <% revisions.forEach(function (r) { var iCount = (function () { try { return JSON.parse(r.items_json || '[]').length } catch(e){ return 0 } })(); %>
+          <div class="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between text-xs">
+            <div>
+              <span class="font-semibold text-gray-900">Revision <%= r.revision_number %></span>
+              <% if (r.revision_number === template.published_revision) { %>
+                <span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Live</span>
+              <% } %>
+              <span class="text-gray-400 ml-2"><%= iCount %> question<%= iCount === 1 ? '' : 's' %></span>
+            </div>
+            <span class="text-gray-500">
+              <%= new Date(r.published_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>
+              <% if (r.publisher_name) { %> · <%= r.publisher_name %><% } %>
+            </span>
+          </div>
+        <% }); %>
+      </div>
+    </details>
+  <% } %>
 
   <!-- Questions List -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">

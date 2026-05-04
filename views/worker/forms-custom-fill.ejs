@@ -1,0 +1,164 @@
+<meta name="color-scheme" content="light only">
+
+<style>
+  .cf-wrap { padding: 0.5rem; padding-bottom: 6rem; }
+  .cf-back { display: inline-flex; align-items: center; gap: 4px; color: #00D2BE; font-size: 0.85rem; font-weight: 600; }
+  .cf-h1 { font-size: 1.4rem; font-weight: 800; color: #fff; margin-top: 0.25rem; letter-spacing: -0.01em; }
+  .cf-rev { font-size: 0.7rem; color: rgba(255,255,255,0.5); margin-top: 4px; }
+  .cf-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; margin-top: 12px; }
+  .cf-section-title { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #00D2BE; margin-bottom: 10px; }
+  .cf-q { padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.05); }
+  .cf-q:first-child { border-top: none; padding-top: 0; }
+  .cf-q-text { font-size: 0.88rem; color: #fff; font-weight: 600; line-height: 1.3; }
+  .cf-q-required { color: #FCA5A5; margin-left: 4px; }
+  .cf-q-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .cf-radio { position: relative; }
+  .cf-radio input { position: absolute; opacity: 0; }
+  .cf-radio span {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 7px 14px; border-radius: 999px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.65); font-size: 0.78rem; font-weight: 600;
+    cursor: pointer; transition: all 0.12s;
+  }
+  .cf-radio input:checked + span { background: #00D2BE; border-color: #00D2BE; color: #0F1B30; }
+  .cf-radio input:checked + span.fail { background: #EF4444; border-color: #EF4444; color: #fff; }
+  .cf-radio input:checked + span.na   { background: #6B7280; border-color: #6B7280; color: #fff; }
+  .cf-input, .cf-textarea {
+    width: 100%; background: #fff; color: #0F172A;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 8px;
+    padding: 9px 12px; font-size: 0.9rem; color-scheme: light;
+  }
+  .cf-input:focus, .cf-textarea:focus { outline: none; border-color: #2B7FFF; box-shadow: 0 0 0 3px rgba(43,127,255,0.18); }
+  .cf-textarea { resize: vertical; min-height: 60px; }
+
+  .cf-sig-pad { border: 2px dashed rgba(255,255,255,0.18); border-radius: 12px; background: #F8FAFC; height: 160px; }
+  .cf-sig-pad.signed { border-style: solid; border-color: rgba(16,185,129,0.45); background: #F0FDF4; }
+  .cf-sig-pad canvas { width: 100%; height: 100%; touch-action: none; display: block; }
+  .cf-sig-clear {
+    font-size: 0.7rem; font-weight: 600; color: rgba(255,255,255,0.65);
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+    padding: 4px 10px; border-radius: 6px;
+  }
+
+  .cf-submit-bar { position: sticky; bottom: 0; padding: 16px 0 calc(16px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(180deg, transparent, rgba(10,22,40,0.95) 35%); margin-top: 16px; }
+  .cf-submit { width: 100%; padding: 16px; border-radius: 14px; font-size: 1rem; font-weight: 700;
+               color: #fff; background: linear-gradient(135deg, #2B7FFF, #1D6AE5);
+               border: none; box-shadow: 0 8px 24px rgba(29,106,229,0.45); cursor: pointer;
+               display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; }
+</style>
+
+<div class="cf-wrap">
+  <a href="/w/forms/custom" class="cf-back">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    Custom checklists
+  </a>
+  <h1 class="cf-h1"><%= template.name %></h1>
+  <p class="cf-rev">Revision <%= revision.revision_number %><% if (template.description) { %> · <%= template.description %><% } %></p>
+
+  <form method="POST" action="/w/forms/custom/<%= template.id %>">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <% if (allocation) { %><input type="hidden" name="allocation_id" value="<%= allocation.id %>"><% } %>
+
+    <% sections.forEach(function (s) { %>
+      <div class="cf-card">
+        <% if (s.name) { %><p class="cf-section-title"><%= s.name %></p><% } %>
+        <% s.items.forEach(function (it) { %>
+          <div class="cf-q">
+            <p class="cf-q-text">
+              <%= it.question %>
+              <% if (it.required) { %><span class="cf-q-required">*</span><% } %>
+            </p>
+            <div class="cf-q-row">
+              <% if (it.response_type === 'yes_no_na') { %>
+                <% ['yes','no','na'].forEach(function (v) { %>
+                  <label class="cf-radio">
+                    <input type="radio" name="answer_<%= it.id %>" value="<%= v %>" <%= it.required ? 'required' : '' %>>
+                    <span class="<%= v === 'no' ? 'fail' : v === 'na' ? 'na' : '' %>"><%= v === 'na' ? 'N/A' : v.charAt(0).toUpperCase() + v.slice(1) %></span>
+                  </label>
+                <% }) %>
+              <% } else if (it.response_type === 'pass_fail') { %>
+                <% ['pass','fail'].forEach(function (v) { %>
+                  <label class="cf-radio">
+                    <input type="radio" name="answer_<%= it.id %>" value="<%= v %>" <%= it.required ? 'required' : '' %>>
+                    <span class="<%= v === 'fail' ? 'fail' : '' %>"><%= v.charAt(0).toUpperCase() + v.slice(1) %></span>
+                  </label>
+                <% }) %>
+              <% } else if (it.response_type === 'number') { %>
+                <input type="number" name="answer_<%= it.id %>" class="cf-input" step="any" <%= it.required ? 'required' : '' %>>
+              <% } else if (it.response_type === 'signature') { %>
+                <div class="cf-sig-pad" id="sig-<%= it.id %>">
+                  <canvas data-itemid="<%= it.id %>"></canvas>
+                </div>
+                <input type="hidden" name="answer_<%= it.id %>" id="sigval-<%= it.id %>">
+                <div style="margin-top:6px;display:flex;justify-content:flex-end;">
+                  <button type="button" class="cf-sig-clear" onclick="cfClearSig(<%= it.id %>)">Clear</button>
+                </div>
+              <% } else { %>
+                <textarea name="answer_<%= it.id %>" class="cf-textarea" rows="2" <%= it.required ? 'required' : '' %>></textarea>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% }) %>
+
+    <% if (template.require_signature) { %>
+      <div class="cf-card">
+        <p class="cf-section-title">Worker signature *</p>
+        <div class="cf-sig-pad" id="cf-main-sig"><canvas data-mainsig="1"></canvas></div>
+        <input type="hidden" name="signature_data" id="cf-main-sig-val">
+        <div style="margin-top:6px;display:flex;justify-content:flex-end;">
+          <button type="button" class="cf-sig-clear" onclick="cfClearMain()">Clear</button>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="cf-submit-bar">
+      <button type="submit" class="cf-submit">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        Submit
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  function setupSig(canvas, hiddenInput, padEl) {
+    var ctx = canvas.getContext('2d');
+    var drawing = false, drawn = false;
+    function resize() {
+      var rect = canvas.parentElement.getBoundingClientRect();
+      var data = drawn ? canvas.toDataURL() : null;
+      canvas.width = rect.width; canvas.height = rect.height;
+      ctx.strokeStyle = '#0F172A'; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      if (data && drawn) { var img = new Image(); img.onload = function () { ctx.drawImage(img, 0, 0); }; img.src = data; }
+    }
+    resize(); window.addEventListener('resize', resize);
+    function pos(e) { var r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+    canvas.addEventListener('pointerdown', function (e) { drawing = true; drawn = true; padEl.classList.add('signed'); var p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); });
+    canvas.addEventListener('pointermove', function (e) { if (!drawing) return; var p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); });
+    canvas.addEventListener('pointerup',    function () { drawing = false; if (drawn && hiddenInput) hiddenInput.value = canvas.toDataURL('image/png'); });
+    canvas.addEventListener('pointerleave', function () { drawing = false; });
+    return { clear: function () { ctx.clearRect(0,0,canvas.width,canvas.height); drawn = false; padEl.classList.remove('signed'); if (hiddenInput) hiddenInput.value = ''; } };
+  }
+
+  // Per-item signature pads (response_type: signature)
+  var itemPads = {};
+  document.querySelectorAll('canvas[data-itemid]').forEach(function (c) {
+    var id = c.getAttribute('data-itemid');
+    var hidden = document.getElementById('sigval-' + id);
+    var pad = document.getElementById('sig-' + id);
+    itemPads[id] = setupSig(c, hidden, pad);
+  });
+  window.cfClearSig = function (id) { if (itemPads[id]) itemPads[id].clear(); };
+
+  // Optional whole-form signature
+  var mainCanvas = document.querySelector('canvas[data-mainsig]');
+  var mainPad = document.getElementById('cf-main-sig');
+  var mainVal = document.getElementById('cf-main-sig-val');
+  var mainSig = mainCanvas ? setupSig(mainCanvas, mainVal, mainPad) : null;
+  window.cfClearMain = function () { if (mainSig) mainSig.clear(); };
+})();
+</script>

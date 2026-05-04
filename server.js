@@ -155,6 +155,7 @@ app.use('/w', requireWorker, workerLocals, managerLocals, require('./routes/work
 app.use('/w', requireWorker, workerLocals, managerLocals, require('./routes/worker/manage'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/profile'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/forms'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/custom-checklists'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/notifications'));
 app.get('/w/more', requireWorker, workerLocals, (req, res) => {
   res.locals.isManager = require('./middleware/managerAuth').isManager(req.session.worker);

@@ -6975,6 +6975,63 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 150: Custom checklists — admin-authored forms that show
+  // up on the worker portal, with versioned revisions so an admin can
+  // tweak a template without breaking submissions filed against an
+  // earlier revision.
+  // =============================================
+  if (!isMigrationApplied.get(150)) {
+    try {
+      const ctCols = db.prepare("PRAGMA table_info(checklist_templates)").all().map(c => c.name);
+      const addCt = (name, ddl) => { if (!ctCols.includes(name)) try { db.exec(`ALTER TABLE checklist_templates ADD COLUMN ${ddl}`); } catch (e) {} };
+      addCt('worker_visible',     "worker_visible INTEGER NOT NULL DEFAULT 0");
+      addCt('require_signature',  "require_signature INTEGER NOT NULL DEFAULT 0");
+      addCt('require_photo',      "require_photo INTEGER NOT NULL DEFAULT 0");
+      addCt('published_revision', "published_revision INTEGER DEFAULT 0");
+      addCt('published_at',       "published_at DATETIME");
+      addCt('published_by_id',    "published_by_id INTEGER REFERENCES users(id)");
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS checklist_template_revisions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          template_id INTEGER NOT NULL REFERENCES checklist_templates(id) ON DELETE CASCADE,
+          revision_number INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT DEFAULT '',
+          require_signature INTEGER NOT NULL DEFAULT 0,
+          require_photo INTEGER NOT NULL DEFAULT 0,
+          items_json TEXT NOT NULL,
+          published_by_id INTEGER REFERENCES users(id),
+          published_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(template_id, revision_number)
+        )
+      `);
+      db.exec("CREATE INDEX IF NOT EXISTS idx_ctr_template ON checklist_template_revisions(template_id, revision_number DESC)");
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS custom_checklist_responses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          template_id INTEGER NOT NULL REFERENCES checklist_templates(id) ON DELETE CASCADE,
+          revision_number INTEGER NOT NULL,
+          crew_member_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+          allocation_id INTEGER REFERENCES crew_allocations(id) ON DELETE SET NULL,
+          booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
+          answers_json TEXT NOT NULL DEFAULT '{}',
+          signature_data TEXT,
+          submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      db.exec("CREATE INDEX IF NOT EXISTS idx_ccr_template ON custom_checklist_responses(template_id, submitted_at DESC)");
+      db.exec("CREATE INDEX IF NOT EXISTS idx_ccr_crew ON custom_checklist_responses(crew_member_id, submitted_at DESC)");
+
+      recordMigration.run(150, 'custom checklists: worker_visible + revisions + responses');
+      console.log('Migration 150 applied: custom checklists schema');
+    } catch (e) {
+      console.error('Migration 150 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
