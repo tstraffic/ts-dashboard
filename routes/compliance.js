@@ -154,16 +154,16 @@ router.get('/api/next-ref', (req, res) => {
   };
   const prefix = prefixMap[type] || 'TSREF';
 
-  // Next number after the current maximum. Monotonically increasing —
-  // never re-issues a number, even if earlier ones were deleted, so
-  // historical references stay stable and nothing ever jumps backwards.
-  // Seeds at 3001 if there's nothing for this prefix yet.
-  const rows = db.prepare("SELECT reference_number FROM compliance WHERE reference_number LIKE ? || '%'").all(prefix);
-  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const tailRe = new RegExp('^' + escaped + '(\\d+)(?:-\\d+)?$');
+  // Global monotonic counter — one shared number space across every
+  // prefix so refs sort cleanly by recency and the sequence keeps
+  // climbing instead of resetting per-type. Floor at 3000 (legacy
+  // genesis) only kicks in for an empty DB; with data, the counter
+  // simply continues from the highest existing suffix.
+  const rows = db.prepare("SELECT reference_number FROM compliance WHERE reference_number IS NOT NULL AND reference_number != ''").all();
+  const tailRe = /^TS[A-Z]+(\d+)(?:-\d+)?$/;
   let max = 3000;
   rows.forEach(r => {
-    const match = r.reference_number.match(tailRe);
+    const match = (r.reference_number || '').match(tailRe);
     if (match) {
       const n = parseInt(match[1], 10);
       if (n > max) max = n;

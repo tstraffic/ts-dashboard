@@ -7032,6 +7032,63 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 151: Realign compliance reference_number prefixes with
+  // item_type. Council rows that ended up with TSTGS, free-text refs
+  // like 'Council Approval', etc. get a fresh prefix that matches the
+  // type. Numbering continues from the highest existing suffix —
+  // monotonically upwards, no resets — so a system already at
+  // TSTGS3099 produces TSCA3100, TSCA3101, … as fixes land.
+  // =============================================
+  if (!isMigrationApplied.get(151)) {
+    try {
+      const prefixMap = {
+        traffic_guidance: 'TSTGS',
+        road_occupancy: 'TSROL',
+        rol: 'TSROL',
+        council_permit: 'TSCA',
+        tmp_approval: 'TSTMP',
+        swms_review: 'TSSWMS',
+        insurance: 'TSINS',
+        induction: 'TSIND',
+        environmental: 'TSENV',
+        utility_clearance: 'TSUC',
+        spa: 'TSSPA',
+        police_notification: 'TSPN',
+        letter_drop: 'TSLD',
+        other: 'TSOTH',
+      };
+
+      const allRefs = db.prepare("SELECT reference_number FROM compliance WHERE reference_number IS NOT NULL AND reference_number != ''").all();
+      const tailRe = /^TS[A-Z]+(\d+)(?:-\d+)?$/;
+      let maxNum = 3000;
+      allRefs.forEach(r => {
+        const m = (r.reference_number || '').match(tailRe);
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (n > maxNum) maxNum = n;
+        }
+      });
+
+      const rows = db.prepare("SELECT id, item_type, reference_number FROM compliance WHERE reference_number IS NOT NULL AND reference_number != ''").all();
+      const update = db.prepare("UPDATE compliance SET reference_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+      let fixed = 0;
+      rows.forEach(row => {
+        const expected = prefixMap[row.item_type] || 'TSREF';
+        if (!row.reference_number.startsWith(expected)) {
+          maxNum += 1;
+          update.run(expected + maxNum, row.id);
+          fixed += 1;
+        }
+      });
+
+      recordMigration.run(151, 'compliance refs: realign prefix to item_type, continue numbering from current max');
+      console.log(`Migration 151 applied: realigned ${fixed} compliance reference number(s) to match item_type`);
+    } catch (e) {
+      console.error('Migration 151 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
