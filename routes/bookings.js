@@ -300,6 +300,10 @@ function normaliseTimeStr(raw) {
   return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
 }
 
+// Auto-fill lat/lng from the address fields after every save. Imported
+// here so the booking POST/PUT routes can fire-and-forget the geocode.
+const { geocodeBookingIfNeeded } = require('../services/bookingGeocode');
+
 // POST / — Create booking
 router.post('/', (req, res) => {
   const db = getDb(); const b = req.body;
@@ -369,6 +373,11 @@ router.post('/', (req, res) => {
   logActivity({ user: req.session.user, action: 'create', entityType: 'booking', entityId: bookingId, details: `Created booking ${bookingNumber}`, req });
   req.flash('success', `Booking ${bookingNumber} created.`);
   res.redirect('/bookings');
+
+  // Background geocode after the response goes out — never blocks the
+  // user's save. Skips if the user already pinned the marker manually
+  // OR coords are already populated.
+  setImmediate(() => { geocodeBookingIfNeeded(bookingId).catch(() => {}); });
 });
 
 // GET /resources — Available crew (JSON) with qualification data
@@ -652,6 +661,29 @@ router.post('/:id', (req, res) => {
 
   logActivity({ user: req.session.user, action: 'update', entityType: 'booking', entityId: req.params.id, details: `Updated booking ${existing.booking_number}`, req });
   req.flash('success', `Booking ${existing.booking_number} updated.`); res.redirect('/bookings/' + req.params.id);
+
+  // Background geocode — only re-runs if address text might have
+  // changed (lat/lng cleared) or marker_is_accurate is false. The
+  // helper is conservative: if a user-pinned marker is set, it
+  // leaves the coords alone.
+  setImmediate(() => { geocodeBookingIfNeeded(req.params.id).catch(() => {}); });
+});
+
+// POST /:id/geocode — Force re-geocode of a single booking. Useful
+// after the address fields change without an actual save (e.g. when
+// importing) or to manually refresh stale coordinates. Returns JSON
+// so the booking-detail page can surface the result without a redirect.
+router.post('/:id/geocode', async (req, res) => {
+  try {
+    const result = await geocodeBookingIfNeeded(req.params.id, { force: true });
+    if (result) {
+      logActivity({ user: req.session.user, action: 'update', entityType: 'booking', entityId: req.params.id, details: `Re-geocoded → ${result.lat}, ${result.lng} (${result.city || ''})`, req });
+      return res.json({ ok: true, lat: result.lat, lng: result.lng, city: result.city || '' });
+    }
+    res.json({ ok: false, error: 'Could not geocode address.' });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 // POST /:id/status
