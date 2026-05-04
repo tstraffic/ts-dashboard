@@ -297,11 +297,16 @@
       <label for="mode-recur">Recurring</label>
     </div>
 
-    <!-- Single -->
+    <!-- Single — give the input the real `dates` name so the form
+         submits the picked date natively even if the JS submit handler
+         is somehow blocked or hasn't loaded. The handler still runs and
+         is harmless: it overwrites the dates container with another
+         hidden input, but the existing one in the date field carries
+         the picked value through regardless. -->
     <div id="lv-mode-single" class="lv-mode-panel space-y-3">
       <div>
         <label class="lv-label">Date</label>
-        <input type="date" class="lv-input" id="lv-single-date" min="<%= todayIso %>">
+        <input type="date" class="lv-input" id="lv-single-date" name="dates" min="<%= todayIso %>">
       </div>
     </div>
 
@@ -428,6 +433,13 @@
       modeInput.value = mode;
       document.querySelectorAll('.lv-mode-panel').forEach(function (p) { p.style.display = 'none'; });
       document.getElementById('lv-mode-' + mode).style.display = 'block';
+      // The single-date input has name="dates" so the form submits
+      // natively even without JS — but in multiple/recurring modes we
+      // don't want a leftover single-date value piggy-backing on the
+      // submission, so disable it (the disabled attr stops it from
+      // being included in form data).
+      var single = document.getElementById('lv-single-date');
+      if (single) single.disabled = (mode !== 'single');
     };
     window.lvAddDate = function () {
       var inp = document.getElementById('lv-multi-add');
@@ -462,7 +474,9 @@
       lvOpen(iso);
     };
 
-    // Build hidden dates[] inputs before submit
+    // Build hidden dates[] inputs before submit. In single mode the
+    // lv-single-date input itself carries name="dates" so we don't
+    // need to add anything — just validate the field has a value.
     document.getElementById('lv-form').addEventListener('submit', function (e) {
       var mode = modeInput.value;
       var container = document.getElementById('lv-dates-container');
@@ -470,7 +484,7 @@
       if (mode === 'single') {
         var d = document.getElementById('lv-single-date').value;
         if (!d) { e.preventDefault(); alert('Please pick a date.'); return; }
-        container.innerHTML = '<input type="hidden" name="dates" value="' + d + '">';
+        // Native submission carries it via name="dates"; nothing more to do.
       } else if (mode === 'multiple') {
         if (selectedDates.size === 0) { e.preventDefault(); alert('Please add at least one date.'); return; }
         Array.from(selectedDates).forEach(function (d) {
