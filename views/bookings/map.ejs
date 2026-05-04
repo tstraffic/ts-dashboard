@@ -1,0 +1,61 @@
+<% locals.currentPage = 'bookings-map' %>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+
+  <div class="flex items-end justify-between flex-wrap gap-3">
+    <div>
+      <a href="/bookings" class="text-sm text-gray-500 hover:text-gray-700 mb-1 inline-flex items-center gap-1">&larr; Bookings</a>
+      <h1 class="text-2xl font-bold text-gray-900">Bookings Map</h1>
+      <p class="text-sm text-gray-500 mt-0.5">
+        Every non-cancelled booking with coordinates from the last day through the next <%= days %> day<%= days === 1 ? '' : 's' %>.
+        <% if (rows.length === 0) { %><span class="text-amber-600 font-medium">No bookings to plot — bookings without lat/lng don't appear.</span><% } %>
+      </p>
+    </div>
+    <form method="GET" action="/bookings/map" class="flex items-center gap-2">
+      <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Window</label>
+      <select name="days" onchange="this.form.submit()" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">
+        <% [3, 7, 14, 30].forEach(function (d) { %>
+          <option value="<%= d %>" <%= days === d ? 'selected' : '' %>>Next <%= d %> days</option>
+        <% }) %>
+      </select>
+    </form>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+    <%- include('../partials/leaflet-map', {
+      mapId: 'bookings-overview-map',
+      lat: rows.length > 0 ? rows[0].latitude : null,
+      lng: rows.length > 0 ? rows[0].longitude : null,
+      zoom: 11,
+      height: '70vh',
+      markers: markers
+    }) %>
+    <p class="text-[10px] text-gray-400 mt-2">
+      <%= rows.length %> booking<%= rows.length === 1 ? '' : 's' %> plotted.
+      Click a pin to open the booking. Map data &copy; OpenStreetMap contributors.
+    </p>
+  </div>
+
+  <% if (rows.length > 0) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-200">
+        <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">On the map (<%= rows.length %>)</h2>
+      </div>
+      <div class="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
+        <% rows.forEach(function (r) { %>
+          <a href="/bookings/<%= r.id %>" class="px-4 py-2.5 flex items-center justify-between gap-3 hover:bg-gray-50 transition">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold text-gray-900 truncate"><%= r.booking_number || ('#' + r.id) %><% if (r.title) { %> · <%= r.title %><% } %></p>
+              <p class="text-xs text-gray-500 truncate">
+                <%= new Date(r.start_datetime).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) %>
+                <% if (r.suburb) { %> · <%= r.suburb %><% } %>
+              </p>
+            </div>
+            <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex-shrink-0"><%= (r.status || '').replace(/_/g, ' ') %></span>
+          </a>
+        <% }) %>
+      </div>
+    </div>
+  <% } %>
+
+</div>

@@ -1,0 +1,112 @@
+<%
+  /*
+    Reusable Leaflet map partial.
+
+    Inputs (via locals when included):
+      mapId     — unique DOM id for this map instance, default 'leaflet-map'
+      lat       — latitude (number, required)
+      lng       — longitude (number, required)
+      zoom      — initial zoom, default 15
+      height    — CSS height (px or any unit), default '320px'
+      markers   — optional array of { lat, lng, label, href, color } for
+                  multi-pin maps (e.g. all bookings). When omitted the
+                  map renders a single pin at lat/lng.
+      address   — optional address string used to build a Google/Apple
+                  Maps direction link below the map.
+
+    Loads Leaflet 1.9 from unpkg + OpenStreetMap tiles. CSS/JS are
+    loaded once per page even if the partial is included multiple
+    times, via a guard on window.L.
+  */
+  var _mapId    = (typeof mapId    !== 'undefined' && mapId)    ? mapId    : ('leaflet-map-' + Math.random().toString(36).slice(2, 8));
+  var _zoom     = (typeof zoom     !== 'undefined' && zoom)     ? zoom     : 15;
+  var _height   = (typeof height   !== 'undefined' && height)   ? height   : '320px';
+  var _lat      = typeof lat !== 'undefined' ? lat : null;
+  var _lng      = typeof lng !== 'undefined' ? lng : null;
+  var _markers  = (typeof markers  !== 'undefined' && Array.isArray(markers)) ? markers : null;
+  var _address  = (typeof address  !== 'undefined' && address) ? String(address) : '';
+%>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+<div id="<%= _mapId %>" style="height: <%= _height %>; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid #E5E7EB; z-index: 0;" role="img" aria-label="Map"></div>
+
+<% if (_address || (_lat && _lng)) { %>
+  <%
+    var navTarget = _address || (_lat + ',' + _lng);
+    var encoded = encodeURIComponent(navTarget);
+  %>
+  <div class="flex items-center gap-3 mt-2 text-xs">
+    <a href="https://www.google.com/maps/dir/?api=1&destination=<%= encoded %>" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-brand-600 hover:text-brand-700 font-semibold">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m-6 3l6-3"/></svg>
+      Open in Google Maps
+    </a>
+    <a href="https://maps.apple.com/?daddr=<%= encoded %>" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-gray-600 hover:text-gray-800 font-semibold">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Open in Apple Maps
+    </a>
+  </div>
+<% } %>
+
+<script>
+(function () {
+  var INIT = function () {
+    var el = document.getElementById('<%= _mapId %>');
+    if (!el || el.dataset.mapInit === '1') return;
+    el.dataset.mapInit = '1';
+
+    var markers = <%- JSON.stringify(_markers || []) %>;
+    var lat = <%= _lat != null ? _lat : 'null' %>;
+    var lng = <%= _lng != null ? _lng : 'null' %>;
+    var zoom = <%= _zoom %>;
+
+    var center;
+    if (markers.length > 0) {
+      center = [markers[0].lat, markers[0].lng];
+    } else if (lat != null && lng != null) {
+      center = [lat, lng];
+    } else {
+      // Fallback: Sydney CBD so the map still renders something
+      center = [-33.8688, 151.2093];
+      zoom = 10;
+    }
+
+    var map = L.map(el, { scrollWheelZoom: false }).setView(center, zoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    if (markers.length > 0) {
+      var bounds = [];
+      markers.forEach(function (m) {
+        if (m.lat == null || m.lng == null) return;
+        var marker = L.marker([m.lat, m.lng]);
+        var html = '';
+        if (m.label) html += '<div style="font-weight:700;color:#0F172A;">' + m.label + '</div>';
+        if (m.href)  html += '<a href="' + m.href + '" style="color:#2B7FFF;font-size:12px;font-weight:600;">Open ›</a>';
+        if (html) marker.bindPopup(html);
+        marker.addTo(map);
+        bounds.push([m.lat, m.lng]);
+      });
+      if (bounds.length > 1) {
+        try { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 }); } catch (e) {}
+      }
+    } else if (lat != null && lng != null) {
+      L.marker([lat, lng]).addTo(map);
+    }
+
+    // Re-flow if the container size changes (sidebar collapse, tab
+    // switch, etc.) — Leaflet caches the size on init and won't
+    // redraw tiles otherwise.
+    setTimeout(function () { map.invalidateSize(); }, 200);
+  };
+
+  // Defer until Leaflet's script tag has loaded.
+  if (window.L) INIT();
+  else {
+    var t = setInterval(function () { if (window.L) { clearInterval(t); INIT(); } }, 50);
+  }
+})();
+</script>

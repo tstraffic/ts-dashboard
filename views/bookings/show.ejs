@@ -180,16 +180,83 @@
   </div>
   <% } %>
   <% if (b.latitude && b.longitude) { %>
-  <div class="mt-3 pt-3 border-t border-gray-100 flex items-center gap-4">
-    <span class="text-xs text-gray-400">Coordinates:</span>
-    <span class="text-xs font-mono text-gray-600"><%= b.latitude %>, <%= b.longitude %></span>
-    <% if (b.marker_is_accurate) { %>
-    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">
-      <svg class="w-3 h-3 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-      Accurate
-    </span>
-    <% } %>
-  </div>
+    <div class="mt-3 pt-3 border-t border-gray-100 flex items-center gap-4 flex-wrap">
+      <span class="text-xs text-gray-400">Coordinates:</span>
+      <span class="text-xs font-mono text-gray-600"><%= b.latitude %>, <%= b.longitude %></span>
+      <% if (b.marker_is_accurate) { %>
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700">
+          <svg class="w-3 h-3 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+          Accurate
+        </span>
+      <% } else { %>
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-500" title="Auto-geocoded from the address — suburb-level precision">
+          ~ Auto
+        </span>
+      <% } %>
+      <form method="POST" action="/bookings/<%= b.id %>/geocode" class="ml-auto" onsubmit="return _bookingGeocode(this, event)">
+        <%- include('../partials/csrf') %>
+        <button type="submit" class="text-[11px] text-gray-400 hover:text-brand-600 font-semibold">Re-geocode</button>
+      </form>
+    </div>
+    <div class="mt-3">
+      <%- include('../partials/leaflet-map', {
+        mapId: 'booking-map-' + b.id,
+        lat: b.latitude,
+        lng: b.longitude,
+        zoom: 16,
+        height: '320px',
+        address: [b.site_address, b.suburb, b.state, b.postcode].filter(Boolean).join(', ')
+      }) %>
+    </div>
+    <script>
+      // Inline so the show page can offer "Re-geocode" without a full
+      // reload — handy when the admin updates the address inline.
+      window._bookingGeocode = function (form, e) {
+        e.preventDefault();
+        var btn = form.querySelector('button');
+        var orig = btn.textContent;
+        btn.textContent = 'Geocoding…';
+        var fd = new FormData(form);
+        fetch(form.action, { method: 'POST', body: fd })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (j && j.ok) {
+              btn.textContent = '✓ Updated — reloading';
+              setTimeout(function () { location.reload(); }, 600);
+            } else {
+              btn.textContent = j && j.error ? j.error : 'Failed';
+              setTimeout(function () { btn.textContent = orig; }, 2000);
+            }
+          })
+          .catch(function () { btn.textContent = 'Failed'; setTimeout(function () { btn.textContent = orig; }, 2000); });
+        return false;
+      };
+    </script>
+  <% } else if (b.site_address || b.suburb) { %>
+    <div class="mt-3 pt-3 border-t border-gray-100 flex items-center gap-3">
+      <span class="text-xs text-gray-400">No coordinates yet.</span>
+      <form method="POST" action="/bookings/<%= b.id %>/geocode" onsubmit="return _bookingGeocode(this, event)">
+        <%- include('../partials/csrf') %>
+        <button type="submit" class="text-xs text-brand-600 hover:text-brand-700 font-semibold">Geocode now</button>
+      </form>
+    </div>
+    <script>
+      window._bookingGeocode = window._bookingGeocode || function (form, e) {
+        e.preventDefault();
+        var btn = form.querySelector('button');
+        var orig = btn.textContent;
+        btn.textContent = 'Geocoding…';
+        var fd = new FormData(form);
+        fetch(form.action, { method: 'POST', body: fd })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (j && j.ok) { btn.textContent = '✓ Done — reloading'; setTimeout(function () { location.reload(); }, 600); }
+            else { btn.textContent = (j && j.error) || 'Failed'; setTimeout(function () { btn.textContent = orig; }, 2000); }
+          })
+          .catch(function () { btn.textContent = 'Failed'; setTimeout(function () { btn.textContent = orig; }, 2000); });
+        return false;
+      };
+    </script>
   <% } %>
 </div>
 <% } %>
