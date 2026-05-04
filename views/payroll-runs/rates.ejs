@@ -110,7 +110,7 @@
                         <% if (e.employee_code) { %><p class="text-[10px] text-gray-400 font-mono"><%= e.employee_code %></p><% } %>
                       </td>
                       <td class="px-2 py-1">
-                        <select name="rows[<%= e.id %>][payment_type]" class="px-2 py-1 border border-gray-300 rounded text-sm">
+                        <select name="rows[emp_<%= e.id %>][payment_type]" class="px-2 py-1 border border-gray-300 rounded text-sm">
                           <option value="" <%= !e.payment_type ? 'selected' : '' %>>—</option>
                           <option value="cash" <%= e.payment_type === 'cash' ? 'selected' : '' %>>Cash</option>
                           <option value="tfn"  <%= e.payment_type === 'tfn'  ? 'selected' : '' %>>TFN</option>
@@ -119,7 +119,7 @@
                       </td>
                       <% if (tab.key === 'tfn') { %>
                         <td class="px-2 py-1">
-                          <select name="rows[<%= e.id %>][award_classification_id]" class="px-2 py-1 border border-gray-300 rounded text-sm">
+                          <select name="rows[emp_<%= e.id %>][award_classification_id]" class="px-2 py-1 border border-gray-300 rounded text-sm">
                             <option value="">— None —</option>
                             <% classifications.forEach(c => { %>
                               <option value="<%= c.id %>" <%= e.award_classification_id == c.id ? 'selected' : '' %>><%= c.classification %></option>
@@ -129,24 +129,24 @@
                       <% } %>
                       <% cols.forEach(c => { %>
                         <td class="px-1 py-1 text-right">
-                          <input type="number" step="<%= c.step %>" min="0" name="rows[<%= e.id %>][<%= c.key %>]" value="<%= e[c.key] || 0 %>" class="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-right tabular-nums">
+                          <input type="number" step="<%= c.step %>" min="0" name="rows[emp_<%= e.id %>][<%= c.key %>]" value="<%= e[c.key] || 0 %>" class="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-right tabular-nums">
                         </td>
                       <% }) %>
                       <td class="px-2 py-1">
-                        <input type="text" name="rows[<%= e.id %>][payroll_bsb]" value="<%= e.payroll_bsb || '' %>" placeholder="000-000" class="w-24 px-2 py-1 border border-gray-300 rounded text-sm font-mono">
+                        <input type="text" name="rows[emp_<%= e.id %>][payroll_bsb]" value="<%= e.payroll_bsb || '' %>" placeholder="000-000" class="w-24 px-2 py-1 border border-gray-300 rounded text-sm font-mono">
                       </td>
                       <td class="px-2 py-1">
-                        <input type="text" name="rows[<%= e.id %>][payroll_account]" value="<%= e.payroll_account || '' %>" placeholder="000000000" class="w-32 px-2 py-1 border border-gray-300 rounded text-sm font-mono">
+                        <input type="text" name="rows[emp_<%= e.id %>][payroll_account]" value="<%= e.payroll_account || '' %>" placeholder="000000000" class="w-32 px-2 py-1 border border-gray-300 rounded text-sm font-mono">
                       </td>
                     </tr>
 
                     <!-- Hidden mirror inputs so columns NOT shown in this tab still post their current values -->
                     <% const allRateKeys = ['rate_day','rate_ot','rate_dt','rate_night','rate_night_ot','rate_night_dt','rate_weekend','rate_public_holiday','rate_meal','rate_fares_daily']; %>
                     <% allRateKeys.forEach(k => { if (!cols.find(c => c.key === k)) { %>
-                      <input type="hidden" name="rows[<%= e.id %>][<%= k %>]" value="<%= e[k] || 0 %>">
+                      <input type="hidden" name="rows[emp_<%= e.id %>][<%= k %>]" value="<%= e[k] || 0 %>">
                     <% } }) %>
                     <% if (tab.key !== 'tfn') { %>
-                      <input type="hidden" name="rows[<%= e.id %>][award_classification_id]" value="<%= e.award_classification_id || '' %>">
+                      <input type="hidden" name="rows[emp_<%= e.id %>][award_classification_id]" value="<%= e.award_classification_id || '' %>">
                     <% } %>
                   <% }) %>
                 </tbody>

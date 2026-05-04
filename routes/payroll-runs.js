@@ -765,6 +765,15 @@ router.post('/rates', requirePermission('hr_employees'), (req, res) => {
     return res.redirect('/payroll/rates');
   }
 
+  // Pre-validate award_classification_id values so a stale/missing row in
+  // the dropdown doesn't trip the foreign-key constraint and 500 the
+  // whole save. We collect every classification id that's actually
+  // referenced and check them in one query.
+  const validClassIds = new Set();
+  try {
+    db.prepare("SELECT id FROM award_classifications").all().forEach(r => validClassIds.add(r.id));
+  } catch (e) { /* table may be missing on a stale deploy — fall back to allowing nothing */ }
+
   const stmt = db.prepare(`
     UPDATE employees SET
       payment_type = ?, award_classification_id = ?,
@@ -776,14 +785,26 @@ router.post('/rates', requirePermission('hr_employees'), (req, res) => {
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `);
-  let n = 0;
-  const tx = db.transaction(() => {
-    for (const id of Object.keys(data)) {
-      const empId = parseInt(id, 10);
-      if (!empId) continue;
-      const r = data[id];
+
+  // Per-row try/catch so one bad employee doesn't take down the whole
+  // save. The route used to wrap everything in db.transaction() and
+  // any single-row error bubbled up as a 500 + lost the entire batch.
+  // The form posts each row as `rows[emp_<id>][field]`. The `emp_` prefix
+  // is critical: without it, qs treats numeric bracket indices as array
+  // positions and (for low IDs) compacts the result, throwing away the
+  // employee ID entirely. With the prefix, every key stays an object
+  // key regardless of how many rows or how small the IDs.
+  let saved = 0;
+  const failures = [];
+  for (const id of Object.keys(data)) {
+    const empId = parseInt(String(id).replace(/^emp_/, ''), 10);
+    if (!empId) continue;
+    const r = data[id];
+    if (!r || typeof r !== 'object') continue;
+    try {
       const pt = String(r.payment_type || '').toLowerCase();
-      const cid = parseInt(r.award_classification_id, 10) || null;
+      let cid = parseInt(r.award_classification_id, 10);
+      if (!Number.isFinite(cid) || !validClassIds.has(cid)) cid = null;
       stmt.run(
         ['cash', 'tfn', 'abn'].includes(pt) ? pt : '',
         cid,
@@ -795,18 +816,26 @@ router.post('/rates', requirePermission('hr_employees'), (req, res) => {
         String(r.payroll_account || '').trim(),
         empId,
       );
-      n++;
+      saved++;
+    } catch (e) {
+      console.error(`[payroll/rates] Failed to save employee ${empId}: ${e.message}`);
+      failures.push({ empId, error: e.message });
     }
-  });
-  tx();
+  }
 
   logActivity({
     user: req.session.user, action: 'update', entityType: 'employee',
-    entityLabel: 'rates', details: `Bulk-updated rates for ${n} employees`,
+    entityLabel: 'rates', details: `Bulk-updated rates for ${saved} employees${failures.length ? ` (${failures.length} failed)` : ''}`,
     ip: req.ip,
   });
 
-  req.flash('success', `Saved rates for ${n} employees.`);
+  if (failures.length === 0) {
+    req.flash('success', `Saved rates for ${saved} employees.`);
+  } else if (saved > 0) {
+    req.flash('error', `Saved ${saved} employees, ${failures.length} failed: ${failures.slice(0, 3).map(f => '#' + f.empId).join(', ')}${failures.length > 3 ? '…' : ''}. Check the server log.`);
+  } else {
+    req.flash('error', `Save failed for all ${failures.length} employees. ${failures[0] ? 'First error: ' + failures[0].error : ''}`);
+  }
   res.redirect('/payroll/rates');
 });
 
