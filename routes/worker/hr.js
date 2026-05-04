@@ -204,6 +204,11 @@ router.get('/hr/leave', (req, res) => {
     currentM: `${year}-${pad(month + 1)}`,
     todayIso: sydneyToday(),
     recentLeave,
+    // Surface flashes from the submit redirect — without these the layout
+    // would silently swallow success/error toasts and the worker would
+    // think their submission disappeared into the void.
+    flash_success: req.flash('success'),
+    flash_error: req.flash('error'),
   });
 });
 
@@ -217,7 +222,18 @@ router.post('/hr/leave', (req, res) => {
 
   const dates = expandLeaveDates(req.body);
   if (dates.length === 0) {
-    req.flash('error', 'Please select at least one date.');
+    // Be loud about why this failed so the worker isn't left guessing —
+    // log the body shape + redirect with a specific message describing
+    // which mode-specific field was blank.
+    console.warn('[leave] no dates resolved from body:', {
+      mode: req.body.mode, dates: req.body.dates,
+      start_date: req.body.start_date, end_date: req.body.end_date,
+      recur_start: req.body.recur_start, recur_until: req.body.recur_until,
+    });
+    let msg = 'Please pick at least one date.';
+    if (req.body.mode === 'recurring') msg = 'Pick a start, an end, and at least one weekday for the recurring leave.';
+    else if (req.body.mode === 'multiple') msg = 'Add at least one date to the multiple-date list.';
+    req.flash('error', msg);
     return res.redirect('/w/hr/leave');
   }
 
@@ -227,21 +243,32 @@ router.post('/hr/leave', (req, res) => {
   const empId = employee ? employee.id : null;
 
   const insert = db.prepare(`
-    INSERT INTO employee_leave (employee_id, crew_member_id, leave_type, shift_period, start_date, end_date, total_days, reason)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO employee_leave (employee_id, crew_member_id, leave_type, shift_period, start_date, end_date, total_days, reason, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `);
-  const tx = db.transaction(() => {
-    for (const d of capped) {
-      insert.run(empId, worker.id, leaveType, shiftPeriod, d, d, shiftPeriod === 'full_day' ? 1 : 0.5, reason);
-    }
-  });
-  try { tx(); } catch (e) {
-    console.error('Leave insert failed:', e.message);
+  let inserted = 0;
+  try {
+    const tx = db.transaction(() => {
+      for (const d of capped) {
+        const r = insert.run(empId, worker.id, leaveType, shiftPeriod, d, d, shiftPeriod === 'full_day' ? 1 : 0.5, reason);
+        if (r.changes > 0) inserted++;
+      }
+    });
+    tx();
+  } catch (e) {
+    console.error('[leave] insert failed:', e.message, { worker_id: worker.id, dates: capped });
     req.flash('error', 'Could not save leave: ' + e.message);
     return res.redirect('/w/hr/leave');
   }
 
-  req.flash('success', capped.length === 1 ? 'Leave submitted.' : `${capped.length} leave days submitted.`);
+  if (inserted === 0) {
+    console.warn('[leave] tx ran but inserted 0 rows', { worker_id: worker.id, dates: capped });
+    req.flash('error', 'Submission accepted but no rows saved — try again or contact the office.');
+    return res.redirect('/w/hr/leave');
+  }
+
+  console.log('[leave] submitted', { worker_id: worker.id, count: inserted, dates: capped });
+  req.flash('success', inserted === 1 ? 'Leave submitted — pending approval.' : `${inserted} leave days submitted — pending approval.`);
   res.redirect('/w/hr/leave');
 });
 
