@@ -180,6 +180,57 @@
 
 <div class="lv-wrap">
 
+  <!-- Quick inline form — works without ANY JavaScript. Submits directly
+       to /w/hr/leave with mode=single + a single date input. The slide-up
+       sheet remains as a richer option (multiple dates / recurring) but
+       this guarantees a worker can always file a leave request even if
+       the sheet's JS doesn't load. -->
+  <details class="lv-quick" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:10px 14px;margin-bottom:14px;" <% if ((typeof flash_error !== 'undefined' && flash_error && flash_error.length) || (typeof flash_success !== 'undefined' && flash_success && flash_success.length)) { %>open<% } %>>
+    <summary style="cursor:pointer;font-size:0.85rem;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;list-style:none;">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span style="width:26px;height:26px;border-radius:8px;background:rgba(245,158,11,0.18);color:#FCD34D;display:inline-flex;align-items:center;justify-content:center;">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        </span>
+        Quick add leave
+      </span>
+      <span style="font-size:0.7rem;color:rgba(255,255,255,0.45);font-weight:500;">Tap to expand</span>
+    </summary>
+    <form method="POST" action="/w/hr/leave" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+      <input type="hidden" name="mode" value="single">
+      <div style="grid-column:span 2;">
+        <label class="lv-label">Date</label>
+        <input type="date" name="dates" required min="<%= todayIso %>" class="lv-input">
+      </div>
+      <div>
+        <label class="lv-label">Type</label>
+        <select name="leave_type" class="lv-select">
+          <option value="annual">Annual</option>
+          <option value="sick">Sick</option>
+          <option value="personal">Personal</option>
+          <option value="unpaid">Unpaid</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label class="lv-label">Period</label>
+        <select name="shift_period" class="lv-select">
+          <option value="full_day">Full day</option>
+          <option value="day">Day 6a–6p</option>
+          <option value="night">Night 6p–6a</option>
+        </select>
+      </div>
+      <div style="grid-column:span 2;">
+        <label class="lv-label">Reason (optional)</label>
+        <input type="text" name="reason" class="lv-input" placeholder="Optional…" maxlength="200">
+      </div>
+      <button type="submit" class="lv-btn-primary" style="grid-column:span 2;">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        Submit leave request
+      </button>
+    </form>
+  </details>
+
   <!-- Month navigation -->
   <div class="lv-monthbar">
     <a href="/w/hr/leave?m=<%= prevM %>" aria-label="Previous month">
