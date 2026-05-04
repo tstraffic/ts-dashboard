@@ -414,12 +414,25 @@ router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 
     const submittedDate = req.body.submitted_date || today;
     const expiryDate = req.body.expiry_date || null;
     const notes = req.body.notes || sub.notes || '';
+    const hoursSpent = parseFloat(req.body.hours_spent) || 0;
+    const chargeClient = (req.body.charge_client === '1' || req.body.charge_client === 1 || req.body.charge_client === true || req.body.charge_client === 'on') ? 1 : 0;
+    const chargeAmount = parseFloat(req.body.charge_amount) || 0;
+    const councilFeePaid = (req.body.council_fee_paid === '1' || req.body.council_fee_paid === 1 || req.body.council_fee_paid === true || req.body.council_fee_paid === 'on') ? 1 : 0;
+    const councilFeeAmount = parseFloat(req.body.council_fee_amount) || 0;
 
     db.prepare(`
       UPDATE compliance
-      SET description = ?, status = 'submitted', submitted_date = ?, expiry_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+      SET description = ?, status = 'submitted', submitted_date = ?, expiry_date = ?, notes = ?,
+          hours_spent = ?,
+          charge_client = ?, charge_amount = ?,
+          council_fee_paid = ?, council_fee_amount = ?,
+          updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(desc, submittedDate, expiryDate, notes, sub.id);
+    `).run(desc, submittedDate, expiryDate, notes,
+           hoursSpent,
+           chargeClient, chargeAmount,
+           councilFeePaid, councilFeeAmount,
+           sub.id);
 
     planStatus.syncParentStatus(db, sub.parent_id);
 

@@ -7355,6 +7355,26 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 155: hours_spent column on compliance — captured per
+  // sub-plan at upload-and-submit time so each Sub-Plan records the
+  // hours of effort that went into it. Cost / fee fields already exist
+  // (costs, charge_client, charge_amount, council_fee_paid,
+  // council_fee_amount); this just adds the time dimension.
+  // =============================================
+  if (!isMigrationApplied.get(155)) {
+    try {
+      const cols = db.prepare("PRAGMA table_info(compliance)").all().map(c => c.name);
+      if (!cols.includes('hours_spent')) {
+        try { db.exec("ALTER TABLE compliance ADD COLUMN hours_spent NUMERIC NOT NULL DEFAULT 0"); } catch (e) {}
+      }
+      recordMigration.run(155, 'compliance: hours_spent column for sub-plan effort tracking');
+      console.log('Migration 155 applied: compliance.hours_spent column');
+    } catch (e) {
+      console.error('Migration 155 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

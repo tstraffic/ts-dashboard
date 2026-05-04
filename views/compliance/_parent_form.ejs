@@ -179,6 +179,19 @@
         <% } %>
       <% }) %>
 
+      <script>
+        // "Charge client" / "Council fee" toggles enable their matching
+        // amount input — same pattern as the create-page count grid.
+        document.querySelectorAll('.charge-toggle').forEach(cb => {
+          cb.addEventListener('change', e => {
+            const target = document.getElementById(cb.dataset.target);
+            if (!target) return;
+            target.disabled = !cb.checked;
+            if (cb.checked) target.focus();
+          });
+        });
+      </script>
+
       <!-- Add a sub-plan of any type -->
       <details class="mt-4 group">
         <summary class="cursor-pointer inline-flex items-center text-sm font-medium text-brand-600 hover:text-brand-700 list-none">

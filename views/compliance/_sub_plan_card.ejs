@@ -122,20 +122,39 @@
             class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"><%= sub.notes || '' %></textarea>
         </div>
 
-        <% if (isROL) { %>
-          <div class="sm:col-span-2 flex items-center">
-            <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extension" class="inline" id="ext-<%= sub.id %>">
-              <%- include('../partials/csrf') %>
-              <input type="hidden" name="extension_required" value="<%= sub.extension_required ? '0' : '1' %>">
-            </form>
-            <label class="inline-flex items-center text-xs text-gray-700 cursor-pointer">
-              <input type="checkbox" <%= sub.extension_required ? 'checked' : '' %>
-                onchange="document.getElementById('ext-<%= sub.id %>').submit()"
-                class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 mr-2">
-              ROL extension required
-            </label>
-          </div>
-        <% } %>
+        <!-- Effort + cost capture, all part of the same submission action. -->
+        <div class="sm:col-span-2 pt-3 border-t border-gray-200">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Hours spent</label>
+          <input type="number" name="hours_spent" min="0" step="0.25" value="<%= sub.hours_spent || '' %>"
+            placeholder="0"
+            class="w-32 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="inline-flex items-center text-xs font-medium text-gray-700 cursor-pointer mb-1">
+            <input type="checkbox" name="charge_client" value="1" <%= sub.charge_client ? 'checked' : '' %>
+              class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 mr-2 charge-toggle"
+              data-target="charge_amount_<%= sub.id %>">
+            Charge client
+          </label>
+          <input type="number" name="charge_amount" id="charge_amount_<%= sub.id %>" min="0" step="0.01" value="<%= sub.charge_amount || '' %>"
+            placeholder="Amount ($)"
+            <%= sub.charge_client ? '' : 'disabled' %>
+            class="ml-6 w-40 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="inline-flex items-center text-xs font-medium text-gray-700 cursor-pointer mb-1">
+            <input type="checkbox" name="council_fee_paid" value="1" <%= sub.council_fee_paid ? 'checked' : '' %>
+              class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 mr-2 charge-toggle"
+              data-target="council_fee_amount_<%= sub.id %>">
+            Council cost / fee
+          </label>
+          <input type="number" name="council_fee_amount" id="council_fee_amount_<%= sub.id %>" min="0" step="0.01" value="<%= sub.council_fee_amount || '' %>"
+            placeholder="Amount ($)"
+            <%= sub.council_fee_paid ? '' : 'disabled' %>
+            class="ml-6 w-40 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
+        </div>
 
         <div class="sm:col-span-2 flex items-center justify-end">
           <button type="submit" class="px-3 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-md">
