@@ -333,47 +333,61 @@
     const archived = (recentLeave || []).filter(l => l.status === 'cancelled' || l.status === 'rejected').sort((a, b) => b.start_date.localeCompare(a.start_date));
   %>
 
-  <% function sectionHead(title, count, accent) { %>
-    <div class="flex items-center justify-between mt-5 mb-2 px-1">
-      <h3 class="text-[11px] font-bold uppercase tracking-wider" style="color:<%= accent %>;"><%= title %></h3>
-      <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.55);"><%= count %></span>
-    </div>
-  <% } %>
-
-  <% if (pending.length > 0) { %>
-    <% sectionHead('Pending approval', pending.length, '#FCD34D') %>
-    <% pending.forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
-  <% } %>
-
-  <% if (upcoming.length > 0) { %>
-    <% sectionHead('Upcoming approved leave', upcoming.length, '#6EE7B7') %>
-    <% upcoming.forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
-  <% } %>
-
-  <% if (past.length > 0) { %>
-    <% sectionHead('Recent past', Math.min(past.length, 5), 'rgba(255,255,255,0.5)') %>
-    <% past.slice(0, 5).forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
-    <% if (past.length > 5) { %>
-      <details class="mt-1">
-        <summary style="cursor:pointer;font-size:0.7rem;color:rgba(255,255,255,0.45);padding:6px 4px;list-style:none;">
-          Show <%= past.length - 5 %> older approved leave<%= past.length - 5 === 1 ? '' : 's' %> ›
-        </summary>
-        <% past.slice(5).forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
-      </details>
-    <% } %>
-  <% } %>
-
-  <% if (archived.length > 0) { %>
-    <details class="mt-5">
+  <% /* Every group is now a <details> so the page stays compact —
+        Pending and Upcoming default to OPEN (action items the worker
+        usually wants to see); Recent past and Archived default to
+        CLOSED so the page doesn't snowball as history accumulates. */ %>
+  <% function leaveSection(title, items, accent, opts) {
+       opts = opts || {};
+       const dim = opts.dim ? ' opacity-70' : '';
+       const open = opts.open ? ' open' : ''; %>
+    <details class="mt-5"<%- open %>>
       <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;padding:6px 4px;">
-        <h3 class="text-[11px] font-bold uppercase tracking-wider" style="color:rgba(255,255,255,0.4);">Archived (cancelled &amp; rejected)</h3>
-        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);"><%= archived.length %></span>
+        <span style="display:inline-flex;align-items:center;gap:8px;">
+          <svg class="lv-chev" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" style="color:rgba(255,255,255,0.55);transition:transform 0.15s;"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          <h3 class="text-[11px] font-bold uppercase tracking-wider" style="color:<%= accent %>;"><%= title %></h3>
+        </span>
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.55);"><%= items.length %></span>
       </summary>
-      <div class="opacity-70 mt-1">
-        <% archived.forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
+      <div class="mt-1<%= dim %>">
+        <% items.forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
       </div>
     </details>
   <% } %>
+
+  <style>
+    /* Rotate the section chevron when its <details> is open. Tiny
+       affordance so collapsed/expanded state is obvious. */
+    details[open] > summary .lv-chev { transform: rotate(90deg); }
+  </style>
+
+  <% if (pending.length > 0)  { leaveSection('Pending approval',         pending,  '#FCD34D',                  { open: true })  } %>
+  <% if (upcoming.length > 0) { leaveSection('Upcoming approved leave',  upcoming, '#6EE7B7',                  { open: true })  } %>
+
+  <% if (past.length > 0) { %>
+    <details class="mt-5">
+      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;padding:6px 4px;">
+        <span style="display:inline-flex;align-items:center;gap:8px;">
+          <svg class="lv-chev" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" style="color:rgba(255,255,255,0.55);transition:transform 0.15s;"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          <h3 class="text-[11px] font-bold uppercase tracking-wider" style="color:rgba(255,255,255,0.5);">Recent past</h3>
+        </span>
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.55);"><%= past.length %></span>
+      </summary>
+      <div class="mt-1">
+        <% past.slice(0, 5).forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
+        <% if (past.length > 5) { %>
+          <details class="mt-1">
+            <summary style="cursor:pointer;font-size:0.7rem;color:rgba(255,255,255,0.45);padding:6px 4px;list-style:none;">
+              Show <%= past.length - 5 %> older approved leave<%= past.length - 5 === 1 ? '' : 's' %> ›
+            </summary>
+            <% past.slice(5).forEach(l => { %><%- leaveItem(l, typeof csrfToken !== 'undefined' ? csrfToken : '') %><% }) %>
+          </details>
+        <% } %>
+      </div>
+    </details>
+  <% } %>
+
+  <% if (archived.length > 0) { leaveSection('Archived (cancelled & rejected)', archived, 'rgba(255,255,255,0.4)', { dim: true }) } %>
 
   <% if (pending.length === 0 && upcoming.length === 0 && past.length === 0 && archived.length === 0) { %>
     <p class="text-xs text-white/35 italic mt-5 px-1 text-center">No leave on record yet — use Quick add above to file your first request.</p>
