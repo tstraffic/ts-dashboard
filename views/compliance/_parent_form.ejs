@@ -145,7 +145,19 @@
     </div>
   </form>
 
-  <% if (isEdit) { %>
+  <% if (isEdit) {
+    // Plan-wide tallies — sums across every sub-plan, regardless of
+    // status, so the totals stay visible even before submission.
+    let totalHours = 0, totalCharge = 0, totalCouncilFee = 0, submittedCount = 0;
+    (subPlans || []).forEach(s => {
+      totalHours += parseFloat(s.hours_spent) || 0;
+      if (s.charge_client) totalCharge += parseFloat(s.charge_amount) || 0;
+      if (s.council_fee_paid) totalCouncilFee += parseFloat(s.council_fee_amount) || 0;
+      if (['submitted','approved'].includes(s.status)) submittedCount += 1;
+    });
+    const fmtMoney = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
+    const fmtHours = n => (Math.round(n * 100) / 100) + ' hr' + (n === 1 ? '' : 's');
+  %>
     <!-- Sub-plan grid (edit only) -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
       <div class="flex items-center justify-between mb-4">
@@ -154,6 +166,28 @@
           <p class="text-sm text-gray-500">Each sub-plan becomes "submitted" the moment you upload its files. Use the buttons after that to approve or reject.</p>
         </div>
       </div>
+
+      <% if (subPlans && subPlans.length > 0) { %>
+        <!-- Plan totals strip — rolls up hours and money across all sub-plans -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5 p-4 bg-gradient-to-br from-brand-50 to-blue-50 border border-brand-100 rounded-lg">
+          <div>
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Sub-plans</div>
+            <div class="text-lg font-bold text-gray-900 mt-0.5"><%= submittedCount %> / <%= subPlans.length %> <span class="text-xs font-normal text-gray-500">submitted</span></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Total hours</div>
+            <div class="text-lg font-bold text-gray-900 mt-0.5"><%= fmtHours(totalHours) %></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">To charge client</div>
+            <div class="text-lg font-bold text-emerald-700 mt-0.5"><%= fmtMoney(totalCharge) %></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Council fees</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5"><%= fmtMoney(totalCouncilFee) %></div>
+          </div>
+        </div>
+      <% } %>
 
       <% if (!subPlans || subPlans.length === 0) { %>
         <div class="text-center py-8 text-sm text-gray-500 bg-gray-50 rounded-lg">No sub-plans yet. Add one below.</div>

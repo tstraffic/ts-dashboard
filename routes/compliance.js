@@ -204,7 +204,9 @@ router.get('/', (req, res) => {
   const subPlansByParent = {};
   if (parentIds.length > 0) {
     const placeholders = parentIds.map(() => '?').join(',');
-    const subs = db.prepare(`SELECT id, parent_id, item_type, reference_number, description, status, expiry_date, extension_required FROM compliance WHERE parent_id IN (${placeholders}) ORDER BY item_type, reference_number`).all(...parentIds);
+    const subs = db.prepare(`SELECT id, parent_id, item_type, reference_number, description, status, expiry_date, extension_required,
+      hours_spent, charge_client, charge_amount, council_fee_paid, council_fee_amount
+      FROM compliance WHERE parent_id IN (${placeholders}) ORDER BY item_type, reference_number`).all(...parentIds);
     const docCounts = db.prepare(`SELECT compliance_id, COUNT(*) as c FROM compliance_documents WHERE compliance_id IN (SELECT id FROM compliance WHERE parent_id IN (${placeholders})) GROUP BY compliance_id`).all(...parentIds);
     const dcMap = {};
     docCounts.forEach(r => { dcMap[r.compliance_id] = r.c; });
