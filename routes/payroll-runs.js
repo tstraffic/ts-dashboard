@@ -756,87 +756,117 @@ router.get('/rates', requirePermission('hr_employees'), (req, res) => {
   });
 });
 
-// POST /payroll/rates — bulk update
+// POST /payroll/rates — bulk update.
+//
+// Wrapped in a top-level try/catch so any unexpected schema drift on a
+// stale deploy (missing column, FK mismatch, anything else) lands as a
+// red flash banner instead of an Express 500. Inspect the server log
+// for the original error text — it's printed there with a stack trace.
 router.post('/rates', requirePermission('hr_employees'), (req, res) => {
-  const db = getDb();
-  const data = req.body && req.body.rows;
-  if (!data || typeof data !== 'object') {
-    req.flash('error', 'No rate data submitted.');
+  try {
+    const db = getDb();
+    const data = req.body && req.body.rows;
+    if (!data || typeof data !== 'object') {
+      req.flash('error', 'No rate data submitted.');
+      return res.redirect('/payroll/rates');
+    }
+
+    // Probe which rate/payroll columns actually exist on this DB. Earlier
+    // versions of the schema were missing some of these (rate_meal,
+    // rate_fares_daily, rate_public_holiday, payroll_bsb, payroll_account,
+    // award_classification_id) and a stale deploy would 500 the whole
+    // save the moment we tried to UPDATE a non-existent column. Build the
+    // SET clause from the columns that exist so the route works on any
+    // deploy generation.
+    const empCols = new Set(db.prepare("PRAGMA table_info(employees)").all().map(c => c.name));
+    const FIELDS = [
+      { col: 'payment_type',            kind: 'pt'    },
+      { col: 'award_classification_id', kind: 'cid'   },
+      { col: 'rate_day',                kind: 'num'   },
+      { col: 'rate_ot',                 kind: 'num'   },
+      { col: 'rate_dt',                 kind: 'num'   },
+      { col: 'rate_night',              kind: 'num'   },
+      { col: 'rate_night_ot',           kind: 'num'   },
+      { col: 'rate_night_dt',           kind: 'num'   },
+      { col: 'rate_weekend',            kind: 'num'   },
+      { col: 'rate_public_holiday',     kind: 'num'   },
+      { col: 'rate_meal',               kind: 'num'   },
+      { col: 'rate_fares_daily',        kind: 'num'   },
+      { col: 'payroll_bsb',             kind: 'str'   },
+      { col: 'payroll_account',         kind: 'str'   },
+    ].filter(f => empCols.has(f.col));
+    if (FIELDS.length === 0) {
+      req.flash('error', 'Rate columns missing from database — migrations may not have run.');
+      return res.redirect('/payroll/rates');
+    }
+
+    // Pre-validate award_classification_id values so a stale/missing row
+    // in the dropdown doesn't trip the foreign-key constraint.
+    const validClassIds = new Set();
+    try {
+      db.prepare("SELECT id FROM award_classifications").all().forEach(r => validClassIds.add(r.id));
+    } catch (e) { /* table missing — treat as no valid ids */ }
+
+    const setClause = FIELDS.map(f => `${f.col} = ?`).join(', ') + ', updated_at = CURRENT_TIMESTAMP';
+    const stmt = db.prepare(`UPDATE employees SET ${setClause} WHERE id = ?`);
+
+    // Per-row try/catch so one bad employee doesn't take down the whole
+    // save. The form posts each row as `rows[emp_<id>][field]`. The
+    // `emp_` prefix is critical: without it, qs treats numeric bracket
+    // indices as array positions and (for low IDs) compacts the result,
+    // throwing away the employee ID entirely.
+    let saved = 0;
+    const failures = [];
+    for (const id of Object.keys(data)) {
+      const empId = parseInt(String(id).replace(/^emp_/, ''), 10);
+      if (!empId) continue;
+      const r = data[id];
+      if (!r || typeof r !== 'object') continue;
+      try {
+        const values = FIELDS.map(f => {
+          if (f.kind === 'pt') {
+            const pt = String(r.payment_type || '').toLowerCase();
+            return ['cash', 'tfn', 'abn'].includes(pt) ? pt : '';
+          }
+          if (f.kind === 'cid') {
+            const cid = parseInt(r.award_classification_id, 10);
+            return Number.isFinite(cid) && validClassIds.has(cid) ? cid : null;
+          }
+          if (f.kind === 'num') return toNum(r[f.col]);
+          if (f.kind === 'str') return String(r[f.col] || '').trim();
+          return null;
+        });
+        stmt.run(...values, empId);
+        saved++;
+      } catch (e) {
+        console.error(`[payroll/rates] Failed to save employee ${empId}: ${e.message}`);
+        failures.push({ empId, error: e.message });
+      }
+    }
+
+    try {
+      logActivity({
+        user: req.session.user, action: 'update', entityType: 'employee',
+        entityLabel: 'rates', details: `Bulk-updated rates for ${saved} employees${failures.length ? ` (${failures.length} failed)` : ''}`,
+        ip: req.ip,
+      });
+    } catch (e) { /* audit log shouldn't block the save */ }
+
+    if (failures.length === 0) {
+      req.flash('success', `Saved rates for ${saved} employees.`);
+    } else if (saved > 0) {
+      req.flash('error', `Saved ${saved} employees, ${failures.length} failed: ${failures.slice(0, 3).map(f => '#' + f.empId).join(', ')}${failures.length > 3 ? '…' : ''}. Check the server log.`);
+    } else {
+      req.flash('error', `Save failed for all ${failures.length} employees. ${failures[0] ? 'First error: ' + failures[0].error : ''}`);
+    }
+    return res.redirect('/payroll/rates');
+  } catch (err) {
+    // Catch-all — turns any unhandled exception (schema drift, FK trip,
+    // anything else) into a flash banner instead of a generic 500 page.
+    console.error('[payroll/rates] Unhandled error:', err);
+    req.flash('error', 'Save failed: ' + (err && err.message ? err.message : 'unknown error') + '. Check the server log.');
     return res.redirect('/payroll/rates');
   }
-
-  // Pre-validate award_classification_id values so a stale/missing row in
-  // the dropdown doesn't trip the foreign-key constraint and 500 the
-  // whole save. We collect every classification id that's actually
-  // referenced and check them in one query.
-  const validClassIds = new Set();
-  try {
-    db.prepare("SELECT id FROM award_classifications").all().forEach(r => validClassIds.add(r.id));
-  } catch (e) { /* table may be missing on a stale deploy — fall back to allowing nothing */ }
-
-  const stmt = db.prepare(`
-    UPDATE employees SET
-      payment_type = ?, award_classification_id = ?,
-      rate_day = ?, rate_ot = ?, rate_dt = ?,
-      rate_night = ?, rate_night_ot = ?, rate_night_dt = ?,
-      rate_weekend = ?, rate_public_holiday = ?,
-      rate_meal = ?, rate_fares_daily = ?,
-      payroll_bsb = ?, payroll_account = ?,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `);
-
-  // Per-row try/catch so one bad employee doesn't take down the whole
-  // save. The route used to wrap everything in db.transaction() and
-  // any single-row error bubbled up as a 500 + lost the entire batch.
-  // The form posts each row as `rows[emp_<id>][field]`. The `emp_` prefix
-  // is critical: without it, qs treats numeric bracket indices as array
-  // positions and (for low IDs) compacts the result, throwing away the
-  // employee ID entirely. With the prefix, every key stays an object
-  // key regardless of how many rows or how small the IDs.
-  let saved = 0;
-  const failures = [];
-  for (const id of Object.keys(data)) {
-    const empId = parseInt(String(id).replace(/^emp_/, ''), 10);
-    if (!empId) continue;
-    const r = data[id];
-    if (!r || typeof r !== 'object') continue;
-    try {
-      const pt = String(r.payment_type || '').toLowerCase();
-      let cid = parseInt(r.award_classification_id, 10);
-      if (!Number.isFinite(cid) || !validClassIds.has(cid)) cid = null;
-      stmt.run(
-        ['cash', 'tfn', 'abn'].includes(pt) ? pt : '',
-        cid,
-        toNum(r.rate_day), toNum(r.rate_ot), toNum(r.rate_dt),
-        toNum(r.rate_night), toNum(r.rate_night_ot), toNum(r.rate_night_dt),
-        toNum(r.rate_weekend), toNum(r.rate_public_holiday),
-        toNum(r.rate_meal), toNum(r.rate_fares_daily),
-        String(r.payroll_bsb || '').trim(),
-        String(r.payroll_account || '').trim(),
-        empId,
-      );
-      saved++;
-    } catch (e) {
-      console.error(`[payroll/rates] Failed to save employee ${empId}: ${e.message}`);
-      failures.push({ empId, error: e.message });
-    }
-  }
-
-  logActivity({
-    user: req.session.user, action: 'update', entityType: 'employee',
-    entityLabel: 'rates', details: `Bulk-updated rates for ${saved} employees${failures.length ? ` (${failures.length} failed)` : ''}`,
-    ip: req.ip,
-  });
-
-  if (failures.length === 0) {
-    req.flash('success', `Saved rates for ${saved} employees.`);
-  } else if (saved > 0) {
-    req.flash('error', `Saved ${saved} employees, ${failures.length} failed: ${failures.slice(0, 3).map(f => '#' + f.empId).join(', ')}${failures.length > 3 ? '…' : ''}. Check the server log.`);
-  } else {
-    req.flash('error', `Save failed for all ${failures.length} employees. ${failures[0] ? 'First error: ' + failures[0].error : ''}`);
-  }
-  res.redirect('/payroll/rates');
 });
 
 // ============================================================================
