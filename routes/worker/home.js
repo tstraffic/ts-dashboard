@@ -243,10 +243,22 @@ router.get('/home', async (req, res) => {
   try {
     const JP = ['vehicle_prestart','risk_toolbox','tc_prestart','team_leader','post_shift_vehicle'];
     const fromS = localIso(new Date(Date.now() - 7 * 86400000));
+    // Only count shifts the worker actually accepted/worked. Skip
+    // anything still pending acceptance, declined, cancelled, or where
+    // the parent booking was cancelled — none of those are expected to
+    // have Job-Pack checklists filed against them, so they shouldn't
+    // pull the worker's compliance percentage down.
     const allocations = db.prepare(`
-      SELECT id, booking_id FROM crew_allocations
-      WHERE crew_member_id = ? AND status != 'cancelled'
-        AND date(allocation_date) >= date(?)
+      SELECT ca.id, ca.booking_id
+      FROM crew_allocations ca
+      LEFT JOIN bookings b ON ca.booking_id = b.id
+      WHERE ca.crew_member_id = ?
+        AND ca.status IN ('confirmed','completed')
+        AND date(ca.allocation_date) >= date(?)
+        AND (b.id IS NULL OR (
+          b.deleted_at IS NULL
+          AND b.status NOT IN ('cancelled','late_cancellation')
+        ))
     `).all(member.id, fromS);
     const distinctBookings = new Set(allocations.map(a => a.booking_id).filter(Boolean));
     const allocCount = allocations.length;

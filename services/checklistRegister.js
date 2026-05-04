@@ -57,11 +57,15 @@ function countWindow(db, from, to) {
       AND (deleted_at IS NULL)
       AND status NOT IN ('cancelled','late_cancellation')
   `).get(fromS, toS).c;
+  // Only allocations the worker accepted/worked count toward expected
+  // checklists. Pending requests, declines and cancellations don't ever
+  // produce a Job-Pack — so counting them would unfairly drag the
+  // compliance % down for shifts the worker never actually started.
   const a = db.prepare(`
     SELECT COUNT(*) AS c FROM crew_allocations ca
     LEFT JOIN bookings b ON ca.booking_id = b.id
     WHERE date(ca.allocation_date) >= date(?) AND date(ca.allocation_date) < date(?)
-      AND ca.status != 'cancelled'
+      AND ca.status IN ('confirmed','completed')
       AND (b.id IS NULL OR (b.deleted_at IS NULL AND b.status NOT IN ('cancelled','late_cancellation')))
   `).get(fromS, toS).c;
   return { bookings: b, allocations: a };
@@ -193,7 +197,7 @@ function workerBreakdown(db, from, to) {
     LEFT JOIN crew_members cm ON ca.crew_member_id = cm.id
     LEFT JOIN bookings b ON ca.booking_id = b.id
     WHERE date(ca.allocation_date) >= date(?) AND date(ca.allocation_date) < date(?)
-      AND ca.status != 'cancelled'
+      AND ca.status IN ('confirmed','completed')
       AND (b.id IS NULL OR (b.deleted_at IS NULL AND b.status NOT IN ('cancelled','late_cancellation')))
     GROUP BY ca.crew_member_id, cm.full_name
   `).all(fromS, toS);
