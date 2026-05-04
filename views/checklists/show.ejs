@@ -561,15 +561,46 @@ window._editItemViaPicker = function (itemId) {
     }).catch(function () {});
   }
 
+  // Edge auto-scroll while a drag is in flight — when the cursor sits
+  // within 80px of the top or bottom of the viewport, scroll the page
+  // so the user can keep dragging past the visible area instead of
+  // getting stuck. Activated on dragstart, torn down on dragend.
+  var scrollY = 0;          // latest pointer Y (viewport coords)
+  var scrollRaf = null;
+  function startEdgeScroll() {
+    if (scrollRaf) return;
+    var EDGE = 80, MAX_PX = 18;
+    function tick() {
+      var h = window.innerHeight;
+      var dy = 0;
+      if (scrollY < EDGE)         dy = -((EDGE - scrollY) / EDGE) * MAX_PX;
+      else if (scrollY > h - EDGE) dy =  ((scrollY - (h - EDGE)) / EDGE) * MAX_PX;
+      if (dy !== 0) window.scrollBy(0, dy);
+      scrollRaf = requestAnimationFrame(tick);
+    }
+    scrollRaf = requestAnimationFrame(tick);
+  }
+  function stopEdgeScroll() {
+    if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
+  }
+  // Capture the latest pointer Y from any dragover bubbling up.
+  document.addEventListener('dragover', function (e) {
+    if (!dragId) return;
+    scrollY = e.clientY;
+  }, true);
+
   list.querySelectorAll('.cl-row').forEach(function (row) {
     row.addEventListener('dragstart', function (e) {
       dragId = row.dataset.itemId;
       row.classList.add('opacity-50');
       try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', row.dataset.itemId); } catch (_) {}
+      scrollY = e.clientY != null ? e.clientY : 0;
+      startEdgeScroll();
     });
     row.addEventListener('dragend', function () {
       row.classList.remove('opacity-50');
       dragId = null;
+      stopEdgeScroll();
     });
     row.addEventListener('dragover', function (e) {
       if (!dragId) return;
