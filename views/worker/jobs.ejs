@@ -277,14 +277,20 @@
       <% }) %>
     <% } %>
 
-    <!-- Confirmed (this week only) -->
+    <!-- This week's shifts (confirmed + finished within the visible week
+         so navigating backward to a past week shows the shifts that
+         were actually worked). -->
+    <%
+      var weekTotal = 0;
+      Object.keys(confirmedByDate).forEach(function (k) { weekTotal += confirmedByDate[k].length; });
+    %>
     <div class="ws-section-head">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4" style="color:#6EE7B7;"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-      <span class="ws-section-title confirmed">Confirmed (<%= confirmed.filter(s => s.allocation_date >= weekStartIso && s.allocation_date <= weekEndIso).length %>)</span>
+      <span class="ws-section-title confirmed">This week (<%= weekTotal %>)</span>
     </div>
 
     <% if (Object.keys(confirmedByDate).length === 0) { %>
-      <p class="text-sm italic" style="color:rgba(255,255,255,0.4); padding-left: 6px;">No confirmed shifts this week.</p>
+      <p class="text-sm italic" style="color:rgba(255,255,255,0.4); padding-left: 6px;">No shifts this week.</p>
     <% } else { %>
       <% Object.keys(confirmedByDate).sort().forEach(function (date) {
         var d = new Date(date + 'T00:00:00');
@@ -320,7 +326,15 @@
                 </p>
               <% } %>
               <div class="ws-shift-pills">
-                <span class="ws-pill confirmed">Accepted</span>
+                <% if (s.status === 'completed') { %>
+                  <span class="ws-pill completed">Completed</span>
+                <% } else if (s.status === 'declined') { %>
+                  <span class="ws-pill declined">Declined</span>
+                <% } else if (s.allocation_date < today) { %>
+                  <span class="ws-pill past">Past</span>
+                <% } else { %>
+                  <span class="ws-pill confirmed">Accepted</span>
+                <% } %>
                 <% if (s.role_on_site) { %>
                   <span class="ws-pill role">as <%= s.role_on_site.replace(/_/g, ' ') %></span>
                 <% } %>

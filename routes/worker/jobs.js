@@ -178,8 +178,51 @@ router.get('/jobs', (req, res) => {
   // Filter confirmed shifts down to the visible week — Requests stay
   // unfiltered (always visible across all weeks) so workers don't miss
   // a pending acceptance by flipping forward.
-  const confirmedThisWeek = confirmed.filter(s =>
+  // The list also pulls in past shifts that fall inside the visible week
+  // (drawn from `finished`) so navigating backward shows what the worker
+  // actually worked, not an empty week. The Past tab still renders the
+  // raw chronological all-time list — these two surfaces stay in sync
+  // because both are sourced from crew_allocations.
+  const confirmedFromUpcoming = confirmed.filter(s =>
     s.allocation_date >= weekStartIso && s.allocation_date <= weekEndIso
+  );
+  // Refetch any shifts in the visible week that landed in the "finished"
+  // bucket (status completed/declined OR allocation_date < today).
+  // The earlier finished query has LIMIT 20 so older weeks could miss
+  // rows — pull a dedicated set for the visible window with no limit.
+  const finishedThisWeek = db.prepare(`
+    SELECT ca.*,
+      COALESCE(j.job_number, b.booking_number) AS job_number,
+      COALESCE(j.job_name,   b.title)          AS job_name,
+      COALESCE(j.client,     b.title)          AS client,
+      COALESCE(j.site_address, b.site_address) AS site_address,
+      COALESCE(j.suburb,     b.suburb)         AS suburb,
+      j.project_name, j.state,
+      u.full_name AS supervisor_name,
+      CASE WHEN ca.job_id IS NULL AND ca.booking_id IS NOT NULL
+           THEN 'booking' ELSE 'allocation' END AS source
+    FROM crew_allocations ca
+    LEFT JOIN jobs j     ON ca.job_id = j.id
+    LEFT JOIN bookings b ON ca.booking_id = b.id
+    LEFT JOIN users u    ON j.ops_supervisor_id = u.id
+    WHERE ca.crew_member_id = ?
+      AND ca.status != 'cancelled'
+      AND (ca.status IN ('completed','declined','confirmed') OR ca.allocation_date < ?)
+      AND ca.allocation_date BETWEEN ? AND ?
+    ORDER BY ca.allocation_date ASC, ca.start_time ASC
+  `).all(worker.id, today, weekStartIso, weekEndIso);
+
+  // Merge upcoming-confirmed + finished-this-week, dedup by allocation id.
+  const seen = new Set();
+  const confirmedThisWeek = [];
+  [...confirmedFromUpcoming, ...finishedThisWeek].forEach(s => {
+    const k = s.id || `${s.allocation_date}-${s.start_time}-${s.booking_id || ''}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    confirmedThisWeek.push(s);
+  });
+  confirmedThisWeek.sort((a, b) =>
+    (a.allocation_date + (a.start_time || '')).localeCompare(b.allocation_date + (b.start_time || ''))
   );
 
   // Day-by-day count for the strip indicators.
