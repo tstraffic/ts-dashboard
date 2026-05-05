@@ -27,6 +27,7 @@ const PERMISSIONS = {
   dashboard:     ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
   jobs:          ['admin', 'operations', 'planning', 'finance', 'sales', 'management'],
   projects:      ['admin', 'operations', 'planning', 'finance', 'sales', 'management'],
+  tenders:       ['admin', 'planning', 'sales', 'management'],
   clients:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
   notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
 

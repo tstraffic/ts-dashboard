@@ -39,7 +39,15 @@
       <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
       Back
     </a>
-    <h1 class="text-2xl font-bold text-gray-900"><%= pageTitle %></h1>
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <h1 class="text-2xl font-bold text-gray-900"><%= pageTitle %></h1>
+      <% if (isEdit && typeof tender !== 'undefined' && tender) { %>
+        <a href="/tenders/<%= tender.id %>" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-50 text-purple-700 ring-1 ring-purple-600/20 hover:bg-purple-100">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+          Tender <%= tender.tender_number %>
+        </a>
+      <% } %>
+    </div>
   </div>
 
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
