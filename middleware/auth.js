@@ -24,16 +24,16 @@ function normaliseRole(role) {
 //        hr (HR modules + limited ops), sales (CRM + limited ops)
 const PERMISSIONS = {
   // ── Shared ──
-  dashboard:     ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
+  dashboard:     ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts', 'safety'],
   jobs:          ['admin', 'operations', 'planning', 'finance', 'sales', 'management'],
   projects:      ['admin', 'operations', 'planning', 'finance', 'sales', 'management'],
   tenders:       ['admin', 'planning', 'sales', 'management'],
   clients:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
-  notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
+  notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts', 'safety'],
 
   // ── Operations only (no planning) ──
   tasks:         ['admin', 'operations', 'planning'],  // planning sees only their own + plan-linked tasks
-  incidents:     ['admin', 'operations'],
+  incidents:     ['admin', 'operations', 'safety'],
   contacts:      ['admin', 'operations', 'hr', 'sales'],
   timesheets:    ['admin', 'operations', 'finance'],
   crew:          ['admin', 'operations'],
@@ -52,10 +52,13 @@ const PERMISSIONS = {
   updates:       ['admin', 'planning'],
 
   // ── Site audits (safety/ops/planning/admin) ──
-  audits:        ['admin', 'operations', 'planning', 'management'],
+  audits:        ['admin', 'operations', 'planning', 'management', 'safety'],
 
   // ── Checklist templates (admin/planning manage templates, ops can view) ──
-  checklists:    ['admin', 'operations', 'planning'],
+  checklists:    ['admin', 'operations', 'planning', 'safety'],
+
+  // ── SWMS register (Safety-led, ops/planning can view) ──
+  swms:          ['admin', 'safety', 'operations', 'planning'],
 
   // ── Finance / Admin ──
   // `finance` is the section gate — controls whether the Finance heading
