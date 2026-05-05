@@ -107,8 +107,12 @@
     <% } %>
     <% } %>
 
-    <%/* ── SAFETY SECTION (safety role) — Site Audits, Incidents, Checklists ── */%>
-    <% if (user && user.role === 'safety') { %>
+    <%/* ── SAFETY SECTION — Site Audits, Incidents, Checklists, SWMS.
+         Visible to safety + admin. Other roles already see Site Audits /
+         Incidents / Checklists inside their Planning / Operations sections;
+         admins see the Safety group too so they can reach SWMS, which has
+         no other home in the sidebar. */%>
+    <% if (user && (user.role === 'safety' || user.role === 'admin')) { %>
     <div class="pt-3 mt-2 border-t border-white/10">
       <p class="px-3 text-[10px] font-bold text-brand-400/45 uppercase tracking-widest mb-1.5">Safety</p>
     </div>
