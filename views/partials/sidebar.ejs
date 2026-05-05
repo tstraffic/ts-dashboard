@@ -99,16 +99,13 @@
       <% if (b.compliance) { %><span class="sidebar-badge bg-blue-500 text-white"><%= b.compliance %></span><% } %>
     </a>
     <% } %>
-    <% if (canAccess(user, 'audits')) { %>
-    <a href="/audits" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'audits' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
-      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
-      <span class="flex-1">Site Audits</span>
-    </a>
-    <% } %>
     <% } %>
 
-    <%/* ── SAFETY SECTION (safety role) — Site Audits, Incidents, Checklists ── */%>
-    <% if (user && user.role === 'safety') { %>
+    <%/* ── SAFETY SECTION — Site Audits, Incidents, Checklists, SWMS.
+         Single home for all four. Visible to anyone whose role can hit at
+         least one of them — gating each link below by its own canAccess
+         keeps users from seeing modules they can't open. */%>
+    <% if (canAccess(user, 'audits') || canAccess(user, 'incidents') || canAccess(user, 'checklists') || canAccess(user, 'swms')) { %>
     <div class="pt-3 mt-2 border-t border-white/10">
       <p class="px-3 text-[10px] font-bold text-brand-400/45 uppercase tracking-widest mb-1.5">Safety</p>
     </div>
@@ -194,24 +191,11 @@
       <% if (b.leavePending) { %><span class="sidebar-badge bg-amber-500 text-white"><%= b.leavePending %></span><% } %>
     </a>
     <% } %>
-    <% if (canAccess(user, 'incidents')) { %>
-    <a href="/incidents" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'incidents' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
-      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-      <span class="flex-1">Incidents</span>
-      <% if (b.incidents) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.incidents %></span><% } %>
-    </a>
-    <% } %>
     <% if (canAccess(user, 'equipment')) { %>
     <a href="/equipment" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'equipment' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all" <%= b.hireOverdue ? 'title="' + b.hireOverdue + ' hire(s) past return date — still on meter"' : '' %>>
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
       <span class="flex-1">Equipment</span>
       <% if (b.hireOverdue) { %><span class="sidebar-badge bg-red-500 text-white"><%= b.hireOverdue %></span><% } %>
-    </a>
-    <% } %>
-    <% if (canAccess(user, 'checklists')) { %>
-    <a href="/checklists" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'checklists' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
-      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-      Checklists
     </a>
     <% } %>
     <% } %>
@@ -358,12 +342,6 @@
     <a href="/equipment" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'equipment' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
       <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
       Equipment
-    </a>
-    <% } %>
-    <% if (canAccess(user, 'checklists')) { %>
-    <a href="/checklists" class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= typeof currentPage !== 'undefined' && currentPage === 'checklists' ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/10' : 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15' %> transition-all">
-      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-      Checklists
     </a>
     <% } %>
     <% if (canAccess(user, 'documents')) { %>
