@@ -354,7 +354,9 @@ router.get('/api/check-ref', (req, res) => {
 // status to 'submitted'.
 // ============================================================
 
-// Add a sub-plan to an existing parent. Body: { item_type }.
+// Add a sub-plan to an existing parent. Body: { item_type, other_description? }.
+// For 'other', other_description is the user-supplied label (e.g. "Methodologies",
+// "Staging") so the row isn't anonymous in the register.
 router.post('/:id/sub-plans', (req, res) => {
   const db = getDb();
   const parent = db.prepare("SELECT id, plan_number, job_id, client_id FROM compliance WHERE id = ? AND parent_id IS NULL AND plan_number IS NOT NULL").get(req.params.id);
@@ -371,13 +373,19 @@ router.post('/:id/sub-plans', (req, res) => {
   }
   const seq = planStatus.nextSubPlanSeq(db, parent.id, itemType);
   const ref = planStatus.buildSubPlanRef(parent.plan_number, itemType, seq);
+  const otherDesc = itemType === 'other'
+    ? String(req.body.other_description || '').trim().slice(0, 120)
+    : '';
+  // Title shows "<Other label> (REF)" when there is one, plain ref otherwise — matches
+  // the createParentPlan path so newly-added rows look the same as initial-creation rows.
+  const title = otherDesc ? `${otherDesc} (${ref})` : ref;
   const result = db.prepare(`
-    INSERT INTO compliance (parent_id, job_id, client_id, item_type, item_types, title, status, reference_number, description)
-    VALUES (?, ?, ?, ?, ?, ?, 'not_started', ?, '')
-  `).run(parent.id, parent.job_id || null, parent.client_id || null, itemType, itemType, ref, ref);
+    INSERT INTO compliance (parent_id, job_id, client_id, item_type, item_types, title, status, reference_number, description, other_description)
+    VALUES (?, ?, ?, ?, ?, ?, 'not_started', ?, '', ?)
+  `).run(parent.id, parent.job_id || null, parent.client_id || null, itemType, itemType, title, ref, otherDesc);
   planStatus.syncParentStatus(db, parent.id);
   if (req.headers.accept && req.headers.accept.includes('json')) {
-    return res.json({ success: true, id: result.lastInsertRowid, reference_number: ref });
+    return res.json({ success: true, id: result.lastInsertRowid, reference_number: ref, other_description: otherDesc });
   }
   req.flash('success', `Sub-plan ${ref} added.`);
   res.redirect('/compliance/' + parent.id + '/edit');

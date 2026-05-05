@@ -11,6 +11,11 @@
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2 flex-wrap">
         <code class="text-sm font-semibold text-gray-900"><%= sub.reference_number %></code>
+        <% if (sub.item_type === 'other' && sub.other_description) { %>
+          <%/* The free-text label the user typed when generating this Other slot — shows what
+               the row is actually for (e.g. "Methodologies", "Staging") so it isn't anonymous. */%>
+          <span class="text-sm font-medium text-gray-700">— <%= sub.other_description %></span>
+        <% } %>
         <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset <%= statusBadge[sub.status] || statusBadge.not_started %>">
           <%= (sub.status || 'not_started').replace(/_/g, ' ') %>
         </span>
