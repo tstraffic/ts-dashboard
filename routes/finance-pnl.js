@@ -30,9 +30,14 @@ router.get('/', (req, res) => {
   if (client_id) { where += ` AND p.client_id = ?`; params.push(client_id); }
   if (status && status !== 'all') { where += ` AND p.status = ?`; params.push(status); }
 
+  // Compliance plans can be linked to either a job OR a tender (mutually
+  // exclusive in practice). The register shows whichever one is set so a
+  // tender-stage plan doesn't display a blank/incorrect Job column.
   const plans = db.prepare(`
     SELECT p.id, p.plan_number, p.title, p.status, p.created_at,
+      p.tender_id,
       j.id AS job_id, j.job_number, j.project_name,
+      t.tender_number, t.title AS tender_title, t.status AS tender_status,
       cl.company_name AS client_name,
       COALESCE(SUM(s.hours_spent), 0) AS total_hours,
       COALESCE(SUM(CASE WHEN s.charge_client = 1 THEN s.charge_amount ELSE 0 END), 0) AS total_charge,
@@ -42,6 +47,7 @@ router.get('/', (req, res) => {
     FROM compliance p
     LEFT JOIN compliance s ON s.parent_id = p.id
     LEFT JOIN jobs j ON p.job_id = j.id
+    LEFT JOIN tenders t ON p.tender_id = t.id
     LEFT JOIN clients cl ON p.client_id = cl.id
     ${where}
     GROUP BY p.id

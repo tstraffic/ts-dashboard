@@ -393,7 +393,15 @@ router.get('/:id', (req, res) => {
   let chatMembers = [];
   try { chatMembers = db.prepare('SELECT u.id, u.full_name, u.role FROM chat_thread_members ctm JOIN users u ON ctm.user_id = u.id WHERE ctm.thread_id = ? AND u.active = 1 ORDER BY u.full_name').all(chatThreadId); } catch(e) {}
 
+  // job.id coerced to int up front and reused by every job-scoped lookup
+  // below. CAST(job_id) on top of parseInt covers legacy rows whose
+  // job_id was stored as text.
+  const jobIdInt = parseInt(job.id, 10);
+
   // Final plans = approved compliance items + traffic_plans marked as final (for operations view)
+  // Each query lives in its own try/catch so a hiccup in the compliance
+  // lookup doesn't silently nuke finalTrafficPlans (the bug behind
+  // "Push to Final Plans" uploads not appearing on the Final Plans tab).
   let finalPlans = [];
   let finalPlanDocs = [];
   let finalTrafficPlans = [];
@@ -403,28 +411,37 @@ router.get('/:id', (req, res) => {
       FROM compliance c
       LEFT JOIN users u ON c.internal_approver_id = u.id
       LEFT JOIN users d ON c.assigned_to_id = d.id
-      WHERE c.job_id = ? AND c.status IN ('approved','submitted')
+      WHERE CAST(c.job_id AS INTEGER) = ? AND c.status IN ('approved','submitted')
       ORDER BY c.title
-    `).all(job.id);
+    `).all(jobIdInt);
+  } catch (e) {
+    console.error('[Jobs] finalPlans (compliance) query failed for job', job.id, ':', e.message);
+  }
+  try {
     if (finalPlans.length > 0) {
       finalPlanDocs = db.prepare(`
         SELECT cd.*, u.full_name as uploaded_by_name
         FROM compliance_documents cd
         LEFT JOIN users u ON cd.uploaded_by_id = u.id
-        WHERE cd.compliance_id IN (SELECT id FROM compliance WHERE job_id = ? AND status IN ('approved','submitted'))
+        WHERE cd.compliance_id IN (SELECT id FROM compliance WHERE CAST(job_id AS INTEGER) = ? AND status IN ('approved','submitted'))
         ORDER BY cd.created_at DESC
-      `).all(job.id);
+      `).all(jobIdInt);
     }
-    // Also include traffic_plans marked as final
+  } catch (e) {
+    console.error('[Jobs] finalPlanDocs query failed for job', job.id, ':', e.message);
+  }
+  try {
     finalTrafficPlans = db.prepare(`
       SELECT tp.*, u.full_name as created_by_name, mf.full_name as marked_final_by_name
       FROM traffic_plans tp
       LEFT JOIN users u ON tp.created_by_id = u.id
       LEFT JOIN users mf ON tp.marked_final_by = mf.id
-      WHERE tp.job_id = ? AND tp.is_final = 1
+      WHERE CAST(tp.job_id AS INTEGER) = ? AND tp.is_final = 1
       ORDER BY tp.marked_final_at DESC
-    `).all(job.id);
-  } catch(e) {}
+    `).all(jobIdInt);
+  } catch (e) {
+    console.error('[Jobs] finalTrafficPlans query failed for job', job.id, ':', e.message);
+  }
 
   // Plan flags for this job
   let planFlags = [];
@@ -440,16 +457,19 @@ router.get('/:id', (req, res) => {
   // SWMS + Risk Assessments attached to this job — feed the Safety tab.
   // Schema-aware probes so a pre-migration deploy doesn't crash here;
   // the tab just shows empty if either table doesn't exist yet.
+  // jobIdInt is reused from the Final Plans block above.
   let swmsForJob = [];
   try {
     swmsForJob = db.prepare(`
       SELECT s.*, u.full_name AS owner_name
       FROM swms s
       LEFT JOIN users u ON u.id = s.owner_id
-      WHERE s.job_id = ?
+      WHERE CAST(s.job_id AS INTEGER) = ?
       ORDER BY s.created_at DESC
-    `).all(job.id);
-  } catch (e) {}
+    `).all(jobIdInt);
+  } catch (e) {
+    console.error('[Jobs] SWMS Safety tab query failed for job', job.id, ':', e.message);
+  }
 
   let riskAssessmentsForJob = [];
   try {
@@ -457,10 +477,12 @@ router.get('/:id', (req, res) => {
       SELECT r.*, u.full_name AS owner_name
       FROM risk_assessments r
       LEFT JOIN users u ON u.id = r.owner_id
-      WHERE r.job_id = ?
+      WHERE CAST(r.job_id AS INTEGER) = ?
       ORDER BY r.created_at DESC
-    `).all(job.id);
-  } catch (e) {}
+    `).all(jobIdInt);
+  } catch (e) {
+    console.error('[Jobs] Risk Assessments Safety tab query failed for job', job.id, ':', e.message);
+  }
 
   // Site audits attached to this job — also surface under the Safety tab.
   let auditsForJob = [];

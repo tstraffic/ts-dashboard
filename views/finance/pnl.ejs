@@ -114,7 +114,7 @@
       <thead>
         <tr class="border-b border-gray-200 bg-gray-50/50">
           <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Plan</th>
-          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Job</th>
+          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Job / Tender</th>
           <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Client</th>
           <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Hours</th>
           <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Council</th>
@@ -138,6 +138,14 @@
               <% if (r.job_number) { %>
                 <a href="/jobs/<%= r.job_id %>" class="text-brand-600 hover:underline" onclick="event.stopPropagation()"><%= r.job_number %></a>
                 <% if (r.project_name) { %><span class="block text-gray-400 text-[11px] truncate max-w-[160px]"><%= r.project_name %></span><% } %>
+              <% } else if (r.tender_id) { %>
+                <%/* Plan attached to a tender, not a job — render the tender link
+                     with a TENDER chip so finance can see this is pre-award. */%>
+                <span class="inline-flex items-center gap-1.5">
+                  <a href="/tenders/<%= r.tender_id %>" class="text-brand-600 hover:underline" onclick="event.stopPropagation()"><%= r.tender_number || ('Tender #' + r.tender_id) %></a>
+                  <span class="inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded bg-purple-50 text-purple-700 ring-1 ring-purple-200">TENDER</span>
+                </span>
+                <% if (r.tender_title) { %><span class="block text-gray-400 text-[11px] truncate max-w-[160px]"><%= r.tender_title %></span><% } %>
               <% } else { %>—<% } %>
             </td>
             <td class="px-3 py-2.5 text-gray-600 text-xs hidden lg:table-cell truncate max-w-[160px]"><%= r.client_name || '—' %></td>
