@@ -86,28 +86,50 @@ router.post('/', upload.single('plan_file'), (req, res) => {
   const filePath = req.file ? req.file.path.replace(/\\/g, '/') : '';
   const fileOriginalName = req.file ? req.file.originalname : '';
 
+  // The "Push to Final Plans" + "Client Provided" toggles must work from
+  // both upload paths — the drag-drop on the job page (POST /quick-upload)
+  // *and* the regular New Plan form. Without this, ticking the box on the
+  // regular form would silently drop the flag and the plan would never
+  // land in the Final Plans tab.
+  const markFinal = b.mark_final === '1' || b.mark_final === 'on' || b.mark_final === true;
+  const isClientProvided = b.client_provided === '1' || b.client_provided === 'on' || b.client_provided === true;
+  const designer = b.designer || (isClientProvided ? 'Client Provided' : '');
+  const status = markFinal ? 'approved' : (b.status || 'draft');
+
   try {
-    db.prepare(`
-      INSERT INTO traffic_plans (job_id, plan_number, plan_type, plan_types, designer, rol_required, rol_submitted, rol_approved, council, tfnsw, submitted_date, approval_date, approved_date, expiry_date, client_required_date, works_expected_date, status, file_link, file_path, file_original_name, notes, created_by_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    const result = db.prepare(`
+      INSERT INTO traffic_plans (job_id, plan_number, plan_type, plan_types, designer, rol_required, rol_submitted, rol_approved, council, tfnsw, submitted_date, approval_date, approved_date, expiry_date, client_required_date, works_expected_date, status, file_link, file_path, file_original_name, notes, is_final, marked_final_at, marked_final_by, created_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      b.job_id || null, planNumber, planType, planTypes, b.designer || '',
+      b.job_id || null, planNumber, planType, planTypes, designer,
       b.rol_required ? 1 : 0, b.rol_submitted ? 1 : 0, b.rol_approved ? 1 : 0,
       b.council || '', b.tfnsw || '',
       b.submitted_date || null, b.approval_date || null, b.approved_date || null, b.expiry_date || null,
       b.client_required_date || null, b.works_expected_date || null,
-      b.status || 'draft', b.file_link || '', filePath, fileOriginalName, b.notes || '',
+      status, b.file_link || '', filePath, fileOriginalName, b.notes || '',
+      markFinal ? 1 : 0,
+      markFinal ? new Date().toISOString() : null,
+      markFinal ? req.session.user.id : null,
       req.session.user.id
     );
+
+    // Defensive re-set: some SQLite versions / driver paths don't persist
+    // the is_final default reliably on first insert. Mirrors the safety
+    // net the quick-upload route already uses.
+    if (markFinal && result.lastInsertRowid) {
+      db.prepare('UPDATE traffic_plans SET is_final = 1, marked_final_at = ?, marked_final_by = ?, status = ? WHERE id = ?')
+        .run(new Date().toISOString(), req.session.user.id, 'approved', result.lastInsertRowid);
+    }
+
     const typeMap = { TGS: 'TGS', TCP: 'TCP', TMP: 'TMP', ROL: 'ROL' };
     const typeLabel = (planTypes || planType || '').split(',').map(t => typeMap[t] || t).join(' / ');
     autoLogDiary(db, {
       jobId: b.job_id,
-      summary: `[${req.session.user.full_name}] Traffic plan created: ${planNumber} (${typeLabel}). Designer: ${b.designer || 'unassigned'}. Status: ${b.status || 'draft'}.`,
+      summary: `[${req.session.user.full_name}] Traffic plan created: ${planNumber} (${typeLabel}). Designer: ${designer || 'unassigned'}. Status: ${status}${markFinal ? ' → FINAL' : ''}.`,
       userId: req.session.user.id
     });
 
-    req.flash('success', `Traffic Plan ${planNumber} created successfully.`);
+    req.flash('success', `Traffic Plan ${planNumber} created successfully${markFinal ? ' and pushed to Final Plans.' : '.'}`);
     const returnTo = b.return_to && b.return_to !== '/plans' ? b.return_to : '/plans';
     res.redirect(returnTo);
   } catch (err) {
