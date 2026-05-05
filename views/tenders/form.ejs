@@ -1,0 +1,113 @@
+<% locals.currentPage = 'tenders' %>
+
+<div class="max-w-3xl mx-auto space-y-5">
+  <div>
+    <a href="<%= isEdit ? '/tenders/' + tender.id : '/tenders' %>" class="text-sm text-brand-600 hover:underline">← <%= isEdit ? tender.tender_number : 'All tenders' %></a>
+    <h1 class="text-2xl font-bold text-gray-900 mt-1"><%= isEdit ? 'Edit ' + tender.tender_number : 'New tender' %></h1>
+    <% if (!isEdit) { %><p class="text-sm text-gray-500 mt-1">A tender is a bid for work. Once you create it, link existing plans and jobs to group them under the bid.</p><% } %>
+  </div>
+
+  <form method="POST" action="<%= isEdit ? '/tenders/' + tender.id : '/tenders' %>" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4">
+    <%- include('../partials/csrf') %>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="md:col-span-2">
+        <label for="title" class="block text-sm font-medium text-gray-600 mb-1">Title <span class="text-red-600">*</span></label>
+        <input type="text" id="title" name="title" required maxlength="200"
+          value="<%= isEdit ? (tender.title || '') : '' %>"
+          placeholder="e.g. Canterbury Road Project tender"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+      </div>
+
+      <div>
+        <label for="client_id" class="block text-sm font-medium text-gray-600 mb-1">Client</label>
+        <select id="client_id" name="client_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">
+          <option value="">— None —</option>
+          <% clients.forEach(c => { %>
+            <option value="<%= c.id %>" <%= isEdit && tender.client_id == c.id ? 'selected' : '' %>><%= c.company_name %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
+        <label for="owner_id" class="block text-sm font-medium text-gray-600 mb-1">Owner</label>
+        <select id="owner_id" name="owner_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">
+          <option value="">— Unassigned —</option>
+          <% users.forEach(u => { %>
+            <option value="<%= u.id %>" <%= isEdit && tender.owner_id == u.id ? 'selected' : '' %>><%= u.full_name %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
+        <label for="status" class="block text-sm font-medium text-gray-600 mb-1">Status</label>
+        <select id="status" name="status" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">
+          <% statusValues.forEach(s => { %>
+            <option value="<%= s %>" <%= isEdit && tender.status === s ? 'selected' : (!isEdit && s === 'open' ? 'selected' : '') %>><%= statusLabels[s] %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
+        <label for="estimated_value" class="block text-sm font-medium text-gray-600 mb-1">Estimated value ($)</label>
+        <input type="number" id="estimated_value" name="estimated_value" min="0" step="0.01"
+          value="<%= isEdit ? (parseFloat(tender.estimated_value) || 0) : 0 %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm tabular-nums">
+      </div>
+
+      <div>
+        <label for="submission_due" class="block text-sm font-medium text-gray-600 mb-1">Submission due</label>
+        <input type="date" id="submission_due" name="submission_due"
+          value="<%= isEdit ? (tender.submission_due || '') : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">
+      </div>
+
+      <% if (isEdit) { %>
+        <div>
+          <label for="submitted_at" class="block text-sm font-medium text-gray-600 mb-1">Submitted on</label>
+          <input type="date" id="submitted_at" name="submitted_at"
+            value="<%= tender.submitted_at || '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">
+        </div>
+
+        <div>
+          <label for="decision_at" class="block text-sm font-medium text-gray-600 mb-1">Decision on</label>
+          <input type="date" id="decision_at" name="decision_at"
+            value="<%= tender.decision_at || '' %>"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">
+        </div>
+      <% } %>
+
+      <div class="md:col-span-2">
+        <label for="principal_contractor" class="block text-sm font-medium text-gray-600 mb-1">Principal contractor</label>
+        <input type="text" id="principal_contractor" name="principal_contractor" maxlength="200"
+          value="<%= isEdit ? (tender.principal_contractor || '') : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">
+      </div>
+
+      <div class="md:col-span-2">
+        <label for="site_address" class="block text-sm font-medium text-gray-600 mb-1">Site address</label>
+        <input type="text" id="site_address" name="site_address" maxlength="300"
+          value="<%= isEdit ? (tender.site_address || '') : '' %>"
+          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm">
+      </div>
+
+      <div class="md:col-span-2">
+        <label for="notes" class="block text-sm font-medium text-gray-600 mb-1">Notes</label>
+        <textarea id="notes" name="notes" rows="3" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm"><%= isEdit ? (tender.notes || '') : '' %></textarea>
+      </div>
+
+      <% if (isEdit) { %>
+        <div class="md:col-span-2">
+          <label for="decision_notes" class="block text-sm font-medium text-gray-600 mb-1">Decision notes</label>
+          <textarea id="decision_notes" name="decision_notes" rows="2" placeholder="Why was this tender won/lost? What did we learn?" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm"><%= tender.decision_notes || '' %></textarea>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="flex items-center justify-end gap-3 pt-3 border-t border-gray-200">
+      <a href="<%= isEdit ? '/tenders/' + tender.id : '/tenders' %>" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</a>
+      <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-500 rounded-lg"><%= isEdit ? 'Save changes' : 'Create tender' %></button>
+    </div>
+  </form>
+</div>

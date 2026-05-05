@@ -91,9 +91,14 @@ function createParentPlan(req, res, db, b) {
       parentId = parentRes.lastInsertRowid;
 
       const insertSub = db.prepare(`
-        INSERT INTO compliance (parent_id, job_id, client_id, item_type, item_types, title, status, reference_number, description, assigned_to_id)
-        VALUES (?, ?, ?, ?, ?, ?, 'not_started', ?, '', ?)
+        INSERT INTO compliance (parent_id, job_id, client_id, item_type, item_types, title, status, reference_number, description, assigned_to_id, other_description)
+        VALUES (?, ?, ?, ?, ?, ?, 'not_started', ?, '', ?, ?)
       `);
+
+      // For 'Other', each generated sub-plan gets its own description from
+      // body field `other_description_<seq>`. Falls back to legacy single
+      // `other_description` field if the per-row inputs aren't present.
+      const legacyOtherDesc = String(b.other_description || '').trim().slice(0, 120);
 
       SUB_PLAN_TYPES.forEach(type => {
         const raw = b['count_' + type];
@@ -102,7 +107,14 @@ function createParentPlan(req, res, db, b) {
         const typeOwnerId = b['owner_' + type] || null;
         for (let seq = 1; seq <= count; seq++) {
           const ref = planStatus.buildSubPlanRef(planNumber, type, seq);
-          insertSub.run(parentId, jobId, clientId, type, type, ref, ref, typeOwnerId);
+          let subTitle = ref;
+          let subOtherDesc = '';
+          if (type === 'other') {
+            const perRow = String(b['other_description_' + seq] || '').trim().slice(0, 120);
+            subOtherDesc = perRow || legacyOtherDesc;
+            if (subOtherDesc) subTitle = `${subOtherDesc} (${ref})`;
+          }
+          insertSub.run(parentId, jobId, clientId, type, type, subTitle, ref, typeOwnerId, subOtherDesc);
           subPlanCount += 1;
         }
       });
@@ -811,11 +823,17 @@ router.get('/:id/edit', (req, res) => {
     }
   }
 
+  // Tender link (if this plan is rolled up under a tender)
+  let tender = null;
+  if (item.tender_id) {
+    try { tender = db.prepare("SELECT id, tender_number, title, status FROM tenders WHERE id = ?").get(item.tender_id); } catch (e) {}
+  }
+
   res.render('compliance/form', {
     title: isParent ? 'Edit Plan' : 'Edit Plan / Approval',
     item, jobs, clients, users, user: req.session.user,
     prefillJobId: '', prefillClientId: '', returnTo,
-    documents, linkedTask, revisions,
+    documents, linkedTask, revisions, tender,
     isParent, subPlans, subPlanDocs, subPlanTypes: SUB_PLAN_TYPES,
   });
 });

@@ -7529,6 +7529,58 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 158: Tenders — first-class parent records grouping jobs +
+  // compliance (plans). A tender represents work being bid on; once it's
+  // won, the linked jobs/plans roll up under it. tender_id FK is added
+  // to jobs and compliance with ON DELETE SET NULL so deleting a tender
+  // doesn't cascade-delete real work.
+  // =============================================
+  if (!isMigrationApplied.get(158)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS tenders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tender_number TEXT UNIQUE,
+          title TEXT NOT NULL,
+          client_id INTEGER REFERENCES clients(id),
+          status TEXT NOT NULL DEFAULT 'open',
+          estimated_value REAL DEFAULT 0,
+          submission_due DATE,
+          submitted_at DATE,
+          decision_at DATE,
+          decision_notes TEXT,
+          principal_contractor TEXT,
+          site_address TEXT,
+          notes TEXT,
+          created_by_id INTEGER REFERENCES users(id),
+          owner_id INTEGER REFERENCES users(id),
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_tenders_status ON tenders(status);
+        CREATE INDEX IF NOT EXISTS idx_tenders_client ON tenders(client_id);
+      `);
+
+      const jobsCols158 = db.prepare("PRAGMA table_info(jobs)").all().map(c => c.name);
+      if (!jobsCols158.includes('tender_id')) {
+        try { db.exec("ALTER TABLE jobs ADD COLUMN tender_id INTEGER REFERENCES tenders(id) ON DELETE SET NULL"); } catch (e) {}
+      }
+      try { db.exec("CREATE INDEX IF NOT EXISTS idx_jobs_tender ON jobs(tender_id)"); } catch (e) {}
+
+      const compCols158 = db.prepare("PRAGMA table_info(compliance)").all().map(c => c.name);
+      if (!compCols158.includes('tender_id')) {
+        try { db.exec("ALTER TABLE compliance ADD COLUMN tender_id INTEGER REFERENCES tenders(id) ON DELETE SET NULL"); } catch (e) {}
+      }
+      try { db.exec("CREATE INDEX IF NOT EXISTS idx_compliance_tender ON compliance(tender_id)"); } catch (e) {}
+
+      recordMigration.run(158, 'tenders table + tender_id FK on jobs and compliance');
+      console.log('Migration 158 applied: tenders table + tender_id FK on jobs + compliance');
+    } catch (e) {
+      console.error('Migration 158 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

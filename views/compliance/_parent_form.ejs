@@ -41,13 +41,21 @@
       <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
       Back
     </a>
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between flex-wrap gap-2">
       <h1 class="text-2xl font-bold text-gray-900"><%= pageTitle %><% if (isEdit) { %> <span class="text-gray-400 font-mono text-lg">#<%= planNumber %></span><% } %></h1>
-      <% if (isEdit) { %>
-        <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ring-1 ring-inset <%= STATUS_BADGE[item.status] || STATUS_BADGE.not_started %>">
-          <%= (item.status || 'not_started').replace(/_/g, ' ') %>
-        </span>
-      <% } %>
+      <div class="flex items-center gap-2 flex-wrap">
+        <% if (isEdit && typeof tender !== 'undefined' && tender) { %>
+          <a href="/tenders/<%= tender.id %>" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-50 text-purple-700 ring-1 ring-purple-600/20 hover:bg-purple-100">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+            Tender <%= tender.tender_number %>
+          </a>
+        <% } %>
+        <% if (isEdit) { %>
+          <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ring-1 ring-inset <%= STATUS_BADGE[item.status] || STATUS_BADGE.not_started %>">
+            <%= (item.status || 'not_started').replace(/_/g, ' ') %>
+          </span>
+        <% } %>
+      </div>
     </div>
   </div>
 
@@ -126,19 +134,27 @@
         <p class="text-sm text-gray-500 mb-4">Tick each type you need, set how many, and pick an owner for that type. Each one becomes its own slot with a system reference (e.g. <code class="px-1.5 py-0.5 bg-gray-100 rounded">TSTGS3100-1</code>) you can name and upload to.</p>
         <div class="space-y-2.5">
           <% subPlanTypes.forEach(t => { %>
-            <label class="grid grid-cols-[1fr_auto_minmax(0,200px)] items-center gap-3 px-4 py-3 border border-gray-200 rounded-lg hover:border-brand-300 hover:bg-brand-50/40 cursor-pointer has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50">
-              <span class="flex items-center gap-2.5 text-sm text-gray-800">
-                <input type="checkbox" class="type-toggle w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" data-type="<%= t %>">
-                <%= TYPE_LABELS[t] || t %>
-              </span>
-              <input type="number" name="count_<%= t %>" min="1" max="20" value="1" disabled
-                class="count-input w-16 px-2 py-1 text-sm text-center border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
-              <select name="owner_<%= t %>" disabled
-                class="owner-input w-full px-2 py-1 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
-                <option value="">— Owner —</option>
-                <% users.forEach(u => { %><option value="<%= u.id %>"><%= u.full_name %></option><% }) %>
-              </select>
-            </label>
+            <div class="border border-gray-200 rounded-lg hover:border-brand-300 hover:bg-brand-50/40 has-[:checked]:border-brand-400 has-[:checked]:bg-brand-50">
+              <label class="grid grid-cols-[1fr_auto_minmax(0,200px)] items-center gap-3 px-4 py-3 cursor-pointer">
+                <span class="flex items-center gap-2.5 text-sm text-gray-800">
+                  <input type="checkbox" class="type-toggle w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" data-type="<%= t %>">
+                  <%= TYPE_LABELS[t] || t %>
+                </span>
+                <input type="number" name="count_<%= t %>" min="1" max="20" value="1" disabled
+                  class="count-input w-16 px-2 py-1 text-sm text-center border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
+                <select name="owner_<%= t %>" disabled
+                  class="owner-input w-full px-2 py-1 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
+                  <option value="">— Owner —</option>
+                  <% users.forEach(u => { %><option value="<%= u.id %>"><%= u.full_name %></option><% }) %>
+                </select>
+              </label>
+              <% if (t === 'other') { %>
+                <div class="px-4 pb-3 -mt-1 hidden other-desc-wrap space-y-1.5" id="otherDescList">
+                  <p class="text-[11px] text-gray-500">Describe each one — one row per "Other" you're generating.</p>
+                  <!-- Description inputs are rendered by JS when count or checkbox changes -->
+                </div>
+              <% } %>
+            </div>
           <% }) %>
         </div>
       </div>
@@ -147,10 +163,54 @@
         // Disabled inputs aren't submitted, so unticked types vanish.
         document.querySelectorAll('.type-toggle').forEach(cb => {
           cb.addEventListener('change', e => {
-            const row = e.target.closest('label');
-            row.querySelector('.count-input').disabled = !cb.checked;
-            row.querySelector('.owner-input').disabled = !cb.checked;
-            if (cb.checked) row.querySelector('.count-input').focus();
+            const card = e.target.closest('.border');
+            const countInput = card.querySelector('.count-input');
+            countInput.disabled = !cb.checked;
+            card.querySelector('.owner-input').disabled = !cb.checked;
+            if (cb.dataset.type === 'other') {
+              renderOtherDescriptions(card, cb.checked);
+              if (cb.checked) {
+                const first = card.querySelector('.other-desc-row input');
+                if (first) first.focus(); else countInput.focus();
+                return;
+              }
+            }
+            if (cb.checked) countInput.focus();
+          });
+        });
+
+        // Other gets one description input per count. When count changes
+        // we add/remove rows so each "Other" sub-plan has its own label.
+        function renderOtherDescriptions(card, checked) {
+          const wrap = card.querySelector('.other-desc-wrap');
+          if (!wrap) return;
+          wrap.classList.toggle('hidden', !checked);
+          if (!checked) { wrap.querySelectorAll('.other-desc-row').forEach(r => r.remove()); return; }
+          const count = Math.max(1, parseInt(card.querySelector('.count-input').value, 10) || 1);
+          // Preserve current values when re-rendering
+          const existing = Array.from(wrap.querySelectorAll('.other-desc-row input')).map(i => i.value);
+          wrap.querySelectorAll('.other-desc-row').forEach(r => r.remove());
+          for (let i = 1; i <= count; i++) {
+            const row = document.createElement('div');
+            row.className = 'other-desc-row flex items-center gap-2';
+            row.innerHTML = `
+              <span class="text-[11px] font-mono text-gray-400 w-6 shrink-0">#${i}</span>
+              <input type="text" name="other_description_${i}" maxlength="120"
+                placeholder="What is Other #${i}? e.g. RMS letter, environmental approval…"
+                class="flex-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" />
+            `;
+            const input = row.querySelector('input');
+            if (existing[i - 1] != null) input.value = existing[i - 1];
+            wrap.appendChild(row);
+          }
+        }
+
+        // Re-render description rows when the "Other" count changes
+        document.querySelectorAll('.type-toggle[data-type="other"]').forEach(cb => {
+          const card = cb.closest('.border');
+          const countInput = card.querySelector('.count-input');
+          countInput.addEventListener('input', () => {
+            if (cb.checked) renderOtherDescriptions(card, true);
           });
         });
       </script>

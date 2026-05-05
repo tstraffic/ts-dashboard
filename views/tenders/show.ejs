@@ -1,0 +1,196 @@
+<% locals.currentPage = 'tenders' %>
+<%
+  function fmtMoney(n) { const v = parseFloat(n) || 0; return '$' + v.toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+  function fmtDate(s) { if (!s) return '—'; return new Date(s + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  const STATUS_BADGE = {
+    open:      'bg-amber-50 text-amber-700 ring-amber-200',
+    submitted: 'bg-blue-50 text-blue-700 ring-blue-200',
+    won:       'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    lost:      'bg-rose-50 text-rose-700 ring-rose-200',
+    withdrawn: 'bg-gray-50 text-gray-700 ring-gray-200',
+  };
+%>
+
+<div class="max-w-5xl mx-auto space-y-5">
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-3 flex-wrap">
+    <div>
+      <a href="/tenders" class="text-sm text-brand-600 hover:underline">← All tenders</a>
+      <h1 class="text-2xl font-bold text-gray-900 mt-1 flex items-center gap-2">
+        <%= tender.title %>
+        <span class="font-mono text-sm text-gray-400">#<%= tender.tender_number %></span>
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ring-1 ring-inset <%= STATUS_BADGE[tender.status] || 'bg-gray-50 text-gray-700' %>"><%= statusLabels[tender.status] || tender.status %></span>
+      </h1>
+      <p class="text-sm text-gray-500 mt-1">
+        <% if (tender.client_name) { %><%= tender.client_name %> · <% } %>
+        Owner: <%= tender.owner_name || 'Unassigned' %>
+        <% if (tender.submission_due) { %> · Due <%= fmtDate(tender.submission_due) %><% } %>
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/tenders/<%= tender.id %>/edit" class="px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg">Edit</a>
+      <form method="POST" action="/tenders/<%= tender.id %>/delete" onsubmit="return confirm('Delete this tender? Linked jobs and plans stay; they just become unlinked.')">
+        <%- include('../partials/csrf') %>
+        <button type="submit" class="px-3 py-2 bg-white border border-gray-300 hover:bg-red-50 hover:border-red-300 hover:text-red-600 text-gray-700 text-sm font-semibold rounded-lg">Delete</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tender summary -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Estimated value</p>
+        <p class="text-lg font-bold text-gray-900 mt-0.5 tabular-nums"><%= fmtMoney(tender.estimated_value) %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Submitted</p>
+        <p class="text-sm font-semibold text-gray-900 mt-0.5 tabular-nums"><%= fmtDate(tender.submitted_at) %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Decision</p>
+        <p class="text-sm font-semibold text-gray-900 mt-0.5 tabular-nums"><%= fmtDate(tender.decision_at) %></p>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Created by</p>
+        <p class="text-sm text-gray-700 mt-0.5"><%= tender.created_by_name || '—' %></p>
+      </div>
+    </div>
+    <% if (tender.principal_contractor || tender.site_address) { %>
+      <div class="mt-4 pt-3 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+        <% if (tender.principal_contractor) { %><div><span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Principal contractor</span><span class="text-gray-700"><%= tender.principal_contractor %></span></div><% } %>
+        <% if (tender.site_address) { %><div><span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Site</span><span class="text-gray-700"><%= tender.site_address %></span></div><% } %>
+      </div>
+    <% } %>
+    <% if (tender.notes) { %>
+      <div class="mt-4 pt-3 border-t border-gray-100">
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Notes</p>
+        <p class="text-sm text-gray-700 whitespace-pre-line"><%= tender.notes %></p>
+      </div>
+    <% } %>
+    <% if (tender.decision_notes) { %>
+      <div class="mt-3 p-3 bg-gray-50 border border-gray-100 rounded-lg">
+        <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Decision notes</p>
+        <p class="text-sm text-gray-700 whitespace-pre-line"><%= tender.decision_notes %></p>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Linked Jobs -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div>
+        <h2 class="text-sm font-bold text-gray-900">Linked jobs <span class="text-gray-400 font-normal">(<%= linkedJobs.length %>)</span></h2>
+        <p class="text-xs text-gray-500 mt-0.5">Jobs that fall under this tender. Linking later wires the job's plans up automatically.</p>
+      </div>
+    </div>
+    <% if (linkedJobs.length === 0) { %>
+      <div class="px-5 py-6 text-center text-sm text-gray-500">No jobs linked yet.</div>
+    <% } else { %>
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Job</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+            <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Contract</th>
+            <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% linkedJobs.forEach(j => { %>
+            <tr>
+              <td class="px-3 py-2">
+                <a href="/jobs/<%= j.id %>" class="font-semibold text-gray-900 hover:text-brand-600"><%= j.job_number %></a>
+                <span class="text-gray-500"> — <%= j.project_name || j.job_name || j.client || '' %></span>
+              </td>
+              <td class="px-2 py-2 text-xs text-gray-600"><%= j.status %></td>
+              <td class="px-2 py-2 text-right text-xs tabular-nums text-gray-700"><%= fmtMoney(j.contract_value) %></td>
+              <td class="px-2 py-2 text-right">
+                <form method="POST" action="/tenders/<%= tender.id %>/unlink-job" class="inline">
+                  <%- include('../partials/csrf') %>
+                  <input type="hidden" name="job_id" value="<%= j.id %>">
+                  <button type="submit" class="text-xs text-gray-500 hover:text-red-600 font-semibold">Unlink</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+    <form method="POST" action="/tenders/<%= tender.id %>/link-job" class="px-5 py-3 border-t border-gray-200 flex items-center gap-2 bg-gray-50/50">
+      <%- include('../partials/csrf') %>
+      <select name="job_id" required class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+        <option value="">— Pick a job to link —</option>
+        <% availableJobs.forEach(j => { if (!linkedJobs.find(lj => lj.id === j.id)) { %>
+          <option value="<%= j.id %>"><%= j.job_number %> — <%= j.project_name || j.job_name || j.client || '' %> (<%= j.status %>)</option>
+        <% } }) %>
+      </select>
+      <button type="submit" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">+ Link job</button>
+    </form>
+  </div>
+
+  <!-- Linked Plans -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div>
+        <h2 class="text-sm font-bold text-gray-900">Linked plans <span class="text-gray-400 font-normal">(<%= linkedPlans.length %>)</span></h2>
+        <p class="text-xs text-gray-500 mt-0.5">Plans &amp; approvals being prepared for this tender (TGS, CTMP, ROL, council permits, etc.).</p>
+      </div>
+    </div>
+    <% if (linkedPlans.length === 0) { %>
+      <div class="px-5 py-6 text-center text-sm text-gray-500">No plans linked yet.</div>
+    <% } else { %>
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">#</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Title</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Job</th>
+            <th class="px-2 py-2 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">Sub-plans</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+            <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% linkedPlans.forEach(p => { %>
+            <tr>
+              <td class="px-3 py-2 font-mono text-xs text-gray-500">#<%= p.plan_number || p.id %></td>
+              <td class="px-2 py-2"><a href="/compliance/<%= p.id %>/edit" class="font-semibold text-gray-900 hover:text-brand-600"><%= p.title %></a></td>
+              <td class="px-2 py-2 text-xs text-gray-600">
+                <% if (p.job_id) { %><a href="/jobs/<%= p.job_id %>" class="hover:text-brand-600"><%= p.job_number %></a><% } else { %>—<% } %>
+              </td>
+              <td class="px-2 py-2 text-center text-xs tabular-nums text-gray-700"><%= p.sub_count %></td>
+              <td class="px-2 py-2 text-xs text-gray-600"><%= p.status %></td>
+              <td class="px-2 py-2 text-right">
+                <form method="POST" action="/tenders/<%= tender.id %>/unlink-plan" class="inline">
+                  <%- include('../partials/csrf') %>
+                  <input type="hidden" name="plan_id" value="<%= p.id %>">
+                  <button type="submit" class="text-xs text-gray-500 hover:text-red-600 font-semibold">Unlink</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+    <form method="POST" action="/tenders/<%= tender.id %>/link-plan" class="px-5 py-3 border-t border-gray-200 flex items-center gap-2 bg-gray-50/50">
+      <%- include('../partials/csrf') %>
+      <select name="plan_id" required class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+        <option value="">— Pick a plan to link —</option>
+        <% availablePlans.forEach(p => { if (!linkedPlans.find(lp => lp.id === p.id)) { %>
+          <option value="<%= p.id %>"><% if (p.plan_number) { %>#<%= p.plan_number %> — <% } %><%= p.title %><% if (p.job_number) { %> (<%= p.job_number %>)<% } %></option>
+        <% } }) %>
+      </select>
+      <button type="submit" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">+ Link plan</button>
+    </form>
+  </div>
+</div>
+
+<% if (flash_success && flash_success.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-semibold shadow-lg z-50" id="flash"><%= flash_success[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flash')?.remove(), 2800);</script>
+<% } %>
+<% if (flash_error && flash_error.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold shadow-lg z-50" id="flasherr"><%= flash_error[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flasherr')?.remove(), 4000);</script>
+<% } %>

@@ -201,6 +201,7 @@ app.use('/dashboard', requireLogin, requirePermission('dashboard'), require('./r
 app.use('/projects', requireLogin, requirePermission('projects'), require('./routes/projects'));
 app.use('/clients', requireLogin, requirePermission('clients'), require('./routes/clients'));
 app.use('/jobs', requireLogin, requirePermission('jobs'), require('./routes/jobs'));
+app.use('/tenders', requireLogin, requirePermission('tenders'), require('./routes/tenders'));
 app.use('/tasks', requireLogin, requirePermission('tasks'), require('./routes/tasks'));
 app.use('/compliance', requireLogin, requirePermission('compliance'), require('./routes/compliance'));
 app.use('/audits', requireLogin, requirePermission('audits'), require('./routes/audits'));

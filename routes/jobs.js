@@ -218,6 +218,14 @@ router.get('/:id', (req, res) => {
     return res.redirect('/jobs');
   }
 
+  // Tender link (if this job is rolled up under a tender)
+  job.tender = null;
+  if (job.tender_id) {
+    try {
+      job.tender = db.prepare("SELECT id, tender_number, title, status FROM tenders WHERE id = ?").get(job.tender_id);
+    } catch (e) { /* tenders table may not exist on stale deploy */ }
+  }
+
   // Auto-calculate health from live data
   job.health = recalculateJobHealth(db, job.id);
 
