@@ -1,0 +1,71 @@
+<%- include('partials/secure-form-style') %>
+<%
+  function money(n) { if (n == null) return '$0.00'; return '$' + Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function shortRange(a, b) {
+    if (!a || !b) return '';
+    const d1 = new Date(a + 'T00:00:00'); const d2 = new Date(b + 'T00:00:00');
+    const sameMonth = d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear();
+    const o = { day: 'numeric', month: 'short' };
+    return d1.toLocaleDateString('en-AU', o) + ' – ' + (sameMonth ? d2.getDate() : d2.toLocaleDateString('en-AU', o)) + ' ' + d2.getFullYear();
+  }
+%>
+
+<div class="sf-wrap">
+  <a href="/w/hr" class="sf-back">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    HR & My Info
+  </a>
+
+  <div class="sf-hero">
+    <div class="sf-hero-ic" style="background: rgba(96,165,250,0.2); color: #60A5FA;">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+    </div>
+    <h1 class="sf-title">Pay breakdown</h1>
+    <p class="sf-sub">Hours, rates, and allowances for each finalized pay run — only the categories that apply to you.</p>
+  </div>
+
+  <% if (notLinked) { %>
+    <div class="sf-section" style="text-align: center;">
+      <p class="text-sm text-white/75">We haven't linked your crew profile to your HR record yet.</p>
+      <p class="text-xs text-white/50 mt-1">Ask your supervisor to run the link step in the roster and your pay history will appear here.</p>
+    </div>
+  <% } else if (lines.length === 0) { %>
+    <div class="sf-section" style="text-align: center; padding: 2rem 1rem;">
+      <div style="font-size: 2.4rem; margin-bottom: 0.5rem;">📋</div>
+      <p class="text-sm font-semibold text-white">No pay runs yet</p>
+      <p class="text-xs text-white/55 mt-1">Once payroll finalizes a run that includes you, the breakdown will land here.</p>
+    </div>
+  <% } else { %>
+    <div class="sf-section" style="padding: 0.5rem;">
+      <% lines.forEach(function (l) { %>
+        <a href="/w/hr/pay-runs/<%= l.id %>" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; text-decoration: none; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); margin-bottom: 6px;">
+          <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(96,165,250,0.15); color: #60A5FA; flex-shrink: 0;">
+            <span style="font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; line-height: 1;"><%= l.period_end ? new Date(l.period_end + 'T00:00:00').toLocaleDateString('en-AU', { month: 'short' }).toUpperCase() : '—' %></span>
+            <span style="font-size: 1.1rem; font-weight: 800; line-height: 1.1;"><%= l.period_end ? new Date(l.period_end + 'T00:00:00').getDate() : '?' %></span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <p style="font-size: 0.85rem; font-weight: 700; color: #fff; line-height: 1.2;"><%= shortRange(l.period_start, l.period_end) %></p>
+            <p style="font-size: 0.7rem; color: rgba(255,255,255,0.55); margin-top: 2px;">
+              Wages <%= money(l.total_wages) %>
+              <% if (l.total_allowance > 0) { %> · Allow <%= money(l.total_allowance) %><% } %>
+              <% if (l.total_deductions > 0) { %> · −<%= money(l.total_deductions) %><% } %>
+            </p>
+          </div>
+          <div style="text-align: right; flex-shrink: 0;">
+            <p style="font-size: 0.95rem; font-weight: 800; color: #fff;"><%= money(l.grand_total) %></p>
+            <% if (l.paid) { %>
+              <span style="display: inline-block; margin-top: 2px; padding: 1px 6px; border-radius: 999px; font-size: 0.58rem; font-weight: 700; background: rgba(16,185,129,0.2); color: #34D399; text-transform: uppercase; letter-spacing: 0.05em;">Paid</span>
+            <% } else { %>
+              <span style="display: inline-block; margin-top: 2px; padding: 1px 6px; border-radius: 999px; font-size: 0.58rem; font-weight: 700; background: rgba(245,158,11,0.18); color: #FBBF24; text-transform: uppercase; letter-spacing: 0.05em;">Pending</span>
+            <% } %>
+          </div>
+        </a>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<% if (flash_success && flash_success.length) { %><div class="sf-toast show"><%= flash_success[0] %></div>
+<% } else if (flash_error && flash_error.length) { %><div class="sf-toast show err"><%= flash_error[0] %></div>
+<% } %>
+<script>setTimeout(()=>{ const t=document.querySelector('.sf-toast.show'); if(t) t.classList.remove('show'); }, 3500);</script>

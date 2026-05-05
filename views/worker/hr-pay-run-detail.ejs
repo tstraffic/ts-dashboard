@@ -1,0 +1,111 @@
+<%- include('partials/secure-form-style') %>
+<%
+  function money(n) { if (n == null) return '$0.00'; return '$' + Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function shortRange(a, b) {
+    if (!a || !b) return '';
+    const d1 = new Date(a + 'T00:00:00'); const d2 = new Date(b + 'T00:00:00');
+    const sameMonth = d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear();
+    const o = { day: 'numeric', month: 'short' };
+    return d1.toLocaleDateString('en-AU', o) + ' – ' + (sameMonth ? d2.getDate() : d2.toLocaleDateString('en-AU', o)) + ' ' + d2.getFullYear();
+  }
+%>
+
+<div class="sf-wrap">
+  <a href="/w/hr/pay-runs" class="sf-back">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    Pay history
+  </a>
+
+  <div class="sf-hero">
+    <div class="sf-hero-ic" style="background: rgba(96,165,250,0.2); color: #60A5FA;">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </div>
+    <h1 class="sf-title"><%= shortRange(line.period_start, line.period_end) %></h1>
+    <p class="sf-sub"><%= line.label || ('Pay run ' + line.pay_run_id) %><% if (line.paid) { %> · <span style="color: #34D399; font-weight: 700;">Paid</span><% } %></p>
+  </div>
+
+  <% if (visibleBuckets.length > 0) { %>
+    <div class="sf-section">
+      <div class="sf-section-title">Hours &amp; rates</div>
+      <% visibleBuckets.forEach(function (b) { %>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <div>
+            <p style="font-size: 0.78rem; font-weight: 700; color: #fff;"><%= b.label %></p>
+            <p style="font-size: 0.65rem; color: rgba(255,255,255,0.5);"><%= b.total_hours.toFixed(2) %> hrs × <%= money(b.rate) %></p>
+          </div>
+          <p style="font-size: 0.85rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums;"><%= money(b.total_wages) %></p>
+        </div>
+      <% }) %>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0 2px;">
+        <p style="font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.05em;">Total wages</p>
+        <p style="font-size: 0.95rem; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums;"><%= money(line.total_wages) %></p>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (showTravel || showMeal || (expenses && expenses.length > 0)) { %>
+    <div class="sf-section">
+      <div class="sf-section-title">Allowances</div>
+      <% if (showTravel) { %>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <div>
+            <p style="font-size: 0.78rem; font-weight: 700; color: #fff;">Travel</p>
+            <p style="font-size: 0.65rem; color: rgba(255,255,255,0.5);"><%= line.travel_count || 0 %> day<%= (line.travel_count || 0) === 1 ? '' : 's' %> × <%= money(line.travel_rate) %></p>
+          </div>
+          <p style="font-size: 0.85rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums;"><%= money(line.travel_allowance) %></p>
+        </div>
+      <% } %>
+      <% if (showMeal) { %>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <div>
+            <p style="font-size: 0.78rem; font-weight: 700; color: #fff;">Meal</p>
+            <p style="font-size: 0.65rem; color: rgba(255,255,255,0.5);"><%= line.meal_count || 0 %> shift<%= (line.meal_count || 0) === 1 ? '' : 's' %> × <%= money(line.meal_rate) %></p>
+          </div>
+          <p style="font-size: 0.85rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums;"><%= money(line.meal_allowance) %></p>
+        </div>
+      <% } %>
+      <% (expenses || []).forEach(function (e) { %>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <p style="font-size: 0.78rem; font-weight: 700; color: #fff;"><%= e.label === 'Other' && e.custom_label ? e.custom_label : e.label %></p>
+          <p style="font-size: 0.85rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums;"><%= money(e.amount) %></p>
+        </div>
+      <% }) %>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0 2px;">
+        <p style="font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.05em;">Total allowances</p>
+        <p style="font-size: 0.9rem; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums;"><%= money(line.total_allowance) %></p>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (deductions && deductions.length > 0) { %>
+    <div class="sf-section" style="border-color: rgba(244,114,182,0.2);">
+      <div class="sf-section-title">Deductions</div>
+      <% deductions.forEach(function (d) { %>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <p style="font-size: 0.78rem; font-weight: 700; color: #fff;"><%= d.description %></p>
+          <p style="font-size: 0.85rem; font-weight: 700; color: #FB7185; font-variant-numeric: tabular-nums;">−<%= money(d.amount) %></p>
+        </div>
+      <% }) %>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0 2px;">
+        <p style="font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.05em;">Total deductions</p>
+        <p style="font-size: 0.9rem; font-weight: 800; color: #FB7185; font-variant-numeric: tabular-nums;">−<%= money(line.total_deductions) %></p>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="sf-section" style="background: linear-gradient(160deg, rgba(16,185,129,0.18), rgba(10,22,40,0.5)); border-color: rgba(16,185,129,0.3);">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <p style="font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.05em;">Take-home</p>
+      <p style="font-size: 1.4rem; font-weight: 800; color: #34D399; font-variant-numeric: tabular-nums;"><%= money(line.grand_total) %></p>
+    </div>
+  </div>
+
+  <p style="margin-top: 0.75rem; text-align: center; font-size: 0.65rem; color: rgba(255,255,255,0.4); padding: 0 0.5rem;">
+    For your official payslip PDF, head to <a href="/w/hr/payslips" style="color: #60A5FA;">Payslips</a>.
+  </p>
+</div>
+
+<% if (flash_success && flash_success.length) { %><div class="sf-toast show"><%= flash_success[0] %></div>
+<% } else if (flash_error && flash_error.length) { %><div class="sf-toast show err"><%= flash_error[0] %></div>
+<% } %>
+<script>setTimeout(()=>{ const t=document.querySelector('.sf-toast.show'); if(t) t.classList.remove('show'); }, 3500);</script>

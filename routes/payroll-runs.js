@@ -394,10 +394,16 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
 
     let totalSalary = 0, totalSuper = 0;
     for (const l of lines) { totalSalary += toNum(l.salary_amount); totalSuper += toNum(l.super_amount); }
+
+    let incomeLabels = [];
+    try {
+      incomeLabels = db.prepare("SELECT label FROM income_labels WHERE active = 1 ORDER BY sort_order ASC, label ASC").all().map(r => r.label);
+    } catch (e) { /* table missing on stale deploy */ }
+
     return res.render('payroll-runs/management-show', {
       title: run.label || 'Management Pay Run',
       currentPage: 'pay-runs',
-      run, lines, eligibleStaff,
+      run, lines, eligibleStaff, incomeLabels,
       totals: { salary: round2(totalSalary), super: round2(totalSuper), grand: round2(totalSalary + totalSuper) },
       fmtMoney, periodLabel,
     });
@@ -414,9 +420,40 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
     ORDER BY LOWER(prl.full_name) ASC
   `).all(run.id);
 
+  // Load expenses + deductions for every line in this run (one query each)
+  const expensesByLine = {}, deductionsByLine = {};
+  if (lines.length) {
+    const lineIds = lines.map(l => l.id);
+    const placeholders = lineIds.map(() => '?').join(',');
+    try {
+      const expenseRows = db.prepare(`
+        SELECT * FROM pay_run_line_expenses
+        WHERE pay_run_line_id IN (${placeholders})
+        ORDER BY pay_run_line_id, id ASC
+      `).all(...lineIds);
+      for (const r of expenseRows) {
+        if (!expensesByLine[r.pay_run_line_id]) expensesByLine[r.pay_run_line_id] = [];
+        expensesByLine[r.pay_run_line_id].push(r);
+      }
+    } catch (e) { /* table may not exist on a stale deploy */ }
+    try {
+      const dedRows = db.prepare(`
+        SELECT * FROM pay_run_line_deductions
+        WHERE pay_run_line_id IN (${placeholders})
+        ORDER BY pay_run_line_id, sort_order ASC, id ASC
+      `).all(...lineIds);
+      for (const r of dedRows) {
+        if (!deductionsByLine[r.pay_run_line_id]) deductionsByLine[r.pay_run_line_id] = [];
+        deductionsByLine[r.pay_run_line_id].push(r);
+      }
+    } catch (e) { /* table may not exist on a stale deploy */ }
+  }
+
   const buckets = { cash: [], tfn: [], abn: [], unclassified: [] };
   for (const l of lines) {
     hydrateLine(l);
+    l.expenses = expensesByLine[l.id] || [];
+    l.deductions = deductionsByLine[l.id] || [];
     const t = (l.payment_type || '').toLowerCase();
     if      (t === 'cash') buckets.cash.push(l);
     else if (t === 'tfn')  buckets.tfn.push(l);
@@ -487,10 +524,37 @@ router.post('/runs/:id/lines/:lineId', requirePermission('payroll'), (req, res) 
   if (b.bsb !== undefined)        updates.bsb = String(b.bsb || '').trim();
   if (b.acc_number !== undefined) updates.acc_number = String(b.acc_number || '').trim();
 
-  // Allowances
-  if (b.travel_allowance !== undefined) updates.travel_allowance = toNum(b.travel_allowance);
-  if (b.meal_allowance   !== undefined) updates.meal_allowance   = toNum(b.meal_allowance);
-  if (b.other_allowance  !== undefined) updates.other_allowance  = toNum(b.other_allowance);
+  // Allowances — Travel and Meal accept rate × count breakdown.
+  // If `*_override = 1` is sent, the explicit `*_allowance` value wins.
+  // Otherwise the allowance is recomputed from rate × count.
+  if (b.travel_rate !== undefined)  updates.travel_rate  = toNum(b.travel_rate);
+  if (b.travel_count !== undefined) updates.travel_count = Math.max(0, parseInt(b.travel_count, 10) || 0);
+  if (b.meal_rate !== undefined)    updates.meal_rate    = toNum(b.meal_rate);
+  if (b.meal_count !== undefined)   updates.meal_count   = Math.max(0, parseInt(b.meal_count, 10) || 0);
+
+  const travelOverride = String(b.travel_override || '') === '1';
+  if (travelOverride && b.travel_allowance !== undefined) {
+    updates.travel_allowance = toNum(b.travel_allowance);
+  } else if (b.travel_rate !== undefined || b.travel_count !== undefined) {
+    const r = updates.travel_rate  != null ? updates.travel_rate  : toNum(line.travel_rate);
+    const c = updates.travel_count != null ? updates.travel_count : (parseInt(line.travel_count, 10) || 0);
+    updates.travel_allowance = round2(r * c);
+  } else if (b.travel_allowance !== undefined) {
+    updates.travel_allowance = toNum(b.travel_allowance);
+  }
+
+  const mealOverride = String(b.meal_override || '') === '1';
+  if (mealOverride && b.meal_allowance !== undefined) {
+    updates.meal_allowance = toNum(b.meal_allowance);
+  } else if (b.meal_rate !== undefined || b.meal_count !== undefined) {
+    const r = updates.meal_rate  != null ? updates.meal_rate  : toNum(line.meal_rate);
+    const c = updates.meal_count != null ? updates.meal_count : (parseInt(line.meal_count, 10) || 0);
+    updates.meal_allowance = round2(r * c);
+  } else if (b.meal_allowance !== undefined) {
+    updates.meal_allowance = toNum(b.meal_allowance);
+  }
+
+  if (b.other_allowance !== undefined) updates.other_allowance = toNum(b.other_allowance);
 
   // Paid
   if (b.paid !== undefined) {
@@ -1163,6 +1227,414 @@ router.post('/rates', requirePermission('payroll'), (req, res) => {
     console.error('[payroll/rates] Unhandled error:', err);
     req.flash('error', 'Save failed: ' + (err && err.message ? err.message : 'unknown error') + '. Check the server log.');
     return res.redirect('/payroll/rates');
+  }
+});
+
+// ============================================================================
+// /payroll/income-labels — managed dropdown values for management pay runs
+// ============================================================================
+router.get('/income-labels', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const labels = db.prepare(`
+      SELECT id, label, sort_order, active,
+        (SELECT COUNT(*) FROM pay_run_lines WHERE income_label = income_labels.label) AS use_count
+      FROM income_labels
+      ORDER BY active DESC, sort_order ASC, label ASC
+    `).all();
+    res.render('payroll-runs/income-labels', {
+      title: 'Income Labels',
+      currentPage: 'pay-runs',
+      labels,
+    });
+  } catch (err) {
+    console.error('[payroll/income-labels GET]', err);
+    req.flash('error', 'Could not load income labels: ' + (err && err.message || 'unknown error'));
+    return res.redirect('/payroll/runs');
+  }
+});
+
+router.post('/income-labels', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const label = String(req.body.label || '').trim().slice(0, 80);
+    const sortOrder = parseInt(req.body.sort_order, 10) || 100;
+    if (!label) {
+      req.flash('error', 'Label is required.');
+      return res.redirect('/payroll/income-labels');
+    }
+    try {
+      db.prepare("INSERT INTO income_labels (label, sort_order, active) VALUES (?, ?, 1)").run(label, sortOrder);
+      req.flash('success', `Added "${label}".`);
+    } catch (e) {
+      if (/UNIQUE/i.test(e.message)) req.flash('error', `"${label}" already exists.`);
+      else throw e;
+    }
+    return res.redirect('/payroll/income-labels');
+  } catch (err) {
+    console.error('[payroll/income-labels POST]', err);
+    req.flash('error', 'Could not add label: ' + (err && err.message || 'unknown error'));
+    return res.redirect('/payroll/income-labels');
+  }
+});
+
+router.post('/income-labels/:id', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const id = parseInt(req.params.id, 10);
+    const existing = db.prepare("SELECT * FROM income_labels WHERE id = ?").get(id);
+    if (!existing) { req.flash('error', 'Label not found.'); return res.redirect('/payroll/income-labels'); }
+    const updates = [];
+    const params = [];
+    if (req.body.label !== undefined) {
+      const newLabel = String(req.body.label || '').trim().slice(0, 80);
+      if (!newLabel) { req.flash('error', 'Label cannot be empty.'); return res.redirect('/payroll/income-labels'); }
+      updates.push('label = ?'); params.push(newLabel);
+      // Cascade rename to existing pay_run_lines so denormalised data stays consistent
+      if (newLabel !== existing.label) {
+        db.prepare("UPDATE pay_run_lines SET income_label = ? WHERE income_label = ?").run(newLabel, existing.label);
+      }
+    }
+    if (req.body.sort_order !== undefined) {
+      updates.push('sort_order = ?'); params.push(parseInt(req.body.sort_order, 10) || 100);
+    }
+    if (req.body.active !== undefined) {
+      const a = (req.body.active === '1' || req.body.active === 'on' || req.body.active === true) ? 1 : 0;
+      updates.push('active = ?'); params.push(a);
+    }
+    if (updates.length) {
+      updates.push('updated_at = CURRENT_TIMESTAMP');
+      params.push(id);
+      db.prepare(`UPDATE income_labels SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      req.flash('success', 'Label updated.');
+    }
+    return res.redirect('/payroll/income-labels');
+  } catch (err) {
+    console.error('[payroll/income-labels PUT]', err);
+    req.flash('error', 'Update failed: ' + (err && err.message || 'unknown error'));
+    return res.redirect('/payroll/income-labels');
+  }
+});
+
+router.post('/income-labels/:id/delete', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const id = parseInt(req.params.id, 10);
+    const row = db.prepare("SELECT * FROM income_labels WHERE id = ?").get(id);
+    if (!row) { req.flash('error', 'Label not found.'); return res.redirect('/payroll/income-labels'); }
+    const inUse = db.prepare("SELECT COUNT(*) AS c FROM pay_run_lines WHERE income_label = ?").get(row.label).c;
+    if (inUse > 0) {
+      req.flash('error', `Cannot delete "${row.label}" — it's used by ${inUse} pay-run line${inUse === 1 ? '' : 's'}. Disable it instead.`);
+      return res.redirect('/payroll/income-labels');
+    }
+    db.prepare("DELETE FROM income_labels WHERE id = ?").run(id);
+    req.flash('success', `Deleted "${row.label}".`);
+    return res.redirect('/payroll/income-labels');
+  } catch (err) {
+    console.error('[payroll/income-labels DELETE]', err);
+    req.flash('error', 'Delete failed: ' + (err && err.message || 'unknown error'));
+    return res.redirect('/payroll/income-labels');
+  }
+});
+
+// ============================================================================
+// Per-line expenses (Fuel / Tolls / Parking / Other) with optional receipts
+// ============================================================================
+
+// Helper — recalc other_allowance + grand_total for a line after expenses change
+function recalcOtherAllowanceAndTotals(db, line) {
+  const sum = db.prepare("SELECT COALESCE(SUM(amount), 0) AS s FROM pay_run_line_expenses WHERE pay_run_line_id = ?").get(line.id).s;
+  const isPH = makeIsPH(loadPHSet(db));
+  const merged = Object.assign({}, line, { other_allowance: round2(toNum(sum)) });
+  const recomputed = recomputeLine(merged, { isPH });
+  const updates = Object.assign({ other_allowance: round2(toNum(sum)) }, recomputed, { updated_at: new Date().toISOString() });
+  const cols = Object.keys(updates);
+  const setSql = cols.map(c => `${c} = ?`).join(', ');
+  const params = cols.map(c => updates[c]); params.push(line.id);
+  db.prepare(`UPDATE pay_run_lines SET ${setSql} WHERE id = ?`).run(...params);
+  return updates;
+}
+
+function recalcDeductionsAndTotals(db, line) {
+  const sum = db.prepare("SELECT COALESCE(SUM(amount), 0) AS s FROM pay_run_line_deductions WHERE pay_run_line_id = ?").get(line.id).s;
+  const isPH = makeIsPH(loadPHSet(db));
+  const merged = Object.assign({}, line, { total_deductions: round2(toNum(sum)) });
+  const recomputed = recomputeLine(merged, { isPH });
+  const updates = Object.assign({ total_deductions: round2(toNum(sum)) }, recomputed, { updated_at: new Date().toISOString() });
+  const cols = Object.keys(updates);
+  const setSql = cols.map(c => `${c} = ?`).join(', ');
+  const params = cols.map(c => updates[c]); params.push(line.id);
+  db.prepare(`UPDATE pay_run_lines SET ${setSql} WHERE id = ?`).run(...params);
+  return updates;
+}
+
+const { payrollReceiptUpload, payrollReceiptsDir } = require('../middleware/upload');
+
+// POST /payroll/runs/:id/lines/:lineId/expenses — create a new expense.
+// Multipart so a receipt file can be attached at create time.
+router.post('/runs/:id/lines/:lineId/expenses', requirePermission('payroll'), (req, res) => {
+  payrollReceiptUpload.single('receipt')(req, res, (multerErr) => {
+    try {
+      if (multerErr) {
+        if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(400).json({ error: multerErr.message });
+        req.flash('error', 'Upload failed: ' + multerErr.message);
+        return res.redirect('/payroll/runs/' + req.params.id);
+      }
+      const db = getDb();
+      const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
+      if (!line) {
+        if (req.file) try { fs.unlinkSync(req.file.path); } catch (e) {}
+        if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Line not found' });
+        req.flash('error', 'Line not found.');
+        return res.redirect('/payroll/runs/' + req.params.id);
+      }
+
+      const labelRaw = String(req.body.label || 'Fuel').trim().slice(0, 40) || 'Fuel';
+      const customLabel = labelRaw === 'Other' ? String(req.body.custom_label || '').trim().slice(0, 80) : null;
+      const amount = round2(toNum(req.body.amount));
+
+      let relPath = null, fname = null, mime = null, size = null;
+      if (req.file) {
+        relPath = path.relative(payrollReceiptsDir, req.file.path).replace(/\\/g, '/');
+        fname = req.file.originalname;
+        mime = req.file.mimetype;
+        size = req.file.size;
+      }
+
+      const result = db.prepare(`
+        INSERT INTO pay_run_line_expenses (pay_run_line_id, label, custom_label, amount, receipt_path, receipt_filename, mime_type, file_size, uploaded_by_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(line.id, labelRaw, customLabel, amount, relPath, fname, mime, size,
+        (req.session && req.session.user && req.session.user.id) || null);
+
+      recalcOtherAllowanceAndTotals(db, line);
+
+      if (req.xhr || (req.headers.accept || '').includes('json')) {
+        const fresh = db.prepare("SELECT * FROM pay_run_line_expenses WHERE id = ?").get(result.lastInsertRowid);
+        const lineFresh = db.prepare("SELECT other_allowance, total_allowance, grand_total FROM pay_run_lines WHERE id = ?").get(line.id);
+        return res.json({ ok: true, expense: fresh, line: lineFresh });
+      }
+      req.flash('success', 'Expense added.');
+      return res.redirect('/payroll/runs/' + req.params.id);
+    } catch (err) {
+      console.error('[expenses POST]', err);
+      if (req.file) try { fs.unlinkSync(req.file.path); } catch (e) {}
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(500).json({ error: err.message });
+      req.flash('error', 'Add expense failed: ' + (err && err.message || 'unknown error'));
+      return res.redirect('/payroll/runs/' + req.params.id);
+    }
+  });
+});
+
+// POST /payroll/runs/:id/lines/:lineId/expenses/:expenseId — update label / amount.
+// Receipt replacement handled by the create endpoint (delete + create).
+router.post('/runs/:id/lines/:lineId/expenses/:expenseId', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
+    const exp = db.prepare("SELECT * FROM pay_run_line_expenses WHERE id = ? AND pay_run_line_id = ?").get(req.params.expenseId, req.params.lineId);
+    if (!line || !exp) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Not found' });
+      req.flash('error', 'Expense not found.');
+      return res.redirect('/payroll/runs/' + req.params.id);
+    }
+    const updates = [];
+    const params = [];
+    if (req.body.label !== undefined) {
+      const lbl = String(req.body.label || 'Fuel').trim().slice(0, 40) || 'Fuel';
+      updates.push('label = ?'); params.push(lbl);
+      if (lbl === 'Other') {
+        updates.push('custom_label = ?');
+        params.push(String(req.body.custom_label || '').trim().slice(0, 80));
+      } else {
+        updates.push('custom_label = ?'); params.push(null);
+      }
+    } else if (req.body.custom_label !== undefined) {
+      updates.push('custom_label = ?'); params.push(String(req.body.custom_label || '').trim().slice(0, 80));
+    }
+    if (req.body.amount !== undefined) {
+      updates.push('amount = ?'); params.push(round2(toNum(req.body.amount)));
+    }
+    if (updates.length) {
+      updates.push('updated_at = CURRENT_TIMESTAMP');
+      params.push(exp.id);
+      db.prepare(`UPDATE pay_run_line_expenses SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      recalcOtherAllowanceAndTotals(db, line);
+    }
+    if (req.xhr || (req.headers.accept || '').includes('json')) {
+      const fresh = db.prepare("SELECT * FROM pay_run_line_expenses WHERE id = ?").get(exp.id);
+      const lineFresh = db.prepare("SELECT other_allowance, total_allowance, grand_total FROM pay_run_lines WHERE id = ?").get(line.id);
+      return res.json({ ok: true, expense: fresh, line: lineFresh });
+    }
+    req.flash('success', 'Expense updated.');
+    return res.redirect('/payroll/runs/' + req.params.id);
+  } catch (err) {
+    console.error('[expenses PUT]', err);
+    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(500).json({ error: err.message });
+    req.flash('error', 'Update failed: ' + (err && err.message || 'unknown error'));
+    return res.redirect('/payroll/runs/' + req.params.id);
+  }
+});
+
+// POST /payroll/runs/:id/lines/:lineId/expenses/:expenseId/delete
+router.post('/runs/:id/lines/:lineId/expenses/:expenseId/delete', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
+    const exp = db.prepare("SELECT * FROM pay_run_line_expenses WHERE id = ? AND pay_run_line_id = ?").get(req.params.expenseId, req.params.lineId);
+    if (!line || !exp) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Not found' });
+      req.flash('error', 'Expense not found.');
+      return res.redirect('/payroll/runs/' + req.params.id);
+    }
+    if (exp.receipt_path) {
+      const abs = path.join(payrollReceiptsDir, exp.receipt_path);
+      try { fs.unlinkSync(abs); } catch (e) { /* file may already be gone */ }
+    }
+    db.prepare("DELETE FROM pay_run_line_expenses WHERE id = ?").run(exp.id);
+    recalcOtherAllowanceAndTotals(db, line);
+    if (req.xhr || (req.headers.accept || '').includes('json')) {
+      const lineFresh = db.prepare("SELECT other_allowance, total_allowance, grand_total FROM pay_run_lines WHERE id = ?").get(line.id);
+      return res.json({ ok: true, line: lineFresh });
+    }
+    req.flash('success', 'Expense removed.');
+    return res.redirect('/payroll/runs/' + req.params.id);
+  } catch (err) {
+    console.error('[expenses DELETE]', err);
+    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(500).json({ error: err.message });
+    req.flash('error', 'Delete failed: ' + (err && err.message || 'unknown error'));
+    return res.redirect('/payroll/runs/' + req.params.id);
+  }
+});
+
+// GET /payroll/runs/:id/lines/:lineId/expenses/:expenseId/receipt — auth-checked stream
+router.get('/runs/:id/lines/:lineId/expenses/:expenseId/receipt', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const exp = db.prepare(`
+      SELECT prle.* FROM pay_run_line_expenses prle
+      JOIN pay_run_lines prl ON prl.id = prle.pay_run_line_id
+      WHERE prle.id = ? AND prl.id = ? AND prl.pay_run_id = ?
+    `).get(req.params.expenseId, req.params.lineId, req.params.id);
+    if (!exp || !exp.receipt_path) return res.status(404).send('Receipt not found');
+    const abs = path.join(payrollReceiptsDir, exp.receipt_path);
+    if (!fs.existsSync(abs)) return res.status(404).send('Receipt file missing');
+    res.setHeader('Content-Type', exp.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${(exp.receipt_filename || 'receipt').replace(/"/g, '')}"`);
+    return fs.createReadStream(abs).pipe(res);
+  } catch (err) {
+    console.error('[expenses receipt GET]', err);
+    return res.status(500).send('Error reading receipt');
+  }
+});
+
+// ============================================================================
+// Per-line deductions
+// ============================================================================
+router.post('/runs/:id/lines/:lineId/deductions', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
+    if (!line) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Line not found' });
+      req.flash('error', 'Line not found.');
+      return res.redirect('/payroll/runs/' + req.params.id);
+    }
+    const description = String(req.body.description || '').trim().slice(0, 200);
+    const amount = round2(toNum(req.body.amount));
+    if (!description) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(400).json({ error: 'Description required' });
+      req.flash('error', 'Description is required.');
+      return res.redirect('/payroll/runs/' + req.params.id);
+    }
+    const result = db.prepare(`
+      INSERT INTO pay_run_line_deductions (pay_run_line_id, description, amount, sort_order)
+      VALUES (?, ?, ?, ?)
+    `).run(line.id, description, amount, parseInt(req.body.sort_order, 10) || 100);
+    recalcDeductionsAndTotals(db, line);
+    if (req.xhr || (req.headers.accept || '').includes('json')) {
+      const fresh = db.prepare("SELECT * FROM pay_run_line_deductions WHERE id = ?").get(result.lastInsertRowid);
+      const lineFresh = db.prepare("SELECT total_deductions, grand_total FROM pay_run_lines WHERE id = ?").get(line.id);
+      return res.json({ ok: true, deduction: fresh, line: lineFresh });
+    }
+    req.flash('success', 'Deduction added.');
+    return res.redirect('/payroll/runs/' + req.params.id);
+  } catch (err) {
+    console.error('[deductions POST]', err);
+    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(500).json({ error: err.message });
+    req.flash('error', 'Add deduction failed: ' + (err && err.message || 'unknown error'));
+    return res.redirect('/payroll/runs/' + req.params.id);
+  }
+});
+
+router.post('/runs/:id/lines/:lineId/deductions/:dedId', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
+    const ded = db.prepare("SELECT * FROM pay_run_line_deductions WHERE id = ? AND pay_run_line_id = ?").get(req.params.dedId, req.params.lineId);
+    if (!line || !ded) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Not found' });
+      req.flash('error', 'Deduction not found.');
+      return res.redirect('/payroll/runs/' + req.params.id);
+    }
+    const updates = [];
+    const params = [];
+    if (req.body.description !== undefined) {
+      const desc = String(req.body.description || '').trim().slice(0, 200);
+      if (!desc) {
+        if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(400).json({ error: 'Description required' });
+        req.flash('error', 'Description is required.');
+        return res.redirect('/payroll/runs/' + req.params.id);
+      }
+      updates.push('description = ?'); params.push(desc);
+    }
+    if (req.body.amount !== undefined) {
+      updates.push('amount = ?'); params.push(round2(toNum(req.body.amount)));
+    }
+    if (updates.length) {
+      updates.push('updated_at = CURRENT_TIMESTAMP');
+      params.push(ded.id);
+      db.prepare(`UPDATE pay_run_line_deductions SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      recalcDeductionsAndTotals(db, line);
+    }
+    if (req.xhr || (req.headers.accept || '').includes('json')) {
+      const fresh = db.prepare("SELECT * FROM pay_run_line_deductions WHERE id = ?").get(ded.id);
+      const lineFresh = db.prepare("SELECT total_deductions, grand_total FROM pay_run_lines WHERE id = ?").get(line.id);
+      return res.json({ ok: true, deduction: fresh, line: lineFresh });
+    }
+    req.flash('success', 'Deduction updated.');
+    return res.redirect('/payroll/runs/' + req.params.id);
+  } catch (err) {
+    console.error('[deductions PUT]', err);
+    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(500).json({ error: err.message });
+    req.flash('error', 'Update failed: ' + (err && err.message || 'unknown error'));
+    return res.redirect('/payroll/runs/' + req.params.id);
+  }
+});
+
+router.post('/runs/:id/lines/:lineId/deductions/:dedId/delete', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
+    const ded = db.prepare("SELECT * FROM pay_run_line_deductions WHERE id = ? AND pay_run_line_id = ?").get(req.params.dedId, req.params.lineId);
+    if (!line || !ded) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Not found' });
+      req.flash('error', 'Deduction not found.');
+      return res.redirect('/payroll/runs/' + req.params.id);
+    }
+    db.prepare("DELETE FROM pay_run_line_deductions WHERE id = ?").run(ded.id);
+    recalcDeductionsAndTotals(db, line);
+    if (req.xhr || (req.headers.accept || '').includes('json')) {
+      const lineFresh = db.prepare("SELECT total_deductions, grand_total FROM pay_run_lines WHERE id = ?").get(line.id);
+      return res.json({ ok: true, line: lineFresh });
+    }
+    req.flash('success', 'Deduction removed.');
+    return res.redirect('/payroll/runs/' + req.params.id);
+  } catch (err) {
+    console.error('[deductions DELETE]', err);
+    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(500).json({ error: err.message });
+    req.flash('error', 'Delete failed: ' + (err && err.message || 'unknown error'));
+    return res.redirect('/payroll/runs/' + req.params.id);
   }
 });
 

@@ -7418,6 +7418,117 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 157: Pay run feature pack
+  //   - income_labels: managed dropdown of income labels for management runs
+  //   - pay_run_line_expenses: per-line expense items with optional receipts
+  //     (Fuel / Tolls / Parking / Other-with-custom-label, attached file)
+  //   - pay_run_line_deductions: per-line deductions {description, amount}
+  //   - pay_run_lines.travel_rate / travel_count / meal_rate / meal_count:
+  //     break travel/meal allowances into rate × quantity for transparent
+  //     editing on the pay-run line edit modal.
+  //   - pay_run_lines.total_deductions: SUM of pay_run_line_deductions for
+  //     the line, denormalised so the existing recomputeLine path can
+  //     subtract it from grand_total.
+  // =============================================
+  if (!isMigrationApplied.get(157)) {
+    try {
+      // Income labels dropdown (used by management pay runs)
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS income_labels (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          label TEXT NOT NULL UNIQUE,
+          sort_order INTEGER NOT NULL DEFAULT 100,
+          active INTEGER NOT NULL DEFAULT 1,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      const seedLabels = ['Salary', 'Director Fee', 'Bonus', 'Commission', 'Allowance', 'Reimbursement'];
+      const seedStmt = db.prepare("INSERT OR IGNORE INTO income_labels (label, sort_order) VALUES (?, ?)");
+      seedLabels.forEach((l, i) => seedStmt.run(l, (i + 1) * 10));
+
+      // Per-line expenses with optional receipt attachments
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS pay_run_line_expenses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          pay_run_line_id INTEGER NOT NULL REFERENCES pay_run_lines(id) ON DELETE CASCADE,
+          label TEXT NOT NULL DEFAULT 'Fuel',
+          custom_label TEXT,
+          amount REAL NOT NULL DEFAULT 0,
+          receipt_path TEXT,
+          receipt_filename TEXT,
+          mime_type TEXT,
+          file_size INTEGER,
+          uploaded_by_id INTEGER,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_pay_run_line_expenses_line ON pay_run_line_expenses(pay_run_line_id);
+      `);
+
+      // Per-line deductions
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS pay_run_line_deductions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          pay_run_line_id INTEGER NOT NULL REFERENCES pay_run_lines(id) ON DELETE CASCADE,
+          description TEXT NOT NULL,
+          amount REAL NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 100,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_pay_run_line_deductions_line ON pay_run_line_deductions(pay_run_line_id);
+      `);
+
+      // travel/meal rate × count + total_deductions on pay_run_lines
+      const lineCols157 = db.prepare("PRAGMA table_info(pay_run_lines)").all().map(c => c.name);
+      const addLine157 = (name, ddl) => { if (!lineCols157.includes(name)) try { db.exec(`ALTER TABLE pay_run_lines ADD COLUMN ${ddl}`); } catch (e) {} };
+      addLine157('travel_rate',     "travel_rate REAL DEFAULT 0");
+      addLine157('travel_count',    "travel_count INTEGER DEFAULT 0");
+      addLine157('meal_rate',       "meal_rate REAL DEFAULT 0");
+      addLine157('meal_count',      "meal_count INTEGER DEFAULT 0");
+      addLine157('total_deductions',"total_deductions REAL DEFAULT 0");
+
+      // Backfill rate/count for existing rows from employees table
+      try {
+        db.exec(`
+          UPDATE pay_run_lines
+          SET travel_rate = COALESCE(
+            (SELECT rate_fares_daily FROM employees WHERE id = pay_run_lines.employee_id), 0)
+          WHERE (travel_rate IS NULL OR travel_rate = 0) AND employee_id IS NOT NULL;
+        `);
+        db.exec(`
+          UPDATE pay_run_lines
+          SET travel_count = CASE
+            WHEN travel_rate > 0 THEN CAST(ROUND(travel_allowance / travel_rate) AS INTEGER)
+            ELSE 0 END
+          WHERE (travel_count IS NULL OR travel_count = 0) AND travel_allowance > 0;
+        `);
+        db.exec(`
+          UPDATE pay_run_lines
+          SET meal_rate = COALESCE(
+            (SELECT rate_meal FROM employees WHERE id = pay_run_lines.employee_id), 0)
+          WHERE (meal_rate IS NULL OR meal_rate = 0) AND employee_id IS NOT NULL;
+        `);
+        db.exec(`
+          UPDATE pay_run_lines
+          SET meal_count = CASE
+            WHEN meal_rate > 0 THEN CAST(ROUND(meal_allowance / meal_rate) AS INTEGER)
+            ELSE 0 END
+          WHERE (meal_count IS NULL OR meal_count = 0) AND meal_allowance > 0;
+        `);
+      } catch (e) {
+        console.error('Migration 157 backfill warning:', e.message);
+      }
+
+      recordMigration.run(157, 'pay run feature pack: income_labels, expenses, deductions, travel/meal rate×count');
+      console.log('Migration 157 applied: pay run feature pack (income_labels + expenses + deductions + travel/meal rate×count)');
+    } catch (e) {
+      console.error('Migration 157 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

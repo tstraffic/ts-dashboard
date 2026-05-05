@@ -84,9 +84,18 @@
                 <td class="px-4 py-2">
                   <form method="POST" action="/payroll/runs/<%= run.id %>/management-lines/<%= line.id %>" class="inline">
                     <%- include('../partials/csrf') %>
-                    <input type="text" name="income_label" value="<%= line.income_label || 'Salary' %>"
-                      onblur="if(this.value!==this.defaultValue) this.form.submit()"
-                      class="w-40 px-2 py-1 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <% const currentLabel = line.income_label || 'Salary'; %>
+                    <% const labelInList = (incomeLabels || []).includes(currentLabel); %>
+                    <select name="income_label"
+                      onchange="this.form.submit()"
+                      class="w-44 px-2 py-1 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
+                      <% (incomeLabels || []).forEach(opt => { %>
+                        <option value="<%= opt %>" <%= opt === currentLabel ? 'selected' : '' %>><%= opt %></option>
+                      <% }) %>
+                      <% if (!labelInList && currentLabel) { %>
+                        <option value="<%= currentLabel %>" selected><%= currentLabel %> (legacy)</option>
+                      <% } %>
+                    </select>
                   </form>
                 </td>
                 <td class="px-4 py-2 text-right">
@@ -147,8 +156,15 @@
         </select>
       </div>
       <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Income label</label>
-        <input type="text" name="income_label" value="Salary" required class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1 flex items-center justify-between">
+          <span>Income label</span>
+          <a href="/payroll/income-labels" class="text-[10px] font-semibold text-brand-600 hover:underline normal-case tracking-normal">Manage</a>
+        </label>
+        <select name="income_label" required class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md">
+          <% ((incomeLabels && incomeLabels.length) ? incomeLabels : ['Salary']).forEach(opt => { %>
+            <option value="<%= opt %>" <%= opt === 'Salary' ? 'selected' : '' %>><%= opt %></option>
+          <% }) %>
+        </select>
       </div>
       <div>
         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Amount</label>

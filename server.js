@@ -42,7 +42,11 @@ app.use(helmet({
 }));
 
 // Middleware
-app.use(express.urlencoded({ extended: true }));
+// parameterLimit raised from default 1000 because the bulk Worker Rates form
+// (/payroll/rates) submits ~14 fields per employee in a single POST. With
+// 70+ employees the default limit is exceeded and body-parser throws before
+// the route handler runs — Express then returns a generic 500.
+app.use(express.urlencoded({ extended: true, limit: '10mb', parameterLimit: 100000 }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/data/uploads', express.static(path.join(__dirname, 'data', 'uploads')));
