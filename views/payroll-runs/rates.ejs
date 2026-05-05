@@ -14,15 +14,19 @@
   // What columns each tab shows. Cash + ABN + TFN have different rate sets.
   const COLS = {
     cash: [
-      { key: 'rate_day',   label: 'Day',   step: '0.01' },
-      { key: 'rate_night', label: 'Night', step: '0.01' },
+      { key: 'rate_day',           label: 'Day',     step: '0.01' },
+      { key: 'rate_night',         label: 'Night',   step: '0.01' },
+      { key: 'rate_meal',          label: 'Meal',    step: '0.01' },
+      { key: 'rate_fares_daily',   label: 'Travel',  step: '0.01' },
     ],
     abn: [
-      { key: 'rate_day',      label: 'Day',     step: '0.01' },
-      { key: 'rate_ot',       label: 'Day OT',  step: '0.01' },
-      { key: 'rate_night',    label: 'Night',   step: '0.01' },
-      { key: 'rate_night_ot', label: 'Night OT',step: '0.01' },
-      { key: 'rate_weekend',  label: 'Weekend', step: '0.01' },
+      { key: 'rate_day',           label: 'Day',     step: '0.01' },
+      { key: 'rate_ot',            label: 'Day OT',  step: '0.01' },
+      { key: 'rate_night',         label: 'Night',   step: '0.01' },
+      { key: 'rate_night_ot',      label: 'Night OT',step: '0.01' },
+      { key: 'rate_weekend',       label: 'Weekend', step: '0.01' },
+      { key: 'rate_meal',          label: 'Meal',    step: '0.01' },
+      { key: 'rate_fares_daily',   label: 'Travel',  step: '0.01' },
     ],
     tfn: [
       { key: 'rate_day',           label: 'Day',     step: '0.01' },
@@ -165,6 +169,39 @@
 </div>
 
 <script>
+  // When a TFN worker's award classification changes, fetch the
+  // classification's rates and auto-fill the row's rate inputs.
+  document.querySelectorAll('select[name*="[award_classification_id]"]').forEach(sel => {
+    sel.addEventListener('change', async (e) => {
+      const id = e.target.value;
+      if (!id) return;
+      try {
+        const r = await fetch('/payroll/award-classifications/' + id + '.json', { headers: { 'Accept': 'application/json' } });
+        if (!r.ok) return;
+        const data = await r.json();
+        if (!data || !data.rates) return;
+        // Find the parent row for this select and write each rate input
+        const row = e.target.closest('tr');
+        if (!row) return;
+        const empMatch = e.target.name.match(/emp_(\d+)/);
+        if (!empMatch) return;
+        const empId = empMatch[1];
+        Object.entries(data.rates).forEach(([k, v]) => {
+          if (v == null) return;
+          // Update visible input AND any hidden mirror inputs for the same key
+          document.querySelectorAll('input[name="rows[emp_' + empId + '][' + k + ']"]').forEach(inp => {
+            inp.value = (parseFloat(v) || 0).toFixed(2);
+          });
+        });
+        // Tiny visual signal that the row was filled
+        row.classList.add('bg-emerald-50');
+        setTimeout(() => row.classList.remove('bg-emerald-50'), 900);
+      } catch (err) {
+        console.error('Award fetch failed:', err);
+      }
+    });
+  });
+
   function showTab(key) {
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
     document.getElementById('tab-' + key).classList.remove('hidden');

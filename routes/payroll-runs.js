@@ -122,7 +122,7 @@ function createManagementRun(req, res) {
       const staff = db.prepare(`
         SELECT id, employee_code, first_name, last_name, payment_type,
           COALESCE(weekly_salary, 0) AS weekly_salary,
-          COALESCE(super_rate, 0.115) AS super_rate,
+          COALESCE(super_rate, 0.12) AS super_rate,
           COALESCE(payroll_bsb, '') AS payroll_bsb,
           COALESCE(payroll_account, '') AS payroll_account
         FROM employees
@@ -374,7 +374,7 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
     const lines = db.prepare(`
       SELECT prl.*, e.employee_code, e.first_name, e.last_name,
         COALESCE(e.weekly_salary, 0) AS emp_weekly_salary,
-        COALESCE(e.super_rate, 0.115) AS emp_super_rate
+        COALESCE(e.super_rate, 0.12) AS emp_super_rate
       FROM pay_run_lines prl
       LEFT JOIN employees e ON e.id = prl.employee_id
       WHERE prl.pay_run_id = ?
@@ -386,14 +386,45 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
     const eligibleStaff = db.prepare(`
       SELECT id, first_name, last_name, employee_code,
         COALESCE(weekly_salary, 0) AS weekly_salary,
-        COALESCE(super_rate, 0.115) AS super_rate
+        COALESCE(super_rate, 0.12) AS super_rate
       FROM employees
       WHERE on_management_payroll = 1 AND deleted_at IS NULL
       ORDER BY LOWER(first_name), LOWER(last_name)
     `).all();
 
-    let totalSalary = 0, totalSuper = 0;
-    for (const l of lines) { totalSalary += toNum(l.salary_amount); totalSuper += toNum(l.super_amount); }
+    // Tax/net computed at the EMPLOYEE level (not per line) so a person
+    // with multiple income lines (Salary + Director fee + Bonus) is taxed
+    // on the combined total, not each line independently. PAYG → Schedule 1
+    // weekly TFT-claimed approximation; period derived from run dates.
+    const { payAsYouGo } = require('../lib/payroll');
+    const periodWeeks = (() => {
+      if (!run.period_start || !run.period_end) return 1;
+      const ms = new Date(run.period_end + 'T00:00:00') - new Date(run.period_start + 'T00:00:00');
+      return Math.max(1, Math.round(ms / (7 * 86400000) + 1) || 1);
+    })();
+
+    // Sum gross per employee, then split tax proportionally back to lines.
+    const grossByEmp = {};
+    for (const l of lines) {
+      const k = l.employee_id || ('name:' + (l.full_name || ''));
+      grossByEmp[k] = (grossByEmp[k] || 0) + toNum(l.salary_amount);
+    }
+    const taxByEmp = {};
+    for (const k of Object.keys(grossByEmp)) {
+      taxByEmp[k] = payAsYouGo(grossByEmp[k], periodWeeks);
+    }
+    let totalSalary = 0, totalSuper = 0, totalTax = 0;
+    for (const l of lines) {
+      const k = l.employee_id || ('name:' + (l.full_name || ''));
+      const g = grossByEmp[k] || 0;
+      const taxFull = taxByEmp[k] || 0;
+      // Allocate this line's share of the employee's tax in proportion to its salary
+      l.tax_withheld = g > 0 ? round2(taxFull * (toNum(l.salary_amount) / g)) : 0;
+      l.net_pay = round2(toNum(l.salary_amount) - l.tax_withheld);
+      totalSalary += toNum(l.salary_amount);
+      totalSuper  += toNum(l.super_amount);
+      totalTax    += l.tax_withheld;
+    }
 
     let incomeLabels = [];
     try {
@@ -404,7 +435,13 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
       title: run.label || 'Management Pay Run',
       currentPage: 'pay-runs',
       run, lines, eligibleStaff, incomeLabels,
-      totals: { salary: round2(totalSalary), super: round2(totalSuper), grand: round2(totalSalary + totalSuper) },
+      totals: {
+        salary: round2(totalSalary),
+        super: round2(totalSuper),
+        tax: round2(totalTax),
+        net: round2(totalSalary - totalTax),
+        grand: round2(totalSalary + totalSuper),
+      },
       fmtMoney, periodLabel,
     });
   }
@@ -761,7 +798,7 @@ router.post('/runs/:id/management-lines', requirePermission('payroll'), (req, re
     const emp = db.prepare(`
       SELECT id, first_name, last_name, payment_type,
         COALESCE(weekly_salary, 0) AS weekly_salary,
-        COALESCE(super_rate, 0.115) AS super_rate,
+        COALESCE(super_rate, 0.12) AS super_rate,
         COALESCE(payroll_bsb, '') AS payroll_bsb,
         COALESCE(payroll_account, '') AS payroll_account
       FROM employees WHERE id = ?
@@ -1635,6 +1672,46 @@ router.post('/runs/:id/lines/:lineId/deductions/:dedId/delete', requirePermissio
     if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(500).json({ error: err.message });
     req.flash('error', 'Delete failed: ' + (err && err.message || 'unknown error'));
     return res.redirect('/payroll/runs/' + req.params.id);
+  }
+});
+
+// GET /payroll/award-classifications/:id.json — used by the worker rates
+// page to auto-fill rate inputs when a TFN worker's classification changes.
+router.get('/award-classifications/:id.json', requirePermission('payroll'), (req, res) => {
+  try {
+    const db = getDb();
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Bad id' });
+    const row = db.prepare(`
+      SELECT id, classification, award_name,
+        rate_day, rate_day_ot, rate_day_dt,
+        rate_night, rate_night_ot, rate_night_dt,
+        rate_weekend, rate_public_holiday,
+        rate_meal, rate_fares_daily
+      FROM award_classifications WHERE id = ?
+    `).get(id);
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    // Map column names to the form input keys used in views/payroll-runs/rates.ejs.
+    return res.json({
+      id: row.id,
+      classification: row.classification,
+      award_name: row.award_name,
+      rates: {
+        rate_day:            row.rate_day,
+        rate_ot:             row.rate_day_ot,
+        rate_dt:             row.rate_day_dt,
+        rate_night:          row.rate_night,
+        rate_night_ot:       row.rate_night_ot,
+        rate_night_dt:       row.rate_night_dt,
+        rate_weekend:        row.rate_weekend,
+        rate_public_holiday: row.rate_public_holiday,
+        rate_meal:           row.rate_meal,
+        rate_fares_daily:    row.rate_fares_daily,
+      },
+    });
+  } catch (err) {
+    console.error('[award-classifications/:id.json]', err);
+    return res.status(500).json({ error: err.message });
   }
 });
 

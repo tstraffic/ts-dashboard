@@ -36,18 +36,26 @@
   </div>
 
   <!-- Totals strip -->
-  <div class="grid grid-cols-3 gap-3">
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Salary</p>
-      <p class="text-2xl font-bold text-gray-900 mt-1 tabular-nums">$<%= fmtMoney(totals.salary) %></p>
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gross</p>
+      <p class="text-xl font-bold text-gray-900 mt-1 tabular-nums">$<%= fmtMoney(totals.salary) %></p>
     </div>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-      <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Total Super</p>
-      <p class="text-2xl font-bold text-amber-700 mt-1 tabular-nums">$<%= fmtMoney(totals.super) %></p>
+    <div class="bg-white border border-rose-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Tax (PAYG)</p>
+      <p class="text-xl font-bold text-rose-700 mt-1 tabular-nums">−$<%= fmtMoney(totals.tax || 0) %></p>
     </div>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Salary + Super</p>
-      <p class="text-2xl font-bold text-emerald-700 mt-1 tabular-nums">$<%= fmtMoney(totals.grand) %></p>
+    <div class="bg-white border border-emerald-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Net (take-home)</p>
+      <p class="text-xl font-bold text-emerald-700 mt-1 tabular-nums">$<%= fmtMoney(totals.net || 0) %></p>
+    </div>
+    <div class="bg-white border border-amber-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Super (12%)</p>
+      <p class="text-xl font-bold text-amber-700 mt-1 tabular-nums">$<%= fmtMoney(totals.super) %></p>
+    </div>
+    <div class="bg-gradient-to-br from-brand-600 to-brand-700 text-white rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-white/80 uppercase tracking-widest">Salary + Super</p>
+      <p class="text-xl font-bold mt-1 tabular-nums">$<%= fmtMoney(totals.grand) %></p>
     </div>
   </div>
 
@@ -64,7 +72,9 @@
           <tr>
             <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Employee</th>
             <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Income</th>
-            <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Salary</th>
+            <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Gross</th>
+            <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest" title="PAYG estimate, weekly TFT-claimed">Tax</th>
+            <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Net</th>
             <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Super</th>
             <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest"></th>
           </tr>
@@ -106,6 +116,8 @@
                       class="w-24 px-2 py-1 text-sm text-right tabular-nums bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
                   </form>
                 </td>
+                <td class="px-4 py-2 text-right text-sm tabular-nums text-rose-600">−$<%= fmtMoney(line.tax_withheld || 0) %></td>
+                <td class="px-4 py-2 text-right text-sm font-semibold tabular-nums text-emerald-700">$<%= fmtMoney(line.net_pay || 0) %></td>
                 <td class="px-4 py-2 text-right">
                   <form method="POST" action="/payroll/runs/<%= run.id %>/management-lines/<%= line.id %>" class="inline">
                     <%- include('../partials/csrf') %>
@@ -130,6 +142,8 @@
           <tr>
             <td colspan="2" class="px-4 py-2 text-sm font-bold text-gray-700">Plan totals</td>
             <td class="px-4 py-2 text-right text-sm font-bold text-gray-900 tabular-nums">$<%= fmtMoney(totals.salary) %></td>
+            <td class="px-4 py-2 text-right text-sm font-bold text-rose-700 tabular-nums">−$<%= fmtMoney(totals.tax || 0) %></td>
+            <td class="px-4 py-2 text-right text-sm font-bold text-emerald-700 tabular-nums">$<%= fmtMoney(totals.net || 0) %></td>
             <td class="px-4 py-2 text-right text-sm font-bold text-amber-700 tabular-nums">$<%= fmtMoney(totals.super) %></td>
             <td></td>
           </tr>

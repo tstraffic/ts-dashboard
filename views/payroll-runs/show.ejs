@@ -30,30 +30,35 @@
   </div>
 
   <!-- Top totals strip -->
+  <%
+    const grandHours = (totals.cash.hours || 0) + (totals.tfn.hours || 0) + (totals.abn.hours || 0) + (totals.unclassified.hours || 0);
+    function fmtHours(n) { return (Math.round((parseFloat(n) || 0) * 100) / 100).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  %>
   <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
     <div class="bg-white border border-gray-200 rounded-xl p-4">
       <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Workers</p>
       <p class="text-2xl font-bold text-gray-900 mt-1 tabular-nums"><%= grand.line_count %></p>
+      <p class="text-[10px] text-gray-400 mt-0.5"><%= fmtHours(grandHours) %> hrs total</p>
     </div>
     <div class="bg-white border border-amber-200 rounded-xl p-4">
       <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Cash</p>
       <p class="text-xl font-bold text-amber-700 mt-1 tabular-nums">$<%= fmtMoney(totals.cash.total) %></p>
-      <p class="text-[10px] text-gray-400 mt-0.5"><%= buckets.cash.length %> workers · +GST $<%= fmtMoney(totals.cash.with_gst) %></p>
+      <p class="text-[10px] text-gray-400 mt-0.5"><%= buckets.cash.length %> · <%= fmtHours(totals.cash.hours) %> hrs · +GST $<%= fmtMoney(totals.cash.with_gst) %></p>
     </div>
     <div class="bg-white border border-emerald-200 rounded-xl p-4">
       <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">TFN</p>
       <p class="text-xl font-bold text-emerald-700 mt-1 tabular-nums">$<%= fmtMoney(totals.tfn.total) %></p>
-      <p class="text-[10px] text-gray-400 mt-0.5"><%= buckets.tfn.length %> workers</p>
+      <p class="text-[10px] text-gray-400 mt-0.5"><%= buckets.tfn.length %> · <%= fmtHours(totals.tfn.hours) %> hrs</p>
     </div>
     <div class="bg-white border border-sky-200 rounded-xl p-4">
       <p class="text-[10px] font-bold text-sky-500 uppercase tracking-widest">ABN</p>
       <p class="text-xl font-bold text-sky-700 mt-1 tabular-nums">$<%= fmtMoney(totals.abn.total) %></p>
-      <p class="text-[10px] text-gray-400 mt-0.5"><%= buckets.abn.length %> workers</p>
+      <p class="text-[10px] text-gray-400 mt-0.5"><%= buckets.abn.length %> · <%= fmtHours(totals.abn.hours) %> hrs</p>
     </div>
     <div class="bg-gradient-to-br from-brand-600 to-brand-700 text-white rounded-xl p-4">
       <p class="text-[10px] font-bold text-white/80 uppercase tracking-widest">Grand Total</p>
       <p class="text-xl font-bold mt-1 tabular-nums">$<%= fmtMoney(grand.total) %></p>
-      <p class="text-[10px] text-white/80 mt-0.5"><%= grand.paid_count %>/<%= grand.line_count %> paid · $<%= fmtMoney(grand.paid) %></p>
+      <p class="text-[10px] text-white/80 mt-0.5"><%= grand.paid_count %>/<%= grand.line_count %> paid · <%= fmtHours(grandHours) %> hrs</p>
     </div>
   </div>
 
@@ -249,10 +254,20 @@
             </button>
           </div>
 
-          <!-- Live grand-total preview -->
-          <div class="bg-brand-50 border border-brand-200 rounded-lg p-2.5 flex items-center justify-between">
-            <p class="text-[11px] font-semibold text-brand-900">Grand total (live)</p>
-            <p class="text-base font-bold text-brand-900 tabular-nums">$<span id="grandTotalDisplay">0.00</span></p>
+          <!-- Live grand-total preview + tax estimate (TFN only) -->
+          <div class="bg-brand-50 border border-brand-200 rounded-lg p-2.5 space-y-1">
+            <div class="flex items-center justify-between">
+              <p class="text-[11px] font-semibold text-brand-900">Gross (wages + allowances − deductions)</p>
+              <p class="text-base font-bold text-brand-900 tabular-nums">$<span id="grandTotalDisplay">0.00</span></p>
+            </div>
+            <div id="taxRow" class="hidden flex items-center justify-between text-[11px]">
+              <span class="text-rose-700 font-semibold">PAYG tax (est., weekly TFT-claimed)</span>
+              <span class="text-rose-700 font-semibold tabular-nums">−$<span id="taxDisplay">0.00</span></span>
+            </div>
+            <div id="netRow" class="hidden flex items-center justify-between text-[11px]">
+              <span class="text-emerald-700 font-semibold">Net take-home</span>
+              <span class="text-emerald-700 font-bold tabular-nums">$<span id="netDisplay">0.00</span></span>
+            </div>
           </div>
 
           <div>
@@ -456,6 +471,20 @@
   }
   wireTravelMeal();
 
+  // ---- PAYG weekly tax (TFT-claimed) — mirrors lib/payroll.js payAsYouGoWeekly ----
+  function paygWeekly(grossWeekly) {
+    const g = parseFloat(grossWeekly) || 0;
+    if (g <= 0) return 0;
+    const annual = g * 52;
+    let tax = 0;
+    if (annual > 190000) tax += (annual - 190000) * 0.45;
+    if (annual > 135000) tax += (Math.min(annual, 190000) - 135000) * 0.37;
+    if (annual > 45000)  tax += (Math.min(annual, 135000) -  45000) * 0.30;
+    if (annual > 18200)  tax += (Math.min(annual,  45000) -  18200) * 0.16;
+    if (annual >  26000) tax += annual * 0.02;
+    return Math.round(tax / 52);
+  }
+
   // ---- Grand total live preview ----
   function recomputeGrandTotalPreview() {
     let wages = 0;
@@ -468,6 +497,20 @@
     const ded    = parseFloat(document.getElementById('deductionsTotalDisplay').textContent.replace(/[^0-9.\-]/g, '')) || 0;
     const grand = wages + travel + meal + other - ded;
     document.getElementById('grandTotalDisplay').textContent = grand.toFixed(2);
+    // Tax + net are TFN-only (Cash/ABN are taxed by the contractor themselves)
+    const pt = document.getElementById('ptSelect').value;
+    const taxRow = document.getElementById('taxRow');
+    const netRow = document.getElementById('netRow');
+    if (pt === 'tfn') {
+      const tax = paygWeekly(grand);
+      document.getElementById('taxDisplay').textContent = tax.toFixed(2);
+      document.getElementById('netDisplay').textContent = (grand - tax).toFixed(2);
+      taxRow.classList.remove('hidden');
+      netRow.classList.remove('hidden');
+    } else {
+      taxRow.classList.add('hidden');
+      netRow.classList.add('hidden');
+    }
   }
 
   // ---- Expenses CRUD ----

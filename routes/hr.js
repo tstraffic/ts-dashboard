@@ -698,7 +698,7 @@ router.post('/employees/:id', requirePermission('hr_employees'), (req, res) => {
     // missing the column doesn't crash the whole save.
     set('on_management_payroll', (b.on_management_payroll === '1' || b.on_management_payroll === 'on') ? 1 : 0);
     set('weekly_salary', parseFloat(b.weekly_salary) || 0);
-    set('super_rate', parseFloat(b.super_rate) || 0.115);
+    set('super_rate', parseFloat(b.super_rate) || 0.12);
   }
 
   sets.push('updated_at = CURRENT_TIMESTAMP');

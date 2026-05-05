@@ -7400,7 +7400,7 @@ function runMigrations(db) {
       const addEmp = (name, ddl) => { if (!empCols.includes(name)) try { db.exec(`ALTER TABLE employees ADD COLUMN ${ddl}`); } catch (e) {} };
       addEmp('on_management_payroll', "on_management_payroll INTEGER NOT NULL DEFAULT 0");
       addEmp('weekly_salary',         "weekly_salary REAL DEFAULT 0");
-      addEmp('super_rate',            "super_rate REAL DEFAULT 0.115");
+      addEmp('super_rate',            "super_rate REAL DEFAULT 0.12");
 
       const lineCols = db.prepare("PRAGMA table_info(pay_run_lines)").all().map(c => c.name);
       const addLine = (name, ddl) => { if (!lineCols.includes(name)) try { db.exec(`ALTER TABLE pay_run_lines ADD COLUMN ${ddl}`); } catch (e) {} };
@@ -7578,6 +7578,121 @@ function runMigrations(db) {
       console.log('Migration 158 applied: tenders table + tender_id FK on jobs + compliance');
     } catch (e) {
       console.error('Migration 158 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 159: Super guarantee rate to 12% (FY2025-26).
+  //   - Bumps employees.super_rate default from 0.115 → 0.12.
+  //   - Backfills existing employees on the old 0.115 rate.
+  //   - Recalculates super_amount on existing pay_run_lines for management
+  //     runs where super_amount = round(salary × 0.115). Pay runs already
+  //     finalised but mis-rated should be corrected — the only rows we
+  //     recompute are those whose super_amount currently matches the old
+  //     11.5% formula (so manually-overridden rows survive untouched).
+  // =============================================
+  if (!isMigrationApplied.get(159)) {
+    try {
+      db.prepare("UPDATE employees SET super_rate = 0.12 WHERE super_rate IS NULL OR super_rate = 0.115").run();
+
+      // Recompute super_amount on management lines where it matches the
+      // old 0.115 formula. round2 in JS = Math.round(n*100)/100, mirror in SQL.
+      const stale = db.prepare(`
+        SELECT id, salary_amount, super_amount FROM pay_run_lines
+        WHERE salary_amount IS NOT NULL AND salary_amount > 0
+      `).all();
+      const upd = db.prepare("UPDATE pay_run_lines SET super_amount = ? WHERE id = ?");
+      let n = 0;
+      for (const l of stale) {
+        const expectedOld = Math.round(parseFloat(l.salary_amount) * 0.115 * 100) / 100;
+        if (Math.abs(parseFloat(l.super_amount) - expectedOld) < 0.005) {
+          const newSuper = Math.round(parseFloat(l.salary_amount) * 0.12 * 100) / 100;
+          upd.run(newSuper, l.id);
+          n++;
+        }
+      }
+
+      recordMigration.run(159, 'super rate bumped to 12% + backfill matching pay-run lines');
+      console.log(`Migration 159 applied: super rate → 12% (refreshed ${n} pay-run lines that were on the old 11.5% rate)`);
+    } catch (e) {
+      console.error('Migration 159 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 160: Seed Building & Construction General On-site Award
+  // (MA000020) classifications — General Building / Non-Residential
+  // Shiftworker rates, FY2025-26.
+  //   Base hourly rates from the FW Commission award library.
+  //   Shift loadings derived from clauses 17 (shiftworker penalties) and
+  //   24 (overtime, weekend, PH multipliers). Meal/Fares are placeholders
+  //   the user can adjust on /payroll/award-rates — they don't drift from
+  //   the award by classification anyway.
+  // =============================================
+  if (!isMigrationApplied.get(160)) {
+    try {
+      const AWARD_NAME = 'MA000020 — General Building (Non-Residential) Shiftworker';
+      const FY = '2025-07-01';
+      const MEAL = 19.50;
+      const FARES = 19.30;
+      // [classification, base ordinary $/hr]
+      const LEVELS = [
+        ['CW/ECW 1a',  25.46],
+        ['CW/ECW 1b',  25.96],
+        ['CW/ECW 1c',  26.31],
+        ['CW/ECW 1d',  26.78],
+        ['CW/ECW 2',   27.32],
+        ['CW/ECW 3',   28.12],
+        ['CW/ECW 4',   29.00],
+        ['CW/ECW 5',   29.89],
+        ['CW/ECW 6',   30.68],
+        ['CW/ECW 7',   31.56],
+        ['CW/ECW 8',   32.33],
+      ];
+      const r2 = n => Math.round(n * 100) / 100;
+
+      // Match any existing seeded version by name+effective_from so we
+      // don't duplicate. Use REPLACE-equivalent via DELETE + INSERT
+      // to refresh stale rates without leaving zombie copies.
+      const existing = db.prepare("SELECT id FROM award_classifications WHERE award_name = ? AND effective_from = ?").all(AWARD_NAME, FY);
+      for (const e of existing) db.prepare("DELETE FROM award_classifications WHERE id = ?").run(e.id);
+
+      const ins = db.prepare(`
+        INSERT INTO award_classifications
+          (award_name, classification, effective_from, effective_to,
+           rate_day, rate_day_ot, rate_day_dt,
+           rate_night, rate_night_ot, rate_night_dt,
+           rate_weekend, rate_public_holiday,
+           rate_meal, rate_fares_daily,
+           notes, active)
+        VALUES (?, ?, ?, NULL,
+           ?, ?, ?,
+           ?, ?, ?,
+           ?, ?,
+           ?, ?,
+           ?, 1)
+      `);
+      let inserted = 0;
+      for (const [cls, base] of LEVELS) {
+        ins.run(
+          AWARD_NAME, cls, FY,
+          // Day:    1.0  / OT 1.5  / DT 2.0
+          r2(base * 1.0),  r2(base * 1.5),  r2(base * 2.0),
+          // Night (afternoon/night shift loading 150%): base × 1.5,
+          // night OT × 2.0, night DT × 2.5
+          r2(base * 1.5),  r2(base * 2.0),  r2(base * 2.5),
+          // Weekend Saturday × 1.5, PH × 2.5
+          r2(base * 1.5),  r2(base * 2.5),
+          MEAL, FARES,
+          'Seeded from FW Commission award library; verify against current Schedule B before payroll.'
+        );
+        inserted++;
+      }
+
+      recordMigration.run(160, 'Seed BCG Award MA000020 General Building Shiftworker classifications');
+      console.log(`Migration 160 applied: seeded ${inserted} BCG Award classifications (effective ${FY})`);
+    } catch (e) {
+      console.error('Migration 160 error:', e.message);
     }
   }
 
