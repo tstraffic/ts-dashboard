@@ -231,12 +231,12 @@
     </div>
     <% } else { %>
     <% bookings.forEach((booking, idx) => {
-      const start = new Date(booking.startDateTime);
-      const end = new Date(booking.endDateTime);
-      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      const dayName = days[start.getDay()];
-      const startStr = `${dayName} ${start.getDate()}/${start.getMonth()+1} ${start.getHours()}:${String(start.getMinutes()).padStart(2,'0')}${start.getHours() < 12 ? 'am' : 'pm'}`;
-      const endStr = `${end.getHours()}:${String(end.getMinutes()).padStart(2,'0')}${end.getHours() < 12 ? 'am' : 'pm'}`;
+      // Render start/end strings in Sydney via the locale formatter so we
+      // don't pull UTC hours from .getHours() on Railway.
+      const _bkOpts = { timeZone: 'Australia/Sydney', weekday: 'short', day: 'numeric', month: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true };
+      const _bkEndOpts = { timeZone: 'Australia/Sydney', hour: 'numeric', minute: '2-digit', hour12: true };
+      const startStr = new Date(booking.startDateTime).toLocaleString('en-AU', _bkOpts);
+      const endStr = new Date(booking.endDateTime).toLocaleTimeString('en-AU', _bkEndOpts);
       const confirmedCount = booking.personnel.filter(p => p.confirmed).length;
       const totalPeople = booking.personnel.length;
     %>
@@ -546,8 +546,8 @@
               <%= booking.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) %>
             </span>
           </td>
-          <td class="whitespace-nowrap"><%= start.toLocaleDateString('en-AU', {day:'2-digit',month:'short'}) %> <%= String(start.getHours()).padStart(2,'0') %>:<%= String(start.getMinutes()).padStart(2,'0') %></td>
-          <td class="whitespace-nowrap"><%= String(end.getHours()).padStart(2,'0') %>:<%= String(end.getMinutes()).padStart(2,'0') %></td>
+          <td class="whitespace-nowrap"><%= formatDateTime(booking.startDateTime) %></td>
+          <td class="whitespace-nowrap"><%= formatTime(booking.endDateTime) %></td>
           <td><%= booking.project.client %></td>
           <td class="max-w-xs truncate"><%= booking.project.name %></td>
           <td><%= booking.supervisor %></td>

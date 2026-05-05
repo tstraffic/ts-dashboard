@@ -3,8 +3,10 @@
   const b = booking;
   const start = new Date(b.startDateTime);
   const end = new Date(b.endDateTime);
-  const timeOpts = { hour: '2-digit', minute: '2-digit', hour12: true };
-  const dateOpts = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+  // All booking date/time displays are pinned to Sydney via these opts so
+  // server (UTC) and user (Sydney) both render the same wall-clock time.
+  const timeOpts = { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit', hour12: true };
+  const dateOpts = { timeZone: 'Australia/Sydney', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
   const statusColors = {
     client_booking: 'bg-gray-100 text-gray-600 ring-1 ring-gray-300',
     unconfirmed: 'bg-purple-50 text-purple-700 ring-1 ring-purple-600/20',
@@ -312,7 +314,7 @@
                   <% jobPackTypes.forEach(function (t) { var f = w.forms[t]; %>
                     <td class="py-2 px-1 text-center">
                       <% if (f) { %>
-                        <a href="/safety-forms/<%= f.id %>" title="Submitted <%= new Date(f.submitted_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>">
+                        <a href="/safety-forms/<%= f.id %>" title="Submitted <%= formatDateTime(f.submitted_at) %>">
                           <svg class="w-4 h-4 text-emerald-600 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                         </a>
                       <% } else { %>
@@ -322,7 +324,7 @@
                   <% }) %>
                   <td class="py-2 text-center">
                     <% if (w.docket) { %>
-                      <a href="/dockets/<%= w.docket.id %>" title="Signed <%= new Date(w.docket.signed_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>" class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-brand-50 text-brand-700">SIGNED</a>
+                      <a href="/dockets/<%= w.docket.id %>" title="Signed <%= formatDateTime(w.docket.signed_at) %>" class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-brand-50 text-brand-700">SIGNED</a>
                     <% } else { %>
                       <span class="text-[10px] font-bold text-gray-400">—</span>
                     <% } %>
@@ -374,7 +376,7 @@
                 <div class="flex items-center gap-1.5 flex-wrap mt-1.5">
                   <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold <%= TASK_PORTAL[t.assignee_portal_role] || TASK_PORTAL.traffic_controller %>"><%= t.assignee_name %></span>
                   <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ring-1 <%= TASK_PRIORITY[t.priority] || TASK_PRIORITY.normal %>"><%= (t.priority || 'normal').toUpperCase() %></span>
-                  <% if (t.due_at) { %><span class="text-[10px] text-gray-500">Due <%= new Date(t.due_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></span><% } %>
+                  <% if (t.due_at) { %><span class="text-[10px] text-gray-500">Due <%= formatDateTime(t.due_at) %></span><% } %>
                   <% if (t.created_by_name) { %><span class="text-[10px] text-gray-400">· by <%= t.created_by_name %></span><% } %>
                 </div>
               </div>
@@ -576,7 +578,7 @@
                 <span class="text-xs font-medium text-gray-600"><%= n.author_name || 'System' %></span>
                 <div class="flex items-center gap-2">
                   <% if (n.is_private) { %><span class="text-[10px] text-amber-500 font-medium">Private</span><% } %>
-                  <span class="text-[10px] text-gray-400"><%= new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></span>
+                  <span class="text-[10px] text-gray-400"><%= formatDateTime(n.created_at) %></span>
                   <form method="POST" action="/bookings/<%= b.id %>/notes/<%= n.id %>/delete" class="inline">
                     <%- include('../partials/csrf') %>
                     <button type="submit" class="text-gray-300 hover:text-red-500 transition"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
@@ -888,7 +890,7 @@
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-sm text-gray-700"><%= a.details || a.action %></p>
-              <p class="text-[10px] text-gray-400"><%= a.user_name || 'System' %> &middot; <%= a.created_at ? new Date(a.created_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '' %></p>
+              <p class="text-[10px] text-gray-400"><%= a.user_name || 'System' %> &middot; <%= a.created_at ? formatDateTime(a.created_at) : '' %></p>
             </div>
           </div>
         <% }); %>

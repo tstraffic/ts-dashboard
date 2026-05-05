@@ -5,6 +5,7 @@ const { sendTaskAssignmentEmail, sendTaskStatusEmail } = require('../middleware/
 const { sendPushToUser } = require('../services/pushNotification');
 const { autoLogDiary, logStatusChange } = require('../lib/diary');
 const { isAdminRole, hideAdminTasksSql } = require('../lib/taskVisibility');
+const { closeCasFromTask } = require('../lib/correctiveActions');
 
 /**
  * Check if current user can modify a task.
@@ -384,6 +385,9 @@ router.post('/bulk', (req, res) => {
     allowedIds.forEach(id => {
       const t = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
       stmt.run(id);
+      // Cascade-close any corrective action wired to this task so the
+      // incident page mirrors the task list.
+      closeCasFromTask(db, id, req.session.user, 'Closed via linked task.');
       // Auto-log to site diary
       if (t && t.job_id) {
         logStatusChange(db, {
@@ -659,6 +663,12 @@ router.post('/:id/status', (req, res) => {
     db.prepare('UPDATE tasks SET status = ?, completed_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(newStatus, completedDate, req.params.id);
 
+    // Cascade close to the linked corrective action (if any) so the
+    // incident page reflects the task closure.
+    if (newStatus === 'complete') {
+      closeCasFromTask(db, req.params.id, req.session.user, 'Closed via linked task.');
+    }
+
     // Send status change email to task owner (fire-and-forget)
     try {
       if (task.owner_id) {
@@ -709,6 +719,9 @@ router.post('/:id/complete', (req, res) => {
   }
   const today = new Date().toISOString().split('T')[0];
   db.prepare("UPDATE tasks SET status = 'complete', completed_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(today, req.params.id);
+
+  // Mirror the close onto any linked corrective action.
+  closeCasFromTask(db, req.params.id, req.session.user, 'Closed via linked task.');
 
   // Auto-log to site diary + notify
   if (task && task.job_id) {

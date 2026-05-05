@@ -478,7 +478,7 @@
             </div>
             <div class="flex flex-wrap gap-4 text-xs text-gray-500 mb-2">
               <% if (tp.designer && tp.designer !== 'Client Provided') { %><span>Designer: <span class="text-gray-700"><%= tp.designer %></span></span><% } %>
-              <% if (tp.marked_final_at) { %><span>Finalised: <span class="text-gray-700"><%= new Date(tp.marked_final_at).toLocaleDateString('en-AU') %></span></span><% } %>
+              <% if (tp.marked_final_at) { %><span>Finalised: <span class="text-gray-700"><%= formatDate(tp.marked_final_at) %></span></span><% } %>
               <% if (tp.marked_final_by_name) { %><span>By: <span class="text-gray-700"><%= tp.marked_final_by_name %></span></span><% } %>
             </div>
             <% if (tp.file_path) { %>
@@ -513,8 +513,8 @@
             <div class="flex flex-wrap gap-4 text-xs text-gray-500 mb-2">
               <% if (types) { %><span>Type: <span class="text-gray-700 font-medium"><%= types %></span></span><% } %>
               <% if (plan.designer || plan.designer_name) { %><span>Designer: <span class="text-gray-700"><%= plan.designer || plan.designer_name %></span></span><% } %>
-              <% if (plan.approved_date) { %><span>Approved: <span class="text-gray-700"><%= new Date(plan.approved_date).toLocaleDateString('en-AU') %></span></span><% } %>
-              <% if (plan.submitted_date) { %><span>Submitted: <span class="text-gray-700"><%= new Date(plan.submitted_date).toLocaleDateString('en-AU') %></span></span><% } %>
+              <% if (plan.approved_date) { %><span>Approved: <span class="text-gray-700"><%= formatDate(plan.approved_date) %></span></span><% } %>
+              <% if (plan.submitted_date) { %><span>Submitted: <span class="text-gray-700"><%= formatDate(plan.submitted_date) %></span></span><% } %>
             </div>
             <% if (plan.notes) { %><p class="text-xs text-gray-500 mt-1"><%= plan.notes %></p><% } %>
 

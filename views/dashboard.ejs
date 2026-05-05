@@ -206,7 +206,7 @@
             <% if (b.title) { %>— <span class="text-gray-700 font-normal"><%= b.title %></span><% } %>
           </a>
           <p class="text-[11px] text-gray-500">
-            <%= new Date(b.start_datetime).toLocaleString('en-AU', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>
+            <%= formatDateTime(b.start_datetime) %>
             <% if (b.suburb) { %> · <%= b.suburb %><% } %>
             <% if (b.job_client) { %> · <%= b.job_client %><% } %>
           </p>
@@ -699,7 +699,7 @@
           <div class="min-w-0">
             <p class="text-xs text-gray-700 truncate"><span class="font-medium"><%= a.user_name || 'System' %></span> <%= a.action %> <%= a.entity_type ? a.entity_type.replace(/_/g, ' ') : '' %></p>
             <% if (a.entity_label) { %><p class="text-[10px] text-gray-400 truncate"><%= a.entity_label %></p><% } %>
-            <p class="text-[10px] text-gray-300"><%= new Date(a.created_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></p>
+            <p class="text-[10px] text-gray-300"><%= formatDateTime(a.created_at) %></p>
           </div>
         </div>
         <% }) %>

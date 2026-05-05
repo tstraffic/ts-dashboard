@@ -7,7 +7,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { initializeDatabase } = require('./db/schema');
-const { requireLogin, requirePermission, canAccess } = require('./middleware/auth');
+const { requireLogin, requirePermission, canAccess, canViewInternalCost } = require('./middleware/auth');
 const { requireWorker, blockWorkerFromAdmin, workerLocals } = require('./middleware/workerAuth');
 const { managerLocals } = require('./middleware/managerAuth');
 const { notificationCountMiddleware, generateNotifications, sendDailyDigests, generateWeeklySummaries } = require('./middleware/notifications');
@@ -81,19 +81,11 @@ if (isProduction) app.set('trust proxy', 1);
 
 app.use(flash());
 
-// Global date formatter — DD/MM/YYYY Australian format
-function formatDateAU(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-function formatDateShortAU(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
-}
+// Global date formatters — DD/MM/YYYY in Sydney time.
+// All formatters delegate to lib/sydney.js so DST is handled automatically
+// (Australia/Sydney via Intl) and plain DATE columns aren't shifted across
+// midnight by tz conversion.
+const { formatDateAU, formatDateShortAU, formatDateTimeAU, formatTimeAU } = require('./lib/sydney');
 
 // Flash messages + permission helper available in all templates
 app.use((req, res, next) => {
@@ -101,8 +93,11 @@ app.use((req, res, next) => {
   res.locals.flash_error = req.flash('error');
   res.locals.user = req.session.user || null;
   res.locals.canAccess = canAccess;
+  res.locals.canSeeCost = canViewInternalCost(req.session.user);
   res.locals.formatDate = formatDateAU;
   res.locals.formatDateShort = formatDateShortAU;
+  res.locals.formatDateTime = formatDateTimeAU;
+  res.locals.formatTime = formatTimeAU;
   next();
 });
 
@@ -220,6 +215,7 @@ app.use('/contacts', requireLogin, requirePermission('contacts'), require('./rou
 app.use('/documents', requireLogin, requirePermission('documents'), require('./routes/documents'));
 app.use('/activity', requireLogin, requirePermission('activity'), require('./routes/activity'));
 app.use('/budgets', requireLogin, requirePermission('budgets'), require('./routes/budgets'));
+app.use('/finance/pnl', requireLogin, require('./routes/finance-pnl'));
 app.use('/timesheets', requireLogin, requirePermission('timesheets'), require('./routes/timesheets'));
 app.use('/crew', requireLogin, requirePermission('crew'), require('./routes/crew'));
 app.use('/bookings', requireLogin, requirePermission('bookings'), require('./routes/bookings'));

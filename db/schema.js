@@ -8052,6 +8052,39 @@ function runMigrations(db) {
     }
   }
 
+  // Migration 169: seed default internal hourly cost rate ($40/hr).
+  // Used by the compliance Sub-plans P&L (admin/finance only) to convert
+  // hours_spent into a T&S cost figure so we can compare to charge_amount.
+  if (!isMigrationApplied.get(169)) {
+    try {
+      db.prepare(`
+        INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, description)
+        VALUES (?, ?, ?, ?)
+      `).run('internal_hourly_rate', '40', 'number', 'Internal T&S labour cost per hour (admin/finance P&L only)');
+      recordMigration.run(169, 'Internal hourly rate config');
+      console.log('Migration 169 applied: internal_hourly_rate seeded');
+    } catch (e) {
+      console.error('Migration 169 error:', e.message);
+    }
+  }
+
+  // Migration 170: link corrective_actions to tasks. Each new CA spawns a
+  // task assigned to the same user; closing one side closes the other.
+  // Nullable so legacy CAs (created before this) still work.
+  if (!isMigrationApplied.get(170)) {
+    try {
+      const cols = db.prepare("PRAGMA table_info(corrective_actions)").all().map(c => c.name);
+      if (!cols.includes('task_id')) {
+        db.exec("ALTER TABLE corrective_actions ADD COLUMN task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL");
+        db.exec("CREATE INDEX IF NOT EXISTS idx_ca_task ON corrective_actions(task_id)");
+      }
+      recordMigration.run(170, 'corrective_actions.task_id link');
+      console.log('Migration 170 applied: corrective_actions.task_id added');
+    } catch (e) {
+      console.error('Migration 170 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

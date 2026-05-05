@@ -4,6 +4,19 @@
   const isApproved = sub.status === 'approved';
   const isRejected = sub.status === 'rejected';
   const docCount = (docs || []).length;
+
+  // Per-sub-plan cost/profit (admin + finance only). Only show the chip
+  // line if there's some money or hours data — otherwise it'd just say $0
+  // on every empty card.
+  const subHourlyRate = parseFloat((systemConfig && systemConfig.internal_hourly_rate) || 40) || 40;
+  const subHours = parseFloat(sub.hours_spent) || 0;
+  const subCharge = sub.charge_client ? (parseFloat(sub.charge_amount) || 0) : 0;
+  const subCouncil = sub.council_fee_paid ? (parseFloat(sub.council_fee_amount) || 0) : 0;
+  const subLabour = subHours * subHourlyRate;
+  const subCost = subLabour + subCouncil;
+  const subProfit = subCharge - subCost;
+  const showSubCost = canSeeCost && (subHours > 0 || subCharge > 0 || subCouncil > 0);
+  const fmtMoneySub = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
 %>
 
 <div id="sub-<%= sub.id %>" class="border border-gray-200 rounded-lg p-4 <%= isApproved ? 'bg-emerald-50/30' : isRejected ? 'bg-rose-50/30' : 'bg-white' %>">
@@ -81,6 +94,22 @@
       </form>
     </div>
   </div>
+
+  <% if (showSubCost) { %>
+    <!-- T&S internal cost line — admin + finance only.
+         Hidden from planning/operations even when they're on the page. -->
+    <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs px-2.5 py-1.5 bg-slate-50 ring-1 ring-slate-200 rounded">
+      <span class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mr-1">T&amp;S P&amp;L</span>
+      <span class="text-slate-600">Labour <span class="font-medium text-slate-900"><%= fmtMoneySub(subLabour) %></span> <span class="text-slate-400">(<%= subHours %>h × $<%= subHourlyRate %>)</span></span>
+      <% if (subCouncil > 0) { %><span class="text-slate-600">+ Council <span class="font-medium text-amber-700"><%= fmtMoneySub(subCouncil) %></span></span><% } %>
+      <span class="text-slate-600">= Cost <span class="font-semibold text-slate-900"><%= fmtMoneySub(subCost) %></span></span>
+      <span class="text-slate-400">·</span>
+      <span class="text-slate-600">Charge <span class="font-medium text-emerald-700"><%= fmtMoneySub(subCharge) %></span></span>
+      <span class="ml-auto font-semibold <%= subProfit >= 0 ? 'text-emerald-700' : 'text-rose-700' %>">
+        <%= subProfit >= 0 ? 'Profit ' : 'Loss ' %><%= fmtMoneySub(Math.abs(subProfit)) %>
+      </span>
+    </div>
+  <% } %>
 
   <!-- Documents -->
   <% if (docCount > 0) { %>
