@@ -148,6 +148,21 @@ router.get('/:id', requirePermission('tenders'), (req, res) => {
     ORDER BY c.id DESC
   `).all(tender.id);
 
+  // Linked tasks (tender_id is added in migration 162; fall back to []
+  // on stale schemas so the page still renders pre-migration).
+  let linkedTasks = [];
+  try {
+    linkedTasks = db.prepare(`
+      SELECT t.id, t.title, t.status, t.priority, t.due_date, t.division,
+        u.full_name AS owner_name, j.job_number, j.id AS job_id
+      FROM tasks t
+      LEFT JOIN users u ON u.id = t.owner_id
+      LEFT JOIN jobs j ON j.id = t.job_id
+      WHERE t.tender_id = ? AND t.deleted_at IS NULL
+      ORDER BY t.due_date ASC, t.id DESC
+    `).all(tender.id);
+  } catch (e) {}
+
   // Available pickers — recent jobs/plans without a tender, plus those already linked
   const availableJobs = db.prepare(`
     SELECT id, job_number, job_name, project_name, client, status FROM jobs
@@ -163,7 +178,7 @@ router.get('/:id', requirePermission('tenders'), (req, res) => {
 
   res.render('tenders/show', {
     title: tender.tender_number, currentPage: 'tenders',
-    tender, linkedJobs, linkedPlans, availableJobs, availablePlans,
+    tender, linkedJobs, linkedPlans, linkedTasks, availableJobs, availablePlans,
     statusValues: STATUS_VALUES, statusLabels: STATUS_LABELS,
   });
 });

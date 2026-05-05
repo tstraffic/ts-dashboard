@@ -7785,11 +7785,87 @@ function runMigrations(db) {
   }
 
   // =============================================
+  // Migration 162: tasks.tender_id so tasks can be attached to a tender,
+  // matching the existing tender_id on jobs and compliance.
+  // =============================================
+  if (!isMigrationApplied.get(162)) {
+    try {
+      const tasksCols162 = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
+      if (!tasksCols162.includes('tender_id')) {
+        try { db.exec("ALTER TABLE tasks ADD COLUMN tender_id INTEGER REFERENCES tenders(id) ON DELETE SET NULL"); } catch (e) {}
+      }
+      try { db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_tender ON tasks(tender_id)"); } catch (e) {}
+      recordMigration.run(162, 'tasks.tender_id FK to tenders');
+      console.log('Migration 162 applied: tasks.tender_id added');
+    } catch (e) {
+      console.error('Migration 162 error:', e.message);
+    }
+  }
+
+  // =============================================
+  // Migration 163: Expand compliance.item_type CHECK to allow every sub-plan
+  // type that routes/compliance.js generates. Migration 65 added
+  // police_notification + letter_drop but missed sza and bus_approval, so
+  // those plan types blow up at insert time with a CHECK constraint error.
+  // Rebuild the table with the full superset.
+  // =============================================
+  if (!isMigrationApplied.get(163)) {
+    console.log('Running migration 163: Expand compliance item_type CHECK to include sza + bus_approval');
+    try {
+      const ddlRow = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'compliance'").get();
+      const oldDDL = ddlRow ? ddlRow.sql : '';
+      const needsRebuild = !oldDDL.includes("'sza'") || !oldDDL.includes("'bus_approval'");
+      if (needsRebuild) {
+        const cols = db.prepare("PRAGMA table_info(compliance)").all();
+        const fkRows = db.prepare("PRAGMA foreign_key_list(compliance)").all();
+        const fkByCol = {};
+        fkRows.forEach(fk => { fkByCol[fk.from] = fk; });
+
+        const colDefs = cols.map(c => {
+          let def = `${c.name} ${c.type}`;
+          if (c.name === 'item_type') {
+            def = "item_type TEXT NOT NULL CHECK(item_type IN ('tmp_approval','council_permit','traffic_guidance','insurance','swms_review','induction','road_occupancy','utility_clearance','environmental','rol','insurance_certificate','public_liability','vehicle_registration','plant_inspection','staff_certification','spa','sza','police_notification','letter_drop','bus_approval','other'))";
+          } else {
+            if (c.notnull && !c.pk) def += ' NOT NULL';
+            if (c.dflt_value !== null) def += ` DEFAULT ${c.dflt_value}`;
+          }
+          if (c.pk) def += ' PRIMARY KEY AUTOINCREMENT';
+          if (fkByCol[c.name] && c.name !== 'item_type') {
+            const fk = fkByCol[c.name];
+            def += ` REFERENCES ${fk.table}(${fk.to})`;
+            if (fk.on_delete && fk.on_delete !== 'NO ACTION') def += ` ON DELETE ${fk.on_delete}`;
+            if (fk.on_update && fk.on_update !== 'NO ACTION') def += ` ON UPDATE ${fk.on_update}`;
+          }
+          return def;
+        }).join(', ');
+
+        db.exec('PRAGMA foreign_keys = OFF');
+        db.exec('BEGIN');
+        db.exec(`CREATE TABLE compliance_new (${colDefs})`);
+        const colNames = cols.map(c => c.name).join(', ');
+        db.exec(`INSERT INTO compliance_new (${colNames}) SELECT ${colNames} FROM compliance`);
+        db.exec('DROP TABLE compliance');
+        db.exec('ALTER TABLE compliance_new RENAME TO compliance');
+        db.exec('COMMIT');
+        db.exec('PRAGMA foreign_keys = ON');
+        // Rebuild dropped indexes (table rebuild drops them).
+        try { db.exec('CREATE INDEX IF NOT EXISTS idx_compliance_job_id ON compliance(job_id)'); } catch (e) {}
+        try { db.exec('CREATE INDEX IF NOT EXISTS idx_compliance_tender ON compliance(tender_id)'); } catch (e) {}
+        console.log('Migration 163: compliance rebuilt with sza + bus_approval allowed.');
+      } else {
+        console.log('Migration 163: CHECK already includes sza + bus_approval, skipping rebuild.');
+      }
+      recordMigration.run(163, 'Expand compliance item_type CHECK with sza + bus_approval');
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch (_) {}
+      console.error('Migration 163 error:', e.message);
+    }
+  }
+
+  // =============================================
   // Migration 164: Add 'safety' to users.role CHECK so we can assign the
   // new Safety role (Site Audits, Incidents, Checklists). Mirrors the
   // table-rebuild pattern from migration 133.
-  // (Numbered 164 to avoid colliding with migrations 162/163 reserved by
-  //  the Tenders/Plans/Tasks PR #245.)
   // =============================================
   if (!isMigrationApplied.get(164)) {
     const userSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();

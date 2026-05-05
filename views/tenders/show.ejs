@@ -136,6 +136,7 @@
         <h2 class="text-sm font-bold text-gray-900">Linked plans <span class="text-gray-400 font-normal">(<%= linkedPlans.length %>)</span></h2>
         <p class="text-xs text-gray-500 mt-0.5">Plans &amp; approvals being prepared for this tender (TGS, CTMP, ROL, council permits, etc.).</p>
       </div>
+      <a href="/compliance/new?tender_id=<%= tender.id %>&return_to=/tenders/<%= tender.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-lg whitespace-nowrap">+ New plan</a>
     </div>
     <% if (linkedPlans.length === 0) { %>
       <div class="px-5 py-6 text-center text-sm text-gray-500">No plans linked yet.</div>
@@ -181,8 +182,47 @@
           <option value="<%= p.id %>"><% if (p.plan_number) { %>#<%= p.plan_number %> — <% } %><%= p.title %><% if (p.job_number) { %> (<%= p.job_number %>)<% } %></option>
         <% } }) %>
       </select>
-      <button type="submit" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">+ Link plan</button>
+      <button type="submit" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">+ Link existing</button>
     </form>
+  </div>
+
+  <!-- Linked Tasks -->
+  <% var tasks = (typeof linkedTasks !== 'undefined' && Array.isArray(linkedTasks)) ? linkedTasks : []; %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div>
+        <h2 class="text-sm font-bold text-gray-900">Linked tasks <span class="text-gray-400 font-normal">(<%= tasks.length %>)</span></h2>
+        <p class="text-xs text-gray-500 mt-0.5">Action items belonging to this tender — submission deadlines, internal reviews, follow-ups.</p>
+      </div>
+      <a href="/tasks/new?tender_id=<%= tender.id %>&return_to=/tenders/<%= tender.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-lg whitespace-nowrap">+ New task</a>
+    </div>
+    <% if (tasks.length === 0) { %>
+      <div class="px-5 py-6 text-center text-sm text-gray-500">No tasks yet.</div>
+    <% } else { %>
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Task</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Owner</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Due</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% tasks.forEach(t => { %>
+            <tr>
+              <td class="px-3 py-2">
+                <a href="/tasks/<%= t.id %>/edit" class="font-semibold text-gray-900 hover:text-brand-600"><%= t.title %></a>
+                <% if (t.job_number) { %><span class="text-xs text-gray-400 ml-2">· <%= t.job_number %></span><% } %>
+              </td>
+              <td class="px-2 py-2 text-xs text-gray-600"><%= t.owner_name || '—' %></td>
+              <td class="px-2 py-2 text-xs text-gray-600 tabular-nums"><%= fmtDate(t.due_date) %></td>
+              <td class="px-2 py-2 text-xs text-gray-600"><%= (t.status || '').replace(/_/g, ' ') %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
   </div>
 </div>
 

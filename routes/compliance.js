@@ -74,26 +74,39 @@ function createParentPlan(req, res, db, b) {
   const planNumber = planStatus.nextPlanNumber(db);
   const jobId = b.job_id || null;
   const clientId = b.client_id || null;
+  const tenderId = b.tender_id ? (parseInt(b.tender_id, 10) || null) : null;
   const clientRequestDate = b.client_request_date || null;
   const pmId = b.pm_id || null;
 
   let parentId = null;
   let subPlanCount = 0;
   try {
+    // Detect tender_id column once; legacy DBs without migration 158 fall back gracefully.
+    let hasTenderCol = false;
+    try {
+      hasTenderCol = db.prepare("PRAGMA table_info(compliance)").all().some(c => c.name === 'tender_id');
+    } catch (e) {}
+
     const tx = db.transaction(() => {
       // item_type is NOT NULL + CHECK in legacy schema; use 'other' as a
       // benign placeholder. Parent rows are distinguished from regular
       // 'other'-typed legacy rows by plan_number IS NOT NULL.
-      const parentRes = db.prepare(`
-        INSERT INTO compliance (parent_id, plan_number, item_type, item_types, job_id, client_id, title, status, client_request_date, notes, assigned_to_id)
-        VALUES (NULL, ?, 'other', '', ?, ?, ?, 'not_started', ?, ?, ?)
-      `).run(planNumber, jobId, clientId, title, clientRequestDate, b.notes || '', pmId);
+      const parentInsertSql = hasTenderCol
+        ? `INSERT INTO compliance (parent_id, plan_number, item_type, item_types, job_id, client_id, tender_id, title, status, client_request_date, notes, assigned_to_id)
+           VALUES (NULL, ?, 'other', '', ?, ?, ?, ?, 'not_started', ?, ?, ?)`
+        : `INSERT INTO compliance (parent_id, plan_number, item_type, item_types, job_id, client_id, title, status, client_request_date, notes, assigned_to_id)
+           VALUES (NULL, ?, 'other', '', ?, ?, ?, 'not_started', ?, ?, ?)`;
+      const parentRes = hasTenderCol
+        ? db.prepare(parentInsertSql).run(planNumber, jobId, clientId, tenderId, title, clientRequestDate, b.notes || '', pmId)
+        : db.prepare(parentInsertSql).run(planNumber, jobId, clientId, title, clientRequestDate, b.notes || '', pmId);
       parentId = parentRes.lastInsertRowid;
 
-      const insertSub = db.prepare(`
-        INSERT INTO compliance (parent_id, job_id, client_id, item_type, item_types, title, status, reference_number, description, assigned_to_id, other_description)
-        VALUES (?, ?, ?, ?, ?, ?, 'not_started', ?, '', ?, ?)
-      `);
+      const subInsertSql = hasTenderCol
+        ? `INSERT INTO compliance (parent_id, job_id, client_id, tender_id, item_type, item_types, title, status, reference_number, description, assigned_to_id, other_description)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'not_started', ?, '', ?, ?)`
+        : `INSERT INTO compliance (parent_id, job_id, client_id, item_type, item_types, title, status, reference_number, description, assigned_to_id, other_description)
+           VALUES (?, ?, ?, ?, ?, ?, 'not_started', ?, '', ?, ?)`;
+      const insertSub = db.prepare(subInsertSql);
 
       // For 'Other', each generated sub-plan gets its own description from
       // body field `other_description_<seq>`. Falls back to legacy single
@@ -114,7 +127,11 @@ function createParentPlan(req, res, db, b) {
             subOtherDesc = perRow || legacyOtherDesc;
             if (subOtherDesc) subTitle = `${subOtherDesc} (${ref})`;
           }
-          insertSub.run(parentId, jobId, clientId, type, type, subTitle, ref, typeOwnerId, subOtherDesc);
+          if (hasTenderCol) {
+            insertSub.run(parentId, jobId, clientId, tenderId, type, type, subTitle, ref, typeOwnerId, subOtherDesc);
+          } else {
+            insertSub.run(parentId, jobId, clientId, type, type, subTitle, ref, typeOwnerId, subOtherDesc);
+          }
           subPlanCount += 1;
         }
       });
@@ -562,9 +579,12 @@ router.get('/new', (req, res) => {
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
+  let tenders = [];
+  try { tenders = db.prepare("SELECT id, tender_number, title, status FROM tenders WHERE status IN ('open','submitted','won') ORDER BY id DESC").all(); } catch (e) {}
   res.render('compliance/form', {
-    title: 'New Plan', item: null, jobs, clients, users,
+    title: 'New Plan', item: null, jobs, clients, users, tenders,
     user: req.session.user, prefillJobId: req.query.job_id || '', prefillClientId: req.query.client_id || '',
+    prefillTenderId: req.query.tender_id || '',
     returnTo: req.query.return_to || '/compliance', linkedTask: null, revisions: [],
     isParent: true, subPlans: [], subPlanDocs: {}, subPlanTypes: SUB_PLAN_TYPES,
   });
@@ -829,10 +849,13 @@ router.get('/:id/edit', (req, res) => {
     try { tender = db.prepare("SELECT id, tender_number, title, status FROM tenders WHERE id = ?").get(item.tender_id); } catch (e) {}
   }
 
+  let tenders = [];
+  try { tenders = db.prepare("SELECT id, tender_number, title, status FROM tenders ORDER BY id DESC").all(); } catch (e) {}
+
   res.render('compliance/form', {
     title: isParent ? 'Edit Plan' : 'Edit Plan / Approval',
-    item, jobs, clients, users, user: req.session.user,
-    prefillJobId: '', prefillClientId: '', returnTo,
+    item, jobs, clients, users, tenders, user: req.session.user,
+    prefillJobId: '', prefillClientId: '', prefillTenderId: '', returnTo,
     documents, linkedTask, revisions, tender,
     isParent, subPlans, subPlanDocs, subPlanTypes: SUB_PLAN_TYPES,
   });
@@ -850,19 +873,41 @@ router.post('/:id', (req, res) => {
   // constraint, so branch early.
   if (oldItem && oldItem.parent_id == null && oldItem.plan_number != null) {
     try {
-      db.prepare(`
-        UPDATE compliance
-        SET title = ?, job_id = ?, client_id = ?, client_request_date = ?, notes = ?, assigned_to_id = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(
-        b.title || oldItem.title,
-        b.job_id || null,
-        b.client_id || null,
-        b.client_request_date || null,
-        b.notes || '',
-        b.pm_id || null,
-        req.params.id
-      );
+      let hasTenderCol = false;
+      try { hasTenderCol = db.prepare("PRAGMA table_info(compliance)").all().some(c => c.name === 'tender_id'); } catch (e) {}
+      const newTenderId = b.tender_id ? (parseInt(b.tender_id, 10) || null) : null;
+      if (hasTenderCol) {
+        db.prepare(`
+          UPDATE compliance
+          SET title = ?, job_id = ?, client_id = ?, tender_id = ?, client_request_date = ?, notes = ?, assigned_to_id = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(
+          b.title || oldItem.title,
+          b.job_id || null,
+          b.client_id || null,
+          newTenderId,
+          b.client_request_date || null,
+          b.notes || '',
+          b.pm_id || null,
+          req.params.id
+        );
+        // Cascade tender_id to all sub-plans so the rollup stays consistent.
+        try { db.prepare("UPDATE compliance SET tender_id = ? WHERE parent_id = ?").run(newTenderId, req.params.id); } catch (e) {}
+      } else {
+        db.prepare(`
+          UPDATE compliance
+          SET title = ?, job_id = ?, client_id = ?, client_request_date = ?, notes = ?, assigned_to_id = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(
+          b.title || oldItem.title,
+          b.job_id || null,
+          b.client_id || null,
+          b.client_request_date || null,
+          b.notes || '',
+          b.pm_id || null,
+          req.params.id
+        );
+      }
       req.flash('success', 'Plan updated.');
     } catch (err) {
       console.error('[Compliance] Parent Plan update error:', err.message);
