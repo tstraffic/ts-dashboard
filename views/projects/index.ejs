@@ -138,6 +138,9 @@
                       <span class="inline-block w-2 h-2 rounded-full bg-red-500 flex-shrink-0" title="High Priority"></span>
                     <% } %>
                   </div>
+                  <% if (job.project_name) { %>
+                    <p class="text-xs text-gray-500 mt-0.5 truncate max-w-[260px]" title="<%= job.project_name %>"><%= job.project_name %></p>
+                  <% } %>
                   <% if (job.pending_tasks > 0 || job.pending_plans > 0 || job.overdue_tasks > 0 || job.overdue_compliance > 0) { %>
                     <div class="flex flex-wrap gap-1 mt-0.5">
                       <% if (job.overdue_tasks > 0) { %>
