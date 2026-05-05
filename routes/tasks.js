@@ -285,7 +285,10 @@ router.get('/new', (req, res) => {
   const db = getDb();
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND username != 'admin' ORDER BY full_name").all();
-  res.render('tasks/form', { title: 'New Task', task: null, jobs, users, user: req.session.user, prefillJobId: req.query.job_id || '' });
+  let tenders = [];
+  try { tenders = db.prepare("SELECT id, tender_number, title, status FROM tenders WHERE status IN ('open','submitted','won') ORDER BY id DESC").all(); } catch (e) {}
+  res.render('tasks/form', { title: 'New Task', task: null, jobs, users, tenders, user: req.session.user,
+    prefillJobId: req.query.job_id || '', prefillTenderId: req.query.tender_id || '' });
 });
 
 // POST / — Create task
@@ -302,10 +305,11 @@ router.post('/', (req, res) => {
     const ownerIds = Array.isArray(b.owner_id) ? b.owner_id.filter(Boolean) : (b.owner_id ? [b.owner_id] : []);
     const primaryOwnerId = ownerIds[0] || null;
 
+    const tenderId = b.tender_id ? (parseInt(b.tender_id, 10) || null) : null;
     const result = db.prepare(`
-      INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority, task_type, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(jobId, division, b.title, b.description || '', primaryOwnerId, b.due_date,
+      INSERT INTO tasks (job_id, tender_id, division, title, description, owner_id, due_date, status, priority, task_type, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(jobId, tenderId, division, b.title, b.description || '', primaryOwnerId, b.due_date,
       b.status || 'not_started', b.priority || 'medium', b.task_type || 'one_off', b.notes || '', req.session.user.id);
 
     const newTaskId = result.lastInsertRowid;
@@ -442,6 +446,8 @@ router.get('/:id/edit', (req, res) => {
 
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const users = db.prepare("SELECT id, full_name, role FROM users WHERE active = 1 AND username != 'admin' ORDER BY full_name").all();
+  let tenders = [];
+  try { tenders = db.prepare("SELECT id, tender_number, title, status FROM tenders ORDER BY id DESC").all(); } catch (e) {}
 
   // Load subtasks
   let subtasks = [];
@@ -507,7 +513,7 @@ router.get('/:id/edit', (req, res) => {
   }
   task.owners = taskOwners;
 
-  res.render('tasks/form', { title: 'Edit Task', task, jobs, users, user: req.session.user, prefillJobId: '', editable, subtasks, comments, dependencies, dependents, allTasks, activityLog, linkedCompliance });
+  res.render('tasks/form', { title: 'Edit Task', task, jobs, users, tenders, user: req.session.user, prefillJobId: '', prefillTenderId: '', editable, subtasks, comments, dependencies, dependents, allTasks, activityLog, linkedCompliance });
 });
 
 // POST /:id — Update task
@@ -544,14 +550,15 @@ router.post('/:id', (req, res) => {
     const ownersChanged = JSON.stringify(newOwnerIds.sort()) !== JSON.stringify(oldOwnerIds.sort());
 
     const updateJobId = b.job_id || null;
+    const updateTenderId = b.tender_id ? (parseInt(b.tender_id, 10) || null) : null;
     // Only admins/management can park a task in the admin division (private).
     let division = b.division || 'ops';
     if (division === 'admin' && !isAdminRole(req.session.user)) division = existingTask.division || 'ops';
     const completedDate = b.status === 'complete' ? new Date().toISOString().split('T')[0] : null;
     db.prepare(`
-      UPDATE tasks SET job_id=?, division=?, title=?, description=?, owner_id=?, due_date=?,
+      UPDATE tasks SET job_id=?, tender_id=?, division=?, title=?, description=?, owner_id=?, due_date=?,
       status=?, priority=?, task_type=?, notes=?, completed_date=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
-    `).run(updateJobId, division, b.title, b.description || '', primaryOwnerId, b.due_date,
+    `).run(updateJobId, updateTenderId, division, b.title, b.description || '', primaryOwnerId, b.due_date,
       b.status, b.priority, b.task_type || 'one_off', b.notes || '', completedDate, req.params.id);
 
     // Sync task_owners junction table
