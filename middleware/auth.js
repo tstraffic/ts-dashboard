@@ -57,6 +57,9 @@ const PERMISSIONS = {
   // ── Checklist templates (admin/planning manage templates, ops can view) ──
   checklists:    ['admin', 'operations', 'planning', 'safety'],
 
+  // ── SWMS register (Safety-led, ops/planning can view) ──
+  swms:          ['admin', 'safety', 'operations', 'planning'],
+
   // ── Finance / Admin ──
   // `finance` is the section gate — controls whether the Finance heading
   // even shows in the sidebar. Individual links inside have their own

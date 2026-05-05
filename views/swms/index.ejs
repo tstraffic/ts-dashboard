@@ -1,0 +1,126 @@
+<% locals.currentPage = 'swms' %>
+<%
+  function fmtDate(s) {
+    if (!s) return '—';
+    return new Date(s).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  const STATUS_BADGE = {
+    draft:    'bg-amber-50 text-amber-700 ring-amber-200',
+    active:   'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    archived: 'bg-gray-50 text-gray-600 ring-gray-200',
+  };
+  const KIND_BADGE = {
+    template: 'bg-blue-50 text-blue-700 ring-blue-200',
+    job:      'bg-purple-50 text-purple-700 ring-purple-200',
+  };
+%>
+
+<div class="max-w-6xl mx-auto space-y-5">
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-3 flex-wrap">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">SWMS Register</h1>
+      <p class="text-sm text-gray-500 mt-0.5">Safe Work Method Statements — templates and job-linked docs.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <a href="/swms/new?kind=template" class="px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg inline-flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5 5 5M12 5v12"/></svg>
+        Import template
+      </a>
+      <a href="/swms/new?kind=job" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg inline-flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/></svg>
+        Assign new SWMS
+      </a>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</p>
+      <p class="text-xl font-bold text-gray-900 mt-0.5"><%= counts.total || 0 %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Templates</p>
+      <p class="text-xl font-bold text-blue-700 mt-0.5"><%= counts.templates || 0 %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Job-linked</p>
+      <p class="text-xl font-bold text-purple-700 mt-0.5"><%= counts.job_linked || 0 %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Drafts</p>
+      <p class="text-xl font-bold text-amber-700 mt-0.5"><%= counts.drafts || 0 %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Active</p>
+      <p class="text-xl font-bold text-emerald-700 mt-0.5"><%= counts.active || 0 %></p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <form method="GET" action="/swms" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 flex flex-wrap items-end gap-3">
+    <div>
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Kind</label>
+      <select name="kind" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+        <option value="" <%= filters.kind === 'all' ? 'selected' : '' %>>All</option>
+        <option value="template" <%= filters.kind === 'template' ? 'selected' : '' %>>Templates</option>
+        <option value="job" <%= filters.kind === 'job' ? 'selected' : '' %>>Job-linked</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Status</label>
+      <select name="status" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+        <option value="" <%= filters.status === 'all' ? 'selected' : '' %>>All</option>
+        <option value="draft" <%= filters.status === 'draft' ? 'selected' : '' %>>Draft</option>
+        <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Active</option>
+        <option value="archived" <%= filters.status === 'archived' ? 'selected' : '' %>>Archived</option>
+      </select>
+    </div>
+    <button type="submit" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Filter</button>
+    <a href="/swms" class="px-3 py-2 text-gray-500 text-sm hover:text-gray-700">Clear</a>
+  </form>
+
+  <!-- Register table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <% if (!rows.length) { %>
+      <div class="px-5 py-12 text-center text-sm text-gray-500">No SWMS yet. Use the buttons above to import a template or assign a new one.</div>
+    <% } else { %>
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Title</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Kind</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Job</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Owner</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">File</th>
+            <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Created</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% rows.forEach(r => { %>
+            <tr class="hover:bg-gray-50/50">
+              <td class="px-3 py-2">
+                <a href="/swms/<%= r.id %>" class="font-semibold text-gray-900 hover:text-brand-600"><%= r.title %></a>
+                <% if (r.description) { %><p class="text-xs text-gray-500 mt-0.5 line-clamp-1"><%= r.description %></p><% } %>
+              </td>
+              <td class="px-2 py-2"><span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ring-1 ring-inset <%= KIND_BADGE[r.kind] %>"><%= kindLabels[r.kind] %></span></td>
+              <td class="px-2 py-2 text-xs text-gray-600"><% if (r.job_number) { %><a href="/jobs/<%= r.job_id %>" class="hover:text-brand-600"><%= r.job_number %></a><% } else { %>—<% } %></td>
+              <td class="px-2 py-2 text-xs text-gray-600"><%= r.owner_name || '—' %></td>
+              <td class="px-2 py-2"><span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ring-1 ring-inset <%= STATUS_BADGE[r.status] %>"><%= statusLabels[r.status] %></span></td>
+              <td class="px-2 py-2 text-xs">
+                <% if (r.file_path) { %>
+                  <a href="/swms/<%= r.id %>/file" class="text-brand-600 hover:underline"><%= r.file_original_name || 'Download' %></a>
+                <% } else { %>
+                  <span class="text-gray-400">—</span>
+                <% } %>
+              </td>
+              <td class="px-2 py-2 text-xs text-gray-600 tabular-nums"><%= fmtDate(r.created_at) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+</div>

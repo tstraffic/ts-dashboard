@@ -228,6 +228,7 @@ app.use('/schedule', requireLogin, requirePermission('schedule'), require('./rou
 app.use('/equipment/hire-dockets', requireLogin, requirePermission('equipment'), require('./routes/equipmentHireDockets'));
 app.use('/equipment', requireLogin, requirePermission('equipment'), require('./routes/equipment'));
 app.use('/checklists', requireLogin, requirePermission('checklists'), require('./routes/checklists'));
+app.use('/swms', requireLogin, requirePermission('swms'), require('./routes/swms'));
 app.use('/exports', requireLogin, requirePermission('exports'), require('./routes/exports'));
 app.use('/reports', requireLogin, requirePermission('reports'), require('./routes/reports'));
 app.use('/marketing', requireLogin, requirePermission('marketing'), require('./routes/marketing'));

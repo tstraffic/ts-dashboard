@@ -7822,6 +7822,43 @@ function runMigrations(db) {
     console.log('Migration 164 applied.');
   }
 
+  // =============================================
+  // Migration 165: SWMS register. A single table holds both reusable
+  // templates (kind = 'template') and job-linked SWMS docs (kind = 'job').
+  // Either flavour can be in 'draft' (no file uploaded yet — a placeholder
+  // assigned to someone to fill in), 'active' (file uploaded, in use),
+  // or 'archived'. Soft-deletes rather than ON DELETE CASCADE so a job
+  // delete doesn't lose the SWMS history.
+  // =============================================
+  if (!isMigrationApplied.get(165)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS swms (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          description TEXT DEFAULT '',
+          kind TEXT NOT NULL DEFAULT 'job' CHECK(kind IN ('template','job')),
+          status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','active','archived')),
+          job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+          owner_id INTEGER REFERENCES users(id),
+          file_path TEXT DEFAULT '',
+          file_original_name TEXT DEFAULT '',
+          notes TEXT DEFAULT '',
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_swms_kind ON swms(kind);
+        CREATE INDEX IF NOT EXISTS idx_swms_job ON swms(job_id);
+        CREATE INDEX IF NOT EXISTS idx_swms_status ON swms(status);
+      `);
+      recordMigration.run(165, 'SWMS register table');
+      console.log('Migration 165 applied: swms table');
+    } catch (e) {
+      console.error('Migration 165 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
