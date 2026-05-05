@@ -462,6 +462,20 @@ router.get('/:id', (req, res) => {
     `).all(job.id);
   } catch (e) {}
 
+  // Site audits attached to this job — also surface under the Safety tab.
+  let auditsForJob = [];
+  try {
+    auditsForJob = db.prepare(`
+      SELECT a.id, a.audit_datetime, a.auditor_name, a.overall_result, a.overall_finding,
+        a.score_total, a.score_max, a.score_percent, a.status,
+        u.full_name AS auditor_user_name
+      FROM site_audits a
+      LEFT JOIN users u ON u.id = a.auditor_id
+      WHERE a.job_id = ?
+      ORDER BY COALESCE(a.audit_datetime, a.created_at) DESC, a.id DESC
+    `).all(job.id);
+  } catch (e) {}
+
   res.render('jobs/show', {
     title: job.job_number,
     job, tasks, complianceItems, complianceDocs, deliveryDocs, accountsDocs,
@@ -470,7 +484,7 @@ router.get('/:id', (req, res) => {
     equipmentAssignments, hireDockets, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
     complianceTgsItems, allUsers, diaryAttachments, chatMembers,
     finalPlans, finalPlanDocs, finalTrafficPlans, planFlags, planRevisions, viewMode,
-    swmsForJob, riskAssessmentsForJob,
+    swmsForJob, riskAssessmentsForJob, auditsForJob,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });

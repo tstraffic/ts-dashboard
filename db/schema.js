@@ -8006,6 +8006,52 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 168: add 'safety' to tasks.division CHECK so the task form
+  // can offer Safety as a division (matches the 'safety' role added in
+  // migration 164). Same table-rebuild pattern as migration 115's
+  // tasks_rebuild_115. Idempotent — skips when 'safety' already permitted.
+  // =============================================
+  if (!isMigrationApplied.get(168)) {
+    try {
+      const tableSQL = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get();
+      const currentSQL = tableSQL ? tableSQL.sql : '';
+      if (currentSQL && !currentSQL.includes("'safety'")) {
+        const existingCols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
+        // Get full DDL for each column so we don't lose anything (added by later migrations)
+        const colDefs = db.prepare("PRAGMA table_info(tasks)").all().map(c => {
+          let def = `${c.name} ${c.type}`;
+          if (c.name === 'division') {
+            def = "division TEXT NOT NULL DEFAULT 'ops' CHECK(division IN ('ops','planning','finance','admin','marketing','accounts','management','hr','safety'))";
+          } else {
+            if (c.notnull && !c.pk) def += ' NOT NULL';
+            if (c.dflt_value !== null) def += ` DEFAULT ${c.dflt_value}`;
+            if (c.pk) def += ' PRIMARY KEY AUTOINCREMENT';
+          }
+          return def;
+        }).join(', ');
+        db.exec('PRAGMA foreign_keys = OFF');
+        db.exec('BEGIN');
+        db.exec(`CREATE TABLE tasks_new_168 (${colDefs})`);
+        const colList = existingCols.join(', ');
+        db.exec(`INSERT INTO tasks_new_168 (${colList}) SELECT ${colList} FROM tasks`);
+        db.exec('DROP TABLE tasks');
+        db.exec('ALTER TABLE tasks_new_168 RENAME TO tasks');
+        db.exec('COMMIT');
+        db.exec('PRAGMA foreign_keys = ON');
+        try { db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_job ON tasks(job_id)'); } catch (e) {}
+        try { db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_tender ON tasks(tender_id)'); } catch (e) {}
+        console.log("Migration 168: tasks.division CHECK now allows 'safety'");
+      } else {
+        console.log("Migration 168: 'safety' already in tasks.division CHECK — skipping rebuild.");
+      }
+      recordMigration.run(168, "tasks.division CHECK + 'safety'");
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch (_) {}
+      console.error('Migration 168 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
