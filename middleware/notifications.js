@@ -188,6 +188,52 @@ function generateNotifications() {
       console.error('SWMS expiry reminder error:', e.message);
     }
 
+    // 2d. Risk Assessments expiring within 30 days. Same cadence + recipient
+    // set as SWMS — templates 3mo, job-linked 6mo. Mirrors the swms_expiring
+    // notifier above so the two modules stay in lockstep.
+    try {
+      const raAvailable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='risk_assessments'").get();
+      if (raAvailable) {
+        const raCols = db.prepare("PRAGMA table_info(risk_assessments)").all().map(c => c.name);
+        const hasReminder = raCols.includes('last_reminded_at');
+        const expiringRA = db.prepare(`
+          SELECT r.id, r.title, r.kind, r.expiry_date, r.job_id, r.last_reminded_at,
+            j.job_number
+          FROM risk_assessments r
+          LEFT JOIN jobs j ON j.id = r.job_id
+          WHERE r.expiry_date IS NOT NULL
+            AND r.expiry_date <= date('now','+30 days')
+            AND r.status != 'archived'
+            ${hasReminder ? "AND (r.last_reminded_at IS NULL OR r.last_reminded_at < datetime('now','-7 days'))" : ''}
+        `).all();
+        if (expiringRA.length > 0) {
+          const recipients = db.prepare(`
+            SELECT id FROM users
+            WHERE active = 1 AND LOWER(role) IN ('admin','management','operations','safety')
+          `).all();
+          const stampReminded = hasReminder
+            ? db.prepare("UPDATE risk_assessments SET last_reminded_at = CURRENT_TIMESTAMP WHERE id = ?")
+            : null;
+          for (const r of expiringRA) {
+            const days = Math.round((new Date(r.expiry_date) - new Date(today)) / 86400000);
+            const isOverdue = days < 0;
+            const phrase = isOverdue ? `${Math.abs(days)} day${days === -1 ? '' : 's'} overdue` :
+                           days === 0 ? 'expires today' :
+                           `expires in ${days} day${days === 1 ? '' : 's'}`;
+            const title = `Risk Assessment ${isOverdue ? 'overdue' : 'expiring'}: ${r.title}`;
+            const cycleNote = r.kind === 'template' ? '3-month review' : '6-month renewal';
+            const msg = `${r.title} (${cycleNote})${r.job_number ? ' — ' + r.job_number : ''} ${phrase}.`;
+            for (const u of recipients) {
+              insertAndTrack(u.id, 'risk_assessment_expiring', title, msg, '/risk-assessments/' + r.id, r.job_id);
+            }
+            if (stampReminded) stampReminded.run(r.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Risk Assessment expiry reminder error:', e.message);
+    }
+
     // 3. Missing updates --> notify PM (no update in 7+ days)
     const missingUpdates = db.prepare(`
       SELECT j.id, j.job_number, j.project_manager_id

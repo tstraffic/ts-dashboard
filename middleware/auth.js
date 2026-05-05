@@ -60,6 +60,9 @@ const PERMISSIONS = {
   // ── SWMS register (Safety-led, ops/planning can view) ──
   swms:          ['admin', 'safety', 'operations', 'planning'],
 
+  // ── Risk Assessment register (same access pattern as SWMS) ──
+  risk_assessments: ['admin', 'safety', 'operations', 'planning'],
+
   // ── Finance / Admin ──
   // `finance` is the section gate — controls whether the Finance heading
   // even shows in the sidebar. Individual links inside have their own
