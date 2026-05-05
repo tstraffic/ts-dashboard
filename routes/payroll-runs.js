@@ -446,9 +446,15 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
     });
   }
 
+  // Pull the employee's configured rates alongside each line so the edit
+  // modal can fall back to the worker rates page values when a line was
+  // imported before the rate was set (those columns end up at 0 on the
+  // line itself, which then renders "Rate $0.00" in the modal).
   const lines = db.prepare(`
     SELECT prl.*, e.employee_code, e.payment_type AS emp_payment_type,
       e.award_classification_id,
+      COALESCE(e.rate_fares_daily, 0) AS emp_travel_rate,
+      COALESCE(e.rate_meal, 0)         AS emp_meal_rate,
       ac.classification AS classification_name
     FROM pay_run_lines prl
     LEFT JOIN employees e ON e.id = prl.employee_id
