@@ -1002,33 +1002,55 @@ function buildSheetXml(section, run) {
 }
 
 // ============================================================================
-// GET /payroll/rates — section-tabbed bulk rate editor
+// GET /payroll/rates — section-tabbed bulk rate editor.
+//
+// Schema-aware: builds the SELECT from columns that actually exist so a
+// stale deploy missing one (rate_meal, payroll_bsb, award_classification_id, …)
+// renders the page anyway with the missing fields treated as 0/null. Top-
+// level try/catch turns any other failure into a flash banner — never a
+// generic 500. The matching POST below uses the same pattern.
 // ============================================================================
 router.get('/rates', requirePermission('payroll'), (req, res) => {
-  const db = getDb();
-  const employees = db.prepare(`
-    SELECT id, employee_code, full_name, payment_type,
-      rate_day, rate_ot, rate_dt,
-      rate_night, rate_night_ot, rate_night_dt,
-      rate_weekend, rate_public_holiday,
-      rate_meal, rate_fares_daily,
-      payroll_bsb, payroll_account,
-      award_classification_id
-    FROM employees
-    WHERE active = 1
-    ORDER BY LOWER(full_name) ASC
-  `).all();
-  const classifications = db.prepare(`
-    SELECT id, classification, award_name, effective_from
-    FROM award_classifications
-    WHERE active = 1
-    ORDER BY classification ASC
-  `).all();
-  res.render('payroll-runs/rates', {
-    title: 'Worker Rates',
-    currentPage: 'pay-runs',
-    employees, classifications,
-  });
+  try {
+    const db = getDb();
+    const empCols = new Set(db.prepare("PRAGMA table_info(employees)").all().map(c => c.name));
+    const WANT = ['id', 'employee_code', 'full_name', 'payment_type',
+      'rate_day', 'rate_ot', 'rate_dt',
+      'rate_night', 'rate_night_ot', 'rate_night_dt',
+      'rate_weekend', 'rate_public_holiday',
+      'rate_meal', 'rate_fares_daily',
+      'payroll_bsb', 'payroll_account',
+      'award_classification_id'];
+    const cols = WANT.filter(c => empCols.has(c));
+    // id and full_name are required for the page to function. If they're
+    // missing the schema is in a state we can't recover from without a
+    // proper migration run.
+    if (!cols.includes('id') || !cols.includes('full_name')) {
+      req.flash('error', 'Employee table is missing core columns — check that migrations have run.');
+      return res.redirect('/payroll/runs');
+    }
+    const activeClause = empCols.has('active') ? 'WHERE active = 1' : '';
+    const employees = db.prepare(`SELECT ${cols.join(', ')} FROM employees ${activeClause} ORDER BY LOWER(full_name) ASC`).all();
+
+    let classifications = [];
+    try {
+      classifications = db.prepare(`
+        SELECT id, classification, award_name, effective_from
+        FROM award_classifications WHERE active = 1
+        ORDER BY classification ASC
+      `).all();
+    } catch (e) { /* table may not exist on a stale deploy */ }
+
+    res.render('payroll-runs/rates', {
+      title: 'Worker Rates',
+      currentPage: 'pay-runs',
+      employees, classifications,
+    });
+  } catch (err) {
+    console.error('[payroll/rates GET] Unhandled error:', err);
+    req.flash('error', 'Could not load Worker Rates: ' + (err && err.message ? err.message : 'unknown error'));
+    return res.redirect('/payroll/runs');
+  }
 });
 
 // POST /payroll/rates — bulk update.
