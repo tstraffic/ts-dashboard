@@ -229,7 +229,6 @@ app.use('/risk-assessments', requireLogin, requirePermission('risk_assessments')
 app.use('/exports', requireLogin, requirePermission('exports'), require('./routes/exports'));
 app.use('/reports', requireLogin, requirePermission('reports'), require('./routes/reports'));
 app.use('/marketing', requireLogin, requirePermission('marketing'), require('./routes/marketing'));
-app.use('/defects', requireLogin, requirePermission('defects'), require('./routes/defects'));
 app.use('/hr', requireLogin, require('./routes/hr-secure'));
 app.use('/hr', requireLogin, require('./routes/hr'));
 app.use('/kudos-admin', requireLogin, require('./routes/kudos-admin'));

@@ -20,7 +20,6 @@ function getUrgencyKpis(db, today, user) {
   return {
     overdueTasks: db.prepare(`SELECT COUNT(*) as c FROM tasks WHERE due_date < ? AND status != 'complete' AND deleted_at IS NULL ${taskFilter}${adminGuard}`).get(today).c,
     openIncidents: db.prepare("SELECT COUNT(*) as c FROM incidents WHERE investigation_status NOT IN ('closed', 'resolved')").get().c,
-    openDefects: db.prepare("SELECT COUNT(*) as c FROM defects WHERE status NOT IN ('closed', 'deferred')").get().c,
     unconfirmedAllocations: db.prepare("SELECT COUNT(*) as c FROM crew_allocations WHERE allocation_date = ? AND status = 'allocated'").get(today).c,
     overdueCompliance: db.prepare("SELECT COUNT(*) as c FROM compliance WHERE due_date < ? AND status NOT IN ('approved','expired','submitted')").get(today).c,
     ticketsExpiring: db.prepare(`
