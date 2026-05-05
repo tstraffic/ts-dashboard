@@ -1,0 +1,168 @@
+<% locals.currentPage = 'finance-pnl' %>
+
+<%
+  function fmtMoney(val) {
+    const n = Number(val) || 0;
+    return '$' + n.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtMoneyShort(val) {
+    const n = Number(val) || 0;
+    if (Math.abs(n) >= 1000000) return '$' + (n / 1000000).toFixed(1) + 'M';
+    if (Math.abs(n) >= 10000)   return '$' + (n / 1000).toFixed(0) + 'k';
+    return '$' + n.toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+  function fmtHours(n) {
+    return (Math.round((Number(n) || 0) * 100) / 100).toFixed(2) + 'h';
+  }
+%>
+
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Compliance Plan P&amp;L</h1>
+    <p class="text-gray-500 text-xs mt-0.5">Internal cost vs client charge across every plan · admin &amp; finance only</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 text-[11px] font-medium rounded-md">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      Internal rate $<%= hourlyRate %>/hr
+    </span>
+  </div>
+</div>
+
+<!-- Roll-up totals -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4 p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+  <div>
+    <div class="text-[10px] uppercase tracking-wide text-gray-400 font-bold">Hours</div>
+    <div class="text-lg font-bold text-gray-900 mt-0.5 tabular-nums"><%= fmtHours(totals.hours) %></div>
+  </div>
+  <div>
+    <div class="text-[10px] uppercase tracking-wide text-gray-400 font-bold">Charged</div>
+    <div class="text-lg font-bold text-emerald-700 mt-0.5 tabular-nums"><%= fmtMoneyShort(totals.charge) %></div>
+  </div>
+  <div>
+    <div class="text-[10px] uppercase tracking-wide text-gray-400 font-bold">Council fees</div>
+    <div class="text-lg font-bold text-amber-700 mt-0.5 tabular-nums"><%= fmtMoneyShort(totals.council) %></div>
+  </div>
+  <div>
+    <div class="text-[10px] uppercase tracking-wide text-gray-400 font-bold">Labour cost</div>
+    <div class="text-lg font-bold text-gray-900 mt-0.5 tabular-nums"><%= fmtMoneyShort(totals.labour) %></div>
+  </div>
+  <div>
+    <div class="text-[10px] uppercase tracking-wide text-gray-400 font-bold">T&amp;S total cost</div>
+    <div class="text-lg font-bold text-gray-900 mt-0.5 tabular-nums"><%= fmtMoneyShort(totals.cost) %></div>
+  </div>
+  <div>
+    <div class="text-[10px] uppercase tracking-wide text-gray-400 font-bold">Profit / Loss</div>
+    <div class="text-lg font-bold mt-0.5 tabular-nums <%= totals.profit >= 0 ? 'text-emerald-700' : 'text-rose-700' %>">
+      <%= (totals.profit >= 0 ? '' : '-') + fmtMoneyShort(Math.abs(totals.profit)) %>
+    </div>
+    <% if (totals.charge > 0) { %>
+      <div class="text-[10px] text-gray-400 leading-tight"><%= ((totals.profit / totals.charge) * 100).toFixed(1) %>% margin</div>
+    <% } %>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="GET" action="/finance/pnl" class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-4 flex flex-wrap items-end gap-3">
+  <div>
+    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Job</label>
+    <select name="job_id" class="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white">
+      <option value="">All jobs</option>
+      <% jobs.forEach(j => { %>
+        <option value="<%= j.id %>" <%= filters.job_id == j.id ? 'selected' : '' %>><%= j.job_number %><%= j.project_name ? ' — ' + j.project_name : '' %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div>
+    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Client</label>
+    <select name="client_id" class="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white">
+      <option value="">All clients</option>
+      <% clients.forEach(c => { %>
+        <option value="<%= c.id %>" <%= filters.client_id == c.id ? 'selected' : '' %>><%= c.company_name %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div>
+    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</label>
+    <select name="status" class="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white">
+      <option value="all">All</option>
+      <option value="not_started" <%= filters.status === 'not_started' ? 'selected' : '' %>>Not started</option>
+      <option value="submitted"   <%= filters.status === 'submitted'   ? 'selected' : '' %>>Submitted</option>
+      <option value="approved"    <%= filters.status === 'approved'    ? 'selected' : '' %>>Approved</option>
+      <option value="rejected"    <%= filters.status === 'rejected'    ? 'selected' : '' %>>Rejected</option>
+    </select>
+  </div>
+  <label class="inline-flex items-center text-xs text-gray-700 cursor-pointer mt-4">
+    <input type="checkbox" name="has_charge" value="1" <%= filters.has_charge === '1' ? 'checked' : '' %>
+      class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 mr-2">
+    Only plans with client charge
+  </label>
+  <div class="ml-auto flex items-center gap-2">
+    <button type="submit" class="px-3 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-md">Apply</button>
+    <a href="/finance/pnl" class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900">Reset</a>
+  </div>
+</form>
+
+<% if (rows.length === 0) { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center">
+    <p class="text-gray-500 text-sm font-medium">No compliance plans match these filters</p>
+    <p class="text-gray-400 text-xs mt-1">Once sub-plans capture hours and charge amounts, they'll roll up here</p>
+  </div>
+<% } else { %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-gray-200 bg-gray-50/50">
+          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Plan</th>
+          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Job</th>
+          <th class="px-3 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Client</th>
+          <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:table-cell">Hours</th>
+          <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Council</th>
+          <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">T&amp;S cost</th>
+          <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Charged</th>
+          <th class="px-3 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Profit / Loss</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        <% rows.forEach(r => {
+          const marginPct = r.total_charge > 0 ? (r.profit / r.total_charge * 100) : null;
+          const profitClass = r.profit >= 0 ? 'text-emerald-700' : 'text-rose-700';
+        %>
+          <tr class="hover:bg-gray-50 cursor-pointer <%= r.profit < 0 && r.total_charge > 0 ? 'border-l-2 border-l-rose-500' : '' %>" onclick="window.location='/compliance/<%= r.id %>/edit'">
+            <td class="px-3 py-2.5">
+              <a href="/compliance/<%= r.id %>/edit" class="text-brand-600 hover:text-brand-700 font-semibold text-sm hover:underline tabular-nums"><%= r.plan_number %></a>
+              <p class="text-gray-500 text-xs truncate max-w-[280px]"><%= r.title || '—' %></p>
+              <p class="text-gray-400 text-[11px] mt-0.5"><%= r.submitted_count %> / <%= r.sub_count %> sub-plans submitted</p>
+            </td>
+            <td class="px-3 py-2.5 text-gray-600 text-xs hidden md:table-cell">
+              <% if (r.job_number) { %>
+                <a href="/jobs/<%= r.job_id %>" class="text-brand-600 hover:underline" onclick="event.stopPropagation()"><%= r.job_number %></a>
+                <% if (r.project_name) { %><span class="block text-gray-400 text-[11px] truncate max-w-[160px]"><%= r.project_name %></span><% } %>
+              <% } else { %>—<% } %>
+            </td>
+            <td class="px-3 py-2.5 text-gray-600 text-xs hidden lg:table-cell truncate max-w-[160px]"><%= r.client_name || '—' %></td>
+            <td class="px-3 py-2.5 text-right text-gray-700 text-xs tabular-nums hidden sm:table-cell"><%= fmtHours(r.total_hours) %></td>
+            <td class="px-3 py-2.5 text-right text-amber-700 text-xs tabular-nums hidden md:table-cell">
+              <%= r.total_council > 0 ? fmtMoneyShort(r.total_council) : '—' %>
+            </td>
+            <td class="px-3 py-2.5 text-right text-gray-900 text-xs font-medium tabular-nums">
+              <%= fmtMoneyShort(r.total_cost) %>
+            </td>
+            <td class="px-3 py-2.5 text-right text-emerald-700 text-xs font-medium tabular-nums">
+              <%= r.total_charge > 0 ? fmtMoneyShort(r.total_charge) : '—' %>
+            </td>
+            <td class="px-3 py-2.5 text-right">
+              <div class="text-xs font-bold tabular-nums <%= profitClass %>">
+                <%= (r.profit >= 0 ? '' : '-') + fmtMoneyShort(Math.abs(r.profit)) %>
+              </div>
+              <% if (marginPct !== null) { %>
+                <div class="text-[10px] text-gray-400 tabular-nums"><%= marginPct.toFixed(1) %>%</div>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <div class="mt-2 text-xs text-gray-400"><%= rows.length %> plan<%= rows.length !== 1 ? 's' : '' %> · totals exclude rows hidden by filter</div>
+<% } %>

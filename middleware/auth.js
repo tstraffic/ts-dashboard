@@ -52,7 +52,10 @@ const PERMISSIONS = {
   exports:       ['admin', 'operations', 'finance', 'hr', 'management', 'accounts'],
 
   // ── Planning only (no operations) ──
-  compliance:    ['admin', 'planning', 'management', 'operations'],
+  // Finance is in here so they can open a plan and see its P&L. Cost +
+  // profit tiles are role-gated again at render time so planning/ops
+  // never see internal cost numbers.
+  compliance:    ['admin', 'planning', 'management', 'operations', 'finance'],
   plans:         ['admin', 'planning', 'management', 'operations'],
   updates:       ['admin', 'planning'],
 
@@ -198,4 +201,13 @@ function canViewSensitiveHR(user) {
   return role === 'admin' || role === 'hr';
 }
 
-module.exports = { requireLogin, requireRole, requirePermission, requireAccountsAccess, canViewAccounts, canViewSensitiveHR, canAccess, normaliseRole, PERMISSIONS };
+// Internal labour cost + plan-level profit/loss. Compliance is open to
+// planning/ops/safety so they can manage sub-plans, but the cost and
+// profit numbers must stay invisible to anyone other than admin/finance.
+function canViewInternalCost(user) {
+  if (!user) return false;
+  const role = normaliseRole(user.role);
+  return role === 'admin' || role === 'finance';
+}
+
+module.exports = { requireLogin, requireRole, requirePermission, requireAccountsAccess, canViewAccounts, canViewSensitiveHR, canViewInternalCost, canAccess, normaliseRole, PERMISSIONS };

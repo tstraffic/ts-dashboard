@@ -46,7 +46,7 @@
     Escalation: <%= incident.escalation_level.charAt(0).toUpperCase() + incident.escalation_level.slice(1) %>
   </span>
   <% if (incident.escalated_at) { %>
-    <span class="text-xs text-gray-400 ml-2">Escalated <%= new Date(incident.escalated_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) %></span>
+    <span class="text-xs text-gray-400 ml-2">Escalated <%= formatDateShort(incident.escalated_at) %></span>
   <% } %>
 </div>
 <% } %>
@@ -264,7 +264,15 @@
       <tbody class="divide-y divide-gray-200">
         <% correctiveActions.forEach(ca => { %>
         <tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 text-gray-600 max-w-[300px]"><%= ca.description %></td>
+          <td class="px-4 py-3 text-gray-600 max-w-[300px]">
+            <%= ca.description %>
+            <% if (ca.task_id) { %>
+              <a href="/tasks/<%= ca.task_id %>/edit" class="inline-flex items-center gap-1 ml-1 mt-1 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded ring-1 ring-brand-200" title="Open the task this CA is linked to">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                Task #<%= ca.task_id %>
+              </a>
+            <% } %>
+          </td>
           <td class="px-4 py-3 text-gray-600"><%= ca.assigned_to_name || 'Unassigned' %></td>
           <td class="px-4 py-3 text-gray-500 text-xs"><%= ca.due_date || '-' %></td>
           <td class="px-4 py-3">

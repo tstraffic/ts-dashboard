@@ -360,7 +360,7 @@ router.get('/job-report.pdf', (req, res) => {
   // Header
   doc.fontSize(20).font('Helvetica-Bold').text('T&S Traffic Control', { align: 'center' });
   doc.fontSize(14).font('Helvetica').text('Job Summary Report', { align: 'center' });
-  doc.fontSize(9).fillColor('#666').text(`Generated ${new Date().toLocaleDateString('en-AU')}`, { align: 'center' });
+  doc.fontSize(9).fillColor('#666').text(`Generated ${new Date().toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' })}`, { align: 'center' });
   doc.moveDown(1.5);
 
   // Job Details

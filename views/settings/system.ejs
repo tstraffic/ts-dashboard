@@ -9,7 +9,9 @@
 <form method="POST" action="/settings/system">
   <%- include('../partials/csrf') %>
   <%
-    // Group configs by prefix
+    // Group configs by prefix. The Finance group is only built when the
+    // viewer is admin/finance — otherwise planning would see the internal
+    // hourly rate and could back-calculate T&S costs from public numbers.
     const configGroups = {
       'Company': configs.filter(c => ['company_name', 'company_tagline'].includes(c.config_key)),
       'Regional': configs.filter(c => ['default_timezone', 'currency'].includes(c.config_key)),
@@ -17,6 +19,9 @@
       'Compliance & Fatigue': configs.filter(c => ['fatigue_max_days', 'fatigue_window_days', 'ticket_expiry_warning_days'].includes(c.config_key)),
       'Email (SMTP)': configs.filter(c => ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from'].includes(c.config_key)),
     };
+    if (canSeeCost) {
+      configGroups['Finance'] = configs.filter(c => ['internal_hourly_rate'].includes(c.config_key));
+    }
 
     const fieldLabels = {
       company_name: 'Company Name',
@@ -34,6 +39,7 @@
       smtp_user: 'SMTP Username',
       smtp_pass: 'SMTP Password',
       smtp_from: 'From Address',
+      internal_hourly_rate: 'Internal Labour Rate ($/hr)',
     };
   %>
 

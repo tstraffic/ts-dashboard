@@ -4,6 +4,8 @@ const { getDb } = require('../db/database');
 const { logActivity } = require('../middleware/audit');
 const upload = require('../middleware/upload');
 const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadForEntity } = require('../lib/chat');
+const { createLinkedTask, closeTaskFromCa } = require('../lib/correctiveActions');
+const { sydneyToday } = require('../lib/sydney');
 
 // Helper to generate next incident number
 function nextIncidentNumber(db) {
@@ -284,34 +286,50 @@ router.post('/:id/delete', (req, res) => {
 });
 
 // ADD CORRECTIVE ACTION
+// Each CA with an assignee spawns a task in the Safety division so the
+// assigned user sees it on /tasks. The task id is stored on the CA so
+// closing one side later cascades to the other.
 router.post('/:id/corrective-actions', (req, res) => {
   const db = getDb();
   const incident = db.prepare('SELECT * FROM incidents WHERE id = ?').get(req.params.id);
   if (!incident) { req.flash('error', 'Incident not found.'); return res.redirect('/incidents'); }
 
   const { description, assigned_to_id, due_date, priority } = req.body;
+  const ownerId = assigned_to_id || null;
+  const ca = {
+    job_id: incident.job_id,
+    description,
+    assigned_to_id: ownerId,
+    due_date,
+    priority: priority || 'medium',
+  };
+
+  const taskId = createLinkedTask(db, ca, incident, req.session.user);
+
   const result = db.prepare(`
-    INSERT INTO corrective_actions (incident_id, job_id, description, assigned_to_id, due_date, priority)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(req.params.id, incident.job_id, description, assigned_to_id || null, due_date, priority || 'medium');
+    INSERT INTO corrective_actions (incident_id, job_id, description, assigned_to_id, due_date, priority, task_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(req.params.id, incident.job_id, description, ownerId, due_date, ca.priority, taskId);
 
   logActivity({ user: req.session.user, action: 'create', entityType: 'corrective_action', entityId: result.lastInsertRowid, entityLabel: description.substring(0, 60), jobId: incident.job_id, ip: req.ip });
 
-  req.flash('success', 'Corrective action added.');
+  req.flash('success', taskId ? 'Corrective action added and assigned as a task.' : 'Corrective action added.');
   res.redirect(`/incidents/${req.params.id}`);
 });
 
-// COMPLETE CORRECTIVE ACTION
+// COMPLETE CORRECTIVE ACTION — closes the linked task too if any.
 router.post('/:id/corrective-actions/:caId/complete', (req, res) => {
   const db = getDb();
-  const today = new Date().toISOString().split('T')[0];
+  const today = sydneyToday();
   db.prepare(`
     UPDATE corrective_actions SET status='completed', completed_date=?, completion_notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
   `).run(today, req.body.completion_notes || '', req.params.caId);
 
+  const flippedTask = closeTaskFromCa(db, req.params.caId, req.session.user);
+
   logActivity({ user: req.session.user, action: 'complete', entityType: 'corrective_action', entityId: parseInt(req.params.caId), ip: req.ip });
 
-  req.flash('success', 'Corrective action completed.');
+  req.flash('success', flippedTask ? 'Corrective action completed and linked task closed.' : 'Corrective action completed.');
   res.redirect(`/incidents/${req.params.id}`);
 });
 
