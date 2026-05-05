@@ -1682,8 +1682,13 @@ router.get('/award-classifications/:id.json', requirePermission('payroll'), (req
     const db = getDb();
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Bad id' });
+    // Schema-aware: base_rate_day was added in migration 161, so a stale
+    // deploy may not have it yet — probe before selecting.
+    const acCols = new Set(db.prepare("PRAGMA table_info(award_classifications)").all().map(c => c.name));
+    const baseSelect = acCols.has('base_rate_day') ? 'base_rate_day,' : '';
     const row = db.prepare(`
       SELECT id, classification, award_name,
+        ${baseSelect}
         rate_day, rate_day_ot, rate_day_dt,
         rate_night, rate_night_ot, rate_night_dt,
         rate_weekend, rate_public_holiday,
@@ -1696,6 +1701,7 @@ router.get('/award-classifications/:id.json', requirePermission('payroll'), (req
       id: row.id,
       classification: row.classification,
       award_name: row.award_name,
+      base_rate_day: row.base_rate_day || null,
       rates: {
         rate_day:            row.rate_day,
         rate_ot:             row.rate_day_ot,
