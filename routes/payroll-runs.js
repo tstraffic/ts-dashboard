@@ -1131,7 +1131,17 @@ router.get('/rates', requirePermission('payroll'), (req, res) => {
       return res.redirect('/payroll/runs');
     }
     const activeClause = empCols.has('active') ? 'WHERE active = 1' : '';
-    const employees = db.prepare(`SELECT ${cols.join(', ')} FROM employees ${activeClause} ORDER BY LOWER(full_name) ASC`).all();
+    // Pull base_rate_day off the employee's award classification (when set) so the
+    // rates table can show "Base $X.XX" under each derived rate column. Schema-aware
+    // so a deploy missing migration 161 still renders — base_rate_day just stays null.
+    let acHasBase = false;
+    try { acHasBase = db.prepare("PRAGMA table_info(award_classifications)").all().some(c => c.name === 'base_rate_day'); } catch (e) {}
+    const baseSelect = acHasBase ? ', ac.base_rate_day' : '';
+    const baseJoin   = (cols.includes('award_classification_id') && acHasBase)
+      ? ' LEFT JOIN award_classifications ac ON ac.id = e.award_classification_id'
+      : '';
+    const empSelect  = cols.map(c => 'e.' + c).join(', ');
+    const employees = db.prepare(`SELECT ${empSelect}${baseSelect} FROM employees e${baseJoin} ${activeClause ? activeClause.replace('WHERE', 'WHERE e.') : ''} ORDER BY LOWER(e.full_name) ASC`).all();
 
     let classifications = [];
     try {
