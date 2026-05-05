@@ -757,6 +757,90 @@
       </div>
     <% } %>
 
+    <!-- Site Audits attached to this job — pushed in here so Safety has one place for everything -->
+    <% const auditsList = (typeof auditsForJob !== 'undefined' && Array.isArray(auditsForJob)) ? auditsForJob : []; %>
+    <div class="flex items-center justify-between mt-6 mb-3">
+      <h3 class="text-base font-semibold text-gray-900">Site Audits</h3>
+      <a href="/audits/new?job_id=<%= job.id %>&return_to=/jobs/<%= job.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/></svg>
+        New Audit
+      </a>
+    </div>
+    <% if (auditsList.length === 0) { %>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
+        <p class="text-gray-400 text-sm">No site audits for this job yet.</p>
+      </div>
+    <% } else { %>
+      <%
+        // Match the colour scheme used on the Site Audits register so the
+        // job-page table feels like the same object on both screens.
+        const AUDIT_RESULT_BADGE = {
+          pass:                  'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+          'pass with actions':   'bg-amber-50 text-amber-700 ring-amber-600/20',
+          fail:                  'bg-rose-50 text-rose-700 ring-rose-600/20',
+        };
+        const AUDIT_STATUS_BADGE = {
+          'signed off': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+          submitted:    'bg-blue-50 text-blue-700 ring-blue-600/20',
+          draft:        'bg-gray-100 text-gray-600 ring-gray-300',
+        };
+        function _auditDate(s) {
+          if (!s) return '—';
+          // audit_datetime is TEXT — fall back to the raw value if it's not parseable as a date
+          const d = new Date(s);
+          if (isNaN(d.getTime())) return s;
+          return d.toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+      %>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-200 bg-gray-50/50">
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden sm:table-cell">Auditor</th>
+              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Score</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Finding</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% auditsList.forEach(a => {
+                 const finding = (a.overall_finding || '').toLowerCase();
+                 const status  = (a.status || '').toLowerCase();
+                 const pct = (a.score_percent != null) ? Math.round(parseFloat(a.score_percent)) : null;
+            %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3 text-xs text-gray-700 tabular-nums"><%= _auditDate(a.audit_datetime) %></td>
+              <td class="px-4 py-3 text-xs text-gray-600 hidden sm:table-cell"><%= a.auditor_name || a.auditor_user_name || '—' %></td>
+              <td class="px-4 py-3 text-right tabular-nums">
+                <% if (pct != null) { %>
+                  <span class="text-sm font-semibold <%= pct >= 95 ? 'text-emerald-700' : pct >= 85 ? 'text-amber-700' : 'text-rose-700' %>"><%= pct %>%</span>
+                  <% if (a.score_max) { %><span class="text-[10px] text-gray-400 ml-1">(<%= a.score_total %>/<%= a.score_max %>)</span><% } %>
+                <% } else { %>
+                  <span class="text-gray-400 text-xs">—</span>
+                <% } %>
+              </td>
+              <td class="px-4 py-3">
+                <% if (finding) { %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ring-1 ring-inset <%= AUDIT_RESULT_BADGE[finding] || 'bg-gray-50 text-gray-600 ring-gray-400/20' %>"><%= a.overall_finding %></span>
+                <% } else { %>
+                  <span class="text-gray-400 text-xs">—</span>
+                <% } %>
+              </td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ring-1 ring-inset <%= AUDIT_STATUS_BADGE[status] || 'bg-gray-100 text-gray-600 ring-gray-300' %>"><%= a.status || 'draft' %></span>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <a href="/audits/<%= a.id %>" class="text-brand-600 text-xs font-medium">Open →</a>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
     <!-- Linked Plans (collapsed summary) — kept here so admins still have one click to the plan register -->
     <% if (complianceItems.length > 0) { %>
     <div class="mt-4">

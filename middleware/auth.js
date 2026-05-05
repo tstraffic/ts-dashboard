@@ -24,17 +24,22 @@ function normaliseRole(role) {
 //        hr (HR modules + limited ops), sales (CRM + limited ops)
 const PERMISSIONS = {
   // ── Shared ──
-  dashboard:     ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts', 'safety'],
-  jobs:          ['admin', 'operations', 'planning', 'finance', 'sales', 'management'],
-  projects:      ['admin', 'operations', 'planning', 'finance', 'sales', 'management'],
-  tenders:       ['admin', 'planning', 'sales', 'management'],
-  clients:       ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts'],
-  notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'sales', 'management', 'accounts', 'safety'],
+  // 'sales' has been retired — kept out of every list so any historical
+  // sales-role user is now effectively read-only at the auth layer until
+  // an admin migrates them. The role still passes the users.role CHECK
+  // (no migration), so existing rows aren't destroyed; they just can't
+  // reach any module via the sidebar gates.
+  dashboard:     ['admin', 'operations', 'planning', 'finance', 'hr', 'management', 'accounts', 'safety'],
+  jobs:          ['admin', 'operations', 'planning', 'finance', 'management'],
+  projects:      ['admin', 'operations', 'planning', 'finance', 'management'],
+  tenders:       ['admin', 'planning', 'management'],
+  clients:       ['admin', 'operations', 'planning', 'finance', 'hr', 'management', 'accounts'],
+  notifications: ['admin', 'operations', 'planning', 'finance', 'hr', 'management', 'accounts', 'safety'],
 
   // ── Operations only (no planning) ──
   tasks:         ['admin', 'operations', 'planning'],  // planning sees only their own + plan-linked tasks
   incidents:     ['admin', 'operations', 'safety'],
-  contacts:      ['admin', 'operations', 'hr', 'sales'],
+  contacts:      ['admin', 'operations', 'hr'],
   timesheets:    ['admin', 'operations', 'finance'],
   crew:          ['admin', 'operations'],
   allocations:   ['admin', 'operations'],
@@ -43,8 +48,8 @@ const PERMISSIONS = {
   defects:       ['admin', 'operations'],
   documents:     ['admin', 'operations', 'finance'],
   bookings:      ['admin', 'operations'],
-  reports:       ['admin', 'operations', 'finance', 'hr', 'sales', 'management', 'accounts'],
-  exports:       ['admin', 'operations', 'finance', 'hr', 'sales', 'management', 'accounts'],
+  reports:       ['admin', 'operations', 'finance', 'hr', 'management', 'accounts'],
+  exports:       ['admin', 'operations', 'finance', 'hr', 'management', 'accounts'],
 
   // ── Planning only (no operations) ──
   compliance:    ['admin', 'planning', 'management', 'operations'],

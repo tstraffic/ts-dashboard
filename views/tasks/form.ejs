@@ -281,13 +281,15 @@
             </label>
             <select id="division" name="division" required <%= disabled %> class="tf-select <%= disabled ? 'opacity-60 cursor-not-allowed' : '' %>">
               <option value="">Select division…</option>
-              <option value="ops" <%= isEdit && task.division === 'ops' ? 'selected' : (!isEdit ? 'selected' : '') %>>Operations</option>
-              <option value="planning" <%= isEdit && task.division === 'planning' ? 'selected' : '' %>>Planning</option>
-              <option value="finance" <%= isEdit && task.division === 'finance' ? 'selected' : '' %>>Finance</option>
               <% if (user && ['admin','management'].includes((user.role || '').toLowerCase())) { %>
                 <option value="admin" <%= isEdit && task.division === 'admin' ? 'selected' : '' %>>Admin (private)</option>
               <% } %>
-              <option value="hr" <%= isEdit && task.division === 'hr' ? 'selected' : '' %>>Human Resources</option>
+              <option value="ops" <%= isEdit && task.division === 'ops' ? 'selected' : (!isEdit ? 'selected' : '') %>>Operations</option>
+              <option value="planning" <%= isEdit && task.division === 'planning' ? 'selected' : '' %>>Planning</option>
+              <option value="finance" <%= isEdit && task.division === 'finance' ? 'selected' : '' %>>Finance</option>
+              <option value="hr" <%= isEdit && task.division === 'hr' ? 'selected' : '' %>>HR</option>
+              <option value="marketing" <%= isEdit && task.division === 'marketing' ? 'selected' : '' %>>Marketing</option>
+              <option value="safety" <%= isEdit && task.division === 'safety' ? 'selected' : '' %>>Safety</option>
             </select>
           </div>
 

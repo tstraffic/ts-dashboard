@@ -64,9 +64,13 @@
             <option value="planning" <%= isEdit && editUser.role === 'planning' ? 'selected' : '' %>>Planning</option>
             <option value="finance" <%= isEdit && editUser.role === 'finance' ? 'selected' : '' %>>Finance</option>
             <option value="hr" <%= isEdit && editUser.role === 'hr' ? 'selected' : '' %>>HR</option>
-            <option value="sales" <%= isEdit && editUser.role === 'sales' ? 'selected' : '' %>>Sales</option>
             <option value="marketing" <%= isEdit && editUser.role === 'marketing' ? 'selected' : '' %>>Marketing</option>
             <option value="safety" <%= isEdit && editUser.role === 'safety' ? 'selected' : '' %>>Safety</option>
+            <%/* Legacy: only surfaces when editing an existing sales user, so
+                 we don't break their record but new users can't pick Sales. */%>
+            <% if (isEdit && editUser.role === 'sales') { %>
+            <option value="sales" selected>Sales (legacy)</option>
+            <% } %>
             <% if (isEdit && editUser.role === 'management') { %>
             <option value="management" selected>Management (legacy — behaves as Admin)</option>
             <% } %>
