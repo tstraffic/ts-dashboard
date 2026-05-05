@@ -456,10 +456,16 @@
       ? parseFloat(l.travel_allowance)
       : (effectiveTravelRate * travelCount);
 
+    // All three travel fields (rate, count, total) are locked by default
+    // and only become editable when the Override checkbox is ticked. The
+    // numbers shown reflect the worker rates × auto-derived counts so the
+    // line is correct even when the line was imported before rates were set.
     document.getElementById('travelRate').value = effectiveTravelRate.toFixed(2);
     document.getElementById('travelCount').value = travelCount;
     document.getElementById('travelAllowance').value = travelAllowance.toFixed(2);
     document.getElementById('travelOverride').checked = false;
+    document.getElementById('travelRate').readOnly = true;
+    document.getElementById('travelCount').readOnly = true;
     document.getElementById('travelAllowance').readOnly = true;
 
     const lineMealRate = parseFloat(l.meal_rate) || 0;
@@ -475,6 +481,8 @@
     document.getElementById('mealCount').value = mealCount;
     document.getElementById('mealAllowance').value = mealAllowance.toFixed(2);
     document.getElementById('mealOverride').checked = false;
+    document.getElementById('mealRate').readOnly = true;
+    document.getElementById('mealCount').readOnly = true;
     document.getElementById('mealAllowance').readOnly = true;
 
     // Other allowance is now driven by the expenses list — keep hidden mirror in sync
@@ -499,6 +507,9 @@
   }
 
   // ---- Travel / meal recompute on input ----
+  // All three inputs (rate, count, total) are locked by default. Ticking
+  // Override unlocks all of them so the user can set any custom value.
+  // Unticking re-locks everything and snaps the total back to rate×count.
   function wireTravelMeal() {
     function bind(rateId, countId, totalId, overrideId) {
       const r = document.getElementById(rateId);
@@ -514,8 +525,11 @@
       r.addEventListener('input', update);
       c.addEventListener('input', update);
       o.addEventListener('change', () => {
-        t.readOnly = !o.checked;
-        if (!o.checked) update();
+        const editable = o.checked;
+        r.readOnly = !editable;
+        c.readOnly = !editable;
+        t.readOnly = !editable;
+        if (!editable) update();
       });
       t.addEventListener('input', recomputeGrandTotalPreview);
     }

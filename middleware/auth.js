@@ -50,6 +50,8 @@ const PERMISSIONS = {
   bookings:      ['admin', 'operations'],
   reports:       ['admin', 'operations', 'finance', 'hr', 'management', 'accounts'],
   exports:       ['admin', 'operations', 'finance', 'hr', 'management', 'accounts'],
+  // 'defects' permission retired with the Defects feature removal — kept
+  // out of this map so canAccess(user, 'defects') returns false everywhere.
 
   // ── Planning only (no operations) ──
   // Finance is in here so they can open a plan and see its P&L. Cost +

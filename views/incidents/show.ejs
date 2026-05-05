@@ -29,7 +29,6 @@
     <% } %>
   </div>
   <div class="flex items-center gap-2">
-    <a href="/defects/new?job_id=<%= incident.job_id %>" class="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-sm font-medium rounded-lg transition-colors border border-amber-200">Create Defect</a>
     <a href="/incidents/<%= incident.id %>/edit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Edit</a>
     <form method="POST" action="/incidents/<%= incident.id %>/delete" onsubmit="return confirm('Are you sure you want to delete this incident? This cannot be undone.')">
       <%- include('../partials/csrf') %>

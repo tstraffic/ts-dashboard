@@ -131,14 +131,6 @@
     </div>
     <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Unconfirmed</p>
   </a>
-  <!-- WARNING: Open Defects -->
-  <a href="/defects" class="urgency-tile group rounded-xl p-3 border-l-4 <%= kpi.openDefects > 0 ? 'bg-amber-50/60 border-l-amber-500 border-t border-r border-b border-t-amber-200 border-r-amber-200 border-b-amber-200' : 'bg-white border-l-gray-200 border border-gray-200' %> hover:shadow-md transition-shadow">
-    <div class="flex items-center justify-between">
-      <p class="text-2xl font-extrabold <%= kpi.openDefects > 0 ? 'text-amber-600' : 'text-emerald-600' %>"><span class="kpi-number" data-count="<%= kpi.openDefects %>">0</span></p>
-      <% if (kpi.openDefects > 0) { %><svg class="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg><% } %>
-    </div>
-    <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Open Defects</p>
-  </a>
   <!-- CRITICAL: Overdue Plans -->
   <a href="/compliance" class="urgency-tile group rounded-xl p-3 border-l-4 <%= kpi.overdueCompliance > 0 ? 'bg-red-50/60 border-l-red-500 border-t border-r border-b border-t-red-200 border-r-red-200 border-b-red-200' : 'bg-white border-l-gray-200 border border-gray-200' %> hover:shadow-md transition-shadow">
     <div class="flex items-center justify-between">
@@ -835,77 +827,8 @@
   <% } %>
 </div>
 
-<!-- Mobile FAB (Quick Actions) -->
-<div class="fixed bottom-6 right-6 z-40 lg:hidden" id="fab-container">
-  <div class="fab-menu hidden flex flex-col-reverse gap-2 mb-3" id="fab-menu">
-    <a href="/jobs/new" class="flex items-center gap-2 bg-white shadow-lg rounded-full pl-3 pr-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
-      <span class="w-8 h-8 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-      </span>
-      New Job
-    </a>
-    <a href="/incidents/new" class="flex items-center gap-2 bg-white shadow-lg rounded-full pl-3 pr-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
-      <span class="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-      </span>
-      Incident
-    </a>
-    <a href="/defects/new" class="flex items-center gap-2 bg-white shadow-lg rounded-full pl-3 pr-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
-      <span class="w-8 h-8 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      </span>
-      Defect
-    </a>
-    <% if (isOps) { %>
-    <a href="/allocations" class="flex items-center gap-2 bg-white shadow-lg rounded-full pl-3 pr-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
-      <span class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-      </span>
-      Allocations
-    </a>
-    <% } %>
-  </div>
-  <button id="fab-toggle" class="w-14 h-14 bg-brand-600 hover:bg-brand-500 text-white rounded-full shadow-lg flex items-center justify-center transition-transform" onclick="document.getElementById('fab-menu').classList.toggle('hidden'); this.classList.toggle('rotate-45')">
-    <svg class="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-  </button>
-</div>
-
-<!-- Desktop Quick Actions (hidden on mobile where FAB is used) -->
-<div class="hidden lg:block">
-  <div class="bg-white border border-gray-200 rounded-2xl p-4">
-    <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">Quick Actions</h3>
-    <div class="flex flex-wrap gap-2">
-      <a href="/jobs/new" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-medium rounded-lg transition">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        New Job
-      </a>
-      <a href="/tasks" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-medium rounded-lg transition">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-        Tasks
-      </a>
-      <a href="/incidents/new" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-medium rounded-lg transition">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-        Report Incident
-      </a>
-      <a href="/defects/new" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-medium rounded-lg transition">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        Report Defect
-      </a>
-      <% if (isOps) { %>
-      <a href="/allocations" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-medium rounded-lg transition">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-        Allocations
-      </a>
-      <% } %>
-      <% if (isPlanning) { %>
-      <a href="/compliance" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-medium rounded-lg transition">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-        Compliance
-      </a>
-      <% } %>
-    </div>
-  </div>
-</div>
+<!-- Quick Actions live in the global FAB (bottom-right, on every page).
+     Defects feature retired — the Report Defect button is gone. -->
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>

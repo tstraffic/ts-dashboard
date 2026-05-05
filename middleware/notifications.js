@@ -298,28 +298,7 @@ function generateNotifications() {
       if (result.changes > 0) sendTeamsNotification(title, msg, link).catch(() => {});
     }
 
-    // 7. Critical defects --> notify management users
-    const criticalDefects = db.prepare(`
-      SELECT d.id, d.defect_number, d.title, d.job_id, j.job_number
-      FROM defects d
-      JOIN jobs j ON d.job_id = j.id
-      WHERE d.severity = 'critical' AND d.status NOT IN ('closed', 'deferred')
-    `).all();
-
-    const mgmtUsers = db.prepare("SELECT id FROM users WHERE role = 'management' AND active = 1").all();
-    for (const d of criticalDefects) {
-      let teamsNotified = false;
-      for (const u of mgmtUsers) {
-        const title = 'Critical Defect: ' + d.defect_number;
-        const msg = d.defect_number + ': ' + d.title + ' on ' + d.job_number;
-        const link = '/defects/' + d.id;
-        const result = insertAndTrack(u.id, 'critical_defect', title, msg, link, d.job_id);
-        if (result.changes > 0 && !teamsNotified) {
-          sendTeamsNotification(title, msg, link).catch(() => {});
-          teamsNotified = true;
-        }
-      }
-    }
+    // (Defects feature retired — no notifier needed.)
 
     // 8. Ticket Expiry --> notify management (30-day warning for crew member tickets)
     const expiringTickets = db.prepare(`

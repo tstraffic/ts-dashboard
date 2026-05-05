@@ -129,6 +129,86 @@
     }
   </script>
 
+  <!-- Global Quick Actions FAB — bottom-right, visible everywhere admin
+       so the user can spawn the most-used flows from any page. Replaces
+       the per-page dashboard Quick Actions strip. -->
+  <% if (typeof user !== 'undefined' && user) { %>
+  <div class="fixed bottom-5 right-5 z-40 print:hidden" id="globalFab">
+    <div id="globalFabMenu" class="hidden flex-col-reverse gap-2 mb-3">
+      <% if (canAccess(user, 'jobs')) { %>
+      <a href="/jobs/new" class="fab-item flex items-center gap-2 bg-white shadow-lg rounded-full pl-2.5 pr-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:translate-x-[-2px] transition-transform">
+        <span class="w-7 h-7 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        </span>
+        New Job
+      </a>
+      <% } %>
+      <% if (canAccess(user, 'tasks')) { %>
+      <a href="/tasks" class="fab-item flex items-center gap-2 bg-white shadow-lg rounded-full pl-2.5 pr-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+        <span class="w-7 h-7 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
+        </span>
+        Tasks
+      </a>
+      <% } %>
+      <% if (canAccess(user, 'incidents')) { %>
+      <a href="/incidents/new" class="fab-item flex items-center gap-2 bg-white shadow-lg rounded-full pl-2.5 pr-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+        <span class="w-7 h-7 bg-red-100 text-red-600 rounded-full flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        </span>
+        Report Incident
+      </a>
+      <% } %>
+      <% if (canAccess(user, 'allocations')) { %>
+      <a href="/allocations" class="fab-item flex items-center gap-2 bg-white shadow-lg rounded-full pl-2.5 pr-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+        <span class="w-7 h-7 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </span>
+        Allocations
+      </a>
+      <% } %>
+      <% if (canAccess(user, 'compliance')) { %>
+      <a href="/compliance" class="fab-item flex items-center gap-2 bg-white shadow-lg rounded-full pl-2.5 pr-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+        <span class="w-7 h-7 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </span>
+        Compliance
+      </a>
+      <% } %>
+    </div>
+    <button type="button" id="globalFabToggle" aria-label="Quick actions"
+      class="w-14 h-14 bg-brand-600 hover:bg-brand-500 active:bg-brand-700 text-white rounded-full shadow-xl flex items-center justify-center transition-transform">
+      <svg id="globalFabIcon" class="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    </button>
+  </div>
+  <script>
+  (function(){
+    const btn = document.getElementById('globalFabToggle');
+    const menu = document.getElementById('globalFabMenu');
+    const icon = document.getElementById('globalFabIcon');
+    if (!btn || !menu) return;
+    function close() {
+      menu.classList.add('hidden');
+      menu.classList.remove('flex');
+      icon.classList.remove('rotate-45');
+    }
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = menu.classList.toggle('hidden');
+      menu.classList.toggle('flex', !open);
+      icon.classList.toggle('rotate-45', !open);
+    });
+    // Click-outside dismiss
+    document.addEventListener('click', (e) => {
+      if (menu.classList.contains('hidden')) return;
+      if (!e.target.closest('#globalFab')) close();
+    });
+    // Esc dismiss
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  })();
+  </script>
+  <% } %>
+
   <!-- Global Lightbox overlay for images & documents -->
   <div id="lightbox-overlay" class="fixed inset-0 z-[9999] bg-black/90 hidden flex-col items-center justify-center" style="display:none;">
     <div class="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/60 to-transparent z-10">

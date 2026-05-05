@@ -64,7 +64,6 @@ function sidebarBadges(req, res, next) {
 
       // Safety
       incidents: safeCount(db, "SELECT COUNT(*) as c FROM incidents WHERE investigation_status NOT IN ('closed', 'resolved')"),
-      defects: safeCount(db, "SELECT COUNT(*) as c FROM defects WHERE status NOT IN ('closed', 'deferred')"),
 
       // Hire dockets past their return date but still marked picked_up —
       // every day past is money the supplier might still be charging.

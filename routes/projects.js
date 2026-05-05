@@ -247,14 +247,6 @@ router.get('/:id', (req, res) => {
     `).all(job.id);
   } catch (e) { /* table or column may be older — ignore */ }
 
-  const defects = db.prepare(`
-    SELECT d.*, u.full_name as reported_by_name, u2.full_name as assigned_to_name
-    FROM defects d
-    LEFT JOIN users u ON d.reported_by_id = u.id
-    LEFT JOIN users u2 ON d.assigned_to_id = u2.id
-    WHERE d.job_id = ? ORDER BY CASE d.severity WHEN 'critical' THEN 1 WHEN 'major' THEN 2 WHEN 'moderate' THEN 3 ELSE 4 END, d.created_at DESC
-  `).all(job.id);
-
   const trafficPlans = db.prepare(`
     SELECT tp.*, u.full_name as created_by_name FROM traffic_plans tp
     LEFT JOIN users u ON tp.created_by_id = u.id
@@ -304,7 +296,7 @@ router.get('/:id', (req, res) => {
     FROM activity_log al
     LEFT JOIN users u ON al.user_id = u.id
     WHERE (al.entity_type = 'job' AND al.entity_id = ?)
-      OR (al.entity_type IN ('task','incident','compliance','defect','equipment_assignment','timesheet','traffic_plan','project_update') AND al.job_id = ?)
+      OR (al.entity_type IN ('task','incident','compliance','equipment_assignment','timesheet','traffic_plan','project_update') AND al.job_id = ?)
     ORDER BY al.created_at DESC LIMIT 30
   `).all(job.id, job.id);
 
@@ -331,6 +323,74 @@ router.get('/:id', (req, res) => {
   let planRevisions = [];
   try { planRevisions = db.prepare('SELECT pr.*, u.full_name as created_by_name FROM plan_revisions pr LEFT JOIN users u ON pr.created_by = u.id WHERE pr.plan_id IN (SELECT id FROM traffic_plans WHERE job_id = ?) ORDER BY pr.created_at DESC').all(job.id); } catch(e) {}
 
+  // /projects/:id and /jobs/:id render the same template (jobs/show) but
+  // were diverging — the projects route never queried Final Plans (FINAL
+  // traffic_plans) or Safety (SWMS / RAs), so those tabs rendered empty
+  // even when the data existed. Mirroring the jobs.js queries here so
+  // the two URLs are interchangeable. JS-side filter against
+  // String(jobIdInt) is the same pattern that fixed jobs.js — bulletproof
+  // against any text-vs-int storage weirdness.
+  const jobIdInt = parseInt(job.id, 10);
+  const isTruthy = v => v === 1 || v === '1' || v === true || v === 'true';
+  let finalTrafficPlans = (trafficPlans || [])
+    .filter(t => isTruthy(t.is_final))
+    .map(t => ({ ...t, marked_final_by_name: null }));
+  if (finalTrafficPlans.length > 0) {
+    const ids = [...new Set(finalTrafficPlans.map(t => t.marked_final_by).filter(Boolean))];
+    if (ids.length > 0) {
+      const placeholders = ids.map(() => '?').join(',');
+      const userMap = {};
+      for (const u of db.prepare(`SELECT id, full_name FROM users WHERE id IN (${placeholders})`).all(...ids)) {
+        userMap[u.id] = u.full_name;
+      }
+      finalTrafficPlans = finalTrafficPlans.map(t => ({ ...t, marked_final_by_name: userMap[t.marked_final_by] || null }));
+    }
+    finalTrafficPlans.sort((a, b) => (b.marked_final_at || '').localeCompare(a.marked_final_at || ''));
+  }
+
+  const matchesJob = (rowJobId) => rowJobId != null && String(rowJobId).trim() === String(jobIdInt);
+  let swmsForJob = [];
+  try {
+    const rows = db.prepare(`
+      SELECT s.*, u.full_name AS owner_name
+      FROM swms s
+      LEFT JOIN users u ON u.id = s.owner_id
+      WHERE COALESCE(s.kind, 'job') = 'job' AND s.job_id IS NOT NULL
+      ORDER BY s.created_at DESC
+    `).all();
+    swmsForJob = rows.filter(r => matchesJob(r.job_id));
+  } catch (e) {
+    console.error('[Projects] SWMS Safety tab query failed for job', job.id, ':', e.message);
+  }
+
+  let riskAssessmentsForJob = [];
+  try {
+    const rows = db.prepare(`
+      SELECT r.*, u.full_name AS owner_name
+      FROM risk_assessments r
+      LEFT JOIN users u ON u.id = r.owner_id
+      WHERE COALESCE(r.kind, 'job') = 'job' AND r.job_id IS NOT NULL
+      ORDER BY r.created_at DESC
+    `).all();
+    riskAssessmentsForJob = rows.filter(r => matchesJob(r.job_id));
+  } catch (e) {
+    console.error('[Projects] Risk Assessments Safety tab query failed for job', job.id, ':', e.message);
+  }
+
+  // Site audits attached to this job — also surface under the Safety tab.
+  let auditsForJob = [];
+  try {
+    auditsForJob = db.prepare(`
+      SELECT a.id, a.audit_datetime, a.auditor_name, a.overall_result, a.overall_finding,
+        a.score_total, a.score_max, a.score_percent, a.status
+      FROM audits a
+      WHERE a.job_id = ?
+      ORDER BY a.audit_datetime DESC
+    `).all(jobIdInt);
+  } catch (e) {
+    console.error('[Projects] Audits Safety tab query failed for job', job.id, ':', e.message);
+  }
+
   const viewMode = req.query.view || '';
 
   res.render('jobs/show', {
@@ -338,9 +398,10 @@ router.get('/:id', (req, res) => {
     job, tasks, complianceItems, complianceDocs, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
     complianceCosts, equipmentCosts,
-    equipmentAssignments, hireDockets, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
+    equipmentAssignments, hireDockets, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
     complianceTgsItems, allUsers, diaryAttachments, chatMembers, activities,
-    finalPlans, finalPlanDocs, planFlags, planRevisions, viewMode,
+    finalPlans, finalPlanDocs, finalTrafficPlans, planFlags, planRevisions, viewMode,
+    swmsForJob, riskAssessmentsForJob, auditsForJob,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });
@@ -418,7 +479,7 @@ router.post('/:id/delete', (req, res) => {
     'tasks', 'project_updates', 'crew_allocations', 'timesheets',
     'incidents', 'corrective_actions', 'client_contacts', 'communication_log',
     'equipment_assignments', 'job_budgets', 'cost_entries', 'documents',
-    'defects', 'traffic_plans', 'compliance', 'notifications'
+    'traffic_plans', 'compliance', 'notifications'
   ];
   for (const table of linkedTables) {
     try { db.prepare(`DELETE FROM ${table} WHERE job_id = ?`).run(req.params.id); } catch (e) { /* table may not exist */ }

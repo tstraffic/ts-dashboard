@@ -331,15 +331,6 @@ router.get('/:id', (req, res) => {
     `).all(job.id);
   } catch (e) { /* column/table may be older — ignore */ }
 
-  // Defects for this job
-  const defects = db.prepare(`
-    SELECT d.*, u.full_name as reported_by_name, u2.full_name as assigned_to_name
-    FROM defects d
-    LEFT JOIN users u ON d.reported_by_id = u.id
-    LEFT JOIN users u2 ON d.assigned_to_id = u2.id
-    WHERE d.job_id = ? ORDER BY CASE d.severity WHEN 'critical' THEN 1 WHEN 'major' THEN 2 WHEN 'moderate' THEN 3 ELSE 4 END, d.created_at DESC
-  `).all(job.id);
-
   // Traffic plans for this job
   const trafficPlans = db.prepare(`
     SELECT tp.*, u.full_name as created_by_name FROM traffic_plans tp
@@ -537,7 +528,7 @@ router.get('/:id', (req, res) => {
     job, tasks, complianceItems, complianceDocs, deliveryDocs, accountsDocs,
     incidents, contacts, timesheets, budget, costEntries, totalSpend,
     complianceCosts, equipmentCosts,
-    equipmentAssignments, hireDockets, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
+    equipmentAssignments, hireDockets, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
     complianceTgsItems, allUsers, diaryAttachments, chatMembers,
     finalPlans, finalPlanDocs, finalTrafficPlans, planFlags, planRevisions, viewMode,
     swmsForJob, riskAssessmentsForJob, auditsForJob,
