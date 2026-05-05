@@ -430,17 +430,37 @@ router.get('/:id', (req, res) => {
   } catch (e) {
     console.error('[Jobs] finalPlanDocs query failed for job', job.id, ':', e.message);
   }
+  // Reuse the trafficPlans dataset (which is what the Traffic Plans tab
+  // shows) and filter by is_final in JS. This guarantees the two tabs
+  // never disagree — if Traffic Plans renders a row with the FINAL
+  // badge, Final Plans is guaranteed to surface the same row.
+  // is_final is INTEGER 0/1 normally but historic rows can be '1'/true
+  // so we coerce broadly.
   try {
-    finalTrafficPlans = db.prepare(`
-      SELECT tp.*, u.full_name as created_by_name, mf.full_name as marked_final_by_name
-      FROM traffic_plans tp
-      LEFT JOIN users u ON tp.created_by_id = u.id
-      LEFT JOIN users mf ON tp.marked_final_by = mf.id
-      WHERE CAST(tp.job_id AS INTEGER) = ? AND tp.is_final = 1
-      ORDER BY tp.marked_final_at DESC
-    `).all(jobIdInt);
+    const isTruthy = v => v === 1 || v === '1' || v === true || v === 'true';
+    finalTrafficPlans = (trafficPlans || [])
+      .filter(t => isTruthy(t.is_final))
+      .map(t => ({ ...t, marked_final_by_name: null }));
+    if (finalTrafficPlans.length > 0) {
+      // Hydrate marked_final_by_name in one round-trip rather than
+      // running the JOIN inline above.
+      const ids = [...new Set(finalTrafficPlans.map(t => t.marked_final_by).filter(Boolean))];
+      if (ids.length > 0) {
+        const placeholders = ids.map(() => '?').join(',');
+        const userMap = {};
+        for (const u of db.prepare(`SELECT id, full_name FROM users WHERE id IN (${placeholders})`).all(...ids)) {
+          userMap[u.id] = u.full_name;
+        }
+        finalTrafficPlans = finalTrafficPlans.map(t => ({ ...t, marked_final_by_name: userMap[t.marked_final_by] || null }));
+      }
+      finalTrafficPlans.sort((a, b) => {
+        const am = a.marked_final_at || '';
+        const bm = b.marked_final_at || '';
+        return bm.localeCompare(am);
+      });
+    }
   } catch (e) {
-    console.error('[Jobs] finalTrafficPlans query failed for job', job.id, ':', e.message);
+    console.error('[Jobs] finalTrafficPlans filter failed for job', job.id, ':', e.message);
   }
 
   // Plan flags for this job
@@ -458,28 +478,42 @@ router.get('/:id', (req, res) => {
   // Schema-aware probes so a pre-migration deploy doesn't crash here;
   // the tab just shows empty if either table doesn't exist yet.
   // jobIdInt is reused from the Final Plans block above.
+  // Pull every job-kind SWMS / RA and filter by job_id in JS using
+  // string-coerced equality. This is bulletproof against any storage
+  // weirdness (job_id stored as text, with whitespace, etc.) where
+  // a SQL = comparison was silently missing rows. The SWMS register
+  // page works using SQL = ? so we know the data is reachable; the
+  // job-detail Safety tab now matches via JS coercion to remove the
+  // last shred of doubt.
+  const matchesJob = (rowJobId) => {
+    if (rowJobId == null) return false;
+    return String(rowJobId).trim() === String(jobIdInt);
+  };
+
   let swmsForJob = [];
   try {
-    swmsForJob = db.prepare(`
+    const rows = db.prepare(`
       SELECT s.*, u.full_name AS owner_name
       FROM swms s
       LEFT JOIN users u ON u.id = s.owner_id
-      WHERE CAST(s.job_id AS INTEGER) = ?
+      WHERE COALESCE(s.kind, 'job') = 'job' AND s.job_id IS NOT NULL
       ORDER BY s.created_at DESC
-    `).all(jobIdInt);
+    `).all();
+    swmsForJob = rows.filter(r => matchesJob(r.job_id));
   } catch (e) {
     console.error('[Jobs] SWMS Safety tab query failed for job', job.id, ':', e.message);
   }
 
   let riskAssessmentsForJob = [];
   try {
-    riskAssessmentsForJob = db.prepare(`
+    const rows = db.prepare(`
       SELECT r.*, u.full_name AS owner_name
       FROM risk_assessments r
       LEFT JOIN users u ON u.id = r.owner_id
-      WHERE CAST(r.job_id AS INTEGER) = ?
+      WHERE COALESCE(r.kind, 'job') = 'job' AND r.job_id IS NOT NULL
       ORDER BY r.created_at DESC
-    `).all(jobIdInt);
+    `).all();
+    riskAssessmentsForJob = rows.filter(r => matchesJob(r.job_id));
   } catch (e) {
     console.error('[Jobs] Risk Assessments Safety tab query failed for job', job.id, ':', e.message);
   }

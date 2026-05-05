@@ -184,7 +184,7 @@
             <div class="grid grid-cols-12 gap-2 items-end">
               <div class="col-span-2">
                 <label class="block text-[10px] font-semibold text-gray-500 mb-0.5">Meal</label>
-                <p class="text-[10px] text-gray-400">10h+ × meal</p>
+                <p class="text-[10px] text-gray-400">9.5h+ × meal</p>
               </div>
               <div class="col-span-3">
                 <label class="block text-[10px] text-gray-500 mb-0.5">Rate ($)</label>
@@ -348,6 +348,11 @@
       meal_rate: <%= l.meal_rate || 0 %>,
       meal_count: <%= l.meal_count || 0 %>,
       meal_allowance: <%= l.meal_allowance || 0 %>,
+      // Worker Rates page values — the modal falls back to these whenever
+      // the line's own travel_rate / meal_rate is 0 (i.e. line was
+      // imported before the worker rate was configured).
+      emp_travel_rate: <%= l.emp_travel_rate || 0 %>,
+      emp_meal_rate:   <%= l.emp_meal_rate || 0 %>,
       other_allowance: <%= l.other_allowance || 0 %>,
       total_deductions: <%= l.total_deductions || 0 %>,
       grand_total: <%= l.grand_total || 0 %>,
@@ -413,14 +418,62 @@
     form.querySelector('input[name="acc_number"]').value = l.acc_number;
 
     // Travel + Meal rate × count
-    document.getElementById('travelRate').value = (parseFloat(l.travel_rate) || 0).toFixed(2);
-    document.getElementById('travelCount').value = parseInt(l.travel_count, 10) || 0;
-    document.getElementById('travelAllowance').value = (parseFloat(l.travel_allowance) || 0).toFixed(2);
+    // If the line was imported before worker rates existed, the line's
+    // travel_rate / meal_rate columns end up at 0. Fall back to the
+    // worker-rates page values (emp_travel_rate / emp_meal_rate) and
+    // recompute the count + total so the modal shows the right numbers
+    // straight away. The user can still tick Override to edit.
+    function deriveTravelDays(line) {
+      const dates = new Set();
+      for (const k of BUCKET_KEYS) {
+        const b = line.buckets && line.buckets[k];
+        if (!b || !Array.isArray(b.hours)) continue;
+        b.hours.forEach((h, i) => { if ((parseFloat(h) || 0) > 0) dates.add(i); });
+      }
+      return dates.size;
+    }
+    function deriveMealShifts(line) {
+      // 9.5h+ across day + night for that day-of-week counts as one
+      // meal-eligible shift (matches the office rule: any shift past
+      // 9.5h triggers the meal allowance).
+      let n = 0;
+      const totalsByDow = [0,0,0,0,0,0,0];
+      for (const k of BUCKET_KEYS) {
+        const b = line.buckets && line.buckets[k];
+        if (!b || !Array.isArray(b.hours)) continue;
+        b.hours.forEach((h, i) => { totalsByDow[i] += parseFloat(h) || 0; });
+      }
+      totalsByDow.forEach(h => { if (h >= 9.5) n++; });
+      return n;
+    }
+
+    const lineTravelRate = parseFloat(l.travel_rate) || 0;
+    const empTravelRate  = parseFloat(l.emp_travel_rate) || 0;
+    const effectiveTravelRate = lineTravelRate > 0 ? lineTravelRate : empTravelRate;
+    let travelCount = parseInt(l.travel_count, 10) || 0;
+    if (travelCount === 0 && effectiveTravelRate > 0) travelCount = deriveTravelDays(l);
+    const travelAllowance = (parseFloat(l.travel_allowance) > 0)
+      ? parseFloat(l.travel_allowance)
+      : (effectiveTravelRate * travelCount);
+
+    document.getElementById('travelRate').value = effectiveTravelRate.toFixed(2);
+    document.getElementById('travelCount').value = travelCount;
+    document.getElementById('travelAllowance').value = travelAllowance.toFixed(2);
     document.getElementById('travelOverride').checked = false;
     document.getElementById('travelAllowance').readOnly = true;
-    document.getElementById('mealRate').value = (parseFloat(l.meal_rate) || 0).toFixed(2);
-    document.getElementById('mealCount').value = parseInt(l.meal_count, 10) || 0;
-    document.getElementById('mealAllowance').value = (parseFloat(l.meal_allowance) || 0).toFixed(2);
+
+    const lineMealRate = parseFloat(l.meal_rate) || 0;
+    const empMealRate  = parseFloat(l.emp_meal_rate) || 0;
+    const effectiveMealRate = lineMealRate > 0 ? lineMealRate : empMealRate;
+    let mealCount = parseInt(l.meal_count, 10) || 0;
+    if (mealCount === 0 && effectiveMealRate > 0) mealCount = deriveMealShifts(l);
+    const mealAllowance = (parseFloat(l.meal_allowance) > 0)
+      ? parseFloat(l.meal_allowance)
+      : (effectiveMealRate * mealCount);
+
+    document.getElementById('mealRate').value = effectiveMealRate.toFixed(2);
+    document.getElementById('mealCount').value = mealCount;
+    document.getElementById('mealAllowance').value = mealAllowance.toFixed(2);
     document.getElementById('mealOverride').checked = false;
     document.getElementById('mealAllowance').readOnly = true;
 
