@@ -163,10 +163,20 @@ router.get('/submissions/:id', (req, res) => {
     return res.status(404).render('error', { title: 'Not Found', message: 'Submission not found', user: req.session.user });
   }
 
+  // Award classifications for the rate-prefill dropdown on the approve modal
+  let awardClassifications = [];
+  try {
+    awardClassifications = getDb().prepare(`
+      SELECT id, classification, award_name FROM award_classifications
+      WHERE active = 1 ORDER BY award_name, classification
+    `).all();
+  } catch (e) { /* table may not exist on stale deploy */ }
+
   res.render('induction/admin/submission-detail', {
     title: submission.full_name || 'Submission',
     currentPage: 'induction',
     submission,
+    awardClassifications,
   });
 });
 
@@ -245,6 +255,38 @@ router.post('/submissions/:id/status', (req, res) => {
       // 3. Get the new employee record ID
       const newEmployee = db.prepare("SELECT id FROM employees WHERE employee_code = ?").get(employeeId);
       const newEmpId = newEmployee ? newEmployee.id : null;
+
+      // 3a. Persist any rates the approver entered on the modal — gated by
+      // the columns that exist on this deploy. Award classification id is
+      // stored separately so future pay runs can resolve from it.
+      if (newEmpId) {
+        try {
+          const empCols = new Set(db.prepare("PRAGMA table_info(employees)").all().map(c => c.name));
+          const RATE_FIELDS = [
+            'rate_day', 'rate_ot', 'rate_dt',
+            'rate_night', 'rate_night_ot', 'rate_night_dt',
+            'rate_weekend', 'rate_public_holiday',
+            'rate_meal', 'rate_fares_daily',
+          ].filter(f => empCols.has(f));
+          const sets = [], params = [];
+          for (const f of RATE_FIELDS) {
+            const v = req.body[f];
+            if (v !== undefined && v !== '') {
+              const n = parseFloat(v);
+              if (Number.isFinite(n) && n >= 0) { sets.push(`${f} = ?`); params.push(n); }
+            }
+          }
+          if (empCols.has('award_classification_id') && req.body.award_classification_id) {
+            const cid = parseInt(req.body.award_classification_id, 10);
+            if (Number.isFinite(cid)) { sets.push('award_classification_id = ?'); params.push(cid); }
+          }
+          if (sets.length) {
+            sets.push('updated_at = CURRENT_TIMESTAMP');
+            params.push(newEmpId);
+            db.prepare(`UPDATE employees SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+          }
+        } catch (e) { console.error('Induction approve: rate persist failed:', e.message); }
+      }
 
       // 3a. Seed the encrypted payroll tables (bank, super, TFN) from the induction form
       if (newEmpId) {

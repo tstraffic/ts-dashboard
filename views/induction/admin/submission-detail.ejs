@@ -507,9 +507,100 @@
       <input type="hidden" name="status" value="approved">
       <div class="mb-4">
         <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Review Notes (optional)</label>
-        <textarea name="review_notes" rows="3" placeholder="Add any notes about this approval..."
+        <textarea name="review_notes" rows="2" placeholder="Add any notes about this approval..."
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"></textarea>
       </div>
+
+      <!-- Pay rates — saved to the new employee record. Set per their payment_type. -->
+      <%
+        const pt = (s.payment_type || '').toLowerCase();
+        const showAll = pt === 'tfn';
+        const showAbnExtra = pt === 'abn';
+      %>
+      <div class="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-xs font-bold text-gray-700 uppercase tracking-widest">Pay rates (<%= pt ? pt.toUpperCase() : 'Unclassified' %>)</p>
+          <% if (pt === 'tfn') { %>
+            <select name="award_classification_id" class="text-xs px-2 py-1 border border-gray-300 rounded bg-white" data-rate-prefill="1">
+              <option value="">— Award class (auto-fill) —</option>
+              <% (typeof awardClassifications !== 'undefined' ? awardClassifications : []).forEach(c => { %>
+                <option value="<%= c.id %>"><%= c.classification %></option>
+              <% }) %>
+            </select>
+          <% } %>
+        </div>
+        <p class="text-[10px] text-gray-500 mb-2">These flow to the worker's Worker Rates entry and pull into pay runs at import time. Override per pay run anytime.</p>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="text-[10px] text-gray-600">Day rate
+            <input type="number" step="0.01" min="0" name="rate_day" data-rate-key="rate_day"
+              class="rate-cell w-full px-2 py-1 border border-gray-300 rounded text-sm tabular-nums" placeholder="0.00">
+          </label>
+          <label class="text-[10px] text-gray-600">Night rate
+            <input type="number" step="0.01" min="0" name="rate_night" data-rate-key="rate_night"
+              class="rate-cell w-full px-2 py-1 border border-gray-300 rounded text-sm tabular-nums" placeholder="0.00">
+          </label>
+          <% if (showAll || showAbnExtra) { %>
+            <label class="text-[10px] text-gray-600">Day OT
+              <input type="number" step="0.01" min="0" name="rate_ot" data-rate-key="rate_ot"
+                class="rate-cell w-full px-2 py-1 border border-gray-300 rounded text-sm tabular-nums" placeholder="0.00">
+            </label>
+            <label class="text-[10px] text-gray-600">Night OT
+              <input type="number" step="0.01" min="0" name="rate_night_ot" data-rate-key="rate_night_ot"
+                class="rate-cell w-full px-2 py-1 border border-gray-300 rounded text-sm tabular-nums" placeholder="0.00">
+            </label>
+            <label class="text-[10px] text-gray-600">Weekend
+              <input type="number" step="0.01" min="0" name="rate_weekend" data-rate-key="rate_weekend"
+                class="rate-cell w-full px-2 py-1 border border-gray-300 rounded text-sm tabular-nums" placeholder="0.00">
+            </label>
+          <% } %>
+          <% if (showAll) { %>
+            <label class="text-[10px] text-gray-600">Day DT
+              <input type="number" step="0.01" min="0" name="rate_dt" data-rate-key="rate_dt"
+                class="rate-cell w-full px-2 py-1 border border-gray-300 rounded text-sm tabular-nums" placeholder="0.00">
+            </label>
+            <label class="text-[10px] text-gray-600">Night DT
+              <input type="number" step="0.01" min="0" name="rate_night_dt" data-rate-key="rate_night_dt"
+                class="rate-cell w-full px-2 py-1 border border-gray-300 rounded text-sm tabular-nums" placeholder="0.00">
+            </label>
+            <label class="text-[10px] text-gray-600">Public holiday
+              <input type="number" step="0.01" min="0" name="rate_public_holiday" data-rate-key="rate_public_holiday"
+                class="rate-cell w-full px-2 py-1 border border-gray-300 rounded text-sm tabular-nums" placeholder="0.00">
+            </label>
+          <% } %>
+          <label class="text-[10px] text-gray-600">Meal allowance ($/shift)
+            <input type="number" step="0.01" min="0" name="rate_meal" data-rate-key="rate_meal"
+              class="rate-cell w-full px-2 py-1 border border-gray-300 rounded text-sm tabular-nums" placeholder="0.00">
+          </label>
+          <label class="text-[10px] text-gray-600">Travel allowance ($/day)
+            <input type="number" step="0.01" min="0" name="rate_fares_daily" data-rate-key="rate_fares_daily"
+              class="rate-cell w-full px-2 py-1 border border-gray-300 rounded text-sm tabular-nums" placeholder="0.00">
+          </label>
+        </div>
+      </div>
+
+      <script>
+        // When the award_classification_id select changes, fetch the
+        // classification's rates and prefill the inputs.
+        (function () {
+          const sel = document.querySelector('select[data-rate-prefill]');
+          if (!sel) return;
+          sel.addEventListener('change', async (e) => {
+            const id = e.target.value;
+            if (!id) return;
+            try {
+              const r = await fetch('/payroll/award-classifications/' + id + '.json', { headers: { 'Accept': 'application/json' } });
+              if (!r.ok) return;
+              const data = await r.json();
+              if (!data || !data.rates) return;
+              Object.entries(data.rates).forEach(([k, v]) => {
+                const inp = document.querySelector('input[data-rate-key="' + k + '"]');
+                if (inp && v != null) inp.value = (parseFloat(v) || 0).toFixed(2);
+              });
+            } catch (err) { console.error(err); }
+          });
+        })();
+      </script>
+
       <div class="flex items-center gap-3 justify-end">
         <button type="button" onclick="document.getElementById('approveModal').classList.add('hidden')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Cancel</button>
         <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Approve</button>
