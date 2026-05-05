@@ -1,0 +1,87 @@
+<% locals.currentPage = 'pay-runs' %>
+
+<div class="space-y-5 max-w-4xl">
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <div>
+      <a href="/payroll/runs" class="text-sm text-brand-600 hover:underline">← Pay Runs</a>
+      <h1 class="text-2xl font-bold text-gray-900 mt-1">Income Labels</h1>
+      <p class="text-sm text-gray-500 mt-1">Choices that appear in the "Income" dropdown on Management pay runs (Salary, Director Fee, Bonus, etc.). Disable a label to keep it on existing rows but hide it from the dropdown.</p>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
+    <form method="POST" action="/payroll/income-labels" class="p-4 border-b border-gray-200 flex items-end gap-3 flex-wrap">
+      <%- include('../partials/csrf') %>
+      <div class="flex-1 min-w-[180px]">
+        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">New label</label>
+        <input type="text" name="label" required maxlength="80" placeholder="e.g. Christmas Bonus" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      </div>
+      <div class="w-28">
+        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Sort</label>
+        <input type="number" name="sort_order" min="0" max="9999" value="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm tabular-nums">
+      </div>
+      <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">Add label</button>
+    </form>
+
+    <% if (!labels || labels.length === 0) { %>
+      <div class="p-10 text-center text-sm text-gray-500">No income labels yet.</div>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Label</th>
+              <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Sort</th>
+              <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">In use</th>
+              <th class="px-2 py-2 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">Active</th>
+              <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% labels.forEach(l => { %>
+              <tr class="<%= l.active ? '' : 'opacity-50 bg-gray-50' %>">
+                <td class="px-3 py-2">
+                  <form method="POST" action="/payroll/income-labels/<%= l.id %>" class="flex items-center gap-2">
+                    <%- include('../partials/csrf') %>
+                    <input type="text" name="label" value="<%= l.label %>" maxlength="80" class="w-full max-w-md px-2 py-1.5 border border-gray-300 rounded text-sm">
+                    <button type="submit" class="text-xs font-semibold text-brand-600 hover:text-brand-700">Save</button>
+                  </form>
+                </td>
+                <td class="px-2 py-2 text-right text-xs tabular-nums text-gray-600"><%= l.sort_order %></td>
+                <td class="px-2 py-2 text-right text-xs tabular-nums text-gray-600"><%= l.use_count || 0 %></td>
+                <td class="px-2 py-2 text-center">
+                  <form method="POST" action="/payroll/income-labels/<%= l.id %>" class="inline">
+                    <%- include('../partials/csrf') %>
+                    <input type="hidden" name="active" value="<%= l.active ? '0' : '1' %>">
+                    <button type="submit" class="px-2 py-1 text-[11px] font-semibold rounded <%= l.active ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">
+                      <%= l.active ? 'Active' : 'Disabled' %>
+                    </button>
+                  </form>
+                </td>
+                <td class="px-2 py-2 text-right">
+                  <% if ((l.use_count || 0) === 0) { %>
+                    <form method="POST" action="/payroll/income-labels/<%= l.id %>/delete" class="inline" onsubmit="return confirm('Delete &quot;<%= l.label %>&quot;? This cannot be undone.')">
+                      <%- include('../partials/csrf') %>
+                      <button type="submit" class="text-xs font-semibold text-red-600 hover:text-red-700">Delete</button>
+                    </form>
+                  <% } else { %>
+                    <span class="text-[11px] text-gray-400" title="Used by <%= l.use_count %> pay-run line(s) — disable instead of deleting">Locked</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<% if (flash_success && flash_success.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-semibold shadow-lg z-50" id="flash"><%= flash_success[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flash')?.remove(), 2800);</script>
+<% } %>
+<% if (flash_error && flash_error.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold shadow-lg z-50" id="flasherr"><%= flash_error[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flasherr')?.remove(), 4000);</script>
+<% } %>

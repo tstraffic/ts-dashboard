@@ -378,4 +378,113 @@ router.get('/hr/payslips/:id', (req, res) => {
   fs.createReadStream(filePath).pipe(res);
 });
 
+// ============================================
+// PAY RUN BREAKDOWN — per-line wage breakdown for the logged-in worker
+// Filters out rate categories the worker didn't earn (e.g. Cash workers
+// never see DT/Weekend/PH; no travel row if travel_count = 0).
+// ============================================
+const { BUCKETS: PR_BUCKETS, BUCKET_LABELS: PR_BUCKET_LABELS, safeParseJson: prSafeParseJson } = require('../../lib/payroll');
+
+// Section → bucket whitelist. Mirrors routes/payroll-runs.js SECTIONS.
+const SECTION_BUCKETS_WHITELIST = {
+  cash: ['day_normal', 'night_normal'],
+  tfn:  PR_BUCKETS,
+  abn:  ['day_normal', 'day_ot', 'night_normal', 'night_ot', 'weekend'],
+  '':   PR_BUCKETS,
+};
+
+function fmtMoney(n) {
+  const v = parseFloat(n) || 0;
+  return v.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// GET /w/hr/pay-runs — list of finalized pay-run lines belonging to this worker
+router.get('/hr/pay-runs', (req, res) => {
+  const db = getDb();
+  const empId = loadLinkedEmployeeId(req.session.worker.id);
+  if (!empId) {
+    return res.render('worker/hr-pay-runs', {
+      title: 'Pay breakdown', currentPage: 'more',
+      lines: [], notLinked: true,
+      flash_success: req.flash('success'), flash_error: req.flash('error'),
+    });
+  }
+  const lines = db.prepare(`
+    SELECT prl.id, prl.pay_run_id, prl.payment_type, prl.total_wages,
+      prl.travel_allowance, prl.meal_allowance, prl.other_allowance,
+      prl.total_allowance, prl.total_deductions, prl.grand_total, prl.paid,
+      pr.period_start, pr.period_end, pr.label, pr.status,
+      COALESCE(pr.pay_run_type, 'traffic_control') AS pay_run_type
+    FROM pay_run_lines prl
+    JOIN pay_runs pr ON pr.id = prl.pay_run_id
+    WHERE prl.employee_id = ? AND pr.status = 'finalized'
+    ORDER BY pr.period_end DESC, prl.id DESC
+    LIMIT 50
+  `).all(empId);
+  res.render('worker/hr-pay-runs', {
+    title: 'Pay breakdown', currentPage: 'more',
+    lines, notLinked: false, fmtMoney,
+    flash_success: req.flash('success'), flash_error: req.flash('error'),
+  });
+});
+
+// GET /w/hr/pay-runs/:lineId — filtered breakdown for one line
+router.get('/hr/pay-runs/:lineId', (req, res) => {
+  const db = getDb();
+  const empId = loadLinkedEmployeeId(req.session.worker.id);
+  if (!empId) return res.status(404).send('Not linked');
+  const line = db.prepare(`
+    SELECT prl.*, pr.period_start, pr.period_end, pr.label, pr.status,
+      COALESCE(pr.pay_run_type, 'traffic_control') AS pay_run_type
+    FROM pay_run_lines prl
+    JOIN pay_runs pr ON pr.id = prl.pay_run_id
+    WHERE prl.id = ? AND prl.employee_id = ? AND pr.status = 'finalized'
+  `).get(req.params.lineId, empId);
+  if (!line) return res.status(404).send('Pay-run line not found');
+
+  // Hydrate buckets from JSON (fallback to legacy columns)
+  let buckets = prSafeParseJson(line.buckets_json, null);
+  if (!buckets) buckets = {};
+
+  // Apply filter rule 1: only buckets the worker's section allows AND total_hours > 0
+  const allowedSection = SECTION_BUCKETS_WHITELIST[line.payment_type || ''] || PR_BUCKETS;
+  const visibleBuckets = [];
+  for (const k of allowedSection) {
+    const b = buckets[k];
+    if (!b) continue;
+    const hrs = parseFloat(b.total_hours) || 0;
+    if (hrs > 0) {
+      visibleBuckets.push({
+        key: k,
+        label: PR_BUCKET_LABELS[k] || k,
+        total_hours: hrs,
+        rate: parseFloat(b.rate) || 0,
+        total_wages: parseFloat(b.total_wages) || 0,
+      });
+    }
+  }
+
+  // Allowances — only show if this worker actually earned them
+  const showTravel = (parseInt(line.travel_count, 10) || 0) > 0 || parseFloat(line.travel_allowance) > 0;
+  const showMeal   = (parseInt(line.meal_count, 10)   || 0) > 0 || parseFloat(line.meal_allowance) > 0;
+
+  // Expense items
+  let expenses = [];
+  try {
+    expenses = db.prepare("SELECT id, label, custom_label, amount FROM pay_run_line_expenses WHERE pay_run_line_id = ? ORDER BY id ASC").all(line.id);
+  } catch (e) { /* table may not exist */ }
+
+  // Deductions
+  let deductions = [];
+  try {
+    deductions = db.prepare("SELECT id, description, amount FROM pay_run_line_deductions WHERE pay_run_line_id = ? ORDER BY sort_order ASC, id ASC").all(line.id);
+  } catch (e) { /* table may not exist */ }
+
+  res.render('worker/hr-pay-run-detail', {
+    title: 'Pay breakdown', currentPage: 'more',
+    line, visibleBuckets, showTravel, showMeal, expenses, deductions, fmtMoney,
+    flash_success: req.flash('success'), flash_error: req.flash('error'),
+  });
+});
+
 module.exports = router;
