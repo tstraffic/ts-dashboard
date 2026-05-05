@@ -40,6 +40,17 @@ const KIND_LABELS = { template: 'Template', job: 'Job-linked' };
 const STATUS_LABELS = { draft: 'Draft', active: 'Active', archived: 'Archived' };
 const STATUS_VALUES = ['draft', 'active', 'archived'];
 const KIND_VALUES = ['template', 'job'];
+// Renewal cadence from the safety policy: job-linked SWMS renew every
+// 6 months, templates update every 3 months. Used to auto-default the
+// expiry_date when the admin doesn't enter one.
+const CYCLE_MONTHS = { template: 3, job: 6 };
+
+function defaultExpiryFor(kind, baseDate = new Date()) {
+  const months = CYCLE_MONTHS[kind] || 6;
+  const d = new Date(baseDate.getTime());
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
 
 function loadFormChoices(db) {
   return {
@@ -48,41 +59,49 @@ function loadFormChoices(db) {
   };
 }
 
-// GET /swms — register list
+// GET /swms — register list (split into Templates + Job-linked sections by default)
 router.get('/', (req, res) => {
   const db = getDb();
-  const { kind, status, job_id } = req.query;
-  let sql = `
+  const { status, job_id } = req.query;
+  // The register no longer filters by kind from query — both sections always
+  // render together so "templates vs job-linked" is visually obvious. The
+  // status / job_id filters still apply to both.
+  let where = '1=1';
+  const params = [];
+  if (status && STATUS_VALUES.includes(status)) { where += ' AND s.status = ?'; params.push(status); }
+  if (job_id) { where += ' AND s.job_id = ?'; params.push(parseInt(job_id, 10) || 0); }
+
+  const sql = `
     SELECT s.*, j.job_number, j.project_name, j.client,
       u.full_name AS owner_name, cu.full_name AS created_by_name
     FROM swms s
     LEFT JOIN jobs j ON j.id = s.job_id
     LEFT JOIN users u ON u.id = s.owner_id
     LEFT JOIN users cu ON cu.id = s.created_by_id
-    WHERE 1=1
+    WHERE ${where}
+    ORDER BY s.created_at DESC
   `;
-  const params = [];
-  if (kind && KIND_VALUES.includes(kind))     { sql += ' AND s.kind = ?';   params.push(kind); }
-  if (status && STATUS_VALUES.includes(status)) { sql += ' AND s.status = ?'; params.push(status); }
-  if (job_id) { sql += ' AND s.job_id = ?'; params.push(parseInt(job_id, 10) || 0); }
-  sql += ' ORDER BY s.created_at DESC';
+  const all = db.prepare(sql).all(...params);
+  const templates = all.filter(r => r.kind === 'template');
+  const jobLinked = all.filter(r => r.kind === 'job');
 
-  const rows = db.prepare(sql).all(...params);
   const counts = db.prepare(`
     SELECT
       COUNT(*) AS total,
       SUM(CASE WHEN kind = 'template' THEN 1 ELSE 0 END) AS templates,
       SUM(CASE WHEN kind = 'job'      THEN 1 ELSE 0 END) AS job_linked,
       SUM(CASE WHEN status = 'draft'  THEN 1 ELSE 0 END) AS drafts,
-      SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active
+      SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active,
+      SUM(CASE WHEN expiry_date IS NOT NULL AND expiry_date < date('now')      THEN 1 ELSE 0 END) AS expired,
+      SUM(CASE WHEN expiry_date IS NOT NULL AND expiry_date BETWEEN date('now') AND date('now','+30 days') THEN 1 ELSE 0 END) AS expiring_soon
     FROM swms
   `).get();
 
   res.render('swms/index', {
     title: 'SWMS Register', currentPage: 'swms',
-    rows, counts,
+    templates, jobLinked, counts,
     kindLabels: KIND_LABELS, statusLabels: STATUS_LABELS,
-    filters: { kind: kind || 'all', status: status || 'all', job_id: job_id || '' },
+    filters: { status: status || 'all', job_id: job_id || '' },
   });
 });
 
@@ -117,9 +136,11 @@ router.post('/', swmsUpload.single('swms_file'), (req, res) => {
     const fileName = req.file ? req.file.originalname : '';
     let status = STATUS_VALUES.includes(b.status) ? b.status : (filePath ? 'active' : 'draft');
 
+    // Expiry: respect the admin's input if any, otherwise default to today + cycle.
+    const expiryDate = (b.expiry_date && /^\d{4}-\d{2}-\d{2}$/.test(b.expiry_date)) ? b.expiry_date : defaultExpiryFor(kind);
     const r = db.prepare(`
-      INSERT INTO swms (title, description, kind, status, job_id, owner_id, file_path, file_original_name, notes, created_by_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO swms (title, description, kind, status, job_id, owner_id, file_path, file_original_name, notes, expiry_date, created_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       title,
       String(b.description || '').trim(),
@@ -128,6 +149,7 @@ router.post('/', swmsUpload.single('swms_file'), (req, res) => {
       b.owner_id ? (parseInt(b.owner_id, 10) || null) : null,
       filePath, fileName,
       String(b.notes || '').trim(),
+      expiryDate,
       req.session.user ? req.session.user.id : null
     );
     try { logActivity({ user: req.session.user, action: 'create', entityType: 'swms', entityId: r.lastInsertRowid, entityLabel: title, details: kind, ip: req.ip }); } catch (e) {}
@@ -191,9 +213,21 @@ router.post('/:id', swmsUpload.single('swms_file'), (req, res) => {
       fileName = req.file.originalname;
     }
     const status = STATUS_VALUES.includes(b.status) ? b.status : swms.status;
+    // Expiry: editable on update. Empty string means "renew from today" — useful
+    // shortcut for admins ticking through expired rows. Reset last_reminded_at
+    // when expiry moves so the next reminder fires fresh.
+    let expiryDate = swms.expiry_date;
+    if (b.expiry_date === '') {
+      expiryDate = defaultExpiryFor(kind);
+    } else if (b.expiry_date && /^\d{4}-\d{2}-\d{2}$/.test(b.expiry_date)) {
+      expiryDate = b.expiry_date;
+    }
+    const expiryChanged = String(expiryDate || '') !== String(swms.expiry_date || '');
     db.prepare(`
       UPDATE swms SET title = ?, description = ?, kind = ?, status = ?, job_id = ?, owner_id = ?,
-        file_path = ?, file_original_name = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+        file_path = ?, file_original_name = ?, notes = ?, expiry_date = ?,
+        last_reminded_at = CASE WHEN ? = 1 THEN NULL ELSE last_reminded_at END,
+        updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
       title, String(b.description || '').trim(), kind, status,
@@ -201,6 +235,8 @@ router.post('/:id', swmsUpload.single('swms_file'), (req, res) => {
       b.owner_id ? (parseInt(b.owner_id, 10) || null) : null,
       filePath, fileName,
       String(b.notes || '').trim(),
+      expiryDate,
+      expiryChanged ? 1 : 0,
       swms.id
     );
     try { logActivity({ user: req.session.user, action: 'update', entityType: 'swms', entityId: swms.id, entityLabel: title, details: '', ip: req.ip }); } catch (e) {}

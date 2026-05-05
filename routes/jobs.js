@@ -437,6 +437,19 @@ router.get('/:id', (req, res) => {
   // View mode: planning, operations, or all (admin toggle)
   const viewMode = req.query.view || '';
 
+  // SWMS attached to this job — feeds the Safety tab. Schema-aware probe so a
+  // pre-migration-165 deploy doesn't crash here; the tab just shows empty.
+  let swmsForJob = [];
+  try {
+    swmsForJob = db.prepare(`
+      SELECT s.*, u.full_name AS owner_name
+      FROM swms s
+      LEFT JOIN users u ON u.id = s.owner_id
+      WHERE s.job_id = ?
+      ORDER BY s.created_at DESC
+    `).all(job.id);
+  } catch (e) {}
+
   res.render('jobs/show', {
     title: job.job_number,
     job, tasks, complianceItems, complianceDocs, deliveryDocs, accountsDocs,
@@ -445,6 +458,7 @@ router.get('/:id', (req, res) => {
     equipmentAssignments, hireDockets, defects, trafficPlans, chatThreadId, diaryEntries, tgsPlans,
     complianceTgsItems, allUsers, diaryAttachments, chatMembers,
     finalPlans, finalPlanDocs, finalTrafficPlans, planFlags, planRevisions, viewMode,
+    swmsForJob,
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });

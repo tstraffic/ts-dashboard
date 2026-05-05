@@ -139,6 +139,55 @@ function generateNotifications() {
       insertAndTrack(userId, 'expiring_compliance', title, message, '/compliance/' + s.parent_id + '/edit#sub-' + s.id, s.job_id);
     }
 
+    // 2c. SWMS expiring within 30 days. Templates renew every 3 months,
+    // job-linked SWMS every 6 months — cycle is encoded on the row's
+    // existing expiry_date, so we just watch for rows in the 30-day
+    // window. Reminders fan out to admin / operations / safety inboxes.
+    // last_reminded_at on the SWMS row is bumped after dispatch so we
+    // don't re-send the same reminder daily.
+    try {
+      const swmsAvailable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='swms'").get();
+      if (swmsAvailable) {
+        const swmsCols = db.prepare("PRAGMA table_info(swms)").all().map(c => c.name);
+        const hasReminder = swmsCols.includes('last_reminded_at');
+        const expiringSwms = db.prepare(`
+          SELECT s.id, s.title, s.kind, s.expiry_date, s.job_id, s.last_reminded_at,
+            j.job_number
+          FROM swms s
+          LEFT JOIN jobs j ON j.id = s.job_id
+          WHERE s.expiry_date IS NOT NULL
+            AND s.expiry_date <= date('now','+30 days')
+            AND s.status != 'archived'
+            ${hasReminder ? "AND (s.last_reminded_at IS NULL OR s.last_reminded_at < datetime('now','-7 days'))" : ''}
+        `).all();
+        if (expiringSwms.length > 0) {
+          const recipients = db.prepare(`
+            SELECT id FROM users
+            WHERE active = 1 AND LOWER(role) IN ('admin','management','operations','safety')
+          `).all();
+          const stampReminded = hasReminder
+            ? db.prepare("UPDATE swms SET last_reminded_at = CURRENT_TIMESTAMP WHERE id = ?")
+            : null;
+          for (const s of expiringSwms) {
+            const days = Math.round((new Date(s.expiry_date) - new Date(today)) / 86400000);
+            const isOverdue = days < 0;
+            const phrase = isOverdue ? `${Math.abs(days)} day${days === -1 ? '' : 's'} overdue` :
+                           days === 0 ? 'expires today' :
+                           `expires in ${days} day${days === 1 ? '' : 's'}`;
+            const title = `SWMS ${isOverdue ? 'overdue' : 'expiring'}: ${s.title}`;
+            const cycleNote = s.kind === 'template' ? '3-month review' : '6-month renewal';
+            const msg = `${s.title} (${cycleNote})${s.job_number ? ' — ' + s.job_number : ''} ${phrase}.`;
+            for (const u of recipients) {
+              insertAndTrack(u.id, 'swms_expiring', title, msg, '/swms/' + s.id, s.job_id);
+            }
+            if (stampReminded) stampReminded.run(s.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('SWMS expiry reminder error:', e.message);
+    }
+
     // 3. Missing updates --> notify PM (no update in 7+ days)
     const missingUpdates = db.prepare(`
       SELECT j.id, j.job_number, j.project_manager_id
