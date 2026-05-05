@@ -1,0 +1,160 @@
+<% locals.currentPage = 'risk-assessments' %>
+<%
+  function fmtDate(s) {
+    if (!s) return '—';
+    return new Date(s).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  // Days until expiry (negative = past). Used to colour the expiry cell red
+  // when expired, amber when due in the next 30 days.
+  function expiryClass(s) {
+    if (!s) return 'text-gray-400';
+    const d = Math.floor((new Date(s) - new Date(new Date().toISOString().slice(0,10))) / 86400000);
+    if (d < 0) return 'text-red-700 font-semibold';
+    if (d <= 30) return 'text-amber-700 font-semibold';
+    return 'text-gray-700';
+  }
+  function expiryLabel(s) {
+    if (!s) return '—';
+    const d = Math.floor((new Date(s) - new Date(new Date().toISOString().slice(0,10))) / 86400000);
+    const date = new Date(s).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (d < 0)  return date + ' · ' + Math.abs(d) + 'd overdue';
+    if (d <= 30) return date + ' · in ' + d + 'd';
+    return date;
+  }
+  const STATUS_BADGE = {
+    draft:    'bg-amber-50 text-amber-700 ring-amber-200',
+    active:   'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    archived: 'bg-gray-50 text-gray-600 ring-gray-200',
+  };
+%>
+
+<div class="max-w-6xl mx-auto space-y-5">
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-3 flex-wrap">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Risk Assessment Register</h1>
+      <p class="text-sm text-gray-500 mt-0.5">Risk Assessments — templates renew every 3 months, job-linked every 6 months.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <a href="/risk-assessments/new?kind=template" class="px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg inline-flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5 5 5M12 5v12"/></svg>
+        Import template
+      </a>
+      <a href="/risk-assessments/new?kind=job" class="px-3 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg inline-flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/></svg>
+        Assign new RA
+      </a>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</p>
+      <p class="text-xl font-bold text-gray-900 mt-0.5"><%= counts.total || 0 %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Templates</p>
+      <p class="text-xl font-bold text-blue-700 mt-0.5"><%= counts.templates || 0 %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Job-linked</p>
+      <p class="text-xl font-bold text-purple-700 mt-0.5"><%= counts.job_linked || 0 %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Active</p>
+      <p class="text-xl font-bold text-emerald-700 mt-0.5"><%= counts.active || 0 %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Expiring &lt;30d</p>
+      <p class="text-xl font-bold <%= counts.expiring_soon ? 'text-amber-700' : 'text-gray-300' %> mt-0.5"><%= counts.expiring_soon || 0 %></p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+      <p class="text-[10px] font-bold text-red-500 uppercase tracking-widest">Expired</p>
+      <p class="text-xl font-bold <%= counts.expired ? 'text-red-700' : 'text-gray-300' %> mt-0.5"><%= counts.expired || 0 %></p>
+    </div>
+  </div>
+
+  <!-- Filters (status only — kind split is implicit via the two sections below) -->
+  <form method="GET" action="/risk-assessments" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 flex flex-wrap items-end gap-3">
+    <div>
+      <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Status</label>
+      <select name="status" class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+        <option value="" <%= filters.status === 'all' ? 'selected' : '' %>>All</option>
+        <option value="draft" <%= filters.status === 'draft' ? 'selected' : '' %>>Draft</option>
+        <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Active</option>
+        <option value="archived" <%= filters.status === 'archived' ? 'selected' : '' %>>Archived</option>
+      </select>
+    </div>
+    <button type="submit" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Filter</button>
+    <a href="/risk-assessments" class="px-3 py-2 text-gray-500 text-sm hover:text-gray-700">Clear</a>
+  </form>
+
+  <%
+  // Render the same table for either section. Templates have no Job column
+  // (always blank), so we hide it to keep the layout tight.
+  function renderRows(rows, showJob) {
+  %>
+  <% if (!rows.length) { %>
+    <div class="px-5 py-8 text-center text-sm text-gray-500">No <%= showJob ? 'job-linked Risk Assessments' : 'templates' %> yet.</div>
+  <% } else { %>
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Title</th>
+          <% if (showJob) { %><th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Job</th><% } %>
+          <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Owner</th>
+          <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+          <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Expiry</th>
+          <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">File</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        <% rows.forEach(r => { %>
+          <tr class="hover:bg-gray-50/50">
+            <td class="px-3 py-2">
+              <a href="/risk-assessments/<%= r.id %>" class="font-semibold text-gray-900 hover:text-brand-600"><%= r.title %></a>
+              <% if (r.description) { %><p class="text-xs text-gray-500 mt-0.5 line-clamp-1"><%= r.description %></p><% } %>
+            </td>
+            <% if (showJob) { %>
+              <td class="px-2 py-2 text-xs text-gray-600"><% if (r.job_number) { %><a href="/jobs/<%= r.job_id %>" class="hover:text-brand-600"><%= r.job_number %></a><% } else { %>—<% } %></td>
+            <% } %>
+            <td class="px-2 py-2 text-xs text-gray-600"><%= r.owner_name || '—' %></td>
+            <td class="px-2 py-2"><span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ring-1 ring-inset <%= STATUS_BADGE[r.status] %>"><%= statusLabels[r.status] %></span></td>
+            <td class="px-2 py-2 text-xs tabular-nums <%= expiryClass(r.expiry_date) %>"><%= expiryLabel(r.expiry_date) %></td>
+            <td class="px-2 py-2 text-xs">
+              <% if (r.file_path) { %>
+                <a href="/risk-assessments/<%= r.id %>/file" class="text-brand-600 hover:underline"><%= r.file_original_name || 'Download' %></a>
+              <% } else { %>
+                <span class="text-gray-400">—</span>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+  <% } %>
+
+  <!-- Templates section (3-month update cycle) -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-blue-50/40">
+      <div>
+        <h2 class="text-sm font-bold text-blue-900">Templates <span class="text-blue-700/60 font-normal">(<%= templates.length %>)</span></h2>
+        <p class="text-xs text-blue-700/70 mt-0.5">Reusable Risk Assessments that any job can pull from. Reviewed every 3 months.</p>
+      </div>
+    </div>
+    <%- renderRows(templates, false) %>
+  </div>
+
+  <!-- Job-linked section (6-month renewal cycle) -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-purple-50/40">
+      <div>
+        <h2 class="text-sm font-bold text-purple-900">Job-linked <span class="text-purple-700/60 font-normal">(<%= jobLinked.length %>)</span></h2>
+        <p class="text-xs text-purple-700/70 mt-0.5">Tied to a specific job. Renew every 6 months.</p>
+      </div>
+    </div>
+    <%- renderRows(jobLinked, true) %>
+  </div>
+</div>

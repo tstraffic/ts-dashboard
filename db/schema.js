@@ -7968,6 +7968,44 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 167: Risk Assessment register. Mirrors the SWMS table 1:1
+  // (templates + job-linked, draft/active/archived, expiry tracking) so
+  // the two modules can share UI patterns and the operator only has to
+  // learn one workflow.
+  // =============================================
+  if (!isMigrationApplied.get(167)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS risk_assessments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          description TEXT DEFAULT '',
+          kind TEXT NOT NULL DEFAULT 'job' CHECK(kind IN ('template','job')),
+          status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','active','archived')),
+          job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+          owner_id INTEGER REFERENCES users(id),
+          file_path TEXT DEFAULT '',
+          file_original_name TEXT DEFAULT '',
+          notes TEXT DEFAULT '',
+          expiry_date DATE,
+          last_reminded_at DATETIME,
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_ra_kind ON risk_assessments(kind);
+        CREATE INDEX IF NOT EXISTS idx_ra_job ON risk_assessments(job_id);
+        CREATE INDEX IF NOT EXISTS idx_ra_status ON risk_assessments(status);
+        CREATE INDEX IF NOT EXISTS idx_ra_expiry ON risk_assessments(expiry_date);
+      `);
+      recordMigration.run(167, 'risk_assessments register table');
+      console.log('Migration 167 applied: risk_assessments table');
+    } catch (e) {
+      console.error('Migration 167 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
