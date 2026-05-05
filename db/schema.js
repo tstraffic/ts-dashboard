@@ -7696,6 +7696,94 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 161: Casual loading + CW/ECW 9.
+  //   Every T&S worker is engaged as casual under the BCG Award, so every
+  //   classification rate gets a 25% casual loading per clause 11.4. We
+  //   keep the published ordinary rate visible as base_rate_day so the
+  //   admin can verify against Schedule B.
+  //   Also adds CW/ECW 9 (the missing top-tier classification).
+  // =============================================
+  if (!isMigrationApplied.get(161)) {
+    try {
+      const acCols = db.prepare("PRAGMA table_info(award_classifications)").all().map(c => c.name);
+      if (!acCols.includes('base_rate_day')) {
+        try { db.exec("ALTER TABLE award_classifications ADD COLUMN base_rate_day REAL"); } catch (e) {}
+      }
+
+      const AWARD_NAME = 'MA000020 — General Building (Non-Residential) Shiftworker';
+      const FY = '2025-07-01';
+      const MEAL = 19.00;
+      const FARES = 21.94;
+      const LOADING = 1.25;
+      // [classification, base ordinary $/hr]
+      const LEVELS = [
+        ['CW/ECW 1a',  25.46],
+        ['CW/ECW 1b',  25.96],
+        ['CW/ECW 1c',  26.31],
+        ['CW/ECW 1d',  26.78],
+        ['CW/ECW 2',   27.32],
+        ['CW/ECW 3',   28.12],
+        ['CW/ECW 4',   29.00],
+        ['CW/ECW 5',   29.89],
+        ['CW/ECW 6',   30.68],
+        ['CW/ECW 7',   31.56],
+        ['CW/ECW 8',   32.33],
+        ['CW/ECW 9',   33.13],  // verify against current Schedule B
+      ];
+      const r2 = n => Math.round(n * 100) / 100;
+
+      // Wipe and re-seed so casual loading is applied uniformly.
+      db.prepare("DELETE FROM award_classifications WHERE award_name = ? AND effective_from = ?").run(AWARD_NAME, FY);
+
+      const ins = db.prepare(`
+        INSERT INTO award_classifications
+          (award_name, classification, effective_from, effective_to,
+           base_rate_day,
+           rate_day, rate_day_ot, rate_day_dt,
+           rate_night, rate_night_ot, rate_night_dt,
+           rate_weekend, rate_public_holiday,
+           rate_meal, rate_fares_daily,
+           notes, active)
+        VALUES (?, ?, ?, NULL,
+           ?,
+           ?, ?, ?,
+           ?, ?, ?,
+           ?, ?,
+           ?, ?,
+           ?, 1)
+      `);
+      let inserted = 0;
+      for (const [cls, base] of LEVELS) {
+        // BCG clause 11.4: casual loading 25% applies on top of the
+        // *appropriate* rate of pay (i.e. inclusive of OT/shift loadings).
+        ins.run(
+          AWARD_NAME, cls, FY,
+          base, // base_rate_day — published ordinary rate before casual loading
+          // Day:    1.0 * 1.25
+          r2(base * 1.0  * LOADING),
+          r2(base * 1.5  * LOADING), // Day OT
+          r2(base * 2.0  * LOADING), // Day DT
+          // Night (afternoon/night 150% shift loading) × casual loading
+          r2(base * 1.5  * LOADING),
+          r2(base * 2.0  * LOADING), // Night OT
+          r2(base * 2.5  * LOADING), // Night DT
+          // Weekend Saturday × 1.5  × casual; PH × 2.5 × casual
+          r2(base * 1.5  * LOADING),
+          r2(base * 2.5  * LOADING),
+          MEAL, FARES,
+          'Casual loading 25% applied per clause 11.4. Base ordinary stored as base_rate_day. Verify against current Schedule B before payroll.'
+        );
+        inserted++;
+      }
+
+      recordMigration.run(161, 'Casual loading 25% on BCG classifications + CW/ECW 9');
+      console.log(`Migration 161 applied: seeded ${inserted} BCG classifications with 25% casual loading (incl. CW/ECW 9)`);
+    } catch (e) {
+      console.error('Migration 161 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
