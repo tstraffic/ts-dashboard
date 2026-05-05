@@ -7784,6 +7784,44 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 164: Add 'safety' to users.role CHECK so we can assign the
+  // new Safety role (Site Audits, Incidents, Checklists). Mirrors the
+  // table-rebuild pattern from migration 133.
+  // (Numbered 164 to avoid colliding with migrations 162/163 reserved by
+  //  the Tenders/Plans/Tasks PR #245.)
+  // =============================================
+  if (!isMigrationApplied.get(164)) {
+    const userSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
+    if (userSql && userSql.sql && !userSql.sql.includes("'safety'")) {
+      const cols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+      const colDefs = db.prepare("PRAGMA table_info(users)").all().map(c => {
+        const notNull = c.notnull ? ' NOT NULL' : '';
+        const dflt = c.dflt_value !== null ? ` DEFAULT ${c.dflt_value}` : '';
+        const pk = c.pk ? ' PRIMARY KEY AUTOINCREMENT' : '';
+        const unique = c.name === 'username' ? ' UNIQUE' : '';
+        return `${c.name} ${c.type}${pk}${unique}${notNull}${dflt}`;
+      }).join(',\n            ');
+
+      db.pragma('foreign_keys = OFF');
+      db.exec(`
+        CREATE TABLE users_new (
+            ${colDefs},
+            CHECK(role IN ('admin','operations','planning','finance','hr','sales','management','marketing','accounts','safety'))
+        );
+      `);
+      db.exec(`INSERT INTO users_new (${cols.join(',')}) SELECT ${cols.join(',')} FROM users;`);
+      db.exec('DROP TABLE users;');
+      db.exec('ALTER TABLE users_new RENAME TO users;');
+      db.pragma('foreign_keys = ON');
+      console.log("Migration 164: users.role CHECK now includes 'safety'");
+    } else {
+      console.log('Migration 164: users CHECK already permits safety — nothing to do.');
+    }
+    recordMigration.run(164, "Expand users.role CHECK to include safety");
+    console.log('Migration 164 applied.');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
