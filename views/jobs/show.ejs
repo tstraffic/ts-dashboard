@@ -231,10 +231,11 @@
   const _rawRole = (user && user.role) ? user.role : '';
   const role = ROLE_ALIASES_TABS[_rawRole] || _rawRole;
   const TABS_BY_ROLE = {
-    admin:      ['overview','diary','tasks','plans','final-plans','compliance','timesheets','incidents','equipment','contacts','chat','budget','accounts'],
-    operations: ['overview','diary','tasks',         'final-plans','compliance','timesheets','incidents','equipment','contacts','chat','budget'],
-    planning:   ['overview',        'plans','final-plans',                                                                      'chat'],
+    admin:      ['overview','diary','tasks','plans','final-plans','safety','timesheets','incidents','equipment','contacts','chat','budget','accounts'],
+    operations: ['overview','diary','tasks',         'final-plans','safety','timesheets','incidents','equipment','contacts','chat','budget'],
+    planning:   ['overview',        'plans','final-plans','safety',                                                                  'chat'],
     finance:    ['overview',                'final-plans',             'timesheets',                                             'chat','budget','accounts'],
+    safety:     ['overview',                'final-plans','safety',                                              'incidents',         'chat'],
   };
   const visibleTabs = TABS_BY_ROLE[role] || ['overview','chat'];
   function showTab(t) { return visibleTabs.includes(t); }
@@ -269,10 +270,10 @@
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Final Plans</a>
     <% } %>
-    <% if (showTab('compliance')) { %>
-    <a href="#compliance" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+    <% if (showTab('safety')) { %>
+    <a href="#safety" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
-      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Compliance</a>
+      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Safety</a>
     <% } %>
     <% if (showTab('timesheets')) { %>
     <a href="#timesheets" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
@@ -630,96 +631,72 @@
   </div>
   <% } %>
 
-  <!-- Compliance Tab — Document Upload -->
-  <% if (showTab('compliance')) { %>
-  <div id="compliance" class="tab-content">
+  <!-- Safety Tab — SWMS attached to this job (replaces the old Compliance tab) -->
+  <% if (showTab('safety')) { %>
+  <div id="safety" class="tab-content">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">Compliance Documents</h2>
-      <button type="button" onclick="document.getElementById('compliance-upload-form').classList.toggle('hidden')" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-        Upload Document
-      </button>
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">Safety</h2>
+        <p class="text-xs text-gray-500 mt-0.5">SWMS linked to this job. Renewals run on a 6-month cycle.</p>
+      </div>
+      <a href="/swms/new?kind=job&job_id=<%= job.id %>&return_to=/jobs/<%= job.id %>" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/></svg>
+        Assign SWMS
+      </a>
     </div>
 
-    <!-- Upload Form (hidden by default) -->
-    <div id="compliance-upload-form" class="hidden bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
-      <form method="POST" action="/jobs/<%= job.id %>/compliance-upload" enctype="multipart/form-data">
-        <%- include('../partials/csrf') %>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="block text-xs font-medium text-gray-500 mb-1">Document Type</label>
-            <select name="category" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-              <option value="tgs">TGS (Traffic Guidance Scheme)</option>
-              <option value="tmp">TMP (Traffic Management Plan)</option>
-              <option value="rol">ROL (Road Occupancy Licence)</option>
-              <option value="spa">SPA (Swept Path Analysis)</option>
-              <option value="sza">SZA (Speed Zone Authorisation)</option>
-              <option value="council_permit">Council Permit</option>
-              <option value="swms">SWMS</option>
-              <option value="insurance">Insurance</option>
-              <option value="induction">Induction</option>
-              <option value="environmental">Environmental</option>
-              <option value="police_notification">Police Notification</option>
-              <option value="letter_drop">Letter Drop</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-500 mb-1">Files</label>
-            <input type="file" name="files" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.csv,.txt,.zip,.dwg,.dxf" class="w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
-          </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors">Upload</button>
-          <button type="button" onclick="document.getElementById('compliance-upload-form').classList.add('hidden')" class="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg">Cancel</button>
-        </div>
-      </form>
-    </div>
-
-    <% const cdocs = typeof complianceDocs !== 'undefined' ? complianceDocs : []; %>
-    <% if (cdocs.length === 0) { %>
+    <% const swmsList = (typeof swmsForJob !== 'undefined' && Array.isArray(swmsForJob)) ? swmsForJob : []; %>
+    <% if (swmsList.length === 0) { %>
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
         <svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        <p class="text-gray-400 text-sm">No compliance documents uploaded yet.</p>
-        <button type="button" onclick="document.getElementById('compliance-upload-form').classList.remove('hidden')" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Upload the first document</button>
+        <p class="text-gray-400 text-sm">No SWMS linked to this job yet.</p>
+        <a href="/swms/new?kind=job&job_id=<%= job.id %>&return_to=/jobs/<%= job.id %>" class="text-brand-600 text-sm hover:underline mt-2 inline-block">Assign the first SWMS</a>
       </div>
     <% } else { %>
       <%
-        const typeLabels = { tgs: 'TGS', tmp: 'TMP', rol: 'ROL', spa: 'SPA', sza: 'SZA', council_permit: 'Council Permit', swms: 'SWMS', insurance: 'Insurance', induction: 'Induction', environmental: 'Environmental', police_notification: 'Police', letter_drop: 'Letter Drop', other: 'Other', general: 'General' };
-        const typeColors = { tgs: 'bg-blue-50 text-blue-700 ring-blue-600/20', tmp: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20', rol: 'bg-purple-50 text-purple-700 ring-purple-600/20', spa: 'bg-cyan-50 text-cyan-700 ring-cyan-600/20', sza: 'bg-violet-50 text-violet-700 ring-violet-600/20', council_permit: 'bg-amber-50 text-amber-700 ring-amber-600/20', swms: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20', insurance: 'bg-rose-50 text-rose-700 ring-rose-600/20' };
+        const SAFETY_STATUS_BADGE = {
+          draft:    'bg-amber-50 text-amber-700 ring-amber-600/20',
+          active:   'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+          archived: 'bg-gray-50 text-gray-600 ring-gray-400/20',
+        };
+        function _swmsExpiry(s) {
+          if (!s) return { label: '—', cls: 'text-gray-400' };
+          const days = Math.floor((new Date(s) - new Date(new Date().toISOString().slice(0,10))) / 86400000);
+          const label = new Date(s).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+          if (days < 0)  return { label: label + ' · ' + Math.abs(days) + 'd overdue', cls: 'text-red-700 font-semibold' };
+          if (days <= 30) return { label: label + ' · in ' + days + 'd', cls: 'text-amber-700 font-semibold' };
+          return { label, cls: 'text-gray-700' };
+        }
       %>
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50/50">
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Document</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden sm:table-cell">Uploaded By</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden md:table-cell">Date</th>
-              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">SWMS</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide hidden sm:table-cell">Owner</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Expiry</th>
+              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">File</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <% cdocs.forEach(doc => { %>
+            <% swmsList.forEach(s => { const exp = _swmsExpiry(s.expiry_date); %>
             <tr class="hover:bg-gray-50">
               <td class="px-4 py-3">
-                <a href="/jobs/<%= job.id %>/compliance-doc/<%= doc.filename %>" class="text-brand-600 hover:text-brand-700 hover:underline font-medium flex items-center gap-1.5">
-                  <svg class="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                  <span class="truncate max-w-[200px]"><%= doc.original_name %></span>
-                </a>
-                <% if (doc.file_size) { %><span class="text-[10px] text-gray-400 ml-5"><%= Math.round(doc.file_size / 1024) %>KB</span><% } %>
+                <a href="/swms/<%= s.id %>" class="font-medium text-gray-900 hover:text-brand-600"><%= s.title %></a>
+                <% if (s.description) { %><p class="text-xs text-gray-500 mt-0.5 line-clamp-1"><%= s.description %></p><% } %>
               </td>
+              <td class="px-4 py-3 text-gray-600 text-xs hidden sm:table-cell"><%= s.owner_name || '—' %></td>
               <td class="px-4 py-3">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ring-1 <%= typeColors[doc.category] || 'bg-gray-50 text-gray-600 ring-gray-400/20' %>"><%= typeLabels[doc.category] || doc.category %></span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ring-1 ring-inset <%= SAFETY_STATUS_BADGE[s.status] %>"><%= (s.status || '').replace(/_/g, ' ') %></span>
               </td>
-              <td class="px-4 py-3 text-gray-500 text-xs hidden sm:table-cell"><%= doc.uploaded_by_name || '-' %></td>
-              <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell"><%= doc.created_at ? formatDate(doc.created_at) : '-' %></td>
-              <td class="px-4 py-3 text-right whitespace-nowrap">
-                <a href="/jobs/<%= job.id %>/compliance-doc/<%= doc.filename %>" class="text-brand-600 text-xs font-medium mr-2">Download</a>
-                <form method="POST" action="/jobs/<%= job.id %>/compliance-doc/<%= doc.id %>/delete" class="inline" onsubmit="return confirm('Delete this document?')">
-                  <%- include('../partials/csrf') %>
-                  <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
-                </form>
+              <td class="px-4 py-3 text-xs tabular-nums <%= exp.cls %>"><%= exp.label %></td>
+              <td class="px-4 py-3 text-right">
+                <% if (s.file_path) { %>
+                  <a href="/swms/<%= s.id %>/file" class="text-brand-600 text-xs font-medium">Download</a>
+                <% } else { %>
+                  <span class="text-gray-400 text-xs">no file</span>
+                <% } %>
               </td>
             </tr>
             <% }) %>
@@ -728,16 +705,16 @@
       </div>
     <% } %>
 
-    <!-- Linked Plans (collapsed summary) -->
+    <!-- Linked Plans (collapsed summary) — kept here so admins still have one click to the plan register -->
     <% if (complianceItems.length > 0) { %>
     <div class="mt-4">
       <button type="button" onclick="document.getElementById('linked-plans-section').classList.toggle('hidden')" class="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-        <%= complianceItems.length %> linked plan<%= complianceItems.length !== 1 ? 's' : '' %> from register
+        <%= complianceItems.length %> linked plan<%= complianceItems.length !== 1 ? 's' : '' %> from Plans &amp; Approvals register
       </button>
       <div id="linked-plans-section" class="hidden mt-2 space-y-1">
         <% complianceItems.forEach(item => { %>
-        <a href="/compliance/<%= item.id %>/edit?return_to=/projects/<%= job.id %>%23compliance" class="block px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 text-sm text-gray-700 transition-colors">
+        <a href="/compliance/<%= item.id %>/edit?return_to=/jobs/<%= job.id %>%23safety" class="block px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 text-sm text-gray-700 transition-colors">
           <span class="font-medium"><%= item.title %></span>
           <% if (item.reference_number) { %><span class="text-xs text-gray-400 ml-1">(<%= item.reference_number %>)</span><% } %>
           <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ml-2
@@ -1621,7 +1598,7 @@
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
-            <a href="#compliance" onclick="activateTab(document.querySelector('a[href=\'#compliance\']'))" class="text-sm text-purple-700 hover:underline">Plans & Approvals (Council fees, TGS costs)</a>
+            <a href="/compliance?job_id=<%= job.id %>" class="text-sm text-purple-700 hover:underline">Plans & Approvals (Council fees, TGS costs)</a>
           </div>
           <span class="text-sm font-semibold text-gray-900">$<%= (complianceCosts || 0).toLocaleString() %></span>
         </div>

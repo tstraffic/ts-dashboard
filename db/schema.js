@@ -7935,6 +7935,39 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 166: SWMS expiry tracking. Job-linked SWMS renew every 6
+  // months, templates update every 3 months. expiry_date is auto-set on
+  // create from kind, but admins can override. last_reminded_at lets the
+  // notifier de-dupe expiry reminders without spamming.
+  // Backfills existing rows so the register shows sensible expiry from
+  // day one.
+  // =============================================
+  if (!isMigrationApplied.get(166)) {
+    try {
+      const swmsCols = db.prepare("PRAGMA table_info(swms)").all().map(c => c.name);
+      if (!swmsCols.includes('expiry_date')) {
+        try { db.exec("ALTER TABLE swms ADD COLUMN expiry_date DATE"); } catch (e) {}
+      }
+      if (!swmsCols.includes('last_reminded_at')) {
+        try { db.exec("ALTER TABLE swms ADD COLUMN last_reminded_at DATETIME"); } catch (e) {}
+      }
+      try { db.exec("CREATE INDEX IF NOT EXISTS idx_swms_expiry ON swms(expiry_date)"); } catch (e) {}
+
+      // Backfill: any existing row without an expiry_date gets created_at + 6mo (job)
+      // or + 3mo (template). New rows go through the route handler which does the same.
+      const backfilled = db.prepare(`
+        UPDATE swms
+        SET expiry_date = date(created_at, CASE kind WHEN 'template' THEN '+3 months' ELSE '+6 months' END)
+        WHERE expiry_date IS NULL
+      `).run();
+      recordMigration.run(166, 'swms.expiry_date + last_reminded_at + backfill');
+      console.log(`Migration 166 applied: swms expiry tracking added (${backfilled.changes} rows backfilled)`);
+    } catch (e) {
+      console.error('Migration 166 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
