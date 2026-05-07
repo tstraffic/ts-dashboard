@@ -9,7 +9,9 @@ const { requirePermission, canViewSensitiveHR } = require('../middleware/auth');
 const { logActivity } = require('../middleware/audit');
 const { createInvitation, TOKEN_EXPIRY_HOURS } = require('../services/invitations');
 const { sendEmail } = require('../services/email');
-const { workerInviteEmail } = require('../services/emailTemplates');
+const { workerInviteEmail, sopSignLinkEmail } = require('../services/emailTemplates');
+const crypto = require('crypto');
+const { currentVersion: currentSopVersion } = require('../lib/sop');
 
 // Only admin and finance can see pay rates
 function canViewRates(user) {
@@ -183,24 +185,30 @@ router.get('/roster', requirePermission('hr_employees'), (req, res) => {
   const sortCol = { full_name: 'e.full_name', employee_code: 'e.employee_code', start_date: 'e.start_date', status: 'e.employment_status', deleted_at: 'e.deleted_at' }[sort] || (showDeleted ? 'e.deleted_at' : 'e.full_name');
   const sortOrder = order === 'desc' ? 'DESC' : (showDeleted && !sort ? 'DESC' : 'ASC');
 
+  const sopVersion = currentSopVersion();
   const employees = db.prepare(`
     SELECT e.*, m.full_name as manager_name,
       cm.employee_id as worker_id, cm.pin_plain as worker_pin,
       cm.portal_role as portal_role,
       CASE WHEN cm.pin_hash IS NOT NULL THEN 1 ELSE 0 END as has_pin,
-      (SELECT MIN(ec.expiry_date) FROM employee_competencies ec WHERE ec.employee_id = e.id AND ec.expiry_date IS NOT NULL AND ec.expiry_date >= DATE('now')) as next_expiry
+      (SELECT MIN(ec.expiry_date) FROM employee_competencies ec WHERE ec.employee_id = e.id AND ec.expiry_date IS NOT NULL AND ec.expiry_date >= DATE('now')) as next_expiry,
+      (SELECT id FROM sop_acknowledgements a WHERE a.crew_member_id = e.linked_crew_member_id AND a.sop_version = ? ORDER BY id DESC LIMIT 1) as sop_ack_id
     FROM employees e
     LEFT JOIN employees m ON e.manager_id = m.id
     LEFT JOIN crew_members cm ON e.linked_crew_member_id = cm.id
     WHERE ${where}
     ORDER BY ${sortCol} ${sortOrder}
-  `).all(...params);
+  `).all(sopVersion, ...params);
 
   employees.forEach(emp => {
     const comps = db.prepare('SELECT * FROM employee_competencies WHERE employee_id = ?').all(emp.id);
     const docs = db.prepare('SELECT * FROM employee_documents WHERE employee_id = ?').all(emp.id);
     emp.readiness = computeReadiness(emp, comps, docs);
+    emp.sopSigned = !!emp.sop_ack_id;
   });
+
+  // Count of active employees still missing the current-version acknowledgement
+  const sopUnsignedCount = employees.filter(e => e.linked_crew_member_id && e.employment_status === 'active' && !e.sopSigned).length;
 
   // Stats (all exclude deleted except totalDeleted)
   const totalActive = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'active' AND deleted_at IS NULL").get().c;
@@ -220,6 +228,8 @@ router.get('/roster', requirePermission('hr_employees'), (req, res) => {
     stats: { totalActive, totalDeactivated, totalOnLeave, totalTerminated, totalCash, totalTfn, totalAbn, totalActiveAll, totalDeleted },
     filters: { employment_type, status, level, search, sort, order, payment_type, view },
     showDeleted,
+    sopVersion,
+    sopUnsignedCount,
     user: req.session.user
   });
 });
@@ -549,6 +559,29 @@ router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
   let training = [];
   try { training = db.prepare('SELECT * FROM training_completions WHERE employee_id = ? ORDER BY completed_at DESC').all(employee.id); } catch (e) {}
 
+  // SOP acknowledgement status — current version + history
+  const sopVersion = currentSopVersion();
+  let sopStatus = { signed: false, signedAt: null, version: sopVersion, openLinkUrl: null };
+  let sopHistory = [];
+  if (employee.linked_crew_member_id) {
+    try {
+      sopHistory = db.prepare(
+        'SELECT id, sop_version, signed_at, signed_via, signature_url FROM sop_acknowledgements WHERE crew_member_id = ? ORDER BY signed_at DESC LIMIT 10'
+      ).all(employee.linked_crew_member_id);
+      const current = sopHistory.find(a => a.sop_version === sopVersion);
+      if (current) { sopStatus.signed = true; sopStatus.signedAt = current.signed_at; }
+      if (!sopStatus.signed) {
+        const openSession = db.prepare(
+          'SELECT token FROM sop_signing_sessions WHERE target_crew_member_id = ? AND sop_version = ? AND closed_at IS NULL ORDER BY id DESC LIMIT 1'
+        ).get(employee.linked_crew_member_id, sopVersion);
+        if (openSession) {
+          const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+          sopStatus.openLinkUrl = `${baseUrl}/sop-sign/${openSession.token}`;
+        }
+      }
+    } catch (e) { /* tables may not exist on stale deploys */ }
+  }
+
   // Induction submission (for super/bank details) — linked via crew member
   let induction = null;
   if (employee.linked_crew_member_id) {
@@ -571,6 +604,8 @@ router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
     recentTimesheets,
     training,
     induction,
+    sopStatus,
+    sopHistory,
     settingsOptions,
     canViewSensitive: canViewSensitiveHR(req.session.user),
     showRates: canViewRates(req.session.user),
@@ -1464,6 +1499,123 @@ router.post('/employees/:id/block', requirePermission('hr_employees'), (req, res
     req.flash('success', 'Employee blocked from allocation.');
   }
   res.redirect(`/hr/employees/${req.params.id}`);
+});
+
+// ============================================
+// SOP SIGN-LINK MANAGEMENT
+// ============================================
+// Helper: get or create an open individual signing session for a crew member.
+// Re-uses an existing open session for the current SOP version so we don't
+// orphan tokens every time the admin clicks "Send link".
+function getOrCreateIndividualSession(db, crewMemberId, createdById) {
+  const version = currentSopVersion();
+  const existing = db.prepare(`
+    SELECT * FROM sop_signing_sessions
+    WHERE target_crew_member_id = ? AND sop_version = ? AND closed_at IS NULL
+    ORDER BY id DESC LIMIT 1
+  `).get(crewMemberId, version);
+  if (existing) return existing;
+
+  const token = crypto.randomBytes(8).toString('hex');
+  const result = db.prepare(`
+    INSERT INTO sop_signing_sessions (token, title, sop_version, target_crew_member_id, created_by_id)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(token, 'Individual sign-off', version, crewMemberId, createdById);
+  return db.prepare('SELECT * FROM sop_signing_sessions WHERE id = ?').get(result.lastInsertRowid);
+}
+
+function buildSignUrl(req, token) {
+  const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+  return `${baseUrl}/sop-sign/${token}`;
+}
+
+// POST /hr/employees/:id/sop-link — generate a sign link, optionally email it.
+// Returns the URL on the flash so the admin can copy/paste; sends email if
+// action=email and the linked crew member has an email on file.
+router.post('/employees/:id/sop-link', requirePermission('hr_employees'), async (req, res) => {
+  const db = getDb();
+  const employee = db.prepare('SELECT id, full_name, email, linked_crew_member_id FROM employees WHERE id = ?').get(req.params.id);
+  if (!employee) { req.flash('error', 'Employee not found.'); return res.redirect('/hr/roster'); }
+  if (!employee.linked_crew_member_id) {
+    req.flash('error', 'This employee has no linked crew record yet — can\'t generate a sign link.');
+    return res.redirect(`/hr/employees/${employee.id}`);
+  }
+
+  const session = getOrCreateIndividualSession(db, employee.linked_crew_member_id, req.session.user.id);
+  const signUrl = buildSignUrl(req, session.token);
+  const action = (req.body.action || 'copy').toLowerCase();
+
+  if (action === 'email') {
+    const recipient = (req.body.email || employee.email || '').trim();
+    if (!recipient) {
+      req.flash('error', 'No email on file for this person — use Copy Link instead, or set their email first.');
+      return res.redirect(`/hr/employees/${employee.id}`);
+    }
+    try {
+      await sendEmail(recipient, 'Action required: SOP sign-off', sopSignLinkEmail(employee.full_name, signUrl));
+      db.prepare("UPDATE sop_signing_sessions SET sent_to_email = ?, sent_at = datetime('now') WHERE id = ?").run(recipient, session.id);
+      logActivity({ user: req.session.user, action: 'update', entityType: 'sop_acknowledgement_request',
+        entityId: employee.id, entityLabel: employee.full_name,
+        details: `Emailed SOP sign link to ${recipient}`, ip: req.ip });
+      req.flash('success', `SOP sign link emailed to ${recipient}.`);
+    } catch (e) {
+      console.error('SOP email failed:', e.message);
+      req.flash('error', `Email failed: ${e.message}. The link is still valid: ${signUrl}`);
+    }
+  } else {
+    req.flash('success', `Copy this link: ${signUrl}`);
+  }
+
+  res.redirect(`/hr/employees/${employee.id}`);
+});
+
+// POST /hr/roster/sop-bulk-send — send SOP sign links to every active employee
+// who hasn't acknowledged the current SOP version. Skips anyone without an
+// email on file and reports them in the flash.
+router.post('/roster/sop-bulk-send', requirePermission('hr_employees'), async (req, res) => {
+  const db = getDb();
+  const version = currentSopVersion();
+
+  // Find all active employees with a linked crew_member who don't have a
+  // current-version acknowledgement.
+  const targets = db.prepare(`
+    SELECT e.id as employee_id, e.full_name, e.email, e.linked_crew_member_id
+    FROM employees e
+    WHERE e.deleted_at IS NULL
+      AND e.employment_status = 'active'
+      AND e.linked_crew_member_id IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM sop_acknowledgements a
+        WHERE a.crew_member_id = e.linked_crew_member_id AND a.sop_version = ?
+      )
+  `).all(version);
+
+  let sent = 0;
+  const skippedNoEmail = [];
+  const failed = [];
+
+  for (const t of targets) {
+    if (!t.email) { skippedNoEmail.push(t.full_name); continue; }
+    try {
+      const session = getOrCreateIndividualSession(db, t.linked_crew_member_id, req.session.user.id);
+      const signUrl = buildSignUrl(req, session.token);
+      await sendEmail(t.email, 'Action required: SOP sign-off', sopSignLinkEmail(t.full_name, signUrl));
+      db.prepare("UPDATE sop_signing_sessions SET sent_to_email = ?, sent_at = datetime('now') WHERE id = ?").run(t.email, session.id);
+      sent += 1;
+    } catch (e) {
+      console.error(`SOP bulk email failed for ${t.full_name}:`, e.message);
+      failed.push(t.full_name);
+    }
+  }
+
+  logActivity({ user: req.session.user, action: 'update', entityType: 'sop_acknowledgement_request',
+    details: `Bulk SOP sign link sent: ${sent} sent, ${skippedNoEmail.length} skipped (no email), ${failed.length} failed`, ip: req.ip });
+
+  const parts = [`Sent ${sent} SOP sign link${sent === 1 ? '' : 's'}.`];
+  if (skippedNoEmail.length) parts.push(`Skipped (no email): ${skippedNoEmail.join(', ')}.`);
+  if (failed.length) parts.push(`Failed: ${failed.join(', ')}.`);
+  req.flash(sent > 0 ? 'success' : 'error', parts.join(' '));
+  res.redirect('/hr/roster');
 });
 
 module.exports = router;

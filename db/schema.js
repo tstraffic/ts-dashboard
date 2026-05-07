@@ -8233,6 +8233,21 @@ function runMigrations(db) {
     console.log('Migration 173 applied');
   }
 
+  // =============================================
+  // Migration 174: target_crew_member_id on sop_signing_sessions
+  // Per-person sign links bind a session to one specific crew member so
+  // the mobile page locks the name and the recipient can't accidentally
+  // sign as someone else.
+  // =============================================
+  if (!isMigrationApplied.get(174)) {
+    console.log('Running migration 174: target_crew_member_id on sop_signing_sessions');
+    try { db.exec('ALTER TABLE sop_signing_sessions ADD COLUMN target_crew_member_id INTEGER REFERENCES crew_members(id)'); } catch (e) { /* may exist */ }
+    try { db.exec('ALTER TABLE sop_signing_sessions ADD COLUMN sent_to_email TEXT DEFAULT NULL'); } catch (e) { /* may exist */ }
+    try { db.exec('ALTER TABLE sop_signing_sessions ADD COLUMN sent_at DATETIME DEFAULT NULL'); } catch (e) { /* may exist */ }
+    recordMigration.run(174, 'target_crew_member_id + email tracking on sop_signing_sessions');
+    console.log('Migration 174 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

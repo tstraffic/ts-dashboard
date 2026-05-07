@@ -103,6 +103,16 @@ function dailyDigestEmail(fullName, notifications) {
   `);
 }
 
+function sopSignLinkEmail(fullName, signUrl) {
+  return baseTemplate('SOP Sign-Off — Action Required', `
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 8px;">Hi ${fullName},</p>
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">As part of working with T&S Traffic Control, we need you to sign off that you've reviewed our Standard Operating Procedures and been adequately educated on them.</p>
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">Click the button below on your phone, draw your signature and submit. Takes about 30 seconds.</p>
+    ${buttonHtml('Sign SOP acknowledgement', signUrl)}
+    <p style="color:#6B7280;font-size:13px;margin:0;">If the button doesn't work, copy and paste this link into your browser:<br><a href="${signUrl}" style="color:#1D6AE5;word-break:break-all;">${signUrl}</a></p>
+  `);
+}
+
 module.exports = {
   adminInviteEmail,
   workerInviteEmail,
@@ -110,4 +120,5 @@ module.exports = {
   pinResetEmail,
   notificationEmail,
   dailyDigestEmail,
+  sopSignLinkEmail,
 };

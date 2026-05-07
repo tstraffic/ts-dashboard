@@ -56,6 +56,30 @@
     </a>
   </div>
 
+  <!-- SOP Sign-Off Bulk Banner -->
+  <% if (typeof sopUnsignedCount !== 'undefined' && sopUnsignedCount > 0 && !locals.showDeleted) { %>
+  <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+      <div class="flex items-start sm:items-center gap-3 flex-1">
+        <div class="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </div>
+        <div class="min-w-0">
+          <p class="text-sm font-bold text-amber-900"><%= sopUnsignedCount %> active worker<%= sopUnsignedCount === 1 ? '' : 's' %> haven't signed the current SOP (<code class="text-xs bg-white/60 px-1 rounded"><%= sopVersion %></code>)</p>
+          <p class="text-xs text-amber-800 mt-0.5">Send each unsigned worker an email with their personal sign link. People without an email on file will be skipped.</p>
+        </div>
+      </div>
+      <form method="POST" action="/hr/roster/sop-bulk-send" onsubmit="return confirm('Send SOP sign-link emails to all <%= sopUnsignedCount %> unsigned active workers?')" class="flex-shrink-0">
+        <%- include('../partials/csrf') %>
+        <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold rounded-lg transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          Send to all unsigned
+        </button>
+      </form>
+    </div>
+  </div>
+  <% } %>
+
   <!-- Worker Portal Preview -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
     <div class="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -201,6 +225,7 @@
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Type</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Readiness</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell" title="Has signed the current SOP version">SOP</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Tier</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Portal</th>
               <% if (locals.showDeleted) { %>
@@ -275,6 +300,21 @@
                   </span>
                 <% } else { %>
                   <span class="text-gray-300 text-xs">-</span>
+                <% } %>
+              </td>
+              <td class="px-3 sm:px-4 py-3 hidden md:table-cell">
+                <% if (!emp.linked_crew_member_id) { %>
+                  <span class="text-gray-300 text-xs">—</span>
+                <% } else if (emp.sopSigned) { %>
+                  <span class="inline-flex items-center gap-1 text-emerald-600 text-xs font-semibold" title="Signed current SOP">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    Signed
+                  </span>
+                <% } else { %>
+                  <span class="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold" title="Not signed current SOP">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                    Not signed
+                  </span>
                 <% } %>
               </td>
               <!-- Tier — inline portal_role picker so the office can promote

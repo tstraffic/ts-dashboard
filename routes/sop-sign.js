@@ -32,6 +32,7 @@ function loadAttendeeList(sessionId) {
 
 // GET /sop-sign/:token — pick name + sign
 router.get('/:token', (req, res) => {
+  const db = getDb();
   const session = loadSession(req.params.token);
   if (!session) {
     return res.status(404).render('sop-sign/error', { layout: false, message: 'This sign-off link is invalid.' });
@@ -40,11 +41,30 @@ router.get('/:token', (req, res) => {
     return res.status(410).render('sop-sign/error', { layout: false, message: 'This sign-off session has been closed. Please ask the presenter to start a new one.' });
   }
 
-  const attendees = loadAttendeeList(session.id);
+  // Individual link (target set) → lock the name to one person and short-circuit
+  // if they've already signed the current SOP version
+  let targetCrew = null;
+  if (session.target_crew_member_id) {
+    targetCrew = db.prepare('SELECT id, full_name, employee_id, email FROM crew_members WHERE id = ?').get(session.target_crew_member_id);
+    if (targetCrew) {
+      const existing = db.prepare(
+        'SELECT id FROM sop_acknowledgements WHERE crew_member_id = ? AND sop_version = ? ORDER BY id DESC LIMIT 1'
+      ).get(targetCrew.id, session.sop_version);
+      if (existing) {
+        return res.render('sop-sign/mobile', {
+          layout: false, session, attendees: [], ackText: sopAckText(), sopVersion: session.sop_version,
+          submitted: true, signedName: targetCrew.full_name, alreadyDone: true, error: null,
+        });
+      }
+    }
+  }
+
+  const attendees = session.target_crew_member_id ? [] : loadAttendeeList(session.id);
 
   res.render('sop-sign/mobile', {
     layout: false,
     session,
+    targetCrew,
     attendees,
     ackText: sopAckText(),
     sopVersion: currentSopVersion(),
@@ -67,16 +87,26 @@ router.post('/:token/submit', (req, res) => {
     return res.status(status || 400).render('sop-sign/error', { layout: false, message: msg });
   };
 
-  const crewId = req.body.crew_member_id ? parseInt(req.body.crew_member_id, 10) : null;
+  // If session is bound to one specific person, ignore any client-side picker
+  // and force that crew member to be the signer.
+  let crewId = null;
+  if (session.target_crew_member_id) {
+    crewId = session.target_crew_member_id;
+  } else if (req.body.crew_member_id) {
+    crewId = parseInt(req.body.crew_member_id, 10);
+  }
+
   const typedName = (req.body.full_name || '').toString().trim();
   const email = (req.body.email || '').toString().trim();
   const sigDataUrl = (req.body.signature_data || '').toString();
 
   let resolvedName = typedName;
+  let resolvedEmail = email;
   if (crewId) {
-    const m = db.prepare('SELECT full_name, email FROM crew_members WHERE id = ? AND active = 1').get(crewId);
+    const m = db.prepare('SELECT full_name, email FROM crew_members WHERE id = ?').get(crewId);
     if (!m) return fail('Could not find that person on the crew list.');
     resolvedName = m.full_name;
+    if (!resolvedEmail) resolvedEmail = m.email || '';
   }
   if (!resolvedName) return fail('Please pick your name from the list or type it.');
 
@@ -104,7 +134,13 @@ router.post('/:token/submit', (req, res) => {
     INSERT INTO sop_acknowledgements
       (session_id, crew_member_id, full_name, email, sop_version, signature_url, signed_via, signed_ip)
     VALUES (?, ?, ?, ?, ?, ?, 'mobile', ?)
-  `).run(session.id, crewId, resolvedName, email, session.sop_version, signatureUrl, signedIp);
+  `).run(session.id, crewId, resolvedName, resolvedEmail, session.sop_version, signatureUrl, signedIp);
+
+  // For individual sessions (sent via email), close them once signed so the
+  // link can't be reused — keeps the audit trail tidy.
+  if (session.target_crew_member_id) {
+    db.prepare("UPDATE sop_signing_sessions SET closed_at = datetime('now') WHERE id = ?").run(session.id);
+  }
 
   if (wantsJson) return res.json({ ok: true });
   res.render('sop-sign/mobile', {
