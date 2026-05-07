@@ -452,223 +452,566 @@ const employeeGuideSlides = [
   },
 ];
 
+// ═════════════════════════════════════════════════════════════════════
+//  TRAFFIC CONTROL — TRAINING MODULE 1
+//  Same dark/glass design language as the Employee Guide above so the
+//  two modules feel like one product, not two stitched-together decks.
+// ═════════════════════════════════════════════════════════════════════
 const tcTrainingSlides = [
+  // ── Slide 1: Title ──
   {
-    title: 'Traffic Control',
-    subtitle: 'Training Module 1',
-    content: '<div class="text-center"><p class="text-2xl text-orange-600 mb-4">Field Operations & Safety</p><p class="text-lg text-gray-600">Your complete guide to traffic control in the field</p></div>',
+    title: 'Traffic Control — Training Module 1',
+    subtitle: '"A Safe Way Home"',
+    content: '<div class="text-center"><img src="/images/slides/ts-logo.png?v=8" alt="T&S Logo" style="height:120px;margin:0 auto 1.5rem;display:block;"><p class="text-2xl" style="color:var(--cyan);margin-bottom:0.5rem;">Module 1 — Field Operations &amp; Safety</p><p class="text-lg" style="color:var(--text-body);">Your complete guide to traffic control in the field</p></div>',
     layout: 'title',
-    icon: '🚧'
+    icon: ''
   },
+  // ═══════════════════════════════════════
+  //  SECTION 1: START OF SHIFT
+  // ═══════════════════════════════════════
   {
     title: '1. Start of Shift',
-    subtitle: 'What to do when arriving to site',
-    content: '<div class="grid md:grid-cols-3 gap-4"><div class="bg-orange-500 text-white rounded-xl p-5 text-center"><p class="text-3xl mb-2">🪪</p><p class="font-bold">Credentials</p><p class="text-sm opacity-90">Must have White Card, TCR & IMP Safe Work Card</p></div><div class="bg-blue-600 text-white rounded-xl p-5 text-center"><p class="text-3xl mb-2">⏰</p><p class="font-bold">15 Min Early</p><p class="text-sm opacity-90">Arrive 15 minutes before booking time</p></div><div class="bg-green-600 text-white rounded-xl p-5 text-center"><p class="text-3xl mb-2">🦺</p><p class="font-bold">Full PPE</p><p class="text-sm opacity-90">Must be in full PPE before arriving</p></div><div class="bg-teal-500 text-white rounded-xl p-5 text-center"><p class="text-3xl mb-2">✅</p><p class="font-bold">Pre-Start</p><p class="text-sm opacity-90">Sign onto Pre-Start Checklist on Traffio</p></div><div class="bg-purple-600 text-white rounded-xl p-5 text-center"><p class="text-3xl mb-2">📋</p><p class="font-bold">SWMS</p><p class="text-sm opacity-90">Sign onto T&S SWMS and with client</p></div><div class="bg-sky-500 text-white rounded-xl p-5 text-center"><p class="text-3xl mb-2">👋</p><p class="font-bold">Notify</p><p class="text-sm opacity-90">Notify Team Leader and Site Manager</p></div></div>',
-    layout: 'split',
-    icon: '🌅'
+    subtitle: '',
+    content: '<div class="text-center"><p class="text-2xl" style="color:var(--cyan);margin-bottom:0.5rem;">Section 1</p><p class="text-lg" style="color:var(--text-body);">Arriving on site, paperwork, and pre-start checks</p></div>',
+    layout: 'highlight',
+    icon: ''
   },
+  // ── Arriving on Site ──
   {
-    title: 'What is SWMS?',
-    subtitle: 'Safe Work Method Statement',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-green-50 border border-green-200 rounded-xl p-6 mb-6"><p class="text-xl font-bold mb-4 text-gray-900">Purpose & Importance</p><ul class="space-y-3 text-lg"><li class="flex items-start gap-3"><span class="text-green-600">✓</span> <strong>Identifies Risks</strong> — Lists hazards for specific tasks</li><li class="flex items-start gap-3"><span class="text-green-600">✓</span> <strong>Implements Controls</strong> — How risks are minimised or eliminated</li><li class="flex items-start gap-3"><span class="text-green-600">✓</span> <strong>Ensures Compliance</strong> — Meets NSW WHS laws</li><li class="flex items-start gap-3"><span class="text-green-600">✓</span> <strong>Protects Workers</strong> — Reduces accidents and injuries</li></ul></div><div class="bg-red-600 text-white rounded-xl p-5"><p class="font-bold">If hazards are not controlled effectively, work must STOP immediately.</p></div></div>',
-    layout: 'content',
-    icon: '📄'
+    title: 'What to Do When Arriving on Site',
+    subtitle: 'Six things, every shift, no exceptions',
+    content: '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;"><div style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:white;border-radius:0.75rem;padding:1.25rem;"><div style="font-size:1.5rem;font-weight:800;margin-bottom:0.4rem;">1</div><p style="font-weight:700;margin-bottom:0.4rem;">15 minutes early</p><p style="font-size:0.9rem;opacity:0.9;">Arrive 15 minutes before your booking time.</p></div><div style="background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:white;border-radius:0.75rem;padding:1.25rem;"><div style="font-size:1.5rem;font-weight:800;margin-bottom:0.4rem;">2</div><p style="font-weight:700;margin-bottom:0.4rem;">Full PPE on arrival</p><p style="font-size:0.9rem;opacity:0.9;">PPE must be on <strong>before</strong> you reach a T&S worksite.</p></div><div style="background:linear-gradient(135deg,#1e40af,#1d4ed8);color:white;border-radius:0.75rem;padding:1.25rem;"><div style="font-size:1.5rem;font-weight:800;margin-bottom:0.4rem;">3</div><p style="font-weight:700;margin-bottom:0.4rem;">Carry credentials</p><p style="font-size:0.9rem;opacity:0.9;">White Card, TCR, and IMP Safe Work Card with you at all times.</p></div><div style="background:linear-gradient(135deg,#0d9488,#14b8a6);color:white;border-radius:0.75rem;padding:1.25rem;"><div style="font-size:1.5rem;font-weight:800;margin-bottom:0.4rem;">4</div><p style="font-weight:700;margin-bottom:0.4rem;">Notify the team</p><p style="font-size:0.9rem;opacity:0.9;">Check in with the Team Leader and Site Manager.</p></div><div style="background:linear-gradient(135deg,#15803d,#16a34a);color:white;border-radius:0.75rem;padding:1.25rem;"><div style="font-size:1.5rem;font-weight:800;margin-bottom:0.4rem;">5</div><p style="font-weight:700;margin-bottom:0.4rem;">Pre-Start checklist</p><p style="font-size:0.9rem;opacity:0.9;">Sign onto the Pre-Start in Traffio. Activate ROL if needed.</p></div><div style="background:linear-gradient(135deg,#16a34a,#22c55e);color:white;border-radius:0.75rem;padding:1.25rem;"><div style="font-size:1.5rem;font-weight:800;margin-bottom:0.4rem;">6</div><p style="font-weight:700;margin-bottom:0.4rem;">Sign onto SWMS</p><p style="font-size:0.9rem;opacity:0.9;">T&S SWMS inside the vehicle <em>and</em> with the client.</p></div></div>',
+    layout: 'split',
+    icon: ''
   },
+  // ── What is SWMS ──
+  {
+    title: 'What is a SWMS?',
+    subtitle: 'Safe Work Method Statement',
+    content: '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><p style="font-weight:700;color:var(--cyan);font-size:1.05rem;margin-bottom:0.75rem;">Purpose &amp; Importance</p><ul style="list-style:none;padding:0;display:grid;gap:0.55rem;color:rgba(255,255,255,0.78);font-size:14px;"><li><strong style="color:white;">Identifies risks</strong> — lists hazards for specific tasks.</li><li><strong style="color:white;">Implements controls</strong> — specifies how risks are minimised.</li><li><strong style="color:white;">Ensures compliance</strong> — meets NSW WHS laws.</li><li><strong style="color:white;">Protects workers</strong> — reduces accidents and injuries.</li><li><strong style="color:white;">Provides a work plan</strong> — structured, repeatable, safe.</li></ul></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><p style="font-weight:700;color:var(--cyan);font-size:1.05rem;margin-bottom:0.75rem;">How a SWMS is Used</p><ul style="list-style:none;padding:0;display:grid;gap:0.55rem;color:rgba(255,255,255,0.78);font-size:14px;"><li>Must be <strong style="color:white;">accessible on-site</strong> for all workers.</li><li>Workers must <strong style="color:white;">read and follow</strong> it.</li><li>Supervisors must <strong style="color:white;">review &amp; update</strong> as conditions change.</li><li style="color:#fca5a5;">If hazards aren\'t controlled effectively — <strong>work stops immediately.</strong></li></ul></div></div>',
+    layout: 'content',
+    icon: ''
+  },
+  // ── ROL ──
   {
     title: 'Road Occupancy Licence (ROL)',
     subtitle: 'When and how to activate',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-orange-500 text-white rounded-xl p-6 mb-6 text-center"><p class="text-xl font-bold">MUST have an ROL for any works within 50m of a traffic light or main RMS road</p></div><div class="bg-orange-50 border border-orange-200 rounded-xl p-6 space-y-4"><div class="flex items-start gap-4"><div class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">1</div><p class="text-gray-900">Search <strong>myrol.transport.nsw.gov.au</strong> and answer questions to activate</p></div><div class="flex items-start gap-4"><div class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">2</div><p class="text-gray-900">Read ALL Licence Conditions and observe approved dates & times</p></div><div class="flex items-start gap-4"><div class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">3</div><p class="text-gray-900">Activate BEFORE commencing setup — deactivate at end of shift</p></div><div class="flex items-start gap-4"><div class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">4</div><p class="text-gray-900">Setup MUST follow attached TGS — contact supervisor for any changes</p></div></div></div>',
+    content: '<div style="max-w-:48rem;margin:0 auto;"><div style="border-left:3px solid var(--cyan);padding:0.75rem 0 0.75rem 16px;margin-bottom:1.25rem;"><p style="color:var(--cyan);font-weight:600;font-size:1.1rem;">An ROL is required for any works within 50 m of a traffic light or main RMS road.</p></div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;border-left:3px solid var(--ts-blue);"><div style="font-size:1.5rem;font-weight:800;color:var(--ts-blue);margin-bottom:0.4rem;">1</div><p style="font-weight:600;margin-bottom:0.3rem;">Apply &amp; activate</p><p style="color:var(--text-body);font-size:14px;">Visit <strong>myrol.transport.nsw.gov.au</strong> and complete the activation questions.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;border-left:3px solid var(--ts-orange);"><div style="font-size:1.5rem;font-weight:800;color:var(--ts-orange);margin-bottom:0.4rem;">2</div><p style="font-weight:600;margin-bottom:0.3rem;">Read every condition</p><p style="color:var(--text-body);font-size:14px;">Observe the approved dates &amp; times exactly as stated on the licence.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;border-left:3px solid var(--ts-green);"><div style="font-size:1.5rem;font-weight:800;color:var(--ts-green);margin-bottom:0.4rem;">3</div><p style="font-weight:600;margin-bottom:0.3rem;">Activate before set-up</p><p style="color:var(--text-body);font-size:14px;">Activate before any cones go down. Deactivate at the end of shift.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;border-left:3px solid #dc2626;"><div style="font-size:1.5rem;font-weight:800;color:#fca5a5;margin-bottom:0.4rem;">4</div><p style="font-weight:600;margin-bottom:0.3rem;">Set up to the TGS</p><p style="color:var(--text-body);font-size:14px;">Any change to the plan — call your supervisor first.</p></div></div></div>',
     layout: 'content',
-    icon: '📜'
+    icon: ''
   },
+  // ── Prestart Toolbox Talk ──
   {
-    title: 'Prestart Toolbox Talk',
+    title: 'Pre-Start Toolbox Talk',
     subtitle: 'Mandatory before each shift',
-    content: '<div class="grid md:grid-cols-2 gap-4"><div class="bg-orange-500 text-white rounded-xl p-5"><p class="font-bold text-lg mb-2">🎯 Site Hazards</p><p class="opacity-90">Identify potential dangers — speeding vehicles, weather, road conditions</p></div><div class="bg-blue-600 text-white rounded-xl p-5"><p class="font-bold text-lg mb-2">🗺️ Traffic Management</p><p class="opacity-90">Review site layout, signage, and flow of vehicles</p></div><div class="bg-green-600 text-white rounded-xl p-5"><p class="font-bold text-lg mb-2">👷 Roles & Duties</p><p class="opacity-90">Clarify duties for TCs, spotters, and supervisors</p></div><div class="bg-red-600 text-white rounded-xl p-5"><p class="font-bold text-lg mb-2">🚨 Emergency Plan</p><p class="opacity-90">Emergency contacts, first aid, evacuation points</p></div><div class="bg-purple-600 text-white rounded-xl p-5"><p class="font-bold text-lg mb-2">📻 Communication</p><p class="opacity-90">Agree on hand signals, radios, and tools</p></div><div class="bg-teal-500 text-white rounded-xl p-5"><p class="font-bold text-lg mb-2">🌦️ Weather</p><p class="opacity-90">Plan for rain, heat, wind, or low visibility</p></div></div>',
+    content: '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;"><div style="background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1.05rem;margin-bottom:0.4rem;">Site-Specific Hazards</p><p style="font-size:0.9rem;opacity:0.9;">Speeding vehicles, weather, road condition risks.</p></div><div style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1.05rem;margin-bottom:0.4rem;">Traffic Mgmt Plan</p><p style="font-size:0.9rem;opacity:0.9;">Site layout, signage, vehicle flow.</p></div><div style="background:linear-gradient(135deg,#15803d,#16a34a);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1.05rem;margin-bottom:0.4rem;">Roles &amp; Duties</p><p style="font-size:0.9rem;opacity:0.9;">TCs, spotters, supervisors — who does what.</p></div><div style="background:linear-gradient(135deg,#b91c1c,#dc2626);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1.05rem;margin-bottom:0.4rem;">Emergency Plan</p><p style="font-size:0.9rem;opacity:0.9;">Contacts, first aid, evacuation points.</p></div><div style="background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1.05rem;margin-bottom:0.4rem;">Communication</p><p style="font-size:0.9rem;opacity:0.9;">Radios, hand signals, agreed channels.</p></div><div style="background:linear-gradient(135deg,#0d9488,#14b8a6);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1.05rem;margin-bottom:0.4rem;">Weather &amp; Environment</p><p style="font-size:0.9rem;opacity:0.9;">Rain, heat, wind, low visibility — adjust the plan.</p></div></div>',
     layout: 'split',
-    icon: '🔧'
+    icon: ''
   },
+  // ── Safety Measures ──
   {
-    title: 'Safety Measures — Toolbox',
-    subtitle: 'Must discuss every shift',
-    content: '<div class="max-w-3xl mx-auto space-y-3"><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3"><span class="text-xl">🚶</span><p class="text-gray-900"><strong>Pedestrian Routes</strong> must include ramps and be fully accessible to people with disabilities</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3"><span class="text-xl">⚠️</span><p class="text-gray-900"><strong>Ground Openings</strong> and Work Zones must be fully closed off using cones and tiger tails</p></div><div class="bg-red-600 text-white rounded-xl p-4 flex items-start gap-3"><span class="text-xl">🚜</span><p><strong>Machinery Operations</strong> — No person within <strong>5-metre radius</strong> of any truck or machinery. Must have designated spotter.</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3"><span class="text-xl">🪧</span><p class="text-gray-900"><strong>Traffic Signage</strong> must follow Australian Standards (AS) with proper spacing</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3"><span class="text-xl">🚪</span><p class="text-gray-900"><strong>Emergency Planning</strong> — Confirm clear escape routes for all TC positions</p></div></div>',
-    layout: 'list',
-    icon: '🔒'
+    title: 'Safety Measures — Pre-Start',
+    subtitle: 'Discussed every shift, not occasionally',
+    content: '<div style="max-width:48rem;margin:0 auto;display:grid;gap:0.65rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;"><strong style="color:white;">Pedestrian routes</strong> — must include ramps, smooth surface, fully accessible to people with disabilities.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;"><strong style="color:white;">Ground openings &amp; work zones</strong> — fully closed off using cones and tiger tails.</div><div style="background:linear-gradient(135deg,#b91c1c,#dc2626);color:white;border-radius:0.75rem;padding:0.95rem 1.1rem;"><strong>Machinery operations</strong> — designated spotter at all times. <strong>Nobody within a 5 m radius</strong> of any truck or machinery. Provide alternate safe routes.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;"><strong style="color:white;">Traffic signage</strong> — correct direction and spacing per Australian Standards.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;"><strong style="color:white;">Heavy machinery &amp; work vehicles</strong> — clearly identified when operating near the site.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;"><strong style="color:white;">Emergency planning</strong> — clear escape routes confirmed for every TC position.</div></div>',
+    layout: 'content',
+    icon: ''
   },
+  // ── Discussion 1 ──
+  {
+    title: 'You arrive on site and the TGS doesn\'t match the road. What do you do?',
+    subtitle: '',
+    content: '<p>Talk through the right call as a team. Who do you contact, and what stops on site until that call is made?</p>',
+    layout: 'discussion',
+    icon: ''
+  },
+  // ═══════════════════════════════════════
+  //  SECTION 2: DURING SHIFT
+  // ═══════════════════════════════════════
+  {
+    title: '2. During Shift',
+    subtitle: '',
+    content: '<div class="text-center"><p class="text-2xl" style="color:var(--cyan);margin-bottom:0.5rem;">Section 2</p><p class="text-lg" style="color:var(--text-body);">Setting up the work zone, running the shift, breaks</p></div>',
+    layout: 'highlight',
+    icon: ''
+  },
+  // ── Shift Timeline ──
   {
     title: 'Shift Timeline',
-    subtitle: 'A typical day on site',
-    content: '<div class="max-w-4xl mx-auto"><div class="flex flex-wrap justify-center gap-2"><div class="bg-blue-600 text-white rounded-lg px-4 py-3 text-center"><p class="text-xs opacity-80">06:45</p><p class="text-sm font-bold">Drive</p></div><div class="text-2xl text-orange-500">→</div><div class="bg-blue-600 text-white rounded-lg px-4 py-3 text-center"><p class="text-xs opacity-80">07:00</p><p class="text-sm font-bold">Toolbox</p></div><div class="text-2xl text-orange-500">→</div><div class="bg-green-600 text-white rounded-lg px-4 py-3 text-center"><p class="text-xs opacity-80">07:15</p><p class="text-sm font-bold">Set Up</p></div><div class="text-2xl text-orange-500">→</div><div class="bg-green-600 text-white rounded-lg px-4 py-3 text-center"><p class="text-xs opacity-80">09:00</p><p class="text-sm font-bold">Rotate</p></div><div class="text-2xl text-orange-500">→</div><div class="bg-orange-500 text-white rounded-lg px-4 py-3 text-center"><p class="text-xs opacity-80">12:00</p><p class="text-sm font-bold">Lunch</p></div><div class="text-2xl text-orange-500">→</div><div class="bg-green-600 text-white rounded-lg px-4 py-3 text-center"><p class="text-xs opacity-80">13:00</p><p class="text-sm font-bold">Check Signs</p></div><div class="text-2xl text-orange-500">→</div><div class="bg-red-600 text-white rounded-lg px-4 py-3 text-center"><p class="text-xs opacity-80">15:30</p><p class="text-sm font-bold">Pack Up</p></div><div class="text-2xl text-orange-500">→</div><div class="bg-blue-600 text-white rounded-lg px-4 py-3 text-center"><p class="text-xs opacity-80">16:00</p><p class="text-sm font-bold">Timesheet</p></div></div><p class="text-center text-lg text-orange-600 mt-6 font-bold">YOUR SAFETY, IN OUR SIGHTS</p></div>',
+    subtitle: '"Your safety, in our sights"',
+    content: '<div style="max-width:54rem;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:0.75rem;"><div style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:white;border-radius:0.75rem;padding:1rem;text-align:center;"><p style="font-size:11px;opacity:0.85;letter-spacing:0.05em;">06:45 — BEFORE SHIFT</p><p style="font-weight:700;margin-top:0.4rem;font-size:14px;">Toolbox / Pre-Start</p><p style="font-size:12px;opacity:0.9;margin-top:0.2rem;">Begin set-up</p></div><div style="background:linear-gradient(135deg,#15803d,#16a34a);color:white;border-radius:0.75rem;padding:1rem;text-align:center;"><p style="font-size:11px;opacity:0.85;letter-spacing:0.05em;">~09:00 — SHIFT START</p><p style="font-weight:700;margin-top:0.4rem;font-size:14px;">TLC + Rotate</p><p style="font-size:12px;opacity:0.9;margin-top:0.2rem;">Check signs</p></div><div style="background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border-radius:0.75rem;padding:1rem;text-align:center;"><p style="font-size:11px;opacity:0.85;letter-spacing:0.05em;">~12:00 — MIDDAY</p><p style="font-weight:700;margin-top:0.4rem;font-size:14px;">Lunch Rotations</p><p style="font-size:12px;opacity:0.9;margin-top:0.2rem;">Check signs · Risk assess</p></div><div style="background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:white;border-radius:0.75rem;padding:1rem;text-align:center;"><p style="font-size:11px;opacity:0.85;letter-spacing:0.05em;">~15:00</p><p style="font-weight:700;margin-top:0.4rem;font-size:14px;">Finalise</p><p style="font-size:12px;opacity:0.9;margin-top:0.2rem;">Vehicle checklist · Timesheet</p></div><div style="background:linear-gradient(135deg,#0d9488,#14b8a6);color:white;border-radius:0.75rem;padding:1rem;text-align:center;"><p style="font-size:11px;opacity:0.85;letter-spacing:0.05em;">~18:00 — SUNSET</p><p style="font-weight:700;margin-top:0.4rem;font-size:14px;">Drive Home Safe</p><p style="font-size:12px;opacity:0.9;margin-top:0.2rem;">Site fully cleared</p></div></div>',
     layout: 'content',
-    icon: '⏰'
+    icon: ''
   },
+  // ── Setting Up Step 1 ──
   {
     title: 'Setting Up — Step 1',
-    subtitle: 'Assess the Site',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-orange-500 text-white rounded-xl p-6 mb-6 text-center"><p class="text-xl font-bold">"Stop before you set up."</p></div><div class="bg-orange-50 border border-orange-200 rounded-xl p-6"><p class="font-bold text-lg mb-4 text-gray-900">Checklist:</p><ul class="space-y-3 text-lg"><li class="flex items-start gap-3"><span class="text-green-600">✓</span> Check road speed, lanes, gradients, and visibility</li><li class="flex items-start gap-3"><span class="text-green-600">✓</span> Identify hazards: blind corners, driveways, heavy traffic, weather</li><li class="flex items-start gap-3"><span class="text-green-600">✓</span> Confirm the TMP/TGS matches actual conditions</li><li class="flex items-start gap-3"><span class="text-green-600">✓</span> Ensure all PPE and equipment are available</li><li class="flex items-start gap-3"><span class="text-green-600">✓</span> Communicate hazards in the toolbox talk</li></ul><p class="mt-4 text-red-600 font-semibold">If site conditions differ from the plan — STOP and call the Team Leader.</p></div></div>',
+    subtitle: 'Assess the site',
+    content: '<div style="max-width:48rem;margin:0 auto;"><div style="border-left:3px solid var(--cyan);padding:0.75rem 0 0.75rem 16px;margin-bottom:1.25rem;"><p style="color:var(--cyan);font-weight:600;font-size:1.1rem;">"Stop before you set up." Identify every risk before installing any device.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><p style="font-weight:700;color:white;margin-bottom:0.75rem;">Checklist</p><ul style="list-style:none;padding:0;display:grid;gap:0.55rem;color:rgba(255,255,255,0.78);font-size:14px;"><li>Check road speed, lanes, gradients, and visibility.</li><li>Identify hazards — blind corners, driveways, heavy traffic, weather.</li><li>Confirm the TMP / TGS matches actual conditions.</li><li>Ensure all PPE and equipment are available.</li><li>Communicate hazards in the toolbox talk.</li><li style="color:#fca5a5;"><strong>If site conditions differ from the plan — stop and call the Team Leader.</strong></li></ul></div></div>',
     layout: 'content',
-    icon: '👁️'
+    icon: ''
   },
+  // ── Setting Up Step 2 ──
   {
     title: 'Setting Up — Step 2',
-    subtitle: 'Place Advance Warning Signs',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-orange-500 text-white rounded-xl p-6 mb-6 text-center"><p class="text-xl font-bold">"Warn before you work."</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-6 mb-4"><p class="font-bold text-lg mb-3 text-gray-900">Spacing by Speed:</p><div class="grid grid-cols-3 gap-3 text-center"><div class="bg-green-600 text-white rounded-lg p-3"><p class="font-bold">40 km/h</p><p class="text-sm opacity-90">40m spacing</p></div><div class="bg-orange-500 text-white rounded-lg p-3"><p class="font-bold">60 km/h</p><p class="text-sm opacity-90">80m spacing</p></div><div class="bg-red-600 text-white rounded-lg p-3"><p class="font-bold">80+ km/h</p><p class="text-sm opacity-90">Shadow vehicle required</p></div></div></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-6"><p class="font-bold mb-3 text-gray-900">Install signs:</p><ul class="space-y-2 text-gray-700"><li>🪧 "Roadwork Ahead", "Digger Man", "Prepare to Stop", "TC Ahead"</li><li>📐 Signs face traffic direction — clean, upright, and secure</li><li>♿ No sign blocks pedestrian paths or private driveways</li></ul></div></div>',
+    subtitle: 'Place advance warning signs',
+    content: '<div style="max-width:48rem;margin:0 auto;"><div style="border-left:3px solid var(--ts-orange);padding:0.75rem 0 0.75rem 16px;margin-bottom:1.25rem;"><p style="color:var(--ts-orange);font-weight:600;font-size:1.1rem;">"Warn before you work." Alert drivers early; control approach speeds.</p></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1.25rem;"><div style="background:linear-gradient(135deg,#15803d,#16a34a);color:white;border-radius:0.75rem;padding:1rem;text-align:center;"><p style="font-weight:700;font-size:1.05rem;">40 km/h</p><p style="font-size:13px;opacity:0.9;">40 m spacing</p></div><div style="background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border-radius:0.75rem;padding:1rem;text-align:center;"><p style="font-weight:700;font-size:1.05rem;">60 km/h</p><p style="font-size:13px;opacity:0.9;">80 m spacing</p></div><div style="background:linear-gradient(135deg,#b91c1c,#dc2626);color:white;border-radius:0.75rem;padding:1rem;text-align:center;"><p style="font-weight:700;font-size:1.05rem;">&gt; 70 km/h</p><p style="font-size:13px;opacity:0.9;">Shadow vehicle</p></div></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;"><ul style="list-style:none;padding:0;display:grid;gap:0.5rem;color:rgba(255,255,255,0.78);font-size:14px;"><li>Signs face traffic direction; clean, upright, secure.</li><li>Install <em>Roadwork Ahead</em>, <em>Digger Man</em>, <em>Prepare to Stop</em>, <em>TC Ahead</em>.</li><li>Never block pedestrian paths or private driveways.</li></ul></div></div>',
     layout: 'content',
-    icon: '🪧'
+    icon: ''
   },
+  // ── Setting Up Step 3 ──
   {
     title: 'Setting Up — Step 3',
-    subtitle: 'Install Traffic Control Devices',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-orange-500 text-white rounded-xl p-6 mb-6 text-center"><p class="text-xl font-bold">"Guide traffic safely through or around the site."</p></div><div class="bg-orange-50 border border-orange-200 rounded-xl p-6"><ul class="space-y-4 text-lg"><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Place cones and barriers <strong>in traffic direction</strong></li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Keep cones <strong>evenly spaced</strong> per speed limit</li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Use bollards or barriers for pedestrians</li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Set up Stop/Slow bats or PTCDs (portable lights/gates)</li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Confirm lane tapers, buffers, and spacing against the TGS</li></ul></div></div>',
+    subtitle: 'Install traffic control devices',
+    content: '<div style="max-width:48rem;margin:0 auto;"><div style="border-left:3px solid var(--ts-orange);padding:0.75rem 0 0.75rem 16px;margin-bottom:1.25rem;"><p style="color:var(--ts-orange);font-weight:600;font-size:1.1rem;">"Guide traffic safely through or around the site."</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><ul style="list-style:none;padding:0;display:grid;gap:0.6rem;color:rgba(255,255,255,0.78);font-size:14px;"><li>Place cones and barriers <strong style="color:white;">in traffic direction</strong>.</li><li>Keep cones <strong style="color:white;">evenly spaced</strong> per the speed limit.</li><li>Use bollards or barriers for pedestrians.</li><li>Set up Stop/Slow bats or PTCDs (portable lights / gates).</li><li>Confirm lane tapers, buffers, and spacing against the TGS.</li></ul></div></div>',
     layout: 'content',
-    icon: '🚧'
+    icon: ''
   },
+  // ── Setting Up Step 4 ──
   {
     title: 'Setting Up — Step 4',
-    subtitle: 'Establish Safe Work Zones',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-red-600 text-white rounded-xl p-6 mb-6 text-center"><p class="text-xl font-bold">"Protect your people first."</p></div><div class="bg-red-50 border border-red-200 rounded-xl p-6"><ul class="space-y-4 text-lg"><li class="flex items-start gap-3"><span class="text-red-600">●</span> Mark <strong>buffer zones</strong> (safety space in front of work crew)</li><li class="flex items-start gap-3"><span class="text-red-600">●</span> Create <strong>exclusion zones</strong> around plant and machinery</li><li class="flex items-start gap-3"><span class="text-red-600">●</span> Keep at least <strong>5m distance</strong> from operating trucks or excavators</li><li class="flex items-start gap-3"><span class="text-red-600">●</span> Confirm <strong>escape routes</strong> are known and clear</li><li class="flex items-start gap-3"><span class="text-red-600">●</span> <strong>No unauthorised entry</strong> into exclusion zones</li></ul></div></div>',
+    subtitle: 'Establish safe work zones',
+    content: '<div style="max-width:48rem;margin:0 auto;"><div style="border-left:3px solid #dc2626;padding:0.75rem 0 0.75rem 16px;margin-bottom:1.25rem;"><p style="color:#fca5a5;font-weight:600;font-size:1.1rem;">"Protect your people first." Separate live traffic from workers.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><ul style="list-style:none;padding:0;display:grid;gap:0.6rem;color:rgba(255,255,255,0.78);font-size:14px;"><li>Mark <strong style="color:white;">buffer zones</strong> in front of the work crew.</li><li>Create <strong style="color:white;">exclusion zones</strong> around plant and machinery.</li><li>Maintain <strong style="color:white;">5 m clear</strong> from operating trucks or excavators.</li><li>Confirm escape routes are known and unblocked.</li><li>No unauthorised entry into exclusion zones — ever.</li></ul></div></div>',
     layout: 'content',
-    icon: '🛑'
+    icon: ''
   },
+  // ── Setting Up Step 5 ──
   {
     title: 'Setting Up — Step 5',
-    subtitle: 'Inspect, Test & Monitor',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-green-600 text-white rounded-xl p-6 mb-6 text-center"><p class="text-xl font-bold">"Check it before you start it."</p></div><div class="bg-green-50 border border-green-200 rounded-xl p-6"><ul class="space-y-4 text-lg"><li class="flex items-start gap-3"><span class="text-green-600">✓</span> Walk the full site — check visibility, cone alignment, sign order</li><li class="flex items-start gap-3"><span class="text-green-600">✓</span> Adjust any crooked, missing, or obstructed devices</li><li class="flex items-start gap-3"><span class="text-green-600">✓</span> Team Leader completes and submits the <strong>TLC in Traffio</strong></li><li class="flex items-start gap-3"><span class="text-green-600">✓</span> Review setup <strong>mid-shift</strong> and after any weather or traffic change</li><li class="flex items-start gap-3"><span class="text-green-600">✓</span> Keep <strong>photos</strong> for records and audits</li></ul></div></div>',
+    subtitle: 'Inspect, test, and monitor',
+    content: '<div style="max-width:48rem;margin:0 auto;"><div style="border-left:3px solid var(--ts-green);padding:0.75rem 0 0.75rem 16px;margin-bottom:1.25rem;"><p style="color:var(--ts-green);font-weight:600;font-size:1.1rem;">"Check it before you start it." Verify the setup before opening to traffic.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><ul style="list-style:none;padding:0;display:grid;gap:0.6rem;color:rgba(255,255,255,0.78);font-size:14px;"><li>Walk the full site — visibility, cone alignment, sign order.</li><li>Adjust any crooked, missing, or obstructed devices.</li><li>Team Leader completes and submits the <strong style="color:white;">TLC in Traffio</strong>.</li><li>Review setup mid-shift and after any weather or traffic change.</li><li>Keep photos for records and audits.</li></ul></div></div>',
     layout: 'content',
-    icon: '🔍'
+    icon: ''
   },
+  // ── TLC ──
   {
     title: 'Team Leader Checklists (TLC)',
-    subtitle: 'Critical for compliance',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-blue-50 border border-blue-200 rounded-xl p-6 space-y-4"><p class="text-lg text-gray-900">TLCs are submitted on <strong>Traffio</strong> and are essential for:</p><ul class="space-y-3 text-lg"><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Ensuring site setup is completed correctly and documented early</li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Providing evidence for client requirements and safety audits</li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Must clearly show adequate traffic and pedestrian signage</li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> All TCs must be wearing full PPE in photos</li></ul></div><div class="bg-red-600 text-white rounded-xl p-5 mt-6"><p class="font-bold">⚠️ In the event of an incident, TLCs will be reviewed by SafeWork NSW.</p><p class="opacity-90 mt-1">If the checklist does not comply with Australian Standards (AS), the Team Leader may face fines.</p></div></div>',
+    subtitle: 'The audit trail that protects everyone',
+    content: '<div style="max-width:48rem;margin:0 auto;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;margin-bottom:1rem;"><p style="color:rgba(255,255,255,0.78);font-size:14px;line-height:1.7;">TLCs are submitted on <strong style="color:white;">Traffio</strong> early in the shift. They prove the site was set up correctly, give clients the evidence they need for safety audits, and show every TC in full PPE.</p></div><div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;margin-bottom:0.5rem;">Why this matters</p><p style="font-size:14px;opacity:0.95;">If an incident happens, TLCs are reviewed by SafeWork NSW. A non-compliant checklist can result in fines for the Team Leader and a recorded failure on the employee\'s profile.</p></div></div>',
     layout: 'content',
-    icon: '📋'
+    icon: ''
   },
+  // ── Breaks ──
   {
     title: 'Breaks',
-    subtitle: 'Mandatory rest schedule',
-    content: '<div class="max-w-3xl mx-auto"><div class="grid md:grid-cols-3 gap-4 mb-6"><div class="bg-orange-500 text-white rounded-xl p-5 text-center"><p class="text-3xl font-bold">2 hrs</p><p class="font-semibold mt-1">On the bat</p><p class="text-sm opacity-90">Min. 15-min rest break</p></div><div class="bg-orange-500 text-white rounded-xl p-5 text-center"><p class="text-3xl font-bold">5 hrs</p><p class="font-semibold mt-1">On shift</p><p class="text-sm opacity-90">Min. 30-min meal break</p></div><div class="bg-red-600 text-white rounded-xl p-5 text-center"><p class="text-3xl font-bold">12 hrs</p><p class="font-semibold mt-1">Maximum</p><p class="text-sm opacity-90">Including all breaks</p></div></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-5 mb-4"><p class="font-bold mb-2 text-gray-900">Managing Breaks:</p><ul class="space-y-2 text-gray-700"><li>• Stagger breaks — one TC at a time</li><li>• Use relief controllers to cover</li><li>• Rotate between high and low intensity positions</li><li>• Increase breaks in extreme weather</li></ul></div><div class="bg-red-600 text-white rounded-xl p-4 text-center"><p class="font-bold">NO EATING OR RESTING IN THE UTE WHILST ON SHIFT!</p></div></div>',
+    subtitle: 'NSW WHS rest schedule',
+    content: '<div style="max-width:48rem;margin:0 auto;"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.25rem;"><div style="background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border-radius:0.75rem;padding:1.25rem;text-align:center;"><p style="font-size:2rem;font-weight:800;">2 hrs</p><p style="font-weight:700;font-size:0.95rem;">on the bat</p><p style="font-size:12px;opacity:0.9;margin-top:0.3rem;">Min. 15-min rest</p></div><div style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:white;border-radius:0.75rem;padding:1.25rem;text-align:center;"><p style="font-size:2rem;font-weight:800;">5 hrs</p><p style="font-weight:700;font-size:0.95rem;">on shift</p><p style="font-size:12px;opacity:0.9;margin-top:0.3rem;">Min. 30-min meal</p></div><div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:white;border-radius:0.75rem;padding:1.25rem;text-align:center;"><p style="font-size:2rem;font-weight:800;">12 hrs</p><p style="font-weight:700;font-size:0.95rem;">max shift</p><p style="font-size:12px;opacity:0.9;margin-top:0.3rem;">Including breaks</p></div></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;margin-bottom:1rem;"><p style="font-weight:700;color:white;margin-bottom:0.5rem;">Organise without dropping coverage</p><ul style="list-style:none;padding:0;display:grid;gap:0.45rem;color:rgba(255,255,255,0.78);font-size:14px;"><li>Stagger breaks — one TC at a time.</li><li>Use relief controllers; rotate high- and low-intensity positions.</li><li>Increase break frequency in extreme heat, cold, or rain.</li><li>Night shifts may need shorter intervals due to reduced visibility.</li></ul></div><div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:white;border-radius:0.75rem;padding:0.85rem 1.1rem;text-align:center;font-weight:700;">No eating or resting in the Ute whilst on shift.</div></div>',
     layout: 'content',
-    icon: '☕'
+    icon: ''
   },
+  // ═══════════════════════════════════════
+  //  SECTION 3: END OF SHIFT
+  // ═══════════════════════════════════════
   {
-    title: 'End of Shift',
-    subtitle: 'Packing up safely',
-    content: '<div class="max-w-3xl mx-auto space-y-4"><div class="bg-blue-600 text-white rounded-xl p-5"><p class="font-bold text-lg mb-2">1. Remove in Reverse Order</p><ul class="space-y-1 opacity-90"><li>• Start from the termination area first</li><li>• Progressively remove cones, barriers, signs</li><li>• Signs removed LAST — do not remove early</li><li>• Always face oncoming traffic when working near road</li></ul></div><div class="bg-green-600 text-white rounded-xl p-5"><p class="font-bold text-lg mb-2">2. Vehicle Manoeuvring</p><ul class="space-y-1 opacity-90"><li>• Park vehicle in safe, visible location</li><li>• Use a spotter when reversing or merging</li><li>• Warning lights, beacons, hazard signals ON</li></ul></div><div class="bg-orange-500 text-white rounded-xl p-5"><p class="font-bold text-lg mb-2">3. Final Check</p><ul class="space-y-1 opacity-90"><li>• Walk through — confirm all equipment packed</li><li>• Road returned to normal conditions</li><li>• Communicate to team that site is fully cleared</li></ul></div></div>',
-    layout: 'list',
-    icon: '🏁'
-  },
-  {
-    title: 'Safety in Traffic Control',
-    subtitle: 'The foundation of everything we do',
-    content: '<div class="text-center max-w-2xl mx-auto"><p class="text-2xl leading-relaxed mb-8 text-gray-900">Safety is the foundation of effective traffic control.</p><p class="text-xl text-gray-600 mb-8">Our goal: <strong>protect our team, the public, and our clients.</strong></p><div class="bg-teal-500 text-white rounded-2xl p-8"><p class="text-lg">This section outlines our policies, responsibilities, and procedures to ensure <strong>incident-free worksites.</strong></p></div></div>',
+    title: '3. End of Shift',
+    subtitle: '',
+    content: '<div class="text-center"><p class="text-2xl" style="color:var(--cyan);margin-bottom:0.5rem;">Section 3</p><p class="text-lg" style="color:var(--text-body);">Packing up, vehicle checks, and timesheets</p></div>',
     layout: 'highlight',
-    icon: '🛡️'
+    icon: ''
   },
+  // ── Packing Up ──
+  {
+    title: 'Vehicle / TC Safety — Packing Up',
+    subtitle: 'Reverse the way you set up',
+    content: '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;"><div style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1rem;margin-bottom:0.5rem;">1. Reverse order</p><ul style="list-style:none;padding:0;display:grid;gap:0.4rem;font-size:13px;opacity:0.95;"><li>Start at the termination end.</li><li>Cones, barriers, signs progressively.</li><li><strong>Signs come down last.</strong></li><li>Always face oncoming traffic.</li></ul></div><div style="background:linear-gradient(135deg,#15803d,#16a34a);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1rem;margin-bottom:0.5rem;">2. Vehicle plan</p><ul style="list-style:none;padding:0;display:grid;gap:0.4rem;font-size:13px;opacity:0.95;"><li>Park safe and visible.</li><li>Spotter when reversing or merging.</li><li>Beacons + hazard lights on.</li></ul></div><div style="background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1rem;margin-bottom:0.5rem;">3. Final check</p><ul style="list-style:none;padding:0;display:grid;gap:0.4rem;font-size:13px;opacity:0.95;"><li>Walk the site, nothing left behind.</li><li>Road back to normal conditions.</li><li>Confirm to team: site cleared.</li></ul></div></div>',
+    layout: 'split',
+    icon: ''
+  },
+  // ── Vehicle Checklists ──
+  {
+    title: 'Vehicle Checklists',
+    subtitle: 'Submitted on Traffio after every shift',
+    content: '<div style="max-width:48rem;margin:0 auto;display:grid;gap:0.65rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;"><strong style="color:white;">All drivers</strong> must submit their Service NSW driving record to admin <strong style="color:white;">before</strong> using any company vehicle.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;">Vehicle checklists on <strong style="color:white;">Traffio</strong> create the maintenance and inspection record.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;">Any safety concern with the vehicle must be reported through the checklist <strong style="color:white;">immediately</strong>.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;">Every employee is responsible for keeping vehicles, assets, and tools in good working order.</div><div style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:white;border-radius:0.75rem;padding:0.95rem 1.1rem;"><strong>Refuel before returning to depot</strong> — minimum half a tank. All rubbish disposed of correctly.</div></div>',
+    layout: 'content',
+    icon: ''
+  },
+  // ── Timesheets ──
+  {
+    title: 'Timesheets',
+    subtitle: 'Submitted by the Team Leader',
+    content: '<div style="max-width:48rem;margin:0 auto;display:grid;gap:0.65rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;">Timesheets <strong style="color:white;">must</strong> be submitted by the Team Leader.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;">The client signs off, including approved break and finish times.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;">Every employee reviews their own hours after submission.</div><div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:white;border-radius:0.75rem;padding:0.95rem 1.1rem;">If the timesheet isn\'t submitted or signed correctly, you miss <strong>that week\'s pay run</strong> until it\'s fixed.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;">All checklists must be complete and accurate before the timesheet is submitted.</div></div>',
+    layout: 'content',
+    icon: ''
+  },
+  // ═══════════════════════════════════════
+  //  SECTION 4: SAFETY IN TRAFFIC CONTROL
+  // ═══════════════════════════════════════
+  {
+    title: '4. Safety in Traffic Control',
+    subtitle: '',
+    content: '<div class="text-center"><p class="text-2xl" style="color:var(--cyan);margin-bottom:0.5rem;">Section 4</p><p class="text-lg" style="color:var(--text-body);">Culture, communication, weather, and hazard awareness</p></div>',
+    layout: 'highlight',
+    icon: ''
+  },
+  // ── Purpose of Safety ──
+  {
+    title: 'Why Safety Comes First',
+    subtitle: '',
+    content: '<div style="max-width:46rem;margin:0 auto;text-align:center;"><div style="border-left:3px solid var(--cyan);padding:0.75rem 0 0.75rem 16px;margin-bottom:1.5rem;text-align:left;"><p style="color:var(--cyan);font-weight:600;font-size:1.1rem;">Safety is the foundation of effective traffic control.</p></div><p style="font-size:1.1rem;color:rgba(255,255,255,0.78);line-height:1.7;margin-bottom:1.25rem;">Our goal — protect our team, the public, and our clients.</p><div style="background:linear-gradient(135deg,#0d9488,#14b8a6);color:white;border-radius:1rem;padding:1.5rem;"><p style="font-size:1rem;line-height:1.7;">This section outlines the policies, responsibilities, and procedures that keep our worksites incident-free.</p></div></div>',
+    layout: 'content',
+    icon: ''
+  },
+  // ── Team Culture ──
   {
     title: 'Team-Based Safety Culture',
     subtitle: 'We work for each other',
-    content: '<div class="max-w-3xl mx-auto"><div class="space-y-4"><div class="bg-orange-50 border border-orange-200 rounded-xl p-6 flex items-start gap-4"><span class="text-3xl">🤝</span><div><p class="font-bold text-lg text-gray-900">Do your checks — for the whole team</p><p class="text-gray-600">Not just for yourself, but to protect everyone around you.</p></div></div><div class="bg-blue-50 border border-blue-200 rounded-xl p-6 flex items-start gap-4"><span class="text-3xl">📢</span><div><p class="font-bold text-lg text-gray-900">Speak up if something looks unsafe</p><p class="text-gray-600">Your voice could prevent an accident or save a life.</p></div></div><div class="bg-green-50 border border-green-200 rounded-xl p-6 flex items-start gap-4"><span class="text-3xl">🎓</span><div><p class="font-bold text-lg text-gray-900">Help new workers understand the ropes</p><p class="text-gray-600">Your guidance could prevent an accident.</p></div></div></div><div class="bg-orange-500 text-white rounded-xl p-5 mt-6 text-center"><p class="text-lg font-bold">No shortcuts — everyone deserves to go home safe.</p></div></div>',
+    content: '<div style="max-width:48rem;margin:0 auto;display:grid;gap:0.75rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.1rem 1.25rem;border-left:3px solid var(--ts-blue);"><p style="font-weight:600;color:white;margin-bottom:0.25rem;">Do your checks — for the whole team</p><p style="color:var(--text-body);font-size:14px;">Not just for yourself; you\'re protecting everyone around you.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.1rem 1.25rem;border-left:3px solid var(--ts-orange);"><p style="font-weight:600;color:white;margin-bottom:0.25rem;">Speak up if something looks unsafe</p><p style="color:var(--text-body);font-size:14px;">Your voice could prevent an accident — or save a life.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.1rem 1.25rem;border-left:3px solid var(--ts-green);"><p style="font-weight:600;color:white;margin-bottom:0.25rem;">Help new workers learn the ropes</p><p style="color:var(--text-body);font-size:14px;">Your guidance can prevent the next accident.</p></div><div style="background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border-radius:0.75rem;padding:1rem 1.25rem;text-align:center;font-weight:700;">No shortcuts — everyone deserves to go home safe.</div></div>',
     layout: 'content',
-    icon: '👥'
+    icon: ''
   },
+  // ── Weather ──
   {
     title: 'Adverse Weather',
-    subtitle: 'Adjust for conditions',
-    content: '<div class="grid grid-cols-2 gap-6 max-w-3xl mx-auto"><div class="bg-blue-600 text-white rounded-xl p-6 text-center"><p class="text-4xl mb-3">🌧️</p><p class="font-bold text-lg">Rain</p><p class="opacity-90">Slow speed zones, extra visibility measures</p></div><div class="bg-red-600 text-white rounded-xl p-6 text-center"><p class="text-4xl mb-3">🔥</p><p class="font-bold text-lg">Heat</p><p class="opacity-90">Breathable PPE, hydrate often</p></div><div class="bg-gray-600 text-white rounded-xl p-6 text-center"><p class="text-4xl mb-3">💨</p><p class="font-bold text-lg">Wind</p><p class="opacity-90">Secure signage and barriers</p></div><div class="bg-purple-600 text-white rounded-xl p-6 text-center"><p class="text-4xl mb-3">🌑</p><p class="font-bold text-lg">Low Light</p><p class="opacity-90">Reflective gear and adequate lighting</p></div></div>',
+    subtitle: 'Adjust the plan to the conditions',
+    content: '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;max-width:48rem;margin:0 auto;"><div style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1.1rem;margin-bottom:0.4rem;">Rain</p><p style="font-size:14px;opacity:0.95;">Slow speed zones, extra visibility measures.</p></div><div style="background:linear-gradient(135deg,#b91c1c,#dc2626);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1.1rem;margin-bottom:0.4rem;">Heat</p><p style="font-size:14px;opacity:0.95;">Breathable PPE, hydrate often.</p></div><div style="background:linear-gradient(135deg,#475569,#64748b);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1.1rem;margin-bottom:0.4rem;">Wind</p><p style="font-size:14px;opacity:0.95;">Secure signage and barriers.</p></div><div style="background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:white;border-radius:0.75rem;padding:1.25rem;"><p style="font-weight:700;font-size:1.1rem;margin-bottom:0.4rem;">Low light</p><p style="font-size:14px;opacity:0.95;">Reflective gear and adequate site lighting.</p></div></div>',
     layout: 'split',
-    icon: '🌦️'
+    icon: ''
   },
+  // ── Communication ──
   {
     title: 'Communication Protocols',
-    subtitle: 'Clear communication saves lives',
-    content: '<div class="max-w-3xl mx-auto space-y-4"><div class="bg-gray-50 border border-gray-200 rounded-xl p-5 flex items-start gap-4"><span class="text-2xl">📻</span><p class="text-lg text-gray-900">Use radios correctly and keep communication <strong>clear and concise</strong></p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-5 flex items-start gap-4"><span class="text-2xl">✋</span><p class="text-lg text-gray-900">Follow <strong>hand signal protocols</strong> when directing traffic or vehicles</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-5 flex items-start gap-4"><span class="text-2xl">✅</span><p class="text-lg text-gray-900">Always <strong>confirm instructions</strong> — don\'t assume</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-5 flex items-start gap-4"><span class="text-2xl">⬆️</span><p class="text-lg text-gray-900"><strong>Escalate issues</strong> to the team leader promptly</p></div></div>',
-    layout: 'list',
-    icon: '📻'
+    subtitle: 'Clear comms save lives',
+    content: '<div style="max-width:48rem;margin:0 auto;display:grid;gap:0.6rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;color:rgba(255,255,255,0.85);">Use radios correctly — keep transmissions <strong style="color:white;">clear and concise</strong>.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;color:rgba(255,255,255,0.85);">Follow <strong style="color:white;">hand signal protocols</strong> when directing traffic or vehicles.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;color:rgba(255,255,255,0.85);">Always <strong style="color:white;">confirm instructions</strong> — don\'t assume.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;color:rgba(255,255,255,0.85);"><strong style="color:white;">Escalate</strong> issues to the Team Leader promptly.</div></div>',
+    layout: 'content',
+    icon: ''
   },
+  // ── Emergency Response ──
   {
     title: 'Emergency Response',
     subtitle: 'Be prepared at all times',
-    content: '<div class="max-w-3xl mx-auto"><div class="grid md:grid-cols-3 gap-6"><div class="bg-red-600 text-white rounded-xl p-6 text-center"><p class="text-4xl mb-3">🚪</p><p class="font-bold text-lg mb-2">Know Your Exits</p><p class="opacity-90">Emergency exits, first aid locations, assembly points</p></div><div class="bg-orange-500 text-white rounded-xl p-6 text-center"><p class="text-4xl mb-3">😌</p><p class="font-bold text-lg mb-2">Stay Calm</p><p class="opacity-90">Alert your team and call for help immediately</p></div><div class="bg-green-600 text-white rounded-xl p-6 text-center"><p class="text-4xl mb-3">📝</p><p class="font-bold text-lg mb-2">Report Everything</p><p class="opacity-90">All incidents must be reported, no matter how small</p></div></div></div>',
+    content: '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;max-width:48rem;margin:0 auto;"><div style="background:linear-gradient(135deg,#b91c1c,#dc2626);color:white;border-radius:0.75rem;padding:1.5rem;text-align:center;"><p style="font-weight:700;font-size:1.05rem;margin-bottom:0.5rem;">Know your exits</p><p style="font-size:14px;opacity:0.95;">Emergency exits, first aid, assembly points.</p></div><div style="background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border-radius:0.75rem;padding:1.5rem;text-align:center;"><p style="font-weight:700;font-size:1.05rem;margin-bottom:0.5rem;">Stay calm</p><p style="font-size:14px;opacity:0.95;">Alert your team and call for help immediately.</p></div><div style="background:linear-gradient(135deg,#15803d,#16a34a);color:white;border-radius:0.75rem;padding:1.5rem;text-align:center;"><p style="font-weight:700;font-size:1.05rem;margin-bottom:0.5rem;">Report everything</p><p style="font-size:14px;opacity:0.95;">All incidents must be reported, no matter how small.</p></div></div>',
     layout: 'split',
-    icon: '🚨'
+    icon: ''
   },
+  // ── Incident Reporting ──
   {
-    title: 'Incident & Near-Miss Reporting',
-    subtitle: 'Honest reporting prevents future accidents',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-blue-50 border border-blue-200 rounded-xl p-6 space-y-4"><div class="flex items-start gap-4"><div class="w-10 h-10 bg-red-600 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">1</div><p class="text-lg text-gray-900">Report injuries, near misses, and unsafe behaviour <strong>immediately</strong></p></div><div class="flex items-start gap-4"><div class="w-10 h-10 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">2</div><p class="text-lg text-gray-900">Complete the incident report form <strong>as soon as possible</strong></p></div><div class="flex items-start gap-4"><div class="w-10 h-10 bg-green-600 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">3</div><p class="text-lg text-gray-900">Honest reporting helps <strong>prevent future accidents</strong></p></div><div class="flex items-start gap-4"><div class="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">4</div><p class="text-lg text-gray-900">Follow-up actions will be taken <strong>seriously</strong></p></div></div></div>',
+    title: 'Incident &amp; Near-Miss Reporting',
+    subtitle: 'Honest reporting prevents the next accident',
+    content: '<div style="max-width:48rem;margin:0 auto;background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><div style="display:grid;gap:0.85rem;"><div style="display:flex;align-items:flex-start;gap:0.85rem;"><div style="width:32px;height:32px;flex-shrink:0;background:#dc2626;color:white;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:700;">1</div><p style="color:rgba(255,255,255,0.85);font-size:14px;line-height:1.6;">Report injuries, near misses, and unsafe behaviour <strong style="color:white;">immediately</strong>.</p></div><div style="display:flex;align-items:flex-start;gap:0.85rem;"><div style="width:32px;height:32px;flex-shrink:0;background:#ea580c;color:white;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:700;">2</div><p style="color:rgba(255,255,255,0.85);font-size:14px;line-height:1.6;">Complete the incident report form <strong style="color:white;">as soon as possible</strong>.</p></div><div style="display:flex;align-items:flex-start;gap:0.85rem;"><div style="width:32px;height:32px;flex-shrink:0;background:#16a34a;color:white;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:700;">3</div><p style="color:rgba(255,255,255,0.85);font-size:14px;line-height:1.6;">Honest reporting helps <strong style="color:white;">prevent future accidents</strong>.</p></div><div style="display:flex;align-items:flex-start;gap:0.85rem;"><div style="width:32px;height:32px;flex-shrink:0;background:#2563eb;color:white;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:700;">4</div><p style="color:rgba(255,255,255,0.85);font-size:14px;line-height:1.6;">Follow-up actions are taken <strong style="color:white;">seriously</strong>.</p></div></div></div>',
     layout: 'content',
-    icon: '📋'
+    icon: ''
   },
+  // ── Scenario Table ──
   {
     title: 'What To Do In These Situations',
-    subtitle: 'Quick response guide',
-    content: '<div class="max-w-3xl mx-auto space-y-3"><div class="bg-red-600 text-white rounded-xl p-4 flex items-start gap-4"><span class="font-bold w-52 flex-shrink-0">Driver ignores STOP bat</span><p class="opacity-90">Move to safety, radio supervisor immediately</p></div><div class="bg-orange-500 text-white rounded-xl p-4 flex items-start gap-4"><span class="font-bold w-52 flex-shrink-0">You feel dizzy or faint</span><p class="opacity-90">Notify buddy/supervisor, leave post safely</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-4"><span class="font-bold w-52 flex-shrink-0 text-gray-900">Public in your work zone</span><p class="text-gray-600">Politely stop them, guide away, call for backup if needed</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-4"><span class="font-bold w-52 flex-shrink-0 text-gray-900">Aggressive driver/person</span><p class="text-gray-600">Don\'t engage, step back, call supervisor</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-4"><span class="font-bold w-52 flex-shrink-0 text-gray-900">Co-worker sleeping on post</span><p class="text-gray-600">Tell supervisor privately</p></div></div>',
-    layout: 'list',
-    icon: '🆘'
+    subtitle: 'Quick-response guide',
+    content: '<div style="max-width:48rem;margin:0 auto;display:grid;gap:0.55rem;"><div style="display:grid;grid-template-columns:200px 1fr;gap:1rem;background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:white;border-radius:0.6rem;padding:0.85rem 1rem;align-items:center;"><strong>Driver ignores STOP bat</strong><span style="font-size:14px;opacity:0.95;">Move to safety, radio supervisor immediately.</span></div><div style="display:grid;grid-template-columns:200px 1fr;gap:1rem;background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border-radius:0.6rem;padding:0.85rem 1rem;align-items:center;"><strong>Feel dizzy or faint</strong><span style="font-size:14px;opacity:0.95;">Notify buddy/supervisor, leave post safely.</span></div><div style="display:grid;grid-template-columns:200px 1fr;gap:1rem;background:var(--glass);border:1px solid var(--border);border-radius:0.6rem;padding:0.85rem 1rem;align-items:center;color:rgba(255,255,255,0.85);"><strong style="color:white;">Public in your work zone</strong><span style="font-size:14px;">Politely stop them, guide away, call for backup if needed.</span></div><div style="display:grid;grid-template-columns:200px 1fr;gap:1rem;background:var(--glass);border:1px solid var(--border);border-radius:0.6rem;padding:0.85rem 1rem;align-items:center;color:rgba(255,255,255,0.85);"><strong style="color:white;">Aggressive driver / person</strong><span style="font-size:14px;">Don\'t engage. Step back. Call supervisor.</span></div><div style="display:grid;grid-template-columns:200px 1fr;gap:1rem;background:var(--glass);border:1px solid var(--border);border-radius:0.6rem;padding:0.85rem 1rem;align-items:center;color:rgba(255,255,255,0.85);"><strong style="color:white;">Co-worker sleeping on post</strong><span style="font-size:14px;">Tell the supervisor privately.</span></div></div>',
+    layout: 'content',
+    icon: ''
   },
+  // ── Silica ──
   {
-    title: 'Stop/Slow Bat',
-    subtitle: 'Your primary tool',
-    content: '<div class="max-w-3xl mx-auto"><div class="grid md:grid-cols-2 gap-6"><div class="bg-orange-50 border border-orange-200 rounded-xl p-6"><p class="text-lg mb-4 text-gray-900">Your stop/slow bat is your <strong>primary tool</strong> as a Traffic Controller.</p><ul class="space-y-3 text-gray-700"><li class="flex items-start gap-2"><span class="text-orange-500">▸</span> Must be extended to minimum <strong>1.8 metres</strong></li><li class="flex items-start gap-2"><span class="text-orange-500">▸</span> Twist and pull to extend, twist and push to shorten</li><li class="flex items-start gap-2"><span class="text-orange-500">▸</span> Ensure clearly visible to oncoming traffic</li></ul></div><div class="bg-red-600 text-white rounded-xl p-6"><p class="font-bold mb-3">Handle With Care!</p><ul class="space-y-2 opacity-90"><li>🚫 Do NOT lean on the bat</li><li>🚫 Do NOT leave it unattended</li><li>🔒 Store neatly in the Ute and lock up</li><li>💰 Replacement cost: <strong>$120</strong></li></ul></div></div></div>',
-    layout: 'split',
-    icon: '🛑'
+    title: 'Silica Safety',
+    subtitle: 'The dust you can\'t see',
+    content: '<div style="max-width:48rem;margin:0 auto;"><div style="border-left:3px solid var(--cyan);padding:0.75rem 0 0.75rem 16px;margin-bottom:1.25rem;"><p style="color:var(--cyan);font-weight:600;font-size:1.05rem;">Crystalline silica is in stone, rock, sand, gravel, clay, bricks, tiles, concrete, and engineered stone. When cut or worked, it releases as fine dust.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><ul style="list-style:none;padding:0;display:grid;gap:0.55rem;color:rgba(255,255,255,0.78);font-size:14px;"><li>Working with silica-containing materials raises your risk of <strong style="color:white;">lung cancer</strong>.</li><li>It\'s the dust you <strong style="color:white;">cannot see</strong> that damages your lungs.</li><li>Eliminate or reduce exposure using the recommended controls.</li><li>Refer to <em>Working with silica and silica-containing products</em> on safeworkaustralia.gov.au.</li></ul></div></div>',
+    layout: 'content',
+    icon: ''
   },
+  // ── Sun ──
+  {
+    title: 'Sun Safety',
+    subtitle: 'Heat, UV, and dehydration',
+    content: '<div style="max-width:48rem;margin:0 auto;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;margin-bottom:1rem;"><p style="font-weight:700;color:white;margin-bottom:0.5rem;">Sun safety rules</p><ul style="list-style:none;padding:0;display:grid;gap:0.5rem;color:rgba(255,255,255,0.78);font-size:14px;"><li>Wear a wide-brimmed hat or hard-hat neck flap.</li><li>Apply SPF 30+ sunscreen every 2 hours.</li><li>UV-protective sunglasses on at all times.</li><li>Seek shade during breaks.</li><li>Stay hydrated — drink water frequently, even when not thirsty.</li></ul></div><div style="background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border-radius:0.75rem;padding:1rem 1.25rem;font-weight:600;">Report symptoms of heat stress — dizziness, nausea, excessive sweating — immediately.</div></div>',
+    layout: 'content',
+    icon: ''
+  },
+  // ── Noise ──
+  {
+    title: 'Hazardous Noise',
+    subtitle: '85 dB+ damages hearing permanently',
+    content: '<div style="max-width:48rem;margin:0 auto;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><p style="color:rgba(255,255,255,0.78);font-size:14px;margin-bottom:0.75rem;">Traffic-control sites have constant noise — machinery, traffic, tools.</p><ul style="list-style:none;padding:0;display:grid;gap:0.55rem;color:rgba(255,255,255,0.78);font-size:14px;"><li>Wear approved hearing protection (earplugs or earmuffs) when required.</li><li>Know where hearing protection is stored in every vehicle.</li><li>Watch for hearing fatigue: ringing ears, muffled sounds, difficulty focusing.</li><li>Report missing or malfunctioning protection straight away.</li><li style="color:#fca5a5;"><strong>Consistent exposure above 85 dB causes permanent damage. Don\'t take risks.</strong></li></ul></div></div>',
+    layout: 'content',
+    icon: ''
+  },
+  // ── Common Hazards ──
+  {
+    title: 'Common On-Site Hazards',
+    subtitle: 'Stay alert for these every shift',
+    content: '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.85rem;max-width:52rem;margin:0 auto;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;"><p style="color:white;font-weight:600;margin-bottom:0.3rem;">Inattentive drivers</p><p style="color:var(--text-body);font-size:13px;">Phones, fatigue, complacency.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;"><p style="color:white;font-weight:600;margin-bottom:0.3rem;">Reversing plant</p><p style="color:var(--text-body);font-size:13px;">Always use a designated spotter.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;"><p style="color:white;font-weight:600;margin-bottom:0.3rem;">Trip hazards</p><p style="color:var(--text-body);font-size:13px;">Cables, cones, uneven surfaces.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;"><p style="color:white;font-weight:600;margin-bottom:0.3rem;">Live traffic lanes</p><p style="color:var(--text-body);font-size:13px;">Buffer zones; never turn your back.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;"><p style="color:white;font-weight:600;margin-bottom:0.3rem;">Noise &amp; dust</p><p style="color:var(--text-body);font-size:13px;">PPE plus elimination controls.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;"><p style="color:white;font-weight:600;margin-bottom:0.3rem;">Weather extremes</p><p style="color:var(--text-body);font-size:13px;">Heat stress, cold, wind, low visibility.</p></div></div>',
+    layout: 'split',
+    icon: ''
+  },
+  // ── Discussion 2 ──
+  {
+    title: 'A driver runs your STOP bat. What do you do — and what don\'t you do?',
+    subtitle: '',
+    content: '<p>Walk through the right and wrong reactions. What information do you capture, who do you call, and how do you keep yourself safe in the next 30 seconds?</p>',
+    layout: 'discussion',
+    icon: ''
+  },
+  // ═══════════════════════════════════════
+  //  SECTION 5: TRAFFIC CONTROL IN PRACTICE
+  // ═══════════════════════════════════════
+  {
+    title: '5. Traffic Control in Practice',
+    subtitle: '',
+    content: '<div class="text-center"><p class="text-2xl" style="color:var(--cyan);margin-bottom:0.5rem;">Section 5</p><p class="text-lg" style="color:var(--text-body);">Tools, set-ups, and the rules behind them</p></div>',
+    layout: 'highlight',
+    icon: ''
+  },
+  // ── Stop/Slow Bat ──
+  {
+    title: 'Stop / Slow Bat',
+    subtitle: 'Your primary tool',
+    content: '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><p style="color:rgba(255,255,255,0.78);font-size:14px;line-height:1.7;margin-bottom:0.75rem;">The stop/slow bat is your primary tool. Treat it like the safety device it is.</p><ul style="list-style:none;padding:0;display:grid;gap:0.5rem;color:rgba(255,255,255,0.78);font-size:14px;"><li>Extend to a <strong style="color:white;">minimum 1.8 m</strong> when in use.</li><li><em>To extend</em> — twist and pull. <em>To shorten</em> — twist and push.</li><li>Always clearly visible to oncoming traffic.</li></ul></div><div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:white;border-radius:0.75rem;padding:1.5rem;"><p style="font-weight:700;margin-bottom:0.6rem;">Handle with care</p><ul style="list-style:none;padding:0;display:grid;gap:0.45rem;font-size:14px;opacity:0.95;"><li>Don\'t lean on it — it bends.</li><li>Never leave it unattended.</li><li>Store neatly in the Ute and lock up.</li><li>Replacement: <strong>$120</strong>.</li></ul></div></div>',
+    layout: 'content',
+    icon: ''
+  },
+  // ── Tiger Tails ──
   {
     title: 'Tiger Tails',
     subtitle: 'Closing off exclusion zones',
-    content: '<div class="max-w-2xl mx-auto text-center"><div class="bg-orange-50 border border-orange-200 rounded-2xl p-8 mb-6"><p class="text-xl mb-6 text-gray-900">All exclusion zones must be <strong>fully closed off</strong> using tiger tails.</p><div class="grid grid-cols-2 gap-4"><div class="bg-red-600 text-white rounded-xl p-4"><p class="font-bold">🚫 Don\'t throw</p></div><div class="bg-red-600 text-white rounded-xl p-4"><p class="font-bold">🚫 Don\'t bend</p></div><div class="bg-red-600 text-white rounded-xl p-4"><p class="font-bold">🚫 Don\'t lean on</p></div><div class="bg-red-600 text-white rounded-xl p-4"><p class="font-bold">🚫 Never leave behind</p></div></div></div><div class="bg-orange-500 text-white rounded-xl p-5"><p class="text-lg">Made of plastic — <strong>extremely brittle.</strong> Each costs <strong>$25</strong> to replace.</p></div></div>',
+    content: '<div style="max-width:46rem;margin:0 auto;text-align:center;"><div style="border-left:3px solid var(--ts-orange);padding:0.75rem 0 0.75rem 16px;margin-bottom:1.5rem;text-align:left;"><p style="color:var(--ts-orange);font-weight:600;font-size:1.05rem;">All exclusion zones must be fully closed off using tiger tails.</p></div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.6rem;margin-bottom:1.25rem;"><div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:white;border-radius:0.6rem;padding:0.75rem;font-weight:700;">Don\'t throw</div><div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:white;border-radius:0.6rem;padding:0.75rem;font-weight:700;">Don\'t bend</div><div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:white;border-radius:0.6rem;padding:0.75rem;font-weight:700;">Don\'t lean on</div><div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:white;border-radius:0.6rem;padding:0.75rem;font-weight:700;">Never leave behind</div></div><div style="background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border-radius:0.75rem;padding:1rem 1.25rem;">Plastic — <strong>extremely brittle</strong>. Each costs <strong>$25</strong> to replace.</div></div>',
     layout: 'highlight',
-    icon: '🐯'
+    icon: ''
   },
+  // ── Pedestrian Mgmt ──
   {
     title: 'Pedestrian Management',
-    subtitle: 'Protecting the public',
-    content: '<div class="max-w-3xl mx-auto space-y-3"><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3"><span class="text-xl">🚶</span><p class="text-gray-900">Always maintain a <strong>safe, clearly marked path</strong> for pedestrians</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3"><span class="text-xl">🪧</span><p class="text-gray-900">Ensure <strong>signage is visible</strong> and facing the correct direction</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3"><span class="text-xl">🔶</span><p class="text-gray-900">Use <strong>bollards, cones, and barriers</strong> to prevent access into work zones</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3"><span class="text-xl">♿</span><p class="text-gray-900">Assist <strong>vulnerable pedestrians</strong> (elderly, disabled, parents with prams)</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3"><span class="text-xl">🚪</span><p class="text-gray-900">Never block access to <strong>entryways or driveways</strong> unless approved</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-start gap-3"><span class="text-xl">👀</span><p class="text-gray-900">If heavy traffic or poor visibility — <strong>use a spotter or second TC</strong></p></div></div>',
-    layout: 'list',
-    icon: '🚶'
-  },
-  {
-    title: 'Stop/Slow Operations',
-    subtitle: 'Manual traffic control',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-blue-50 border border-blue-200 rounded-xl p-6"><ul class="space-y-4 text-lg"><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Manual method used when <strong>one lane is closed</strong></li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> One controller stops traffic from one direction while the other allows traffic to <strong>slowly pass</strong></li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Controllers must <strong>coordinate using radios</strong></li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Ensures safe, <strong>alternating flow</strong> of vehicles through narrow areas</li></ul></div></div>',
+    subtitle: 'Protect the public, every shift',
+    content: '<div style="max-width:48rem;margin:0 auto;display:grid;gap:0.55rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;color:rgba(255,255,255,0.85);">Maintain a <strong style="color:white;">safe, clearly marked path</strong> for pedestrians.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;color:rgba(255,255,255,0.85);">Ensure signage is visible and facing the right direction.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;color:rgba(255,255,255,0.85);">Use bollards, cones, and barriers to <strong style="color:white;">prevent access into work zones</strong>.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;color:rgba(255,255,255,0.85);">Assist <strong style="color:white;">vulnerable pedestrians</strong> — elderly, disabled, parents with prams.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;color:rgba(255,255,255,0.85);">Never block entryways or driveways unless it\'s been approved.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.95rem 1.1rem;color:rgba(255,255,255,0.85);">Heavy traffic or poor visibility — use a spotter or second TC.</div></div>',
     layout: 'content',
-    icon: '🔄'
+    icon: ''
   },
+  // ── Stop/Slow Operations ──
   {
-    title: 'Lane Merger & Taper',
+    title: 'Stop / Slow Operations',
+    subtitle: 'Manual control through a single lane',
+    content: '<div style="max-width:48rem;margin:0 auto;background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><ul style="list-style:none;padding:0;display:grid;gap:0.65rem;color:rgba(255,255,255,0.85);font-size:15px;"><li>Used in work zones where one lane is closed.</li><li>One controller stops traffic from one direction while the other lets traffic <strong style="color:white;">slowly pass</strong>.</li><li>Controllers must <strong style="color:white;">coordinate using radios</strong>.</li><li>Ensures a safe, alternating flow through narrow or obstructed areas.</li></ul></div>',
+    layout: 'content',
+    icon: ''
+  },
+  // ── Lane Merger ──
+  {
+    title: 'Lane Merger Taper',
     subtitle: 'Reducing lanes safely',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-orange-50 border border-orange-200 rounded-xl p-6 mb-4"><ul class="space-y-3 text-lg"><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Two or more lanes reduce into a single lane near roadworks</li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Requires clear <strong>merging signs and chevrons</strong></li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Drivers must merge safely and early</li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> Must have <strong>warning Lane-Stat Signs</strong></li><li class="flex items-start gap-3"><span class="text-orange-500">▸</span> TCs may assist if visibility or volume is high</li></ul></div></div>',
+    content: '<div style="max-width:48rem;margin:0 auto;background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><ul style="list-style:none;padding:0;display:grid;gap:0.6rem;color:rgba(255,255,255,0.85);font-size:14px;"><li>Two or more lanes reduce into a single lane near the works.</li><li>Used to <strong style="color:white;">maintain flow</strong> when one lane is closed.</li><li>Requires clear merging signs and chevrons.</li><li>Drivers must merge <strong style="color:white;">safely and early</strong>.</li><li>Must have warning Lane-Stat signs and chevrons.</li><li>TCs may assist if visibility or traffic volume is high.</li></ul></div>',
     layout: 'content',
-    icon: '↗️'
+    icon: ''
   },
+  // ── Site Entry/Exit ──
   {
-    title: 'Site Entry/Exit',
-    subtitle: 'Safe vehicle access procedures',
-    content: '<div class="max-w-3xl mx-auto"><div class="bg-orange-50 border border-orange-200 rounded-xl p-6 space-y-4"><div class="flex items-start gap-4"><div class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">1</div><p class="text-lg text-gray-900">Highlight entry with <strong>double cones</strong> and small break to pull in safely</p></div><div class="flex items-start gap-4"><div class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">2</div><p class="text-lg text-gray-900">Turn on <strong>flashing lights</strong> before entering</p></div><div class="flex items-start gap-4"><div class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">3</div><p class="text-lg text-gray-900"><strong>Radio the TC</strong> minimum 100m prior</p></div><div class="flex items-start gap-4"><div class="w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">!</div><p class="text-lg text-red-600">If missed — TC directs vehicle to <strong>loop around</strong> and attempt re-entry</p></div><div class="flex items-start gap-4"><div class="w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">!</div><p class="text-lg text-red-600">Ensure <strong>no local traffic follows</strong> work vehicles into the work area</p></div></div></div>',
+    title: 'Site Entry / Exit Process',
+    subtitle: 'Bringing work vehicles in and out safely',
+    content: '<div style="max-width:48rem;margin:0 auto;background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;display:grid;gap:0.85rem;"><div style="display:flex;align-items:flex-start;gap:0.85rem;"><div style="width:32px;height:32px;flex-shrink:0;background:#ea580c;color:white;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:700;">1</div><p style="color:rgba(255,255,255,0.85);font-size:14px;line-height:1.6;">Highlight the entry with <strong style="color:white;">double cones</strong> and a small break to pull in safely.</p></div><div style="display:flex;align-items:flex-start;gap:0.85rem;"><div style="width:32px;height:32px;flex-shrink:0;background:#ea580c;color:white;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:700;">2</div><p style="color:rgba(255,255,255,0.85);font-size:14px;line-height:1.6;">Turn on flashing lights before entering.</p></div><div style="display:flex;align-items:flex-start;gap:0.85rem;"><div style="width:32px;height:32px;flex-shrink:0;background:#ea580c;color:white;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:700;">3</div><p style="color:rgba(255,255,255,0.85);font-size:14px;line-height:1.6;">Radio the TC <strong style="color:white;">at least 100 m prior</strong>.</p></div><div style="display:flex;align-items:flex-start;gap:0.85rem;"><div style="width:32px;height:32px;flex-shrink:0;background:#dc2626;color:white;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:700;">!</div><p style="color:#fca5a5;font-size:14px;line-height:1.6;">Steps missed — TC directs the vehicle to <strong>loop around</strong> and re-attempt entry.</p></div><div style="display:flex;align-items:flex-start;gap:0.85rem;"><div style="width:32px;height:32px;flex-shrink:0;background:#dc2626;color:white;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:700;">!</div><p style="color:#fca5a5;font-size:14px;line-height:1.6;">Ensure no local traffic follows work vehicles into the work area.</p></div></div>',
     layout: 'content',
-    icon: '🚪'
+    icon: ''
   },
+  // ── Spacing Devices ──
+  {
+    title: 'Spacing of Cones / Devices',
+    subtitle: 'Maximum spacing in metres',
+    content: '<div style="max-width:48rem;margin:0 auto;background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;"><table style="width:100%;border-collapse:collapse;color:rgba(255,255,255,0.85);font-size:13.5px;"><thead><tr style="border-bottom:1px solid var(--border);"><th style="text-align:left;padding:0.6rem 0.5rem;color:white;font-weight:600;">Purpose</th><th style="text-align:left;padding:0.6rem 0.5rem;color:white;font-weight:600;">Speed zone</th><th style="text-align:right;padding:0.6rem 0.5rem;color:white;font-weight:600;">Max spacing</th></tr></thead><tbody><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.55rem 0.5rem;">Approach to a TC position</td><td style="padding:0.55rem 0.5rem;">All cases</td><td style="text-align:right;padding:0.55rem 0.5rem;">4 m</td></tr><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.55rem 0.5rem;" rowspan="2">Merge tapers</td><td style="padding:0.55rem 0.5rem;">55–75 km/h</td><td style="text-align:right;padding:0.55rem 0.5rem;">4 m</td></tr><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.55rem 0.5rem;">&gt; 75 km/h</td><td style="text-align:right;padding:0.55rem 0.5rem;">12 m</td></tr><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.55rem 0.5rem;" rowspan="2">Lateral shift tapers</td><td style="padding:0.55rem 0.5rem;">55–75 km/h</td><td style="text-align:right;padding:0.55rem 0.5rem;">12 m</td></tr><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.55rem 0.5rem;">&gt; 75 km/h</td><td style="text-align:right;padding:0.55rem 0.5rem;">18 m</td></tr><tr><td style="padding:0.55rem 0.5rem;" rowspan="3">All other purposes</td><td style="padding:0.55rem 0.5rem;">&lt; 55 km/h</td><td style="text-align:right;padding:0.55rem 0.5rem;">4 m</td></tr><tr><td style="padding:0.55rem 0.5rem;">55–75 km/h</td><td style="text-align:right;padding:0.55rem 0.5rem;">12 m</td></tr><tr><td style="padding:0.55rem 0.5rem;">&gt; 75 km/h</td><td style="text-align:right;padding:0.55rem 0.5rem;">18 m</td></tr></tbody></table></div>',
+    layout: 'content',
+    icon: ''
+  },
+  // ── Recommended Taper Length ──
+  {
+    title: 'Recommended Taper Length',
+    subtitle: 'In metres, by speed and taper type',
+    content: '<div style="max-width:48rem;margin:0 auto;background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.25rem;"><table style="width:100%;border-collapse:collapse;color:rgba(255,255,255,0.85);font-size:13.5px;"><thead><tr style="border-bottom:1px solid var(--border);"><th style="text-align:left;padding:0.55rem 0.5rem;color:white;font-weight:600;">Speed (km/h)</th><th style="text-align:right;padding:0.55rem 0.5rem;color:white;font-weight:600;">TC taper</th><th style="text-align:right;padding:0.55rem 0.5rem;color:white;font-weight:600;">Lateral shift</th><th style="text-align:right;padding:0.55rem 0.5rem;color:white;font-weight:600;">Merge taper</th></tr></thead><tbody><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.5rem;">≤ 45</td><td style="text-align:right;padding:0.5rem;">15</td><td style="text-align:right;padding:0.5rem;">15</td><td style="text-align:right;padding:0.5rem;">15</td></tr><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.5rem;">46–55</td><td style="text-align:right;padding:0.5rem;">15</td><td style="text-align:right;padding:0.5rem;">15</td><td style="text-align:right;padding:0.5rem;">30</td></tr><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.5rem;">56–65</td><td style="text-align:right;padding:0.5rem;">30</td><td style="text-align:right;padding:0.5rem;">30</td><td style="text-align:right;padding:0.5rem;">60</td></tr><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.5rem;">66–75</td><td style="text-align:right;padding:0.5rem;">N/A</td><td style="text-align:right;padding:0.5rem;">70</td><td style="text-align:right;padding:0.5rem;">115</td></tr><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.5rem;">76–85</td><td style="text-align:right;padding:0.5rem;">N/A</td><td style="text-align:right;padding:0.5rem;">80</td><td style="text-align:right;padding:0.5rem;">130</td></tr><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.5rem;">86–95</td><td style="text-align:right;padding:0.5rem;">N/A</td><td style="text-align:right;padding:0.5rem;">90</td><td style="text-align:right;padding:0.5rem;">145</td></tr><tr style="border-bottom:1px solid rgba(255,255,255,0.04);"><td style="padding:0.5rem;">96–105</td><td style="text-align:right;padding:0.5rem;">N/A</td><td style="text-align:right;padding:0.5rem;">100</td><td style="text-align:right;padding:0.5rem;">160</td></tr><tr><td style="padding:0.5rem;">&gt; 105</td><td style="text-align:right;padding:0.5rem;">N/A</td><td style="text-align:right;padding:0.5rem;">110</td><td style="text-align:right;padding:0.5rem;">180</td></tr></tbody></table></div>',
+    layout: 'content',
+    icon: ''
+  },
+  // ── Contraflow ──
+  {
+    title: 'Contraflow',
+    subtitle: 'Rerouting one direction onto the other side',
+    content: '<div style="max-width:48rem;margin:0 auto;background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><ul style="list-style:none;padding:0;display:grid;gap:0.6rem;color:rgba(255,255,255,0.85);font-size:14.5px;"><li>All traffic merges into a single lane.</li><li>One direction is temporarily rerouted onto the opposite side of the road.</li><li>Designed to maintain continuous traffic flow and reduce stoppages.</li><li>Drivers must merge with caution and follow signage for safe transition.</li></ul></div>',
+    layout: 'content',
+    icon: ''
+  },
+  // ── Speed Reduction ──
   {
     title: 'Speed Reduction',
-    subtitle: 'Work zone speed limits',
-    content: '<div class="max-w-3xl mx-auto space-y-4"><div class="bg-gray-50 border border-gray-200 rounded-xl p-5 flex items-start gap-3"><span class="text-xl">🏎️</span><p class="text-lg text-gray-900">Always observe posted speed limits in and around work zones</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-5 flex items-start gap-3"><span class="text-xl">⬇️</span><p class="text-lg text-gray-900">Reduce speed well before entering the site</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-5 flex items-start gap-3"><span class="text-xl">🪧</span><p class="text-lg text-gray-900">Follow all signage and TC instructions</p></div><div class="bg-orange-500 text-white rounded-xl p-5 text-center"><p class="text-xl font-bold">Never exceed 40 km/h in active work zones unless signed otherwise</p></div><div class="bg-gray-50 border border-gray-200 rounded-xl p-5 flex items-start gap-3"><span class="text-xl">🚗</span><p class="text-lg text-gray-900">Maintain safe distance from vehicles and pedestrians</p></div></div>',
-    layout: 'list',
-    icon: '🐌'
+    subtitle: 'Work-zone speed limits',
+    content: '<div style="max-width:48rem;margin:0 auto;display:grid;gap:0.55rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.85rem 1.1rem;color:rgba(255,255,255,0.85);">Always observe posted speed limits in and around work zones.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.85rem 1.1rem;color:rgba(255,255,255,0.85);">Reduce speed well before entering the site.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.85rem 1.1rem;color:rgba(255,255,255,0.85);">Follow all signage and traffic-controller instructions.</div><div style="background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border-radius:0.75rem;padding:0.95rem 1.25rem;text-align:center;font-weight:700;">Never exceed 40 km/h in active work zones unless signed otherwise.</div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:0.85rem 1.1rem;color:rgba(255,255,255,0.85);">Maintain safe distance from vehicles and pedestrians.</div></div>',
+    layout: 'content',
+    icon: ''
   },
+  // ── Road Closure ──
   {
     title: 'Road Closure',
     subtitle: 'Full closure requirements',
-    content: '<div class="max-w-3xl mx-auto text-center"><div class="bg-red-600 text-white rounded-2xl p-8 mb-6"><p class="text-4xl mb-4">🚫</p><p class="text-2xl font-bold">Road Closures</p></div><div class="grid md:grid-cols-2 gap-6"><div class="bg-orange-50 border border-orange-200 rounded-xl p-6"><p class="text-4xl mb-3">🪧</p><p class="font-bold text-lg mb-2 text-gray-900">Warning Signs</p><p class="text-gray-600">Must have warning signs from <strong>ALL directions</strong> coming towards the closure</p></div><div class="bg-blue-50 border border-blue-200 rounded-xl p-6"><p class="text-4xl mb-3">🔀</p><p class="font-bold text-lg mb-2 text-gray-900">Detour Route</p><p class="text-gray-600">ALL road closures must have a clearly signed <strong>detour route</strong></p></div></div></div>',
+    content: '<div style="max-width:48rem;margin:0 auto;text-align:center;"><div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:white;border-radius:1rem;padding:1.5rem 2rem;margin-bottom:1.5rem;"><p style="font-size:1.5rem;font-weight:800;">Drivers must see warning signs <strong>before</strong> the road is closed</p></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><p style="font-weight:700;color:white;margin-bottom:0.5rem;">Warning signs</p><p style="color:var(--text-body);font-size:14px;">From all directions approaching the closure.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;"><p style="font-weight:700;color:white;margin-bottom:0.5rem;">Detour route</p><p style="color:var(--text-body);font-size:14px;">Every closure has a clearly signed detour.</p></div></div></div>',
     layout: 'highlight',
-    icon: '🚫'
+    icon: ''
   },
+  // ── Definitions ──
   {
     title: 'Key Definitions',
     subtitle: 'Know your terminology',
-    content: '<div class="max-w-3xl mx-auto grid grid-cols-2 gap-3 text-sm"><div class="bg-orange-50 border border-orange-200 rounded-lg p-3"><p class="font-bold text-orange-600">ROL</p><p class="text-gray-600">Road Occupancy Licence — permit to use road space</p></div><div class="bg-blue-50 border border-blue-200 rounded-lg p-3"><p class="font-bold text-blue-600">SWMS</p><p class="text-gray-600">Safe Work Method Statement — legal document for high-risk work</p></div><div class="bg-green-50 border border-green-200 rounded-lg p-3"><p class="font-bold text-green-600">TGS / TCP</p><p class="text-gray-600">Traffic Guidance Scheme / Traffic Control Plan</p></div><div class="bg-purple-50 border border-purple-200 rounded-lg p-3"><p class="font-bold text-purple-600">TMP</p><p class="text-gray-600">Traffic Management Plan — detailed planning report</p></div><div class="bg-teal-50 border border-teal-200 rounded-lg p-3"><p class="font-bold text-teal-600">PTCD</p><p class="text-gray-600">Portable Traffic Control Device (VMS, boom gates, lights)</p></div><div class="bg-red-50 border border-red-200 rounded-lg p-3"><p class="font-bold text-red-600">TMA</p><p class="text-gray-600">Truck Mounted Attenuator — rear safety device</p></div><div class="bg-amber-50 border border-amber-200 rounded-lg p-3"><p class="font-bold text-amber-600">VMS</p><p class="text-gray-600">Variable Message Signs — electronic programmable signs</p></div><div class="bg-sky-50 border border-sky-200 rounded-lg p-3"><p class="font-bold text-sky-600">Dimension D</p><p class="text-gray-600">Road speed in metres — determines device placement</p></div></div>',
+    content: '<div style="max-width:50rem;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:0.55rem;"><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.6rem;padding:0.7rem 0.9rem;"><p style="color:var(--cyan);font-weight:700;font-size:13px;">ROL</p><p style="color:var(--text-body);font-size:12.5px;">Road Occupancy Licence — permit to use road space.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.6rem;padding:0.7rem 0.9rem;"><p style="color:var(--cyan);font-weight:700;font-size:13px;">SWMS</p><p style="color:var(--text-body);font-size:12.5px;">Safe Work Method Statement — legal high-risk-work doc.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.6rem;padding:0.7rem 0.9rem;"><p style="color:var(--cyan);font-weight:700;font-size:13px;">TGS / TCP</p><p style="color:var(--text-body);font-size:12.5px;">Traffic Guidance Scheme / Traffic Control Plan.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.6rem;padding:0.7rem 0.9rem;"><p style="color:var(--cyan);font-weight:700;font-size:13px;">TMP</p><p style="color:var(--text-body);font-size:12.5px;">Traffic Management Plan — full planning report.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.6rem;padding:0.7rem 0.9rem;"><p style="color:var(--cyan);font-weight:700;font-size:13px;">PTCD</p><p style="color:var(--text-body);font-size:12.5px;">Portable Traffic Control Device — VMS, boom, lights.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.6rem;padding:0.7rem 0.9rem;"><p style="color:var(--cyan);font-weight:700;font-size:13px;">TMA</p><p style="color:var(--text-body);font-size:12.5px;">Truck Mounted Attenuator — rear protection.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.6rem;padding:0.7rem 0.9rem;"><p style="color:var(--cyan);font-weight:700;font-size:13px;">VMS</p><p style="color:var(--text-body);font-size:12.5px;">Variable Message Sign — programmable LED sign.</p></div><div style="background:var(--glass);border:1px solid var(--border);border-radius:0.6rem;padding:0.7rem 0.9rem;"><p style="color:var(--cyan);font-weight:700;font-size:13px;">Dimension D</p><p style="color:var(--text-body);font-size:12.5px;">Road speed in metres — drives device placement.</p></div></div>',
     layout: 'split',
-    icon: '📖'
+    icon: ''
+  },
+  // ═══════════════════════════════════════
+  //  SECTION 6: MODULE QUIZ
+  // ═══════════════════════════════════════
+  // ── Quiz Intro ──
+  {
+    title: 'Traffic Control — Module 1 Quiz',
+    subtitle: '',
+    content: '<div style="max-width:40rem;margin:0 auto;text-align:center;"><p style="font-size:15px;color:rgba(255,255,255,0.65);margin-bottom:1.25rem;">A <strong>10-question quiz</strong> covering everything in this module. You need <strong>90% or higher</strong> to pass.</p><div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:20px;margin-bottom:1.25rem;text-align:left;"><p style="font-weight:600;font-size:14px;color:white;margin-bottom:12px;">Enter your details to record your completion</p><div style="display:grid;gap:10px;"><input type="text" id="trainee-name" placeholder="Full Name" required style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:white;font-size:14px;font-family:Inter,sans-serif;outline:none;" onfocus="this.style.borderColor=\'rgba(0,210,190,0.5)\'" onblur="this.style.borderColor=\'rgba(255,255,255,0.12)\'"><input type="email" id="trainee-email" placeholder="Email Address" required style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:white;font-size:14px;font-family:Inter,sans-serif;outline:none;" onfocus="this.style.borderColor=\'rgba(0,210,190,0.5)\'" onblur="this.style.borderColor=\'rgba(255,255,255,0.12)\'"></div><p style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:8px;">Use the same email as your T&S employee account so it links automatically.</p></div></div>',
+    layout: 'highlight',
+    icon: ''
+  },
+  // Q1
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 1,
+      question: 'How early should you arrive on site before your booking time?',
+      options: [
+        { id: 'a', text: 'Whenever you can — punctuality is flexible' },
+        { id: 'b', text: '5 minutes before' },
+        { id: 'c', text: '15 minutes before' },
+        { id: 'd', text: '30 minutes before' }
+      ],
+      correctAnswer: 'c'
+    }
+  },
+  // Q2
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 2,
+      question: 'When does an ROL need to be activated?',
+      options: [
+        { id: 'a', text: 'After the cones are down' },
+        { id: 'b', text: 'Before set-up commences, with deactivation at end of shift' },
+        { id: 'c', text: 'Only if the client asks for it' },
+        { id: 'd', text: 'At the end of the week, with the timesheet' }
+      ],
+      correctAnswer: 'b'
+    }
+  },
+  // Q3
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 3,
+      question: 'What is the minimum exclusion distance from any operating truck or machinery?',
+      options: [
+        { id: 'a', text: '1 metre' },
+        { id: 'b', text: '3 metres' },
+        { id: 'c', text: '5 metres' },
+        { id: 'd', text: '10 metres' }
+      ],
+      correctAnswer: 'c'
+    }
+  },
+  // Q4
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 4,
+      question: 'During pack-up, what is removed last from the work zone?',
+      options: [
+        { id: 'a', text: 'Cones' },
+        { id: 'b', text: 'Barriers' },
+        { id: 'c', text: 'Signs' },
+        { id: 'd', text: 'Tiger tails' }
+      ],
+      correctAnswer: 'c'
+    }
+  },
+  // Q5
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 5,
+      question: 'What is the minimum extended height of your stop/slow bat in use?',
+      options: [
+        { id: 'a', text: '1.2 metres' },
+        { id: 'b', text: '1.5 metres' },
+        { id: 'c', text: '1.8 metres' },
+        { id: 'd', text: '2.0 metres' }
+      ],
+      correctAnswer: 'c'
+    }
+  },
+  // Q6
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 6,
+      question: 'A driver ignores your STOP bat. What is the correct first response?',
+      options: [
+        { id: 'a', text: 'Step in front of the vehicle to force it to stop' },
+        { id: 'b', text: 'Move to safety and radio your supervisor immediately' },
+        { id: 'c', text: 'Yell at the driver to come back' },
+        { id: 'd', text: 'Throw a cone at the rear of the vehicle' }
+      ],
+      correctAnswer: 'b'
+    }
+  },
+  // Q7
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 7,
+      question: 'What is the recommended sign spacing for a 60 km/h zone?',
+      options: [
+        { id: 'a', text: '20 m' },
+        { id: 'b', text: '40 m' },
+        { id: 'c', text: '60 m' },
+        { id: 'd', text: '80 m' }
+      ],
+      correctAnswer: 'd'
+    }
+  },
+  // Q8
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 8,
+      question: 'At what shift length must a worker take a minimum 30-minute meal break?',
+      options: [
+        { id: 'a', text: 'After 2 hours' },
+        { id: 'b', text: 'After 3 hours' },
+        { id: 'c', text: 'After 5 hours' },
+        { id: 'd', text: 'After 8 hours' }
+      ],
+      correctAnswer: 'c'
+    }
+  },
+  // Q9
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 9,
+      question: 'Who is responsible for submitting the timesheet at the end of a shift?',
+      options: [
+        { id: 'a', text: 'Each individual traffic controller' },
+        { id: 'b', text: 'The Team Leader, signed by the client' },
+        { id: 'c', text: 'The client only' },
+        { id: 'd', text: 'Admin in the office' }
+      ],
+      correctAnswer: 'b'
+    }
+  },
+  // Q10
+  {
+    title: '', subtitle: '', content: '', layout: 'interactive-quiz', icon: '',
+    quizData: {
+      questionNumber: 10,
+      question: 'What does TLC stand for in the context of T&S work?',
+      options: [
+        { id: 'a', text: 'Traffic Light Control' },
+        { id: 'b', text: 'Team Leader Checklist' },
+        { id: 'c', text: 'Total Lane Closure' },
+        { id: 'd', text: 'Temporary Licence Code' }
+      ],
+      correctAnswer: 'b'
+    }
+  },
+  // Quiz results
+  {
+    title: 'Quiz Results',
+    subtitle: '',
+    content: '',
+    layout: 'quiz-results',
+    icon: ''
   },
 ];
 
