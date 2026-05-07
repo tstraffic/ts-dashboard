@@ -588,6 +588,8 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
       COALESCE(e.rate_fares_daily, 0) AS emp_travel_rate,
       COALESCE(e.rate_meal, 0)         AS emp_meal_rate,
       COALESCE(e.super_rate, 0.12)     AS emp_super_rate,
+      COALESCE(e.payroll_bsb, '')      AS emp_payroll_bsb,
+      COALESCE(e.payroll_account, '')  AS emp_payroll_account,
       ac.classification AS classification_name
     FROM pay_run_lines prl
     LEFT JOIN employees e ON e.id = prl.employee_id
