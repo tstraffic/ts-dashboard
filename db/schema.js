@@ -8384,6 +8384,19 @@ function runMigrations(db) {
     console.log('Migration 179 applied');
   }
 
+  // =============================================
+  // Migration 180: explicit SOP slug pairing for documents
+  // Lets admin pick which SOP "section" a PDF belongs to from a dropdown
+  // instead of relying on filename regex. The slug points at an entry in
+  // lib/sop-content.js. NULL means unlinked (shows under Reference Docs).
+  // =============================================
+  if (!isMigrationApplied.get(180)) {
+    console.log('Running migration 180: sop_slug column on sop_documents');
+    try { db.exec("ALTER TABLE sop_documents ADD COLUMN sop_slug TEXT DEFAULT NULL"); } catch (e) { /* may exist */ }
+    recordMigration.run(180, 'sop_slug column on sop_documents');
+    console.log('Migration 180 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

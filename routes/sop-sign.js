@@ -11,13 +11,14 @@ const sopContent = require('../lib/sop-content');
 const SOP_DOC_DIR = path.join(__dirname, '..', 'data', 'uploads', 'sop-documents');
 const SOP_PAGE_DIR = path.join(SOP_DOC_DIR, 'page-renders');
 
-// Pair each structured SOP with the matching uploaded PDF (if any) so the
-// "View official PDF" link on the rich page goes to the right file.
+// Pair each structured SOP with the matching uploaded PDF.
+// Explicit sop_slug (set by admin via the upload dropdown) wins; regex on
+// filename / title is a fallback for older uploads.
 function pairContentWithPdfs(content, pdfDocs) {
   return content.map(sop => {
-    let matchedPdf = null;
-    if (sop.pdfFilenameMatch) {
-      matchedPdf = pdfDocs.find(d => sop.pdfFilenameMatch.test(d.original_name) || sop.pdfFilenameMatch.test(d.title));
+    let matchedPdf = pdfDocs.find(d => d.sop_slug === sop.slug);
+    if (!matchedPdf && sop.pdfFilenameMatch) {
+      matchedPdf = pdfDocs.find(d => !d.sop_slug && (sop.pdfFilenameMatch.test(d.original_name) || sop.pdfFilenameMatch.test(d.title)));
     }
     return { ...sop, matchedPdf: matchedPdf || null };
   });

@@ -887,10 +887,14 @@ router.get('/sop-documents', (req, res) => {
     ORDER BY d.active DESC, d.display_order ASC, d.id ASC
   `).all();
 
+  const sopContent = require('../lib/sop-content');
+  const sopOptions = sopContent.all().map(s => ({ slug: s.slug, title: s.title, code: s.code }));
+
   res.render('induction/admin/sop-documents', {
     title: 'SOP / SWMS Documents',
     currentPage: 'induction-presentations',
     docs,
+    sopOptions,
     sopVersion: currentSopVersion(),
   });
 });
@@ -905,9 +909,11 @@ router.post('/sop-documents', sopDocUpload.single('file'), async (req, res) => {
   const title = (req.body.title || req.file.originalname.replace(/\.[^.]+$/, '')).toString().trim().slice(0, 200);
   const next = db.prepare('SELECT COALESCE(MAX(display_order), 0) + 1 as n FROM sop_documents').get();
 
+  const sopSlug = (req.body.sop_slug || '').toString().trim() || null;
+
   const result = db.prepare(`
-    INSERT INTO sop_documents (title, filename, original_name, file_path, file_size, mime_type, display_order, active, created_by_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+    INSERT INTO sop_documents (title, filename, original_name, file_path, file_size, mime_type, display_order, active, created_by_id, sop_slug)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
   `).run(
     title,
     req.file.filename,
@@ -917,6 +923,7 @@ router.post('/sop-documents', sopDocUpload.single('file'), async (req, res) => {
     req.file.mimetype || '',
     next.n,
     req.session.user.id,
+    sopSlug,
   );
 
   // Render PDF pages to PNGs so the mobile sign page can display them inline.
@@ -943,6 +950,17 @@ router.post('/sop-documents/:id/render', async (req, res) => {
     pages.length > 0
       ? `Rendered ${pages.length} page${pages.length === 1 ? '' : 's'} for "${doc.title}".`
       : `No pages rendered for "${doc.title}". Check it's a valid PDF.`);
+  res.redirect('/induction/admin/sop-documents');
+});
+
+// POST /induction/admin/sop-documents/:id/link — change which SOP this doc belongs to
+router.post('/sop-documents/:id/link', (req, res) => {
+  const db = getDb();
+  const doc = db.prepare('SELECT id, title FROM sop_documents WHERE id = ?').get(req.params.id);
+  if (!doc) { req.flash('error', 'Document not found.'); return res.redirect('/induction/admin/sop-documents'); }
+  const slug = (req.body.sop_slug || '').toString().trim() || null;
+  db.prepare('UPDATE sop_documents SET sop_slug = ? WHERE id = ?').run(slug, doc.id);
+  req.flash('success', slug ? `Linked "${doc.title}" to ${slug}.` : `Unlinked "${doc.title}" — will appear under Reference Documents.`);
   res.redirect('/induction/admin/sop-documents');
 });
 
