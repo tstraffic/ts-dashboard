@@ -530,8 +530,13 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
     })();
 
     // Sum gross per employee, then split tax proportionally back to lines.
+    // Lines labelled "Cash Wages" are excluded from tax — those amounts are
+    // paid as cash and any tax is handled manually outside the system. They
+    // still count toward gross/super/net, just with zero PAYG withheld.
+    const isCashWages = (l) => /cash/i.test(String(l.income_label || ''));
     const grossByEmp = {};
     for (const l of lines) {
+      if (isCashWages(l)) continue;
       const k = l.employee_id || ('name:' + (l.full_name || ''));
       grossByEmp[k] = (grossByEmp[k] || 0) + toNum(l.salary_amount);
     }
@@ -541,12 +546,17 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
     }
     let totalSalary = 0, totalSuper = 0, totalTax = 0;
     for (const l of lines) {
-      const k = l.employee_id || ('name:' + (l.full_name || ''));
-      const g = grossByEmp[k] || 0;
-      const taxFull = taxByEmp[k] || 0;
-      // Allocate this line's share of the employee's tax in proportion to its salary
-      l.tax_withheld = g > 0 ? round2(taxFull * (toNum(l.salary_amount) / g)) : 0;
-      l.net_pay = round2(toNum(l.salary_amount) - l.tax_withheld);
+      if (isCashWages(l)) {
+        l.tax_withheld = 0;
+        l.net_pay = round2(toNum(l.salary_amount));
+      } else {
+        const k = l.employee_id || ('name:' + (l.full_name || ''));
+        const g = grossByEmp[k] || 0;
+        const taxFull = taxByEmp[k] || 0;
+        // Allocate this line's share of the employee's (taxable) gross
+        l.tax_withheld = g > 0 ? round2(taxFull * (toNum(l.salary_amount) / g)) : 0;
+        l.net_pay = round2(toNum(l.salary_amount) - l.tax_withheld);
+      }
       totalSalary += toNum(l.salary_amount);
       totalSuper  += toNum(l.super_amount);
       totalTax    += l.tax_withheld;
