@@ -18,6 +18,8 @@
     </a>
   </div>
 
+  <%- include('../partials/csrf') %>
+
   <!-- List -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
     <% if (!sheets || sheets.length === 0) { %>
@@ -34,15 +36,17 @@
             <tr>
               <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Period</th>
               <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden sm:table-cell">Projects</th>
-              <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden sm:table-cell">Lines</th>
+              <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden sm:table-cell">Shifts</th>
               <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Hours</th>
               <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Fee</th>
+              <th class="px-4 py-3 text-center text-[10px] font-bold text-amber-700 uppercase tracking-widest" title="Mark when this sheet has been verified and is ready for finance to release payment">Ready</th>
+              <th class="px-4 py-3 text-center text-[10px] font-bold text-emerald-700 uppercase tracking-widest" title="Mark once Abergeldie has paid this sheet">Paid</th>
               <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <% sheets.forEach(s => { %>
-              <tr class="hover:bg-gray-50 transition">
+              <tr class="hover:bg-gray-50 transition <%= s.paid ? 'bg-emerald-50/40' : (s.ready_to_pay ? 'bg-amber-50/40' : '') %>">
                 <td class="px-4 py-3">
                   <a href="/finance/abergeldie/<%= s.id %>" class="block">
                     <p class="font-semibold text-gray-900 text-sm"><%= s.label || periodLabel(s.period_start, s.period_end) %></p>
@@ -50,20 +54,65 @@
                   </a>
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-700 tabular-nums hidden sm:table-cell"><%= s.project_count %></td>
-                <td class="px-4 py-3 text-sm text-gray-600 text-right tabular-nums hidden sm:table-cell"><%= s.line_count %></td>
+                <td class="px-4 py-3 text-sm text-gray-600 text-right tabular-nums hidden sm:table-cell"><%= s.shift_count %></td>
                 <td class="px-4 py-3 text-sm text-gray-600 text-right tabular-nums"><%= fmtHours(s.total_hours) %></td>
                 <td class="px-4 py-3 text-sm font-bold text-gray-900 text-right tabular-nums">$<%= fmtMoney(s.total_fee) %></td>
+                <td class="px-4 py-3 text-center">
+                  <input type="checkbox" <%= s.ready_to_pay ? 'checked' : '' %> data-toggle="ready_to_pay" data-sheet-id="<%= s.id %>" class="sheet-toggle w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500" aria-label="Ready to pay">
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <input type="checkbox" <%= s.paid ? 'checked' : '' %> data-toggle="paid" data-sheet-id="<%= s.id %>" class="sheet-toggle w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" aria-label="Paid">
+                </td>
                 <td class="px-4 py-3 text-right whitespace-nowrap">
                   <a href="/finance/abergeldie/<%= s.id %>" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold text-brand-600 hover:bg-brand-50 rounded-lg">Open →</a>
                 </td>
               </tr>
             <% }) %>
           </tbody>
+          <tfoot class="bg-gray-50 border-t-2 border-gray-300">
+            <tr>
+              <td colspan="4" class="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-widest">Totals</td>
+              <td class="px-4 py-3 text-right text-base font-bold tabular-nums text-gray-900" title="Sum of fees across every sheet">$<%= fmtMoney(totals.fee) %></td>
+              <td class="px-4 py-3 text-center text-xs font-bold tabular-nums text-amber-700" title="Sum of fees for sheets marked Ready to Pay but not yet Paid">$<%= fmtMoney(totals.ready) %></td>
+              <td class="px-4 py-3 text-center text-xs font-bold tabular-nums text-emerald-700" title="Sum of fees for sheets marked Paid">$<%= fmtMoney(totals.paid) %></td>
+              <td></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     <% } %>
   </div>
 </div>
+
+<script>
+  // Toggle "Ready to Pay" / "Paid" via fetch — reload after to refresh totals.
+  // Optimistic flag flip: revert checkbox if the request fails.
+  document.querySelectorAll('input.sheet-toggle').forEach(cb => {
+    cb.addEventListener('change', async (e) => {
+      const target = e.currentTarget;
+      const sheetId = target.dataset.sheetId;
+      const which = target.dataset.toggle === 'paid' ? 'paid' : 'ready';
+      const checked = target.checked;
+      const fd = new URLSearchParams();
+      fd.set('value', checked ? '1' : '0');
+      fd.set('_csrf', document.querySelector('input[name="_csrf"]')?.value || '');
+      try {
+        const r = await fetch('/finance/abergeldie/' + sheetId + '/' + which, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+          body: fd.toString(),
+          credentials: 'same-origin',
+        });
+        if (!r.ok) throw new Error('Save failed');
+        // Reload to refresh totals + row highlight
+        window.location.reload();
+      } catch (err) {
+        target.checked = !checked;
+        alert('Save failed — refresh and try again.');
+      }
+    });
+  });
+</script>
 
 <% if (flash_success && flash_success.length) { %>
   <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-semibold shadow-lg z-50" id="flash"><%= flash_success[0] %></div>
