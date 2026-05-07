@@ -920,7 +920,7 @@
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
         <span id="fs-label">Fullscreen</span>
       </button>
-      <a href="/induction/admin/presentations" class="top-btn">
+      <a href="<%= typeof exitUrl !== 'undefined' && exitUrl ? exitUrl : '/induction/admin/presentations' %>" class="top-btn">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Exit
       </a>
@@ -965,6 +965,9 @@
     const ATTENDEES = <%- JSON.stringify(attendees || []) %>;
     const MODULE = <%- JSON.stringify(module) %>;
     const MODULE_KEY = <%- JSON.stringify(moduleKey || '') %>;
+    const PRESENTER_MODE = <%- JSON.stringify(typeof mode !== 'undefined' && mode ? mode : 'group') %>;
+    const SUBMIT_URL = <%- JSON.stringify(typeof submitUrl !== 'undefined' && submitUrl ? submitUrl : '/induction/admin/present/' + module + '/quiz-result') %>;
+    const EXIT_URL = <%- JSON.stringify(typeof exitUrl !== 'undefined' && exitUrl ? exitUrl : '/induction/admin/presentations') %>;
     let currentIndex = 0;
     let isAnimating = false;
     const selectedAttendeeIds = new Set();
@@ -1274,7 +1277,7 @@
       if (btn) { btn.disabled = true; btn.innerHTML = 'Saving…'; }
       try {
         const _ct = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        const resp = await fetch('/induction/admin/present/' + MODULE + '/quiz-result', {
+        const resp = await fetch(SUBMIT_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-csrf-token': _ct },
           body: JSON.stringify({
@@ -1292,10 +1295,10 @@
           return;
         }
         const recorded = data.recorded || [];
-        if (recorded.length > 0) {
+        if (recorded.length > 0 && PRESENTER_MODE === 'group') {
           alert('Recorded ' + recorded.length + ' attendee completion(s):\n\n' + recorded.join('\n'));
         }
-        window.location.href = '/induction/admin/presentations';
+        window.location.href = EXIT_URL;
       } catch (e) {
         alert('Save error: ' + e.message);
         if (btn) { btn.disabled = false; btn.innerHTML = '&#10003; Save &amp; Complete'; }
@@ -1315,7 +1318,7 @@
           prevSlide();
           break;
         case 'Escape':
-          window.location.href = '/induction/admin/presentations';
+          window.location.href = EXIT_URL;
           break;
         case 'f':
         case 'F':

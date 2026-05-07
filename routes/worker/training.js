@@ -1,7 +1,8 @@
-// Worker portal training — personal quiz mode.
-// Worker takes the quiz on their phone (skipping the slides since they've been
-// through the in-person induction). Gated by employees.online_training_allowed
-// which the admin grants from the employee profile.
+// Worker portal training — personal mode.
+// Worker takes the SAME slide deck + quiz as the in-person presentation, on
+// their phone. Identity is auto-assigned from the worker session, so there's
+// no attendee picker. Gated by employees.online_training_allowed which the
+// admin grants from the employee profile.
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../../db/database');
@@ -53,7 +54,8 @@ router.get('/training', (req, res) => {
   });
 });
 
-// GET /w/training/:slug — present the quiz
+// GET /w/training/:slug — full presentation (slides + quiz). Same view as the
+// admin presenter, just rendered in personal mode (no attendee picker).
 router.get('/training/:slug', (req, res) => {
   const cfg = MODULES[req.params.slug];
   if (!cfg) { req.flash('error', 'Unknown training module.'); return res.redirect('/w/training'); }
@@ -67,54 +69,51 @@ router.get('/training/:slug', (req, res) => {
     });
   }
 
-  const questions = quizFromSlides(cfg.slides);
-  res.render('worker/training-quiz', {
-    title: cfg.title,
-    currentPage: 'training',
-    moduleSlug: req.params.slug,
-    moduleTitle: cfg.title,
+  res.render('induction/admin/presenter', {
+    layout: false,
+    module: req.params.slug,
     moduleKey: cfg.key,
-    questions,
-    worker: req.session.worker,
+    moduleTitle: cfg.title,
+    slides: cfg.slides,
+    totalSlides: cfg.slides.length,
+    attendees: [],
+    title: cfg.title,
+    mode: 'personal',
+    submitUrl: `/w/training/${req.params.slug}/submit-presentation`,
+    exitUrl: '/w/training',
   });
 });
 
-// POST /w/training/:slug/submit — score quiz + record completion
-router.post('/training/:slug/submit', (req, res) => {
+// POST /w/training/:slug/submit-presentation — auto-assigns to worker
+// session. Same payload shape as the admin /quiz-result endpoint, but
+// attendee_ids is ignored.
+router.post('/training/:slug/submit-presentation', (req, res) => {
   const cfg = MODULES[req.params.slug];
-  if (!cfg) return res.status(404).json({ ok: false, error: 'Unknown module' });
+  if (!cfg) return res.status(404).json({ success: false, error: 'Unknown module' });
 
   const db = getDb();
   const employee = workerEmployee(db, req.session.worker.id);
   if (!employee || !employee.online_training_allowed) {
-    return res.status(403).json({ ok: false, error: 'Online training is not enabled for your account. Speak to your supervisor.' });
+    return res.status(403).json({ success: false, error: 'Online training is not enabled for your account.' });
   }
 
-  const questions = quizFromSlides(cfg.slides);
-  const answers = (req.body && req.body.answers) || {};
-  let correct = 0;
-  const breakdown = [];
-  for (const q of questions) {
-    const userAnswer = answers[q.questionNumber] || null;
-    const isCorrect = userAnswer === q.correctAnswer;
-    if (isCorrect) correct += 1;
-    const correctText = (q.options.find(o => o.id === q.correctAnswer) || {}).text || '';
-    breakdown.push({ questionNumber: q.questionNumber, question: q.question, isCorrect, correctAnswer: correctText });
-  }
-  const total = questions.length;
-  const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
-  const passed = pct >= 90;
+  const { score, total, passed, answers } = req.body;
+  const passedFlag = passed ? 1 : 0;
+  const correct = parseInt(score, 10) || 0;
+  const totalCount = parseInt(total, 10) || quizFromSlides(cfg.slides).length;
 
   db.prepare(`
     INSERT INTO training_completions (employee_id, module, full_name, email, score, total, passed)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(employee.id, cfg.key, employee.full_name, employee.email || '', correct, total, passed ? 1 : 0);
+  `).run(employee.id, cfg.key, employee.full_name, employee.email || '', correct, totalCount, passedFlag);
 
-  if (passed) {
+  let recorded = [];
+  if (passedFlag) {
+    recorded.push(employee.full_name);
     try { maybeMarkInducted(db, employee.id, 'online'); } catch (e) { console.error('maybeMarkInducted failed:', e.message); }
   }
 
-  res.json({ ok: true, correct, total, pct, passed, breakdown });
+  res.json({ success: true, recorded });
 });
 
 module.exports = router;
