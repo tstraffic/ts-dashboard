@@ -81,12 +81,107 @@
       </details>
     <% } %>
 
-    <!-- Documents to review -->
-    <% if (typeof documents !== 'undefined' && documents && documents.length > 0) { %>
+    <!-- Structured SOPs (rich, mobile-friendly) -->
+    <% if (typeof structuredSops !== 'undefined' && structuredSops && structuredSops.length > 0) { %>
       <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Review &amp; tick each document</label>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Standard Operating Procedures</label>
+        <ul class="space-y-3" id="sop-structured-list">
+          <% structuredSops.forEach((sop, sIdx) => { %>
+            <li class="bg-white border border-gray-300 rounded-2xl overflow-hidden">
+              <!-- Header (always visible) -->
+              <button type="button" class="w-full flex items-start gap-3 p-4 text-left hover:bg-gray-50 transition" onclick="toggleSop(<%= sIdx %>, this)" aria-expanded="false">
+                <div class="w-10 h-10 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center flex-shrink-0 font-bold">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-bold text-gray-900"><%= sop.title %></p>
+                  <p class="text-[11px] text-gray-500 mt-0.5"><%= sop.code %> · v<%= sop.revision %> · <%= sop.sections.length %> sections</p>
+                  <p class="text-xs text-gray-700 mt-1.5 leading-relaxed"><%= sop.summary %></p>
+                </div>
+                <svg class="w-5 h-5 text-gray-400 flex-shrink-0 transition-transform sop-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+
+              <!-- Body (collapsed by default) -->
+              <div class="hidden border-t border-gray-100 sop-body" id="sop-body-<%= sIdx %>">
+                <div class="px-4 py-4 space-y-5">
+                  <% sop.sections.forEach((sec, secIdx) => { %>
+                    <section class="<%= secIdx > 0 ? 'pt-4 border-t border-gray-100' : '' %>">
+                      <h3 class="text-base font-bold text-gray-900 leading-tight"><%= sec.heading %></h3>
+                      <% if (sec.body) { %>
+                        <p class="text-sm text-gray-700 mt-2 leading-relaxed"><%= sec.body %></p>
+                      <% } %>
+                      <% if (sec.image && sec.image.file) { %>
+                        <img src="<%= sop.imageFolder %>/<%= sec.image.file %>" alt="<%= sec.image.alt || '' %>"
+                             onerror="this.style.display='none'; this.nextElementSibling && this.nextElementSibling.tagName==='FIGCAPTION' && (this.nextElementSibling.style.display='none');"
+                             class="mt-3 w-full rounded-xl border border-gray-200" />
+                        <% if (sec.image.caption) { %>
+                          <figcaption class="text-[11px] text-gray-500 italic mt-1 text-center"><%= sec.image.caption %></figcaption>
+                        <% } %>
+                      <% } %>
+                      <% if (sec.items && sec.items.length > 0) { %>
+                        <ul class="mt-3 space-y-2">
+                          <% sec.items.forEach(item => { const text = typeof item === 'string' ? item : (item && item.text) || ''; %>
+                            <li class="flex gap-2.5 text-sm text-gray-700 leading-relaxed">
+                              <span class="text-brand-500 mt-1 flex-shrink-0">●</span>
+                              <span><%- text %></span>
+                            </li>
+                          <% }) %>
+                        </ul>
+                      <% } %>
+                      <% if (sec.callout) { %>
+                        <%
+                          const calloutColors = {
+                            critical: 'bg-red-50 border-red-300 text-red-900',
+                            warning: 'bg-amber-50 border-amber-300 text-amber-900',
+                            rule: 'bg-brand-50 border-brand-300 text-brand-900',
+                            info: 'bg-gray-50 border-gray-300 text-gray-800',
+                          };
+                          const cls = calloutColors[sec.callout.type] || calloutColors.info;
+                        %>
+                        <div class="mt-3 rounded-lg border-l-4 px-3 py-2.5 text-xs font-medium leading-relaxed <%= cls %>">
+                          <%- sec.callout.text %>
+                        </div>
+                      <% } %>
+                    </section>
+                  <% }) %>
+
+                  <% if (sop.matchedPdf) { %>
+                    <div class="pt-4 border-t border-gray-100">
+                      <a href="/sop-sign/<%= session.token %>/document/<%= sop.matchedPdf.id %>" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-xs font-semibold text-brand-700 hover:text-brand-900">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 16h-2v-2H9v-2h2v-2h-2v-2h6v2h-2v2h2v2h-2v2z"/></svg>
+                        View official PDF
+                      </a>
+                    </div>
+                  <% } %>
+                </div>
+
+                <!-- Per-SOP acknowledgement -->
+                <label class="flex items-center gap-2 px-4 py-3 bg-gray-50 border-t border-gray-100 cursor-pointer">
+                  <input type="checkbox" class="sop-ack w-5 h-5 rounded text-emerald-500 focus:ring-emerald-500" data-sop-slug="<%= sop.slug %>" />
+                  <span class="text-xs text-gray-700 font-semibold">I have read and understood "<%= sop.title %>"</span>
+                </label>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+        <p class="text-[11px] text-gray-500 mt-2">Tap each SOP to expand and read. Tick the box at the bottom of each one.</p>
+      </div>
+    <% } %>
+
+    <!-- Documents to review (uploaded PDFs not paired with structured content) -->
+    <%
+      const pairedPdfIds = (typeof structuredSops !== 'undefined' && structuredSops)
+        ? new Set(structuredSops.filter(s => s.matchedPdf).map(s => s.matchedPdf.id))
+        : new Set();
+      const unpairedDocs = (typeof documents !== 'undefined' && documents)
+        ? documents.filter(d => !pairedPdfIds.has(d.id))
+        : [];
+    %>
+    <% if (unpairedDocs.length > 0) { %>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Additional documents</label>
         <ul class="space-y-2" id="sop-docs">
-          <% documents.forEach((d, i) => { %>
+          <% unpairedDocs.forEach((d, i) => { %>
             <li class="bg-white border border-gray-300 rounded-xl p-3">
               <div class="flex items-start gap-3">
                 <div class="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
@@ -201,12 +296,34 @@
       placeholder.style.display = '';
     });
 
-    // ── SOP doc gate: signature stays disabled until every doc is ticked ──
+    // ── Expand/collapse structured SOP cards ──
+    function toggleSop(idx, btn) {
+      const body = document.getElementById('sop-body-' + idx);
+      const chev = btn.querySelector('.sop-chevron');
+      const expanded = btn.getAttribute('aria-expanded') === 'true';
+      if (expanded) {
+        body.classList.add('hidden');
+        if (chev) chev.style.transform = '';
+        btn.setAttribute('aria-expanded', 'false');
+      } else {
+        body.classList.remove('hidden');
+        if (chev) chev.style.transform = 'rotate(180deg)';
+        btn.setAttribute('aria-expanded', 'true');
+        // Mark as viewed so the per-SOP checkbox can be enabled
+        const cb = body.querySelector('.sop-ack');
+        if (cb) cb.disabled = false;
+      }
+    }
+    window.toggleSop = toggleSop;
+
+    // ── Gate: signature stays disabled until every SOP and every doc is ticked ──
     const docCheckboxes = Array.from(document.querySelectorAll('.doc-ack'));
+    const sopCheckboxes = Array.from(document.querySelectorAll('.sop-ack'));
+    const allCheckboxes = docCheckboxes.concat(sopCheckboxes);
     const sigPadWrap = document.getElementById('sig-pad-wrap');
     const sigGateMsg = document.getElementById('sig-gate-msg');
     function allDocsAcknowledged() {
-      return docCheckboxes.length === 0 || docCheckboxes.every(cb => cb.checked);
+      return allCheckboxes.length === 0 || allCheckboxes.every(cb => cb.checked);
     }
     function syncSignatureGate() {
       const ok = allDocsAcknowledged();
@@ -216,11 +333,13 @@
       }
       if (sigGateMsg) sigGateMsg.classList.toggle('hidden', ok);
     }
-    docCheckboxes.forEach(cb => cb.addEventListener('change', syncSignatureGate));
+    allCheckboxes.forEach(cb => cb.addEventListener('change', syncSignatureGate));
+    // Disable structured-SOP checkboxes until the user has expanded the card
+    sopCheckboxes.forEach(cb => { cb.disabled = true; });
     syncSignatureGate();
 
-    // Mark a document as "viewed" so the checkbox is enabled only after they
-    // open it. Lightweight nudge — not legally binding scroll detection.
+    // Mark a PDF document as "viewed" so its checkbox is enabled only after
+    // they open it. Lightweight nudge — not legally binding scroll detection.
     document.querySelectorAll('.doc-open').forEach(link => {
       const docId = link.dataset.docId;
       const cb = document.querySelector('.doc-ack[data-doc-id="' + docId + '"]');

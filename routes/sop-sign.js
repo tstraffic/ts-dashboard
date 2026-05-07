@@ -6,8 +6,21 @@ const path = require('path');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { currentVersion: currentSopVersion, ackText: sopAckText, activeDocuments: activeSopDocuments } = require('../lib/sop');
+const sopContent = require('../lib/sop-content');
 
 const SOP_DOC_DIR = path.join(__dirname, '..', 'data', 'uploads', 'sop-documents');
+
+// Pair each structured SOP with the matching uploaded PDF (if any) so the
+// "View official PDF" link on the rich page goes to the right file.
+function pairContentWithPdfs(content, pdfDocs) {
+  return content.map(sop => {
+    let matchedPdf = null;
+    if (sop.pdfFilenameMatch) {
+      matchedPdf = pdfDocs.find(d => sop.pdfFilenameMatch.test(d.original_name) || sop.pdfFilenameMatch.test(d.title));
+    }
+    return { ...sop, matchedPdf: matchedPdf || null };
+  });
+}
 
 function loadSession(token) {
   return getDb().prepare('SELECT * FROM sop_signing_sessions WHERE token = ?').get(token);
@@ -63,6 +76,7 @@ router.get('/:token', (req, res) => {
 
   const attendees = session.target_crew_member_id ? [] : loadAttendeeList(session.id);
   const documents = activeSopDocuments(db);
+  const structuredSops = pairContentWithPdfs(sopContent.all(), documents);
 
   res.render('sop-sign/mobile', {
     layout: false,
@@ -70,6 +84,7 @@ router.get('/:token', (req, res) => {
     targetCrew,
     attendees,
     documents,
+    structuredSops,
     ackText: sopAckText(),
     sopVersion: currentSopVersion(),
     submitted: false,
