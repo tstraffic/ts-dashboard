@@ -81,7 +81,7 @@
           <option value="">— None —</option>
           <% jobs.forEach(j => { %>
             <option value="<%= j.id %>" <%= (isEdit && item.job_id == j.id) || (!isEdit && prefillJobId == j.id) ? 'selected' : '' %>>
-              <%= j.job_number %> — <%= j.project_name || j.client || '' %>
+              <%= j.job_number %> — <%= [j.project_name, j.client].filter(Boolean).join(' · ') %>
             </option>
           <% }) %>
         </select>
