@@ -227,8 +227,8 @@ router.post('/', (req, res) => {
   // If override requested, check authorisation
   if (!check.allowed && force_override) {
     const userRole = req.session.user.role;
-    if (userRole !== 'management' && userRole !== 'operations') {
-      req.flash('error', 'Only Management or Operations can override allocation blocks');
+    if (userRole !== 'admin' && userRole !== 'management' && userRole !== 'operations') {
+      req.flash('error', 'Only Admin, Management or Operations can override allocation blocks');
       return res.redirect('/allocations?date=' + allocation_date);
     }
     logActivity({
@@ -340,7 +340,7 @@ router.post('/api/allocate.json', (req, res) => {
 
   if (!check.allowed && force_override) {
     const userRole = req.session.user.role;
-    if (userRole !== 'management' && userRole !== 'operations') {
+    if (userRole !== 'admin' && userRole !== 'management' && userRole !== 'operations') {
       return res.json({ success: false, blocks: ['Unauthorised to override'], warnings: [] });
     }
     logActivity({
@@ -375,7 +375,7 @@ router.post('/api/allocate.json', (req, res) => {
 // POST /api/move.json — Move allocation between jobs
 router.post('/api/move.json', (req, res) => {
   const db = getDb();
-  const { allocation_id, new_job_id } = req.body;
+  const { allocation_id, new_job_id, force_override } = req.body;
 
   const alloc = db.prepare('SELECT * FROM crew_allocations WHERE id = ?').get(allocation_id);
   if (!alloc) return res.json({ success: false, blocks: ['Allocation not found'] });
@@ -385,8 +385,20 @@ router.post('/api/move.json', (req, res) => {
     alloc.allocation_date, alloc.start_time, alloc.end_time, alloc.id
   );
 
-  if (!check.allowed) {
-    return res.json({ success: false, blocks: check.blocks, warnings: check.warnings });
+  if (!check.allowed && !force_override) {
+    return res.json({ success: false, blocks: check.blocks, warnings: check.warnings, overridable: check.overridable });
+  }
+
+  if (!check.allowed && force_override) {
+    const userRole = req.session.user.role;
+    if (userRole !== 'admin' && userRole !== 'management' && userRole !== 'operations') {
+      return res.json({ success: false, blocks: ['Unauthorised to override'], warnings: [] });
+    }
+    logActivity({
+      user: req.session.user, action: 'update', entityType: 'allocation_override',
+      entityId: parseInt(allocation_id), jobId: parseInt(new_job_id),
+      details: 'Override (move): ' + check.blocks.join('; '), ip: req.ip,
+    });
   }
 
   db.prepare('UPDATE crew_allocations SET job_id = ?, status = ? WHERE id = ?')

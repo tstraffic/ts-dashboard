@@ -25,7 +25,7 @@
   const prevStr = prevDate.toISOString().split('T')[0];
   const nextStr = nextDate.toISOString().split('T')[0];
   const dayLabel = selD.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const canOverride = typeof userRole !== 'undefined' && (userRole === 'management' || userRole === 'operations');
+  const canOverride = typeof userRole !== 'undefined' && (userRole === 'admin' || userRole === 'management' || userRole === 'operations');
 %>
 
 <div class="mb-6 flex items-center justify-between flex-wrap gap-4">
@@ -839,8 +839,11 @@ async function moveAllocation(allocId, newJobId) {
     if (result.success) {
       showToast('Allocation moved');
       setTimeout(() => location.reload(), 500);
-    } else {
-      showToast('Move blocked: ' + (result.blocks || []).join('; '), 5000);
+    } else if (result.blocks && result.blocks.length > 0) {
+      showBlockModal(result.blocks, result.warnings || [], result.overridable, {
+        _endpoint: '/allocations/api/move.json',
+        allocation_id: allocId, new_job_id: newJobId,
+      });
     }
   } catch (err) {
     showToast('Error: ' + err.message, 5000);
@@ -873,11 +876,14 @@ document.getElementById('override-btn')?.addEventListener('click', async () => {
   if (!pendingDrop) return;
   document.getElementById('block-modal').classList.add('hidden');
 
+  const { _endpoint, ...payload } = pendingDrop;
+  const url = _endpoint || '/allocations/api/allocate.json';
+
   try {
-    const resp = await fetch('/allocations/api/allocate.json', {
+    const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-csrf-token': document.querySelector('meta[name="csrf-token"]')?.content || '' },
-      body: JSON.stringify({ ...pendingDrop, force_override: true })
+      body: JSON.stringify({ ...payload, force_override: true })
     });
     const result = await resp.json();
     if (result.success) {
