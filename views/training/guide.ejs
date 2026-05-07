@@ -927,8 +927,12 @@
 
       if (passed) {
         spawnConfetti();
-        // POST completion to server
-        fetch('/training/employee-guide/complete', {
+        // POST completion to server. The path is rendered server-side so a
+        // single template serves both the Employee Guide and the Traffic
+        // Control module without forking the HTML.
+        var completionUrl = '<%= completionUrl %>';
+        var modulePath = '<%= modulePath %>';
+        fetch(completionUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ full_name: traineeName, email: traineeEmail, score: correct, total: quizData.length })
@@ -941,10 +945,10 @@
           } else {
             msg.textContent = 'Congratulations! You passed, but we couldn\u2019t save the record. Please let admin know.';
           }
-          actions.innerHTML = '<button class="btn btn-green" onclick="window.location.href=\'/training/employee-guide\'">&#10003; Done</button>';
+          actions.innerHTML = '<button class="btn btn-green" onclick="window.location.href=\'' + modulePath + '\'">&#10003; Done</button>';
         }).catch(function() {
           document.getElementById('resultMsg').textContent = 'Congratulations! You passed. (Could not reach server to save \u2014 let admin know.)';
-          document.getElementById('resultActions').innerHTML = '<button class="btn btn-green" onclick="window.location.href=\'/training/employee-guide\'">&#10003; Done</button>';
+          document.getElementById('resultActions').innerHTML = '<button class="btn btn-green" onclick="window.location.href=\'' + modulePath + '\'">&#10003; Done</button>';
         });
       }
     }
