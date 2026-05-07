@@ -611,7 +611,7 @@ router.get('/presentations', (req, res) => {
 
   res.render('induction/admin/presentations', {
     title: 'Training Presentations',
-    currentPage: 'induction',
+    currentPage: 'induction-presentations',
     presentations,
   });
 });
@@ -735,7 +735,7 @@ router.get('/sign-session/:id', (req, res) => {
 
   res.render('induction/admin/sign-session', {
     title: 'Sign-Off Session',
-    currentPage: 'induction',
+    currentPage: 'induction-presentations',
     layout: false,
     session,
     signUrl,
@@ -789,7 +789,7 @@ router.get('/acknowledgements', (req, res) => {
 
   res.render('induction/admin/acknowledgements', {
     title: 'SOP Acknowledgements',
-    currentPage: 'induction',
+    currentPage: 'induction-presentations',
     acks,
     versions,
     currentVersion: currentSopVersion(),
