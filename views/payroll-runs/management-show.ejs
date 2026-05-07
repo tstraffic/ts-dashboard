@@ -17,23 +17,29 @@
   <div class="flex items-start justify-between gap-3 flex-wrap">
     <div>
       <a href="/payroll/runs" class="text-sm text-brand-600 hover:underline">← Pay Runs</a>
-      <h1 class="text-2xl font-bold text-gray-900 mt-1 flex items-center gap-2">
+      <h1 class="text-2xl font-bold text-gray-900 mt-1 flex items-center gap-2 flex-wrap">
         <%= run.label || ('Management — ' + periodLabel(run.period_start, run.period_end)) %>
         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-violet-50 text-violet-700 ring-1 ring-violet-600/20">MGMT</span>
-        <% if (run.status === 'finalized') { %>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Finalized</span>
-        <% } else { %>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 ring-1 ring-gray-300">Draft</span>
-        <% } %>
+        <% const _s = run.status || 'draft';
+           const _pillClass = _s === 'pending_approval' ? 'bg-amber-100 text-amber-800 ring-amber-300'
+             : _s === 'approved' ? 'bg-blue-100 text-blue-800 ring-blue-300'
+             : _s === 'paid' ? 'bg-emerald-100 text-emerald-800 ring-emerald-300'
+             : _s === 'finalized' ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+             : 'bg-gray-100 text-gray-700 ring-gray-300'; %>
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ring-1 <%= _pillClass %>"><%= statusLabel(_s) %></span>
       </h1>
       <p class="text-sm text-gray-500 mt-1 tabular-nums"><%= fmtDate(run.period_start) %> → <%= fmtDate(run.period_end) %></p>
       <% if (run.notes) { %><p class="text-xs text-gray-500 mt-1"><%= run.notes %></p><% } %>
     </div>
-    <form method="POST" action="/payroll/runs/<%= run.id %>/delete" onsubmit="return confirm('Delete this Management pay run? This is permanent.')">
-      <%- include('../partials/csrf') %>
-      <button type="submit" class="px-3 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 ring-1 ring-rose-200 rounded-lg">Delete run</button>
-    </form>
+    <% if (!runLocked) { %>
+      <form method="POST" action="/payroll/runs/<%= run.id %>/delete" onsubmit="return confirm('Delete this Management pay run? This is permanent.')">
+        <%- include('../partials/csrf') %>
+        <button type="submit" class="px-3 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 ring-1 ring-rose-200 rounded-lg">Delete run</button>
+      </form>
+    <% } %>
   </div>
+
+  <%- include('partials/_status_banner', { run, runLocked, canApprove, canUnlock, submittedBy, approvedBy, paidBy, statusLabel }) %>
 
   <!-- Totals strip -->
   <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -98,7 +104,8 @@
                     <% const labelInList = (incomeLabels || []).includes(currentLabel); %>
                     <select name="income_label"
                       onchange="this.form.submit()"
-                      class="w-44 px-2 py-1 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
+                      <%= runLocked ? 'disabled' : '' %>
+                      class="w-44 px-2 py-1 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed">
                       <% (incomeLabels || []).forEach(opt => { %>
                         <option value="<%= opt %>" <%= opt === currentLabel ? 'selected' : '' %>><%= opt %></option>
                       <% }) %>
@@ -113,7 +120,8 @@
                     <%- include('../partials/csrf') %>
                     <input type="number" step="0.01" min="0" name="salary_amount" value="<%= (parseFloat(line.salary_amount) || 0).toFixed(2) %>"
                       onblur="if(this.value!==this.defaultValue) this.form.submit()"
-                      class="w-24 px-2 py-1 text-sm text-right tabular-nums bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
+                      <%= runLocked ? 'readonly' : '' %>
+                      class="w-24 px-2 py-1 text-sm text-right tabular-nums bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 read-only:bg-gray-50 read-only:text-gray-500 read-only:cursor-not-allowed">
                   </form>
                 </td>
                 <td class="px-4 py-2 text-right text-sm tabular-nums text-rose-600">−$<%= fmtMoney(line.tax_withheld || 0) %></td>
@@ -123,16 +131,19 @@
                     <%- include('../partials/csrf') %>
                     <input type="number" step="0.01" min="0" name="super_amount" value="<%= (parseFloat(line.super_amount) || 0).toFixed(2) %>"
                       onblur="if(this.value!==this.defaultValue) this.form.submit()"
-                      class="w-24 px-2 py-1 text-sm text-right tabular-nums bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
+                      <%= runLocked ? 'readonly' : '' %>
+                      class="w-24 px-2 py-1 text-sm text-right tabular-nums bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 read-only:bg-gray-50 read-only:text-gray-500 read-only:cursor-not-allowed">
                   </form>
                 </td>
                 <td class="px-4 py-2 text-right">
-                  <form method="POST" action="/payroll/runs/<%= run.id %>/management-lines/<%= line.id %>/delete" class="inline" onsubmit="return confirm('Remove this income line?')">
-                    <%- include('../partials/csrf') %>
-                    <button type="submit" title="Remove line" class="p-1.5 text-gray-400 hover:text-rose-600 rounded-md">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
-                  </form>
+                  <% if (!runLocked) { %>
+                    <form method="POST" action="/payroll/runs/<%= run.id %>/management-lines/<%= line.id %>/delete" class="inline" onsubmit="return confirm('Remove this income line?')">
+                      <%- include('../partials/csrf') %>
+                      <button type="submit" title="Remove line" class="p-1.5 text-gray-400 hover:text-rose-600 rounded-md">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                      </button>
+                    </form>
+                  <% } %>
                 </td>
               </tr>
             <% }) %>
@@ -153,6 +164,7 @@
   </div>
 
   <!-- Add an income line -->
+  <% if (!runLocked) { %>
   <details class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 group">
     <summary class="cursor-pointer inline-flex items-center text-sm font-semibold text-brand-600 hover:text-brand-700 list-none">
       <svg class="w-4 h-4 mr-1 transition-transform group-open:rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -193,6 +205,7 @@
       </div>
     </form>
   </details>
+  <% } %>
 </div>
 
 <% if (flash_success && flash_success.length) { %>

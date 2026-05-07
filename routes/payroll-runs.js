@@ -16,6 +16,9 @@ const archiver = require('archiver');
 const { getDb } = require('../db/database');
 const { requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../middleware/audit');
+const { sendEmail } = require('../services/email');
+const { notificationEmail } = require('../services/emailTemplates');
+const { sendPushForNotifications } = require('../services/pushNotification');
 const {
   parseCsv, normalizeShift, aggregateByWorker, inferPeriod,
   matchEmployee, fetchClassification,
@@ -23,7 +26,7 @@ const {
   resolveRates, totalsFromBuckets, emptyBuckets,
   formatLocalDate, safeParseJson,
   BUCKETS, BUCKET_LABELS, BUCKET_RATE_FIELDS,
-  round2, toNum,
+  round2, toNum, payAsYouGo,
 } = require('../lib/payroll');
 
 // ----------------------------------------------------------------------------
@@ -69,6 +72,103 @@ function periodLabel(start, end) {
   const d = new Date(end + 'T00:00:00');
   if (isNaN(d.getTime())) return '';
   return `WE ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getFullYear()).slice(2)}`;
+}
+
+// ---- Approval workflow helpers --------------------------------------------
+// Approver = whose sign-off is required. Default: username 'saadat'.
+// Unlockers = who can re-open an approved run for edits. Default: 'saadat' + 'sajid'.
+// If neither username exists yet (fresh deploy / dev DB), fall back to all
+// active admin users so the workflow still works.
+function getApproverUserIds(db) {
+  const matches = db.prepare("SELECT id FROM users WHERE LOWER(username) IN ('saadat') AND active = 1").all().map(u => u.id);
+  if (matches.length) return matches;
+  return db.prepare("SELECT id FROM users WHERE LOWER(role) = 'admin' AND active = 1").all().map(u => u.id);
+}
+function getUnlockerUserIds(db) {
+  const matches = db.prepare("SELECT id FROM users WHERE LOWER(username) IN ('saadat', 'sajid') AND active = 1").all().map(u => u.id);
+  if (matches.length) return matches;
+  return db.prepare("SELECT id FROM users WHERE LOWER(role) = 'admin' AND active = 1").all().map(u => u.id);
+}
+function getFinanceUserIds(db, alsoIncludeUserId) {
+  const ids = db.prepare("SELECT id FROM users WHERE LOWER(role) IN ('finance', 'accounts') AND active = 1").all().map(u => u.id);
+  if (alsoIncludeUserId && !ids.includes(alsoIncludeUserId)) ids.push(alsoIncludeUserId);
+  return ids;
+}
+function isApprover(db, user) {
+  if (!user || !user.id) return false;
+  return getApproverUserIds(db).includes(user.id);
+}
+function isUnlocker(db, user) {
+  if (!user || !user.id) return false;
+  return getUnlockerUserIds(db).includes(user.id);
+}
+function isRunLocked(run) {
+  if (!run) return false;
+  return run.status === 'pending_approval' || run.status === 'approved' || run.status === 'paid';
+}
+// Friendly label for the status pill
+function statusLabel(status) {
+  switch (status) {
+    case 'pending_approval': return 'Pending approval';
+    case 'approved':         return 'Approved';
+    case 'paid':             return 'Paid';
+    case 'finalized':        return 'Finalized';
+    default:                 return 'Draft';
+  }
+}
+// Block edits on locked runs. Returns true if request should proceed.
+// On block: sends 423 JSON for XHR, otherwise flashes + redirects.
+function assertEditable(req, res, run) {
+  if (!isRunLocked(run)) return true;
+  const msg = `This pay run is ${statusLabel(run.status).toLowerCase()} and locked. Ask an approver to unlock it before editing.`;
+  if (req.xhr || (req.headers.accept || '').includes('json')) {
+    res.status(423).json({ error: msg });
+  } else {
+    req.flash('error', msg);
+    res.redirect('/payroll/runs/' + run.id);
+  }
+  return false;
+}
+// Loads pay_run for a request that only has a line id route. Used by line
+// mutation endpoints so they can also check edit lock state.
+function getRunForLineRoute(db, runId) {
+  return db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(runId);
+}
+// Send in-app + push + email to a list of user ids.
+function notifyPayrollUsers(db, userIds, title, message, link) {
+  if (!userIds || !userIds.length) return;
+  try {
+    const insert = db.prepare(`
+      INSERT INTO notifications (user_id, type, title, message, link)
+      VALUES (?, 'general', ?, ?, ?)
+    `);
+    const newNotifs = [];
+    for (const userId of userIds) {
+      try {
+        insert.run(userId, title, message, link);
+        newNotifs.push({ userId, title, message, link });
+      } catch (e) { /* ignore individual failure */ }
+    }
+    // Push immediately for the new in-app notifications
+    try { sendPushForNotifications(db, newNotifs); } catch (e) { console.error('[payroll/notify] push error:', e.message); }
+    // Email immediately for users who opted in
+    const placeholders = userIds.map(() => '?').join(',');
+    const users = db.prepare(`
+      SELECT id, full_name, email, email_notifications_enabled, notification_frequency
+      FROM users WHERE id IN (${placeholders})
+    `).all(...userIds);
+    for (const u of users) {
+      if (!u.email) continue;
+      if (!u.email_notifications_enabled) continue;
+      if (u.notification_frequency && u.notification_frequency !== 'immediate') continue;
+      try {
+        const html = notificationEmail(u.full_name || '', title, message, link);
+        sendEmail(u.email, title, html).catch(() => {});
+      } catch (e) { /* ignore individual failure */ }
+    }
+  } catch (err) {
+    console.error('[payroll/notify] error:', err.message);
+  }
 }
 
 function loadPHSet(db) {
@@ -176,16 +276,29 @@ function createManagementRun(req, res) {
 
 function sectionTotal(arr) {
   let hours = 0, wages = 0, allow = 0, total = 0;
+  let tfn_super = 0, tfn_tax = 0, tfn_net = 0;
   for (const l of arr) {
     hours += toNum(l.total_hours);
     wages += toNum(l.total_wages);
     allow += toNum(l.total_allowance);
     total += toNum(l.grand_total);
+    // TFN-only super/tax/net are pre-computed on the line in the GET handler
+    tfn_super += toNum(l.tfn_super);
+    tfn_tax   += toNum(l.tfn_tax);
+    tfn_net   += toNum(l.tfn_net);
   }
   return {
     hours: round2(hours), wages: round2(wages), allow: round2(allow), total: round2(total),
     gst: round2(total * 0.10), with_gst: round2(total * 1.10),
+    tfn_super: round2(tfn_super), tfn_tax: round2(tfn_tax), tfn_net: round2(tfn_net),
   };
+}
+
+// Number of weeks in a pay period (1 if missing/invalid). Used for tax calc.
+function periodWeeks(run) {
+  if (!run || !run.period_start || !run.period_end) return 1;
+  const ms = new Date(run.period_end + 'T00:00:00') - new Date(run.period_start + 'T00:00:00');
+  return Math.max(1, Math.round(ms / (7 * 86400000) + 1) || 1);
 }
 
 // ============================================================================
@@ -442,7 +555,13 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
         net: round2(totalSalary - totalTax),
         grand: round2(totalSalary + totalSuper),
       },
-      fmtMoney, periodLabel,
+      fmtMoney, periodLabel, statusLabel,
+      runLocked: isRunLocked(run),
+      canApprove: isApprover(db, req.session.user),
+      canUnlock: isUnlocker(db, req.session.user),
+      submittedBy: run.submitted_by_id ? db.prepare('SELECT full_name, username FROM users WHERE id = ?').get(run.submitted_by_id) : null,
+      approvedBy: run.approved_by_id ? db.prepare('SELECT full_name, username FROM users WHERE id = ?').get(run.approved_by_id) : null,
+      paidBy: run.paid_by_id ? db.prepare('SELECT full_name, username FROM users WHERE id = ?').get(run.paid_by_id) : null,
     });
   }
 
@@ -455,6 +574,7 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
       e.award_classification_id,
       COALESCE(e.rate_fares_daily, 0) AS emp_travel_rate,
       COALESCE(e.rate_meal, 0)         AS emp_meal_rate,
+      COALESCE(e.super_rate, 0.12)     AS emp_super_rate,
       ac.classification AS classification_name
     FROM pay_run_lines prl
     LEFT JOIN employees e ON e.id = prl.employee_id
@@ -492,12 +612,25 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
     } catch (e) { /* table may not exist on a stale deploy */ }
   }
 
+  // Tax is calculated on the period's wages, then converted to weekly + back
+  // to period for ATO bracket alignment. Super = wages × employee super_rate
+  // (default 12%). Net = (wages + allow) − tax (allowances are typically
+  // tax-exempt, so they pass through to net unchanged). TFN only — Cash and
+  // ABN don't have employer-side withholding/super.
+  const weeks = periodWeeks(run);
   const buckets = { cash: [], tfn: [], abn: [], unclassified: [] };
   for (const l of lines) {
     hydrateLine(l);
     l.expenses = expensesByLine[l.id] || [];
     l.deductions = deductionsByLine[l.id] || [];
     const t = (l.payment_type || '').toLowerCase();
+    if (t === 'tfn') {
+      const wages = toNum(l.total_wages);
+      const superRate = toNum(l.emp_super_rate) || 0.12;
+      l.tfn_super = round2(wages * superRate);
+      l.tfn_tax   = payAsYouGo(wages, weeks);
+      l.tfn_net   = round2(toNum(l.grand_total) - l.tfn_tax);
+    }
     if      (t === 'cash') buckets.cash.push(l);
     else if (t === 'tfn')  buckets.tfn.push(l);
     else if (t === 'abn')  buckets.abn.push(l);
@@ -515,6 +648,9 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
     paid:  round2(lines.filter(l => l.paid).reduce((s, l) => s + toNum(l.grand_total), 0)),
     paid_count: lines.filter(l => l.paid).length,
     line_count: lines.length,
+    tfn_super: totals.tfn.tfn_super || 0,
+    tfn_tax:   totals.tfn.tfn_tax   || 0,
+    tfn_net:   totals.tfn.tfn_net   || 0,
   };
 
   const employees = db.prepare(`
@@ -531,7 +667,13 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
     bucketLabels: BUCKET_LABELS,
     bucketKeys: BUCKETS,
     buckets, totals, grand, employees,
-    fmtMoney, periodLabel,
+    fmtMoney, periodLabel, statusLabel,
+    runLocked: isRunLocked(run),
+    canApprove: isApprover(db, req.session.user),
+    canUnlock: isUnlocker(db, req.session.user),
+    submittedBy: run.submitted_by_id ? db.prepare('SELECT full_name, username FROM users WHERE id = ?').get(run.submitted_by_id) : null,
+    approvedBy: run.approved_by_id ? db.prepare('SELECT full_name, username FROM users WHERE id = ?').get(run.approved_by_id) : null,
+    paidBy: run.paid_by_id ? db.prepare('SELECT full_name, username FROM users WHERE id = ?').get(run.paid_by_id) : null,
   });
 });
 
@@ -545,6 +687,7 @@ router.post('/runs/:id/lines/:lineId', requirePermission('payroll'), (req, res) 
   const db = getDb();
   const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
   if (!run) return res.status(404).json({ error: 'Pay run not found' });
+  if (!assertEditable(req, res, run)) return;
   const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, run.id);
   if (!line) return res.status(404).json({ error: 'Line not found' });
 
@@ -686,6 +829,9 @@ router.post('/runs/:id/lines/:lineId', requirePermission('payroll'), (req, res) 
 // ============================================================================
 router.post('/runs/:id/lines/:lineId/match', requirePermission('payroll'), (req, res) => {
   const db = getDb();
+  const run = getRunForLineRoute(db, req.params.id);
+  if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+  if (!assertEditable(req, res, run)) return;
   const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
   if (!line) { req.flash('error', 'Line not found'); return res.redirect('/payroll/runs/' + req.params.id); }
 
@@ -732,6 +878,7 @@ router.post('/runs/:id/refresh', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
   if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+  if (!assertEditable(req, res, run)) return;
 
   const isPH = makeIsPH(loadPHSet(db));
   const lines = db.prepare('SELECT * FROM pay_run_lines WHERE pay_run_id = ?').all(run.id);
@@ -791,11 +938,12 @@ function getManagementLine(db, runId, lineId) {
 router.post('/runs/:id/management-lines', requirePermission('payroll'), (req, res) => {
   try {
     const db = getDb();
-    const run = db.prepare("SELECT id, COALESCE(pay_run_type, 'traffic_control') AS pay_run_type FROM pay_runs WHERE id = ?").get(req.params.id);
+    const run = db.prepare("SELECT *, COALESCE(pay_run_type, 'traffic_control') AS pay_run_type FROM pay_runs WHERE id = ?").get(req.params.id);
     if (!run || run.pay_run_type !== 'management') {
       req.flash('error', 'Management pay run not found.');
       return res.redirect('/payroll/runs');
     }
+    if (!assertEditable(req, res, run)) return;
     const empId = parseInt(req.body.employee_id, 10);
     if (!empId) {
       req.flash('error', 'Employee is required.');
@@ -847,6 +995,9 @@ router.post('/runs/:id/management-lines', requirePermission('payroll'), (req, re
 router.post('/runs/:id/management-lines/:lineId', requirePermission('payroll'), (req, res) => {
   try {
     const db = getDb();
+    const run = getRunForLineRoute(db, req.params.id);
+    if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+    if (!assertEditable(req, res, run)) return;
     const line = getManagementLine(db, req.params.id, req.params.lineId);
     if (!line) {
       if (req.headers.accept && req.headers.accept.includes('json')) return res.status(404).json({ error: 'Line not found' });
@@ -879,6 +1030,9 @@ router.post('/runs/:id/management-lines/:lineId', requirePermission('payroll'), 
 router.post('/runs/:id/management-lines/:lineId/delete', requirePermission('payroll'), (req, res) => {
   try {
     const db = getDb();
+    const run = getRunForLineRoute(db, req.params.id);
+    if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+    if (!assertEditable(req, res, run)) return;
     const line = getManagementLine(db, req.params.id, req.params.lineId);
     if (!line) {
       req.flash('error', 'Management pay run line not found.');
@@ -895,12 +1049,196 @@ router.post('/runs/:id/management-lines/:lineId/delete', requirePermission('payr
 });
 
 // ============================================================================
+// Approval workflow:
+//   draft → pending_approval → approved → paid
+// Anyone with payroll perm can request approval, recall their request, or
+// mark a run as paid. Only the configured approver (Saadat) can approve;
+// only Saadat or Sajid can unlock a locked run back to draft.
+// ============================================================================
+
+// POST /payroll/runs/:id/submit-for-approval — finance asks Saadat to approve
+router.post('/runs/:id/submit-for-approval', requirePermission('payroll'), (req, res) => {
+  const db = getDb();
+  const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
+  if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+  if (run.status !== 'draft' && run.status !== 'finalized') {
+    req.flash('error', `Pay run is already ${statusLabel(run.status).toLowerCase()}.`);
+    return res.redirect('/payroll/runs/' + run.id);
+  }
+  db.prepare(`
+    UPDATE pay_runs SET status = 'pending_approval',
+      submitted_for_approval_at = CURRENT_TIMESTAMP,
+      submitted_by_id = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(req.session.user.id, run.id);
+
+  const period = run.label || periodLabel(run.period_start, run.period_end);
+  const submitter = req.session.user.full_name || req.session.user.username;
+  notifyPayrollUsers(db, getApproverUserIds(db),
+    'Pay run ready for approval',
+    `${submitter} submitted "${period}" for approval — please review and approve.`,
+    '/payroll/runs/' + run.id);
+
+  logActivity({
+    user: req.session.user, action: 'submit_for_approval', entityType: 'pay_run',
+    entityId: run.id, entityLabel: run.label,
+    details: `Submitted pay run for approval: ${period}`, ip: req.ip,
+  });
+  req.flash('success', 'Sent for approval. Saadat has been notified.');
+  res.redirect('/payroll/runs/' + run.id);
+});
+
+// POST /payroll/runs/:id/recall — pull back a submission before it's approved
+router.post('/runs/:id/recall', requirePermission('payroll'), (req, res) => {
+  const db = getDb();
+  const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
+  if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+  if (run.status !== 'pending_approval') {
+    req.flash('error', 'Only pending pay runs can be recalled.');
+    return res.redirect('/payroll/runs/' + run.id);
+  }
+  db.prepare(`
+    UPDATE pay_runs SET status = 'draft',
+      submitted_for_approval_at = NULL,
+      submitted_by_id = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(run.id);
+  logActivity({
+    user: req.session.user, action: 'recall', entityType: 'pay_run',
+    entityId: run.id, entityLabel: run.label,
+    details: 'Recalled pay run from pending approval', ip: req.ip,
+  });
+  req.flash('success', 'Recalled. Pay run is back to draft.');
+  res.redirect('/payroll/runs/' + run.id);
+});
+
+// POST /payroll/runs/:id/approve — Saadat signs off.
+// Saadat can approve from either 'draft' (when handling a run himself, no
+// finance review needed) or 'pending_approval' (the normal flow where finance
+// has flagged the run for sign-off).
+router.post('/runs/:id/approve', requirePermission('payroll'), (req, res) => {
+  const db = getDb();
+  if (!isApprover(db, req.session.user)) {
+    req.flash('error', 'Only Saadat can approve pay runs.');
+    return res.redirect('/payroll/runs/' + req.params.id);
+  }
+  const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
+  if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+  if (run.status !== 'pending_approval' && run.status !== 'draft' && run.status !== 'finalized') {
+    req.flash('error', `Can't approve a ${statusLabel(run.status).toLowerCase()} pay run.`);
+    return res.redirect('/payroll/runs/' + run.id);
+  }
+  db.prepare(`
+    UPDATE pay_runs SET status = 'approved',
+      approved_at = CURRENT_TIMESTAMP,
+      approved_by_id = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(req.session.user.id, run.id);
+
+  // Notify the finance team (and the submitter if they aren't on finance) so
+  // they can release payment.
+  const financeIds = getFinanceUserIds(db, run.submitted_by_id);
+  const period = run.label || periodLabel(run.period_start, run.period_end);
+  const approver = req.session.user.full_name || req.session.user.username;
+  notifyPayrollUsers(db, financeIds,
+    'Pay run approved — ready to pay',
+    `${approver} approved "${period}". Workers can now be paid.`,
+    '/payroll/runs/' + run.id);
+
+  logActivity({
+    user: req.session.user, action: 'approve', entityType: 'pay_run',
+    entityId: run.id, entityLabel: run.label,
+    details: `Approved pay run: ${period}`, ip: req.ip,
+  });
+  req.flash('success', 'Approved. Finance team has been notified.');
+  res.redirect('/payroll/runs/' + run.id);
+});
+
+// POST /payroll/runs/:id/unlock — Saadat or Sajid send it back to draft
+router.post('/runs/:id/unlock', requirePermission('payroll'), (req, res) => {
+  const db = getDb();
+  if (!isUnlocker(db, req.session.user)) {
+    req.flash('error', 'Only Saadat or Sajid can unlock pay runs.');
+    return res.redirect('/payroll/runs/' + req.params.id);
+  }
+  const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
+  if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+  if (!isRunLocked(run)) {
+    req.flash('error', 'Pay run is not locked.');
+    return res.redirect('/payroll/runs/' + run.id);
+  }
+  db.prepare(`
+    UPDATE pay_runs SET status = 'draft',
+      unlocked_at = CURRENT_TIMESTAMP,
+      unlocked_by_id = ?,
+      submitted_for_approval_at = NULL,
+      submitted_by_id = NULL,
+      approved_at = NULL,
+      approved_by_id = NULL,
+      paid_at = NULL,
+      paid_by_id = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(req.session.user.id, run.id);
+
+  const financeIds = getFinanceUserIds(db, run.submitted_by_id);
+  const period = run.label || periodLabel(run.period_start, run.period_end);
+  const unlocker = req.session.user.full_name || req.session.user.username;
+  notifyPayrollUsers(db, financeIds,
+    'Pay run unlocked for edits',
+    `${unlocker} reopened "${period}" for changes. Re-submit for approval once edits are done.`,
+    '/payroll/runs/' + run.id);
+
+  logActivity({
+    user: req.session.user, action: 'unlock', entityType: 'pay_run',
+    entityId: run.id, entityLabel: run.label,
+    details: `Unlocked pay run: ${period}`, ip: req.ip,
+  });
+  req.flash('success', 'Unlocked — back to draft. Finance team notified.');
+  res.redirect('/payroll/runs/' + run.id);
+});
+
+// POST /payroll/runs/:id/mark-paid — finance confirms payment went out
+router.post('/runs/:id/mark-paid', requirePermission('payroll'), (req, res) => {
+  const db = getDb();
+  const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
+  if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+  if (run.status !== 'approved') {
+    req.flash('error', 'Only approved pay runs can be marked as paid.');
+    return res.redirect('/payroll/runs/' + run.id);
+  }
+  db.prepare(`
+    UPDATE pay_runs SET status = 'paid',
+      paid_at = CURRENT_TIMESTAMP,
+      paid_by_id = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(req.session.user.id, run.id);
+
+  logActivity({
+    user: req.session.user, action: 'mark_paid', entityType: 'pay_run',
+    entityId: run.id, entityLabel: run.label,
+    details: `Marked pay run as paid: ${run.label || periodLabel(run.period_start, run.period_end)}`,
+    ip: req.ip,
+  });
+  req.flash('success', 'Marked as paid.');
+  res.redirect('/payroll/runs/' + run.id);
+});
+
+// ============================================================================
 // POST /payroll/runs/:id/delete
 // ============================================================================
 router.post('/runs/:id/delete', requirePermission('payroll'), (req, res) => {
   const db = getDb();
   const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
   if (!run) { req.flash('error', 'Pay run not found'); return res.redirect('/payroll/runs'); }
+  if (isRunLocked(run)) {
+    req.flash('error', `Can't delete a ${statusLabel(run.status).toLowerCase()} pay run — unlock it first.`);
+    return res.redirect('/payroll/runs/' + run.id);
+  }
   db.prepare('DELETE FROM pay_runs WHERE id = ?').run(run.id);
   if (run.csv_filename) {
     try { fs.unlinkSync(path.join(UPLOAD_DIR, run.csv_filename)); } catch (e) {}
@@ -1434,6 +1772,17 @@ router.post('/runs/:id/lines/:lineId/expenses', requirePermission('payroll'), (r
         return res.redirect('/payroll/runs/' + req.params.id);
       }
       const db = getDb();
+      const run = getRunForLineRoute(db, req.params.id);
+      if (!run) {
+        if (req.file) try { fs.unlinkSync(req.file.path); } catch (e) {}
+        if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Pay run not found' });
+        req.flash('error', 'Pay run not found.');
+        return res.redirect('/payroll/runs');
+      }
+      if (isRunLocked(run)) {
+        if (req.file) try { fs.unlinkSync(req.file.path); } catch (e) {}
+        return assertEditable(req, res, run);
+      }
       const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
       if (!line) {
         if (req.file) try { fs.unlinkSync(req.file.path); } catch (e) {}
@@ -1484,6 +1833,13 @@ router.post('/runs/:id/lines/:lineId/expenses', requirePermission('payroll'), (r
 router.post('/runs/:id/lines/:lineId/expenses/:expenseId', requirePermission('payroll'), (req, res) => {
   try {
     const db = getDb();
+    const run = getRunForLineRoute(db, req.params.id);
+    if (!run) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Pay run not found' });
+      req.flash('error', 'Pay run not found.');
+      return res.redirect('/payroll/runs');
+    }
+    if (!assertEditable(req, res, run)) return;
     const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
     const exp = db.prepare("SELECT * FROM pay_run_line_expenses WHERE id = ? AND pay_run_line_id = ?").get(req.params.expenseId, req.params.lineId);
     if (!line || !exp) {
@@ -1533,6 +1889,13 @@ router.post('/runs/:id/lines/:lineId/expenses/:expenseId', requirePermission('pa
 router.post('/runs/:id/lines/:lineId/expenses/:expenseId/delete', requirePermission('payroll'), (req, res) => {
   try {
     const db = getDb();
+    const run = getRunForLineRoute(db, req.params.id);
+    if (!run) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Pay run not found' });
+      req.flash('error', 'Pay run not found.');
+      return res.redirect('/payroll/runs');
+    }
+    if (!assertEditable(req, res, run)) return;
     const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
     const exp = db.prepare("SELECT * FROM pay_run_line_expenses WHERE id = ? AND pay_run_line_id = ?").get(req.params.expenseId, req.params.lineId);
     if (!line || !exp) {
@@ -1587,6 +1950,13 @@ router.get('/runs/:id/lines/:lineId/expenses/:expenseId/receipt', requirePermiss
 router.post('/runs/:id/lines/:lineId/deductions', requirePermission('payroll'), (req, res) => {
   try {
     const db = getDb();
+    const run = getRunForLineRoute(db, req.params.id);
+    if (!run) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Pay run not found' });
+      req.flash('error', 'Pay run not found.');
+      return res.redirect('/payroll/runs');
+    }
+    if (!assertEditable(req, res, run)) return;
     const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
     if (!line) {
       if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Line not found' });
@@ -1623,6 +1993,13 @@ router.post('/runs/:id/lines/:lineId/deductions', requirePermission('payroll'), 
 router.post('/runs/:id/lines/:lineId/deductions/:dedId', requirePermission('payroll'), (req, res) => {
   try {
     const db = getDb();
+    const run = getRunForLineRoute(db, req.params.id);
+    if (!run) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Pay run not found' });
+      req.flash('error', 'Pay run not found.');
+      return res.redirect('/payroll/runs');
+    }
+    if (!assertEditable(req, res, run)) return;
     const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
     const ded = db.prepare("SELECT * FROM pay_run_line_deductions WHERE id = ? AND pay_run_line_id = ?").get(req.params.dedId, req.params.lineId);
     if (!line || !ded) {
@@ -1668,6 +2045,13 @@ router.post('/runs/:id/lines/:lineId/deductions/:dedId', requirePermission('payr
 router.post('/runs/:id/lines/:lineId/deductions/:dedId/delete', requirePermission('payroll'), (req, res) => {
   try {
     const db = getDb();
+    const run = getRunForLineRoute(db, req.params.id);
+    if (!run) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Pay run not found' });
+      req.flash('error', 'Pay run not found.');
+      return res.redirect('/payroll/runs');
+    }
+    if (!assertEditable(req, res, run)) return;
     const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, req.params.id);
     const ded = db.prepare("SELECT * FROM pay_run_line_deductions WHERE id = ? AND pay_run_line_id = ?").get(req.params.dedId, req.params.lineId);
     if (!line || !ded) {
