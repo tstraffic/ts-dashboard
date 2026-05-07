@@ -79,7 +79,7 @@ router.get('/', (req, res) => {
     return acc;
   }, { hours: 0, charge: 0, council: 0, labour: 0, cost: 0, profit: 0 });
 
-  const jobs = db.prepare(`SELECT DISTINCT j.id, j.job_number, j.project_name FROM jobs j INNER JOIN compliance c ON c.job_id = j.id WHERE c.parent_id IS NULL ORDER BY j.job_number DESC`).all();
+  const jobs = db.prepare(`SELECT DISTINCT j.id, j.job_number, j.project_name, j.client FROM jobs j INNER JOIN compliance c ON c.job_id = j.id WHERE c.parent_id IS NULL ORDER BY j.job_number DESC`).all();
   const clients = db.prepare(`SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name`).all();
 
   res.render('finance/pnl', {

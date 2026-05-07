@@ -69,7 +69,8 @@
     <select name="job_id" class="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white">
       <option value="">All jobs</option>
       <% jobs.forEach(j => { %>
-        <option value="<%= j.id %>" <%= filters.job_id == j.id ? 'selected' : '' %>><%= j.job_number %><%= j.project_name ? ' — ' + j.project_name : '' %></option>
+        <% const _suffix = [j.project_name, j.client].filter(Boolean).join(' · '); %>
+        <option value="<%= j.id %>" <%= filters.job_id == j.id ? 'selected' : '' %>><%= j.job_number %><%= _suffix ? ' — ' + _suffix : '' %></option>
       <% }) %>
     </select>
   </div>

@@ -30,7 +30,7 @@
         <select id="hd-job-link" name="job_id" class="hd-input">
           <option value="">— None —</option>
           <% jobs.forEach(j => { %>
-            <option value="<%= j.id %>" data-job-number="<%= j.job_number %>"><%= j.job_number %> — <%= j.project_name || j.client %></option>
+            <option value="<%= j.id %>" data-job-number="<%= j.job_number %>"><%= j.job_number %> — <%= [j.project_name, j.client].filter(Boolean).join(' · ') %></option>
           <% }) %>
         </select>
       </div>
