@@ -82,6 +82,7 @@ const PERMISSIONS = {
   payroll:       ['admin', 'finance', 'accounts'],   // pay runs list + management runs
   payslips:      ['admin', 'finance', 'accounts'],   // payslips list (alias for clarity)
   abergeldie_payments: ['admin', 'finance', 'accounts'], // client payment sheet
+  ute_payments:        ['admin', 'finance', 'accounts'], // ute (vehicle) per-shift payment sheet
   budgets:       ['admin', 'finance'],
   crm:           ['admin'],
   admin:         ['admin'],

@@ -1,0 +1,45 @@
+<% locals.currentPage = 'ute-payments' %>
+
+<div class="space-y-5 max-w-2xl">
+  <div>
+    <a href="/finance/ute-payments" class="text-sm text-brand-600 hover:underline">← Ute Payments</a>
+    <h1 class="text-2xl font-bold text-gray-900 mt-1">New ute payment sheet</h1>
+    <p class="text-sm text-gray-500 mt-1">Upload a Traffio CSV. Rows with a Vehicle Registration / Rego column become ute shifts and are grouped by (plate, driver).</p>
+  </div>
+
+  <form method="POST" action="/finance/ute-payments" enctype="multipart/form-data" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-5">
+    <%- include('../partials/csrf') %>
+
+    <div>
+      <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Traffio CSV <span class="text-rose-500">*</span></label>
+      <input type="file" name="csv" accept=".csv" required class="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+      <p class="text-[11px] text-gray-500 mt-1.5">Looking for any column named Rego / Plate / Vehicle Registration.</p>
+    </div>
+
+    <div>
+      <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Default rate per shift ($)</label>
+      <input type="number" step="0.01" min="0" name="default_rate_per_shift" value="<%= defaultRate.toFixed(2) %>" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm tabular-nums">
+      <p class="text-[11px] text-gray-500 mt-1.5">Used as the starting rate on every line — you can edit each line individually after import.</p>
+    </div>
+
+    <div>
+      <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Label <span class="text-gray-400 font-normal lowercase tracking-normal">(optional)</span></label>
+      <input type="text" name="label" maxlength="200" placeholder="e.g. April 2026 — auto-generated if blank" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm">
+    </div>
+
+    <div>
+      <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Notes <span class="text-gray-400 font-normal lowercase tracking-normal">(optional)</span></label>
+      <textarea name="notes" rows="2" maxlength="1000" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"></textarea>
+    </div>
+
+    <div class="flex items-center justify-between gap-3 pt-2 border-t border-gray-200">
+      <a href="/finance/ute-payments" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Cancel</a>
+      <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">Import CSV</button>
+    </div>
+  </form>
+</div>
+
+<% if (flash_error && flash_error.length) { %>
+  <div class="fixed top-20 right-4 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold shadow-lg z-50" id="flasherr"><%= flash_error[0] %></div>
+  <script>setTimeout(()=>document.getElementById('flasherr')?.remove(), 4000);</script>
+<% } %>

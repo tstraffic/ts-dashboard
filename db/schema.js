@@ -8371,6 +8371,56 @@ function runMigrations(db) {
     }
   }
 
+  // Migration 179: Ute Payment Sheets — same shape as Abergeldie sheets but
+  // billed per shift instead of per hour. Each line = one (plate, driver)
+  // combination with a shift count, an editable rate per shift, and a
+  // computed total_fee = shifts × rate.
+  if (!isMigrationApplied.get(179)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS ute_payment_sheets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          period_start DATE NOT NULL,
+          period_end DATE NOT NULL,
+          label TEXT DEFAULT '',
+          csv_filename TEXT DEFAULT '',
+          csv_uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          default_rate_per_shift REAL NOT NULL DEFAULT 0,
+          notes TEXT DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','finalized')),
+          ready_to_pay INTEGER NOT NULL DEFAULT 0,
+          ready_to_pay_at DATETIME,
+          ready_to_pay_by_id INTEGER REFERENCES users(id),
+          paid INTEGER NOT NULL DEFAULT 0,
+          paid_at DATETIME,
+          paid_by_id INTEGER REFERENCES users(id),
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_ute_sheets_period ON ute_payment_sheets(period_start);
+
+        CREATE TABLE IF NOT EXISTS ute_payment_sheet_lines (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sheet_id INTEGER NOT NULL REFERENCES ute_payment_sheets(id) ON DELETE CASCADE,
+          plate TEXT NOT NULL DEFAULT '',
+          driver_name TEXT NOT NULL DEFAULT '',
+          shift_count INTEGER NOT NULL DEFAULT 0,
+          rate_per_shift REAL NOT NULL DEFAULT 0,
+          total_fee REAL NOT NULL DEFAULT 0,
+          notes TEXT DEFAULT '',
+          sort_order INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_ute_lines_sheet ON ute_payment_sheet_lines(sheet_id);
+      `);
+      recordMigration.run(179, 'Ute payment sheets + lines');
+      console.log('Migration 179 applied: Ute payment sheets');
+    } catch (e) {
+      console.error('Migration 179 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
