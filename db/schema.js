@@ -8371,6 +8371,19 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 179: store rendered page filenames for SOP PDFs
+  // When admin uploads a PDF SOP, the upload handler renders each page to
+  // a PNG (via lib/pdf-render.js) and stores the filenames here so the
+  // mobile sign page can display them as an inline image stack.
+  // =============================================
+  if (!isMigrationApplied.get(179)) {
+    console.log('Running migration 179: page_renders column on sop_documents');
+    try { db.exec("ALTER TABLE sop_documents ADD COLUMN page_renders TEXT DEFAULT NULL"); } catch (e) { /* may exist */ }
+    recordMigration.run(179, 'page_renders column on sop_documents');
+    console.log('Migration 179 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

@@ -9,6 +9,7 @@ const { currentVersion: currentSopVersion, ackText: sopAckText, activeDocuments:
 const sopContent = require('../lib/sop-content');
 
 const SOP_DOC_DIR = path.join(__dirname, '..', 'data', 'uploads', 'sop-documents');
+const SOP_PAGE_DIR = path.join(SOP_DOC_DIR, 'page-renders');
 
 // Pair each structured SOP with the matching uploaded PDF (if any) so the
 // "View official PDF" link on the rich page goes to the right file.
@@ -90,6 +91,22 @@ router.get('/:token', (req, res) => {
     submitted: false,
     error: null,
   });
+});
+
+// GET /sop-sign/:token/document/:docId/page/:pageFile — token-gated PNG
+// serving for the inline PDF page renders.
+router.get('/:token/document/:docId/page/:pageFile', (req, res) => {
+  const session = loadSession(req.params.token);
+  if (!session || session.closed_at) return res.status(404).send('Session unavailable');
+  const db = getDb();
+  const doc = db.prepare('SELECT * FROM sop_documents WHERE id = ? AND active = 1').get(req.params.docId);
+  if (!doc) return res.status(404).send('Document not found');
+  const pageFile = path.basename(req.params.pageFile);
+  const safe = path.resolve(SOP_PAGE_DIR, String(doc.id), pageFile);
+  if (!safe.startsWith(SOP_PAGE_DIR) || !fs.existsSync(safe)) return res.status(404).send('Page missing');
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.sendFile(safe);
 });
 
 // GET /sop-sign/:token/document/:docId — token-gated file serving so workers

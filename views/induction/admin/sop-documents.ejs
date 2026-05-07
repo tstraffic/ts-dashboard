@@ -96,6 +96,22 @@
             <!-- Actions -->
             <div class="flex items-center gap-1 flex-shrink-0">
               <a href="/induction/admin/sop-documents/<%= d.id %>/file" target="_blank" class="px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 rounded">Open</a>
+              <% if (iconFor(d.mime_type, d.original_name) === 'pdf') { %>
+                <%
+                  let pageCount = 0;
+                  if (d.page_renders) { try { pageCount = (JSON.parse(d.page_renders) || []).length; } catch (e) {} }
+                %>
+                <form method="POST" action="/induction/admin/sop-documents/<%= d.id %>/render" class="inline-flex">
+                  <%- include('../../partials/csrf') %>
+                  <button type="submit" class="px-2 py-1 text-xs font-medium <%= pageCount > 0 ? 'text-emerald-600 hover:bg-emerald-50' : 'text-amber-600 hover:bg-amber-50' %> rounded" title="Render PDF pages to images for inline display">
+                    <% if (pageCount > 0) { %>
+                      ✓ <%= pageCount %>p
+                    <% } else { %>
+                      Render
+                    <% } %>
+                  </button>
+                </form>
+              <% } %>
               <form method="POST" action="/induction/admin/sop-documents/<%= d.id %>/move" class="inline-flex">
                 <%- include('../../partials/csrf') %>
                 <input type="hidden" name="dir" value="up">

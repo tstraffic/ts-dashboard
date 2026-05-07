@@ -13,6 +13,26 @@ const { maybeMarkInducted } = require('../lib/induction');
 // SOP document uploads — accept PDFs first, also images/Word docs as a
 // fallback in case the user has an existing file format that's not PDF.
 const SOP_DOC_DIR = path.join(__dirname, '..', 'data', 'uploads', 'sop-documents');
+const SOP_PAGE_DIR = path.join(SOP_DOC_DIR, 'page-renders');
+const { renderPdfToPngs } = require('../lib/pdf-render');
+
+// Render the PDF's pages and save the filenames on the row. Called from the
+// upload handler and the re-render endpoint. Best-effort — failures are
+// logged but don't break the upload (the original PDF is still served).
+async function renderAndPersistPages(db, docRow) {
+  if (!/pdf/i.test(docRow.mime_type) && !/\.pdf$/i.test(docRow.original_name)) return [];
+  try {
+    const out = path.join(SOP_PAGE_DIR, String(docRow.id));
+    fs.mkdirSync(out, { recursive: true });
+    const pages = await renderPdfToPngs(docRow.file_path, out);
+    db.prepare('UPDATE sop_documents SET page_renders = ? WHERE id = ?').run(JSON.stringify(pages), docRow.id);
+    return pages;
+  } catch (e) {
+    console.error(`[sop-render] doc ${docRow.id} failed:`, e.message);
+    return [];
+  }
+}
+
 const sopDocStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     fs.mkdirSync(SOP_DOC_DIR, { recursive: true });
@@ -876,7 +896,7 @@ router.get('/sop-documents', (req, res) => {
 });
 
 // POST /induction/admin/sop-documents — upload a new doc
-router.post('/sop-documents', sopDocUpload.single('file'), (req, res) => {
+router.post('/sop-documents', sopDocUpload.single('file'), async (req, res) => {
   if (!req.file) {
     req.flash('error', 'No file uploaded.');
     return res.redirect('/induction/admin/sop-documents');
@@ -885,7 +905,7 @@ router.post('/sop-documents', sopDocUpload.single('file'), (req, res) => {
   const title = (req.body.title || req.file.originalname.replace(/\.[^.]+$/, '')).toString().trim().slice(0, 200);
   const next = db.prepare('SELECT COALESCE(MAX(display_order), 0) + 1 as n FROM sop_documents').get();
 
-  db.prepare(`
+  const result = db.prepare(`
     INSERT INTO sop_documents (title, filename, original_name, file_path, file_size, mime_type, display_order, active, created_by_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
   `).run(
@@ -899,7 +919,30 @@ router.post('/sop-documents', sopDocUpload.single('file'), (req, res) => {
     req.session.user.id,
   );
 
-  req.flash('success', `Uploaded "${title}".`);
+  // Render PDF pages to PNGs so the mobile sign page can display them inline.
+  // Best-effort — done synchronously here so the admin sees the result on
+  // redirect, but failures are non-fatal.
+  const docRow = db.prepare('SELECT * FROM sop_documents WHERE id = ?').get(result.lastInsertRowid);
+  let pageCount = 0;
+  try {
+    const pages = await renderAndPersistPages(db, docRow);
+    pageCount = pages.length;
+  } catch (e) { /* logged inside */ }
+
+  req.flash('success', `Uploaded "${title}"${pageCount ? ` — rendered ${pageCount} page${pageCount === 1 ? '' : 's'} for inline display` : ''}.`);
+  res.redirect('/induction/admin/sop-documents');
+});
+
+// POST /induction/admin/sop-documents/:id/render — re-render pages (backfill or refresh)
+router.post('/sop-documents/:id/render', async (req, res) => {
+  const db = getDb();
+  const doc = db.prepare('SELECT * FROM sop_documents WHERE id = ?').get(req.params.id);
+  if (!doc) { req.flash('error', 'Document not found.'); return res.redirect('/induction/admin/sop-documents'); }
+  const pages = await renderAndPersistPages(db, doc);
+  req.flash(pages.length > 0 ? 'success' : 'error',
+    pages.length > 0
+      ? `Rendered ${pages.length} page${pages.length === 1 ? '' : 's'} for "${doc.title}".`
+      : `No pages rendered for "${doc.title}". Check it's a valid PDF.`);
   res.redirect('/induction/admin/sop-documents');
 });
 
@@ -920,6 +963,8 @@ router.post('/sop-documents/:id/delete', (req, res) => {
   const doc = db.prepare('SELECT id, title, file_path FROM sop_documents WHERE id = ?').get(req.params.id);
   if (!doc) { req.flash('error', 'Document not found.'); return res.redirect('/induction/admin/sop-documents'); }
   try { fs.unlinkSync(doc.file_path); } catch (e) { /* file may already be gone */ }
+  // Remove rendered pages too
+  try { fs.rmSync(path.join(SOP_PAGE_DIR, String(doc.id)), { recursive: true, force: true }); } catch (e) { /* ok */ }
   db.prepare('DELETE FROM sop_documents WHERE id = ?').run(doc.id);
   req.flash('success', `Deleted "${doc.title}".`);
   res.redirect('/induction/admin/sop-documents');
