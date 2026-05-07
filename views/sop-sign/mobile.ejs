@@ -148,6 +148,17 @@
             <p class="mt-3 text-xs text-gray-500 text-center">
               <a href="/sop-sign/<%= session.token %>/document/<%= sop.matchedPdf.id %>" target="_blank" rel="noopener" class="text-brand-600 hover:underline font-medium">Open as PDF</a>
             </p>
+          <% } else if (sop.matchedPdf) { %>
+            <!-- PDF couldn't be pre-rendered to images — fall back to an
+                 inline iframe so the worker still sees the document. -->
+            <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <iframe src="/sop-sign/<%= session.token %>/document/<%= sop.matchedPdf.id %>#view=FitH"
+                      class="w-full block bg-white" style="height: 80vh; border: 0;"
+                      title="<%= sop.title %>"></iframe>
+            </div>
+            <p class="mt-3 text-xs text-gray-500 text-center">
+              Trouble viewing? <a href="/sop-sign/<%= session.token %>/document/<%= sop.matchedPdf.id %>" target="_blank" rel="noopener" class="text-brand-600 hover:underline font-medium">Open the PDF in a new tab</a>.
+            </p>
           <% } else { %>
             <% if (sop.summary) { %>
               <p class="text-sm text-gray-700 mb-5 leading-relaxed"><%= sop.summary %></p>

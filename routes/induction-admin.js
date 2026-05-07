@@ -17,19 +17,20 @@ const SOP_PAGE_DIR = path.join(SOP_DOC_DIR, 'page-renders');
 const { renderPdfToPngs } = require('../lib/pdf-render');
 
 // Render the PDF's pages and save the filenames on the row. Called from the
-// upload handler and the re-render endpoint. Best-effort — failures are
-// logged but don't break the upload (the original PDF is still served).
+// upload handler and the re-render endpoint. Best-effort — the original PDF
+// is still served even if this fails, and the mobile sign page falls back
+// to an iframe.
 async function renderAndPersistPages(db, docRow) {
-  if (!/pdf/i.test(docRow.mime_type) && !/\.pdf$/i.test(docRow.original_name)) return [];
+  if (!/pdf/i.test(docRow.mime_type) && !/\.pdf$/i.test(docRow.original_name)) return { pages: [], error: null };
   try {
     const out = path.join(SOP_PAGE_DIR, String(docRow.id));
     fs.mkdirSync(out, { recursive: true });
     const pages = await renderPdfToPngs(docRow.file_path, out);
     db.prepare('UPDATE sop_documents SET page_renders = ? WHERE id = ?').run(JSON.stringify(pages), docRow.id);
-    return pages;
+    return { pages, error: null };
   } catch (e) {
     console.error(`[sop-render] doc ${docRow.id} failed:`, e.message);
-    return [];
+    return { pages: [], error: e.message };
   }
 }
 
@@ -930,13 +931,11 @@ router.post('/sop-documents', sopDocUpload.single('file'), async (req, res) => {
   // Best-effort — done synchronously here so the admin sees the result on
   // redirect, but failures are non-fatal.
   const docRow = db.prepare('SELECT * FROM sop_documents WHERE id = ?').get(result.lastInsertRowid);
-  let pageCount = 0;
-  try {
-    const pages = await renderAndPersistPages(db, docRow);
-    pageCount = pages.length;
-  } catch (e) { /* logged inside */ }
-
-  req.flash('success', `Uploaded "${title}"${pageCount ? ` — rendered ${pageCount} page${pageCount === 1 ? '' : 's'} for inline display` : ''}.`);
+  const { pages, error } = await renderAndPersistPages(db, docRow);
+  let suffix = '';
+  if (pages.length > 0) suffix = ` — rendered ${pages.length} page${pages.length === 1 ? '' : 's'} for inline display.`;
+  else if (error) suffix = ` (Inline render failed: ${error}. The PDF will still display via the browser's PDF viewer.)`;
+  req.flash(pages.length > 0 || !error ? 'success' : 'error', `Uploaded "${title}".${suffix}`);
   res.redirect('/induction/admin/sop-documents');
 });
 
@@ -945,11 +944,12 @@ router.post('/sop-documents/:id/render', async (req, res) => {
   const db = getDb();
   const doc = db.prepare('SELECT * FROM sop_documents WHERE id = ?').get(req.params.id);
   if (!doc) { req.flash('error', 'Document not found.'); return res.redirect('/induction/admin/sop-documents'); }
-  const pages = await renderAndPersistPages(db, doc);
-  req.flash(pages.length > 0 ? 'success' : 'error',
-    pages.length > 0
-      ? `Rendered ${pages.length} page${pages.length === 1 ? '' : 's'} for "${doc.title}".`
-      : `No pages rendered for "${doc.title}". Check it's a valid PDF.`);
+  const { pages, error } = await renderAndPersistPages(db, doc);
+  if (pages.length > 0) {
+    req.flash('success', `Rendered ${pages.length} page${pages.length === 1 ? '' : 's'} for "${doc.title}".`);
+  } else {
+    req.flash('error', `Couldn't render "${doc.title}": ${error || 'unknown reason'}. The PDF will still display via the browser's PDF viewer on the sign page.`);
+  }
   res.redirect('/induction/admin/sop-documents');
 });
 
