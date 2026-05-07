@@ -82,7 +82,7 @@
             const rowSpan = Math.max(activeKeys.length, 1);
           %>
           <% if (activeKeys.length === 0) { %>
-            <tr class="<%= l.paid ? 'opacity-60' : '' %>">
+            <tr data-line-id="<%= l.id %>" class="<%= l.paid ? 'opacity-60' : '' %>">
               <td class="px-3 py-2 sticky left-0 bg-white z-[5] <%= l.paid ? 'opacity-100' : '' %>">
                 <p class="font-semibold text-gray-900 text-sm leading-tight"><%= l.full_name %></p>
                 <% if (l.employee_code) { %>
@@ -112,7 +112,7 @@
             </tr>
           <% } else { %>
             <% activeKeys.forEach((bk, idx) => { const b = l.buckets[bk]; const isFirst = idx === 0; const isLast = idx === activeKeys.length - 1; %>
-              <tr class="<%= l.paid ? 'opacity-60' : '' %>">
+              <tr data-line-id="<%= l.id %>" class="<%= l.paid ? 'opacity-60' : '' %>">
                 <% if (isFirst) { %>
                   <td rowspan="<%= rowSpan %>" class="px-3 py-2 align-top sticky left-0 bg-white z-[5] <%= l.paid ? 'opacity-100' : '' %>">
                     <p class="font-semibold text-gray-900 text-sm leading-tight"><%= l.full_name %></p>

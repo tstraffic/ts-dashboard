@@ -73,7 +73,7 @@
     <div class="bg-gradient-to-br from-brand-600 to-brand-700 text-white rounded-xl p-4">
       <p class="text-[10px] font-bold text-white/80 uppercase tracking-widest">Grand Total</p>
       <p class="text-xl font-bold mt-1 tabular-nums">$<%= fmtMoney(grand.total) %></p>
-      <p class="text-[10px] text-white/80 mt-0.5"><%= grand.paid_count %>/<%= grand.line_count %> paid · <%= fmtHours(grandHours) %> hrs</p>
+      <p class="text-[10px] text-white/80 mt-0.5"><span data-paid-count><%= grand.paid_count %></span>/<%= grand.line_count %> paid · <%= fmtHours(grandHours) %> hrs</p>
     </div>
   </div>
 
@@ -842,6 +842,19 @@
   function closeMatchModal() { document.getElementById('matchModal').classList.add('hidden'); }
 
   function togglePaid(lineId, checked) {
+    // Optimistic in-place update — reloading the whole page on every checkbox
+    // tick is jarring when finance ticks 30 workers in a row. Update the
+    // row(s) immediately, send the request in the background, revert on
+    // failure.
+    const rows = document.querySelectorAll('tr[data-line-id="' + lineId + '"]');
+    rows.forEach(r => r.classList.toggle('opacity-60', checked));
+
+    const counter = document.querySelector('[data-paid-count]');
+    if (counter) {
+      const cur = parseInt(counter.textContent, 10) || 0;
+      counter.textContent = String(cur + (checked ? 1 : -1));
+    }
+
     // Use urlencoded so express.urlencoded() parses req.body — multipart
     // FormData would slip through unparsed (no multer on this route).
     const fd = new URLSearchParams();
@@ -855,8 +868,17 @@
       },
       body: fd.toString(),
     }).then(r => r.ok ? r.json() : Promise.reject(r.statusText))
-      .then(() => { window.location.reload(); })
-      .catch(err => alert('Save failed: ' + err));
+      .catch(err => {
+        // Revert the optimistic update
+        rows.forEach(r => r.classList.toggle('opacity-60', !checked));
+        if (counter) {
+          const cur = parseInt(counter.textContent, 10) || 0;
+          counter.textContent = String(cur + (checked ? -1 : 1));
+        }
+        const cb = document.querySelector('input[type="checkbox"][onchange*="togglePaid(' + lineId + ','+'"]');
+        if (cb) cb.checked = !checked;
+        alert('Save failed: ' + err);
+      });
   }
 
   document.addEventListener('keydown', e => {
