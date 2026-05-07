@@ -938,6 +938,79 @@ router.post('/runs/:id/refresh', requirePermission('payroll'), (req, res) => {
 });
 
 // ============================================================================
+// POST /payroll/runs/:id/lines — add a one-off worker to a TC run.
+//   Used for casuals or sub-contractors who didn't come in via the Traffio
+//   CSV but need to be paid for this week. Creates a line with empty buckets
+//   so the user can click Edit and fill in hours/rates straight after.
+//   Optionally links to an existing employee record so future runs can match.
+// ============================================================================
+router.post('/runs/:id/lines', requirePermission('payroll'), (req, res) => {
+  const db = getDb();
+  const run = db.prepare("SELECT *, COALESCE(pay_run_type, 'traffic_control') AS pay_run_type FROM pay_runs WHERE id = ?").get(req.params.id);
+  if (!run) { req.flash('error', 'Pay run not found.'); return res.redirect('/payroll/runs'); }
+  if (run.pay_run_type === 'management') {
+    req.flash('error', 'Management runs use the Add income line form instead.');
+    return res.redirect('/payroll/runs/' + run.id);
+  }
+  if (!assertEditable(req, res, run)) return;
+
+  const fullName = String(req.body.full_name || '').trim().slice(0, 120);
+  const paymentType = String(req.body.payment_type || '').toLowerCase();
+  if (!fullName) {
+    req.flash('error', 'Worker name is required.');
+    return res.redirect('/payroll/runs/' + run.id);
+  }
+  if (!['cash', 'tfn', 'abn'].includes(paymentType)) {
+    req.flash('error', 'Pick a section (Cash, TFN or ABN).');
+    return res.redirect('/payroll/runs/' + run.id);
+  }
+
+  // Optional employee link — if provided, pull in BSB/account + classification
+  // rates so the edit modal has sensible defaults.
+  const empId = parseInt(req.body.employee_id, 10) || null;
+  let emp = null;
+  let classification = null;
+  if (empId) {
+    emp = db.prepare('SELECT * FROM employees WHERE id = ?').get(empId);
+    if (emp && emp.award_classification_id) {
+      try { classification = fetchClassification(db, emp.award_classification_id); } catch (e) { /* ignore */ }
+    }
+  }
+
+  // Default rates from classification + employee fallback. If neither is set
+  // (truly one-off worker), buckets are seeded with $0 rates — user fills
+  // them in via the Edit modal.
+  const rates = resolveRates(emp, classification);
+  const buckets = emptyBuckets(rates);
+
+  const result = db.prepare(`
+    INSERT INTO pay_run_lines (
+      pay_run_id, employee_id, full_name, payment_type, bsb, acc_number,
+      buckets_json, total_hours, total_wages, total_allowance, grand_total,
+      sort_order
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 999)
+  `).run(
+    run.id,
+    emp ? emp.id : null,
+    fullName,
+    paymentType,
+    emp ? (emp.payroll_bsb || '') : '',
+    emp ? (emp.payroll_account || '') : '',
+    JSON.stringify(buckets),
+  );
+
+  logActivity({
+    user: req.session.user, action: 'add_one_off', entityType: 'pay_run_line',
+    entityId: result.lastInsertRowid, entityLabel: fullName,
+    details: `Added one-off ${paymentType.toUpperCase()} worker "${fullName}" to pay run ${run.id}`,
+    ip: req.ip,
+  });
+
+  req.flash('success', `Added ${fullName} to ${paymentType.toUpperCase()}. Click Edit to fill in hours.`);
+  res.redirect('/payroll/runs/' + run.id);
+});
+
+// ============================================================================
 // Management pay run line endpoints — separate from the TC line editor
 // because the column shape is different (salary/super/income_label vs
 // hours buckets) and we want the cleaner per-row try/catch pattern.

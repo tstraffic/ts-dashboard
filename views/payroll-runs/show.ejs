@@ -22,6 +22,10 @@
     </div>
     <div class="flex items-center gap-2">
       <% if (!runLocked) { %>
+        <button type="button" onclick="openAddOneOff()" class="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 hover:bg-brand-50 hover:border-brand-300 hover:text-brand-700 text-gray-700 text-sm font-semibold rounded-lg transition" title="Add a one-off worker to this pay run only (e.g. casual or sub-contractor)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+          Add worker
+        </button>
         <form method="POST" action="/payroll/runs/<%= run.id %>/refresh" onsubmit="return confirm('Re-run categorization for ALL workers? Manual hour edits will be lost. Allowances + rates re-applied from current employee + classification.')">
           <%- include('../partials/csrf') %>
           <button type="submit" class="px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg transition" title="Re-run bucket categorization from shifts using current employee rates + classifications">
@@ -306,6 +310,60 @@
     </div>
   </div>
 </div>
+
+<!-- Add one-off worker modal -->
+<% if (!runLocked) { %>
+<div id="addOneOffModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm overflow-y-auto" onclick="if(event.target===this)closeAddOneOff()">
+  <div class="min-h-full flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <form method="POST" action="/payroll/runs/<%= run.id %>/lines">
+        <%- include('../partials/csrf') %>
+        <div class="p-5 border-b border-gray-200">
+          <h2 class="text-lg font-bold text-gray-900">Add one-off worker</h2>
+          <p class="text-xs text-gray-500 mt-0.5">For casuals or sub-contractors not in this week's CSV. They'll only appear on this pay run.</p>
+        </div>
+        <div class="p-5 space-y-4">
+          <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Worker name <span class="text-rose-500">*</span></label>
+            <input type="text" name="full_name" required maxlength="120" placeholder="e.g. Jane Smith" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Section <span class="text-rose-500">*</span></label>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="relative cursor-pointer">
+                <input type="radio" name="payment_type" value="cash" class="peer sr-only" required>
+                <div class="border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50 peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-800">Cash</div>
+              </label>
+              <label class="relative cursor-pointer">
+                <input type="radio" name="payment_type" value="tfn" class="peer sr-only">
+                <div class="border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-800">TFN</div>
+              </label>
+              <label class="relative cursor-pointer">
+                <input type="radio" name="payment_type" value="abn" class="peer sr-only">
+                <div class="border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50 peer-checked:border-sky-500 peer-checked:bg-sky-50 peer-checked:text-sky-800">ABN</div>
+              </label>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Link to existing employee <span class="text-gray-400 font-normal lowercase tracking-normal">(optional)</span></label>
+            <select name="employee_id" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm">
+              <option value="">— None (truly one-off) —</option>
+              <% employees.forEach(e => { %>
+                <option value="<%= e.id %>"><%= e.full_name %><%= e.employee_code ? ' — ' + e.employee_code : '' %><%= e.payment_type ? ' (' + e.payment_type.toUpperCase() + ')' : '' %></option>
+              <% }) %>
+            </select>
+            <p class="text-[11px] text-gray-500 mt-1.5">Linking pulls in BSB / account + classification rates. Leave blank for someone not in the employee list.</p>
+          </div>
+        </div>
+        <div class="p-5 border-t border-gray-200 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeAddOneOff()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">Add worker</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<% } %>
 
 <!-- Match modal -->
 <div id="matchModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm overflow-y-auto" onclick="if(event.target===this)closeMatchModal()">
@@ -841,6 +899,15 @@
   }
   function closeMatchModal() { document.getElementById('matchModal').classList.add('hidden'); }
 
+  function openAddOneOff() {
+    const m = document.getElementById('addOneOffModal');
+    if (!m) return;
+    m.classList.remove('hidden');
+    // Focus the name field for fast keyboard entry
+    setTimeout(() => m.querySelector('input[name="full_name"]')?.focus(), 50);
+  }
+  function closeAddOneOff() { document.getElementById('addOneOffModal')?.classList.add('hidden'); }
+
   function togglePaid(lineId, checked) {
     // Optimistic in-place update — reloading the whole page on every checkbox
     // tick is jarring when finance ticks 30 workers in a row. Update the
@@ -882,7 +949,7 @@
   }
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closeEditModal(); closeMatchModal(); }
+    if (e.key === 'Escape') { closeEditModal(); closeMatchModal(); closeAddOneOff(); }
   });
 </script>
 
