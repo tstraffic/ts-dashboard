@@ -1,11 +1,11 @@
 // /finance/abergeldie — Abergeldie Payment Sheet
 //
-// Imports a Traffio Person Dockets CSV (same shape as the pay run import) and
-// keeps only the shifts where client_name matches the configured client name
-// ('Abergeldie' by default — case-insensitive substring match so "Abergeldie
-// Complex Infrastructure" still counts). Each kept shift becomes a line on
-// the sheet with hours and fee = hours × fee_per_hour. The show page groups
-// lines by project_name with per-project subtotals and a sheet grand total.
+// Imports a Traffio CSV (Person Dockets OR Person Hours by Client) and keeps
+// only the rows where client_name contains "Abergeldie" (case-insensitive,
+// substring — "Abergeldie Complex Infrastructure" matches). Each kept row
+// becomes a line on the sheet with hours and fee = hours × fee_per_hour.
+// The show page groups lines by project_name with per-project subtotals and
+// a sheet grand total.
 //
 // Aim: replace the manual Excel sheet finance currently maintains for billing
 // Abergeldie. Same Traffio CSV that drives the pay run can drive this too —
@@ -22,7 +22,53 @@ const multer = require('multer');
 const { getDb } = require('../db/database');
 const { requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../middleware/audit');
-const { parseCsv, normalizeShift, inferPeriod } = require('../lib/payroll');
+const { parseCsv, inferPeriod } = require('../lib/payroll');
+
+// Pull a value from a row trying multiple column-name variants. Traffio
+// switches casing/spacing between exports (Person Dockets uses
+// `time_on_date`, Person Hours by Client uses `Date` etc), so we accept any
+// of the common shapes.
+function pick(row, keys) {
+  for (const k of keys) {
+    const v = row[k];
+    if (v != null && String(v).trim() !== '') return String(v).trim();
+  }
+  return '';
+}
+
+// Lenient row → shift normaliser. Unlike lib/payroll's normalizeShift, this
+// does NOT require time_on_date — the Abergeldie sheet only needs person +
+// project + hours, so an aggregated "Person Hours by Client" export works
+// fine even though it has no per-shift date column.
+function normaliseAbergeldieRow(row) {
+  if (!row) return null;
+  const isDeleted = String(row.is_deleted || '').trim() === '1';
+  const excluded  = String(row.person_exclude_from_payrun || '').trim() === '1';
+  if (isDeleted || excluded) return null;
+
+  const hoursStr = pick(row, ['hours_worked', 'hours', 'total_hours', 'Hours', 'Total Hours']);
+  const hours = parseFloat(hoursStr);
+  if (!isFinite(hours) || hours <= 0) return null;
+
+  const fullName = pick(row, ['full_name', 'Full Name', 'person_full_name', 'name', 'Name', 'Person']) ||
+    ((pick(row, ['first_name', 'First Name']) || '') + ' ' + (pick(row, ['last_name', 'Last Name']) || '')).trim();
+  if (!fullName) return null;
+
+  return {
+    person_id:        pick(row, ['person_id', 'Person ID', 'employee_reference']),
+    full_name:        fullName,
+    client_name:      pick(row, ['client_name', 'Client Name', 'client', 'Client']),
+    project_name:     pick(row, ['project_name', 'Project Name', 'project', 'Project']),
+    job_number:       pick(row, ['job_number', 'Job Number', 'Job #', 'job']),
+    booking_id:       pick(row, ['booking_id', 'Booking ID', 'Booking']),
+    booking_address:  pick(row, ['booking_address', 'Address', 'address', 'Site Address']),
+    date:             pick(row, ['time_on_date', 'shift_date', 'date', 'Date', 'Shift Date']) || null,
+    time_on:          pick(row, ['time_on_time', 'time_on', 'start_time', 'Start']),
+    time_off:         pick(row, ['time_off_time', 'time_off', 'end_time', 'End']),
+    hours,
+    notes:            pick(row, ['works_docket_notes', 'notes', 'Notes', 'Comments']),
+  };
+}
 
 const CLIENT_NAME = 'Abergeldie';
 const DEFAULT_FEE_PER_HOUR = 1.50;
@@ -132,7 +178,7 @@ router.post('/abergeldie', requirePermission('abergeldie_payments'), (req, res) 
       req.flash('error', 'Fee per hour must be a positive number.');
       return res.redirect('/finance/abergeldie/new');
     }
-    const targetClient = (req.body.client_filter || CLIENT_NAME).trim() || CLIENT_NAME;
+    const targetClient = CLIENT_NAME;
     const labelInput = String(req.body.label || '').trim();
     const notes = String(req.body.notes || '').trim();
 
@@ -150,11 +196,14 @@ router.post('/abergeldie', requirePermission('abergeldie_payments'), (req, res) 
       return res.redirect('/finance/abergeldie/new');
     }
 
-    const allShifts = rows.map(normalizeShift).filter(Boolean);
+    const allShifts = rows.map(normaliseAbergeldieRow).filter(Boolean);
     const matchingShifts = allShifts.filter(s => shiftIsForClient(s, targetClient));
     if (matchingShifts.length === 0) {
       try { fs.unlinkSync(req.file.path); } catch (e) {}
-      req.flash('error', `No shifts in this CSV match client "${targetClient}". Total shifts in file: ${allShifts.length}.`);
+      const hint = allShifts.length === 0
+        ? `Couldn't read any rows from this CSV — check that it's a Traffio export with a Hours column and a Person/Name column.`
+        : `No rows mention "${targetClient}". Total rows read: ${allShifts.length}.`;
+      req.flash('error', hint);
       return res.redirect('/finance/abergeldie/new');
     }
 
