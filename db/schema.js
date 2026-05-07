@@ -8265,6 +8265,59 @@ function runMigrations(db) {
     console.log('Migration 175 applied');
   }
 
+  // Migration 176: Abergeldie payment sheets — a finance-only "client payment
+  // sheet" that imports a Traffio Person Dockets CSV (same shape as the pay
+  // run import), keeps only shifts where client_name matches the configured
+  // client (default "Abergeldie"), and computes a fee at $X / hour. Lines
+  // are stored at the shift level so we can group by project on display.
+  if (!isMigrationApplied.get(176)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS abergeldie_payment_sheets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          client_name TEXT NOT NULL DEFAULT 'Abergeldie',
+          period_start DATE NOT NULL,
+          period_end DATE NOT NULL,
+          label TEXT DEFAULT '',
+          csv_filename TEXT DEFAULT '',
+          csv_uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          fee_per_hour REAL NOT NULL DEFAULT 1.50,
+          notes TEXT DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','finalized')),
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_aps_period ON abergeldie_payment_sheets(period_start);
+
+        CREATE TABLE IF NOT EXISTS abergeldie_payment_sheet_lines (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sheet_id INTEGER NOT NULL REFERENCES abergeldie_payment_sheets(id) ON DELETE CASCADE,
+          project_name TEXT NOT NULL DEFAULT '',
+          job_number TEXT DEFAULT '',
+          person_id TEXT DEFAULT '',
+          full_name TEXT NOT NULL,
+          shift_date DATE,
+          time_on TEXT DEFAULT '',
+          time_off TEXT DEFAULT '',
+          hours REAL NOT NULL DEFAULT 0,
+          fee_per_hour REAL NOT NULL DEFAULT 0,
+          fee_total REAL NOT NULL DEFAULT 0,
+          booking_address TEXT DEFAULT '',
+          booking_id TEXT DEFAULT '',
+          notes TEXT DEFAULT '',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_aps_lines_sheet ON abergeldie_payment_sheet_lines(sheet_id);
+        CREATE INDEX IF NOT EXISTS idx_aps_lines_project ON abergeldie_payment_sheet_lines(sheet_id, project_name);
+      `);
+      recordMigration.run(176, 'Abergeldie payment sheets + lines');
+      console.log('Migration 176 applied: Abergeldie payment sheets');
+    } catch (e) {
+      console.error('Migration 176 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
