@@ -10,6 +10,8 @@
     body { font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
     canvas { touch-action: none; }
     .ack-text { white-space: pre-wrap; }
+    .step { display: none; }
+    .step.active { display: block; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -38,220 +40,306 @@
     </div>
   <% } %>
 
+  <%
+    // Build step list. We always have welcome + signature; SOP and docs are
+    // conditional on having any structured SOPs / uploaded PDFs.
+    const sops = (typeof structuredSops !== 'undefined' && structuredSops) ? structuredSops : [];
+    const allDocs = (typeof documents !== 'undefined' && documents) ? documents : [];
+    const pairedPdfIds = new Set(sops.filter(s => s.matchedPdf).map(s => s.matchedPdf.id));
+    const unpairedDocs = allDocs.filter(d => !pairedPdfIds.has(d.id));
+
+    const steps = [];
+    steps.push({ kind: 'welcome' });
+    sops.forEach((sop, i) => steps.push({ kind: 'sop', sop, sopIndex: i }));
+    if (allDocs.length > 0) steps.push({ kind: 'documents' });
+    steps.push({ kind: 'signature' });
+    const totalSteps = steps.length;
+
+    const calloutColors = {
+      critical: 'bg-red-50 border-red-300 text-red-900',
+      warning: 'bg-amber-50 border-amber-300 text-amber-900',
+      rule: 'bg-brand-50 border-brand-300 text-brand-900',
+      info: 'bg-gray-50 border-gray-300 text-gray-800',
+    };
+  %>
+
   <!-- Header -->
-  <div class="bg-white border-b border-gray-200 px-5 py-4 sticky top-0 z-10">
+  <div class="bg-white border-b border-gray-200 px-5 py-3 sticky top-0 z-10">
     <div class="flex items-center gap-3">
       <div class="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-sm">T&S</div>
-      <div>
+      <div class="flex-1 min-w-0">
         <h1 class="text-base font-bold text-gray-900 leading-tight">SOP Acknowledgement</h1>
-        <p class="text-xs text-gray-500"><%= session.title || 'In-person sign-off' %></p>
+        <p class="text-xs text-gray-500 truncate"><%= session.title || 'In-person sign-off' %></p>
       </div>
+      <div class="text-xs font-semibold text-gray-500 tabular-nums whitespace-nowrap">
+        Step <span id="step-counter">1</span> / <%= totalSteps %>
+      </div>
+    </div>
+    <!-- Progress bar -->
+    <div class="mt-2.5 h-1 bg-gray-200 rounded-full overflow-hidden">
+      <div id="progress-bar" class="h-full bg-brand-500 transition-all" style="width: <%= Math.round(100 / totalSteps) %>%"></div>
     </div>
   </div>
 
-  <form id="signForm" method="POST" action="/sop-sign/<%= session.token %>/submit" class="p-5 pb-24 max-w-md mx-auto space-y-5">
+  <form id="signForm" method="POST" action="/sop-sign/<%= session.token %>/submit" class="p-5 pb-32 max-w-md mx-auto">
 
-    <% if (typeof targetCrew !== 'undefined' && targetCrew) { %>
-      <!-- Individual link: locked to one person -->
-      <div class="bg-brand-50 border border-brand-200 rounded-xl p-4">
-        <p class="text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1">Signing as</p>
-        <p class="text-base font-bold text-gray-900"><%= targetCrew.full_name %></p>
-        <% if (targetCrew.employee_id) { %><p class="text-xs text-gray-500 mt-0.5"><%= targetCrew.employee_id %></p><% } %>
-      </div>
-    <% } else { %>
-      <!-- Group session: name picker -->
-      <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Pick your name</label>
-        <select id="crew-picker" name="crew_member_id" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-          <option value="">— Select —</option>
-          <% attendees.forEach(a => { %>
-            <option value="<%= a.id %>" <%= a.alreadySigned ? 'disabled' : '' %>>
-              <%= a.full_name %><% if (a.employee_id) { %> · <%= a.employee_id %><% } %><% if (a.alreadySigned) { %>  (already signed)<% } %>
-            </option>
-          <% }) %>
-        </select>
-      </div>
+    <% steps.forEach((step, idx) => { %>
+      <div class="step <%= idx === 0 ? 'active' : '' %>" data-step="<%= idx %>" data-kind="<%= step.kind %>">
 
-      <details class="text-sm">
-        <summary class="text-brand-600 font-medium cursor-pointer">My name isn't on the list</summary>
-        <div class="mt-3 space-y-3">
-          <div>
-            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Full name</label>
-            <input type="text" name="full_name" id="manual-name" autocomplete="name" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="Type your full name" />
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Email (optional)</label>
-            <input type="email" name="email" autocomplete="email" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="you@example.com" />
-          </div>
-        </div>
-      </details>
-    <% } %>
+        <% if (step.kind === 'welcome') { %>
+          <h2 class="text-xl font-bold text-gray-900 mb-1">Before you sign</h2>
+          <p class="text-gray-600 text-sm mb-5">You'll work through <strong><%= sops.length %></strong> Standard Operating Procedure<%= sops.length === 1 ? '' : 's' %><% if (allDocs.length > 0) { %>, view <strong><%= allDocs.length %></strong> reference document<%= allDocs.length === 1 ? '' : 's' %><% } %>, and then sign off.</p>
 
-    <!-- Structured SOPs (rich, mobile-friendly) -->
-    <% if (typeof structuredSops !== 'undefined' && structuredSops && structuredSops.length > 0) { %>
-      <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Standard Operating Procedures</label>
-        <ul class="space-y-3" id="sop-structured-list">
-          <% structuredSops.forEach((sop, sIdx) => { %>
-            <li class="bg-white border border-gray-300 rounded-2xl overflow-hidden">
-              <!-- Header (always visible) -->
-              <button type="button" class="w-full flex items-start gap-3 p-4 text-left hover:bg-gray-50 transition" onclick="toggleSop(<%= sIdx %>, this)" aria-expanded="false">
-                <div class="w-10 h-10 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center flex-shrink-0 font-bold">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-bold text-gray-900"><%= sop.title %></p>
-                  <p class="text-[11px] text-gray-500 mt-0.5"><%= sop.code %> · v<%= sop.revision %> · <%= sop.sections.length %> sections</p>
-                  <p class="text-xs text-gray-700 mt-1.5 leading-relaxed"><%= sop.summary %></p>
-                </div>
-                <svg class="w-5 h-5 text-gray-400 flex-shrink-0 transition-transform sop-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-              </button>
-
-              <!-- Body (collapsed by default) -->
-              <div class="hidden border-t border-gray-100 sop-body" id="sop-body-<%= sIdx %>">
-                <div class="px-4 py-4 space-y-5">
-                  <% sop.sections.forEach((sec, secIdx) => { %>
-                    <section class="<%= secIdx > 0 ? 'pt-4 border-t border-gray-100' : '' %>">
-                      <h3 class="text-base font-bold text-gray-900 leading-tight"><%= sec.heading %></h3>
-                      <% if (sec.body) { %>
-                        <p class="text-sm text-gray-700 mt-2 leading-relaxed"><%= sec.body %></p>
-                      <% } %>
-                      <% if (sec.image && sec.image.file) { %>
-                        <img src="<%= sop.imageFolder %>/<%= sec.image.file %>" alt="<%= sec.image.alt || '' %>"
-                             onerror="this.style.display='none'; this.nextElementSibling && this.nextElementSibling.tagName==='FIGCAPTION' && (this.nextElementSibling.style.display='none');"
-                             class="mt-3 w-full rounded-xl border border-gray-200" />
-                        <% if (sec.image.caption) { %>
-                          <figcaption class="text-[11px] text-gray-500 italic mt-1 text-center"><%= sec.image.caption %></figcaption>
-                        <% } %>
-                      <% } %>
-                      <% if (sec.items && sec.items.length > 0) { %>
-                        <ul class="mt-3 space-y-2">
-                          <% sec.items.forEach(item => { const text = typeof item === 'string' ? item : (item && item.text) || ''; %>
-                            <li class="flex gap-2.5 text-sm text-gray-700 leading-relaxed">
-                              <span class="text-brand-500 mt-1 flex-shrink-0">●</span>
-                              <span><%- text %></span>
-                            </li>
-                          <% }) %>
-                        </ul>
-                      <% } %>
-                      <% if (sec.callout) { %>
-                        <%
-                          const calloutColors = {
-                            critical: 'bg-red-50 border-red-300 text-red-900',
-                            warning: 'bg-amber-50 border-amber-300 text-amber-900',
-                            rule: 'bg-brand-50 border-brand-300 text-brand-900',
-                            info: 'bg-gray-50 border-gray-300 text-gray-800',
-                          };
-                          const cls = calloutColors[sec.callout.type] || calloutColors.info;
-                        %>
-                        <div class="mt-3 rounded-lg border-l-4 px-3 py-2.5 text-xs font-medium leading-relaxed <%= cls %>">
-                          <%- sec.callout.text %>
-                        </div>
-                      <% } %>
-                    </section>
+          <% if (typeof targetCrew !== 'undefined' && targetCrew) { %>
+            <div class="bg-brand-50 border border-brand-200 rounded-xl p-4">
+              <p class="text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1">Signing as</p>
+              <p class="text-base font-bold text-gray-900"><%= targetCrew.full_name %></p>
+              <% if (targetCrew.employee_id) { %><p class="text-xs text-gray-500 mt-0.5"><%= targetCrew.employee_id %></p><% } %>
+            </div>
+          <% } else { %>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Pick your name</label>
+                <select id="crew-picker" name="crew_member_id" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                  <option value="">— Select —</option>
+                  <% attendees.forEach(a => { %>
+                    <option value="<%= a.id %>" <%= a.alreadySigned ? 'disabled' : '' %>>
+                      <%= a.full_name %><% if (a.employee_id) { %> · <%= a.employee_id %><% } %><% if (a.alreadySigned) { %>  (already signed)<% } %>
+                    </option>
                   <% }) %>
-
-                  <% if (sop.matchedPdf) { %>
-                    <div class="pt-4 border-t border-gray-100">
-                      <a href="/sop-sign/<%= session.token %>/document/<%= sop.matchedPdf.id %>" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-xs font-semibold text-brand-700 hover:text-brand-900">
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 16h-2v-2H9v-2h2v-2h-2v-2h6v2h-2v2h2v2h-2v2z"/></svg>
-                        View official PDF
-                      </a>
-                    </div>
-                  <% } %>
-                </div>
-
-                <!-- Per-SOP acknowledgement -->
-                <label class="flex items-center gap-2 px-4 py-3 bg-gray-50 border-t border-gray-100 cursor-pointer">
-                  <input type="checkbox" class="sop-ack w-5 h-5 rounded text-emerald-500 focus:ring-emerald-500" data-sop-slug="<%= sop.slug %>" />
-                  <span class="text-xs text-gray-700 font-semibold">I have read and understood "<%= sop.title %>"</span>
-                </label>
+                </select>
               </div>
-            </li>
-          <% }) %>
-        </ul>
-        <p class="text-[11px] text-gray-500 mt-2">Tap each SOP to expand and read. Tick the box at the bottom of each one.</p>
-      </div>
-    <% } %>
-
-    <!-- Documents to review (uploaded PDFs not paired with structured content) -->
-    <%
-      const pairedPdfIds = (typeof structuredSops !== 'undefined' && structuredSops)
-        ? new Set(structuredSops.filter(s => s.matchedPdf).map(s => s.matchedPdf.id))
-        : new Set();
-      const unpairedDocs = (typeof documents !== 'undefined' && documents)
-        ? documents.filter(d => !pairedPdfIds.has(d.id))
-        : [];
-    %>
-    <% if (unpairedDocs.length > 0) { %>
-      <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Additional documents</label>
-        <ul class="space-y-2" id="sop-docs">
-          <% unpairedDocs.forEach((d, i) => { %>
-            <li class="bg-white border border-gray-300 rounded-xl p-3">
-              <div class="flex items-start gap-3">
-                <div class="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 16h-2v-2H9v-2h2v-2h-2v-2h6v2h-2v2h2v2h-2v2z"/></svg>
+              <details class="text-sm">
+                <summary class="text-brand-600 font-medium cursor-pointer">My name isn't on the list</summary>
+                <div class="mt-3 space-y-3">
+                  <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Full name</label>
+                    <input type="text" name="full_name" id="manual-name" autocomplete="name" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="Type your full name" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Email (optional)</label>
+                    <input type="email" name="email" autocomplete="email" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="you@example.com" />
+                  </div>
                 </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-semibold text-gray-900"><%= d.title %></p>
+              </details>
+            </div>
+          <% } %>
+
+          <p id="welcome-error" class="hidden mt-3 text-red-500 text-xs font-medium">Please pick your name (or type it under "My name isn't on the list").</p>
+        <% } %>
+
+        <% if (step.kind === 'sop') { %>
+          <% const sop = step.sop; %>
+          <p class="text-[10px] font-bold text-brand-600 uppercase tracking-widest mb-1">SOP <%= step.sopIndex + 1 %> of <%= sops.length %></p>
+          <h2 class="text-xl font-bold text-gray-900 mb-1 leading-tight"><%= sop.title %></h2>
+          <p class="text-xs text-gray-500 mb-4"><%= sop.code %> · v<%= sop.revision %></p>
+          <p class="text-sm text-gray-700 mb-5 leading-relaxed"><%= sop.summary %></p>
+
+          <% sop.sections.forEach((sec, secIdx) => { %>
+            <section class="<%= secIdx > 0 ? 'mt-6 pt-6 border-t border-gray-200' : '' %>">
+              <h3 class="text-base font-bold text-gray-900 leading-tight"><%= sec.heading %></h3>
+              <% if (sec.body) { %>
+                <p class="text-sm text-gray-700 mt-2 leading-relaxed"><%= sec.body %></p>
+              <% } %>
+              <% if (sec.image && sec.image.file) { %>
+                <img src="<%= sop.imageFolder %>/<%= sec.image.file %>" alt="<%= sec.image.alt || '' %>"
+                     onerror="this.style.display='none'; if(this.nextElementSibling && this.nextElementSibling.tagName==='FIGCAPTION') this.nextElementSibling.style.display='none';"
+                     class="mt-3 w-full rounded-xl border border-gray-200" />
+                <% if (sec.image.caption) { %>
+                  <figcaption class="text-[11px] text-gray-500 italic mt-1 text-center"><%= sec.image.caption %></figcaption>
+                <% } %>
+              <% } %>
+              <% if (sec.items && sec.items.length > 0) { %>
+                <ul class="mt-3 space-y-2">
+                  <% sec.items.forEach(item => { const text = typeof item === 'string' ? item : (item && item.text) || ''; %>
+                    <li class="flex gap-2.5 text-sm text-gray-700 leading-relaxed">
+                      <span class="text-brand-500 mt-1 flex-shrink-0">●</span>
+                      <span><%- text %></span>
+                    </li>
+                  <% }) %>
+                </ul>
+              <% } %>
+              <% if (sec.callout) { %>
+                <% const cls = calloutColors[sec.callout.type] || calloutColors.info; %>
+                <div class="mt-3 rounded-lg border-l-4 px-3 py-2.5 text-xs font-medium leading-relaxed <%= cls %>">
+                  <%- sec.callout.text %>
+                </div>
+              <% } %>
+            </section>
+          <% }) %>
+
+          <% if (sop.matchedPdf) { %>
+            <div class="mt-6 pt-4 border-t border-gray-200">
+              <a href="/sop-sign/<%= session.token %>/document/<%= sop.matchedPdf.id %>" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-xs font-semibold text-brand-700 hover:text-brand-900">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 16h-2v-2H9v-2h2v-2h-2v-2h6v2h-2v2h2v2h-2v2z"/></svg>
+                View official PDF
+              </a>
+            </div>
+          <% } %>
+
+          <!-- Per-SOP acknowledgement at the end of this section -->
+          <label class="mt-6 flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 cursor-pointer">
+            <input type="checkbox" class="sop-ack w-5 h-5 rounded text-emerald-500 focus:ring-emerald-500" data-sop-slug="<%= sop.slug %>" />
+            <span class="text-sm text-emerald-900 font-semibold leading-snug">I have read and understood "<%= sop.title %>"</span>
+          </label>
+        <% } %>
+
+        <% if (step.kind === 'documents') { %>
+          <h2 class="text-xl font-bold text-gray-900 mb-1">Reference documents</h2>
+          <p class="text-gray-600 text-sm mb-5">These are the official PDFs for your records. Open any to view — no tick required.</p>
+          <ul class="space-y-2">
+            <% allDocs.forEach(d => { %>
+              <li class="bg-white border border-gray-300 rounded-xl p-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 16h-2v-2H9v-2h2v-2h-2v-2h6v2h-2v2h2v2h-2v2z"/></svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-gray-900 truncate"><%= d.title %></p>
+                  </div>
                   <a href="/sop-sign/<%= session.token %>/document/<%= d.id %>" target="_blank" rel="noopener"
-                     class="inline-flex items-center gap-1 mt-1 px-2.5 py-1 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-md transition doc-open"
-                     data-doc-id="<%= d.id %>">
-                    Open document
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                     class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-md transition flex-shrink-0">
+                    Open
                   </a>
                 </div>
+              </li>
+            <% }) %>
+          </ul>
+        <% } %>
+
+        <% if (step.kind === 'signature') { %>
+          <h2 class="text-xl font-bold text-gray-900 mb-1">Sign off</h2>
+          <p class="text-gray-600 text-sm mb-5">You've reviewed the SOPs<% if (allDocs.length > 0) { %> and reference documents<% } %>. Sign below to record your acknowledgement.</p>
+
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
+            <p class="text-[10px] font-bold text-amber-800 uppercase tracking-widest mb-2">Acknowledgement (SOP version <%= sopVersion %>)</p>
+            <p class="ack-text text-sm text-gray-800 leading-relaxed"><%= ackText %></p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Sign here</label>
+            <div id="sig-pad-wrap" class="relative rounded-xl border border-gray-300 bg-white overflow-hidden" style="background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 23px, rgba(0,0,0,0.04) 23px, rgba(0,0,0,0.04) 24px);">
+              <canvas id="sig-canvas" class="block w-full" style="height: 200px;"></canvas>
+              <span id="sig-placeholder" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">Sign with your finger</span>
+              <div class="flex items-center justify-between px-3 py-2 bg-gray-50 border-t border-gray-200">
+                <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Signature</span>
+                <button type="button" id="sig-clear" class="text-xs font-semibold text-gray-500 hover:text-gray-700">Clear</button>
               </div>
-              <label class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 cursor-pointer">
-                <input type="checkbox" class="doc-ack w-5 h-5 rounded text-emerald-500 focus:ring-emerald-500" data-doc-id="<%= d.id %>" />
-                <span class="text-xs text-gray-700 font-medium">I have read and understood this document</span>
-              </label>
-            </li>
-          <% }) %>
-        </ul>
+            </div>
+            <input type="hidden" name="signature_data" id="signature_data">
+            <p id="errMsg" class="hidden text-red-500 text-xs font-medium mt-2"></p>
+          </div>
+        <% } %>
+
       </div>
-    <% } %>
+    <% }) %>
 
-    <!-- Ack text -->
-    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
-      <p class="text-[10px] font-bold text-amber-800 uppercase tracking-widest mb-2">Acknowledgement (SOP version <%= sopVersion %>)</p>
-      <p class="ack-text text-sm text-gray-800 leading-relaxed"><%= ackText %></p>
-    </div>
-
-    <!-- Signature -->
-    <div id="signature-block">
-      <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Sign here</label>
-      <p id="sig-gate-msg" class="hidden text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs font-medium mb-2">Please tick each document above before signing.</p>
-      <div id="sig-pad-wrap" class="relative rounded-xl border border-gray-300 bg-white overflow-hidden transition-opacity" style="background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 23px, rgba(0,0,0,0.04) 23px, rgba(0,0,0,0.04) 24px);">
-        <canvas id="sig-canvas" class="block w-full" style="height: 200px;"></canvas>
-        <span id="sig-placeholder" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">Sign with your finger</span>
-        <div class="flex items-center justify-between px-3 py-2 bg-gray-50 border-t border-gray-200">
-          <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Signature</span>
-          <button type="button" id="sig-clear" class="text-xs font-semibold text-gray-500 hover:text-gray-700">Clear</button>
-        </div>
-      </div>
-      <input type="hidden" name="signature_data" id="signature_data">
-      <p id="errMsg" class="hidden text-red-500 text-xs font-medium mt-2"></p>
-    </div>
-
-    <button type="submit" id="submitBtn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl px-6 py-4 text-base shadow-md active:scale-[0.98] transition">
-      Sign & Submit
-    </button>
   </form>
 
+  <!-- Sticky bottom nav -->
+  <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 z-20">
+    <div class="max-w-md mx-auto flex items-center gap-3">
+      <button type="button" id="prev-btn" class="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+        Back
+      </button>
+      <button type="button" id="next-btn" class="flex-1 py-3 bg-brand-600 hover:bg-brand-500 text-white text-sm font-bold rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed">
+        Next →
+      </button>
+      <button type="button" id="submit-btn" class="hidden flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed">
+        Sign &amp; Submit
+      </button>
+    </div>
+  </div>
+
   <script>
+    const TOTAL_STEPS = <%= totalSteps %>;
+    const STEP_KINDS = <%- JSON.stringify(steps.map(s => s.kind)) %>;
+    const PREVIEW_MODE = <%- JSON.stringify(typeof previewMode !== 'undefined' && previewMode) %>;
+    let currentStep = 0;
+
+    const stepEls = document.querySelectorAll('.step');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    const counter = document.getElementById('step-counter');
+    const progress = document.getElementById('progress-bar');
+
+    function showStep(n) {
+      n = Math.max(0, Math.min(TOTAL_STEPS - 1, n));
+      currentStep = n;
+      stepEls.forEach(el => el.classList.toggle('active', parseInt(el.dataset.step, 10) === n));
+      counter.textContent = (n + 1);
+      progress.style.width = Math.round(((n + 1) / TOTAL_STEPS) * 100) + '%';
+      prevBtn.disabled = n === 0;
+      const isFinal = n === TOTAL_STEPS - 1;
+      nextBtn.classList.toggle('hidden', isFinal);
+      submitBtn.classList.toggle('hidden', !isFinal);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      syncNextEnabled();
+    }
+
+    function currentKind() { return STEP_KINDS[currentStep]; }
+
+    function syncNextEnabled() {
+      const kind = currentKind();
+      let ok = true;
+      if (kind === 'welcome') {
+        // Need name to advance (only if not target-bound)
+        const picker = document.getElementById('crew-picker');
+        if (picker) {
+          const manual = document.getElementById('manual-name');
+          const v = picker.value || (manual && manual.value.trim());
+          ok = !!v;
+        }
+      } else if (kind === 'sop') {
+        const sopEl = stepEls[currentStep];
+        const cb = sopEl.querySelector('.sop-ack');
+        ok = !!(cb && cb.checked);
+      }
+      nextBtn.disabled = !ok;
+      submitBtn.disabled = !(allSopsAcknowledged() && hasInk);
+    }
+
+    function allSopsAcknowledged() {
+      const cbs = document.querySelectorAll('.sop-ack');
+      return Array.from(cbs).every(cb => cb.checked);
+    }
+
+    nextBtn.addEventListener('click', () => {
+      const kind = currentKind();
+      if (kind === 'welcome') {
+        const picker = document.getElementById('crew-picker');
+        if (picker) {
+          const manual = document.getElementById('manual-name');
+          const v = picker.value || (manual && manual.value.trim());
+          if (!v) { document.getElementById('welcome-error').classList.remove('hidden'); return; }
+          document.getElementById('welcome-error').classList.add('hidden');
+        }
+      }
+      showStep(currentStep + 1);
+    });
+    prevBtn.addEventListener('click', () => showStep(currentStep - 1));
+
+    // Watch checkboxes + name picker so Next enables/disables live
+    document.querySelectorAll('.sop-ack').forEach(cb => cb.addEventListener('change', syncNextEnabled));
+    const picker = document.getElementById('crew-picker');
+    if (picker) picker.addEventListener('change', syncNextEnabled);
+    const manual = document.getElementById('manual-name');
+    if (manual) manual.addEventListener('input', syncNextEnabled);
+
     // ── Signature pad ──
     const canvas = document.getElementById('sig-canvas');
     const placeholder = document.getElementById('sig-placeholder');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas && canvas.getContext('2d');
     let drawing = false;
     let last = null;
     let hasInk = false;
 
     function resize() {
+      if (!canvas) return;
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0) return; // not visible yet
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
       ctx.scale(dpr, dpr);
@@ -260,139 +348,75 @@
       ctx.lineJoin = 'round';
       ctx.strokeStyle = '#0f172a';
     }
-    resize();
-    window.addEventListener('resize', () => { resize(); });
+    if (canvas) {
+      // Resize when the signature step becomes active too
+      const obs = new MutationObserver(() => { if (canvas.offsetParent) resize(); });
+      const sigStep = canvas.closest('.step');
+      if (sigStep) obs.observe(sigStep, { attributes: true, attributeFilter: ['class'] });
+      window.addEventListener('resize', () => { resize(); });
 
-    function getXY(e) {
-      const rect = canvas.getBoundingClientRect();
-      const t = e.touches ? e.touches[0] : e;
-      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
-    }
-
-    function start(e) {
-      e.preventDefault();
-      drawing = true;
-      last = getXY(e);
-      placeholder.style.display = 'none';
-    }
-    function move(e) {
-      if (!drawing) return;
-      e.preventDefault();
-      const p = getXY(e);
-      ctx.beginPath();
-      ctx.moveTo(last.x, last.y);
-      ctx.lineTo(p.x, p.y);
-      ctx.stroke();
-      last = p;
-      hasInk = true;
-    }
-    function end() { drawing = false; }
-
-    canvas.addEventListener('mousedown', start);
-    canvas.addEventListener('mousemove', move);
-    canvas.addEventListener('mouseup', end);
-    canvas.addEventListener('mouseleave', end);
-    canvas.addEventListener('touchstart', start, { passive: false });
-    canvas.addEventListener('touchmove', move, { passive: false });
-    canvas.addEventListener('touchend', end);
-
-    document.getElementById('sig-clear').addEventListener('click', () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      hasInk = false;
-      placeholder.style.display = '';
-    });
-
-    // ── Expand/collapse structured SOP cards ──
-    function toggleSop(idx, btn) {
-      const body = document.getElementById('sop-body-' + idx);
-      const chev = btn.querySelector('.sop-chevron');
-      const expanded = btn.getAttribute('aria-expanded') === 'true';
-      if (expanded) {
-        body.classList.add('hidden');
-        if (chev) chev.style.transform = '';
-        btn.setAttribute('aria-expanded', 'false');
-      } else {
-        body.classList.remove('hidden');
-        if (chev) chev.style.transform = 'rotate(180deg)';
-        btn.setAttribute('aria-expanded', 'true');
-        // Mark as viewed so the per-SOP checkbox can be enabled
-        const cb = body.querySelector('.sop-ack');
-        if (cb) cb.disabled = false;
+      function getXY(e) {
+        const rect = canvas.getBoundingClientRect();
+        const t = e.touches ? e.touches[0] : e;
+        return { x: t.clientX - rect.left, y: t.clientY - rect.top };
       }
-    }
-    window.toggleSop = toggleSop;
-
-    // ── Gate: signature stays disabled until every SOP and every doc is ticked ──
-    const docCheckboxes = Array.from(document.querySelectorAll('.doc-ack'));
-    const sopCheckboxes = Array.from(document.querySelectorAll('.sop-ack'));
-    const allCheckboxes = docCheckboxes.concat(sopCheckboxes);
-    const sigPadWrap = document.getElementById('sig-pad-wrap');
-    const sigGateMsg = document.getElementById('sig-gate-msg');
-    function allDocsAcknowledged() {
-      return allCheckboxes.length === 0 || allCheckboxes.every(cb => cb.checked);
-    }
-    function syncSignatureGate() {
-      const ok = allDocsAcknowledged();
-      if (sigPadWrap) {
-        sigPadWrap.style.opacity = ok ? '1' : '0.45';
-        sigPadWrap.style.pointerEvents = ok ? '' : 'none';
+      function start(e) { e.preventDefault(); drawing = true; last = getXY(e); placeholder.style.display = 'none'; }
+      function move(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        const p = getXY(e);
+        ctx.beginPath();
+        ctx.moveTo(last.x, last.y);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        last = p;
+        hasInk = true;
+        syncNextEnabled();
       }
-      if (sigGateMsg) sigGateMsg.classList.toggle('hidden', ok);
-    }
-    allCheckboxes.forEach(cb => cb.addEventListener('change', syncSignatureGate));
-    // Disable structured-SOP checkboxes until the user has expanded the card
-    sopCheckboxes.forEach(cb => { cb.disabled = true; });
-    syncSignatureGate();
+      function end() { drawing = false; }
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      canvas.addEventListener('mouseup', end);
+      canvas.addEventListener('mouseleave', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', end);
 
-    // Mark a PDF document as "viewed" so its checkbox is enabled only after
-    // they open it. Lightweight nudge — not legally binding scroll detection.
-    document.querySelectorAll('.doc-open').forEach(link => {
-      const docId = link.dataset.docId;
-      const cb = document.querySelector('.doc-ack[data-doc-id="' + docId + '"]');
-      if (cb) cb.disabled = true;
-      link.addEventListener('click', () => { if (cb) cb.disabled = false; });
-    });
+      document.getElementById('sig-clear').addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        hasInk = false;
+        placeholder.style.display = '';
+        syncNextEnabled();
+      });
+    }
 
     // ── Submit ──
     const form = document.getElementById('signForm');
-    const errMsg = document.getElementById('errMsg');
-    const PREVIEW_MODE = <%- JSON.stringify(typeof previewMode !== 'undefined' && previewMode) %>;
-    form.addEventListener('submit', (e) => {
-      if (PREVIEW_MODE) {
-        e.preventDefault();
-        alert('Preview mode — submission disabled. Drop into a real session to test signing.');
-        return;
-      }
-      const picker = document.getElementById('crew-picker');
-      const manualEl = document.getElementById('manual-name');
-      // If picker isn't on the page, this is an individual (target-bound) session — skip name check
-      if (picker) {
-        const crewId = picker.value;
-        const manualName = (manualEl && manualEl.value || '').trim();
-        if (!crewId && !manualName) {
-          e.preventDefault();
-          errMsg.textContent = 'Pick your name from the list, or type it in the "name not on list" section.';
-          errMsg.classList.remove('hidden');
-          return;
-        }
-      }
-      if (!allDocsAcknowledged()) {
-        e.preventDefault();
-        errMsg.textContent = 'Please open and tick each document above.';
+    submitBtn.addEventListener('click', (e) => {
+      const errMsg = document.getElementById('errMsg');
+      if (!allSopsAcknowledged()) {
+        errMsg.textContent = 'Please go back and tick each SOP.';
         errMsg.classList.remove('hidden');
         return;
       }
       if (!hasInk) {
-        e.preventDefault();
         errMsg.textContent = 'Please draw your signature above.';
         errMsg.classList.remove('hidden');
         return;
       }
       errMsg.classList.add('hidden');
+      if (PREVIEW_MODE) {
+        alert('Preview mode — submission disabled. Drop into a real session to test signing.');
+        return;
+      }
       document.getElementById('signature_data').value = canvas.toDataURL('image/png');
-      document.getElementById('submitBtn').disabled = true;
-      document.getElementById('submitBtn').textContent = 'Submitting…';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting…';
+      form.submit();
     });
+
+    // Init
+    showStep(0);
   </script>
 
 <% } %>
