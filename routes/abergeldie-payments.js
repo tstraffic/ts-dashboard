@@ -140,6 +140,8 @@ router.get('/abergeldie', requirePermission('abergeldie_payments'), (req, res) =
       (SELECT COUNT(*) FROM abergeldie_payment_sheet_lines WHERE sheet_id = s.id) AS shift_count,
       (SELECT COALESCE(SUM(hours), 0) FROM abergeldie_payment_sheet_lines WHERE sheet_id = s.id) AS total_hours,
       (SELECT COALESCE(SUM(fee_total), 0) FROM abergeldie_payment_sheet_lines WHERE sheet_id = s.id) AS total_fee,
+      (SELECT COALESCE(SUM(fee_total), 0) FROM abergeldie_payment_sheet_lines WHERE sheet_id = s.id AND COALESCE(line_type, 'person') = 'ute') AS ute_fee,
+      (SELECT COUNT(*) FROM abergeldie_payment_sheet_lines WHERE sheet_id = s.id AND COALESCE(line_type, 'person') = 'ute') AS ute_line_count,
       (SELECT COUNT(DISTINCT project_name) FROM abergeldie_payment_sheet_lines WHERE sheet_id = s.id) AS project_count
     FROM abergeldie_payment_sheets s
     LEFT JOIN users u ON u.id = s.created_by_id
@@ -287,41 +289,65 @@ router.get('/abergeldie/:id', requirePermission('abergeldie_payments'), (req, re
   const sheet = db.prepare('SELECT * FROM abergeldie_payment_sheets WHERE id = ?').get(req.params.id);
   if (!sheet) { req.flash('error', 'Payment sheet not found.'); return res.redirect('/finance/abergeldie'); }
 
-  const lines = db.prepare(`
+  const allLines = db.prepare(`
     SELECT * FROM abergeldie_payment_sheet_lines
     WHERE sheet_id = ?
-    ORDER BY project_name ASC, shift_date ASC, LOWER(full_name) ASC
+    ORDER BY line_type ASC, project_name ASC, shift_date ASC, LOWER(full_name) ASC, plate ASC, LOWER(driver_name) ASC
   `).all(sheet.id);
 
-  // Group by project_name
+  // Split by line_type then group by project_name. Each project shows its
+  // worker shifts and ute rows together so Abergeldie sees the full charge
+  // for that project on the email.
   const groupsMap = new Map();
-  let grandHours = 0, grandFee = 0;
-  for (const l of lines) {
+  let grandHours = 0, grandWorkerFee = 0, grandShifts = 0, grandUteFee = 0;
+  for (const l of allLines) {
     const key = l.project_name || '(no project name)';
     if (!groupsMap.has(key)) {
       groupsMap.set(key, {
         project_name: key,
         job_number: l.job_number || '',
         booking_address: l.booking_address || '',
-        lines: [],
-        total_hours: 0,
-        total_fee: 0,
+        person_lines: [],
+        ute_lines: [],
+        total_hours: 0, total_worker_fee: 0,
+        total_shifts: 0, total_ute_fee: 0,
       });
     }
     const g = groupsMap.get(key);
-    g.lines.push(l);
-    g.total_hours += parseFloat(l.hours) || 0;
-    g.total_fee += parseFloat(l.fee_total) || 0;
-    grandHours += parseFloat(l.hours) || 0;
-    grandFee += parseFloat(l.fee_total) || 0;
+    if ((l.line_type || 'person') === 'ute') {
+      g.ute_lines.push(l);
+      g.total_shifts   += parseInt(l.shift_count, 10) || 0;
+      g.total_ute_fee  += parseFloat(l.fee_total)    || 0;
+      grandShifts      += parseInt(l.shift_count, 10) || 0;
+      grandUteFee      += parseFloat(l.fee_total)    || 0;
+    } else {
+      g.person_lines.push(l);
+      g.total_hours       += parseFloat(l.hours)     || 0;
+      g.total_worker_fee  += parseFloat(l.fee_total) || 0;
+      grandHours          += parseFloat(l.hours)     || 0;
+      grandWorkerFee      += parseFloat(l.fee_total) || 0;
+    }
   }
   const groups = Array.from(groupsMap.values()).sort((a, b) => a.project_name.localeCompare(b.project_name));
+  // Compute project totals once
+  for (const g of groups) {
+    g.total_fee = round2(g.total_worker_fee + g.total_ute_fee);
+    g.total_worker_fee = round2(g.total_worker_fee);
+    g.total_ute_fee = round2(g.total_ute_fee);
+    g.total_hours = round2(g.total_hours);
+  }
 
   res.render('abergeldie-payments/show', {
     title: sheet.label || 'Abergeldie Payment Sheet',
     currentPage: 'abergeldie-payments',
     sheet, groups,
-    grand: { hours: round2(grandHours), fee: round2(grandFee), line_count: lines.length, project_count: groups.length },
+    grand: {
+      hours: round2(grandHours), worker_fee: round2(grandWorkerFee),
+      shifts: grandShifts, ute_fee: round2(grandUteFee),
+      fee: round2(grandWorkerFee + grandUteFee),
+      line_count: allLines.length, project_count: groups.length,
+      ute_count: allLines.filter(l => l.line_type === 'ute').length,
+    },
     fmtMoney, fmtHours, periodLabel,
   });
 });
@@ -340,6 +366,9 @@ router.post('/abergeldie/:id', requirePermission('abergeldie_payments'), (req, r
   const periodStart = String(req.body.period_start || '').trim();
   const periodEnd   = String(req.body.period_end || '').trim();
   const feePerHour  = round2(req.body.fee_per_hour);
+  const uteRate     = req.body.default_ute_rate_per_shift !== undefined && req.body.default_ute_rate_per_shift !== ''
+    ? round2(req.body.default_ute_rate_per_shift)
+    : (parseFloat(sheet.default_ute_rate_per_shift) || 0);
   const notes       = String(req.body.notes || '').trim().slice(0, 1000);
 
   // Both dates required and well-formed; end must be on/after start.
@@ -356,22 +385,38 @@ router.post('/abergeldie/:id', requirePermission('abergeldie_payments'), (req, r
     req.flash('error', 'Fee per hour must be a positive number.');
     return res.redirect('/finance/abergeldie/' + sheet.id);
   }
+  if (uteRate < 0) {
+    req.flash('error', 'Ute rate must be 0 or more.');
+    return res.redirect('/finance/abergeldie/' + sheet.id);
+  }
+
+  const feeChanged  = feePerHour !== parseFloat(sheet.fee_per_hour);
+  const uteRateChanged = uteRate !== parseFloat(sheet.default_ute_rate_per_shift);
 
   const tx = db.transaction(() => {
     db.prepare(`
       UPDATE abergeldie_payment_sheets
-      SET label = ?, period_start = ?, period_end = ?, fee_per_hour = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+      SET label = ?, period_start = ?, period_end = ?, fee_per_hour = ?, default_ute_rate_per_shift = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(label || sheet.label || '', periodStart, periodEnd, feePerHour, notes, sheet.id);
+    `).run(label || sheet.label || '', periodStart, periodEnd, feePerHour, uteRate, notes, sheet.id);
 
-    // Recalculate per-line fee if fee/hr changed
-    if (feePerHour !== parseFloat(sheet.fee_per_hour)) {
+    // Recalculate per-line fee on person lines if fee/hr changed
+    if (feeChanged) {
       db.prepare(`
         UPDATE abergeldie_payment_sheet_lines
         SET fee_per_hour = ?,
             fee_total = ROUND(hours * ?, 2)
-        WHERE sheet_id = ?
+        WHERE sheet_id = ? AND COALESCE(line_type, 'person') = 'person'
       `).run(feePerHour, feePerHour, sheet.id);
+    }
+    // Recalculate ute lines if ute rate changed
+    if (uteRateChanged) {
+      db.prepare(`
+        UPDATE abergeldie_payment_sheet_lines
+        SET rate_per_shift = ?,
+            fee_total = ROUND(shift_count * ?, 2)
+        WHERE sheet_id = ? AND COALESCE(line_type, 'person') = 'ute'
+      `).run(uteRate, uteRate, sheet.id);
     }
   });
   tx();
@@ -379,7 +424,7 @@ router.post('/abergeldie/:id', requirePermission('abergeldie_payments'), (req, r
   logActivity({
     user: req.session.user, action: 'update', entityType: 'abergeldie_payment_sheet',
     entityId: sheet.id, entityLabel: label || sheet.label,
-    details: `Updated Abergeldie payment sheet (period ${periodStart}→${periodEnd}, $${feePerHour}/hr)`,
+    details: `Updated Abergeldie payment sheet (period ${periodStart}→${periodEnd}, $${feePerHour}/hr, ute $${uteRate}/shift)`,
     ip: req.ip,
   });
 
@@ -430,6 +475,178 @@ router.post('/abergeldie/:id/ready', requirePermission('abergeldie_payments'), m
 router.post('/abergeldie/:id/paid',  requirePermission('abergeldie_payments'), makeToggle('paid'));
 
 // ===========================================================================
+// POST /finance/abergeldie/:id/upload-utes — adds ute lines to an existing
+// sheet from a Traffio "Vehicle Job Report" CSV. Skips Cancelled bookings,
+// keeps only Abergeldie rows, groups by (plate, driver, project_name) so
+// the same plate moving between projects becomes separate billable lines.
+// Re-uploading replaces existing ute lines (person lines are untouched).
+// ===========================================================================
+router.post('/abergeldie/:id/upload-utes', requirePermission('abergeldie_payments'), (req, res) => {
+  upload.single('csv')(req, res, (err) => {
+    if (err) { req.flash('error', err.message); return res.redirect('/finance/abergeldie/' + req.params.id); }
+    if (!req.file) { req.flash('error', 'CSV file is required.'); return res.redirect('/finance/abergeldie/' + req.params.id); }
+
+    const db = getDb();
+    const sheet = db.prepare('SELECT * FROM abergeldie_payment_sheets WHERE id = ?').get(req.params.id);
+    if (!sheet) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      req.flash('error', 'Payment sheet not found.');
+      return res.redirect('/finance/abergeldie');
+    }
+    const rateOverride = req.body.default_ute_rate_per_shift;
+    const ratePerShift = rateOverride !== undefined && rateOverride !== ''
+      ? round2(rateOverride)
+      : (parseFloat(sheet.default_ute_rate_per_shift) || 0);
+    if (ratePerShift < 0) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      req.flash('error', 'Rate per shift must be 0 or more.');
+      return res.redirect('/finance/abergeldie/' + sheet.id);
+    }
+
+    let raw;
+    try { raw = fs.readFileSync(req.file.path, 'utf8'); }
+    catch (e) {
+      req.flash('error', 'Could not read uploaded file: ' + e.message);
+      return res.redirect('/finance/abergeldie/' + sheet.id);
+    }
+    const { rows } = parseCsv(raw);
+    if (rows.length === 0) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      req.flash('error', 'CSV had no data rows.');
+      return res.redirect('/finance/abergeldie/' + sheet.id);
+    }
+
+    // Filter to Abergeldie + non-cancelled + has plate, then group.
+    const groups = new Map();
+    let kept = 0, dropped = 0;
+    for (const row of rows) {
+      const status = pick(row, ['booking_status_name', 'Booking Status', 'status']).toLowerCase();
+      if (status === 'cancelled' || status === 'canceled') { dropped++; continue; }
+      const isDeleted = String(row.is_deleted || '').trim() === '1';
+      if (isDeleted) { dropped++; continue; }
+      const client = pick(row, ['client_name', 'Client Name', 'client', 'Client']);
+      if (!/abergeldie/i.test(client)) { dropped++; continue; }
+      const plate = pick(row, ['vehicle_rego', 'Vehicle Rego', 'vehicle_registration', 'Vehicle Registration', 'rego', 'Rego', 'plate', 'Plate']).toUpperCase().replace(/\s+/g, '');
+      if (!plate) { dropped++; continue; }
+      const friendly = pick(row, ['vehicle_friendly_name', 'Vehicle Friendly Name', 'vehicle_resource_name', 'Vehicle Resource Name', 'vehicle_name']);
+      const driver = pick(row, ['driver_name', 'Driver Name', 'driver', 'Driver']) || '(no driver)';
+      const project = pick(row, ['project_name', 'Project Name', 'project', 'Project']) || '(no project)';
+      const jobNumber = pick(row, ['job_number', 'Job Number', 'Job #']);
+      const address = pick(row, ['street_address', 'Street Address', 'booking_address', 'address']);
+
+      const key = plate + '||' + driver + '||' + project;
+      const existing = groups.get(key);
+      if (existing) existing.shift_count += 1;
+      else groups.set(key, { plate, driver_name: driver, project_name: project, vehicle_friendly_name: friendly, job_number: jobNumber, booking_address: address, shift_count: 1 });
+      kept++;
+    }
+
+    if (groups.size === 0) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      req.flash('error', `No matching ute rows in the CSV (read ${rows.length}, skipped ${dropped}). Check that the file is a Traffio Vehicle Job Report for an Abergeldie project.`);
+      return res.redirect('/finance/abergeldie/' + sheet.id);
+    }
+
+    const tx = db.transaction(() => {
+      // Replace existing ute lines (person lines untouched)
+      db.prepare("DELETE FROM abergeldie_payment_sheet_lines WHERE sheet_id = ? AND COALESCE(line_type, 'person') = 'ute'").run(sheet.id);
+      const insertLine = db.prepare(`
+        INSERT INTO abergeldie_payment_sheet_lines
+          (sheet_id, line_type, project_name, job_number, booking_address,
+           plate, vehicle_friendly_name, driver_name,
+           full_name, hours, fee_per_hour,
+           shift_count, rate_per_shift, fee_total)
+        VALUES (?, 'ute', ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)
+      `);
+      for (const g of Array.from(groups.values()).sort((a, b) => a.project_name.localeCompare(b.project_name) || a.plate.localeCompare(b.plate))) {
+        const fee = round2(g.shift_count * ratePerShift);
+        // Reuse `full_name` for the driver too so existing UI bits that expect it don't break.
+        insertLine.run(
+          sheet.id, g.project_name, g.job_number, g.booking_address,
+          g.plate, g.vehicle_friendly_name, g.driver_name,
+          g.driver_name,
+          g.shift_count, ratePerShift, fee,
+        );
+      }
+      db.prepare(`
+        UPDATE abergeldie_payment_sheets
+        SET default_ute_rate_per_shift = ?, utes_csv_filename = ?, utes_uploaded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(ratePerShift, path.basename(req.file.path), sheet.id);
+    });
+    tx();
+
+    logActivity({
+      user: req.session.user, action: 'upload_utes', entityType: 'abergeldie_payment_sheet',
+      entityId: sheet.id, entityLabel: sheet.label,
+      details: `Imported ${kept} ute rows → ${groups.size} (plate, driver, project) lines @ $${ratePerShift}/shift (skipped ${dropped})`,
+      ip: req.ip,
+    });
+
+    req.flash('success', `Imported ${kept} ute shifts → ${groups.size} line(s) @ $${ratePerShift}/shift.`);
+    res.redirect('/finance/abergeldie/' + sheet.id);
+  });
+});
+
+// ===========================================================================
+// POST /finance/abergeldie/:id/lines/:lineId — edit a single ute line.
+// Accepts shift_count and/or rate_per_shift; recomputes fee_total. Returns
+// JSON for AJAX or redirects.
+// ===========================================================================
+router.post('/abergeldie/:id/lines/:lineId', requirePermission('abergeldie_payments'), (req, res) => {
+  const db = getDb();
+  const line = db.prepare('SELECT * FROM abergeldie_payment_sheet_lines WHERE id = ? AND sheet_id = ?').get(req.params.lineId, req.params.id);
+  if (!line) {
+    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Line not found' });
+    req.flash('error', 'Line not found.');
+    return res.redirect('/finance/abergeldie/' + req.params.id);
+  }
+  if ((line.line_type || 'person') !== 'ute') {
+    if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(400).json({ error: 'Only ute lines are editable here' });
+    req.flash('error', 'Only ute lines are editable here.');
+    return res.redirect('/finance/abergeldie/' + req.params.id);
+  }
+
+  const updates = {};
+  if (req.body.shift_count !== undefined)    updates.shift_count    = Math.max(0, parseInt(req.body.shift_count, 10) || 0);
+  if (req.body.rate_per_shift !== undefined) updates.rate_per_shift = Math.max(0, round2(req.body.rate_per_shift));
+  const newCount = updates.shift_count    != null ? updates.shift_count    : (parseInt(line.shift_count, 10) || 0);
+  const newRate  = updates.rate_per_shift != null ? updates.rate_per_shift : (parseFloat(line.rate_per_shift) || 0);
+  updates.fee_total = round2(newCount * newRate);
+
+  const cols = Object.keys(updates);
+  const setSql = cols.map(c => `${c} = ?`).join(', ');
+  const params = cols.map(c => updates[c]);
+  params.push(line.id);
+  db.prepare(`UPDATE abergeldie_payment_sheet_lines SET ${setSql} WHERE id = ?`).run(...params);
+
+  if (req.xhr || (req.headers.accept || '').includes('json')) {
+    const fresh = db.prepare('SELECT * FROM abergeldie_payment_sheet_lines WHERE id = ?').get(line.id);
+    return res.json({ ok: true, line: fresh });
+  }
+  req.flash('success', 'Ute line updated.');
+  res.redirect('/finance/abergeldie/' + req.params.id);
+});
+
+// ===========================================================================
+// POST /finance/abergeldie/:id/clear-utes — delete every ute line on a sheet
+// (person lines untouched). Used when finance needs to re-upload from
+// scratch or remove utes from a sheet entirely.
+// ===========================================================================
+router.post('/abergeldie/:id/clear-utes', requirePermission('abergeldie_payments'), (req, res) => {
+  const db = getDb();
+  const sheet = db.prepare('SELECT * FROM abergeldie_payment_sheets WHERE id = ?').get(req.params.id);
+  if (!sheet) { req.flash('error', 'Payment sheet not found.'); return res.redirect('/finance/abergeldie'); }
+  const result = db.prepare("DELETE FROM abergeldie_payment_sheet_lines WHERE sheet_id = ? AND COALESCE(line_type, 'person') = 'ute'").run(sheet.id);
+  if (sheet.utes_csv_filename) {
+    try { fs.unlinkSync(path.join(UPLOAD_DIR, sheet.utes_csv_filename)); } catch (e) { /* ignore */ }
+    db.prepare("UPDATE abergeldie_payment_sheets SET utes_csv_filename = '', utes_uploaded_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(sheet.id);
+  }
+  req.flash('success', `Removed ${result.changes} ute line(s).`);
+  res.redirect('/finance/abergeldie/' + sheet.id);
+});
+
+// ===========================================================================
 // POST /finance/abergeldie/:id/delete
 // ===========================================================================
 router.post('/abergeldie/:id/delete', requirePermission('abergeldie_payments'), (req, res) => {
@@ -439,6 +656,9 @@ router.post('/abergeldie/:id/delete', requirePermission('abergeldie_payments'), 
   db.prepare('DELETE FROM abergeldie_payment_sheets WHERE id = ?').run(sheet.id);
   if (sheet.csv_filename) {
     try { fs.unlinkSync(path.join(UPLOAD_DIR, sheet.csv_filename)); } catch (e) { /* ignore */ }
+  }
+  if (sheet.utes_csv_filename) {
+    try { fs.unlinkSync(path.join(UPLOAD_DIR, sheet.utes_csv_filename)); } catch (e) { /* ignore */ }
   }
   logActivity({
     user: req.session.user, action: 'delete', entityType: 'abergeldie_payment_sheet',
@@ -460,30 +680,42 @@ router.get('/abergeldie/:id/export.xlsx', requirePermission('abergeldie_payments
   const sheet = db.prepare('SELECT * FROM abergeldie_payment_sheets WHERE id = ?').get(req.params.id);
   if (!sheet) return res.status(404).send('Payment sheet not found');
 
-  const lines = db.prepare(`
+  const allLines = db.prepare(`
     SELECT * FROM abergeldie_payment_sheet_lines
     WHERE sheet_id = ?
-    ORDER BY project_name ASC, shift_date ASC, LOWER(full_name) ASC
+    ORDER BY line_type ASC, project_name ASC, shift_date ASC, LOWER(full_name) ASC, plate ASC
   `).all(sheet.id);
 
-  // Group by project
+  // Group by project, split person/ute
   const groupsMap = new Map();
-  let grandHours = 0, grandFee = 0;
-  for (const l of lines) {
+  let grandHours = 0, grandWorkerFee = 0, grandShifts = 0, grandUteFee = 0;
+  for (const l of allLines) {
     const key = l.project_name || '(no project name)';
-    if (!groupsMap.has(key)) groupsMap.set(key, { project_name: key, lines: [], total_hours: 0, total_fee: 0 });
+    if (!groupsMap.has(key)) groupsMap.set(key, { project_name: key, person_lines: [], ute_lines: [], total_hours: 0, total_worker_fee: 0, total_shifts: 0, total_ute_fee: 0 });
     const g = groupsMap.get(key);
-    g.lines.push(l);
-    g.total_hours += parseFloat(l.hours) || 0;
-    g.total_fee += parseFloat(l.fee_total) || 0;
-    grandHours += parseFloat(l.hours) || 0;
-    grandFee += parseFloat(l.fee_total) || 0;
+    if ((l.line_type || 'person') === 'ute') {
+      g.ute_lines.push(l);
+      g.total_shifts  += parseInt(l.shift_count, 10) || 0;
+      g.total_ute_fee += parseFloat(l.fee_total) || 0;
+      grandShifts     += parseInt(l.shift_count, 10) || 0;
+      grandUteFee     += parseFloat(l.fee_total) || 0;
+    } else {
+      g.person_lines.push(l);
+      g.total_hours      += parseFloat(l.hours) || 0;
+      g.total_worker_fee += parseFloat(l.fee_total) || 0;
+      grandHours         += parseFloat(l.hours) || 0;
+      grandWorkerFee     += parseFloat(l.fee_total) || 0;
+    }
   }
   const groups = Array.from(groupsMap.values()).sort((a, b) => a.project_name.localeCompare(b.project_name));
 
   const sheetXml = buildAbergeldieSheetXml({
     sheet, groups,
-    grand: { hours: round2(grandHours), fee: round2(grandFee), shift_count: lines.length, project_count: groups.length },
+    grand: {
+      hours: round2(grandHours), worker_fee: round2(grandWorkerFee),
+      shifts: grandShifts, ute_fee: round2(grandUteFee),
+      fee: round2(grandWorkerFee + grandUteFee),
+    },
   });
 
   const filename = `${sheet.client_name || 'Abergeldie'}_${(sheet.label || periodLabel(sheet.period_start, sheet.period_end)).replace(/[^A-Za-z0-9._-]/g, '_')}.xlsx`;
@@ -608,7 +840,7 @@ function buildAbergeldieSheetXml({ sheet, groups, grand }) {
     return `<row r="${rowIdx}">${tags.join('')}</row>`;
   };
 
-  // Header: title + period + fee/hr
+  // Header: title + period + rates
   r++;
   rows.push(rowBuilder(r, [
     { v: (sheet.label || `${sheet.client_name} Payment Sheet`), s: 1 },
@@ -617,53 +849,84 @@ function buildAbergeldieSheetXml({ sheet, groups, grand }) {
   rows.push(rowBuilder(r, [
     { v: `Period: ${sheet.period_start || ''} → ${sheet.period_end || ''}` },
     null, null,
-    { v: `Fee per hour: $${(parseFloat(sheet.fee_per_hour) || 0).toFixed(2)}` },
+    { v: `Fee per hour: $${(parseFloat(sheet.fee_per_hour) || 0).toFixed(2)} · Ute / shift: $${(parseFloat(sheet.default_ute_rate_per_shift) || 0).toFixed(2)}` },
   ]));
   r++; // blank
 
-  // Per-project sections
+  // Per-project sections: workers first, then utes (if any), then a project total
   groups.forEach(g => {
     r++;
-    // Project banner row across A..E
     rows.push(rowBuilder(r, [
       { v: g.project_name, s: 4 }, { v: '', s: 4 }, { v: '', s: 4 }, { v: '', s: 4 }, { v: '', s: 4 },
     ]));
-    r++;
-    // Column headers
-    rows.push(rowBuilder(r, [
-      { v: 'Worker', s: 1 },
-      { v: 'Date', s: 1 },
-      { v: 'Time', s: 1 },
-      { v: 'Hours', s: 1 },
-      { v: 'Fee', s: 1 },
-    ]));
-    // Data rows
-    g.lines.forEach(l => {
+
+    // Worker hours block
+    if (g.person_lines.length > 0) {
       r++;
-      const time = (l.time_on || l.time_off) ? `${l.time_on || ''} → ${l.time_off || ''}` : '';
       rows.push(rowBuilder(r, [
-        { v: l.full_name || '' },
-        { v: l.shift_date || '' },
-        { v: time },
-        { t: 'n', v: parseFloat(l.hours) || 0, s: 8 },
-        { t: 'n', v: parseFloat(l.fee_total) || 0, s: 2 },
+        { v: 'Worker', s: 1 }, { v: 'Date', s: 1 }, { v: 'Time', s: 1 },
+        { v: 'Hours', s: 1 }, { v: 'Fee', s: 1 },
       ]));
-    });
-    // Project subtotal
-    r++;
-    rows.push(rowBuilder(r, [
-      { v: 'Project subtotal', s: 4 }, { v: '', s: 4 }, { v: '', s: 4 },
-      { t: 'n', v: round2(g.total_hours), s: 9 },
-      { t: 'n', v: round2(g.total_fee), s: 5 },
-    ]));
+      g.person_lines.forEach(l => {
+        r++;
+        const time = (l.time_on || l.time_off) ? `${l.time_on || ''} → ${l.time_off || ''}` : '';
+        rows.push(rowBuilder(r, [
+          { v: l.full_name || '' },
+          { v: l.shift_date || '' },
+          { v: time },
+          { t: 'n', v: parseFloat(l.hours) || 0, s: 8 },
+          { t: 'n', v: parseFloat(l.fee_total) || 0, s: 2 },
+        ]));
+      });
+      r++;
+      rows.push(rowBuilder(r, [
+        { v: 'Workers subtotal', s: 4 }, { v: '', s: 4 }, { v: '', s: 4 },
+        { t: 'n', v: round2(g.total_hours), s: 9 },
+        { t: 'n', v: round2(g.total_worker_fee), s: 5 },
+      ]));
+    }
+
+    // Ute block
+    if (g.ute_lines.length > 0) {
+      r++;
+      rows.push(rowBuilder(r, [
+        { v: 'Plate', s: 1 }, { v: 'Driver', s: 1 }, { v: 'Shifts', s: 1 },
+        { v: 'Rate / shift', s: 1 }, { v: 'Fee', s: 1 },
+      ]));
+      g.ute_lines.forEach(l => {
+        r++;
+        rows.push(rowBuilder(r, [
+          { v: l.plate || '' },
+          { v: l.driver_name || '' },
+          { t: 'n', v: parseInt(l.shift_count, 10) || 0 },
+          { t: 'n', v: parseFloat(l.rate_per_shift) || 0, s: 2 },
+          { t: 'n', v: parseFloat(l.fee_total) || 0, s: 2 },
+        ]));
+      });
+      r++;
+      rows.push(rowBuilder(r, [
+        { v: 'Utes subtotal', s: 4 }, { v: '', s: 4 },
+        { t: 'n', v: parseInt(g.total_shifts, 10) || 0, s: 4 },
+        { v: '', s: 4 },
+        { t: 'n', v: round2(g.total_ute_fee), s: 5 },
+      ]));
+    }
+
+    // Project total (workers + utes)
+    if (g.person_lines.length > 0 && g.ute_lines.length > 0) {
+      r++;
+      rows.push(rowBuilder(r, [
+        { v: 'Project total', s: 4 }, { v: '', s: 4 }, { v: '', s: 4 }, { v: '', s: 4 },
+        { t: 'n', v: round2((parseFloat(g.total_worker_fee) || 0) + (parseFloat(g.total_ute_fee) || 0)), s: 5 },
+      ]));
+    }
     r++; // blank between projects
   });
 
   // Grand total row
   r++;
   rows.push(rowBuilder(r, [
-    { v: 'Sheet total', s: 6 }, { v: '', s: 6 }, { v: '', s: 6 },
-    { t: 'n', v: grand.hours, s: 6 },
+    { v: 'Sheet total', s: 6 }, { v: '', s: 6 }, { v: '', s: 6 }, { v: '', s: 6 },
     { t: 'n', v: grand.fee, s: 7 },
   ]));
 

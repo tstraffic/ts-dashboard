@@ -8397,6 +8397,33 @@ function runMigrations(db) {
     console.log('Migration 180 applied');
   }
 
+  // Migration 181: Ute lines on the Abergeldie payment sheet so a single
+  // monthly bill can include both worker hours (existing line_type='person')
+  // and ute usage (line_type='ute', billed per shift). Utes are grouped by
+  // (plate, driver, project_name) — same plate moving between projects
+  // becomes multiple lines, which matches what we charge for.
+  if (!isMigrationApplied.get(181)) {
+    try {
+      const sheetCols = new Set(db.prepare("PRAGMA table_info(abergeldie_payment_sheets)").all().map(c => c.name));
+      const lineCols  = new Set(db.prepare("PRAGMA table_info(abergeldie_payment_sheet_lines)").all().map(c => c.name));
+      const addSheet = (name, ddl) => { if (!sheetCols.has(name)) { try { db.exec(`ALTER TABLE abergeldie_payment_sheets ADD COLUMN ${ddl}`); } catch (e) {} } };
+      const addLine  = (name, ddl) => { if (!lineCols.has(name))  { try { db.exec(`ALTER TABLE abergeldie_payment_sheet_lines ADD COLUMN ${ddl}`); } catch (e) {} } };
+      addSheet('default_ute_rate_per_shift', 'default_ute_rate_per_shift REAL NOT NULL DEFAULT 0');
+      addSheet('utes_csv_filename',          "utes_csv_filename TEXT DEFAULT ''");
+      addSheet('utes_uploaded_at',           'utes_uploaded_at DATETIME');
+      addLine('line_type',             "line_type TEXT NOT NULL DEFAULT 'person'");
+      addLine('plate',                 "plate TEXT DEFAULT ''");
+      addLine('vehicle_friendly_name', "vehicle_friendly_name TEXT DEFAULT ''");
+      addLine('driver_name',           "driver_name TEXT DEFAULT ''");
+      addLine('shift_count',           'shift_count INTEGER DEFAULT 0');
+      addLine('rate_per_shift',        'rate_per_shift REAL DEFAULT 0');
+      recordMigration.run(181, 'Abergeldie sheet: ute lines (line_type, plate, shift_count, rate_per_shift)');
+      console.log('Migration 181 applied: ute lines on Abergeldie sheet');
+    } catch (e) {
+      console.error('Migration 181 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
