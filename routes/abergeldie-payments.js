@@ -18,6 +18,7 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const archiver = require('archiver');
 
 const { getDb } = require('../db/database');
 const { requirePermission } = require('../middleware/auth');
@@ -447,5 +448,241 @@ router.post('/abergeldie/:id/delete', requirePermission('abergeldie_payments'), 
   req.flash('success', `Deleted ${sheet.label}.`);
   res.redirect('/finance/abergeldie');
 });
+
+// ===========================================================================
+// GET /finance/abergeldie/:id/export.xlsx — single-sheet xlsx for emailing
+// to Abergeldie. One row per shift, grouped by project with subtotal rows
+// between groups, and a Sheet Total at the bottom. Built as raw OOXML
+// streamed through archiver — no extra dependencies.
+// ===========================================================================
+router.get('/abergeldie/:id/export.xlsx', requirePermission('abergeldie_payments'), (req, res) => {
+  const db = getDb();
+  const sheet = db.prepare('SELECT * FROM abergeldie_payment_sheets WHERE id = ?').get(req.params.id);
+  if (!sheet) return res.status(404).send('Payment sheet not found');
+
+  const lines = db.prepare(`
+    SELECT * FROM abergeldie_payment_sheet_lines
+    WHERE sheet_id = ?
+    ORDER BY project_name ASC, shift_date ASC, LOWER(full_name) ASC
+  `).all(sheet.id);
+
+  // Group by project
+  const groupsMap = new Map();
+  let grandHours = 0, grandFee = 0;
+  for (const l of lines) {
+    const key = l.project_name || '(no project name)';
+    if (!groupsMap.has(key)) groupsMap.set(key, { project_name: key, lines: [], total_hours: 0, total_fee: 0 });
+    const g = groupsMap.get(key);
+    g.lines.push(l);
+    g.total_hours += parseFloat(l.hours) || 0;
+    g.total_fee += parseFloat(l.fee_total) || 0;
+    grandHours += parseFloat(l.hours) || 0;
+    grandFee += parseFloat(l.fee_total) || 0;
+  }
+  const groups = Array.from(groupsMap.values()).sort((a, b) => a.project_name.localeCompare(b.project_name));
+
+  const sheetXml = buildAbergeldieSheetXml({
+    sheet, groups,
+    grand: { hours: round2(grandHours), fee: round2(grandFee), shift_count: lines.length, project_count: groups.length },
+  });
+
+  const filename = `${sheet.client_name || 'Abergeldie'}_${(sheet.label || periodLabel(sheet.period_start, sheet.period_end)).replace(/[^A-Za-z0-9._-]/g, '_')}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  archive.on('error', (err) => { console.error('[abergeldie xlsx]', err); try { res.end(); } catch (e) {} });
+  archive.pipe(res);
+
+  archive.append(buildContentTypes(), { name: '[Content_Types].xml' });
+  archive.append(buildRels(), { name: '_rels/.rels' });
+  archive.append(buildWorkbook(), { name: 'xl/workbook.xml' });
+  archive.append(buildWorkbookRels(), { name: 'xl/_rels/workbook.xml.rels' });
+  archive.append(buildStyles(), { name: 'xl/styles.xml' });
+  archive.append(sheetXml, { name: 'xl/worksheets/sheet1.xml' });
+  archive.finalize();
+});
+
+// ----- xlsx builders -------------------------------------------------------
+function xmlEscape(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+function colLetter(n) { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+function cellRef(c, r) { return colLetter(c) + r; }
+
+function buildContentTypes() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`;
+}
+function buildRels() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+}
+function buildWorkbook() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="Payment Sheet" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`;
+}
+function buildWorkbookRels() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+}
+// Style indexes used in cells:
+//   0 = default plain
+//   1 = bold
+//   2 = currency $#,##0.00 (plain)
+//   3 = currency bold
+//   4 = bold w/ light grey fill (project header)
+//   5 = bold currency w/ light grey fill (project subtotal money)
+//   6 = bold w/ accent fill (sheet total)
+//   7 = bold currency w/ accent fill (grand total money)
+//   8 = number 2dp (hours)
+//   9 = number 2dp bold (subtotal hours)
+function buildStyles() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="2">
+  <numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00"/>
+  <numFmt numFmtId="165" formatCode="0.00"/>
+</numFmts>
+<fonts count="3">
+  <font><sz val="11"/><name val="Calibri"/><color rgb="FF111827"/></font>
+  <font><b/><sz val="11"/><name val="Calibri"/><color rgb="FF111827"/></font>
+  <font><b/><sz val="12"/><name val="Calibri"/><color rgb="FFFFFFFF"/></font>
+</fonts>
+<fills count="4">
+  <fill><patternFill patternType="none"/></fill>
+  <fill><patternFill patternType="gray125"/></fill>
+  <fill><patternFill patternType="solid"><fgColor rgb="FFF3F4F6"/></patternFill></fill>
+  <fill><patternFill patternType="solid"><fgColor rgb="FF1D6AE5"/></patternFill></fill>
+</fills>
+<borders count="2">
+  <border><left/><right/><top/><bottom/><diagonal/></border>
+  <border><top style="thin"><color rgb="FF9CA3AF"/></top></border>
+</borders>
+<cellXfs count="10">
+  <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+  <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+  <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+  <xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>
+  <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+  <xf numFmtId="164" fontId="1" fillId="2" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>
+  <xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+  <xf numFmtId="164" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>
+  <xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+  <xf numFmtId="165" fontId="1" fillId="2" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>
+</cellXfs>
+</styleSheet>`;
+}
+
+function buildAbergeldieSheetXml({ sheet, groups, grand }) {
+  const rows = [];
+  let r = 0;
+  // Style helpers
+  const rowBuilder = (rowIdx, cells) => {
+    const tags = cells.map((cIn, i) => {
+      const ref = cellRef(i + 1, rowIdx);
+      const c = cIn || {};
+      const style = c.s != null ? ` s="${c.s}"` : '';
+      if (c.t === 'n') {
+        return `<c r="${ref}"${style} t="n"><v>${c.v}</v></c>`;
+      }
+      if (c.v == null || c.v === '') return `<c r="${ref}"${style}/>`;
+      return `<c r="${ref}"${style} t="inlineStr"><is><t>${xmlEscape(c.v)}</t></is></c>`;
+    });
+    return `<row r="${rowIdx}">${tags.join('')}</row>`;
+  };
+
+  // Header: title + period + fee/hr
+  r++;
+  rows.push(rowBuilder(r, [
+    { v: (sheet.label || `${sheet.client_name} Payment Sheet`), s: 1 },
+  ]));
+  r++;
+  rows.push(rowBuilder(r, [
+    { v: `Period: ${sheet.period_start || ''} → ${sheet.period_end || ''}` },
+    null, null,
+    { v: `Fee per hour: $${(parseFloat(sheet.fee_per_hour) || 0).toFixed(2)}` },
+  ]));
+  r++; // blank
+
+  // Per-project sections
+  groups.forEach(g => {
+    r++;
+    // Project banner row across A..E
+    rows.push(rowBuilder(r, [
+      { v: g.project_name, s: 4 }, { v: '', s: 4 }, { v: '', s: 4 }, { v: '', s: 4 }, { v: '', s: 4 },
+    ]));
+    r++;
+    // Column headers
+    rows.push(rowBuilder(r, [
+      { v: 'Worker', s: 1 },
+      { v: 'Date', s: 1 },
+      { v: 'Time', s: 1 },
+      { v: 'Hours', s: 1 },
+      { v: 'Fee', s: 1 },
+    ]));
+    // Data rows
+    g.lines.forEach(l => {
+      r++;
+      const time = (l.time_on || l.time_off) ? `${l.time_on || ''} → ${l.time_off || ''}` : '';
+      rows.push(rowBuilder(r, [
+        { v: l.full_name || '' },
+        { v: l.shift_date || '' },
+        { v: time },
+        { t: 'n', v: parseFloat(l.hours) || 0, s: 8 },
+        { t: 'n', v: parseFloat(l.fee_total) || 0, s: 2 },
+      ]));
+    });
+    // Project subtotal
+    r++;
+    rows.push(rowBuilder(r, [
+      { v: 'Project subtotal', s: 4 }, { v: '', s: 4 }, { v: '', s: 4 },
+      { t: 'n', v: round2(g.total_hours), s: 9 },
+      { t: 'n', v: round2(g.total_fee), s: 5 },
+    ]));
+    r++; // blank between projects
+  });
+
+  // Grand total row
+  r++;
+  rows.push(rowBuilder(r, [
+    { v: 'Sheet total', s: 6 }, { v: '', s: 6 }, { v: '', s: 6 },
+    { t: 'n', v: grand.hours, s: 6 },
+    { t: 'n', v: grand.fee, s: 7 },
+  ]));
+
+  // Column widths — A worker, B date, C time, D hours, E fee
+  const cols = `<cols>
+    <col min="1" max="1" width="28" customWidth="1"/>
+    <col min="2" max="2" width="12" customWidth="1"/>
+    <col min="3" max="3" width="18" customWidth="1"/>
+    <col min="4" max="4" width="10" customWidth="1"/>
+    <col min="5" max="5" width="14" customWidth="1"/>
+  </cols>`;
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+${cols}
+<sheetData>
+${rows.join('\n')}
+</sheetData>
+</worksheet>`;
+}
 
 module.exports = router;
