@@ -92,7 +92,7 @@
     const sectTotals = totals[section.key];
     if (!lns || lns.length === 0) return;
   %>
-    <%- include('partials/_section', { section, lines: lns, sectTotals, accent: section.accent, dowLabels, bucketLabels, fmtMoney }) %>
+    <%- include('partials/_section', { section, lines: lns, sectTotals, accent: section.accent, dowLabels, bucketLabels, fmtMoney, runLocked }) %>
   <% }) %>
 
   <% if (buckets.unclassified.length > 0) { %>
@@ -101,7 +101,7 @@
       lines: buckets.unclassified,
       sectTotals: totals.unclassified,
       accent: 'gray',
-      dowLabels, bucketLabels, fmtMoney,
+      dowLabels, bucketLabels, fmtMoney, runLocked,
     }) %>
   <% } %>
 </div>
@@ -842,13 +842,18 @@
   function closeMatchModal() { document.getElementById('matchModal').classList.add('hidden'); }
 
   function togglePaid(lineId, checked) {
-    const fd = new FormData();
+    // Use urlencoded so express.urlencoded() parses req.body — multipart
+    // FormData would slip through unparsed (no multer on this route).
+    const fd = new URLSearchParams();
     fd.set('paid', checked ? '1' : '0');
     fd.set('_csrf', document.querySelector('input[name="_csrf"]').value);
     fetch('/payroll/runs/' + RUN_ID + '/lines/' + lineId, {
       method: 'POST',
-      headers: { 'Accept': 'application/json' },
-      body: fd,
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: fd.toString(),
     }).then(r => r.ok ? r.json() : Promise.reject(r.statusText))
       .then(() => { window.location.reload(); })
       .catch(err => alert('Save failed: ' + err));

@@ -687,7 +687,13 @@ router.post('/runs/:id/lines/:lineId', requirePermission('payroll'), (req, res) 
   const db = getDb();
   const run = db.prepare('SELECT * FROM pay_runs WHERE id = ?').get(req.params.id);
   if (!run) return res.status(404).json({ error: 'Pay run not found' });
-  if (!assertEditable(req, res, run)) return;
+  // Allow paid-only updates on locked runs — finance still needs to tick "paid"
+  // off after Saadat approves the run. Anything that touches wages, allowances,
+  // payment type, etc. requires the run to be editable.
+  const bodyKeys = Object.keys(req.body || {});
+  const PAID_ONLY_KEYS = new Set(['paid', 'paid_ref', '_csrf']);
+  const isPaidOnlyUpdate = bodyKeys.length > 0 && bodyKeys.every(k => PAID_ONLY_KEYS.has(k));
+  if (!isPaidOnlyUpdate && !assertEditable(req, res, run)) return;
   const line = db.prepare('SELECT * FROM pay_run_lines WHERE id = ? AND pay_run_id = ?').get(req.params.lineId, run.id);
   if (!line) return res.status(404).json({ error: 'Line not found' });
 
