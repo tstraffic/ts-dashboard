@@ -9,6 +9,17 @@
   const showGst = accent === 'amber'; // Cash only
   const showTfnExtras = section.key === 'tfn'; // Super, Tax, Net columns
 
+  // The line stores its own bsb/acc_number snapshot, but for older lines
+  // imported before the employee had bank details set, fall back to the
+  // current employee record (joined in as emp_payroll_*). Edits in the
+  // edit modal still write to the line so historical runs stay frozen.
+  function bsbAccFor(l) {
+    return {
+      bsb: l.bsb || l.emp_payroll_bsb || '',
+      acc: l.acc_number || l.emp_payroll_account || '',
+    };
+  }
+
   // Bucket UI flair
   const BUCKET_BADGE = {
     day_normal:    'text-gray-700',
@@ -95,7 +106,8 @@
                 <% if (l.classification_name) { %><p class="text-[10px] text-emerald-600 mt-0.5"><%= l.classification_name %></p><% } %>
               </td>
               <td class="px-2 py-2 text-[11px] font-mono text-gray-600 leading-tight">
-                <% if (l.bsb || l.acc_number) { %><%= l.bsb || '—' %><br><%= l.acc_number || '—' %><% } else { %><span class="text-gray-300">—</span><% } %>
+                <% const _bd = bsbAccFor(l); %>
+                <% if (_bd.bsb || _bd.acc) { %><%= _bd.bsb || '—' %><br><%= _bd.acc || '—' %><% } else { %><span class="text-gray-300">—</span><% } %>
               </td>
               <td colspan="10" class="px-2 py-2 text-xs text-gray-400 italic">No hours</td>
               <% if (showTfnExtras) { %>
@@ -131,8 +143,9 @@
                     <% } %>
                   </td>
                   <td rowspan="<%= rowSpan %>" class="px-2 py-2 align-top text-[11px] font-mono text-gray-600 leading-tight">
-                    <% if (l.bsb || l.acc_number) { %>
-                      <%= l.bsb || '—' %><br><%= l.acc_number || '—' %>
+                    <% const _bd = bsbAccFor(l); %>
+                    <% if (_bd.bsb || _bd.acc) { %>
+                      <%= _bd.bsb || '—' %><br><%= _bd.acc || '—' %>
                     <% } else { %>
                       <span class="text-gray-300">—</span>
                     <% } %>

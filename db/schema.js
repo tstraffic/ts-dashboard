@@ -8148,6 +8148,50 @@ function runMigrations(db) {
     }
   }
 
+  // Migration 172: Backfill payroll BSB + Account on employees from their
+  // latest induction submission so the worker rates page is pre-populated
+  // and finance doesn't have to copy the details across. Inductions are
+  // linked via linked_crew_member_id (or email fallback). Only writes
+  // when the employee's existing field is blank — once finance edits on
+  // the rates page, the employee record is authoritative.
+  if (!isMigrationApplied.get(172)) {
+    try {
+      let hasInduction = false;
+      try { hasInduction = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='induction_submissions'").get() != null; } catch (e) {}
+      if (hasInduction) {
+        const indCols = new Set(db.prepare("PRAGMA table_info(induction_submissions)").all().map(c => c.name));
+        if (indCols.has('bank_bsb') && indCols.has('bank_account_number') && indCols.has('linked_crew_member_id')) {
+          db.exec(`
+            UPDATE employees
+            SET
+              payroll_bsb = CASE WHEN COALESCE(payroll_bsb, '') = '' THEN COALESCE((
+                SELECT bank_bsb FROM induction_submissions
+                WHERE COALESCE(bank_bsb, '') != ''
+                  AND (
+                    (linked_crew_member_id IS NOT NULL AND linked_crew_member_id = employees.linked_crew_member_id)
+                    OR (COALESCE(employees.email, '') != '' AND LOWER(email) = LOWER(employees.email))
+                  )
+                ORDER BY id DESC LIMIT 1
+              ), '') ELSE payroll_bsb END,
+              payroll_account = CASE WHEN COALESCE(payroll_account, '') = '' THEN COALESCE((
+                SELECT bank_account_number FROM induction_submissions
+                WHERE COALESCE(bank_account_number, '') != ''
+                  AND (
+                    (linked_crew_member_id IS NOT NULL AND linked_crew_member_id = employees.linked_crew_member_id)
+                    OR (COALESCE(employees.email, '') != '' AND LOWER(email) = LOWER(employees.email))
+                  )
+                ORDER BY id DESC LIMIT 1
+              ), '') ELSE payroll_account END
+          `);
+        }
+      }
+      recordMigration.run(172, 'employees: backfill payroll_bsb + payroll_account from induction submissions');
+      console.log('Migration 172 applied: BSB + Account backfilled from inductions');
+    } catch (e) {
+      console.error('Migration 172 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
