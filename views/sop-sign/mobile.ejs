@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SOP Sign-Off — T&S Traffic Control</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+    canvas { touch-action: none; }
+    .ack-text { white-space: pre-wrap; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<% if (submitted) { %>
+  <!-- Success screen -->
+  <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+    <div class="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center mb-6 shadow-lg">
+      <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+    </div>
+    <h1 class="text-2xl font-bold text-gray-900 mb-2">Signed!</h1>
+    <p class="text-gray-600 mb-1">Thanks <%= signedName %> — your SOP acknowledgement is recorded.</p>
+    <p class="text-sm text-gray-400">SOP version <%= sopVersion %></p>
+    <p class="text-xs text-gray-400 mt-8 max-w-xs">You can close this tab. The presenter's screen will show your name in the signed list.</p>
+  </div>
+<% } else { %>
+
+  <!-- Header -->
+  <div class="bg-white border-b border-gray-200 px-5 py-4 sticky top-0 z-10">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-sm">T&S</div>
+      <div>
+        <h1 class="text-base font-bold text-gray-900 leading-tight">SOP Acknowledgement</h1>
+        <p class="text-xs text-gray-500"><%= session.title || 'In-person sign-off' %></p>
+      </div>
+    </div>
+  </div>
+
+  <form id="signForm" method="POST" action="/sop-sign/<%= session.token %>/submit" class="p-5 pb-24 max-w-md mx-auto space-y-5">
+
+    <!-- Name picker -->
+    <div>
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Pick your name</label>
+      <select id="crew-picker" name="crew_member_id" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+        <option value="">— Select —</option>
+        <% attendees.forEach(a => { %>
+          <option value="<%= a.id %>" <%= a.alreadySigned ? 'disabled' : '' %>>
+            <%= a.full_name %><% if (a.employee_id) { %> · <%= a.employee_id %><% } %><% if (a.alreadySigned) { %>  (already signed)<% } %>
+          </option>
+        <% }) %>
+      </select>
+    </div>
+
+    <details class="text-sm">
+      <summary class="text-brand-600 font-medium cursor-pointer">My name isn't on the list</summary>
+      <div class="mt-3 space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Full name</label>
+          <input type="text" name="full_name" id="manual-name" autocomplete="name" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="Type your full name" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Email (optional)</label>
+          <input type="email" name="email" autocomplete="email" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="you@example.com" />
+        </div>
+      </div>
+    </details>
+
+    <!-- Ack text -->
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-amber-800 uppercase tracking-widest mb-2">SOP Version <%= sopVersion %></p>
+      <p class="ack-text text-sm text-gray-800 leading-relaxed"><%= ackText %></p>
+    </div>
+
+    <!-- Signature -->
+    <div>
+      <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Sign here</label>
+      <div class="relative rounded-xl border border-gray-300 bg-white overflow-hidden" style="background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 23px, rgba(0,0,0,0.04) 23px, rgba(0,0,0,0.04) 24px);">
+        <canvas id="sig-canvas" class="block w-full" style="height: 200px;"></canvas>
+        <span id="sig-placeholder" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">Sign with your finger</span>
+        <div class="flex items-center justify-between px-3 py-2 bg-gray-50 border-t border-gray-200">
+          <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Signature</span>
+          <button type="button" id="sig-clear" class="text-xs font-semibold text-gray-500 hover:text-gray-700">Clear</button>
+        </div>
+      </div>
+      <input type="hidden" name="signature_data" id="signature_data">
+      <p id="errMsg" class="hidden text-red-500 text-xs font-medium mt-2"></p>
+    </div>
+
+    <button type="submit" id="submitBtn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl px-6 py-4 text-base shadow-md active:scale-[0.98] transition">
+      Sign & Submit
+    </button>
+  </form>
+
+  <script>
+    // ── Signature pad ──
+    const canvas = document.getElementById('sig-canvas');
+    const placeholder = document.getElementById('sig-placeholder');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let last = null;
+    let hasInk = false;
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#0f172a';
+    }
+    resize();
+    window.addEventListener('resize', () => { resize(); });
+
+    function getXY(e) {
+      const rect = canvas.getBoundingClientRect();
+      const t = e.touches ? e.touches[0] : e;
+      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+    }
+
+    function start(e) {
+      e.preventDefault();
+      drawing = true;
+      last = getXY(e);
+      placeholder.style.display = 'none';
+    }
+    function move(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      const p = getXY(e);
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      last = p;
+      hasInk = true;
+    }
+    function end() { drawing = false; }
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', end);
+    canvas.addEventListener('mouseleave', end);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', end);
+
+    document.getElementById('sig-clear').addEventListener('click', () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      hasInk = false;
+      placeholder.style.display = '';
+    });
+
+    // ── Submit ──
+    const form = document.getElementById('signForm');
+    const errMsg = document.getElementById('errMsg');
+    form.addEventListener('submit', (e) => {
+      const crewId = document.getElementById('crew-picker').value;
+      const manualName = document.getElementById('manual-name').value.trim();
+      if (!crewId && !manualName) {
+        e.preventDefault();
+        errMsg.textContent = 'Pick your name from the list, or type it in the "name not on list" section.';
+        errMsg.classList.remove('hidden');
+        return;
+      }
+      if (!hasInk) {
+        e.preventDefault();
+        errMsg.textContent = 'Please draw your signature above.';
+        errMsg.classList.remove('hidden');
+        return;
+      }
+      errMsg.classList.add('hidden');
+      document.getElementById('signature_data').value = canvas.toDataURL('image/png');
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('submitBtn').textContent = 'Submitting…';
+    });
+  </script>
+
+<% } %>
+
+</body>
+</html>

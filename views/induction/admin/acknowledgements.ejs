@@ -1,0 +1,78 @@
+<% locals.currentPage = 'induction' %>
+<%
+  function formatDate(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr.replace(' ', 'T') + 'Z');
+    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+%>
+
+<div class="p-4 md:p-6 max-w-6xl mx-auto">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-5">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">SOP Acknowledgements</h1>
+      <p class="text-gray-500 text-sm mt-1">Everyone who has signed the SOP acknowledgement. Current version: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs"><%= currentVersion %></code></p>
+    </div>
+    <a href="/induction/admin/presentations" class="text-sm text-brand-600 hover:text-brand-700 font-medium">&larr; Back</a>
+  </div>
+
+  <!-- Filters -->
+  <form method="GET" class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-5 flex flex-wrap items-center gap-3">
+    <input type="text" name="search" value="<%= filters.search %>" placeholder="Search name or email"
+      class="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+    <select name="version" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+      <option value="">All versions</option>
+      <% versions.forEach(v => { %>
+        <option value="<%= v %>" <%= filters.version === v ? 'selected' : '' %>><%= v %></option>
+      <% }) %>
+    </select>
+    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition">Filter</button>
+    <% if (filters.search || filters.version) { %>
+      <a href="/induction/admin/acknowledgements" class="text-xs text-gray-500 hover:text-gray-700">Clear</a>
+    <% } %>
+  </form>
+
+  <!-- Table -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <% if (acks.length === 0) { %>
+      <div class="p-8 text-center text-gray-400">
+        <p class="font-medium">No acknowledgements yet</p>
+        <p class="text-sm mt-1">Start a sign-off session from the Training Presentations page.</p>
+      </div>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <tr>
+              <th class="px-4 py-3 text-left">Name</th>
+              <th class="px-4 py-3 text-left">Employee</th>
+              <th class="px-4 py-3 text-left">Email</th>
+              <th class="px-4 py-3 text-left">Version</th>
+              <th class="px-4 py-3 text-left">Signed</th>
+              <th class="px-4 py-3 text-left">Via</th>
+              <th class="px-4 py-3 text-left">Sig</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% acks.forEach(a => { %>
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-medium text-gray-900"><%= a.full_name %></td>
+                <td class="px-4 py-3 text-gray-600"><%= a.crew_employee_code || '—' %></td>
+                <td class="px-4 py-3 text-gray-600"><%= a.email || '—' %></td>
+                <td class="px-4 py-3"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs"><%= a.sop_version %></code></td>
+                <td class="px-4 py-3 text-gray-600 tabular-nums"><%= formatDate(a.signed_at) %></td>
+                <td class="px-4 py-3 text-gray-500 capitalize"><%= a.signed_via %></td>
+                <td class="px-4 py-3">
+                  <% if (a.signature_url) { %>
+                    <a href="<%= a.signature_url %>" target="_blank" class="text-brand-600 hover:text-brand-700 text-xs font-medium">View</a>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>

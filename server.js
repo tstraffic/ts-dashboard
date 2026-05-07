@@ -123,6 +123,8 @@ app.use('/w/setup', require('./routes/worker/setup'));
 app.use('/induction/admin', requireLogin, requirePermission('induction'), require('./routes/induction-admin'));
 app.use('/induction', require('./routes/induction'));
 app.use('/training', require('./routes/training'));
+// Public token-protected SOP sign-off (no auth required, scoped by URL token)
+app.use('/sop-sign', require('./routes/sop-sign'));
 
 // Rate limiting on login endpoints (prevent brute force)
 const loginLimiter = rateLimit({

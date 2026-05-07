@@ -1,10 +1,12 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const { getDb } = require('../db/database');
 const { employeeGuideSlides, tcTrainingSlides } = require('../induction-slides');
 const { encrypt } = require('../services/encryption');
+const { currentVersion: currentSopVersion, ackText: sopAckText } = require('../lib/sop');
 
 // Copy the bank / super / TFN payroll data from an induction submission into
 // the three encrypted per-employee tables. Skips any table that already has a
@@ -612,6 +614,109 @@ router.post('/present/:module/quiz-result', (req, res) => {
     `).run(score, passed ? 1 : 0, JSON.stringify(answers || {}), presentation_id);
   }
   res.json({ success: true });
+});
+
+// ============================================================
+// SOP Sign-Off Sessions (in-person group inductions via QR)
+// ============================================================
+
+// POST /induction/admin/sign-session/start — create a new group session
+router.post('/sign-session/start', (req, res) => {
+  const db = getDb();
+  const { title, presentation_id } = req.body;
+  const token = crypto.randomBytes(8).toString('hex');
+  const result = db.prepare(`
+    INSERT INTO sop_signing_sessions (token, title, sop_version, presentation_id, created_by_id)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    token,
+    (title || 'In-person sign-off').toString().slice(0, 200),
+    currentSopVersion(),
+    presentation_id ? parseInt(presentation_id, 10) : null,
+    req.session.user.id,
+  );
+  res.redirect(`/induction/admin/sign-session/${result.lastInsertRowid}`);
+});
+
+// GET /induction/admin/sign-session/:id — presenter view (QR + live list)
+router.get('/sign-session/:id', (req, res) => {
+  const db = getDb();
+  const session = db.prepare(`
+    SELECT s.*, u.full_name as created_by_name
+    FROM sop_signing_sessions s
+    LEFT JOIN users u ON s.created_by_id = u.id
+    WHERE s.id = ?
+  `).get(req.params.id);
+
+  if (!session) {
+    return res.status(404).render('error', { title: 'Not Found', message: 'Sign-off session not found', user: req.session.user });
+  }
+
+  const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+  const signUrl = `${baseUrl}/sop-sign/${session.token}`;
+
+  res.render('induction/admin/sign-session', {
+    title: 'Sign-Off Session',
+    currentPage: 'induction',
+    layout: false,
+    session,
+    signUrl,
+  });
+});
+
+// GET /induction/admin/sign-session/:id/status.json — poll for new sigs
+router.get('/sign-session/:id/status.json', (req, res) => {
+  const db = getDb();
+  const session = db.prepare('SELECT id, closed_at FROM sop_signing_sessions WHERE id = ?').get(req.params.id);
+  if (!session) return res.status(404).json({ error: 'Not found' });
+
+  const acks = db.prepare(`
+    SELECT id, full_name, email, signed_at, signed_via, crew_member_id
+    FROM sop_acknowledgements
+    WHERE session_id = ?
+    ORDER BY signed_at ASC
+  `).all(session.id);
+
+  res.json({ closed: !!session.closed_at, count: acks.length, acks });
+});
+
+// POST /induction/admin/sign-session/:id/close — finalise the session
+router.post('/sign-session/:id/close', (req, res) => {
+  const db = getDb();
+  db.prepare("UPDATE sop_signing_sessions SET closed_at = datetime('now') WHERE id = ? AND closed_at IS NULL").run(req.params.id);
+  res.redirect('/induction/admin/presentations');
+});
+
+// GET /induction/admin/acknowledgements — list everyone who's signed (audit list)
+router.get('/acknowledgements', (req, res) => {
+  const db = getDb();
+  const { version, search } = req.query;
+  const whereParts = [];
+  const params = [];
+  if (version) { whereParts.push('a.sop_version = ?'); params.push(version); }
+  if (search) { whereParts.push('(a.full_name LIKE ? OR a.email LIKE ?)'); params.push(`%${search}%`, `%${search}%`); }
+  const whereClause = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
+
+  const acks = db.prepare(`
+    SELECT a.*, s.title as session_title, cm.employee_id as crew_employee_code
+    FROM sop_acknowledgements a
+    LEFT JOIN sop_signing_sessions s ON a.session_id = s.id
+    LEFT JOIN crew_members cm ON a.crew_member_id = cm.id
+    ${whereClause}
+    ORDER BY a.signed_at DESC
+    LIMIT 500
+  `).all(...params);
+
+  const versions = db.prepare('SELECT DISTINCT sop_version FROM sop_acknowledgements ORDER BY sop_version DESC').all().map(r => r.sop_version);
+
+  res.render('induction/admin/acknowledgements', {
+    title: 'SOP Acknowledgements',
+    currentPage: 'induction',
+    acks,
+    versions,
+    currentVersion: currentSopVersion(),
+    filters: { version: version || '', search: search || '' },
+  });
 });
 
 module.exports = router;

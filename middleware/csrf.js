@@ -10,9 +10,16 @@ const SKIP_PATHS = [
   '/induction/abn/submit',
 ];
 
+// Path prefixes that skip CSRF — for token-protected public endpoints
+// (e.g. /sop-sign/:token/submit hit by external phones with no session).
+const SKIP_PREFIXES = [
+  '/sop-sign/',
+];
+
 function csrfProtection(req, res, next) {
   // Skip for non-session requests (static assets handled by express.static before this)
   if (SKIP_PATHS.some(p => req.path === p)) return next();
+  if (SKIP_PREFIXES.some(p => req.path.startsWith(p))) return next();
 
   // Generate token if not in session
   if (!req.session._csrf) {

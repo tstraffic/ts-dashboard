@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign-Off Session — T&S Traffic Control</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .qr-frame { background: white; padding: 20px; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.18); }
+    .pulse-dot { animation: pulse 2s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.45; }
+    }
+    .signed-row { animation: slide-in 0.4s ease-out; }
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen text-white">
+  <!-- Top bar -->
+  <div class="flex items-center justify-between px-6 py-4 border-b border-white/10">
+    <div class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 bg-emerald-400 rounded-full pulse-dot"></div>
+      <h1 class="text-lg font-bold tracking-tight">In-Person Sign-Off</h1>
+      <span class="text-sm text-white/50">·</span>
+      <span class="text-sm text-white/70"><%= session.title %></span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-white/50">SOP <%= session.sop_version %></span>
+      <form method="POST" action="/induction/admin/sign-session/<%= session.id %>/close" onsubmit="return confirm('Close this session? No more signatures can be added after that.')">
+        <%- include('../../partials/csrf') %>
+        <button type="submit" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium rounded-lg transition">
+          End session
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="grid lg:grid-cols-2 gap-8 p-6 lg:p-10 max-w-7xl mx-auto">
+
+    <!-- LEFT: QR + URL -->
+    <div class="flex flex-col items-center justify-center text-center">
+      <p class="text-xs font-semibold tracking-widest uppercase text-amber-300 mb-3">Scan with phone</p>
+      <h2 class="text-2xl font-bold mb-6 max-w-sm">Sign the SOP acknowledgement on your phone</h2>
+
+      <div class="qr-frame">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=8&data=<%= encodeURIComponent(signUrl) %>"
+             alt="QR code" width="320" height="320" />
+      </div>
+
+      <p class="mt-6 text-sm text-white/60">Or open this link on your phone:</p>
+      <div class="mt-2 flex items-center gap-2 bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 max-w-full">
+        <code class="text-amber-200 text-sm font-mono break-all" id="sign-url"><%= signUrl %></code>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('sign-url').textContent).then(()=>{this.textContent='✓';setTimeout(()=>{this.textContent='Copy'},1500)})"
+                class="text-xs px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded font-medium transition flex-shrink-0">Copy</button>
+      </div>
+
+      <p class="mt-6 text-xs text-white/40 max-w-sm">
+        Each person picks their name, signs on their phone, and submits. Anyone without a phone can use the laptop button below.
+      </p>
+
+      <a href="/sop-sign/<%= session.token %>" target="_blank"
+         class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-lg transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.5 14L4 9.5L9.5 5M4 9.5h11a5 5 0 015 5v0a5 5 0 01-5 5H8"/></svg>
+        Sign on this laptop instead
+      </a>
+    </div>
+
+    <!-- RIGHT: live signed list -->
+    <div>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold tracking-widest uppercase text-white/60">Signed</h3>
+        <span class="text-3xl font-bold tabular-nums" id="signed-count">0</span>
+      </div>
+
+      <div id="signed-list" class="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+        <div class="text-center py-12 text-white/40 text-sm" id="empty-msg">
+          Waiting for first signature…
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SESSION_ID = <%= session.id %>;
+    const seen = new Set();
+    let pollInterval = null;
+
+    async function poll() {
+      try {
+        const resp = await fetch('/induction/admin/sign-session/' + SESSION_ID + '/status.json');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        renderSigned(data.acks || []);
+        if (data.closed && pollInterval) {
+          clearInterval(pollInterval);
+        }
+      } catch (e) { /* ignore transient errors */ }
+    }
+
+    function renderSigned(acks) {
+      const listEl = document.getElementById('signed-list');
+      const countEl = document.getElementById('signed-count');
+      const emptyEl = document.getElementById('empty-msg');
+      countEl.textContent = acks.length;
+      if (acks.length === 0) {
+        if (emptyEl) emptyEl.style.display = '';
+        return;
+      }
+      if (emptyEl) emptyEl.style.display = 'none';
+
+      // Append only new ones
+      for (const ack of acks) {
+        if (seen.has(ack.id)) continue;
+        seen.add(ack.id);
+        const initials = ack.full_name.split(/\s+/).map(s => s[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
+        const time = new Date(ack.signed_at + 'Z').toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+        const row = document.createElement('div');
+        row.className = 'signed-row flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3';
+        row.innerHTML = `
+          <div class="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${initials}</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold truncate">${escapeHtml(ack.full_name)}</p>
+            ${ack.email ? `<p class="text-xs text-white/50 truncate">${escapeHtml(ack.email)}</p>` : ''}
+          </div>
+          <div class="flex flex-col items-end text-right">
+            <span class="text-xs text-emerald-300 font-medium">✓ Signed</span>
+            <span class="text-[10px] text-white/40 tabular-nums">${time}</span>
+          </div>
+        `;
+        listEl.appendChild(row);
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    poll();
+    pollInterval = setInterval(poll, 3000);
+  </script>
+</body>
+</html>

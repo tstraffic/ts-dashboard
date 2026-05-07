@@ -8192,6 +8192,47 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 173: SOP signing sessions + acknowledgements
+  // Group in-person inductions: presenter creates a session, attendees sign
+  // on their own phones via QR code. Standalone individual sigs also live
+  // here (for early-starters / portal-prompt path).
+  // =============================================
+  if (!isMigrationApplied.get(173)) {
+    console.log('Running migration 173: SOP signing sessions + acknowledgements');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS sop_signing_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        token TEXT UNIQUE NOT NULL,
+        title TEXT DEFAULT '',
+        sop_version TEXT NOT NULL,
+        presentation_id INTEGER REFERENCES induction_presentations(id),
+        created_by_id INTEGER NOT NULL REFERENCES users(id),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        closed_at DATETIME
+      );
+      CREATE INDEX IF NOT EXISTS idx_sop_sessions_token ON sop_signing_sessions(token);
+
+      CREATE TABLE IF NOT EXISTS sop_acknowledgements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER REFERENCES sop_signing_sessions(id),
+        crew_member_id INTEGER REFERENCES crew_members(id),
+        full_name TEXT NOT NULL,
+        email TEXT DEFAULT '',
+        sop_version TEXT NOT NULL,
+        signature_url TEXT NOT NULL,
+        signed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        signed_via TEXT DEFAULT 'mobile',
+        signed_ip TEXT DEFAULT ''
+      );
+      CREATE INDEX IF NOT EXISTS idx_sop_ack_crew ON sop_acknowledgements(crew_member_id);
+      CREATE INDEX IF NOT EXISTS idx_sop_ack_session ON sop_acknowledgements(session_id);
+      CREATE INDEX IF NOT EXISTS idx_sop_ack_version ON sop_acknowledgements(sop_version);
+    `);
+    recordMigration.run(173, 'SOP signing sessions + acknowledgements');
+    console.log('Migration 173 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 
