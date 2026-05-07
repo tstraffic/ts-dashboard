@@ -172,11 +172,21 @@ router.get('/submissions/:id', (req, res) => {
     `).all();
   } catch (e) { /* table may not exist on stale deploy */ }
 
+  // Resolve the linked employee record so the "View in Roster" button can
+  // jump straight into the same HR employee profile that the Roster tab uses,
+  // rather than the legacy /crew/:id workforce view.
+  let linkedEmployeeId = null;
+  if (submission.linked_crew_member_id) {
+    const emp = getDb().prepare('SELECT id FROM employees WHERE linked_crew_member_id = ? AND deleted_at IS NULL').get(submission.linked_crew_member_id);
+    if (emp) linkedEmployeeId = emp.id;
+  }
+
   res.render('induction/admin/submission-detail', {
     title: submission.full_name || 'Submission',
     currentPage: 'induction',
     submission,
     awardClassifications,
+    linkedEmployeeId,
   });
 });
 

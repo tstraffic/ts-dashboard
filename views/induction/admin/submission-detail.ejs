@@ -80,9 +80,9 @@
           </button>
         </form>
       <% } else if (s.linked_crew_member_id) { %>
-        <a href="/crew/<%= s.linked_crew_member_id %>" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">
+        <a href="<%= linkedEmployeeId ? '/hr/employees/' + linkedEmployeeId : '/hr/roster' %>" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">
           <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-          View in Crew Roster
+          View in Roster
         </a>
       <% } %>
     </div>
