@@ -8346,6 +8346,31 @@ function runMigrations(db) {
     console.log('Migration 177 applied');
   }
 
+  // Migration 178: Ready-to-pay + Paid status on Abergeldie payment sheets,
+  // so finance can tick off each sheet through the billing cycle and see
+  // running totals on the index. Both flags default to 0 (not ready / not
+  // paid). Audit columns capture who flipped the switch and when.
+  if (!isMigrationApplied.get(178)) {
+    try {
+      const cols = new Set(db.prepare("PRAGMA table_info(abergeldie_payment_sheets)").all().map(c => c.name));
+      const addCol = (name, ddl) => {
+        if (!cols.has(name)) {
+          try { db.exec(`ALTER TABLE abergeldie_payment_sheets ADD COLUMN ${ddl}`); } catch (e) { /* ignore */ }
+        }
+      };
+      addCol('ready_to_pay',       'ready_to_pay INTEGER NOT NULL DEFAULT 0');
+      addCol('ready_to_pay_at',    'ready_to_pay_at DATETIME');
+      addCol('ready_to_pay_by_id', 'ready_to_pay_by_id INTEGER REFERENCES users(id)');
+      addCol('paid',               'paid INTEGER NOT NULL DEFAULT 0');
+      addCol('paid_at',            'paid_at DATETIME');
+      addCol('paid_by_id',         'paid_by_id INTEGER REFERENCES users(id)');
+      recordMigration.run(178, 'abergeldie_payment_sheets: ready_to_pay + paid status flags');
+      console.log('Migration 178 applied: Abergeldie ready-to-pay + paid flags');
+    } catch (e) {
+      console.error('Migration 178 error:', e.message);
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

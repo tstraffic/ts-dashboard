@@ -126,13 +126,17 @@ function shiftIsForClient(shift, clientName) {
 }
 
 // ===========================================================================
-// GET /finance/abergeldie — list of all sheets
+// GET /finance/abergeldie — list of all sheets with bottom-row totals.
+// Total Fee = sum of every sheet's total_fee.
+// Total Ready to Pay = sum of total_fee for sheets where ready_to_pay = 1
+//   AND paid = 0 (i.e. waiting on payment, not yet settled).
+// Total Paid = sum of total_fee for sheets where paid = 1.
 // ===========================================================================
 router.get('/abergeldie', requirePermission('abergeldie_payments'), (req, res) => {
   const db = getDb();
   const sheets = db.prepare(`
     SELECT s.*, u.full_name AS created_by_name,
-      (SELECT COUNT(*) FROM abergeldie_payment_sheet_lines WHERE sheet_id = s.id) AS line_count,
+      (SELECT COUNT(*) FROM abergeldie_payment_sheet_lines WHERE sheet_id = s.id) AS shift_count,
       (SELECT COALESCE(SUM(hours), 0) FROM abergeldie_payment_sheet_lines WHERE sheet_id = s.id) AS total_hours,
       (SELECT COALESCE(SUM(fee_total), 0) FROM abergeldie_payment_sheet_lines WHERE sheet_id = s.id) AS total_fee,
       (SELECT COUNT(DISTINCT project_name) FROM abergeldie_payment_sheet_lines WHERE sheet_id = s.id) AS project_count
@@ -142,10 +146,19 @@ router.get('/abergeldie', requirePermission('abergeldie_payments'), (req, res) =
     LIMIT 200
   `).all();
 
+  let totalFee = 0, totalReady = 0, totalPaid = 0;
+  for (const s of sheets) {
+    const fee = parseFloat(s.total_fee) || 0;
+    totalFee += fee;
+    if (s.paid) totalPaid += fee;
+    else if (s.ready_to_pay) totalReady += fee;
+  }
+
   res.render('abergeldie-payments/index', {
     title: 'Abergeldie Payment Sheet',
     currentPage: 'abergeldie-payments',
     sheets,
+    totals: { fee: round2(totalFee), ready: round2(totalReady), paid: round2(totalPaid) },
     fmtMoney, fmtHours, periodLabel,
     clientName: CLIENT_NAME,
   });
@@ -372,6 +385,48 @@ router.post('/abergeldie/:id', requirePermission('abergeldie_payments'), (req, r
   req.flash('success', 'Sheet updated.');
   res.redirect('/finance/abergeldie/' + sheet.id);
 });
+
+// ===========================================================================
+// POST /finance/abergeldie/:id/ready — toggle ready-to-pay
+// POST /finance/abergeldie/:id/paid  — toggle paid
+//   Body: { value: '1' | '0' }. Returns JSON for AJAX or redirects on form post.
+// ===========================================================================
+function makeToggle(field) {
+  return (req, res) => {
+    const db = getDb();
+    const sheet = db.prepare('SELECT * FROM abergeldie_payment_sheets WHERE id = ?').get(req.params.id);
+    if (!sheet) {
+      if (req.xhr || (req.headers.accept || '').includes('json')) return res.status(404).json({ error: 'Not found' });
+      req.flash('error', 'Payment sheet not found.');
+      return res.redirect('/finance/abergeldie');
+    }
+    const checked = req.body.value === '1' || req.body.value === 'on' || req.body.value === 'true' || req.body.value === 1 || req.body.value === true;
+    const atCol = field + '_at';
+    const byCol = field + '_by_id';
+    db.prepare(`
+      UPDATE abergeldie_payment_sheets
+      SET ${field} = ?, ${atCol} = ?, ${byCol} = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      checked ? 1 : 0,
+      checked ? new Date().toISOString() : null,
+      checked ? req.session.user.id : null,
+      sheet.id,
+    );
+    logActivity({
+      user: req.session.user, action: 'update', entityType: 'abergeldie_payment_sheet',
+      entityId: sheet.id, entityLabel: sheet.label,
+      details: `Set ${field} = ${checked ? 'true' : 'false'} on Abergeldie sheet`,
+      ip: req.ip,
+    });
+    if (req.xhr || (req.headers.accept || '').includes('json')) {
+      return res.json({ ok: true, [field]: checked ? 1 : 0 });
+    }
+    return res.redirect('/finance/abergeldie');
+  };
+}
+router.post('/abergeldie/:id/ready', requirePermission('abergeldie_payments'), makeToggle('ready_to_pay'));
+router.post('/abergeldie/:id/paid',  requirePermission('abergeldie_payments'), makeToggle('paid'));
 
 // ===========================================================================
 // POST /finance/abergeldie/:id/delete
