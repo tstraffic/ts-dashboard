@@ -313,15 +313,28 @@ router.get('/runs', requirePermission('payroll'), (req, res) => {
   const params = [];
   if (typeFilter) { where += ' AND COALESCE(pr.pay_run_type, \'traffic_control\') = ?'; params.push(typeFilter); }
 
+  // Bucket aggregation:
+  //   Traffic Control runs use the line's payment_type (set per worker — cash/tfn/abn).
+  //   Management runs are all TFN salaried staff, except for income lines
+  //   labelled like "Cash Wages" which are paid out as cash. ABN doesn't
+  //   apply to management runs.
   const runs = db.prepare(`
     SELECT pr.*, u.full_name AS created_by_name,
       COALESCE(pr.pay_run_type, 'traffic_control') AS pay_run_type,
       (SELECT COUNT(*) FROM pay_run_lines WHERE pay_run_id = pr.id) AS line_count,
       (SELECT COALESCE(SUM(grand_total), 0) FROM pay_run_lines WHERE pay_run_id = pr.id) AS grand_total,
-      (SELECT COALESCE(SUM(grand_total), 0) FROM pay_run_lines WHERE pay_run_id = pr.id AND payment_type = 'cash') AS cash_total,
-      (SELECT COALESCE(SUM(grand_total), 0) FROM pay_run_lines WHERE pay_run_id = pr.id AND payment_type = 'tfn') AS tfn_total,
-      (SELECT COALESCE(SUM(grand_total), 0) FROM pay_run_lines WHERE pay_run_id = pr.id AND payment_type = 'abn') AS abn_total,
-      (SELECT COUNT(*) FROM pay_run_lines WHERE pay_run_id = pr.id AND COALESCE(payment_type, '') = '') AS unclassified_count,
+      (SELECT COALESCE(SUM(grand_total), 0) FROM pay_run_lines prl WHERE prl.pay_run_id = pr.id AND (
+        (COALESCE(pr.pay_run_type, 'traffic_control') = 'traffic_control' AND prl.payment_type = 'cash')
+        OR (COALESCE(pr.pay_run_type, 'traffic_control') = 'management' AND LOWER(COALESCE(prl.income_label, '')) LIKE '%cash%')
+      )) AS cash_total,
+      (SELECT COALESCE(SUM(grand_total), 0) FROM pay_run_lines prl WHERE prl.pay_run_id = pr.id AND (
+        (COALESCE(pr.pay_run_type, 'traffic_control') = 'traffic_control' AND prl.payment_type = 'tfn')
+        OR (COALESCE(pr.pay_run_type, 'traffic_control') = 'management' AND LOWER(COALESCE(prl.income_label, '')) NOT LIKE '%cash%')
+      )) AS tfn_total,
+      (SELECT COALESCE(SUM(grand_total), 0) FROM pay_run_lines WHERE pay_run_id = pr.id AND payment_type = 'abn'
+        AND COALESCE(pr.pay_run_type, 'traffic_control') = 'traffic_control') AS abn_total,
+      (SELECT COUNT(*) FROM pay_run_lines WHERE pay_run_id = pr.id AND COALESCE(payment_type, '') = ''
+        AND COALESCE(pr.pay_run_type, 'traffic_control') = 'traffic_control') AS unclassified_count,
       (SELECT COUNT(*) FROM pay_run_lines WHERE pay_run_id = pr.id AND paid = 1) AS paid_count
     FROM pay_runs pr
     LEFT JOIN users u ON u.id = pr.created_by_id
