@@ -1,0 +1,129 @@
+<% locals.currentPage = 'induction-presentations' %>
+<%
+  function fmtSize(bytes) {
+    if (!bytes) return '—';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(0) + ' KB';
+    return (bytes/(1024*1024)).toFixed(1) + ' MB';
+  }
+  function fmtDate(s) {
+    if (!s) return '—';
+    return new Date(s.replace(' ', 'T') + 'Z').toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
+  }
+  function iconFor(mime, name) {
+    const n = (name || '').toLowerCase();
+    if ((mime || '').includes('pdf') || n.endsWith('.pdf')) return 'pdf';
+    if (/\.(png|jpe?g|webp|gif)$/i.test(n)) return 'img';
+    if (/\.docx?$/i.test(n)) return 'doc';
+    if (/\.xlsx?$/i.test(n)) return 'xls';
+    return 'file';
+  }
+%>
+
+<div class="p-4 md:p-6 max-w-5xl mx-auto">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-5">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">SOP / SWMS Documents</h1>
+      <p class="text-gray-500 text-sm mt-1">Files shown to workers on the sign page. They must tick each one before signing. Current version: <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs"><%= sopVersion %></code></p>
+    </div>
+    <a href="/induction/admin/presentations" class="text-sm text-brand-600 hover:text-brand-700 font-medium">&larr; Back</a>
+  </div>
+
+  <!-- Upload -->
+  <form method="POST" action="/induction/admin/sop-documents" enctype="multipart/form-data" class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mb-6">
+    <h2 class="text-sm font-bold text-gray-800 uppercase tracking-widest mb-3">Upload a document</h2>
+    <div class="grid sm:grid-cols-3 gap-3 items-end">
+      <div class="sm:col-span-2">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Title (optional — file name used otherwise)</label>
+        <input type="text" name="title" placeholder="e.g. Traffic Control SWMS"
+          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">File</label>
+        <input type="file" name="file" required accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx"
+          class="w-full text-sm" />
+      </div>
+    </div>
+    <p class="text-[11px] text-gray-500 mt-2">Up to 25MB. PDF preferred — also supports images, Word and Excel.</p>
+    <div class="mt-4">
+      <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        Upload
+      </button>
+    </div>
+  </form>
+
+  <!-- List -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-gray-800">Library</h2>
+      <p class="text-xs text-gray-500"><%= docs.filter(d => d.active).length %> active · <%= docs.length %> total</p>
+    </div>
+
+    <% if (docs.length === 0) { %>
+      <div class="p-10 text-center text-gray-400">
+        <p class="font-medium">No documents yet</p>
+        <p class="text-sm mt-1">Upload your first PDF above to get started.</p>
+      </div>
+    <% } else { %>
+      <ul class="divide-y divide-gray-100">
+        <% docs.forEach((d, idx) => { const ic = iconFor(d.mime_type, d.original_name); %>
+          <li class="px-5 py-3 flex items-center gap-3 <%= !d.active ? 'bg-gray-50/60 opacity-60' : '' %>">
+            <!-- Icon -->
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 <%= ic === 'pdf' ? 'bg-red-50 text-red-600' : ic === 'img' ? 'bg-violet-50 text-violet-600' : ic === 'doc' ? 'bg-blue-50 text-blue-600' : ic === 'xls' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500' %>">
+              <% if (ic === 'pdf') { %>
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 16h-2v-2H9v-2h2v-2h-2v-2h6v2h-2v2h2v2h-2v2z"/></svg>
+              <% } else if (ic === 'img') { %>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              <% } else { %>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <% } %>
+            </div>
+
+            <!-- Title + meta -->
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate"><%= d.title %></p>
+              <p class="text-xs text-gray-500 truncate"><%= d.original_name %> · <%= fmtSize(d.file_size) %> · uploaded <%= fmtDate(d.created_at) %><% if (d.uploaded_by_name) { %> by <%= d.uploaded_by_name %><% } %></p>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-1 flex-shrink-0">
+              <a href="/induction/admin/sop-documents/<%= d.id %>/file" target="_blank" class="px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 rounded">Open</a>
+              <form method="POST" action="/induction/admin/sop-documents/<%= d.id %>/move" class="inline-flex">
+                <%- include('../../partials/csrf') %>
+                <input type="hidden" name="dir" value="up">
+                <button type="submit" class="px-1.5 py-1 text-gray-400 hover:text-gray-700" title="Move up" <%= idx === 0 ? 'disabled' : '' %>>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+                </button>
+              </form>
+              <form method="POST" action="/induction/admin/sop-documents/<%= d.id %>/move" class="inline-flex">
+                <%- include('../../partials/csrf') %>
+                <input type="hidden" name="dir" value="down">
+                <button type="submit" class="px-1.5 py-1 text-gray-400 hover:text-gray-700" title="Move down" <%= idx === docs.length - 1 ? 'disabled' : '' %>>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+              </form>
+              <form method="POST" action="/induction/admin/sop-documents/<%= d.id %>/toggle" class="inline-flex">
+                <%- include('../../partials/csrf') %>
+                <button type="submit" class="px-2 py-1 text-xs font-medium <%= d.active ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50' %> rounded">
+                  <%= d.active ? 'Hide' : 'Show' %>
+                </button>
+              </form>
+              <form method="POST" action="/induction/admin/sop-documents/<%= d.id %>/delete" class="inline-flex" onsubmit="return confirm('Delete \'<%= d.title.replace(/'/g, '\\\'') %>\' permanently? Existing acknowledgements stay on file.')">
+                <%- include('../../partials/csrf') %>
+                <button type="submit" class="px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded">Delete</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+
+  <!-- Bump version note -->
+  <div class="mt-5 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+    <p class="font-semibold mb-1">Forcing re-acknowledgement</p>
+    <p class="text-amber-800/90">When you change SOPs/SWMS substantively (not just typo fixes), bump <code class="bg-amber-100 px-1 rounded">CURRENT_VERSION</code> in <code class="bg-amber-100 px-1 rounded">lib/sop.js</code> — every active worker drops back to "Not signed" on the new version, then bulk-send a sign link to sweep them.</p>
+  </div>
+</div>

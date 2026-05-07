@@ -8318,6 +8318,34 @@ function runMigrations(db) {
     }
   }
 
+  // =============================================
+  // Migration 177: SOP / SWMS document library
+  // Admin uploads PDFs (or images / docx if needed). Workers see all active
+  // docs on the sign page and must tick each before signing. Bumping
+  // lib/sop.js CURRENT_VERSION still forces re-acknowledgement.
+  // =============================================
+  if (!isMigrationApplied.get(177)) {
+    console.log('Running migration 177: SOP document library');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS sop_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_size INTEGER DEFAULT 0,
+        mime_type TEXT DEFAULT '',
+        display_order INTEGER DEFAULT 0,
+        active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_by_id INTEGER REFERENCES users(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_sop_documents_active ON sop_documents(active, display_order);
+    `);
+    recordMigration.run(177, 'SOP document library');
+    console.log('Migration 177 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

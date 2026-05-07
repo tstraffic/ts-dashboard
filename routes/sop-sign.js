@@ -5,7 +5,9 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 const { getDb } = require('../db/database');
-const { currentVersion: currentSopVersion, ackText: sopAckText } = require('../lib/sop');
+const { currentVersion: currentSopVersion, ackText: sopAckText, activeDocuments: activeSopDocuments } = require('../lib/sop');
+
+const SOP_DOC_DIR = path.join(__dirname, '..', 'data', 'uploads', 'sop-documents');
 
 function loadSession(token) {
   return getDb().prepare('SELECT * FROM sop_signing_sessions WHERE token = ?').get(token);
@@ -60,17 +62,37 @@ router.get('/:token', (req, res) => {
   }
 
   const attendees = session.target_crew_member_id ? [] : loadAttendeeList(session.id);
+  const documents = activeSopDocuments(db);
 
   res.render('sop-sign/mobile', {
     layout: false,
     session,
     targetCrew,
     attendees,
+    documents,
     ackText: sopAckText(),
     sopVersion: currentSopVersion(),
     submitted: false,
     error: null,
   });
+});
+
+// GET /sop-sign/:token/document/:docId — token-gated file serving so workers
+// can open the SOP / SWMS PDFs from the sign page without a separate login.
+router.get('/:token/document/:docId', (req, res) => {
+  const session = loadSession(req.params.token);
+  if (!session || session.closed_at) return res.status(404).send('Session unavailable');
+
+  const db = getDb();
+  const doc = db.prepare('SELECT * FROM sop_documents WHERE id = ? AND active = 1').get(req.params.docId);
+  if (!doc) return res.status(404).send('Document not found');
+
+  const safe = path.resolve(SOP_DOC_DIR, path.basename(doc.filename));
+  if (!safe.startsWith(SOP_DOC_DIR) || !fs.existsSync(safe)) return res.status(404).send('File missing');
+
+  if (doc.mime_type) res.setHeader('Content-Type', doc.mime_type);
+  res.setHeader('Content-Disposition', 'inline; filename="' + (doc.original_name || doc.filename) + '"');
+  res.sendFile(safe);
 });
 
 // POST /sop-sign/:token/submit — save signature

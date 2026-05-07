@@ -1,13 +1,37 @@
 const express = require('express');
 const crypto = require('crypto');
+const multer = require('multer');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const { getDb } = require('../db/database');
 const { employeeGuideSlides, tcTrainingSlides } = require('../induction-slides');
 const { encrypt } = require('../services/encryption');
-const { currentVersion: currentSopVersion, ackText: sopAckText } = require('../lib/sop');
+const { currentVersion: currentSopVersion, ackText: sopAckText, activeDocuments: activeSopDocuments } = require('../lib/sop');
 const { maybeMarkInducted } = require('../lib/induction');
+
+// SOP document uploads — accept PDFs first, also images/Word docs as a
+// fallback in case the user has an existing file format that's not PDF.
+const SOP_DOC_DIR = path.join(__dirname, '..', 'data', 'uploads', 'sop-documents');
+const sopDocStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    fs.mkdirSync(SOP_DOC_DIR, { recursive: true });
+    cb(null, SOP_DOC_DIR);
+  },
+  filename: (req, file, cb) => {
+    const safe = (file.originalname || 'doc').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 80);
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safe}`);
+  }
+});
+const sopDocUpload = multer({
+  storage: sopDocStorage,
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per doc
+  fileFilter: (req, file, cb) => {
+    const ok = /\.(pdf|png|jpe?g|webp|docx?|xlsx?)$/i.test(file.originalname);
+    if (!ok) return cb(new Error('Only PDF, image, Word or Excel files are allowed'));
+    cb(null, true);
+  },
+});
 
 // Copy the bank / super / TFN payroll data from an induction submission into
 // the three encrypted per-employee tables. Skips any table that already has a
@@ -795,6 +819,112 @@ router.get('/acknowledgements', (req, res) => {
     currentVersion: currentSopVersion(),
     filters: { version: version || '', search: search || '' },
   });
+});
+
+// ============================================================
+// SOP / SWMS Document Library
+// ============================================================
+
+// GET /induction/admin/sop-documents — list + upload page
+router.get('/sop-documents', (req, res) => {
+  const db = getDb();
+  const docs = db.prepare(`
+    SELECT d.*, u.full_name as uploaded_by_name
+    FROM sop_documents d
+    LEFT JOIN users u ON d.created_by_id = u.id
+    ORDER BY d.active DESC, d.display_order ASC, d.id ASC
+  `).all();
+
+  res.render('induction/admin/sop-documents', {
+    title: 'SOP / SWMS Documents',
+    currentPage: 'induction-presentations',
+    docs,
+    sopVersion: currentSopVersion(),
+  });
+});
+
+// POST /induction/admin/sop-documents — upload a new doc
+router.post('/sop-documents', sopDocUpload.single('file'), (req, res) => {
+  if (!req.file) {
+    req.flash('error', 'No file uploaded.');
+    return res.redirect('/induction/admin/sop-documents');
+  }
+  const db = getDb();
+  const title = (req.body.title || req.file.originalname.replace(/\.[^.]+$/, '')).toString().trim().slice(0, 200);
+  const next = db.prepare('SELECT COALESCE(MAX(display_order), 0) + 1 as n FROM sop_documents').get();
+
+  db.prepare(`
+    INSERT INTO sop_documents (title, filename, original_name, file_path, file_size, mime_type, display_order, active, created_by_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+  `).run(
+    title,
+    req.file.filename,
+    req.file.originalname,
+    req.file.path,
+    req.file.size,
+    req.file.mimetype || '',
+    next.n,
+    req.session.user.id,
+  );
+
+  req.flash('success', `Uploaded "${title}".`);
+  res.redirect('/induction/admin/sop-documents');
+});
+
+// POST /induction/admin/sop-documents/:id/toggle — activate / deactivate
+router.post('/sop-documents/:id/toggle', (req, res) => {
+  const db = getDb();
+  const doc = db.prepare('SELECT id, title, active FROM sop_documents WHERE id = ?').get(req.params.id);
+  if (!doc) { req.flash('error', 'Document not found.'); return res.redirect('/induction/admin/sop-documents'); }
+  const newVal = doc.active ? 0 : 1;
+  db.prepare('UPDATE sop_documents SET active = ? WHERE id = ?').run(newVal, doc.id);
+  req.flash('success', `${doc.title} is now ${newVal ? 'active' : 'hidden'}.`);
+  res.redirect('/induction/admin/sop-documents');
+});
+
+// POST /induction/admin/sop-documents/:id/delete — permanently remove
+router.post('/sop-documents/:id/delete', (req, res) => {
+  const db = getDb();
+  const doc = db.prepare('SELECT id, title, file_path FROM sop_documents WHERE id = ?').get(req.params.id);
+  if (!doc) { req.flash('error', 'Document not found.'); return res.redirect('/induction/admin/sop-documents'); }
+  try { fs.unlinkSync(doc.file_path); } catch (e) { /* file may already be gone */ }
+  db.prepare('DELETE FROM sop_documents WHERE id = ?').run(doc.id);
+  req.flash('success', `Deleted "${doc.title}".`);
+  res.redirect('/induction/admin/sop-documents');
+});
+
+// POST /induction/admin/sop-documents/:id/move — change display order
+// body.dir = 'up' | 'down'. Simple swap with the neighbour at the same active state.
+router.post('/sop-documents/:id/move', (req, res) => {
+  const db = getDb();
+  const doc = db.prepare('SELECT id, display_order, active FROM sop_documents WHERE id = ?').get(req.params.id);
+  if (!doc) return res.redirect('/induction/admin/sop-documents');
+  const dir = req.body.dir === 'up' ? 'up' : 'down';
+  const op = dir === 'up' ? '<' : '>';
+  const ord = dir === 'up' ? 'DESC' : 'ASC';
+  const neighbour = db.prepare(`
+    SELECT id, display_order FROM sop_documents
+    WHERE active = ? AND display_order ${op} ?
+    ORDER BY display_order ${ord} LIMIT 1
+  `).get(doc.active, doc.display_order);
+  if (neighbour) {
+    db.prepare('UPDATE sop_documents SET display_order = ? WHERE id = ?').run(neighbour.display_order, doc.id);
+    db.prepare('UPDATE sop_documents SET display_order = ? WHERE id = ?').run(doc.display_order, neighbour.id);
+  }
+  res.redirect('/induction/admin/sop-documents');
+});
+
+// GET /induction/admin/sop-documents/:id/file — admin file serving
+router.get('/sop-documents/:id/file', (req, res) => {
+  const db = getDb();
+  const doc = db.prepare('SELECT * FROM sop_documents WHERE id = ?').get(req.params.id);
+  if (!doc) return res.status(404).send('Not found');
+  // basename guard against path traversal even though stored path is server-set
+  const safe = path.resolve(SOP_DOC_DIR, path.basename(doc.filename));
+  if (!fs.existsSync(safe)) return res.status(404).send('File missing');
+  if (doc.mime_type) res.setHeader('Content-Type', doc.mime_type);
+  res.setHeader('Content-Disposition', 'inline; filename="' + (doc.original_name || doc.filename) + '"');
+  res.sendFile(safe);
 });
 
 module.exports = router;

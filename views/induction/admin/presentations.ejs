@@ -18,8 +18,11 @@
         <p class="text-emerald-100 text-sm mt-1">Start a session to collect signatures from a room of attendees on their own phones (QR code).</p>
       </div>
       <div class="flex items-center gap-2">
+        <a href="/induction/admin/sop-documents" class="inline-flex items-center gap-2 px-4 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-medium rounded-lg transition border border-white/20">
+          SOP documents
+        </a>
         <a href="/induction/admin/acknowledgements" class="inline-flex items-center gap-2 px-4 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-medium rounded-lg transition border border-white/20">
-          View signed list
+          Signed list
         </a>
         <form method="POST" action="/induction/admin/sign-session/start" class="flex items-center gap-2">
           <%- include('../../partials/csrf') %>
