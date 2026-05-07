@@ -397,6 +397,88 @@
         </div>
         <% } %>
 
+        <!-- Induction (overall) -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+          <h3 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3">Induction</h3>
+
+          <% if (employee.inducted_at) { %>
+            <div class="flex items-center gap-2 text-emerald-700">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="text-sm font-semibold">Inducted</span>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              <%= new Date(employee.inducted_at + (employee.inducted_at.includes('T') ? '' : 'Z')).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) %>
+              <% if (employee.inducted_method) { %> · <%= employee.inducted_method.replace(/_/g,' ') %><% } %>
+              <% if (inductionMarkedBy) { %> · marked by <%= inductionMarkedBy %><% } %>
+            </p>
+            <form method="POST" action="/hr/employees/<%= employee.id %>/mark-inducted" class="mt-3" onsubmit="return confirm('Clear induction status for <%= employee.full_name %>?')">
+              <%- include('../partials/csrf') %>
+              <input type="hidden" name="completed" value="0">
+              <button type="submit" class="text-xs text-gray-500 hover:text-red-600 font-medium">Clear induction status</button>
+            </form>
+          <% } else { %>
+            <div class="flex items-center gap-2 text-amber-700 mb-3">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+              <span class="text-sm font-semibold">Not inducted</span>
+            </div>
+            <form method="POST" action="/hr/employees/<%= employee.id %>/mark-inducted">
+              <%- include('../partials/csrf') %>
+              <input type="hidden" name="completed" value="on">
+              <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                Mark in-person induction complete
+              </button>
+            </form>
+          <% } %>
+
+          <!-- Module status breakdown -->
+          <div class="mt-3 pt-3 border-t border-gray-100">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Module status</p>
+            <ul class="space-y-1.5">
+              <% [['employee_guide','Employee Guide'],['tc_training_1','TC Training Module 1']].forEach(([key,label]) => { %>
+                <li class="flex items-center justify-between text-xs">
+                  <span class="text-gray-700"><%= label %></span>
+                  <% if (trainingPasses && trainingPasses[key]) { %>
+                    <span class="text-emerald-600 font-semibold flex items-center gap-1">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                      <%= trainingPasses[key].score %>/<%= trainingPasses[key].total %>
+                    </span>
+                  <% } else { %>
+                    <span class="text-gray-400">—</span>
+                  <% } %>
+                </li>
+              <% }) %>
+              <li class="flex items-center justify-between text-xs">
+                <span class="text-gray-700">SOP / SWMS Acknowledgement</span>
+                <% if (typeof sopStatus !== 'undefined' && sopStatus.signed) { %>
+                  <span class="text-emerald-600 font-semibold flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    Signed
+                  </span>
+                <% } else { %>
+                  <span class="text-gray-400">—</span>
+                <% } %>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Online training permission -->
+          <div class="mt-3 pt-3 border-t border-gray-100">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-xs font-semibold text-gray-800">Online training access</p>
+                <p class="text-[11px] text-gray-500">Lets them take training presentations on the worker portal.</p>
+              </div>
+              <form method="POST" action="/hr/employees/<%= employee.id %>/toggle-online-training">
+                <%- include('../partials/csrf') %>
+                <button type="submit" class="<%= employee.online_training_allowed ? 'bg-emerald-500' : 'bg-gray-300' %> relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0" aria-label="Toggle online training">
+                  <span class="<%= employee.online_training_allowed ? 'translate-x-6' : 'translate-x-1' %> inline-block h-4 w-4 transform rounded-full bg-white transition shadow"></span>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
         <!-- SOP Acknowledgement -->
         <% if (typeof sopStatus !== 'undefined' && employee.linked_crew_member_id) { %>
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4">

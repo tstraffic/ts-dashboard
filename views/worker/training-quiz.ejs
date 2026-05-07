@@ -1,0 +1,134 @@
+<div class="px-4 py-5 max-w-md mx-auto" id="quiz-root">
+  <a href="/w/training" class="inline-flex items-center gap-1 text-white/60 hover:text-white text-sm mb-3">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    Back
+  </a>
+
+  <div id="quiz-stage">
+    <h1 class="text-xl font-bold text-white mb-1"><%= moduleTitle %></h1>
+    <p class="text-white/60 text-sm mb-5">Quiz · <%= questions.length %> questions · pass at 90%</p>
+
+    <div id="questions" class="space-y-5">
+      <% questions.forEach((q, i) => { %>
+        <div class="bg-white/5 border border-white/10 rounded-2xl p-4" data-question-number="<%= q.questionNumber %>">
+          <p class="text-xs font-bold text-cyan-300 uppercase tracking-widest mb-2">Question <%= i + 1 %> / <%= questions.length %></p>
+          <p class="text-white font-semibold text-base mb-3 leading-snug"><%= q.question %></p>
+          <div class="space-y-2">
+            <% q.options.forEach(opt => { %>
+              <label class="flex items-start gap-3 bg-white/[0.03] active:bg-white/10 border border-white/10 rounded-xl p-3 cursor-pointer has-[:checked]:bg-cyan-500/15 has-[:checked]:border-cyan-400/60 transition">
+                <input type="radio" name="q_<%= q.questionNumber %>" value="<%= opt.id %>" class="mt-0.5 accent-cyan-400" />
+                <span class="text-white text-sm flex-1">
+                  <span class="font-bold text-cyan-300 mr-1"><%= opt.id.toUpperCase() %>.</span>
+                  <%= opt.text %>
+                </span>
+              </label>
+            <% }) %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+
+    <button id="submit-btn" type="button" class="w-full mt-6 mb-2 py-3.5 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-white font-bold rounded-2xl text-base shadow-lg transition">
+      Submit
+    </button>
+    <p id="incomplete-msg" class="hidden text-amber-300 text-sm font-medium text-center">Please answer every question first.</p>
+  </div>
+
+  <!-- Result screen (rendered after submit) -->
+  <div id="result-stage" class="hidden text-center pt-4">
+    <div id="result-icon-wrap" class="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center"></div>
+    <h2 id="result-title" class="text-2xl font-bold text-white mb-1"></h2>
+    <p id="result-score" class="text-white/70 mb-1"></p>
+    <p id="result-pct" class="text-white/40 text-sm mb-6"></p>
+
+    <div id="breakdown" class="text-left space-y-2 mb-6"></div>
+
+    <a href="/w/training" id="result-home" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/15 text-white text-sm font-semibold rounded-xl transition">Back to training</a>
+    <button type="button" id="retry-btn" class="hidden ml-2 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-white text-sm font-semibold rounded-xl transition">Retry</button>
+  </div>
+</div>
+
+<script>
+  const TOTAL_QUESTIONS = <%= questions.length %>;
+  const SLUG = <%- JSON.stringify(moduleSlug) %>;
+
+  document.getElementById('submit-btn').addEventListener('click', submitQuiz);
+  document.getElementById('retry-btn').addEventListener('click', () => location.reload());
+
+  async function submitQuiz() {
+    const answers = {};
+    let unanswered = 0;
+    document.querySelectorAll('[data-question-number]').forEach(card => {
+      const qn = card.dataset.questionNumber;
+      const picked = card.querySelector('input[type=radio]:checked');
+      if (picked) answers[qn] = picked.value;
+      else unanswered += 1;
+    });
+    const msg = document.getElementById('incomplete-msg');
+    if (unanswered > 0) {
+      msg.classList.remove('hidden');
+      msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    msg.classList.add('hidden');
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    try {
+      const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+      const resp = await fetch('/w/training/' + SLUG + '/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf },
+        body: JSON.stringify({ answers })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        alert('Submit failed: ' + (data.error || 'unknown'));
+        btn.disabled = false; btn.textContent = 'Submit';
+        return;
+      }
+      renderResult(data);
+    } catch (e) {
+      alert('Error: ' + e.message);
+      btn.disabled = false; btn.textContent = 'Submit';
+    }
+  }
+
+  function renderResult(r) {
+    document.getElementById('quiz-stage').classList.add('hidden');
+    document.getElementById('result-stage').classList.remove('hidden');
+
+    const wrap = document.getElementById('result-icon-wrap');
+    if (r.passed) {
+      wrap.className = 'w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center bg-emerald-500';
+      wrap.innerHTML = '<svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>';
+      document.getElementById('result-title').textContent = 'Passed!';
+      document.getElementById('retry-btn').classList.add('hidden');
+    } else {
+      wrap.className = 'w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center bg-amber-500';
+      wrap.innerHTML = '<svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>';
+      document.getElementById('result-title').textContent = 'Not yet';
+      document.getElementById('retry-btn').classList.remove('hidden');
+    }
+    document.getElementById('result-score').textContent = r.correct + ' / ' + r.total + ' correct';
+    document.getElementById('result-pct').textContent = r.pct + '% (need 90% to pass)';
+
+    const bd = document.getElementById('breakdown');
+    bd.innerHTML = '';
+    (r.breakdown || []).filter(b => !b.isCorrect).forEach(b => {
+      const row = document.createElement('div');
+      row.className = 'bg-white/5 border border-amber-500/30 rounded-xl p-3 text-sm';
+      row.innerHTML = '<p class="text-amber-300 font-semibold">Q' + b.questionNumber + ': ' + escapeHtml(b.question) + '</p>' +
+                      '<p class="text-white/70 text-xs mt-1">Correct: ' + escapeHtml(b.correctAnswer) + '</p>';
+      bd.appendChild(row);
+    });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+</script>

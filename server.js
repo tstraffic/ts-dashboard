@@ -149,6 +149,7 @@ app.use('/w', requireWorker, workerLocals, require('./routes/worker/chat'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/timesheets'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/availability'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/incidents'));
+app.use('/w', requireWorker, workerLocals, require('./routes/worker/training'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/dockets'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/hr'));
 app.use('/w', requireWorker, workerLocals, require('./routes/worker/hr-secure'));

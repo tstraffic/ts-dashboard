@@ -1,0 +1,40 @@
+<div class="px-4 py-5 max-w-md mx-auto">
+  <h1 class="text-2xl font-bold text-white mb-1">Training</h1>
+  <p class="text-white/60 text-sm mb-5">
+    <% if (inductedAt) { %>
+      You are inducted ✓
+    <% } else if (accessAllowed) { %>
+      Take the quizzes to record your training.
+    <% } else { %>
+      Online training isn't enabled for your account yet.
+    <% } %>
+  </p>
+
+  <% if (!accessAllowed) { %>
+    <div class="bg-amber-500/15 border border-amber-500/40 rounded-2xl p-5 text-amber-200 text-sm">
+      <p class="font-semibold mb-1">Not enabled</p>
+      <p class="text-amber-100/80">Your supervisor needs to grant you online training access from your employee profile. The in-person induction is the standard path — speak to them if you think this is an error.</p>
+    </div>
+  <% } else { %>
+    <div class="space-y-3">
+      <% modules.forEach(m => { %>
+        <a href="/w/training/<%= m.slug %>" class="block bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 rounded-2xl p-4 transition">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-white font-semibold text-base"><%= m.title %></p>
+              <p class="text-white/50 text-xs mt-0.5"><%= m.totalQuestions %> questions · pass at 90%</p>
+            </div>
+            <% if (m.passed) { %>
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-semibold rounded-full flex-shrink-0">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                Passed
+              </span>
+            <% } else { %>
+              <span class="text-white/40 text-xs flex-shrink-0">Take →</span>
+            <% } %>
+          </div>
+        </a>
+      <% }) %>
+    </div>
+  <% } %>
+</div>

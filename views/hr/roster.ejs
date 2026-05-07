@@ -45,6 +45,20 @@
     <% } %>
   </div>
 
+  <!-- Induction quick filters -->
+  <% if (!locals.showDeleted) { %>
+  <div class="flex flex-wrap items-center gap-2">
+    <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mr-1">Induction:</span>
+    <a href="/hr/roster" class="px-2.5 py-1 rounded-full text-xs font-semibold transition <%= !filters.induction ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">All</a>
+    <a href="/hr/roster?induction=inducted" class="px-2.5 py-1 rounded-full text-xs font-semibold transition <%= filters.induction === 'inducted' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">
+      Inducted <span class="<%= filters.induction === 'inducted' ? 'text-emerald-100' : 'text-gray-400' %>">(<%= stats.inductedCount %>)</span>
+    </a>
+    <a href="/hr/roster?induction=not_inducted" class="px-2.5 py-1 rounded-full text-xs font-semibold transition <%= filters.induction === 'not_inducted' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' %>">
+      Not yet <span class="<%= filters.induction === 'not_inducted' ? 'text-amber-100' : 'text-gray-400' %>">(<%= stats.notInductedCount %>)</span>
+    </a>
+  </div>
+  <% } %>
+
   <!-- Active / Deleted tabs -->
   <div class="flex gap-2 border-b border-gray-200">
     <a href="/hr/roster" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all border-b-2 <%= !locals.showDeleted ? 'border-brand-600 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700' %>">
@@ -225,6 +239,7 @@
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell">Type</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Readiness</th>
+              <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell" title="In-person or online induction completed">Inducted</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden md:table-cell" title="Has signed the current SOP version">SOP</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden lg:table-cell">Tier</th>
               <th scope="col" class="px-3 sm:px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden xl:table-cell">Portal</th>
@@ -300,6 +315,19 @@
                   </span>
                 <% } else { %>
                   <span class="text-gray-300 text-xs">-</span>
+                <% } %>
+              </td>
+              <td class="px-3 sm:px-4 py-3 hidden md:table-cell">
+                <% if (emp.inducted_at) { %>
+                  <span class="inline-flex items-center gap-1 text-emerald-600 text-xs font-semibold" title="Inducted <%= new Date(emp.inducted_at).toLocaleDateString('en-AU') %><%= emp.inducted_method ? ' · ' + emp.inducted_method.replace(/_/g,' ') : '' %>">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    Inducted
+                  </span>
+                <% } else { %>
+                  <span class="inline-flex items-center gap-1 text-gray-400 text-xs" title="Not inducted yet">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    Not yet
+                  </span>
                 <% } %>
               </td>
               <td class="px-3 sm:px-4 py-3 hidden md:table-cell">

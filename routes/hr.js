@@ -12,6 +12,7 @@ const { sendEmail } = require('../services/email');
 const { workerInviteEmail, sopSignLinkEmail } = require('../services/emailTemplates');
 const crypto = require('crypto');
 const { currentVersion: currentSopVersion } = require('../lib/sop');
+const { REQUIRED_MODULES } = require('../lib/induction');
 
 // Only admin and finance can see pay rates
 function canViewRates(user) {
@@ -171,7 +172,7 @@ router.get('/', requirePermission('hr_dashboard'), (req, res) => {
 // ============================================
 router.get('/roster', requirePermission('hr_employees'), (req, res) => {
   const db = getDb();
-  const { employment_type, status, level, search, sort, order, payment_type, view } = req.query;
+  const { employment_type, status, level, search, sort, order, payment_type, view, induction } = req.query;
   const showDeleted = view === 'deleted';
 
   let where = showDeleted ? 'e.deleted_at IS NOT NULL' : 'e.deleted_at IS NULL';
@@ -181,6 +182,8 @@ router.get('/roster', requirePermission('hr_employees'), (req, res) => {
   if (status) { where += ' AND e.employment_status = ?'; params.push(status); }
   if (level) { where += ' AND (e.traffic_role_level = ? OR e.role_title = ?)'; params.push(level, level); }
   if (search) { where += ' AND (e.full_name LIKE ? OR e.employee_code LIKE ? OR e.email LIKE ? OR e.phone LIKE ?)'; const s = `%${search}%`; params.push(s, s, s, s); }
+  if (induction === 'inducted') { where += ' AND e.inducted_at IS NOT NULL'; }
+  else if (induction === 'not_inducted') { where += ' AND e.inducted_at IS NULL'; }
 
   const sortCol = { full_name: 'e.full_name', employee_code: 'e.employee_code', start_date: 'e.start_date', status: 'e.employment_status', deleted_at: 'e.deleted_at' }[sort] || (showDeleted ? 'e.deleted_at' : 'e.full_name');
   const sortOrder = order === 'desc' ? 'DESC' : (showDeleted && !sort ? 'DESC' : 'ASC');
@@ -209,6 +212,8 @@ router.get('/roster', requirePermission('hr_employees'), (req, res) => {
 
   // Count of active employees still missing the current-version acknowledgement
   const sopUnsignedCount = employees.filter(e => e.linked_crew_member_id && e.employment_status === 'active' && !e.sopSigned).length;
+  const inductedCount = employees.filter(e => e.employment_status === 'active' && e.inducted_at).length;
+  const notInductedCount = employees.filter(e => e.employment_status === 'active' && !e.inducted_at).length;
 
   // Stats (all exclude deleted except totalDeleted)
   const totalActive = db.prepare("SELECT COUNT(*) as c FROM employees WHERE employment_status = 'active' AND deleted_at IS NULL").get().c;
@@ -225,8 +230,8 @@ router.get('/roster', requirePermission('hr_employees'), (req, res) => {
     title: 'Roster',
     currentPage: 'hr-roster',
     employees,
-    stats: { totalActive, totalDeactivated, totalOnLeave, totalTerminated, totalCash, totalTfn, totalAbn, totalActiveAll, totalDeleted },
-    filters: { employment_type, status, level, search, sort, order, payment_type, view },
+    stats: { totalActive, totalDeactivated, totalOnLeave, totalTerminated, totalCash, totalTfn, totalAbn, totalActiveAll, totalDeleted, inductedCount, notInductedCount },
+    filters: { employment_type, status, level, search, sort, order, payment_type, view, induction },
     showDeleted,
     sopVersion,
     sopUnsignedCount,
@@ -591,6 +596,17 @@ router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
     try { induction = db.prepare("SELECT * FROM induction_submissions WHERE email = ? AND status IN ('submitted','approved') ORDER BY submitted_at DESC LIMIT 1").get(employee.email); } catch (e) {}
   }
 
+  // Induction status: aggregate of training_completions + SOP ack + manual flag
+  const trainingPasses = {};
+  REQUIRED_MODULES.forEach(m => {
+    const row = db.prepare("SELECT id, completed_at, score, total FROM training_completions WHERE employee_id = ? AND module = ? AND passed = 1 ORDER BY completed_at DESC LIMIT 1").get(employee.id, m);
+    trainingPasses[m] = row || null;
+  });
+  let inductionMarkedBy = null;
+  if (employee.inducted_marked_by_id) {
+    inductionMarkedBy = db.prepare('SELECT full_name FROM users WHERE id = ?').get(employee.inducted_marked_by_id);
+  }
+
   res.render('hr/employee-show', {
     title: employee.full_name,
     currentPage: 'hr-employees',
@@ -606,6 +622,8 @@ router.get('/employees/:id', requirePermission('hr_employees'), (req, res) => {
     induction,
     sopStatus,
     sopHistory,
+    trainingPasses,
+    inductionMarkedBy: inductionMarkedBy ? inductionMarkedBy.full_name : null,
     settingsOptions,
     canViewSensitive: canViewSensitiveHR(req.session.user),
     showRates: canViewRates(req.session.user),
@@ -1616,6 +1634,52 @@ router.post('/roster/sop-bulk-send', requirePermission('hr_employees'), async (r
   if (failed.length) parts.push(`Failed: ${failed.join(', ')}.`);
   req.flash(sent > 0 ? 'success' : 'error', parts.join(' '));
   res.redirect('/hr/roster');
+});
+
+// ============================================
+// IN-PERSON INDUCTION + ONLINE TRAINING PERMISSION
+// ============================================
+// POST /hr/employees/:id/mark-inducted — toggle the "induction completed" flag.
+// Body: completed=on (set) or unset (clear). Records who marked it and when.
+router.post('/employees/:id/mark-inducted', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const employee = db.prepare('SELECT id, full_name, inducted_at FROM employees WHERE id = ?').get(req.params.id);
+  if (!employee) { req.flash('error', 'Employee not found.'); return res.redirect('/hr/roster'); }
+
+  const setting = req.body.completed === 'on' || req.body.completed === '1' || req.body.completed === 'true';
+  if (setting) {
+    db.prepare(`
+      UPDATE employees SET inducted_at = datetime('now'), inducted_method = 'in_person', inducted_marked_by_id = ? WHERE id = ?
+    `).run(req.session.user.id, employee.id);
+  } else {
+    db.prepare("UPDATE employees SET inducted_at = NULL, inducted_method = '', inducted_marked_by_id = NULL WHERE id = ?").run(employee.id);
+  }
+
+  logActivity({ user: req.session.user, action: 'update', entityType: 'employee_induction',
+    entityId: employee.id, entityLabel: employee.full_name,
+    details: setting ? 'Marked in-person induction complete' : 'Cleared induction status',
+    ip: req.ip });
+
+  req.flash('success', setting ? `${employee.full_name} marked as inducted.` : `Induction status cleared for ${employee.full_name}.`);
+  res.redirect(`/hr/employees/${employee.id}`);
+});
+
+// POST /hr/employees/:id/toggle-online-training — grant/revoke online-training access
+router.post('/employees/:id/toggle-online-training', requirePermission('hr_employees'), (req, res) => {
+  const db = getDb();
+  const employee = db.prepare('SELECT id, full_name, online_training_allowed FROM employees WHERE id = ?').get(req.params.id);
+  if (!employee) { req.flash('error', 'Employee not found.'); return res.redirect('/hr/roster'); }
+
+  const newValue = employee.online_training_allowed ? 0 : 1;
+  db.prepare('UPDATE employees SET online_training_allowed = ? WHERE id = ?').run(newValue, employee.id);
+
+  logActivity({ user: req.session.user, action: 'update', entityType: 'employee_training_permission',
+    entityId: employee.id, entityLabel: employee.full_name,
+    details: newValue ? 'Granted online training access' : 'Revoked online training access',
+    ip: req.ip });
+
+  req.flash('success', newValue ? `${employee.full_name} can now take training on their portal.` : `${employee.full_name}'s online training access revoked.`);
+  res.redirect(`/hr/employees/${employee.id}`);
 });
 
 module.exports = router;

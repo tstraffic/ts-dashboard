@@ -8248,6 +8248,23 @@ function runMigrations(db) {
     console.log('Migration 174 applied');
   }
 
+  // =============================================
+  // Migration 175: induction tracking + online training permission
+  // employees.inducted_at = canonical "this person has done the induction"
+  // (settable via admin checkbox after in-person, or auto-set when online
+  // training quiz passes). employees.online_training_allowed = admin grants
+  // a worker permission to take training on their portal.
+  // =============================================
+  if (!isMigrationApplied.get(175)) {
+    console.log('Running migration 175: induction + online training columns on employees');
+    try { db.exec('ALTER TABLE employees ADD COLUMN online_training_allowed INTEGER DEFAULT 0'); } catch (e) { /* may exist */ }
+    try { db.exec('ALTER TABLE employees ADD COLUMN inducted_at DATETIME'); } catch (e) { /* may exist */ }
+    try { db.exec("ALTER TABLE employees ADD COLUMN inducted_method TEXT DEFAULT ''"); } catch (e) { /* may exist */ }
+    try { db.exec('ALTER TABLE employees ADD COLUMN inducted_marked_by_id INTEGER REFERENCES users(id)'); } catch (e) { /* may exist */ }
+    recordMigration.run(175, 'inducted + online_training_allowed columns on employees');
+    console.log('Migration 175 applied');
+  }
+
   console.log('All migrations checked/applied.');
 }
 

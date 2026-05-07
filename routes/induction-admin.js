@@ -7,6 +7,7 @@ const { getDb } = require('../db/database');
 const { employeeGuideSlides, tcTrainingSlides } = require('../induction-slides');
 const { encrypt } = require('../services/encryption');
 const { currentVersion: currentSopVersion, ackText: sopAckText } = require('../lib/sop');
+const { maybeMarkInducted } = require('../lib/induction');
 
 // Copy the bank / super / TFN payroll data from an induction submission into
 // the three encrypted per-employee tables. Skips any table that already has a
@@ -548,24 +549,53 @@ router.get('/uploads/:id/:filename', (req, res) => {
 // GET /induction/admin/present/:module — slide presenter
 router.get('/present/:module', (req, res) => {
   const { module } = req.params;
-  let slides, moduleTitle;
+  let slides, moduleTitle, moduleKey;
 
   if (module === 'employee-guide') {
     slides = employeeGuideSlides;
     moduleTitle = 'T&S Employee Guide';
+    moduleKey = 'employee_guide';
   } else if (module === 'tc-training-1') {
     slides = tcTrainingSlides;
     moduleTitle = 'Traffic Control Training — Module 1';
+    moduleKey = 'tc_training_1';
   } else {
     return res.status(404).send('Unknown module');
   }
 
+  // Inject an attendee-picker slide right before the first interactive-quiz
+  // slide so the presenter can mark off who's in the room before they
+  // actually take the quiz. Attendees are written to training_completions
+  // when the quiz is passed.
+  const firstQuizIdx = slides.findIndex(s => s.layout === 'interactive-quiz');
+  let mergedSlides;
+  if (firstQuizIdx >= 0) {
+    mergedSlides = [
+      ...slides.slice(0, firstQuizIdx),
+      { layout: 'attendee-picker', title: 'Who is here today?' },
+      ...slides.slice(firstQuizIdx),
+    ];
+  } else {
+    mergedSlides = slides;
+  }
+
+  // Active crew for the picker
+  const attendees = getDb().prepare(`
+    SELECT cm.id, cm.full_name, cm.employee_id, e.id as employee_table_id
+    FROM crew_members cm
+    LEFT JOIN employees e ON e.linked_crew_member_id = cm.id AND e.deleted_at IS NULL
+    WHERE cm.active = 1
+    ORDER BY cm.full_name
+  `).all();
+
   res.render('induction/admin/presenter', {
     layout: false,
     module,
+    moduleKey,
     moduleTitle,
-    slides,
-    totalSlides: slides.length,
+    slides: mergedSlides,
+    totalSlides: mergedSlides.length,
+    attendees,
     title: moduleTitle,
   });
 });
@@ -614,17 +644,54 @@ router.post('/present/:module/complete', (req, res) => {
   res.json({ success: true });
 });
 
-// POST /induction/admin/present/:module/quiz-result — save quiz score
+// POST /induction/admin/present/:module/quiz-result — save quiz score and
+// (when the quiz passes) record a training_completions row for each selected
+// attendee. attendee_ids are crew_member.id values from the picker slide.
 router.post('/present/:module/quiz-result', (req, res) => {
-  const { presentation_id, score, total, passed, answers } = req.body;
+  const { module } = req.params;
+  const moduleKey = module === 'employee-guide' ? 'employee_guide'
+                  : module === 'tc-training-1' ? 'tc_training_1'
+                  : null;
+  if (!moduleKey) return res.status(400).json({ success: false, error: 'Unknown module' });
+
+  const db = getDb();
+  const { presentation_id, score, total, passed, answers, attendee_ids } = req.body;
+  const passedFlag = passed ? 1 : 0;
+  const ids = Array.isArray(attendee_ids) ? attendee_ids.map(n => parseInt(n, 10)).filter(n => n > 0) : [];
+
   if (presentation_id) {
-    getDb().prepare(`
-      UPDATE induction_presentations
-      SET quiz_score = ?, quiz_passed = ?, quiz_answers = ?
-      WHERE id = ?
-    `).run(score, passed ? 1 : 0, JSON.stringify(answers || {}), presentation_id);
+    try {
+      db.prepare(`
+        UPDATE induction_presentations
+        SET quiz_score = ?, quiz_passed = ?, quiz_answers = ?
+        WHERE id = ?
+      `).run(score, passedFlag, JSON.stringify(answers || {}), presentation_id);
+    } catch (e) { console.error('Update presentation failed:', e.message); }
   }
-  res.json({ success: true });
+
+  // Only record completions when they actually passed
+  let recorded = [];
+  if (passedFlag && ids.length > 0) {
+    const insertCompletion = db.prepare(`
+      INSERT INTO training_completions (employee_id, module, full_name, email, score, total, passed)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
+    `);
+    for (const crewId of ids) {
+      try {
+        const crew = db.prepare(`
+          SELECT cm.id, cm.full_name, cm.email,
+            (SELECT id FROM employees WHERE linked_crew_member_id = cm.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) as employee_id
+          FROM crew_members cm WHERE cm.id = ?
+        `).get(crewId);
+        if (!crew) continue;
+        insertCompletion.run(crew.employee_id || null, moduleKey, crew.full_name, crew.email || '', score || 0, total || 0);
+        if (crew.employee_id) maybeMarkInducted(db, crew.employee_id, 'in_person');
+        recorded.push(crew.full_name);
+      } catch (e) { console.error('Completion insert failed for crew', crewId, e.message); }
+    }
+  }
+
+  res.json({ success: true, recorded });
 });
 
 // ============================================================
