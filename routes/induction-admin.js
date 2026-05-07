@@ -362,22 +362,11 @@ router.post('/submissions/:id/status', (req, res) => {
         UPDATE induction_submissions SET linked_crew_member_id = ?, updated_at = datetime('now') WHERE id = ?
       `).run(crewMemberId, s.id);
 
-      // 6. Auto-create SOP acknowledgement from the induction signature so
-      //    they show up as "Signed" on the roster without a second sign-off step.
-      if (s.signature_url && s.consent_signed_at) {
-        try {
-          const existing = db.prepare(
-            'SELECT id FROM sop_acknowledgements WHERE crew_member_id = ? AND sop_version = ?'
-          ).get(crewMemberId, currentSopVersion());
-          if (!existing) {
-            db.prepare(`
-              INSERT INTO sop_acknowledgements
-                (session_id, crew_member_id, full_name, email, sop_version, signature_url, signed_via, signed_at, signed_ip)
-              VALUES (NULL, ?, ?, ?, ?, ?, 'induction-form', ?, ?)
-            `).run(crewMemberId, fullName, s.email || '', currentSopVersion(), s.signature_url, s.consent_signed_at, s.signed_ip || '');
-          }
-        } catch (e) { console.error('SOP ack auto-create from induction failed:', e.message); }
-      }
+      // Note: SOP acknowledgement is NOT auto-created from the induction
+      // consent signature. The induction-form signature is for the consent
+      // agreement, not the SOPs. New starters need to go through the actual
+      // presentation and sign at the end — admin sends them a sign link from
+      // their roster profile.
 
       req.flash('success', `${fullName} approved and added as employee ${employeeId}. Documents imported to their profile.`);
       return res.redirect(`/induction/admin/submissions/${req.params.id}`);
@@ -480,21 +469,10 @@ router.post('/submissions/:id/convert', (req, res) => {
 
     db.prepare("UPDATE induction_submissions SET linked_crew_member_id = ?, updated_at = datetime('now') WHERE id = ?").run(crewMemberId, s.id);
 
-    // Auto-create SOP acknowledgement from the induction signature
-    if (s.signature_url && s.consent_signed_at) {
-      try {
-        const existing = db.prepare(
-          'SELECT id FROM sop_acknowledgements WHERE crew_member_id = ? AND sop_version = ?'
-        ).get(crewMemberId, currentSopVersion());
-        if (!existing) {
-          db.prepare(`
-            INSERT INTO sop_acknowledgements
-              (session_id, crew_member_id, full_name, email, sop_version, signature_url, signed_via, signed_at, signed_ip)
-            VALUES (NULL, ?, ?, ?, ?, ?, 'induction-form', ?, ?)
-          `).run(crewMemberId, fullName, s.email || '', currentSopVersion(), s.signature_url, s.consent_signed_at, s.signed_ip || '');
-        }
-      } catch (e) { console.error('SOP ack auto-create (manual convert) failed:', e.message); }
-    }
+    // SOP acknowledgement is intentionally NOT auto-created here — the
+    // induction consent signature is for the consent agreement, not the SOPs.
+    // New starters go through the actual presentation and sign at the end via
+    // the SOP sign link.
 
     req.flash('success', `${fullName} converted to employee ${employeeId}. Documents imported.`);
   } catch (err) {
