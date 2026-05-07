@@ -85,8 +85,12 @@
             <tr class="<%= l.paid ? 'opacity-60' : '' %>">
               <td class="px-3 py-2 sticky left-0 bg-white z-[5] <%= l.paid ? 'opacity-100' : '' %>">
                 <p class="font-semibold text-gray-900 text-sm leading-tight"><%= l.full_name %></p>
-                <% if (l.employee_code) { %><p class="text-[10px] text-gray-400 font-mono mt-0.5"><%= l.employee_code %></p><% } else if (!l.employee_id) { %>
+                <% if (l.employee_code) { %>
+                  <p class="text-[10px] text-gray-400 font-mono mt-0.5"><%= l.employee_code %></p>
+                <% } else if (!l.employee_id && !runLocked) { %>
                   <button onclick="openMatch(<%= l.id %>)" class="text-[10px] font-semibold text-amber-600 hover:underline mt-0.5">⚠ Link to employee</button>
+                <% } else if (!l.employee_id && runLocked) { %>
+                  <span class="text-[10px] font-semibold text-gray-400 mt-0.5">⚠ Unlinked</span>
                 <% } %>
                 <% if (l.classification_name) { %><p class="text-[10px] text-emerald-600 mt-0.5"><%= l.classification_name %></p><% } %>
               </td>
@@ -100,7 +104,11 @@
                 <td class="px-2 py-2 text-right text-xs text-gray-300">—</td>
               <% } %>
               <td class="px-2 py-2 text-center"><input type="checkbox" disabled class="w-4 h-4 rounded border-gray-300"></td>
-              <td class="px-2 py-2 text-right"><button onclick="openEdit(<%= l.id %>)" class="px-2 py-1 text-[11px] font-semibold text-brand-600 hover:bg-brand-50 rounded">Edit</button></td>
+              <td class="px-2 py-2 text-right">
+                <% if (!runLocked) { %>
+                  <button onclick="openEdit(<%= l.id %>)" class="px-2 py-1 text-[11px] font-semibold text-brand-600 hover:bg-brand-50 rounded">Edit</button>
+                <% } %>
+              </td>
             </tr>
           <% } else { %>
             <% activeKeys.forEach((bk, idx) => { const b = l.buckets[bk]; const isFirst = idx === 0; const isLast = idx === activeKeys.length - 1; %>
@@ -110,8 +118,10 @@
                     <p class="font-semibold text-gray-900 text-sm leading-tight"><%= l.full_name %></p>
                     <% if (l.employee_code) { %>
                       <p class="text-[10px] text-gray-400 font-mono mt-0.5"><%= l.employee_code %></p>
-                    <% } else if (!l.employee_id) { %>
+                    <% } else if (!l.employee_id && !runLocked) { %>
                       <button onclick="openMatch(<%= l.id %>)" class="text-[10px] font-semibold text-amber-600 hover:underline mt-0.5">⚠ Link to employee</button>
+                    <% } else if (!l.employee_id && runLocked) { %>
+                      <span class="text-[10px] font-semibold text-gray-400 mt-0.5">⚠ Unlinked</span>
                     <% } %>
                     <% if (l.classification_name) { %>
                       <p class="text-[10px] text-emerald-600 mt-0.5">⚖ <%= l.classification_name %></p>
@@ -159,7 +169,9 @@
                     <input type="checkbox" <%= l.paid ? 'checked' : '' %> onchange="togglePaid(<%= l.id %>, this.checked)" class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
                   </td>
                   <td rowspan="<%= rowSpan %>" class="px-2 py-2 text-right align-middle">
-                    <button onclick="openEdit(<%= l.id %>)" class="px-2 py-1 text-[11px] font-semibold text-brand-600 hover:bg-brand-50 rounded">Edit</button>
+                    <% if (!runLocked) { %>
+                      <button onclick="openEdit(<%= l.id %>)" class="px-2 py-1 text-[11px] font-semibold text-brand-600 hover:bg-brand-50 rounded">Edit</button>
+                    <% } %>
                   </td>
                 <% } %>
               </tr>
