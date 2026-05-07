@@ -313,6 +313,67 @@ router.get('/abergeldie/:id', requirePermission('abergeldie_payments'), (req, re
 });
 
 // ===========================================================================
+// POST /finance/abergeldie/:id — edit sheet metadata (label, period dates,
+// fee/hr, notes). When fee/hr changes, every line's fee_total is
+// recalculated as hours × new fee.
+// ===========================================================================
+router.post('/abergeldie/:id', requirePermission('abergeldie_payments'), (req, res) => {
+  const db = getDb();
+  const sheet = db.prepare('SELECT * FROM abergeldie_payment_sheets WHERE id = ?').get(req.params.id);
+  if (!sheet) { req.flash('error', 'Payment sheet not found.'); return res.redirect('/finance/abergeldie'); }
+
+  const label = String(req.body.label || '').trim().slice(0, 200);
+  const periodStart = String(req.body.period_start || '').trim();
+  const periodEnd   = String(req.body.period_end || '').trim();
+  const feePerHour  = round2(req.body.fee_per_hour);
+  const notes       = String(req.body.notes || '').trim().slice(0, 1000);
+
+  // Both dates required and well-formed; end must be on/after start.
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRe.test(periodStart) || !dateRe.test(periodEnd)) {
+    req.flash('error', 'Period start + end dates are required (YYYY-MM-DD).');
+    return res.redirect('/finance/abergeldie/' + sheet.id);
+  }
+  if (periodEnd < periodStart) {
+    req.flash('error', 'Period end must be on or after period start.');
+    return res.redirect('/finance/abergeldie/' + sheet.id);
+  }
+  if (!feePerHour || feePerHour <= 0) {
+    req.flash('error', 'Fee per hour must be a positive number.');
+    return res.redirect('/finance/abergeldie/' + sheet.id);
+  }
+
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE abergeldie_payment_sheets
+      SET label = ?, period_start = ?, period_end = ?, fee_per_hour = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(label || sheet.label || '', periodStart, periodEnd, feePerHour, notes, sheet.id);
+
+    // Recalculate per-line fee if fee/hr changed
+    if (feePerHour !== parseFloat(sheet.fee_per_hour)) {
+      db.prepare(`
+        UPDATE abergeldie_payment_sheet_lines
+        SET fee_per_hour = ?,
+            fee_total = ROUND(hours * ?, 2)
+        WHERE sheet_id = ?
+      `).run(feePerHour, feePerHour, sheet.id);
+    }
+  });
+  tx();
+
+  logActivity({
+    user: req.session.user, action: 'update', entityType: 'abergeldie_payment_sheet',
+    entityId: sheet.id, entityLabel: label || sheet.label,
+    details: `Updated Abergeldie payment sheet (period ${periodStart}→${periodEnd}, $${feePerHour}/hr)`,
+    ip: req.ip,
+  });
+
+  req.flash('success', 'Sheet updated.');
+  res.redirect('/finance/abergeldie/' + sheet.id);
+});
+
+// ===========================================================================
 // POST /finance/abergeldie/:id/delete
 // ===========================================================================
 router.post('/abergeldie/:id/delete', requirePermission('abergeldie_payments'), (req, res) => {
