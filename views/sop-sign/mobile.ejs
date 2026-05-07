@@ -32,6 +32,12 @@
   </div>
 <% } else { %>
 
+  <% if (typeof previewMode !== 'undefined' && previewMode) { %>
+    <div class="bg-amber-500 text-white text-center text-xs font-bold uppercase tracking-widest py-2">
+      Preview · Nothing will be saved · <a href="/induction/admin/sop-documents" class="underline">Back to admin</a>
+    </div>
+  <% } %>
+
   <!-- Header -->
   <div class="bg-white border-b border-gray-200 px-5 py-4 sticky top-0 z-10">
     <div class="flex items-center gap-3">
@@ -350,7 +356,13 @@
     // ── Submit ──
     const form = document.getElementById('signForm');
     const errMsg = document.getElementById('errMsg');
+    const PREVIEW_MODE = <%- JSON.stringify(typeof previewMode !== 'undefined' && previewMode) %>;
     form.addEventListener('submit', (e) => {
+      if (PREVIEW_MODE) {
+        e.preventDefault();
+        alert('Preview mode — submission disabled. Drop into a real session to test signing.');
+        return;
+      }
       const picker = document.getElementById('crew-picker');
       const manualEl = document.getElementById('manual-name');
       // If picker isn't on the page, this is an individual (target-bound) session — skip name check

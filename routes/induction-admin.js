@@ -822,6 +822,38 @@ router.get('/acknowledgements', (req, res) => {
 });
 
 // ============================================================
+// Admin preview of the SOP/SWMS sign page — exactly what workers see, but
+// no row is written when "submitted". Useful for previewing content + image
+// changes before sending real links.
+// ============================================================
+router.get('/sop-preview', (req, res) => {
+  const db = getDb();
+  const sopContent = require('../lib/sop-content');
+  const documents = activeSopDocuments(db);
+  const structuredSops = sopContent.all().map(sop => {
+    let matchedPdf = null;
+    if (sop.pdfFilenameMatch) {
+      matchedPdf = documents.find(d => sop.pdfFilenameMatch.test(d.original_name) || sop.pdfFilenameMatch.test(d.title));
+    }
+    return { ...sop, matchedPdf: matchedPdf || null };
+  });
+
+  res.render('sop-sign/mobile', {
+    layout: false,
+    session: { id: 0, token: 'preview', title: 'Preview', sop_version: currentSopVersion(), target_crew_member_id: null, closed_at: null },
+    targetCrew: null,
+    attendees: [],
+    documents,
+    structuredSops,
+    ackText: sopAckText(),
+    sopVersion: currentSopVersion(),
+    submitted: false,
+    error: null,
+    previewMode: true,
+  });
+});
+
+// ============================================================
 // SOP / SWMS Document Library
 // ============================================================
 
