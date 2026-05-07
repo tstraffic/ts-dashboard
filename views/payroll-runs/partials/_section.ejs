@@ -7,6 +7,7 @@
   };
   const a = ACCENT[accent] || ACCENT.gray;
   const showGst = accent === 'amber'; // Cash only
+  const showTfnExtras = section.key === 'tfn'; // Super, Tax, Net columns
 
   // Bucket UI flair
   const BUCKET_BADGE = {
@@ -27,7 +28,7 @@
       <h2 class="text-base font-bold <%= a.headText %> uppercase tracking-wider"><%= section.label %> Workers</h2>
       <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold <%= a.chip %>"><%= lines.length %></span>
     </div>
-    <div class="flex items-center gap-3 text-xs <%= a.headText %>">
+    <div class="flex items-center gap-3 text-xs <%= a.headText %> flex-wrap">
       <span><%= sectTotals.hours.toFixed(2) %> hrs</span>
       <span class="opacity-50">·</span>
       <span class="font-bold tabular-nums">$<%= fmtMoney(sectTotals.total) %></span>
@@ -36,6 +37,14 @@
         <span class="opacity-80 tabular-nums">+ GST $<%= fmtMoney(sectTotals.gst) %></span>
         <span class="opacity-50">·</span>
         <span class="font-bold tabular-nums">= $<%= fmtMoney(sectTotals.with_gst) %></span>
+      <% } %>
+      <% if (showTfnExtras) { %>
+        <span class="opacity-50">·</span>
+        <span class="opacity-80 tabular-nums" title="Tax withheld (PAYG estimate)">Tax −$<%= fmtMoney(sectTotals.tfn_tax) %></span>
+        <span class="opacity-50">·</span>
+        <span class="font-bold tabular-nums" title="Total − tax = workers' take-home">Net $<%= fmtMoney(sectTotals.tfn_net) %></span>
+        <span class="opacity-50">·</span>
+        <span class="opacity-80 tabular-nums" title="Super contribution (12% of wages)">Super $<%= fmtMoney(sectTotals.tfn_super) %></span>
       <% } %>
     </div>
   </div>
@@ -56,6 +65,11 @@
           <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Wages</th>
           <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Allow.</th>
           <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Total</th>
+          <% if (showTfnExtras) { %>
+            <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest" title="Tax withheld (PAYG estimate)">Tax</th>
+            <th class="px-2 py-2 text-right text-[10px] font-bold text-emerald-600 uppercase tracking-widest" title="Take-home pay (Total − Tax)">Net</th>
+            <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest" title="Super contribution (12% of wages)">Super</th>
+          <% } %>
           <th class="px-2 py-2 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">Paid</th>
           <th class="px-2 py-2"></th>
         </tr>
@@ -80,6 +94,11 @@
                 <% if (l.bsb || l.acc_number) { %><%= l.bsb || '—' %><br><%= l.acc_number || '—' %><% } else { %><span class="text-gray-300">—</span><% } %>
               </td>
               <td colspan="10" class="px-2 py-2 text-xs text-gray-400 italic">No hours</td>
+              <% if (showTfnExtras) { %>
+                <td class="px-2 py-2 text-right text-xs text-gray-300">—</td>
+                <td class="px-2 py-2 text-right text-xs text-gray-300">—</td>
+                <td class="px-2 py-2 text-right text-xs text-gray-300">—</td>
+              <% } %>
               <td class="px-2 py-2 text-center"><input type="checkbox" disabled class="w-4 h-4 rounded border-gray-300"></td>
               <td class="px-2 py-2 text-right"><button onclick="openEdit(<%= l.id %>)" class="px-2 py-1 text-[11px] font-semibold text-brand-600 hover:bg-brand-50 rounded">Edit</button></td>
             </tr>
@@ -131,6 +150,11 @@
                     <% } %>
                   </td>
                   <td rowspan="<%= rowSpan %>" class="px-2 py-2 text-right text-sm font-bold tabular-nums text-gray-900 align-middle">$<%= fmtMoney(l.grand_total) %></td>
+                  <% if (showTfnExtras) { %>
+                    <td rowspan="<%= rowSpan %>" class="px-2 py-2 text-right text-xs tabular-nums text-rose-700 align-middle">−$<%= fmtMoney(l.tfn_tax || 0) %></td>
+                    <td rowspan="<%= rowSpan %>" class="px-2 py-2 text-right text-sm font-semibold tabular-nums text-emerald-700 align-middle">$<%= fmtMoney(l.tfn_net || 0) %></td>
+                    <td rowspan="<%= rowSpan %>" class="px-2 py-2 text-right text-xs tabular-nums text-gray-700 align-middle">$<%= fmtMoney(l.tfn_super || 0) %></td>
+                  <% } %>
                   <td rowspan="<%= rowSpan %>" class="px-2 py-2 text-center align-middle">
                     <input type="checkbox" <%= l.paid ? 'checked' : '' %> onchange="togglePaid(<%= l.id %>, this.checked)" class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
                   </td>
@@ -149,6 +173,11 @@
             <%= section.label %> Total
           </td>
           <td class="px-2 py-2 text-right text-sm font-bold tabular-nums text-gray-900">$<%= fmtMoney(sectTotals.total) %></td>
+          <% if (showTfnExtras) { %>
+            <td class="px-2 py-2 text-right text-xs font-semibold tabular-nums text-rose-700">−$<%= fmtMoney(sectTotals.tfn_tax) %></td>
+            <td class="px-2 py-2 text-right text-sm font-bold tabular-nums text-emerald-700">$<%= fmtMoney(sectTotals.tfn_net) %></td>
+            <td class="px-2 py-2 text-right text-xs font-semibold tabular-nums text-gray-700">$<%= fmtMoney(sectTotals.tfn_super) %></td>
+          <% } %>
           <td colspan="2"></td>
         </tr>
         <% if (showGst) { %>
@@ -160,6 +189,16 @@
           <tr class="bg-amber-50">
             <td colspan="11" class="px-3 py-2 text-right text-xs font-bold text-amber-900 uppercase tracking-widest">Total + GST</td>
             <td class="px-2 py-2 text-right text-sm font-bold tabular-nums text-amber-900">$<%= fmtMoney(sectTotals.with_gst) %></td>
+            <td colspan="2"></td>
+          </tr>
+        <% } %>
+        <% if (showTfnExtras) { %>
+          <tr class="bg-emerald-50">
+            <td colspan="<%= 11 + 1 %>" class="px-3 py-2 text-right text-xs font-bold text-emerald-900 uppercase tracking-widest" title="Total cost to T&S = Total payable + Super">Total employer cost</td>
+            <td colspan="2" class="px-2 py-2 text-right text-xs text-emerald-800">
+              <span class="opacity-70">Total $<%= fmtMoney(sectTotals.total) %> + Super $<%= fmtMoney(sectTotals.tfn_super) %> =</span>
+            </td>
+            <td class="px-2 py-2 text-right text-sm font-bold tabular-nums text-emerald-900">$<%= fmtMoney((parseFloat(sectTotals.total) || 0) + (parseFloat(sectTotals.tfn_super) || 0)) %></td>
             <td colspan="2"></td>
           </tr>
         <% } %>

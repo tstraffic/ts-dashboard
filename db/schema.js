@@ -8085,6 +8085,69 @@ function runMigrations(db) {
     }
   }
 
+  // Migration 171: Pay run approval workflow.
+  // Expands pay_runs.status CHECK to ('draft','pending_approval','approved','paid','finalized')
+  // and adds audit columns (who submitted/approved/paid/unlocked + when).
+  // Existing rows keep their current status. SQLite can't ALTER a CHECK in
+  // place, so we rebuild the table — disable FKs first because pay_run_lines
+  // references pay_runs.
+  if (!isMigrationApplied.get(171)) {
+    let needsRebuild = true;
+    try {
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='pay_runs'").get();
+      if (tableInfo && tableInfo.sql && tableInfo.sql.includes("'pending_approval'")) needsRebuild = false;
+    } catch (e) { /* fall through */ }
+
+    if (needsRebuild) {
+      db.pragma('foreign_keys = OFF');
+      try {
+        const cols = db.prepare("PRAGMA table_info(pay_runs)").all().map(c => c.name);
+        const hasPayRunType = cols.includes('pay_run_type');
+        const payRunTypeCol = hasPayRunType ? "pay_run_type TEXT NOT NULL DEFAULT 'traffic_control'," : '';
+        const payRunTypeSelect = hasPayRunType ? ',pay_run_type' : '';
+
+        db.exec(`
+          CREATE TABLE pay_runs_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            period_start DATE NOT NULL,
+            period_end DATE NOT NULL,
+            label TEXT DEFAULT '',
+            csv_filename TEXT DEFAULT '',
+            csv_uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','pending_approval','approved','paid','finalized')),
+            ${payRunTypeCol}
+            submitted_for_approval_at DATETIME,
+            submitted_by_id INTEGER REFERENCES users(id),
+            approved_at DATETIME,
+            approved_by_id INTEGER REFERENCES users(id),
+            paid_at DATETIME,
+            paid_by_id INTEGER REFERENCES users(id),
+            unlocked_at DATETIME,
+            unlocked_by_id INTEGER REFERENCES users(id),
+            created_by_id INTEGER REFERENCES users(id),
+            notes TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          );
+          INSERT INTO pay_runs_new (id, period_start, period_end, label, csv_filename, csv_uploaded_at, status${payRunTypeSelect}, created_by_id, notes, created_at, updated_at)
+            SELECT id, period_start, period_end, label, csv_filename, csv_uploaded_at, status${payRunTypeSelect}, created_by_id, notes, created_at, updated_at FROM pay_runs;
+          DROP TABLE pay_runs;
+          ALTER TABLE pay_runs_new RENAME TO pay_runs;
+          CREATE INDEX IF NOT EXISTS idx_pay_runs_period ON pay_runs(period_start);
+        `);
+        db.pragma('foreign_keys = ON');
+        recordMigration.run(171, 'pay_runs: approval workflow status + audit columns');
+        console.log('Migration 171 applied: pay_runs approval workflow');
+      } catch (e) {
+        db.pragma('foreign_keys = ON');
+        try { db.exec('DROP TABLE IF EXISTS pay_runs_new'); } catch (re) { /* ignore */ }
+        console.error('Migration 171 error:', e.message);
+      }
+    } else {
+      recordMigration.run(171, 'pay_runs: approval workflow status + audit columns');
+    }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
