@@ -235,7 +235,7 @@ router.get('/', (req, res) => {
   const subPlansByParent = {};
   if (parentIds.length > 0) {
     const placeholders = parentIds.map(() => '?').join(',');
-    const subs = db.prepare(`SELECT c.id, c.parent_id, c.item_type, c.reference_number, c.description, c.status, c.expiry_date, c.extension_required,
+    const subs = db.prepare(`SELECT c.id, c.parent_id, c.item_type, c.reference_number, c.description, c.status, c.submitted_date, c.expiry_date, c.extension_required,
       c.hours_spent, c.charge_client, c.charge_amount, c.council_fee_paid, c.council_fee_amount,
       c.assigned_to_id, u.full_name AS owner_name
       FROM compliance c LEFT JOIN users u ON c.assigned_to_id = u.id
@@ -248,6 +248,40 @@ router.get('/', (req, res) => {
       (subPlansByParent[s.parent_id] = subPlansByParent[s.parent_id] || []).push(s);
     });
   }
+
+  // Bucket items into collapsible monthly groups, keyed by
+  // client_request_date month. Plans with no request date go into a
+  // single "Undated" group rendered first. Newest month first
+  // otherwise — request dates flow naturally newest-on-top so admins
+  // see fresh work without scrolling.
+  const monthBuckets = new Map();
+  items.forEach(it => {
+    const reqDate = it.client_request_date && /^\d{4}-\d{2}/.test(it.client_request_date)
+      ? it.client_request_date.slice(0, 7) : null;
+    const key = reqDate || '0000-00';
+    if (!monthBuckets.has(key)) monthBuckets.set(key, []);
+    monthBuckets.get(key).push(it);
+  });
+  const sortedKeys = Array.from(monthBuckets.keys()).sort((a, b) => b.localeCompare(a));
+  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const monthGroups = sortedKeys.map(key => {
+    let label;
+    if (key === '0000-00') {
+      label = 'Undated';
+    } else {
+      const [y, m] = key.split('-');
+      const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+      label = d.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', month: 'long', year: 'numeric' });
+    }
+    return {
+      key,
+      label,
+      items: monthBuckets.get(key),
+      // Open the current month and the Undated bucket by default; older
+      // months stay collapsed so the page isn't a wall of rows.
+      open: key === currentMonthKey || key === '0000-00',
+    };
+  });
 
   const jobs = db.prepare("SELECT id, job_number, client, project_name FROM jobs WHERE status NOT IN ('closed','completed','cancelled') ORDER BY job_number").all();
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
@@ -274,7 +308,7 @@ router.get('/', (req, res) => {
 
   res.render('compliance/index', {
     title: 'Plans & Approvals',
-    items, jobs, clients, users,
+    items, monthGroups, jobs, clients, users,
     filters: { status: status || '', job_id: job_id || '', client_id: client_id || '', item_type: item_type || '', view, ref: ref || '', date_from: date_from || '', date_to: date_to || '', invoice_state: invoice_state || '' },
     view, periodLabel, prevRef, nextRef, summary,
     subPlansByParent,
@@ -437,8 +471,8 @@ router.post('/sub-plans/:subId/extension', (req, res) => {
 });
 
 // Combined upload + submit. Files are required (≥1); submitted_date
-// defaults to today if blank; expiry_date is optional. Notes are
-// stored on the sub-plan's `notes` column. Status flips to
+// is required (validated server-side); expiry_date is optional.
+// Notes are stored on the sub-plan's `notes` column. Status flips to
 // 'submitted' as a side-effect of a successful upload.
 router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 10), (req, res) => {
   const db = getDb();
@@ -451,6 +485,11 @@ router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 
   const desc = (req.body.description || sub.description || '').trim();
   if (!desc) {
     req.flash('error', 'Description is required before submitting.');
+    return res.redirect('/compliance/' + sub.parent_id + '/edit');
+  }
+  const submittedDateRaw = (req.body.submitted_date || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(submittedDateRaw)) {
+    req.flash('error', 'Submission date is required.');
     return res.redirect('/compliance/' + sub.parent_id + '/edit');
   }
   if (files.length === 0) {
@@ -468,8 +507,7 @@ router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 
       insDoc.run(sub.id, f.filename, f.originalname, relPath, f.size, f.mimetype || '', req.session.user.id);
     });
 
-    const today = new Date().toISOString().split('T')[0];
-    const submittedDate = req.body.submitted_date || today;
+    const submittedDate = submittedDateRaw;
     const expiryDate = req.body.expiry_date || null;
     const notes = req.body.notes || sub.notes || '';
     const hoursSpent = parseFloat(req.body.hours_spent) || 0;
