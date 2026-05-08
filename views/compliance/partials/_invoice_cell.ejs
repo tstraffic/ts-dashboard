@@ -29,7 +29,7 @@
     <p class="text-[10px] text-gray-400 mt-0.5"><%= formatDate(item.ready_for_invoice_at) %><% if (item.ready_for_invoice_by_name) { %> · <%= item.ready_for_invoice_by_name.split(' ')[0] %><% } %></p>
   <% } %>
   <% if (canMarkInvoiced) { %>
-    <button type="button" onclick='event.stopPropagation(); openInvoiceModal(<%= item.id %>, <%- JSON.stringify(item.title || "") %>, <%- JSON.stringify(item.invoice_number || "") %>)'
+    <button type="button" onclick='event.stopPropagation(); openInvoiceModal(<%= item.id %>, <%- JSON.stringify(item.title || "") %>, <%- JSON.stringify(item.invoice_number || "") %>, <%- JSON.stringify(item.charge_amount ? String(item.charge_amount) : "") %>)'
       class="mt-1 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded transition">
       Mark invoiced →
     </button>

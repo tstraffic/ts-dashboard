@@ -492,6 +492,11 @@ router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 
     req.flash('error', 'Submission date is required.');
     return res.redirect('/compliance/' + sub.parent_id + '/edit');
   }
+  const hoursSpentParsed = parseFloat(req.body.hours_spent);
+  if (!Number.isFinite(hoursSpentParsed) || hoursSpentParsed <= 0) {
+    req.flash('error', 'Hours spent is required and must be greater than zero.');
+    return res.redirect('/compliance/' + sub.parent_id + '/edit');
+  }
   if (files.length === 0) {
     // No files attached AND no existing files = can't submit.
     const existingDocs = db.prepare('SELECT COUNT(*) as c FROM compliance_documents WHERE compliance_id = ?').get(sub.id).c;
@@ -510,7 +515,7 @@ router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 
     const submittedDate = submittedDateRaw;
     const expiryDate = req.body.expiry_date || null;
     const notes = req.body.notes || sub.notes || '';
-    const hoursSpent = parseFloat(req.body.hours_spent) || 0;
+    const hoursSpent = hoursSpentParsed;
     const chargeClient = (req.body.charge_client === '1' || req.body.charge_client === 1 || req.body.charge_client === true || req.body.charge_client === 'on') ? 1 : 0;
     const chargeAmount = parseFloat(req.body.charge_amount) || 0;
     const councilFeePaid = (req.body.council_fee_paid === '1' || req.body.council_fee_paid === 1 || req.body.council_fee_paid === true || req.body.council_fee_paid === 'on') ? 1 : 0;
@@ -781,18 +786,22 @@ router.post('/bulk-ready-invoice', (req, res) => {
 
 router.post('/bulk-invoiced', (req, res) => {
   const db = getDb();
-  const { ids, invoice_number } = req.body;
+  const { ids, invoice_number, charge_amount } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No items' });
   // Only admin/finance/accounts can mark as invoiced
   if (!['admin', 'finance', 'accounts'].includes(req.session.user.role)) return res.status(403).json({ error: 'Only admin/accounts can mark as invoiced' });
+  const chargeAmt = parseFloat(charge_amount);
+  if (!Number.isFinite(chargeAmt) || chargeAmt <= 0) {
+    return res.status(400).json({ error: 'Charge amount is required to mark invoiced' });
+  }
   const placeholders = ids.map(() => '?').join(',');
   const invNum = (invoice_number || '').toString().trim();
   if (invNum) {
-    db.prepare(`UPDATE compliance SET invoiced = 1, invoice_number = ?, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`)
-      .run(invNum, req.session.user.id, ...ids);
+    db.prepare(`UPDATE compliance SET invoiced = 1, invoice_number = ?, charge_client = 1, charge_amount = ?, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`)
+      .run(invNum, chargeAmt, req.session.user.id, ...ids);
   } else {
-    db.prepare(`UPDATE compliance SET invoiced = 1, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`)
-      .run(req.session.user.id, ...ids);
+    db.prepare(`UPDATE compliance SET invoiced = 1, charge_client = 1, charge_amount = ?, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`)
+      .run(chargeAmt, req.session.user.id, ...ids);
   }
   res.json({ success: true });
 });
@@ -801,6 +810,7 @@ router.post('/bulk-invoiced', (req, res) => {
 function freshInvoiceState(db, id) {
   return db.prepare(`
     SELECT c.id, c.ready_for_invoice, c.ready_for_invoice_at, c.invoiced, c.invoice_number, c.invoiced_at,
+      c.charge_client, c.charge_amount,
       rfi.full_name AS ready_for_invoice_by_name,
       inv.full_name AS invoiced_by_name
     FROM compliance c
@@ -825,13 +835,22 @@ router.post('/:id/mark-invoiced', (req, res) => {
     req.flash('error', 'Item not found.');
     return res.redirect('/compliance');
   }
+  // Charge amount is mandatory before a row can be marked invoiced — you
+  // can't bill nothing. Mark Ready remains unrestricted so finance can
+  // queue rows even before the price is set.
+  const chargeAmt = parseFloat(req.body.charge_amount);
+  if (!Number.isFinite(chargeAmt) || chargeAmt <= 0) {
+    if (wantsJson) return res.status(400).json({ error: 'Charge amount is required to mark invoiced' });
+    req.flash('error', 'Enter a charge amount before marking as invoiced.');
+    return res.redirect(req.body.return_to || '/compliance');
+  }
   const invNum = (req.body.invoice_number || '').toString().trim();
   if (invNum) {
-    db.prepare(`UPDATE compliance SET invoiced = 1, invoice_number = ?, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-      .run(invNum, req.session.user.id, item.id);
+    db.prepare(`UPDATE compliance SET invoiced = 1, invoice_number = ?, charge_client = 1, charge_amount = ?, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+      .run(invNum, chargeAmt, req.session.user.id, item.id);
   } else {
-    db.prepare(`UPDATE compliance SET invoiced = 1, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-      .run(req.session.user.id, item.id);
+    db.prepare(`UPDATE compliance SET invoiced = 1, charge_client = 1, charge_amount = ?, invoiced_at = CURRENT_TIMESTAMP, invoiced_by_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+      .run(chargeAmt, req.session.user.id, item.id);
   }
   if (wantsJson) return res.json({ success: true, item: freshInvoiceState(db, item.id) });
   req.flash('success', `Marked invoiced${invNum ? ' (' + invNum + ')' : ''}.`);
@@ -1132,6 +1151,7 @@ router.post('/:id/ready-for-invoice', (req, res) => {
   if (wantsJson) {
     const fresh = db.prepare(`
       SELECT c.id, c.ready_for_invoice, c.ready_for_invoice_at, c.invoiced, c.invoice_number, c.invoiced_at,
+        c.charge_client, c.charge_amount,
         rfi.full_name AS ready_for_invoice_by_name,
         inv.full_name AS invoiced_by_name
       FROM compliance c
