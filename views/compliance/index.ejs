@@ -291,20 +291,18 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-gray-50 border-b border-gray-200">
-              <th class="px-3 py-2 w-10">
+              <th class="px-2 py-2 w-10">
                 <input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)" class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 focus:ring-offset-0 cursor-pointer">
               </th>
-              <th class="hidden md:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ref</th>
-              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Title</th>
-              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type</th>
-              <th class="hidden lg:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project</th>
-              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-              <th class="hidden md:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Client Req</th>
-              <th class="hidden sm:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Due Date</th>
-              <th class="hidden lg:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Assigned</th>
-              <th class="hidden xl:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fee</th>
-              <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Invoice</th>
-              <th class="px-3 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Edit</th>
+              <th class="hidden md:table-cell px-2 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ref</th>
+              <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Title</th>
+              <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Type</th>
+              <th class="hidden lg:table-cell px-2 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project</th>
+              <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+              <th class="hidden md:table-cell px-2 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Client Req</th>
+              <th class="hidden sm:table-cell px-2 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Due Date</th>
+              <th class="hidden lg:table-cell px-2 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Assigned</th>
+              <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Invoice</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -314,7 +312,7 @@
                 const chevronClass = group.open ? 'rotate-90' : '';
               %>
               <tr class="month-header bg-gray-50 hover:bg-gray-100 cursor-pointer" data-month-toggle="<%= group.key %>" data-open="<%= group.open ? '1' : '0' %>">
-                <td colspan="12" class="px-3 py-2">
+                <td colspan="10" class="px-2 py-2">
                   <div class="flex items-center gap-2">
                     <svg class="month-chevron w-3.5 h-3.5 text-gray-500 transition-transform <%= chevronClass %>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
                     <span class="text-xs font-bold text-gray-700 uppercase tracking-wider"><%= group.label %></span>
@@ -332,10 +330,10 @@
               const returnTo = '/compliance?' + Object.keys(filters).filter(k => filters[k]).map(k => k + '=' + encodeURIComponent(filters[k])).join('&');
             %>
               <tr class="month-row <%= rowHidden %> <%= (item.revision_required || item.revision_count > 0) ? 'bg-orange-50/60 border-l-[3px] border-l-orange-400' : item.ready_for_invoice && !item.invoiced ? 'bg-amber-50/50 border-l-2 border-l-amber-400' : item.invoiced ? 'bg-emerald-50/30' : getExpiryRowClass(item) %> hover:bg-gray-50 transition-colors cursor-pointer" data-month-row="<%= group.key %>" data-expiry-class="<%= getExpiryRowClass(item) %>" onclick="if(!event.target.closest('a,button,input,.row-checkbox')){window.location.href='/compliance/<%= item.id %>/edit?return_to=<%= encodeURIComponent(returnTo) %>'}">
-                <td class="px-3 py-2">
+                <td class="px-2 py-2">
                   <input type="checkbox" class="row-checkbox w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 focus:ring-offset-0 cursor-pointer" data-id="<%= item.id %>" onclick="updateBulkBar()">
                 </td>
-                <td class="hidden md:table-cell px-3 py-2 whitespace-nowrap">
+                <td class="hidden md:table-cell px-2 py-2 whitespace-nowrap">
                   <% if ((item.parent_id == null) && (item.plan_number != null)) { %>
                     <%
                       const subCount = (subPlansByParent[item.id] || []).length;
@@ -360,7 +358,7 @@
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="px-3 py-2 font-medium text-gray-900 max-w-xs">
+                <td class="px-2 py-2 font-medium text-gray-900 max-w-[14rem]">
                   <span class="truncate block"><%= item.title %></span>
                   <span class="title-invoice-badge" data-id="<%= item.id %>">
                     <% if (item.ready_for_invoice && !item.invoiced) { %>
@@ -369,11 +367,16 @@
                       <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-700 mt-0.5">INVOICED<%= item.invoice_number ? ' — ' + item.invoice_number : '' %></span>
                     <% } %>
                   </span>
+                  <% if (item.item_type === 'council_permit' && item.council_fee_amount > 0) { %>
+                    <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded mt-0.5 <%= item.council_fee_paid ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200' %>">
+                      Council fee $<%= item.council_fee_amount.toLocaleString() %> <%= item.council_fee_paid ? '· paid' : '· unpaid' %>
+                    </span>
+                  <% } %>
                   <% if (item.authority_approver) { %>
                     <span class="text-xs text-gray-400"><%= item.authority_approver %></span>
                   <% } %>
                 </td>
-                <td class="px-3 py-2">
+                <td class="px-2 py-2">
                   <div class="flex flex-wrap gap-1">
                     <% if ((item.parent_id == null) && (item.plan_number != null)) { %>
                       <%
@@ -407,7 +410,7 @@
                     <% } %>
                   </div>
                 </td>
-                <td class="hidden lg:table-cell px-3 py-2">
+                <td class="hidden lg:table-cell px-2 py-2">
                   <% if (item.job_id) { %>
                     <a href="/projects/<%= item.job_id %>" class="text-brand-600 hover:text-brand-700 font-medium"><%= item.job_number %></a>
                     <% if (item.client_id) { %>
@@ -422,7 +425,7 @@
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="px-3 py-2 status-cell" data-id="<%= item.id %>" data-status="<%= item.status %>">
+                <td class="px-2 py-2 status-cell" data-id="<%= item.id %>" data-status="<%= item.status %>">
                   <button type="button"
                     onclick="event.stopPropagation(); openStatusPopover(event, <%= item.id %>, '<%= item.status %>')"
                     class="status-pill inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full <%= sc.color %> hover:ring-1 hover:ring-gray-300 transition cursor-pointer"
@@ -431,14 +434,14 @@
                     <svg class="w-2.5 h-2.5 opacity-60" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                   </button>
                 </td>
-                <td class="hidden md:table-cell px-3 py-2 whitespace-nowrap text-gray-700">
+                <td class="hidden md:table-cell px-2 py-2 whitespace-nowrap text-gray-700">
                   <% if (item.client_request_date) { %>
                     <%= formatDate(item.client_request_date) %>
                   <% } else { %>
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="hidden sm:table-cell px-3 py-2 whitespace-nowrap">
+                <td class="hidden sm:table-cell px-2 py-2 whitespace-nowrap">
                   <% if (item.due_date) { %>
                     <span class="<%= isOverdue ? 'text-red-600 font-semibold' : isDueSoon ? 'text-amber-600 font-medium' : 'text-gray-700' %>">
                       <%= formatDate(item.due_date) %>
@@ -458,7 +461,7 @@
                     </div>
                   <% } %>
                 </td>
-                <td class="hidden lg:table-cell px-3 py-2">
+                <td class="hidden lg:table-cell px-2 py-2">
                   <% if (item.assigned_name) { %>
                     <span class="inline-flex items-center gap-1 text-xs text-gray-600">
                       <span class="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-semibold text-xs flex-shrink-0"><%= item.assigned_name.charAt(0) %></span>
@@ -468,36 +471,16 @@
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="hidden xl:table-cell px-3 py-2 text-sm">
-                  <% if (item.item_type === 'council_permit' && item.council_fee_amount > 0) { %>
-                    <div>$<%= item.council_fee_amount.toLocaleString() %></div>
-                    <% if (item.council_fee_paid) { %>
-                      <span class="text-xs text-emerald-600 font-medium">Paid</span>
-                    <% } else { %>
-                      <span class="text-xs text-red-600 font-medium">Unpaid</span>
-                    <% } %>
-                  <% } else { %>
-                    <span class="text-gray-300">-</span>
-                  <% } %>
-                </td>
-
                 <!-- Invoice column: state pill + per-row action.
                      The cell content is re-rendered client-side after each
                      action, so no full page reload — scroll position stays put. -->
                 <% const canMarkInvoiced = ['admin', 'finance', 'accounts'].includes(user.role); %>
-                <td class="px-3 py-2 align-top whitespace-nowrap invoice-cell"
+                <td class="px-2 py-2 align-top whitespace-nowrap invoice-cell"
                     data-id="<%= item.id %>"
                     data-title="<%= (item.title || '').replace(/"/g, '&quot;') %>">
                   <%- include('partials/_invoice_cell', { item, canMarkInvoiced, formatDate }) %>
                 </td>
 
-                <td class="px-3 py-2 text-right">
-                  <a href="/compliance/<%= item.id %>/edit?return_to=<%= encodeURIComponent(returnTo) %>"
-                    class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-brand-50 hover:text-brand-700 rounded-lg transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                    Edit
-                  </a>
-                </td>
               </tr>
               <% if ((item.parent_id == null) && (item.plan_number != null)) { %>
                 <%
@@ -512,7 +495,7 @@
                   const fmt$ = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
                 %>
                 <tr id="exp-<%= item.id %>" class="hidden bg-gray-50/50 month-row" data-month-row="<%= group.key %>" data-sub-expansion="1">
-                  <td colspan="11" class="px-6 py-3 border-l-2 border-l-brand-300">
+                  <td colspan="9" class="px-6 py-3 border-l-2 border-l-brand-300">
                     <% if (subList.length === 0) { %>
                       <div class="text-xs text-gray-500 italic">No sub-plans yet — open the Plan to add some.</div>
                     <% } else { %>
@@ -1082,7 +1065,7 @@ function showToast(message, type, options) {
         <div>
           <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Invoice number (optional)</label>
           <input type="text" id="invoiceNumberInput" placeholder="e.g. INV-1042"
-            class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500">
+            class="w-full px-2 py-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500">
           <p class="text-[10px] text-gray-400 mt-1.5">Leave blank if you don't have a number yet — you can add it later by editing the item.</p>
         </div>
         <div>
