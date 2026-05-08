@@ -7,7 +7,7 @@
   <div class="mg-hero">
     <p class="mg-hero-label">Manager view</p>
     <h1 class="mg-hero-title">Operations overview</h1>
-    <p class="mg-hero-sub"><%= new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' }) %></p>
+    <p class="mg-hero-sub"><%= new Date().toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', weekday: 'long', day: 'numeric', month: 'long' }) %></p>
 
     <div class="mg-kpis">
       <div class="mg-kpi"><p class="mg-kpi-label">Crew on today</p><p class="mg-kpi-value"><%= kpis.activeCrew %></p><p class="mg-kpi-sub">Allocated across jobs</p></div>

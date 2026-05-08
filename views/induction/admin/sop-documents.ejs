@@ -8,7 +8,7 @@
   }
   function fmtDate(s) {
     if (!s) return '—';
-    return new Date(s.replace(' ', 'T') + 'Z').toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
+    return new Date(s.replace(' ', 'T') + 'Z').toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day:'numeric', month:'short', year:'numeric' });
   }
   function iconFor(mime, name) {
     const n = (name || '').toLowerCase();

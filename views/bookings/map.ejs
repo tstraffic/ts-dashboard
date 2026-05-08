@@ -47,7 +47,7 @@
             <div class="min-w-0 flex-1">
               <p class="text-sm font-semibold text-gray-900 truncate"><%= r.booking_number || ('#' + r.id) %><% if (r.title) { %> · <%= r.title %><% } %></p>
               <p class="text-xs text-gray-500 truncate">
-                <%= new Date(r.start_datetime).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) %>
+                <%= new Date(r.start_datetime).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) %>
                 <% if (r.suburb) { %> · <%= r.suburb %><% } %>
               </p>
             </div>

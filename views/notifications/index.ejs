@@ -76,7 +76,7 @@
   <%
     let lastDate = '';
     notifications.forEach(function(n) {
-      const nDate = new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+      const nDate = new Date(n.created_at).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'long', year: 'numeric' });
       const showDateHeader = nDate !== lastDate;
       lastDate = nDate;
       const ti = typeIcons[n.type] || defaultIcon;
@@ -101,7 +101,7 @@
           <p class="text-xs text-gray-400 mt-0.5 line-clamp-2"><%= n.message %></p>
           <div class="flex items-center gap-3 mt-1">
             <% if (n.job_number) { %><span class="text-xs text-brand-600 font-medium"><%= n.job_number %></span><% } %>
-            <span class="text-[10px] text-gray-300"><%= new Date(n.created_at).toLocaleString('en-AU', { hour: '2-digit', minute: '2-digit' }) %></span>
+            <span class="text-[10px] text-gray-300"><%= new Date(n.created_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit' }) %></span>
             <% if (n.type) { %><span class="text-[10px] text-gray-300"><%= n.type.replace(/_/g, ' ') %></span><% } %>
           </div>
         </div>

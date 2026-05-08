@@ -39,7 +39,7 @@
       </a>
       <h1 class="mt-1 text-2xl font-bold text-gray-900"><%= formLabel %></h1>
       <p class="text-sm text-gray-500">
-        Submitted <%= new Date(sub.submitted_at).toLocaleString('en-AU', { weekday:'short', day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) %>
+        Submitted <%= new Date(sub.submitted_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', weekday:'short', day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) %>
         <% if (sub.signed_name) { %> by <span class="font-medium"><%= sub.signed_name %></span><% } %>
       </p>
     </div>

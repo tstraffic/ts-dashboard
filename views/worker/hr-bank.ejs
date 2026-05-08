@@ -30,9 +30,9 @@
       <div class="sf-readrow"><span class="sf-k">BSB</span><span class="sf-v">•••-•••<%= current.bsb_last3 %></span></div>
       <div class="sf-readrow"><span class="sf-k">Account number</span><span class="sf-v">••••••<%= current.account_last3 %></span></div>
       <% if (current.synced_at) { %>
-        <p class="sf-meta">Synced to QBO <%= new Date(current.synced_at).toLocaleString('en-AU') %></p>
+        <p class="sf-meta">Synced to QBO <%= new Date(current.synced_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }) %></p>
       <% } else { %>
-        <p class="sf-meta">Submitted <%= new Date(current.updated_at).toLocaleString('en-AU') %></p>
+        <p class="sf-meta">Submitted <%= new Date(current.updated_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }) %></p>
       <% } %>
     </div>
   <% } %>

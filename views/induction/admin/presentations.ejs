@@ -137,7 +137,7 @@
             </td>
             <td class="px-6 py-3 text-gray-900"><%= p.presenter_name %></td>
             <td class="px-6 py-3 text-gray-600"><%= p.attendee_names || '—' %></td>
-            <td class="px-6 py-3 text-gray-600"><%= new Date(p.started_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) %></td>
+            <td class="px-6 py-3 text-gray-600"><%= new Date(p.started_at).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', year: 'numeric' }) %></td>
             <td class="px-6 py-3">
               <% if (p.completed_at) { %>
               <span class="inline-flex items-center gap-1 text-green-700 text-xs font-medium">

@@ -606,7 +606,7 @@
             <div class="flex-1 min-w-0">
               <div class="flex items-baseline gap-2">
                 <span class="text-sm font-semibold text-gray-900"><%= c.user_name %></span>
-                <span class="text-xs text-gray-400"><%= new Date(c.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></span>
+                <span class="text-xs text-gray-400"><%= new Date(c.created_at).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></span>
               </div>
               <p class="text-sm text-gray-600 mt-0.5 whitespace-pre-wrap"><%= c.comment %></p>
             </div>

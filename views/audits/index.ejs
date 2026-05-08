@@ -1,4 +1,4 @@
-<% function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleDateString('en-AU'); } catch(e) { return d; } } %>
+<% function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' }); } catch(e) { return d; } } %>
 <% function statusBadge(s) {
   const map = { draft: 'bg-gray-100 text-gray-700', submitted: 'bg-blue-100 text-blue-700', signed_off: 'bg-emerald-100 text-emerald-700' };
   return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold ${map[s] || 'bg-gray-100 text-gray-700'}">${(s||'draft').replace('_',' ')}</span>`;

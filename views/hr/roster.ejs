@@ -2,7 +2,7 @@
 <%
   function fmtDate(d) {
     if (!d) return '-';
-    return new Date(d).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+    return new Date(d).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric' });
   }
   var sBadges = {
     active:      'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
@@ -319,7 +319,7 @@
               </td>
               <td class="px-3 sm:px-4 py-3 hidden md:table-cell">
                 <% if (emp.inducted_at) { %>
-                  <span class="inline-flex items-center gap-1 text-emerald-600 text-xs font-semibold" title="Inducted <%= new Date(emp.inducted_at).toLocaleDateString('en-AU') %><%= emp.inducted_method ? ' · ' + emp.inducted_method.replace(/_/g,' ') : '' %>">
+                  <span class="inline-flex items-center gap-1 text-emerald-600 text-xs font-semibold" title="Inducted <%= new Date(emp.inducted_at).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' }) %><%= emp.inducted_method ? ' · ' + emp.inducted_method.replace(/_/g,' ') : '' %>">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                     Inducted
                   </span>

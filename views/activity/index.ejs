@@ -105,8 +105,8 @@
     let dateStr = '', timeStr = '';
     if (log.created_at) {
       const d = new Date(log.created_at);
-      dateStr = d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
-      timeStr = d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false });
+      dateStr = d.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric' });
+      timeStr = d.toLocaleTimeString('en-AU', { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit', hour12: false });
     }
     const showDateHeader = dateStr !== lastDate;
     lastDate = dateStr;

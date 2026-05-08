@@ -5,7 +5,7 @@
     if (!s) return '';
     const d = new Date(String(s).replace(' ', 'T') + (String(s).includes('T') ? '' : 'Z'));
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    return d.toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Australia/Sydney' });
   }
   const status = run.status || 'draft';
 %>

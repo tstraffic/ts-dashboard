@@ -107,7 +107,7 @@ router.get('/manage/shifts', requireManager, async (req, res) => {
   const byJob = new Map();
   for (const s of shifts) {
     const c = latestByCrew[s.crew_member_id];
-    s.clockLabel = c ? (c.event_type === 'clock_in' ? 'On site since ' + new Date(c.event_time).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }) : 'Clocked off ' + new Date(c.event_time).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })) : 'Not clocked on';
+    s.clockLabel = c ? (c.event_type === 'clock_in' ? 'On site since ' + new Date(c.event_time).toLocaleTimeString('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', minute: '2-digit' }) : 'Clocked off ' + new Date(c.event_time).toLocaleTimeString('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', minute: '2-digit' })) : 'Not clocked on';
     s.clockState = c ? c.event_type : 'none';
     if (!byJob.has(s.job_id)) byJob.set(s.job_id, { job_number: s.job_number, client: s.client, suburb: s.suburb, site_address: s.site_address, supervisor: s.supervisor_name, members: [] });
     byJob.get(s.job_id).members.push(s);

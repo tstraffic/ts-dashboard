@@ -64,7 +64,7 @@
             </div>
           </details>
           <% } %>
-          <p class="text-[10px] text-gray-300 mt-1"><%= new Date(a.created_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></p>
+          <p class="text-[10px] text-gray-300 mt-1"><%= new Date(a.created_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></p>
         </div>
       </div>
     </div>

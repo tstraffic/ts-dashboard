@@ -2,7 +2,7 @@
 <%
   function fmtDate(s) {
     if (!s) return '—';
-    return new Date(s).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(s).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', year: 'numeric' });
   }
   const STATUS_BADGE = {
     draft:    'bg-amber-50 text-amber-700 ring-amber-200',

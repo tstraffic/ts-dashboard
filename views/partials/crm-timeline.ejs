@@ -53,7 +53,7 @@
     if (diffHours < 24) return diffHours + 'h ago';
     if (diffDays < 7) return diffDays + 'd ago';
     if (diffDays < 30) return Math.floor(diffDays / 7) + 'w ago';
-    return date.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric' });
   }
 %>
 
@@ -110,7 +110,7 @@
         <span class="font-medium text-gray-500"><%= evt.user_name %></span>
         <% } %>
         <% if (evt.date) { %>
-        <span class="<%= evt.user_name ? 'ml-1' : '' %>"><%= new Date(evt.date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) %> at <%= new Date(evt.date).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }) %></span>
+        <span class="<%= evt.user_name ? 'ml-1' : '' %>"><%= new Date(evt.date).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric' }) %> at <%= new Date(evt.date).toLocaleTimeString('en-AU', { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit' }) %></span>
         <% } %>
       </p>
     </div>

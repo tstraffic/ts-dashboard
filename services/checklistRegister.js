@@ -165,7 +165,7 @@ function dashboardSummary(db) {
   const lastWeekRows = computeWindow(db, lastWeekStart, lastWeekEnd);
 
   return {
-    monthLabel: now.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }),
+    monthLabel: now.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', month: 'long', year: 'numeric' }),
     month: monthRows,
     lastWeekRange: ymd(lastWeekStart) + ' → ' + ymd(new Date(lastWeekEnd.getTime() - 86400000)),
     lastWeek: lastWeekRows,

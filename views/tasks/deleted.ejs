@@ -8,8 +8,8 @@
     if (!v) return '';
     const d = new Date(v.replace ? v.replace(' ', 'T') + 'Z' : v);
     if (isNaN(d.getTime())) return v;
-    return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
-           d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
+           d.toLocaleTimeString('en-AU', { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit' });
   }
 %>
 

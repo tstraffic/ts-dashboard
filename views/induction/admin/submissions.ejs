@@ -27,7 +27,7 @@
     const diffDays = Math.floor(diffHrs / 24);
     if (diffDays === 1) return '1 day ago';
     if (diffDays < 30) return diffDays + ' days ago';
-    return then.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+    return then.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric' });
   }
 
   function docCount(s) {
@@ -224,7 +224,7 @@
                 </td>
 
                 <!-- Submitted -->
-                <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap" title="<%= s.submitted_at ? new Date(s.submitted_at).toLocaleString('en-AU') : '' %>">
+                <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap" title="<%= s.submitted_at ? new Date(s.submitted_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }) : '' %>">
                   <%= timeAgo(s.submitted_at) %>
                 </td>
 
