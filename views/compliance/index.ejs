@@ -300,9 +300,7 @@
               <th class="hidden lg:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project</th>
               <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
               <th class="hidden md:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Client Req</th>
-              <th class="hidden lg:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Submitted</th>
               <th class="hidden sm:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Due Date</th>
-              <th class="hidden xl:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Expiry</th>
               <th class="hidden lg:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Assigned</th>
               <th class="hidden xl:table-cell px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fee</th>
               <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Invoice</th>
@@ -316,7 +314,7 @@
                 const chevronClass = group.open ? 'rotate-90' : '';
               %>
               <tr class="month-header bg-gray-50 hover:bg-gray-100 cursor-pointer" data-month-toggle="<%= group.key %>" data-open="<%= group.open ? '1' : '0' %>">
-                <td colspan="14" class="px-3 py-2">
+                <td colspan="12" class="px-3 py-2">
                   <div class="flex items-center gap-2">
                     <svg class="month-chevron w-3.5 h-3.5 text-gray-500 transition-transform <%= chevronClass %>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
                     <span class="text-xs font-bold text-gray-700 uppercase tracking-wider"><%= group.label %></span>
@@ -332,19 +330,6 @@
               const isExpiryNear = item.expiry_date && item.expiry_date >= todayStr && item.expiry_date <= soonStr && ['submitted','approved'].includes(item.status);
               const isExpired = item.expiry_date && item.expiry_date < todayStr;
               const returnTo = '/compliance?' + Object.keys(filters).filter(k => filters[k]).map(k => k + '=' + encodeURIComponent(filters[k])).join('&');
-
-              // Latest submission date for the parent row: the max submitted_date
-              // across its sub-plans (sub-plans not yet submitted have no date).
-              // For legacy flat rows (no sub-plans), fall back to the row's own
-              // submitted_date so the column still has data.
-              let latestSubmitted = '';
-              const _subs = subPlansByParent[item.id] || [];
-              if (_subs.length > 0) {
-                latestSubmitted = _subs.map(s => s.submitted_date).filter(Boolean).sort().pop() || '';
-              } else if (item.submitted_date) {
-                latestSubmitted = item.submitted_date;
-              }
-              const _submittedCount = _subs.filter(s => s.submitted_date).length;
             %>
               <tr class="month-row <%= rowHidden %> <%= (item.revision_required || item.revision_count > 0) ? 'bg-orange-50/60 border-l-[3px] border-l-orange-400' : item.ready_for_invoice && !item.invoiced ? 'bg-amber-50/50 border-l-2 border-l-amber-400' : item.invoiced ? 'bg-emerald-50/30' : getExpiryRowClass(item) %> hover:bg-gray-50 transition-colors cursor-pointer" data-month-row="<%= group.key %>" data-expiry-class="<%= getExpiryRowClass(item) %>" onclick="if(!event.target.closest('a,button,input,.row-checkbox')){window.location.href='/compliance/<%= item.id %>/edit?return_to=<%= encodeURIComponent(returnTo) %>'}">
                 <td class="px-3 py-2">
@@ -453,16 +438,6 @@
                     <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
-                <td class="hidden lg:table-cell px-3 py-2 whitespace-nowrap">
-                  <% if (latestSubmitted) { %>
-                    <span class="text-gray-700"><%= formatDate(latestSubmitted) %></span>
-                    <% if (_subs.length > 0) { %>
-                      <span class="block text-[10px] text-gray-400"><%= _submittedCount %>/<%= _subs.length %> sub-plans</span>
-                    <% } %>
-                  <% } else { %>
-                    <span class="text-gray-300">—</span>
-                  <% } %>
-                </td>
                 <td class="hidden sm:table-cell px-3 py-2 whitespace-nowrap">
                   <% if (item.due_date) { %>
                     <span class="<%= isOverdue ? 'text-red-600 font-semibold' : isDueSoon ? 'text-amber-600 font-medium' : 'text-gray-700' %>">
@@ -481,16 +456,6 @@
                     <div class="text-[10px] text-teal-600 mt-0.5">
                       <%= item.start_date ? formatDate(item.start_date) : '?' %> – <%= item.finish_date ? formatDate(item.finish_date) : '?' %>
                     </div>
-                  <% } %>
-                </td>
-                <td class="hidden xl:table-cell px-3 py-2 whitespace-nowrap">
-                  <% if (item.expiry_date) { %>
-                    <span class="<%= isExpired ? 'text-red-500 line-through' : isExpiryNear ? 'text-amber-600 font-medium' : 'text-gray-600' %>">
-                      <%= formatDate(item.expiry_date) %>
-                    </span>
-                    <% if (isExpiryNear && !isExpired) { %><span class="block text-xs text-amber-500">EXPIRING</span><% } %>
-                  <% } else { %>
-                    <span class="text-gray-300">—</span>
                   <% } %>
                 </td>
                 <td class="hidden lg:table-cell px-3 py-2">
@@ -547,7 +512,7 @@
                   const fmt$ = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
                 %>
                 <tr id="exp-<%= item.id %>" class="hidden bg-gray-50/50 month-row" data-month-row="<%= group.key %>" data-sub-expansion="1">
-                  <td colspan="13" class="px-6 py-3 border-l-2 border-l-brand-300">
+                  <td colspan="11" class="px-6 py-3 border-l-2 border-l-brand-300">
                     <% if (subList.length === 0) { %>
                       <div class="text-xs text-gray-500 italic">No sub-plans yet — open the Plan to add some.</div>
                     <% } else { %>
@@ -732,7 +697,7 @@ function bulkMarkInvoiced() {
   const ids = getSelectedIds();
   if (ids.length === 0) return;
   // Open modal in bulk mode — invoice number applies to all selected items
-  openInvoiceModal(ids, ids.length + ' selected items', '', true);
+  openInvoiceModal(ids, ids.length + ' selected items', '', '', true);
 }
 
 // ------------------------------------------------------------------------
@@ -788,7 +753,7 @@ function renderInvoiceCell(item) {
     if (CAN_MARK_INVOICED) {
       const td = document.querySelector('.invoice-cell[data-id="' + id + '"]');
       const title = td ? td.dataset.title : '';
-      html += '<button type="button" onclick="event.stopPropagation(); openInvoiceModal(' + id + ', \'' + escapeJs(title) + '\', \'' + escapeJs(item.invoice_number || '') + '\')"'
+      html += '<button type="button" onclick="event.stopPropagation(); openInvoiceModal(' + id + ', \'' + escapeJs(title) + '\', \'' + escapeJs(item.invoice_number || '') + '\', \'' + escapeJs(item.charge_amount || '') + '\')"'
         + ' class="mt-1 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded transition">'
         + 'Mark invoiced →</button>';
       html += '<button type="button" onclick="event.stopPropagation(); unmarkReady(' + id + ')" class="ml-1 text-[10px] text-gray-500 hover:text-red-600 underline transition">undo</button>';
@@ -893,32 +858,44 @@ function unmarkInvoiced(id) {
 
 // Invoice number modal — works for single or bulk mode
 let invoiceModalState = { id: null, ids: null, isBulk: false };
-function openInvoiceModal(idOrIds, label, prefilledNumber, isBulk) {
+function openInvoiceModal(idOrIds, label, prefilledNumber, prefilledCharge, isBulk) {
   invoiceModalState.isBulk = !!isBulk;
   if (isBulk) { invoiceModalState.ids = idOrIds; invoiceModalState.id = null; }
   else        { invoiceModalState.id = idOrIds;  invoiceModalState.ids = null; }
   document.getElementById('invoiceModalLabel').textContent = label;
   const inp = document.getElementById('invoiceNumberInput');
   inp.value = prefilledNumber || '';
+  const chargeInp = document.getElementById('invoiceChargeInput');
+  // Bulk mode shares one charge value across rows — leave it blank since
+  // a single charge rarely makes sense for a multi-row mark.
+  chargeInp.value = (!isBulk && prefilledCharge) ? String(prefilledCharge) : '';
+  // Focus charge if number is already known, otherwise number first.
   document.getElementById('invoiceModal').classList.remove('hidden');
-  setTimeout(() => inp.focus(), 50);
+  setTimeout(() => (prefilledNumber ? chargeInp : inp).focus(), 50);
 }
 function closeInvoiceModal() {
   document.getElementById('invoiceModal').classList.add('hidden');
 }
 function submitInvoiceModal() {
   const num = document.getElementById('invoiceNumberInput').value.trim();
+  const chargeRaw = document.getElementById('invoiceChargeInput').value.trim();
+  const charge = parseFloat(chargeRaw);
+  if (!Number.isFinite(charge) || charge <= 0) {
+    showToast('Enter a charge amount before marking invoiced', 'error');
+    document.getElementById('invoiceChargeInput').focus();
+    return;
+  }
   if (invoiceModalState.isBulk) {
     // Bulk affects many rows — easier to reload, but preserve scroll first.
     preserveScrollOnReload();
     fetch('/compliance/bulk-invoiced', {
       method: 'POST',
       headers: csrfHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ ids: invoiceModalState.ids, invoice_number: num })
+      body: JSON.stringify({ ids: invoiceModalState.ids, invoice_number: num, charge_amount: charge })
     }).then(r => { if (r.ok) window.location.reload(); else { sessionStorage.removeItem('compliance:scrollY'); showToast('Failed to mark invoiced', 'error'); } });
   } else {
     closeInvoiceModal();
-    postJson('/compliance/' + invoiceModalState.id + '/mark-invoiced', { invoice_number: num })
+    postJson('/compliance/' + invoiceModalState.id + '/mark-invoiced', { invoice_number: num, charge_amount: charge })
       .then(data => {
         if (data && data.item) updateInvoiceCell(data.item);
         showToast('Marked invoiced' + (num ? ' (' + num + ')' : ''), 'success', {
@@ -930,7 +907,9 @@ function submitInvoiceModal() {
 }
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeInvoiceModal();
-  if (e.key === 'Enter' && !document.getElementById('invoiceModal').classList.contains('hidden') && document.activeElement === document.getElementById('invoiceNumberInput')) {
+  if (e.key === 'Enter' && !document.getElementById('invoiceModal').classList.contains('hidden')
+      && (document.activeElement === document.getElementById('invoiceNumberInput')
+          || document.activeElement === document.getElementById('invoiceChargeInput'))) {
     e.preventDefault();
     submitInvoiceModal();
   }
@@ -1105,6 +1084,15 @@ function showToast(message, type, options) {
           <input type="text" id="invoiceNumberInput" placeholder="e.g. INV-1042"
             class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500">
           <p class="text-[10px] text-gray-400 mt-1.5">Leave blank if you don't have a number yet — you can add it later by editing the item.</p>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Charge to client <span class="text-rose-500">*</span></label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-gray-400 pointer-events-none">$</span>
+            <input type="number" id="invoiceChargeInput" min="0.01" step="0.01" placeholder="0.00"
+              class="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <p class="text-[10px] text-gray-400 mt-1.5">Required. Locks the price you're billing the client for this row.</p>
         </div>
       </div>
       <div class="p-5 border-t border-gray-200 flex items-center justify-end gap-2">

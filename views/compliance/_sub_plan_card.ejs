@@ -171,9 +171,9 @@
 
         <!-- Effort + cost capture, all part of the same submission action. -->
         <div class="sm:col-span-2 pt-3 border-t border-gray-200">
-          <label class="block text-xs font-medium text-gray-700 mb-1">Hours spent</label>
-          <input type="number" name="hours_spent" min="0" step="0.25" value="<%= sub.hours_spent || '' %>"
-            placeholder="0"
+          <label class="block text-xs font-medium text-gray-700 mb-1">Hours spent <span class="text-rose-500">*</span></label>
+          <input type="number" name="hours_spent" required min="0.25" step="0.25" value="<%= sub.hours_spent || '' %>"
+            placeholder="0.5"
             class="w-32 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
         </div>
 
