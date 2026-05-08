@@ -378,7 +378,7 @@
             </div>
             <div>
               <p class="text-xs text-gray-500">Signed at</p>
-              <p class="text-sm font-medium text-gray-900"><%= docket.signed_at ? new Date(docket.signed_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—' %></p>
+              <p class="text-sm font-medium text-gray-900"><%= docket.signed_at ? new Date(docket.signed_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—' %></p>
             </div>
             <% if (docket.client_name) { %>
               <div>

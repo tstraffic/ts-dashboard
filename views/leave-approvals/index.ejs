@@ -14,7 +14,7 @@
     if (diff === 0) return 'today';
     if (diff === 1) return 'yesterday';
     if (diff < 7) return diff + 'd ago';
-    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+    return d.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short' });
   }
   function leaveTypePill(t) {
     const map = {

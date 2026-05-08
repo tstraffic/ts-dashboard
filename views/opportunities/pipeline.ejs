@@ -6,7 +6,7 @@
   function formatDate(d) {
     if (!d) return '-';
     const dt = new Date(d);
-    return dt.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
+    return dt.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short' });
   }
 
   // pipelineStages is passed from the route (already excludes won/lost/on_hold)

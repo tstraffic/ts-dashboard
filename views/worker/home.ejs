@@ -19,7 +19,7 @@
   }
   function fmtClockTime(ts) {
     const d = new Date(ts);
-    return d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+    return d.toLocaleTimeString('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', minute: '2-digit' });
   }
 
   // Default section order (manager card is inserted after the hero for managers only)
@@ -301,7 +301,7 @@
 
 <% if (section === 'hero' && !hidden.includes('hero')) { %>
   <div class="wh-hero">
-    <p class="wh-hero-sub"><%= new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' }) %></p>
+    <p class="wh-hero-sub"><%= new Date().toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', weekday: 'long', day: 'numeric', month: 'long' }) %></p>
     <h1 class="wh-hero-greet"><%= greeting %>,<br><%= firstName %>.</h1>
     <% if (subtext) { %>
       <p class="wh-hero-ctx <%= subtext.kind %>"><span class="dot"></span><%= subtext.text %></p>

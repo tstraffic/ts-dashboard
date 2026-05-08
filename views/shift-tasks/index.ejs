@@ -15,7 +15,7 @@
   // Format booking option label — terse, scannable, time-led.
   function bkOpt(b) {
     var d = new Date(b.start_datetime);
-    var t = d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+    var t = d.toLocaleTimeString('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', minute: '2-digit' });
     var bits = [b.booking_number || ('#' + b.id), t];
     if (b.title)  bits.push(b.title);
     if (b.suburb) bits.push(b.suburb);
@@ -388,12 +388,12 @@
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ring-1 <%= priorityPill(t.priority) %>"><%= (t.priority || 'normal').toUpperCase() %></span>
                 <% if (t.booking_id) { %>
                   <a href="/bookings/<%= t.booking_id %>#tasks" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 hover:underline">
-                    <%= t.booking_number || '#' + t.booking_id %><% if (t.start_datetime) { %> · <%= new Date(t.start_datetime).toLocaleDateString('en-AU', { day:'numeric', month:'short' }) %><% } %>
+                    <%= t.booking_number || '#' + t.booking_id %><% if (t.start_datetime) { %> · <%= new Date(t.start_datetime).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day:'numeric', month:'short' }) %><% } %>
                   </a>
                 <% } else { %>
                   <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700">GENERAL</span>
                 <% } %>
-                <% if (t.due_at) { %><span class="text-[10px] text-gray-500">Due <%= new Date(t.due_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></span><% } %>
+                <% if (t.due_at) { %><span class="text-[10px] text-gray-500">Due <%= new Date(t.due_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></span><% } %>
                 <% var by = t.created_by_name || t.created_by_crew_name; if (by) { %><span class="text-[10px] text-gray-400">· by <%= by %></span><% } %>
               </div>
             </div>

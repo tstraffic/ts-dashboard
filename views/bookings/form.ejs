@@ -556,7 +556,7 @@
                 <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand-50 text-brand-700"><%= DOC_LABEL[d.document_type] || d.document_type %></span>
                 <% if (d.file_size) { %>· <%= fmtSize(d.file_size) %><% } %>
                 <% if (d.uploader_name) { %>· <%= d.uploader_name %><% } %>
-                · <%= new Date(d.created_at).toLocaleDateString('en-AU', { day:'numeric', month:'short' }) %>
+                · <%= new Date(d.created_at).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day:'numeric', month:'short' }) %>
               </p>
             </div>
             <form method="POST" action="/bookings/<%= booking.id %>/documents/<%= d.id %>/delete" onsubmit="return confirm('Delete this document? Workers will stop seeing it immediately.');">

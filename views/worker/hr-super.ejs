@@ -29,7 +29,7 @@
       <% if (current.choice_form_url) { %>
         <div class="sf-readrow"><span class="sf-k">Choice form</span><span class="sf-v"><a class="text-brand-400 underline" href="<%= current.choice_form_url %>" target="_blank">View PDF</a></span></div>
       <% } %>
-      <p class="sf-meta">Submitted <%= new Date(current.updated_at).toLocaleString('en-AU') %></p>
+      <p class="sf-meta">Submitted <%= new Date(current.updated_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }) %></p>
     </div>
   <% } %>
 

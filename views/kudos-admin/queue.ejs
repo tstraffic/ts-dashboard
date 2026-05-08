@@ -83,7 +83,7 @@
               </p>
               <% if (r.kudos_message) { %><p class="text-xs text-gray-500 mt-1 italic">"<%= r.kudos_message %>"</p><% } %>
               <% if (r.reason) { %><p class="text-xs text-gray-600 mt-1">Reason: <%= r.reason %></p><% } %>
-              <p class="text-[11px] text-gray-400 mt-1"><%= new Date(r.created_at).toLocaleString('en-AU') %></p>
+              <p class="text-[11px] text-gray-400 mt-1"><%= new Date(r.created_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }) %></p>
             </div>
             <div class="flex gap-2 flex-shrink-0">
               <form method="POST" action="/kudos-admin/queue/<%= r.id %>/hide">

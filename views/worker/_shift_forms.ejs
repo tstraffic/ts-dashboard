@@ -52,7 +52,7 @@
             <div class="min-w-0">
               <p class="text-sm font-semibold text-white truncate"><%= jp.label %></p>
               <% if (done) { %>
-                <p class="text-[11px]" style="color:#34D399;">Submitted <%= new Date(done.submitted_at || done.created_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></p>
+                <p class="text-[11px]" style="color:#34D399;">Submitted <%= new Date(done.submitted_at || done.created_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></p>
               <% } else { %>
                 <p class="text-[11px]" style="color:#FBBF24;font-weight:600;">Required <span style="color:rgba(255,255,255,0.45);font-weight:400;">· <%= jp.hint %></span></p>
               <% } %>
@@ -84,7 +84,7 @@
             <div class="min-w-0">
               <p class="text-sm font-semibold text-white truncate"><%= jp.label %></p>
               <% if (done) { %>
-                <p class="text-[11px]" style="color:#34D399;">Submitted <%= new Date(done.submitted_at || done.created_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></p>
+                <p class="text-[11px]" style="color:#34D399;">Submitted <%= new Date(done.submitted_at || done.created_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></p>
               <% } else { %>
                 <p class="text-[11px]" style="color:rgba(255,255,255,0.5);"><%= jp.hint %></p>
               <% } %>
@@ -109,7 +109,7 @@
         <div class="min-w-0">
           <p class="text-sm font-semibold text-white">Docket</p>
           <% if (typeof docket !== 'undefined' && docket) { %>
-            <p class="text-[11px]" style="color:#60A5FA;">Signed · <%= docket.total_hours || 0 %> h · <%= new Date(docket.signed_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></p>
+            <p class="text-[11px]" style="color:#60A5FA;">Signed · <%= docket.total_hours || 0 %> h · <%= new Date(docket.signed_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></p>
           <% } else { %>
             <p class="text-[11px]" style="color:rgba(255,255,255,0.5);">Sign at end of shift — proof of hours.</p>
           <% } %>

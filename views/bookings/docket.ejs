@@ -191,7 +191,7 @@
         <img src="<%= dk.worker_signature %>" alt="Worker signature" class="max-h-24 mx-auto">
       </div>
       <p class="text-xs text-gray-500"><strong>Worker:</strong> <%= dk.worker_signed_name %></p>
-      <p class="text-xs text-gray-400"><strong>Signed:</strong> <%= dk.worker_signed_at ? new Date(dk.worker_signed_at).toLocaleString('en-AU') : '' %></p>
+      <p class="text-xs text-gray-400"><strong>Signed:</strong> <%= dk.worker_signed_at ? new Date(dk.worker_signed_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }) : '' %></p>
     <% } else { %>
       <div class="border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 relative" style="height:150px">
         <canvas id="worker-sig-canvas" class="w-full h-full rounded-lg cursor-crosshair" style="touch-action:none"></canvas>
@@ -212,7 +212,7 @@
         <img src="<%= dk.client_signature %>" alt="Client signature" class="max-h-24 mx-auto">
       </div>
       <p class="text-xs text-gray-500"><strong>Client rep:</strong> <%= dk.client_signed_name %></p>
-      <p class="text-xs text-gray-400"><strong>Signed:</strong> <%= dk.client_signed_at ? new Date(dk.client_signed_at).toLocaleString('en-AU') : '' %></p>
+      <p class="text-xs text-gray-400"><strong>Signed:</strong> <%= dk.client_signed_at ? new Date(dk.client_signed_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }) : '' %></p>
     <% } else { %>
       <div class="border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 relative" style="height:150px">
         <canvas id="client-sig-canvas" class="w-full h-full rounded-lg cursor-crosshair" style="touch-action:none"></canvas>

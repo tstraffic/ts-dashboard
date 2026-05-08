@@ -67,7 +67,7 @@
             </div>
             <div class="text-right shrink-0">
               <p class="text-sm text-gray-700">
-                <%= new Date(evt.event_time + (evt.event_time.includes('Z') ? '' : 'Z')).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true }) %>
+                <%= new Date(evt.event_time + (evt.event_time.includes('Z') ? '' : 'Z')).toLocaleTimeString('en-AU', { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit', hour12: true }) %>
               </p>
               <% if (evt.latitude) { %>
                 <p class="text-[10px] text-gray-400">GPS</p>

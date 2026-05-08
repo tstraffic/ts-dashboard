@@ -3,17 +3,17 @@
   function formatDate(d) {
     if (!d) return '-';
     const dt = new Date(d);
-    return dt.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+    return dt.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric' });
   }
   function formatDateTime(d) {
     if (!d) return '-';
     const dt = new Date(d);
-    return dt.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }) + ' ' + dt.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+    return dt.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short' }) + ' ' + dt.toLocaleTimeString('en-AU', { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit' });
   }
   function formatTime(d) {
     if (!d) return '';
     const dt = new Date(d);
-    return dt.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+    return dt.toLocaleTimeString('en-AU', { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit' });
   }
   const today = new Date().toISOString().split('T')[0];
 

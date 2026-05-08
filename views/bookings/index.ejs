@@ -805,7 +805,7 @@ function handleCalDrop(event, targetDate) {
         <tbody>
           <% bookings.forEach(bk => {
             const d = new Date(bk.startDateTime);
-            const dateStr2 = d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+            const dateStr2 = d.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', year: 'numeric' });
             const statusLabel = (bk.status || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             const statusColors = { complete: 'bg-gray-100 text-gray-500', finalised: 'bg-indigo-100 text-indigo-700', cancelled: 'bg-gray-100 text-gray-400', late_cancellation: 'bg-red-100 text-red-700' };
           %>
@@ -850,7 +850,7 @@ function handleCalDrop(event, targetDate) {
     <div class="grid gap-3">
       <% bookings.forEach(bk => {
         const d = new Date(bk.startDateTime);
-        const dateStr2 = d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+        const dateStr2 = d.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', weekday: 'short', day: 'numeric', month: 'short' });
         const timeStr = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
         const addr = [bk.project.address].filter(Boolean).join(', ') || 'No address';
       %>

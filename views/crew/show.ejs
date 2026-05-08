@@ -412,7 +412,7 @@
       <% } else { %>
         <% if (member.pin_hash && member.last_worker_login) { %>
         <div class="text-xs text-gray-500 mb-2">
-          Last login: <span class="text-gray-700 font-medium"><%= new Date(member.last_worker_login).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></span>
+          Last login: <span class="text-gray-700 font-medium"><%= new Date(member.last_worker_login).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></span>
           <% if (member.worker_login_count) { %> (<%= member.worker_login_count %> total)<% } %>
         </div>
         <% } else if (member.pin_hash) { %>

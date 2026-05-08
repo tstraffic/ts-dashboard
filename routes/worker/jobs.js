@@ -650,8 +650,8 @@ router.get('/booking-shift/:bookingId', (req, res) => {
 
   // Format dates
   const startDt = booking.start_datetime ? new Date(booking.start_datetime) : new Date();
-  const startDay = startDt.toLocaleDateString('en-AU', { weekday: 'long' });
-  const startDate = startDt.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+  const startDay = startDt.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', weekday: 'long' });
+  const startDate = startDt.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'long', year: 'numeric' });
   const startTime = booking.start_datetime ? booking.start_datetime.substring(11, 16) : '';
   const endTime = booking.end_datetime ? booking.end_datetime.substring(11, 16) : '';
 

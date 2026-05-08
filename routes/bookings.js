@@ -439,7 +439,7 @@ router.get('/map', (req, res) => {
     lat: r.latitude,
     lng: r.longitude,
     label: (r.booking_number || '#' + r.id) + ' · ' + (r.title || '')
-         + ' · ' + new Date(r.start_datetime).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
+         + ' · ' + new Date(r.start_datetime).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
          + (r.suburb ? ' · ' + r.suburb : ''),
     href: '/bookings/' + r.id,
   }));

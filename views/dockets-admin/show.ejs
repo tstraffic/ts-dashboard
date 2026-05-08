@@ -23,7 +23,7 @@
       Docket — <%= docket.crew_name || ('#' + docket.crew_member_id) %>
     </h1>
     <p class="text-sm text-gray-500">
-      Signed <%= new Date(docket.signed_at).toLocaleString('en-AU', { weekday:'short', day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) %>
+      Signed <%= new Date(docket.signed_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', weekday:'short', day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) %>
       <% if (docket.docket_type) { %> · <%= docket.docket_type.replace(/_/g, ' ') %><% } %>
     </p>
   </div>
@@ -75,7 +75,7 @@
       <% } else { %>
         <p class="text-sm"><span class="text-xs text-gray-500">Rep: </span><%= docket.client_name || '—' %></p>
         <% if (docket.client_signed_name) { %><p class="text-sm"><span class="text-xs text-gray-500">Printed name: </span><%= docket.client_signed_name %></p><% } %>
-        <% if (docket.client_signed_at) { %><p class="text-xs text-gray-500 mt-1">Signed at <%= new Date(docket.client_signed_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></p><% } %>
+        <% if (docket.client_signed_at) { %><p class="text-xs text-gray-500 mt-1">Signed at <%= new Date(docket.client_signed_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></p><% } %>
       <% } %>
     </div>
 
@@ -113,7 +113,7 @@
         <li class="flex items-center gap-2">
           <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
           <a href="/safety-forms/<%= f.id %>" class="text-brand-700 font-medium hover:underline"><%= FORM_LABEL[f.form_type] || f.form_type %></a>
-          <span class="text-xs text-gray-500">· <%= new Date(f.submitted_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></span>
+          <span class="text-xs text-gray-500">· <%= new Date(f.submitted_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %></span>
         </li>
       <% }) %>
       <% missingTypes.forEach(function (t) { %>

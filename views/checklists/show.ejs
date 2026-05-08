@@ -103,7 +103,7 @@
       </button>
       <% if (template.published_revision) { %>
         <span class="text-xs text-gray-500">Live: rev <%= template.published_revision %>
-          <% if (template.published_at) { %>· <%= new Date(template.published_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %><% } %>
+          <% if (template.published_at) { %>· <%= new Date(template.published_at).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %><% } %>
         </span>
       <% } %>
     </form>
@@ -147,7 +147,7 @@
               <span class="text-gray-400 ml-2"><%= iCount %> question<%= iCount === 1 ? '' : 's' %></span>
             </div>
             <span class="text-gray-500">
-              <%= new Date(r.published_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>
+              <%= new Date(r.published_at).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>
               <% if (r.publisher_name) { %> · <%= r.publisher_name %><% } %>
             </span>
           </div>

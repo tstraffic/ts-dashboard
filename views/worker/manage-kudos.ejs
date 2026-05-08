@@ -19,7 +19,7 @@
             <p class="mg-job-client" style="font-size: 0.85rem;">Reported by <%= r.reporter_name %></p>
             <p class="mg-job-meta">
               <% if (r.kudos_id) { %>Kudos from <strong style="color: rgba(255,255,255,0.8);"><%= r.sender_name || 'unknown' %></strong><% } else { %>Comment<% } %>
-              · <%= new Date(r.created_at).toLocaleString('en-AU') %>
+              · <%= new Date(r.created_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }) %>
               <% if (r.hidden_at) { %> · <span style="color: #F87171;">Already hidden</span><% } %>
             </p>
           </div>

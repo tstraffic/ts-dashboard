@@ -2,7 +2,7 @@
 <%
   function fmtDate(s) {
     if (!s) return '—';
-    return new Date(s).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(s).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', year: 'numeric' });
   }
   // Days until expiry (negative = past). Used to colour the expiry cell red
   // when expired, amber when due in the next 30 days.

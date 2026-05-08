@@ -93,7 +93,7 @@
                   <div class="flex items-center space-x-3 text-xs text-gray-500 mt-1">
                     <span><%= formatFileSize(doc.file_size) %></span>
                     <span>by <%= doc.uploaded_by_name || 'Unknown' %></span>
-                    <span><%= doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '' %></span>
+                    <span><%= doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric' }) : '' %></span>
                   </div>
                 </div>
                 <form method="POST" action="/documents/delete/<%= doc.id %>" class="ml-4">
@@ -175,7 +175,7 @@
                     <div class="flex items-center space-x-3 text-xs text-gray-500 mt-1">
                       <span><%= formatFileSize(doc.file_size) %></span>
                       <span>by <%= doc.uploaded_by_name || 'Unknown' %></span>
-                      <span><%= doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '' %></span>
+                      <span><%= doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: '2-digit', month: 'short', year: 'numeric' }) : '' %></span>
                     </div>
                   </div>
                   <form method="POST" action="/documents/delete/<%= doc.id %>" class="ml-4">

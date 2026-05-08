@@ -77,7 +77,7 @@
           <% rows.forEach(function (r) { %>
             <tr class="hover:bg-gray-50">
               <td class="px-5 py-2.5 text-gray-600 whitespace-nowrap">
-                <%= new Date(r.submitted_at).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>
+                <%= new Date(r.submitted_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) %>
               </td>
               <td class="px-3 py-2.5">
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-brand-50 text-brand-700 ring-1 ring-brand-600/10"><%= fmtLabel(r.form_type) %></span>

@@ -30,7 +30,7 @@
       <% if (current.pdf_url) { %>
         <div class="sf-readrow"><span class="sf-k">Signed copy</span><span class="sf-v"><a class="text-brand-400 underline" href="<%= current.pdf_url %>" target="_blank">Download PDF</a></span></div>
       <% } %>
-      <p class="sf-meta">Submitted <%= new Date(current.submitted_at).toLocaleString('en-AU') %></p>
+      <p class="sf-meta">Submitted <%= new Date(current.submitted_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }) %></p>
     </div>
   <% } %>
 
