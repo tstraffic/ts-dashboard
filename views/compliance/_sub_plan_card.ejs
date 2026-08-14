@@ -285,45 +285,6 @@
     </div>
   <% } %>
 
-  <!-- Documents — always visible: attached files + a drop-to-attach zone.
-       Attaching does NOT submit the plan; the full submission (description /
-       dates / hours / status flip) lives in the "Submit plan" disclosure
-       below the zone. -->
-  <div class="mb-3">
-    <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Documents<% if (docCount > 0) { %> · <%= docCount %><% } %></p>
-    <% if (docCount > 0) { %>
-    <div class="mb-2 space-y-1">
-      <% docs.forEach(d => { %>
-        <div class="flex items-center justify-between gap-2 px-2 py-1.5 bg-gray-50 rounded text-xs">
-          <a href="<%= d.file_path %>" target="_blank" class="flex-1 truncate text-brand-600 hover:text-brand-700">
-            <%= d.original_name %>
-          </a>
-          <span class="text-gray-400 shrink-0"><%= Math.round((d.file_size || 0) / 1024) %> KB</span>
-          <form method="POST" action="/compliance/<%= sub.id %>/documents/<%= d.id %>/delete" class="inline shrink-0" onsubmit="return confirm('Delete this file?')">
-            <%- include('../partials/csrf') %>
-            <input type="hidden" name="return_to" value="/compliance/<%= parentId %>/edit">
-            <button type="submit" class="text-gray-400 hover:text-rose-600 p-0.5">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-          </form>
-        </div>
-      <% }) %>
-    </div>
-    <% } %>
-    <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/documents" enctype="multipart/form-data" data-attach-form>
-      <%- include('../partials/csrf') %>
-      <div data-dropzone>
-        <input type="file" name="documents" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.dwg,.dxf">
-        <div class="dropzone-label">
-          <svg class="w-6 h-6 mx-auto mb-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
-          <p class="text-xs text-gray-500">Drag &amp; drop to attach — or <span class="text-brand-600 font-medium">click to browse</span></p>
-          <p class="text-[11px] text-gray-400 mt-0.5">Attaching doesn't submit the plan. Max 25MB / 10 files.</p>
-        </div>
-      </div>
-      <noscript><button type="submit" class="mt-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">Attach</button></noscript>
-    </form>
-  </div>
-
   <!-- Council permit two-stage workflow: Applied → Approved.
        Stage 1 lodges the application — Description + Submission date + Job start
        are required first (files optional); stage 2 attaches the issued permit
@@ -441,12 +402,19 @@
     </div>
   <% } %>
 
-  <!-- Upload + submit (combined) -->
+  <!-- Upload + submit (combined) — FIRST in the action stack, and open by
+       default until the plan has actually been lodged. It used to sit
+       collapsed under a big Documents dropzone, so people dropped the TGS
+       into Documents (attach-only) and the plan never counted as
+       submitted. Council permits keep their own two-stage block above as
+       the primary flow, so the disclosure stays collapsed for them. -->
+  <% const submitOpen = !isSubmitted && sub.item_type !== 'council_permit'; %>
   <% if (!isApproved && !isRejected) { %>
-    <details class="group">
-      <summary class="cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center list-none">
+    <details class="group" <%= submitOpen ? 'open' : '' %>>
+      <summary class="cursor-pointer text-xs font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center list-none px-2.5 py-1.5 -ml-1 rounded-md bg-brand-50 ring-1 ring-brand-100">
         <svg class="w-3.5 h-3.5 mr-1 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-        <%= isSubmitted ? 'Re-submit plan…' : 'Submit plan…' %>
+        <%= isSubmitted ? 'Re-submit plan…' : 'Submit plan' %>
+        <% if (!isSubmitted) { %><span class="ml-1.5 font-normal text-brand-600/80">— upload the plan here to lodge it</span><% } %>
       </summary>
       <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/upload-submit" enctype="multipart/form-data" class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-md">
         <%- include('../partials/csrf') %>
@@ -539,6 +507,45 @@
       </form>
     </details>
   <% } %>
+
+  <!-- Supporting documents — attach-only, deliberately BELOW Submit plan.
+       This zone is for extras (site photos, correspondence, markups); it
+       never changes the sub-plan's status. The actual plan goes through
+       "Submit plan" above. -->
+  <div class="mt-3 mb-3">
+    <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Supporting documents<% if (docCount > 0) { %> · <%= docCount %><% } %></p>
+    <% if (docCount > 0) { %>
+    <div class="mb-2 space-y-1">
+      <% docs.forEach(d => { %>
+        <div class="flex items-center justify-between gap-2 px-2 py-1.5 bg-gray-50 rounded text-xs">
+          <a href="<%= d.file_path %>" target="_blank" class="flex-1 truncate text-brand-600 hover:text-brand-700">
+            <%= d.original_name %>
+          </a>
+          <span class="text-gray-400 shrink-0"><%= Math.round((d.file_size || 0) / 1024) %> KB</span>
+          <form method="POST" action="/compliance/<%= sub.id %>/documents/<%= d.id %>/delete" class="inline shrink-0" onsubmit="return confirm('Delete this file?')">
+            <%- include('../partials/csrf') %>
+            <input type="hidden" name="return_to" value="/compliance/<%= parentId %>/edit">
+            <button type="submit" class="text-gray-400 hover:text-rose-600 p-0.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </form>
+        </div>
+      <% }) %>
+    </div>
+    <% } %>
+    <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/documents" enctype="multipart/form-data" data-attach-form>
+      <%- include('../partials/csrf') %>
+      <div data-dropzone>
+        <input type="file" name="documents" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.dwg,.dxf">
+        <div class="dropzone-label">
+          <svg class="w-6 h-6 mx-auto mb-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+          <p class="text-xs text-gray-500">Drag &amp; drop supporting files — or <span class="text-brand-600 font-medium">click to browse</span></p>
+          <p class="text-[11px] text-gray-400 mt-0.5">Extras only — this does <span class="font-semibold">not</span> submit the plan. Use <span class="font-medium">Submit plan</span> above for that. Max 25MB / 10 files.</p>
+        </div>
+      </div>
+      <noscript><button type="submit" class="mt-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">Attach</button></noscript>
+    </form>
+  </div>
 
   <!-- Fees (itemised, with receipts) -->
   <details class="mt-3 group">
