@@ -16,6 +16,8 @@ function withDb(fn) {
   try { return fn(db); } finally { db.close(); }
 }
 
+// Reports merged into Assets (Jul 2026) — /departments/reports now
+// redirects there, so it's covered by the redirect test below, not a hub row.
 const HUBS = [
   { key: 'planning', h1: 'Planning Home' },
   { key: 'safety', h1: 'Safety Home' },
@@ -23,10 +25,9 @@ const HUBS = [
   { key: 'finance', h1: 'Finance Home' },
   { key: 'people', h1: 'People / HR Home' },
   { key: 'assets', h1: 'Assets Home' },
-  { key: 'reports', h1: 'Reports Home' },
 ];
 
-test('all seven hubs render a header, title icon and at least one stat tile', async ({ page }) => {
+test('all six hubs render a header, title icon and at least one stat tile', async ({ page }) => {
   await loginAs(page);
   for (const hub of HUBS) {
     await page.goto('/departments/' + hub.key);
@@ -35,6 +36,12 @@ test('all seven hubs render a header, title icon and at least one stat tile', as
     await expect(page.locator('h1.page-title svg'), hub.key + ' title icon').toHaveCount(1);
     expect(await page.locator('.stat-card').count(), hub.key + ' stat cards').toBeGreaterThan(0);
   }
+});
+
+test('the retired reports hub redirects to assets', async ({ page }) => {
+  await loginAs(page);
+  await page.goto('/departments/reports');
+  await expect(page.locator('h1')).toContainText('Assets Home');
 });
 
 test('the title icon is centred on the heading text, not baseline-nudged', async ({ page }) => {
@@ -127,17 +134,18 @@ test('planning needs panel surfaces an overdue plan', async ({ page }) => {
   withDb(db => db.prepare("DELETE FROM compliance WHERE title LIKE 'DHOME %'").run());
 });
 
-test('reports hub keeps its curated links and skips the needs panel', async ({ page }) => {
+test('assets hub carries the absorbed report links without duplicates', async ({ page }) => {
+  // Reports merged into Assets: the curated report extras that aren't
+  // reachable from /reports itself rode along (lib/departments.js assets
+  // entry); the /reports register link arrives via the sidebar section.
   await loginAs(page);
-  await page.goto('/departments/reports');
+  await page.goto('/departments/assets');
 
   const grid = page.locator('[data-module-grid]');
-  await expect(grid).toContainText('Crew reports');
   await expect(grid).toContainText('Plan P&L');
-  // Reports has no needsKeys — the panel must not render at all.
-  await expect(page.locator('#dept-needs')).toHaveCount(0);
-  // The reports sidebar section's negated-gate links (Safety/HR Reports for
-  // users WITHOUT 'reports') must not leak in for an admin who has both.
+  await expect(grid).toContainText('Audit reports');
   const hrefs = await grid.locator('a').evaluateAll(as => as.map(a => a.getAttribute('href')));
+  expect(hrefs).toContain('/reports');
+  // No link may render twice (hero href + extras + section links dedupe).
   expect(new Set(hrefs).size).toBe(hrefs.length);
 });

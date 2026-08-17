@@ -89,7 +89,11 @@ test('the plan can then be SUBMITTED without re-picking files', async ({ page })
   await page.goto(editUrl(seed));
 
   const card = page.locator(`#sub-${seed.tgsId}`);
-  await card.locator('summary', { hasText: /Submit plan/ }).click();
+  // The Submit plan disclosure is OPEN by default on an un-lodged plan
+  // (Aug 2026 — it leads the card now); a blind summary click would close
+  // it. Ensure open whichever state it starts in.
+  await card.locator('details', { has: page.locator('form[action*="upload-submit"]') })
+    .evaluate(el => { el.open = true; });
   const submitForm = card.locator('form[action*="upload-submit"]');
   await submitForm.locator('input[name="description"]').fill('E2E submitted with attached docs');
   await submitForm.locator('input[name="hours_spent"]').fill('0.5');
@@ -107,7 +111,8 @@ test('upload-submit still validates (missing hours blocks it)', async ({ page })
   await loginAs(page);
   await page.goto(editUrl(seed));
   const card = page.locator(`#sub-${seed.tgsId}`);
-  await card.locator('summary', { hasText: /Submit plan/ }).click();
+  await card.locator('details', { has: page.locator('form[action*="upload-submit"]') })
+    .evaluate(el => { el.open = true; });
   await card.locator('form[action*="upload-submit"] input[name="description"]').fill('Missing hours');
   // Attach a file so the file rule passes; hours left empty. The browser's
   // own `required` blocks first — clear it to exercise the server rule.

@@ -26,6 +26,20 @@ const TODAY = '2026-09-01'; // fixed future date — deterministic, never "today
 
 function db() { return new Database(TEST_DB); }
 
+// The suite shares one DB serially — leave nothing behind for the specs
+// that run after this file (worker.spec &c. render /w/home for EMP-TEST
+// and must see only their own state).
+test.afterAll(() => {
+  const d = db();
+  try {
+    for (const number of ['BK-LEAK', 'BK-NIGHT', 'BK-IDOR', 'BK-QSAVE']) {
+      d.prepare('DELETE FROM crew_allocations WHERE booking_id IN (SELECT id FROM bookings WHERE booking_number = ?)').run(number);
+      d.prepare('DELETE FROM booking_crew WHERE booking_id IN (SELECT id FROM bookings WHERE booking_number = ?)').run(number);
+      d.prepare('DELETE FROM bookings WHERE booking_number = ?').run(number);
+    }
+  } finally { d.close(); }
+});
+
 function seedBooking({ number, status, start, end, crewId }) {
   const d = db();
   try {

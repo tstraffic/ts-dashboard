@@ -19,16 +19,23 @@ test('creating an employee from the form saves and lands on their page', async (
   await page.fill('input[name="first_name"]', 'Filter');
   await page.fill('input[name="last_name"]', last);
 
-  // Fill only the FIRST of the duplicated copies: the other submits empty, and
-  // the route must keep the filled one (and must not pass the pair through as
-  // an array, which expands into extra bind values and 500s the request).
+  // internal_notes lives on a LATER wizard panel (hidden until its step),
+  // so fill it during the walk-through, not up front — filling a
+  // display:none field times out. Only the FIRST copy matters: the other
+  // submits empty, and the route must keep the filled one (and must not
+  // pass the pair through as an array, which expands into extra bind
+  // values and 500s the request).
   const notes = page.locator('textarea[name="internal_notes"]').first();
-  if (await notes.count()) await notes.fill('Created by the e2e regression test.');
+  let notesFilled = false;
 
   // Six-step wizard — the submit button only appears on the last panel.
   const submit = page.locator('button[type="submit"]:has-text("Add Employee")');
   const next = page.locator('#wizard-next');
   for (let i = 0; i < 8; i++) {
+    if (!notesFilled && await notes.isVisible()) {
+      await notes.fill('Created by the e2e regression test.');
+      notesFilled = true;
+    }
     if (await submit.isVisible()) break;
     if (!(await next.isVisible())) break; // Next hides on the final panel
     await next.click();
