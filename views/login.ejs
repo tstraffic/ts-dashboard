@@ -6,18 +6,21 @@
     // mode so the login screen's light/dark styles still apply. Mirrors the
     // registry in the main layout.
     (function () {
-      var MODE = { daylight:'light', 'warm-paper':'light', 'mint-glass':'light' }; // everything else is dark
+      var MODE = { ts:'light', daylight:'light', 'warm-paper':'light', 'mint-glass':'light' }; // everything else is dark
+      var SKIN = { ts:'ts', 'warm-paper':'warm-paper', 'mint-glass':'mint-glass' };
+      var DEFAULT_THEME = 'ts'; // the T&S house theme — keep in sync with layout.ejs
       function modeOf(id) {
         if (id === 'light') return 'light';
         if (id === 'dark') return 'dark';
         return MODE[id] || 'dark';
       }
       try {
-        var saved = localStorage.getItem('atomis-theme');
-        var id = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'daylight' : 'slate');
+        var id = localStorage.getItem('atomis-theme') || DEFAULT_THEME;
         document.documentElement.setAttribute('data-theme', modeOf(id));
+        if (SKIN[id]) document.documentElement.setAttribute('data-skin', SKIN[id]);
       } catch (e) {
-        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.setAttribute('data-skin', 'ts');
       }
     })();
     window.toggleAtomisTheme = function () {
@@ -25,7 +28,9 @@
       var next = cur === 'light' ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', next);
       // Persist as a baseline id so the main app picks a sensible default.
-      try { localStorage.setItem('atomis-theme', next === 'light' ? 'daylight' : 'slate'); } catch (e) {}
+      if (next === 'light') document.documentElement.setAttribute('data-skin', 'ts');
+      else document.documentElement.removeAttribute('data-skin');
+      try { localStorage.setItem('atomis-theme', next === 'light' ? 'ts' : 'slate'); } catch (e) {}
     };
     document.addEventListener('click', function (e) {
       var btn = e.target.closest && e.target.closest('.theme-toggle');
@@ -37,7 +42,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Sign in | T&S Traffic Control</title>
-  <meta name="theme-color" content="#0F1115">
+  <meta name="theme-color" content="#F7F5F1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="icon" type="image/svg+xml" href="/images/atomis-favicon-dark.svg">
   <link rel="apple-touch-icon" href="/images/atomis-apple-touch-icon.png">
@@ -51,7 +56,7 @@
       --base: #0F1115;
       --surface: #1A1D24;
       --surface-2: #22262F;
-      --emerald: #10B981;
+      --emerald: #3D31C0;
       --text: #F5F5F7;
       --text-mute: #8B8E95;
       --text-faint: #5A5D64;
@@ -63,15 +68,17 @@
       --font-mono: 'Geist Mono', monospace;
     }
     :root[data-theme="light"] {
-      --base: #F7F8FA;
+      --base: #F7F5F1;
       --surface: #FFFFFF;
-      --surface-2: #F1F3F6;
-      --text: #0F1115;
-      --text-mute: #555A63;
-      --text-faint: #8B8E95;
-      --border: rgba(15, 17, 21, 0.08);
-      --border-strong: rgba(15, 17, 21, 0.16);
+      --surface-2: #F1EEE8;
+      --text: #1E1E1E;
+      --text-mute: #57534E;
+      --text-faint: #8A8378;
+      --border: #E7E2D9;
+      --border-strong: #D8D2C6;
     }
+    /* On the paper ground the accent goes to the full logo indigo. */
+    :root[data-theme="light"][data-skin="ts"] { --emerald: #13008E; }
 
     /* ============ Theme toggle ============ */
     .theme-toggle {
@@ -152,7 +159,7 @@
       content: "";
       position: absolute;
       inset: 0;
-      background: radial-gradient(ellipse 700px 500px at 50% 50%, rgba(16,185,129,0.06), transparent 65%);
+      background: radial-gradient(ellipse 700px 500px at 50% 50%, rgba(61,49,192,0.05), transparent 65%);
       pointer-events: none;
     }
     .left-inner {

@@ -16,15 +16,18 @@
       'violet-haze':  { mode: 'dark',  skin: 'violet-haze',  label: 'Violet Haze' },
       twilight:       { mode: 'dark',  skin: 'twilight',     label: 'Twilight' },
       nebula:         { mode: 'dark',  skin: 'nebula',       label: 'Nebula' },
+      ts:             { mode: 'light', skin: 'ts',           label: 'T&S' },
       daylight:       { mode: 'light', skin: '',             label: 'Daylight' },
       'warm-paper':   { mode: 'light', skin: 'warm-paper',   label: 'Warm Paper' },
       'mint-glass':   { mode: 'light', skin: 'mint-glass',   label: 'Mint Glass' }
     };
+    // The house theme. New users and anyone who hasn't picked land here.
+    window.ATOMIS_DEFAULT_THEME = 'ts';
     // Theme saved server-side for this user (follows them to new devices).
     window.ATOMIS_SERVER_THEME = '<%= (typeof user !== "undefined" && user && user.theme) ? user.theme : "" %>';
 
     window.applyAtomisTheme = function (id) {
-      var T = window.ATOMIS_THEMES[id] || window.ATOMIS_THEMES.slate;
+      var T = window.ATOMIS_THEMES[id] || window.ATOMIS_THEMES[window.ATOMIS_DEFAULT_THEME];
       var root = document.documentElement;
       root.setAttribute('data-theme', T.mode);
       if (T.skin) root.setAttribute('data-skin', T.skin);
@@ -40,11 +43,11 @@
       var id;
       try {
         id = localStorage.getItem('atomis-theme') || window.ATOMIS_SERVER_THEME;
-        if (!id) id = window.matchMedia('(prefers-color-scheme: light)').matches ? 'daylight' : 'slate';
+        if (!id) id = window.ATOMIS_DEFAULT_THEME;
         // Back-compat: old values were the bare mode 'light'/'dark'.
         if (id === 'light') id = 'daylight';
         if (id === 'dark') id = 'slate';
-      } catch (e) { id = 'slate'; }
+      } catch (e) { id = window.ATOMIS_DEFAULT_THEME; }
       window.applyAtomisTheme(id);
     })();
 
@@ -62,11 +65,11 @@
 
     // Header toggle — flip to the opposite mode, restoring that side's last pick.
     window.toggleAtomisTheme = function () {
-      var cur = window.ATOMIS_THEMES[window.currentAtomisTheme()] || window.ATOMIS_THEMES.slate;
+      var cur = window.ATOMIS_THEMES[window.currentAtomisTheme()] || window.ATOMIS_THEMES[window.ATOMIS_DEFAULT_THEME];
       var want = cur.mode === 'dark' ? 'light' : 'dark';
       var next;
       try { next = localStorage.getItem('atomis-theme-' + want); } catch (e) {}
-      if (!next || !window.ATOMIS_THEMES[next]) next = (want === 'light') ? 'daylight' : 'slate';
+      if (!next || !window.ATOMIS_THEMES[next]) next = (want === 'light') ? window.ATOMIS_DEFAULT_THEME : 'slate';
       window.setAtomisTheme(next);
     };
     // Delegated click handler — bulletproofs the inline onclick on
@@ -98,7 +101,7 @@
   <title><%= typeof title !== 'undefined' ? title + ' | ' : '' %>T&S Traffic Control</title>
 
   <!-- PWA Meta Tags -->
-  <meta name="theme-color" content="#0F1115">
+  <meta name="theme-color" content="#F7F5F1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="T&S">
@@ -114,7 +117,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="T&S">
-  <meta name="theme-color" content="#10B981">
+  <meta name="theme-color" content="#F7F5F1">
 
   <!-- Atomis typography: Bricolage Grotesque (display) · Geist (body/UI) · Geist Mono (technical) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -132,18 +135,21 @@
             mono: ['"Geist Mono"', 'JetBrains Mono', 'ui-monospace', 'monospace'],
           },
           colors: {
+            // T&S indigo — anchored so brand-700 is #13008E, the blue in the
+            // T&S Traffic Control logo. The accent is a product constant:
+            // theme skins re-tint the ground, never the brand.
             brand: {
-              50:  '#ECFDF5',
-              100: '#D1FAE5',
-              200: '#A7F3D0',
-              300: '#6EE7B7',
-              400: '#34D399',
-              500: '#10B981',
-              600: '#059669',
-              700: '#047857',
-              800: '#065F46',
-              900: '#064E3B',
-              950: '#022C22',
+              50:  '#EFEEFC',
+              100: '#DCDAF7',
+              200: '#BAB6EF',
+              300: '#8B85E2',
+              400: '#6259D2',
+              500: '#3D31C0',
+              600: '#2517A6',
+              700: '#13008E',
+              800: '#100077',
+              900: '#0C0060',
+              950: '#070039',
             },
             atomis: {
               base: '#0F1115',
@@ -159,7 +165,7 @@
           boxShadow: {
             'card': '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)',
             'card-hover': '0 10px 25px -5px rgba(0,0,0,0.08), 0 4px 10px -5px rgba(0,0,0,0.04)',
-            'glow': '0 0 20px rgba(16,185,129,0.18)',
+            'glow': '0 0 20px rgba(61,49,192,0.18)',
           },
           borderRadius: {
             '2xl': '1rem',
@@ -169,8 +175,8 @@
       }
     }
   </script>
-  <link rel="stylesheet" href="/css/custom.css?v=atomis-17">
-  <link rel="stylesheet" href="/css/themes.css?v=atomis-themes-3">
+  <link rel="stylesheet" href="/css/custom.css?v=ts-paper-1">
+  <link rel="stylesheet" href="/css/themes.css?v=ts-paper-1">
   <link rel="stylesheet" href="/css/chat.css?v=atomis-1">
   <link rel="stylesheet" href="/css/bookings-v2.css?v=bk2-71">
   <link rel="stylesheet" href="/css/admin-fluid.css?v=fluid-2">
@@ -231,7 +237,7 @@
   <!-- Register admin service worker -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/admin-sw.js?v=41', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('/admin-sw.js?v=42', { updateViaCache: 'none' })
         .then(function(reg) {
           reg.update();
           console.log('Admin SW registered, scope:', reg.scope);

@@ -149,6 +149,100 @@
 }
 /* ===================== LIGHT VARIANTS ===================== */
 
+/* ---------------------------------------------------------------
+   T&S — the house theme, and the default for this deployment.
+
+   Same Atomis grammar as every other skin (paper ground, opaque
+   cards, fixed status colours) but tuned to T&S's own two logo
+   colours: indigo #13008E and charcoal #1E1E1E. The neutrals are
+   warm on purpose — a bone ground makes the cool indigo read as
+   ink on stock rather than as another blue-grey UI.
+
+   The brand accent itself is global (see the `brand` scale in
+   layout.ejs), so this skin only has to set the ground, the rules,
+   and the warm text ramp.
+   --------------------------------------------------------------- */
+:root[data-skin="ts"][data-theme="light"] {
+  --atomis-base:       #F7F5F1;
+  --atomis-surface:    #FFFFFF;
+  --atomis-surface-2:  #F1EEE8;
+  --atomis-text:       #1E1E1E;
+  --atomis-text-mute:  #57534E;
+  --atomis-text-faint: #8A8378;
+  --dark-border:        rgba(30,30,30,0.10);
+  --dark-border-strong: rgba(30,30,30,0.18);
+  --dark-input-border:  #D8D2C6;
+  /* Paper scale, exposed so components can reference it directly. */
+  --paper:       #F7F5F1;
+  --paper-2:     #F1EEE8;
+  --paper-3:     #E9E5DC;
+  --line:        #E7E2D9;
+  --line-strong: #D8D2C6;
+  --ink:         #1E1E1E;
+  --ink-2:       #57534E;
+  --ink-3:       #8A8378;
+}
+:root[data-skin="ts"][data-theme="light"] body,
+:root[data-skin="ts"][data-theme="light"] body.dark-glass {
+  background-color: #F7F5F1;
+}
+
+/* Warm text ramp — the cool Tailwind greys read blue-ish against bone. */
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-900,
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#111827\] { color: #1E1E1E !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-800 { color: #2C2A27 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-700,
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#374151\] { color: #46423C !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-600 { color: #5C574F !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-500,
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#6B7280\] { color: #7A7469 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-400,
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#9CA3AF\] { color: #A19A8D !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass label { color: #46423C !important; }
+
+/* Warm fills. */
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .bg-gray-50,
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .hover\:bg-gray-50:hover { background: #F5F2ED !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .bg-gray-100,
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .hover\:bg-gray-100:hover { background: #EFEBE4 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .bg-gray-200 { background: #E3DED4 !important; }
+
+/* Hairline rules instead of cool grey borders — and no resting shadow.
+   Cards are defined by their rule, not by a lift. Overlays (shadow-lg and
+   up) keep theirs so dropdowns and modals still read as floating. */
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .bg-white,
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .border-gray-200,
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .border-b { border-color: #E7E2D9 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .border-gray-100 { border-color: #F0ECE4 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .border-gray-300 { border-color: #D8D2C6 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #E7E2D9 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #F0ECE4 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .shadow-sm,
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .shadow-card { box-shadow: none !important; }
+
+/* Sidebar — bone, with the active row marked by an indigo edge rather than
+   a filled pill. Quieter, and it survives at a glance on a long nav. */
+:root[data-skin="ts"][data-theme="light"] #sidebar { background: #FCFBF9 !important; border-right-color: #E7E2D9 !important; }
+:root[data-skin="ts"][data-theme="light"] #sidebar .sidebar-link { color: #46423C !important; }
+:root[data-skin="ts"][data-theme="light"] #sidebar .sidebar-link:hover {
+  background: rgba(30,30,30,0.05) !important;
+  color: #1E1E1E !important;
+}
+:root[data-skin="ts"][data-theme="light"] #sidebar a.sidebar-link[class~="bg-white/15"] {
+  background: #EFEEFC !important;
+  color: #13008E !important;
+  font-weight: 600 !important;
+  box-shadow: inset 2px 0 0 #13008E !important;
+}
+:root[data-skin="ts"][data-theme="light"] #sidebar .sidebar-badge-muted {
+  background: #EFEBE4 !important;
+  color: #57534E !important;
+}
+
+/* Warm the scrollbar so it doesn't read as a cool-grey artefact. */
+:root[data-skin="ts"][data-theme="light"] ::-webkit-scrollbar-thumb { background: #D8D2C6; }
+:root[data-skin="ts"][data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #8A8378; }
+
 /* Warm Paper — soft warm off-white instead of cool grey-white. */
 :root[data-skin="warm-paper"][data-theme="light"] {
   --atomis-base: #faf8f4;
@@ -191,4 +285,79 @@
 /* Mobile: fixed backgrounds can stutter on iOS — let them scroll instead. */
 @media (max-width: 768px) {
   :root[data-skin] body, :root[data-skin] body.dark-glass { background-attachment: scroll, scroll !important; }
+}
+
+/* ============================================================
+   Atomis type devices — available in every theme, themed by token.
+   These are the pieces that make an Atomis screen recognisable:
+   a mono micro-label for anything that names a value, a quiet
+   editorial lede, and a divided stat strip instead of boxed KPIs.
+   ============================================================ */
+
+/* Mono micro-label — for stat captions, eyebrows and status strips;
+   anywhere a label names a value rather than speaking a sentence. */
+.mono-label {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--atomis-text-faint);
+  line-height: 1.4;
+}
+.mono-value {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* One large, quiet voice per page. */
+.display-lede {
+  font-family: 'Bricolage Grotesque', 'Geist', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(1.55rem, 1.1rem + 1.7vw, 2.2rem);
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  color: var(--atomis-text);
+}
+.display-lede .accent { font-weight: 600; color: var(--brand-700); }
+
+/* Stat strip — values divided by hairlines so the row reads as one
+   instrument panel rather than a row of competing cards. */
+.stat-strip { display: flex; flex-wrap: wrap; }
+.stat-strip > * {
+  flex: 1 1 0;
+  min-width: 118px;
+  padding: 0 18px;
+  border-left: 1px solid var(--dark-border);
+}
+.stat-strip > *:first-child { border-left: 0; padding-left: 0; }
+.stat-figure {
+  font-family: 'Bricolage Grotesque', 'Geist', system-ui, sans-serif;
+  font-size: 1.7rem;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--atomis-text);
+  font-variant-numeric: tabular-nums;
+}
+.stat-note { font-size: 11px; color: var(--atomis-text-faint); margin-top: 2px; }
+
+/* Focus is never removed — indigo ring on light, brand-300 on dark. */
+:is(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:root[data-theme="dark"] :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline-color: #8B85E2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
