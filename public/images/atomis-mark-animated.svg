@@ -5,12 +5,12 @@
   </defs>
   <!-- Tilted ring -->
   <g transform="rotate(-22 40 40)">
-    <ellipse cx="40" cy="40" rx="30" ry="13" stroke="#3D31C0" stroke-width="2.2" opacity="0.55"/>
+    <ellipse cx="40" cy="40" rx="30" ry="13" stroke="#10B981" stroke-width="2.2" opacity="0.55"/>
   </g>
   <!-- Core -->
-  <circle cx="40" cy="40" r="11" fill="#3D31C0"/>
+  <circle cx="40" cy="40" r="11" fill="#10B981"/>
   <!-- Animated satellite riding the ring -->
-  <circle cx="0" cy="0" r="5.5" fill="#3D31C0">
+  <circle cx="0" cy="0" r="5.5" fill="#10B981">
     <animateMotion dur="7s" repeatCount="indefinite">
       <mpath href="#atomisRingPath"/>
     </animateMotion>
