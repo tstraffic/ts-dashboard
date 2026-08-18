@@ -17,6 +17,7 @@
       twilight:       { mode: 'dark',  skin: 'twilight',     label: 'Twilight' },
       nebula:         { mode: 'dark',  skin: 'nebula',       label: 'Nebula' },
       ts:             { mode: 'light', skin: 'ts',           label: 'T&S' },
+      'ts-dark':      { mode: 'dark',  skin: 'ts-dark',      label: 'T&S Dark' },
       daylight:       { mode: 'light', skin: '',             label: 'Daylight' },
       'warm-paper':   { mode: 'light', skin: 'warm-paper',   label: 'Warm Paper' },
       'mint-glass':   { mode: 'light', skin: 'mint-glass',   label: 'Mint Glass' }
@@ -69,7 +70,7 @@
       var want = cur.mode === 'dark' ? 'light' : 'dark';
       var next;
       try { next = localStorage.getItem('atomis-theme-' + want); } catch (e) {}
-      if (!next || !window.ATOMIS_THEMES[next]) next = (want === 'light') ? window.ATOMIS_DEFAULT_THEME : 'slate';
+      if (!next || !window.ATOMIS_THEMES[next]) next = (want === 'light') ? window.ATOMIS_DEFAULT_THEME : 'ts-dark';
       window.setAtomisTheme(next);
     };
     // Delegated click handler — bulletproofs the inline onclick on
@@ -101,7 +102,7 @@
   <title><%= typeof title !== 'undefined' ? title + ' | ' : '' %>T&S Traffic Control</title>
 
   <!-- PWA Meta Tags -->
-  <meta name="theme-color" content="#F7F5F1">
+  <meta name="theme-color" content="#F5F4FA">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="T&S">
@@ -117,7 +118,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="T&S">
-  <meta name="theme-color" content="#F7F5F1">
+  <meta name="theme-color" content="#F5F4FA">
 
   <!-- Atomis typography: Bricolage Grotesque (display) · Geist (body/UI) · Geist Mono (technical) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -176,7 +177,7 @@
     }
   </script>
   <link rel="stylesheet" href="/css/custom.css?v=ts-paper-2">
-  <link rel="stylesheet" href="/css/themes.css?v=ts-paper-1">
+  <link rel="stylesheet" href="/css/themes.css?v=ts-2">
   <link rel="stylesheet" href="/css/chat.css?v=ts-1">
   <link rel="stylesheet" href="/css/bookings-v2.css?v=bk2-72">
   <link rel="stylesheet" href="/css/admin-fluid.css?v=fluid-3">
@@ -237,7 +238,7 @@
   <!-- Register admin service worker -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/admin-sw.js?v=44', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('/admin-sw.js?v=45', { updateViaCache: 'none' })
         .then(function(reg) {
           reg.update();
           console.log('Admin SW registered, scope:', reg.scope);

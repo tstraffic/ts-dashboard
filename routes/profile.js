@@ -120,7 +120,7 @@ router.post('/', (req, res) => {
 // POST /profile/theme — persist the chosen UI theme to the user's preferences
 // so it follows them across devices. Client-side localStorage still drives the
 // instant, FOUC-free application; this is the durable record.
-const ATOMIS_THEME_IDS = ['ts','slate','carbon','navy','graphite','atomis','aurora','emerald-dusk','violet-haze','twilight','nebula','daylight','warm-paper','mint-glass'];
+const ATOMIS_THEME_IDS = ['ts','ts-dark','slate','carbon','navy','graphite','atomis','aurora','emerald-dusk','violet-haze','twilight','nebula','daylight','warm-paper','mint-glass'];
 router.post('/theme', (req, res) => {
   const db = getDb();
   const theme = String(req.body.theme || '').trim();

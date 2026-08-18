@@ -6,8 +6,9 @@
     // mode so the login screen's light/dark styles still apply. Mirrors the
     // registry in the main layout.
     (function () {
-      var MODE = { ts:'light', daylight:'light', 'warm-paper':'light', 'mint-glass':'light' }; // everything else is dark
-      var SKIN = { ts:'ts', 'warm-paper':'warm-paper', 'mint-glass':'mint-glass' };
+      var MODE = { ts:'light', daylight:'light', 'warm-paper':'light', 'mint-glass':'light' };
+      // dark ids fall through to 'dark' via modeOf below // everything else is dark
+      var SKIN = { ts:'ts', 'ts-dark':'ts-dark', 'warm-paper':'warm-paper', 'mint-glass':'mint-glass' };
       var DEFAULT_THEME = 'ts'; // the T&S house theme — keep in sync with layout.ejs
       function modeOf(id) {
         if (id === 'light') return 'light';
@@ -42,7 +43,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Sign in | T&S Traffic Control</title>
-  <meta name="theme-color" content="#F7F5F1">
+  <meta name="theme-color" content="#F5F4FA">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="icon" type="image/svg+xml" href="/images/atomis-favicon-dark.svg?v=emerald">
   <link rel="apple-touch-icon" href="/images/atomis-apple-touch-icon.png">
@@ -53,9 +54,9 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --base: #0F1115;
-      --surface: #1A1D24;
-      --surface-2: #22262F;
+      --base: #100F1A;
+      --surface: #1A1826;
+      --surface-2: #232030;
       --emerald: #3D31C0;
       --text: #F5F5F7;
       --text-mute: #8B8E95;
@@ -68,14 +69,14 @@
       --font-mono: 'Geist Mono', monospace;
     }
     :root[data-theme="light"] {
-      --base: #F7F5F1;
+      --base: #F5F4FA;
       --surface: #FFFFFF;
-      --surface-2: #F1EEE8;
-      --text: #1E1E1E;
-      --text-mute: #57534E;
-      --text-faint: #8A8378;
-      --border: #E7E2D9;
-      --border-strong: #D8D2C6;
+      --surface-2: #EEEDF6;
+      --text: #1B1A24;
+      --text-mute: #555264;
+      --text-faint: #8B889E;
+      --border: #E4E2F0;
+      --border-strong: #D0CDE4;
     }
     /* On the paper ground the accent goes to the full logo indigo. */
     :root[data-theme="light"][data-skin="ts"] { --emerald: #13008E; }

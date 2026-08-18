@@ -152,81 +152,88 @@
 /* ---------------------------------------------------------------
    T&S — the house theme, and the default for this deployment.
 
-   Same Atomis grammar as every other skin (paper ground, opaque
-   cards, fixed status colours) but tuned to T&S's own two logo
-   colours: indigo #13008E and charcoal #1E1E1E. The neutrals are
-   warm on purpose — a bone ground makes the cool indigo read as
-   ink on stock rather than as another blue-grey UI.
+   Same Atomis grammar as every other skin, tuned to T&S's two logo
+   colours: indigo #13008E and charcoal #1E1E1E. The ground itself
+   carries the brand — an indigo-tinted paper with a soft brand
+   glow at the top of the page — the way the other Atomis tenant
+   dashboards light their background with their own colour.
 
-   The brand accent itself is global (see the `brand` scale in
-   layout.ejs), so this skin only has to set the ground, the rules,
-   and the warm text ramp.
+   The brand accent is global (the `brand` scale in layout.ejs);
+   this skin sets the ground, the rules, and the ink ramp.
    --------------------------------------------------------------- */
 :root[data-skin="ts"][data-theme="light"] {
-  --atomis-base:       #F7F5F1;
+  --atomis-base:       #F5F4FA;
   --atomis-surface:    #FFFFFF;
-  --atomis-surface-2:  #F1EEE8;
-  --atomis-text:       #1E1E1E;
-  --atomis-text-mute:  #57534E;
-  --atomis-text-faint: #8A8378;
-  --dark-border:        rgba(30,30,30,0.10);
-  --dark-border-strong: rgba(30,30,30,0.18);
-  --dark-input-border:  #D8D2C6;
+  --atomis-surface-2:  #EEEDF6;
+  --atomis-text:       #1B1A24;
+  --atomis-text-mute:  #555264;
+  --atomis-text-faint: #8B889E;
+  --dark-border:        rgba(27,26,36,0.10);
+  --dark-border-strong: rgba(27,26,36,0.18);
+  --dark-input-border:  #D0CDE4;
   /* Paper scale, exposed so components can reference it directly. */
-  --paper:       #F7F5F1;
-  --paper-2:     #F1EEE8;
-  --paper-3:     #E9E5DC;
-  --line:        #E7E2D9;
-  --line-strong: #D8D2C6;
-  --ink:         #1E1E1E;
-  --ink-2:       #57534E;
-  --ink-3:       #8A8378;
+  --paper:       #F5F4FA;
+  --paper-2:     #EEEDF6;
+  --paper-3:     #E6E4F1;
+  --line:        #E4E2F0;
+  --line-strong: #D0CDE4;
+  --ink:         #1B1A24;
+  --ink-2:       #555264;
+  --ink-3:       #8B889E;
 }
+/* Ambient brand lighting — a soft indigo glow washing down from the
+   top of the page. Subtle on light paper; the cards stay pure white
+   so contrast is untouched. */
 :root[data-skin="ts"][data-theme="light"] body,
 :root[data-skin="ts"][data-theme="light"] body.dark-glass {
-  background-color: #F7F5F1;
+  background-color: #F5F4FA;
+  background-image:
+    radial-gradient(110% 65% at 50% -12%, rgba(61,49,192,0.06), rgba(61,49,192,0.015) 45%, transparent 65%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center top;
 }
 
-/* Warm text ramp — the cool Tailwind greys read blue-ish against bone. */
+/* Ink ramp — the neutral greys pick up the indigo cast of the ground. */
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-900,
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#111827\] { color: #1E1E1E !important; }
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-800 { color: #2C2A27 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#111827\] { color: #1B1A24 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-800 { color: #292735 !important; }
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-700,
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#374151\] { color: #46423C !important; }
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-600 { color: #5C574F !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#374151\] { color: #423F52 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-600 { color: #575466 !important; }
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-500,
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#6B7280\] { color: #7A7469 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#6B7280\] { color: #75718A !important; }
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .text-gray-400,
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#9CA3AF\] { color: #A19A8D !important; }
-:root[data-skin="ts"][data-theme="light"] body.dark-glass label { color: #46423C !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .text-\[\#9CA3AF\] { color: #9C99B0 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass label { color: #423F52 !important; }
 
-/* Warm fills. */
+/* Indigo-tinted fills. */
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .bg-gray-50,
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .hover\:bg-gray-50:hover { background: #F5F2ED !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .hover\:bg-gray-50:hover { background: #F2F1F8 !important; }
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .bg-gray-100,
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .hover\:bg-gray-100:hover { background: #EFEBE4 !important; }
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .bg-gray-200 { background: #E3DED4 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .hover\:bg-gray-100:hover { background: #EAE9F3 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .bg-gray-200 { background: #DEDCEC !important; }
 
 /* Hairline rules instead of cool grey borders — and no resting shadow.
    Cards are defined by their rule, not by a lift. Overlays (shadow-lg and
    up) keep theirs so dropdowns and modals still read as floating. */
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .bg-white,
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .border-gray-200,
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .border-b { border-color: #E7E2D9 !important; }
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .border-gray-100 { border-color: #F0ECE4 !important; }
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .border-gray-300 { border-color: #D8D2C6 !important; }
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #E7E2D9 !important; }
-:root[data-skin="ts"][data-theme="light"] body.dark-glass .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #F0ECE4 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .border-b { border-color: #E4E2F0 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .border-gray-100 { border-color: #ECEBF4 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .border-gray-300 { border-color: #D0CDE4 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #E4E2F0 !important; }
+:root[data-skin="ts"][data-theme="light"] body.dark-glass .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #ECEBF4 !important; }
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .shadow-sm,
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .shadow-card { box-shadow: none !important; }
 
-/* Sidebar — bone, with the active row marked by an indigo edge rather than
-   a filled pill. Quieter, and it survives at a glance on a long nav. */
-:root[data-skin="ts"][data-theme="light"] #sidebar { background: #FCFBF9 !important; border-right-color: #E7E2D9 !important; }
-:root[data-skin="ts"][data-theme="light"] #sidebar .sidebar-link { color: #46423C !important; }
+/* Sidebar — brand-tinted paper, active row marked by an indigo edge. */
+:root[data-skin="ts"][data-theme="light"] #sidebar { background: #FAFAFD !important; border-right-color: #E4E2F0 !important; }
+:root[data-skin="ts"][data-theme="light"] #sidebar .sidebar-link { color: #423F52 !important; }
 :root[data-skin="ts"][data-theme="light"] #sidebar .sidebar-link:hover {
-  background: rgba(30,30,30,0.05) !important;
-  color: #1E1E1E !important;
+  background: rgba(61,49,192,0.06) !important;
+  color: #1B1A24 !important;
 }
 :root[data-skin="ts"][data-theme="light"] #sidebar a.sidebar-link[class~="bg-white/15"] {
   background: #EFEEFC !important;
@@ -235,13 +242,47 @@
   box-shadow: inset 2px 0 0 #13008E !important;
 }
 :root[data-skin="ts"][data-theme="light"] #sidebar .sidebar-badge-muted {
-  background: #EFEBE4 !important;
-  color: #57534E !important;
+  background: #EAE9F3 !important;
+  color: #555264 !important;
 }
 
-/* Warm the scrollbar so it doesn't read as a cool-grey artefact. */
-:root[data-skin="ts"][data-theme="light"] ::-webkit-scrollbar-thumb { background: #D8D2C6; }
-:root[data-skin="ts"][data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #8A8378; }
+/* Scrollbar picks up the tint too. */
+:root[data-skin="ts"][data-theme="light"] ::-webkit-scrollbar-thumb { background: #D0CDE4; }
+:root[data-skin="ts"][data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #8B889E; }
+
+/* ---------------------------------------------------------------
+   T&S Dark — the same brand-lit ground, after hours. Indigo-tinted
+   charcoal with the identical glow shape the light skin uses, so
+   the sun/moon toggle reads as one theme changing time of day.
+   Mirrors the structure of the `atomis` skin (grain + top radial).
+   --------------------------------------------------------------- */
+:root[data-skin="ts-dark"] {
+  --atomis-base: #100F1A;
+  --atomis-surface: #1A1826;
+  --atomis-surface-2: #232030;
+  --dark-surface: #1A1826;
+  --dark-surface-hover: #232032;
+  --dark-border: rgba(160,153,235,0.13);
+  --dark-border-strong: rgba(160,153,235,0.22);
+}
+:root[data-skin="ts-dark"] body, :root[data-skin="ts-dark"] body.dark-glass {
+  background-color: var(--atomis-base);
+  background-image: var(--atomis-grain),
+    radial-gradient(120% 70% at 50% -20%, rgba(61,49,192,0.22), rgba(61,49,192,0.05) 38%, transparent 64%);
+  background-attachment: fixed;
+  background-repeat: repeat, no-repeat;
+  background-position: 0 0, center top;
+  background-size: 128px 128px, cover;
+}
+:root[data-skin="ts-dark"] #sidebar {
+  background: #141220 !important;
+  border-right-color: rgba(160,153,235,0.10) !important;
+}
+:root[data-skin="ts-dark"] #sidebar a.sidebar-link[class~="bg-white/15"] {
+  background: rgba(61,49,192,0.28) !important;
+  color: #BAB6EF !important;
+  box-shadow: inset 2px 0 0 #8B85E2 !important;
+}
 
 /* Warm Paper — soft warm off-white instead of cool grey-white. */
 :root[data-skin="warm-paper"][data-theme="light"] {
