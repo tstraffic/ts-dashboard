@@ -64,7 +64,31 @@ function collectFields(body) {
   // Lock today's wage panel into the contract. A signed agreement must keep
   // rendering the rates it was signed on, no matter how many Annual Wage
   // Reviews land afterwards — editing a contract re-snapshots deliberately.
-  fields.RATES_SNAPSHOT = tpl.ratesSnapshot();
+  //
+  // The wizard also lets the admin hand-edit the selected tier's rates
+  // (RATE_* inputs) for the odd engagement that sits above the Award row.
+  // Values equal to the tier default collapse back to a clean snapshot, so
+  // "custom" only ever means someone actually changed a number.
+  const rateOverrides = {};
+  for (const { key } of tpl.RATE_KEYS) {
+    const raw = String(body['RATE_' + key] == null ? '' : body['RATE_' + key]).trim();
+    if (raw === '') continue;
+    const v = parseFloat(raw);
+    if (!isFinite(v) || v < 0) { errors.push(`${key} must be a positive rate.`); continue; }
+    rateOverrides[key] = v;
+  }
+  const allowanceOverrides = {
+    fares: String(body.RATE_fares == null ? '' : body.RATE_fares).trim(),
+    first_aid_higher: String(body.RATE_first_aid_higher == null ? '' : body.RATE_first_aid_higher).trim(),
+  };
+  fields.RATES_SNAPSHOT = tpl.customRatesSnapshot(fields.TIER, rateOverrides, allowanceOverrides);
+
+  // A base rate under the Award minimum for the tier is almost always a typo,
+  // and it's the one edit that could make the agreement unlawful. Block it.
+  const tierDefault = tpl.tierDefaults(fields.TIER);
+  if (tierDefault && rateOverrides.base != null && rateOverrides.base < tierDefault.base) {
+    errors.push(`Base rate $${rateOverrides.base.toFixed(2)} is below the Tier ${fields.TIER} Award minimum of $${tierDefault.base.toFixed(2)}.`);
+  }
   return { fields, errors };
 }
 
@@ -177,6 +201,7 @@ router.get('/new', requirePermission('hr_contracts'), (req, res) => {
     employees, employee, prefill,
     contract: null, fields: prefill || {},
     fieldDefs: tpl.FIELD_DEFS, tiers: tpl.TIERS,
+    rateKeys: tpl.RATE_KEYS, allowances: tpl.ALLOWANCES,
     user: req.session.user,
   });
 });
@@ -197,6 +222,7 @@ router.get('/:id/edit', requirePermission('hr_contracts'), (req, res) => {
     prefill: null,
     contract, fields: parseFields(contract),
     fieldDefs: tpl.FIELD_DEFS, tiers: tpl.TIERS,
+    rateKeys: tpl.RATE_KEYS, allowances: tpl.ALLOWANCES,
     user: req.session.user,
   });
 });

@@ -7,7 +7,12 @@
     void:   { label: 'Void',   cls: 'bg-red-50 text-red-600 ring-red-600/20' },
   };
   const sp = STATUS_PILL[contract.status] || STATUS_PILL.draft;
-  const tier = tiers[Number(fields.TIER)] || {};
+  // The contract's own snapshot — an edited rate must show here exactly as
+  // the PDF renders it, not the live Award row.
+  const snapTiers = (fields.RATES_SNAPSHOT && fields.RATES_SNAPSHOT.tiers) || tiers;
+  const tier = snapTiers[Number(fields.TIER)] || tiers[Number(fields.TIER)] || {};
+  const ratesCustom = !!(fields.RATES_SNAPSHOT && fields.RATES_SNAPSHOT.custom);
+  const awardTier = tiers[Number(fields.TIER)] || {};
 %>
 
 <div class="max-w-4xl mx-auto space-y-5">
@@ -16,7 +21,7 @@
       <a href="/contracts" class="text-sm text-gray-500 hover:text-gray-700 mb-1 inline-flex items-center gap-1">&larr; Contracts</a>
       <p class="page-eyebrow">People · Casual Employment Agreement</p>
       <h1 class="page-title vt-page-title"><%= contract.agreement_number %></h1>
-      <p class="page-sub"><%= contract.employee_name %> · <%= fields.POSITION_TITLE %> · Tier <%= fields.TIER %> (<%= tier.level || '' %>) · version <%= contract.version %></p>
+      <p class="page-sub"><%= contract.employee_name %> · <%= fields.POSITION_TITLE %> · Tier <%= fields.TIER %> (<%= tier.level || '' %>) · version <%= contract.version %><% if (ratesCustom) { %> · <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-amber-100 text-amber-800 align-middle">EDITED RATES</span><% } %></p>
       <div class="chevron-rail" aria-hidden="true"></div>
     </div>
     <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold ring-1 flex-shrink-0 <%= sp.cls %>"><%= sp.label %></span>
@@ -68,7 +73,11 @@
           ['Email', fields.WORKER_EMAIL],
           ['Commencement', fields.START_DATE ? formatDateShort(fields.START_DATE) : '—'],
           ['Classification', (tier.level || '—') + ' · Tier ' + fields.TIER],
-          ['Base rate', tier.base ? ('$' + tier.base.toFixed(2) + '/hr (incl. 25% casual loading)') : '—'],
+          ['Base rate', tier.base
+            ? ('$' + Number(tier.base).toFixed(2) + '/hr (incl. 25% casual loading)'
+               + (ratesCustom && awardTier.base && Math.abs(tier.base - awardTier.base) > 0.005
+                  ? ' · edited from $' + Number(awardTier.base).toFixed(2) : ''))
+            : '—'],
           ['Reports to', fields.REPORTS_TO],
           ['Pay frequency', fields.PAY_FREQUENCY],
           ['Min engagement', fields.MIN_ENGAGEMENT + ' hours'],
