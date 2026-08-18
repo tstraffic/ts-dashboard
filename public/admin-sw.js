@@ -1,12 +1,12 @@
 // Atomis Admin Service Worker — Network-first with offline fallback
-const CACHE_NAME = 'atomis-admin-v22-ts-theme';
+const CACHE_NAME = 'atomis-admin-v23-emerald-mark';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to pre-cache
 const PRECACHE_URLS = [
   '/css/custom.css',
   '/js/app.js',
-  '/images/atomis-mark.svg',
+  '/images/atomis-mark.svg?v=emerald',
   OFFLINE_URL
 ];
 

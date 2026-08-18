@@ -10,7 +10,7 @@
 // this the user's current tab keeps running the prior bundle of JS even
 // after the new SW takes over.
 
-const CACHE_NAME = 'atomis-worker-v10'; // v10: SW-reload loop guard in worker.js
+const CACHE_NAME = 'atomis-worker-v11'; // v11: re-fetch the emerald Atomis mark
 const VENDOR_CACHE = 'atomis-worker-vendor-v1';
 
 // PDF.js, docx-preview, jszip, Motion One — versioned bundles, safe to
@@ -24,7 +24,7 @@ self.addEventListener('install', function (event) {
         '/css/worker.css',
         '/js/worker.js',
         '/js/worker-pdf-viewer.js',
-        '/images/atomis-mark.svg',
+        '/images/atomis-mark.svg?v=emerald',
       ]);
     })
   );

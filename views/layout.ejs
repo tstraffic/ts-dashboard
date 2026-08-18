@@ -109,7 +109,7 @@
   <meta name="application-name" content="T&S Traffic Control">
   <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
   <link rel="manifest" href="/manifest-admin.json">
-  <link rel="icon" type="image/svg+xml" href="/images/atomis-favicon-dark.svg">
+  <link rel="icon" type="image/svg+xml" href="/images/atomis-favicon-dark.svg?v=emerald">
   <link rel="icon" type="image/png" sizes="192x192" href="/images/atomis-icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/images/atomis-icon-512.png">
   <link rel="apple-touch-icon" href="/images/atomis-apple-touch-icon.png">
@@ -237,7 +237,7 @@
   <!-- Register admin service worker -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/admin-sw.js?v=42', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('/admin-sw.js?v=43', { updateViaCache: 'none' })
         .then(function(reg) {
           reg.update();
           console.log('Admin SW registered, scope:', reg.scope);
