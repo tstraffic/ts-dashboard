@@ -361,8 +361,8 @@ body.bk2-sidebar-hidden #sidebar-backdrop { display: none !important; }
 .bk2-edit-titlebtn:disabled { opacity: 0.5; cursor: not-allowed; }
 .bk2-edit-titlebtn--primary { background: #2B7FFF; border-color: #2B7FFF; color: #fff; }
 .bk2-edit-titlebtn--primary:hover:not(:disabled) { background: #1D6AE5; }
-.bk2-edit-titlebtn--save { background: #059669; border-color: #059669; color: #fff; }
-.bk2-edit-titlebtn--save:hover:not(:disabled) { background: #047857; }
+.bk2-edit-titlebtn--save { background: #2517A6; border-color: #2517A6; color: #fff; }
+.bk2-edit-titlebtn--save:hover:not(:disabled) { background: #13008E; }
 
 /* Tab strip — dark, icon + label rows. Active tab inverts to light. */
 .bk2-edit-tabs {
@@ -433,8 +433,8 @@ body.bk2-sidebar-hidden #sidebar-backdrop { display: none !important; }
 .bk2-edit-actbtn--primary:hover { background: #1D6AE5; }
 /* "Open full edit page" — green so it reads as the way through to the
    complete editor, distinct from the gray Save / blue Clone. */
-.bk2-edit-actbtn--fulledit { background: #059669; color: #fff; text-decoration: none; }
-.bk2-edit-actbtn--fulledit:hover { background: #047857; color: #fff; }
+.bk2-edit-actbtn--fulledit { background: #2517A6; color: #fff; text-decoration: none; }
+.bk2-edit-actbtn--fulledit:hover { background: #13008E; color: #fff; }
 
 /* Post-create success ribbon. */
 .bk2-edit-created {
@@ -456,11 +456,11 @@ body.bk2-sidebar-hidden #sidebar-backdrop { display: none !important; }
 .bk2-edit-qv-head p { font-size: 13px; color: #64748B; margin: 4px 0 0; }
 .bk2-edit-qv-btn {
   display: inline-flex; align-items: center; gap: 8px; margin-top: 16px;
-  background: #059669; color: #fff; text-decoration: none;
+  background: #2517A6; color: #fff; text-decoration: none;
   padding: 11px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
-  box-shadow: 0 6px 18px rgba(5,150,105,0.30);
+  box-shadow: 0 6px 18px rgba(37,23,166,0.30);
 }
-.bk2-edit-qv-btn:hover { background: #047857; }
+.bk2-edit-qv-btn:hover { background: #13008E; }
 .bk2-edit-qv-hint { font-size: 11px; color: #94A3B8; margin: 12px 0 0; }
 
 /* The quick-view panel is only ever an error/loading fallback now — for an
@@ -486,8 +486,8 @@ body.bk2-sidebar-hidden #sidebar-backdrop { display: none !important; }
    button stays visible (relabelled "Save" by prefillEditForm) and the
    gray Save / blue Clone are hidden because the form drives saves. */
 .bk2-editor[data-existing="1"] [data-mode-only="create"]:not([data-mode-only="edit-form"]) { display: none !important; }
-.bk2-editor[data-existing="1"] [data-mode-only="edit-form"] { display: inline-flex !important; background: #059669; color: #fff; }
-.bk2-editor[data-existing="1"] [data-mode-only="edit-form"]:hover:not(:disabled) { background: #047857; color: #fff; }
+.bk2-editor[data-existing="1"] [data-mode-only="edit-form"] { display: inline-flex !important; background: #2517A6; color: #fff; }
+.bk2-editor[data-existing="1"] [data-mode-only="edit-form"]:hover:not(:disabled) { background: #13008E; color: #fff; }
 /* Clone lives in the title bar and IS wanted on existing bookings now. */
 /* Resources + Tasks panes in the overlay borrow their content from the full
    booking page (see loadBookingFragment). Reset the padding so the lifted
@@ -665,12 +665,12 @@ body.bk2-sidebar-hidden #sidebar-backdrop { display: none !important; }
 /* Create button — large green outlined, top-right. */
 .bk2-edit-actbtn--create {
   padding: 8px 18px;
-  background: #fff; color: #10B981;
-  border: 1.5px solid #10B981; border-radius: 8px;
+  background: #fff; color: #3D31C0;
+  border: 1.5px solid #3D31C0; border-radius: 8px;
   font-size: 13px; font-weight: 700;
 }
 .bk2-edit-actbtn--create:hover:not(:disabled),
-.bk2-edit-actbtn--create:focus:not(:disabled) { background: #ECFDF5; color: #047857; border-color: #047857; }
+.bk2-edit-actbtn--create:focus:not(:disabled) { background: #EFEEFC; color: #13008E; border-color: #13008E; }
 .bk2-edit-actbtn--create.is-saving { opacity: 0.7; }
 
 /* Placeholder content for tabs that are awaiting spec. */
@@ -1246,8 +1246,8 @@ body.bk2-sidebar-hidden #sidebar-backdrop { display: none !important; }
 }
 .bk2-rp-chip:hover { background: rgba(255,255,255,0.08); color: #E2E8F0; }
 .bk2-rp-chip[aria-pressed="true"] {
-  background: rgba(16,185,129,0.18); color: #6EE7B7;
-  border-color: rgba(16,185,129,0.4);
+  background: rgba(61,49,192,0.18); color: #8B85E2;
+  border-color: rgba(61,49,192,0.4);
 }
 /* "Show Reserves" / "Show On-Leave" — additive reveal toggles, styled in a
    blue accent so they read as "bring these in" rather than the green
@@ -1410,8 +1410,8 @@ body.bk2-sidebar-hidden #sidebar-backdrop { display: none !important; }
 }
 .bk2-qb-summary strong { color: #BBF7D0; }
 :root[data-theme="light"] .bk2-qb-legend  { color: #6B7280; }
-:root[data-theme="light"] .bk2-qb-summary { background: #F0FDF4; border-color: #BBF7D0; color: #065F46; }
-:root[data-theme="light"] .bk2-qb-summary strong { color: #064E3B; }
+:root[data-theme="light"] .bk2-qb-summary { background: #F0FDF4; border-color: #BBF7D0; color: #100077; }
+:root[data-theme="light"] .bk2-qb-summary strong { color: #0C0060; }
 
 /* Status lifecycle strip (under the board) */
 .bk2-lifecycle {
@@ -1509,12 +1509,12 @@ body.bk2-sidebar-hidden #sidebar-backdrop { display: none !important; }
 :root[data-theme="dark"] body.dark-glass .bk2-edit-actbtn:hover:not(:disabled) { background: rgba(255,255,255,0.12); color: #fff; }
 :root[data-theme="dark"] body.dark-glass .bk2-edit-actbtn--create {
   background: transparent;
-  border: 1.5px solid #10B981;
-  color: #34D399;
+  border: 1.5px solid #3D31C0;
+  color: #6259D2;
 }
 :root[data-theme="dark"] body.dark-glass .bk2-edit-actbtn--create:hover:not(:disabled) {
-  background: rgba(16,185,129,0.12);
-  color: #6EE7B7;
+  background: rgba(61,49,192,0.12);
+  color: #8B85E2;
 }
 
 :root[data-theme="dark"] body.dark-glass .bk2-edit-foot {
@@ -1920,13 +1920,13 @@ body.bk2-sidebar-hidden #sidebar-backdrop { display: none !important; }
   background: #F1F5F9; color: #0F172A; border-color: #CBD5E1;
 }
 :root[data-theme="light"] .bk2-edit-actbtn--create {
-  background: #10B981; color: #fff; border: 1px solid #059669;
+  background: #3D31C0; color: #fff; border: 1px solid #2517A6;
   padding: 8px 18px; font-weight: 700;
-  box-shadow: 0 2px 6px rgba(16,185,129,0.25);
+  box-shadow: 0 2px 6px rgba(61,49,192,0.25);
 }
 :root[data-theme="light"] .bk2-edit-actbtn--create:hover:not(:disabled) {
-  background: #059669; color: #fff; border-color: #047857;
-  box-shadow: 0 4px 12px rgba(16,185,129,0.35);
+  background: #2517A6; color: #fff; border-color: #13008E;
+  box-shadow: 0 4px 12px rgba(61,49,192,0.35);
 }
 
 /* Toggle + hint + type cards — clean light styling */
@@ -2438,11 +2438,11 @@ body.bk2-date-loading::before {
 }
 .bk2-vis-toggle svg { width: 13px; height: 13px; flex: 0 0 auto; }
 .bk2-vis-toggle.is-on {
-  background: rgba(16,185,129,0.10);
-  border-color: rgba(16,185,129,0.35);
-  color: #059669;
+  background: rgba(61,49,192,0.10);
+  border-color: rgba(61,49,192,0.35);
+  color: #2517A6;
 }
-.bk2-vis-toggle.is-on:hover { background: rgba(16,185,129,0.18); }
+.bk2-vis-toggle.is-on:hover { background: rgba(61,49,192,0.18); }
 .bk2-vis-toggle.is-off {
   background: rgba(107,114,128,0.08);
   border-color: rgba(107,114,128,0.28);
@@ -2450,9 +2450,9 @@ body.bk2-date-loading::before {
 }
 .bk2-vis-toggle.is-off:hover { background: rgba(107,114,128,0.16); color: #4B5563; }
 :root[data-theme="dark"] body.dark-glass .bk2-vis-toggle.is-on {
-  background: rgba(16,185,129,0.16);
-  border-color: rgba(16,185,129,0.4);
-  color: #6EE7B7;
+  background: rgba(61,49,192,0.16);
+  border-color: rgba(61,49,192,0.4);
+  color: #8B85E2;
 }
 :root[data-theme="dark"] body.dark-glass .bk2-vis-toggle.is-off {
   background: rgba(255,255,255,0.06);
@@ -2464,9 +2464,9 @@ body.bk2-date-loading::before {
    dark mode — the dark pill colors above would be white-on-white there, so
    re-apply the light-theme palette inside those rows. */
 :root[data-theme="dark"] body.dark-glass .bk2-docrow .bk2-vis-toggle.is-on {
-  background: rgba(16,185,129,0.10);
-  border-color: rgba(16,185,129,0.35);
-  color: #059669;
+  background: rgba(61,49,192,0.10);
+  border-color: rgba(61,49,192,0.35);
+  color: #2517A6;
 }
 :root[data-theme="dark"] body.dark-glass .bk2-docrow .bk2-vis-toggle.is-off {
   background: rgba(107,114,128,0.08);
@@ -2684,7 +2684,7 @@ body.bk2-rp-size-l .bk2-rp-item::after { content: attr(data-resource-role); marg
 .crew-chip.pool.is-assigned { opacity: 0.4; cursor: default; }
 .crew-chip.pool.is-assigned:hover { transform: none; box-shadow: none; background: #fff; }
 .crew-chip.assigned { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; padding-right: 4px; }
-.crew-chip.assigned.confirmed { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
+.crew-chip.assigned.confirmed { background: #EFEEFC; border-color: #8B85E2; color: #100077; }
 .crew-chip.assigned.unconfirmed { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
 .crew-chip-avatar { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 9999px; background: rgba(0,0,0,0.06); font-size: 10px; font-weight: 700; }
 .crew-chip.assigned .crew-chip-avatar { background: rgba(0,0,0,0.12); }
@@ -2693,7 +2693,7 @@ body.bk2-rp-size-l .bk2-rp-item::after { content: attr(data-resource-role); marg
 .crew-chip-x { background: transparent; border: 0; color: inherit; opacity: 0.5; font-size: 16px; line-height: 1; padding: 0 4px; border-radius: 9999px; cursor: pointer; }
 .crew-chip-x:hover { opacity: 1; background: rgba(0,0,0,0.08); }
 .crew-chip.dragging { opacity: 0.5; cursor: grabbing; }
-.vehicle-card.drop-hover { background: #ecfdf5 !important; border-color: #6ee7b7 !important; }
+.vehicle-card.drop-hover { background: #EFEEFC !important; border-color: #8B85E2 !important; }
 #assignedCrew.drop-hover { background: #eff6ff; border-color: #93c5fd; border-style: solid; }
 .crew-chip-flash { animation: chip-flash 0.6s ease; }
 @keyframes chip-flash { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.6); } 100% { box-shadow: 0 0 0 12px rgba(34,197,94,0); } }
@@ -3155,7 +3155,7 @@ body.bk2-rp-detail .bk2-rp-warns { display: inline-flex; }
   border-left: 3px solid transparent;
   padding-left: 9px;              /* 12px - 3px border, so text stays aligned */
 }
-.bk2-slot--st-yes     { border-left-color: #34D399; }
+.bk2-slot--st-yes     { border-left-color: #6259D2; }
 .bk2-slot--st-pending { border-left-color: #FBBF24; }
 .bk2-slot--st-no      { border-left-color: #EF4444; }
 .bk2-slot--filled.bk2-slot--st-no { background: rgba(239,68,68,0.12); }
@@ -3199,10 +3199,10 @@ body.bk2-rp-detail .bk2-rp-warns { display: inline-flex; }
   font-family: 'Geist Mono', ui-monospace, monospace;
   border: 1px solid transparent; white-space: nowrap;
 }
-.bk2-acccount--all  { background: rgba(52,211,153,0.16); color: #6EE7B7; border-color: rgba(52,211,153,0.35); }
+.bk2-acccount--all  { background: rgba(98,89,210,0.16); color: #8B85E2; border-color: rgba(98,89,210,0.35); }
 .bk2-acccount--part { background: rgba(251,191,36,0.14); color: #FCD34D; border-color: rgba(251,191,36,0.35); }
 .bk2-acccount--bad  { background: rgba(239,68,68,0.20);  color: #FCA5A5; border-color: rgba(239,68,68,0.45); }
-:root[data-theme="light"] .bk2-acccount--all  { background: #D1FAE5; color: #047857; border-color: #6EE7B7; }
+:root[data-theme="light"] .bk2-acccount--all  { background: #DCDAF7; color: #13008E; border-color: #8B85E2; }
 :root[data-theme="light"] .bk2-acccount--part { background: #FEF3C7; color: #B45309; border-color: #FCD34D; }
 :root[data-theme="light"] .bk2-acccount--bad  { background: #FEE2E2; color: #B91C1C; border-color: #FCA5A5; }
 
@@ -3231,10 +3231,10 @@ body.bk2-rp-detail .bk2-rp-warns { display: inline-flex; }
 /* Avatars were a single saturated navy in both themes; tint by acceptance so
    the crew reads as people-with-a-state, not identical blue coins. */
 :root[data-theme="light"] .bk2-slot-avatar { background: #1D4ED8; color: #EFF6FF; }
-:root[data-theme="light"] .bk2-slot--st-yes     .bk2-slot-avatar { background: #047857; color: #ECFDF5; }
+:root[data-theme="light"] .bk2-slot--st-yes     .bk2-slot-avatar { background: #13008E; color: #EFEEFC; }
 :root[data-theme="light"] .bk2-slot--st-pending .bk2-slot-avatar { background: #B45309; color: #FFFBEB; }
 :root[data-theme="light"] .bk2-slot--st-no      .bk2-slot-avatar { background: #B91C1C; color: #FEF2F2; }
-.bk2-slot--st-yes     .bk2-slot-avatar { background: #065F46; color: #A7F3D0; }
+.bk2-slot--st-yes     .bk2-slot-avatar { background: #100077; color: #BAB6EF; }
 .bk2-slot--st-pending .bk2-slot-avatar { background: #78350F; color: #FDE68A; }
 .bk2-slot--st-no      .bk2-slot-avatar { background: #7F1D1D; color: #FECACA; }
 
@@ -3262,7 +3262,7 @@ body.bk2-rp-detail .bk2-rp-warns { display: inline-flex; }
 
 /* Warnings were dark-tuned pastels — near-invisible on a white card. */
 :root[data-theme="light"] .bk2-warn        { background: #FEE2E2; color: #991B1B; border-color: #FCA5A5; }
-:root[data-theme="light"] .bk2-warn--match { background: #D1FAE5; color: #065F46; border-color: #6EE7B7; }
+:root[data-theme="light"] .bk2-warn--match { background: #DCDAF7; color: #100077; border-color: #8B85E2; }
 :root[data-theme="light"] .bk2-warn--amber { background: #FEF3C7; color: #92400E; border-color: #FCD34D; }
 :root[data-theme="light"] .bk2-warn--red   { background: #FEE2E2; color: #991B1B; border-color: #F87171; }
 :root[data-theme="light"] .bk2-warn--info  { background: #DBEAFE; color: #1E40AF; border-color: #93C5FD; }
@@ -3326,14 +3326,14 @@ body.bk2-rp-detail .bk2-rp-warns { display: inline-flex; }
 .bk2-pop-move-here {
   flex: 0 0 auto; font-size: 9px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.06em; padding: 2px 6px; border-radius: 9999px;
-  background: rgba(52,211,153,0.18); color: #6EE7B7;
+  background: rgba(98,89,210,0.18); color: #8B85E2;
 }
 :root[data-theme="light"] .bk2-pop-move { background: #FFFFFF; border-color: #D1D5DB; color: #111827; }
 :root[data-theme="light"] .bk2-pop-move:hover:not(:disabled) { background: #FEF3C7; border-color: #F59E0B; }
 :root[data-theme="light"] .bk2-pop-move-tag { background: #B45309; color: #FFFBEB; }
 :root[data-theme="light"] .bk2-pop-move.is-spare .bk2-pop-move-tag { background: #4B5563; color: #F9FAFB; }
 :root[data-theme="light"] .bk2-pop-move--pool .bk2-pop-move-tag { background: #E5E7EB; color: #4B5563; }
-:root[data-theme="light"] .bk2-pop-move-here { background: #D1FAE5; color: #047857; }
+:root[data-theme="light"] .bk2-pop-move-here { background: #DCDAF7; color: #13008E; }
 
 /* ── Pointer-based crew drag ────────────────────────────────────────────
    The HTML5 drag this replaces was mouse-only and gave no feedback beyond
@@ -3362,15 +3362,15 @@ body.bk2-dragging-crew [data-bk-crew-drag="1"] { touch-action: none; }
 /* The destination under the pointer. Loud on purpose — the old drag's
    thin outline was the thing planners kept missing. */
 .bk2-drop-live {
-  outline: 2px solid #34D399 !important;
+  outline: 2px solid #6259D2 !important;
   outline-offset: 1px;
-  background: rgba(52,211,153,0.16) !important;
-  box-shadow: 0 0 0 4px rgba(52,211,153,0.14);
+  background: rgba(98,89,210,0.16) !important;
+  box-shadow: 0 0 0 4px rgba(98,89,210,0.14);
 }
 :root[data-theme="light"] .bk2-drop-live {
-  outline-color: #059669 !important;
-  background: #D1FAE5 !important;
-  box-shadow: 0 0 0 4px rgba(5,150,105,0.16);
+  outline-color: #2517A6 !important;
+  background: #DCDAF7 !important;
+  box-shadow: 0 0 0 4px rgba(37,23,166,0.16);
 }
 /* Every possible destination on the card you're dragging within gets a
    quiet hint, so you can see where the drop zones actually are. */
@@ -3392,12 +3392,12 @@ body.bk2-dragging-crew [data-bk-crew-drag="1"] { touch-action: none; }
    Carrying a worker over a DIFFERENT shift card: the whole card lifts as
    the destination, and the chip itself says what release will do. */
 .bk2-card.bk2-drop-live-card {
-  outline: 2px solid #34D399; outline-offset: 3px;
-  box-shadow: 0 0 0 6px rgba(52,211,153,0.12);
+  outline: 2px solid #6259D2; outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(98,89,210,0.12);
 }
 :root[data-theme="light"] .bk2-card.bk2-drop-live-card {
-  outline-color: #059669;
-  box-shadow: 0 0 0 6px rgba(5,150,105,0.14);
+  outline-color: #2517A6;
+  box-shadow: 0 0 0 6px rgba(37,23,166,0.14);
 }
 .bk2-drag-ghost[data-move-hint]:not([data-move-hint=""])::after {
   content: attr(data-move-hint);
@@ -3405,12 +3405,12 @@ body.bk2-dragging-crew [data-bk-crew-drag="1"] { touch-action: none; }
   padding: 2px 9px; border-radius: 9999px;
   font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em;
   font-family: 'Geist Mono', ui-monospace, monospace;
-  background: #065F46; color: #A7F3D0;
+  background: #100077; color: #BAB6EF;
   box-shadow: 0 4px 12px rgba(0,0,0,0.35);
   white-space: nowrap;
 }
 :root[data-theme="light"] .bk2-drag-ghost[data-move-hint]:not([data-move-hint=""])::after {
-  background: #047857; color: #ECFDF5;
+  background: #13008E; color: #EFEEFC;
 }
 
 /* Compact density is a flatter layout with no crew-block containers, so its
@@ -3436,10 +3436,10 @@ body.bk2-dragging-crew .bk2-csum-person { touch-action: none; }
   font-family: 'Geist Mono', ui-monospace, monospace;
   border: 1px solid transparent; white-space: nowrap;
 }
-.bk2-jp--ok   { background: rgba(52,211,153,0.14); color: #6EE7B7; border-color: rgba(52,211,153,0.32); }
+.bk2-jp--ok   { background: rgba(98,89,210,0.14); color: #8B85E2; border-color: rgba(98,89,210,0.32); }
 .bk2-jp--part { background: rgba(251,191,36,0.13); color: #FCD34D; border-color: rgba(251,191,36,0.32); }
 .bk2-jp--none { background: rgba(148,163,184,0.12); color: #94A3B8; border-color: rgba(148,163,184,0.25); }
 .bk2-jp--off  { display: none; }
-:root[data-theme="light"] .bk2-jp--ok   { background: #D1FAE5; color: #047857; border-color: #6EE7B7; }
+:root[data-theme="light"] .bk2-jp--ok   { background: #DCDAF7; color: #13008E; border-color: #8B85E2; }
 :root[data-theme="light"] .bk2-jp--part { background: #FEF3C7; color: #B45309; border-color: #FCD34D; }
 :root[data-theme="light"] .bk2-jp--none { background: #F3F4F6; color: #6B7280; border-color: #E5E7EB; }

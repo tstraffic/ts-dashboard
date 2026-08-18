@@ -24,23 +24,23 @@
    active tabs, "View all →" links, icon accents. (emerald-700 on
    white = 5.4:1; emerald-800 hover.) */
 :root[data-theme="light"] body.dark-glass .text-brand-600,
-:root[data-theme="light"] body.dark-glass a.text-brand-600 { color: #047857 !important; }
-:root[data-theme="light"] body.dark-glass .text-brand-700 { color: #065F46 !important; }
-:root[data-theme="light"] body.dark-glass .hover\:text-brand-600:hover { color: #047857 !important; }
+:root[data-theme="light"] body.dark-glass a.text-brand-600 { color: #13008E !important; }
+:root[data-theme="light"] body.dark-glass .text-brand-700 { color: #100077 !important; }
+:root[data-theme="light"] body.dark-glass .hover\:text-brand-600:hover { color: #13008E !important; }
 :root[data-theme="light"] body.dark-glass .hover\:text-brand-700:hover,
-:root[data-theme="light"] body.dark-glass a.text-brand-600:hover { color: #065F46 !important; }
+:root[data-theme="light"] body.dark-glass a.text-brand-600:hover { color: #100077 !important; }
 
 /* Active tab underline colour follows the text repair. */
-:root[data-theme="light"] body.dark-glass [data-tab].border-brand-600 { border-color: #059669 !important; }
+:root[data-theme="light"] body.dark-glass [data-tab].border-brand-600 { border-color: #2517A6 !important; }
 
 /* Pale brand tints (100/200/300/400) are dark-surface colours; on a
    light background they vanish. Content areas only — the sidebar
    handles its own overrides below. */
 :root[data-theme="light"] body.dark-glass main .text-brand-100,
 :root[data-theme="light"] body.dark-glass main .text-brand-200,
-:root[data-theme="light"] body.dark-glass main .text-brand-300 { color: #047857 !important; }
+:root[data-theme="light"] body.dark-glass main .text-brand-300 { color: #13008E !important; }
 :root[data-theme="light"] body.dark-glass main .text-brand-400,
-:root[data-theme="light"] body.dark-glass main .text-brand-500 { color: #059669 !important; }
+:root[data-theme="light"] body.dark-glass main .text-brand-500 { color: #2517A6 !important; }
 
 /* Sidebar "Customise menu" (text-brand-200 + white/5 bg — invisible
    on the light sidebar). Quiet slate ghost button instead. */
@@ -57,8 +57,8 @@
    mint on mint in light). */
 :root[data-theme="light"] #sidebar .bg-brand-500\/30,
 :root[data-theme="light"] #sidebar [class*="bg-brand-500/30"] {
-  background: #D1FAE5 !important;
-  color: #065F46 !important;
+  background: #DCDAF7 !important;
+  color: #100077 !important;
 }
 
 /* Header ghost icon buttons (bell / quick-add / logout use white/…
@@ -80,7 +80,7 @@ body.dark-glass input:focus-visible,
 body.dark-glass select:focus-visible,
 body.dark-glass textarea:focus-visible,
 body.dark-glass [tabindex]:focus-visible {
-  outline: 2px solid #10B981 !important;
+  outline: 2px solid #3D31C0 !important;
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -90,7 +90,7 @@ body.dark-glass [tabindex]:focus-visible {
 :root[data-theme="light"] body.dark-glass select:focus-visible,
 :root[data-theme="light"] body.dark-glass textarea:focus-visible,
 :root[data-theme="light"] body.dark-glass [tabindex]:focus-visible {
-  outline-color: #059669 !important;
+  outline-color: #2517A6 !important;
 }
 
 /* ───────────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ body.dark-glass .font-display { letter-spacing: -0.02em; }
 /* ───────────────────────────────────────────────────────────
    8. SELECTION + REDUCED MOTION
    ─────────────────────────────────────────────────────────── */
-body.dark-glass ::selection { background: rgba(16, 185, 129, 0.25); }
+body.dark-glass ::selection { background: rgba(61,49,192, 0.25); }
 @media (prefers-reduced-motion: reduce) {
   body.dark-glass button:not(:disabled):active { transform: none; }
 }
@@ -305,8 +305,8 @@ body.dark-glass .chevron-rail {
   border-radius: 1.5px;
   background: repeating-linear-gradient(
     -45deg,
-    rgba(16, 185, 129, 0.55) 0 6px,
-    rgba(16, 185, 129, 0.12) 6px 12px
+    rgba(61,49,192, 0.55) 0 6px,
+    rgba(61,49,192, 0.12) 6px 12px
   );
   /* Fade the stripes out rightward so the rail reads as an
      accent, not a full-width divider. */
@@ -316,8 +316,8 @@ body.dark-glass .chevron-rail {
 :root[data-theme="light"] body.dark-glass .chevron-rail {
   background: repeating-linear-gradient(
     -45deg,
-    rgba(4, 120, 87, 0.65) 0 6px,
-    rgba(4, 120, 87, 0.14) 6px 12px
+    rgba(19,0,142, 0.65) 0 6px,
+    rgba(19,0,142, 0.14) 6px 12px
   );
 }
 /* Critical-banner variant: a striped left rail replacing the flat
@@ -509,15 +509,15 @@ body.dark-glass .panel-header .panel-header-link {
   margin-left: auto;
   font-size: 12px;
   font-weight: 500;
-  color: var(--brand-500, #10B981);
+  color: var(--brand-500, #3D31C0);
 }
-body.dark-glass .panel-header .panel-header-link:hover { color: #34D399; }
+body.dark-glass .panel-header .panel-header-link:hover { color: #6259D2; }
 :root[data-theme="light"] body.dark-glass .panel-header { border-bottom-color: #F3F4F6; }
 :root[data-theme="light"] body.dark-glass .panel-header-title { color: #111827; }
 :root[data-theme="light"] body.dark-glass .panel-header-count { background: #F3F4F6; color: #6B7280; }
 :root[data-theme="light"] body.dark-glass .panel-header-count.is-critical { background: #FEE2E2; color: #DC2626; }
-:root[data-theme="light"] body.dark-glass .panel-header .panel-header-link { color: #059669; }
-:root[data-theme="light"] body.dark-glass .panel-header .panel-header-link:hover { color: #047857; }
+:root[data-theme="light"] body.dark-glass .panel-header .panel-header-link { color: #2517A6; }
+:root[data-theme="light"] body.dark-glass .panel-header .panel-header-link:hover { color: #13008E; }
 
 /* Attention rows. Tone lives in the count numeral (signal colours,
    darkened for light-theme text contrast) — the panel's chevron
@@ -580,7 +580,7 @@ body.dark-glass .attn-clear .attn-clear-sub { font-size: 12.5px; color: #8B8E95;
    clipped by the row's overflow. */
 body.dark-glass .attn-row:focus-visible,
 body.dark-glass .panel-header .panel-header-link:focus-visible {
-  outline: 2px solid var(--brand-500, #10B981);
+  outline: 2px solid var(--brand-500, #3D31C0);
   outline-offset: -2px;
   border-radius: 6px;
 }
@@ -804,14 +804,14 @@ body.dark-glass .crew-face.is-lead { box-shadow: 0 0 0 1.5px #10B981; }
 
 /* ── Attention-row hover affordance ── */
 body.dark-glass .attn-open {
-  font-size: 11px; font-weight: 600; color: var(--brand-500, #10B981);
-  border: 1px solid rgba(16,185,129,0.35); border-radius: 7px;
+  font-size: 11px; font-weight: 600; color: var(--brand-500, #3D31C0);
+  border: 1px solid rgba(61,49,192,0.35); border-radius: 7px;
   padding: 3px 9px; opacity: 0; flex-shrink: 0;
   transition: opacity var(--transition-fast, 150ms);
 }
 body.dark-glass .attn-row:hover .attn-open,
 body.dark-glass .attn-row:focus-visible .attn-open { opacity: 1; }
-:root[data-theme="light"] body.dark-glass .attn-open { color: #059669; border-color: #BFE9D6; background: #ECFDF5; }
+:root[data-theme="light"] body.dark-glass .attn-open { color: #2517A6; border-color: #BFE9D6; background: #EFEEFC; }
 
 /* ── Weather card (right rail — console-dark like the band) ── */
 body.dark-glass .wx-card { background: linear-gradient(165deg, #1E2733, #151B23); border: 1px solid #28323E; color: #E6EAE8; }
@@ -846,10 +846,10 @@ body.dark-glass .mini-chk {
 :root[data-theme="light"] body.dark-glass .mini-chk { border-color: #C4CBC6; }
 body.dark-glass .waiting-review {
   font-size: 11.5px; font-weight: 600; padding: 4px 11px; border-radius: 7px;
-  background: var(--brand-600, #059669); color: #fff; flex-shrink: 0;
+  background: var(--brand-600, #2517A6); color: #fff; flex-shrink: 0;
   transition: background var(--transition-fast, 150ms);
 }
-body.dark-glass .waiting-review:hover { background: var(--brand-500, #10B981); }
+body.dark-glass .waiting-review:hover { background: var(--brand-500, #3D31C0); }
 
 /* ───────────────────────────────────────────────────────────
    19. CONSOLE — LIGHT THEME

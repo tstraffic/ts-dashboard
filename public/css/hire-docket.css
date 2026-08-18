@@ -22,8 +22,8 @@
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 .hd-input:focus {
-  border-color: #10B981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+  border-color: #3D31C0;
+  box-shadow: 0 0 0 3px rgba(61,49,192, 0.18);
 }
 .hd-input[readonly] { color: #6b7280; }
 
@@ -60,9 +60,9 @@
 }
 .hd-pill.is-active,
 .hd-pill:has(input:checked) {
-  background: #10B981;
+  background: #3D31C0;
   color: #fff;
-  border-color: #059669;
+  border-color: #2517A6;
 }
 .hd-pill:hover:not(.is-active) {
   background: #f3f4f6;
@@ -70,7 +70,7 @@
 /* Keyboard focus â€” the input is visually hidden but still focusable, so
    surface a ring on the label whenever the hidden input is :focus-visible. */
 .hd-pill:has(input:focus-visible) {
-  outline: 2px solid #10B981;
+  outline: 2px solid #3D31C0;
   outline-offset: 2px;
 }
 .hd-pill-sm { padding: 4px 10px; font-size: 11px; min-height: 28px; }
@@ -86,14 +86,14 @@
   font-size: 12px;
   font-weight: 500;
   color: #fff;
-  background: #10B981;
-  border: 1px solid #059669;
+  background: #3D31C0;
+  border: 1px solid #2517A6;
   border-radius: 8px;
   cursor: pointer;
   transition: background 120ms ease;
   flex-shrink: 0;
 }
-.hd-add-btn-sm:hover { background: #059669; }
+.hd-add-btn-sm:hover { background: #2517A6; }
 
 /* ---- Signature pad ---- */
 .hd-signature-pad {
