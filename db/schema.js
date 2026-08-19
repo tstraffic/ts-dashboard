@@ -15480,6 +15480,62 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 346 error:', e.message); }
   }
 
+  // Migration 347: client meetings + structured minutes.
+  // company_meetings gains a type ('company' | 'client') and an optional
+  // client link. New structured-minutes layer: user-authored SECTIONS
+  // (headings) each holding dot POINTS, with photo/file ATTACHMENTS
+  // (captioned) hanging off either a section or an individual point —
+  // the source the branded PDF export (services/meetingPdf.js) renders.
+  // The legacy dept-tagged discussion items + to-dos stay untouched:
+  // they route to department hubs, which client minutes never do.
+  if (!isMigrationApplied.get(347)) {
+    try {
+      const cols = db.prepare('PRAGMA table_info(company_meetings)').all().map(c => c.name);
+      if (!cols.includes('meeting_type')) db.exec("ALTER TABLE company_meetings ADD COLUMN meeting_type TEXT NOT NULL DEFAULT 'company'");
+      if (!cols.includes('client_id')) db.exec('ALTER TABLE company_meetings ADD COLUMN client_id INTEGER REFERENCES clients(id)');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS company_meeting_sections (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          meeting_id INTEGER NOT NULL REFERENCES company_meetings(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          position INTEGER NOT NULL DEFAULT 0,
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS company_meeting_points (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          section_id INTEGER NOT NULL REFERENCES company_meeting_sections(id) ON DELETE CASCADE,
+          meeting_id INTEGER NOT NULL REFERENCES company_meetings(id) ON DELETE CASCADE,
+          text TEXT NOT NULL,
+          position INTEGER NOT NULL DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS company_meeting_attachments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          meeting_id INTEGER NOT NULL REFERENCES company_meetings(id) ON DELETE CASCADE,
+          section_id INTEGER REFERENCES company_meeting_sections(id) ON DELETE CASCADE,
+          point_id INTEGER REFERENCES company_meeting_points(id) ON DELETE CASCADE,
+          file_path TEXT NOT NULL,
+          original_name TEXT NOT NULL DEFAULT '',
+          mime_type TEXT DEFAULT '',
+          size_bytes INTEGER DEFAULT 0,
+          is_image INTEGER NOT NULL DEFAULT 0,
+          caption TEXT DEFAULT '',
+          position INTEGER NOT NULL DEFAULT 0,
+          created_by_id INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_cm_sections_meeting ON company_meeting_sections(meeting_id);
+        CREATE INDEX IF NOT EXISTS idx_cm_points_section ON company_meeting_points(section_id);
+        CREATE INDEX IF NOT EXISTS idx_cm_attach_meeting ON company_meeting_attachments(meeting_id);
+        CREATE INDEX IF NOT EXISTS idx_cm_attach_section ON company_meeting_attachments(section_id);
+        CREATE INDEX IF NOT EXISTS idx_cm_attach_point ON company_meeting_attachments(point_id);
+      `);
+      recordMigration.run(347, 'Client meetings + structured minutes (sections, points, captioned attachments)');
+      console.log('Migration 347 applied: client meetings + structured minutes');
+    } catch (e) { console.error('Migration 347 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

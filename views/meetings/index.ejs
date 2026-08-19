@@ -34,12 +34,35 @@ depts.forEach(function (d) { deptLabel[d.key] = d.label; });
     </div>
 
     <details id="add-meeting" class="mb-5 rounded-lg border border-dashed border-gray-300">
-      <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 select-none">New company meeting…</summary>
+      <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 select-none">New meeting…</summary>
       <form method="POST" action="/meetings" class="px-4 pb-4 pt-1 grid sm:grid-cols-2 gap-3">
         <%- include('../partials/csrf') %>
         <div class="sm:col-span-2">
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Meeting type</label>
+          <div class="flex gap-2" id="mtg-type-toggle">
+            <label class="flex-1 flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 cursor-pointer has-[:checked]:border-brand-500 has-[:checked]:ring-1 has-[:checked]:ring-brand-500">
+              <input type="radio" name="meeting_type" value="company" checked class="accent-emerald-600" onchange="document.getElementById('mtg-client-wrap').style.display='none'">
+              Company meeting
+            </label>
+            <label class="flex-1 flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 cursor-pointer has-[:checked]:border-brand-500 has-[:checked]:ring-1 has-[:checked]:ring-brand-500">
+              <input type="radio" name="meeting_type" value="client" class="accent-emerald-600" onchange="document.getElementById('mtg-client-wrap').style.display=''">
+              Client meeting
+            </label>
+          </div>
+        </div>
+        <div class="sm:col-span-2" id="mtg-client-wrap" style="display:none">
+          <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client</label>
+          <select name="client_id"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="">— Pick the client —</option>
+            <% (typeof clients !== 'undefined' ? clients : []).forEach(function (c) { %>
+              <option value="<%= c.id %>"><%= c.company_name %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="sm:col-span-2">
           <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Title</label>
-          <input type="text" name="title" required placeholder="e.g. Weekly leadership meeting"
+          <input type="text" name="title" required placeholder="e.g. Weekly leadership meeting / Project kickoff with client"
             class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
         </div>
         <div>
@@ -80,6 +103,9 @@ depts.forEach(function (d) { deptLabel[d.key] = d.label; });
             <span class="block text-sm font-medium text-gray-900 truncate <%= m.status === 'cancelled' ? 'line-through' : '' %>"><%= m.title %></span>
             <% if (m.attendees) { %><span class="block text-xs text-gray-400 truncate"><%= m.attendees %></span><% } %>
           </span>
+          <% if (m.meeting_type === 'client') { %>
+            <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 uppercase tracking-wide" title="Client meeting"><%= m.client_name || 'Client' %></span>
+          <% } %>
           <% if (m.status === 'cancelled') { %>
             <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-500">CANCELLED</span>
           <% } else if (m.open_todos > 0) { %>
