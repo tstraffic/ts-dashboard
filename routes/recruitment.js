@@ -58,9 +58,24 @@ async function sendInductionSms(db, applicant) {
   if (!sms.isConfigured()) return 'not_configured';
   if (!applicant.induction_date) return 'no_date';
   if (!sms.normalizeAuMobile(applicant.phone)) return 'no_phone';
-  const when = inductionWhenText(applicant.induction_date, applicant.induction_time);
-  const body = 'T&S Traffic Control: your induction is booked for ' + when + '. ' +
-    'Please complete your induction form before you arrive: ' + INDUCTION_FORM_URL;
+  // Full confirmation, same content as inductionConfirmationEmail, opening
+  // with the company name since an SMS has no other sender context beyond the
+  // 11-char sender ID. Date reads "Tuesday, 25/08/2026 at 2:00 pm". Keep the
+  // body GSM-7-safe (no em dashes / curly quotes) or every segment shrinks
+  // from 153 to 67 chars and the per-message cost triples.
+  const iso = String(applicant.induction_date).slice(0, 10);
+  const weekday = new Date(iso + 'T00:00:00Z').toLocaleDateString('en-AU', { weekday: 'long', timeZone: 'UTC' });
+  const dmy = iso.split('-').reverse().join('/');
+  let timeStr = '';
+  const tm = String(applicant.induction_time || '').match(/^(\d{1,2}):(\d{2})/);
+  if (tm) { let h = parseInt(tm[1], 10); const min = tm[2]; const ap = h >= 12 ? 'pm' : 'am'; h = h % 12 || 12; timeStr = ' at ' + h + ':' + min + ' ' + ap; }
+  const body =
+    'T&S Traffic Control: Hi, this is a confirmation for your induction at our depot, ' +
+    'located at 9 Epic Place, Villawood. It will take place on ' + weekday + ', ' + dmy + timeStr +
+    ', for the duration of approximately under an hour. Please bring hard copies of your licenses, ' +
+    'and keep your superannuation details ready if applicable. Casual attire is fine for the ' +
+    'duration of the induction. Please fill out the following form prior to your induction to ' +
+    'register your details within our system: ' + INDUCTION_FORM_URL + ' Thank you';
   const result = await sms.sendSms(applicant.phone, body);
   if (result) {
     try { db.prepare('UPDATE seek_applicants SET induction_sms_sent_at = CURRENT_TIMESTAMP WHERE id = ?').run(applicant.id); } catch (e) { /* column missing on stale deploy */ }
