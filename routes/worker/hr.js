@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDb } = require('../../db/database');
 const { sydneyToday } = require('../../lib/sydney');
 const { stashForm, takeForm } = require('../../lib/formEcho');
+const { safeWorkerBack } = require('../../lib/workerBack');
 
 // GET /w/hr — HR hub
 router.get('/hr', (req, res) => {
@@ -169,9 +170,9 @@ const certFs = require('fs');
 const { renderVocCertificatePdf } = require('../../lib/pdf/vocCertificatePdf');
 const VOC_CERT_DIR = certPath.join(__dirname, '..', '..', 'data', 'uploads', 'voc-certificates');
 
-router.get('/hr/vocs/:id/pdf', async (req, res) => {
-  const db = getDb();
-  const worker = req.session.worker;
+// Load a VOC assessment the logged-in worker is allowed to see the certificate
+// for. Shared by the PDF stream and the in-app viewer so the two can't drift.
+function loadOwnVocCert(db, workerId, id) {
   const a = db.prepare(`
     SELECT a.*, t.name AS template_name, t.default_validity_months,
       cm.full_name AS worker_name, cm.employee_id AS worker_emp_id
@@ -181,8 +182,33 @@ router.get('/hr/vocs/:id/pdf', async (req, res) => {
     WHERE a.id = ? AND a.crew_member_id = ?
       AND a.status = 'submitted' AND a.outcome = 'competent'
       AND COALESCE(a.certificate_status, 'active') = 'active'
-  `).get(req.params.id, worker.id);
-  if (!a || !a.certificate_id) return res.status(404).send('Certificate not available.');
+  `).get(id, workerId);
+  return a && a.certificate_id ? a : null;
+}
+
+// GET /w/hr/vocs/:id/view — In-app viewer for the worker's VOC certificate.
+// Navigating straight to the /pdf byte stream strands the crew member: iOS
+// WKWebView (and the installed PWA) render an inline PDF with no chrome and no
+// back button, so the only way out of the Capacitor shell was to force-quit.
+router.get('/hr/vocs/:id/view', (req, res) => {
+  const db = getDb();
+  const a = loadOwnVocCert(db, req.session.worker.id, req.params.id);
+  if (!a) return res.status(404).send('Certificate not available.');
+  res.render('worker/pdf-view', {
+    layout: 'worker/layout-bare',
+    // template_name IS the equipment name — voc_assessments has no
+    // equipment_name column; the wallet query aliases t.name to it.
+    title: a.template_name || 'VOC Certificate',
+    back: safeWorkerBack(req.query.back, '/w/hr/certs'),
+    pdfUrl: '/w/hr/vocs/' + a.id + '/pdf',
+    fileName: a.certificate_id + '.pdf',
+  });
+});
+
+router.get('/hr/vocs/:id/pdf', async (req, res) => {
+  const db = getDb();
+  const a = loadOwnVocCert(db, req.session.worker.id, req.params.id);
+  if (!a) return res.status(404).send('Certificate not available.');
 
   // Try the stored path first.
   if (a.pdf_path) {
@@ -643,17 +669,45 @@ router.get('/hr/payslips', (req, res) => {
   });
 });
 
-// GET /w/hr/payslips/:id — Download the worker's own payslip (auth-checked stream)
+// Load a payslip the logged-in worker owns, with its resolved file path.
+// Shared by the PDF stream and the in-app viewer so the two can't drift — the
+// viewer must 404 on exactly the cases the stream 404s on, or it would render a
+// chrome-less shell around a document that never loads.
+function loadOwnPayslip(db, workerId, id) {
+  const empId = loadLinkedEmployeeId(workerId);
+  if (!empId) return null;
+  const p = db.prepare('SELECT * FROM payslips WHERE id = ? AND employee_id = ?').get(id, empId);
+  if (!p || !p.pdf_filename) return null;
+  p.filePath = path.join(PAYSLIP_DIR, `emp_${p.employee_id}`, p.pdf_filename);
+  return fs.existsSync(p.filePath) ? p : null;
+}
+
+// GET /w/hr/payslips/:id/view — In-app viewer for the worker's own payslip.
+// Navigating straight to the byte stream strands the crew member: iOS WKWebView
+// (and the installed PWA) render an inline PDF with no chrome and no back
+// button, so the only way out of the Capacitor shell was to force-quit.
+router.get('/hr/payslips/:id/view', (req, res) => {
+  const db = getDb();
+  const p = loadOwnPayslip(db, req.session.worker.id, req.params.id);
+  if (!p) return res.status(404).send('Not found');
+  const period = p.pay_date
+    ? new Date(p.pay_date + 'T00:00:00').toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
+  res.render('worker/pdf-view', {
+    layout: 'worker/layout-bare',
+    title: period ? `Payslip — ${period}` : 'Payslip',
+    back: safeWorkerBack(req.query.back, '/w/hr/payslips'),
+    pdfUrl: '/w/hr/payslips/' + p.id,
+    fileName: `Payslip_${p.pay_date}.pdf`,
+  });
+});
+
+// GET /w/hr/payslips/:id — Download the worker's own payslip (auth-checked stream).
+// Also the /view viewer's data source and download target.
 router.get('/hr/payslips/:id', (req, res) => {
   const db = getDb();
-  const empId = loadLinkedEmployeeId(req.session.worker.id);
-  if (!empId) return res.status(404).send('Not found');
-
-  const p = db.prepare('SELECT * FROM payslips WHERE id = ? AND employee_id = ?').get(req.params.id, empId);
-  if (!p || !p.pdf_filename) return res.status(404).send('Not found');
-
-  const filePath = path.join(PAYSLIP_DIR, `emp_${p.employee_id}`, p.pdf_filename);
-  if (!fs.existsSync(filePath)) return res.status(404).send('File missing');
+  const p = loadOwnPayslip(db, req.session.worker.id, req.params.id);
+  if (!p) return res.status(404).send('Not found');
 
   // First-view timestamp (for admin visibility) + always bump view_count
   try {
@@ -664,7 +718,7 @@ router.get('/hr/payslips/:id', (req, res) => {
   const downloadName = `Payslip_${p.pay_date}.pdf`;
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${downloadName}"`);
-  fs.createReadStream(filePath).pipe(res);
+  fs.createReadStream(p.filePath).pipe(res);
 });
 
 // ============================================

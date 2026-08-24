@@ -1,11 +1,12 @@
 <%
-// In-app viewer for a completed checklist PDF. Renders through the shared
-// pdf.js viewer (public/js/worker-pdf-viewer.js) rather than navigating to
-// the raw byte stream — an inline PDF in iOS WKWebView has no chrome and no
-// back button, which used to strand crew inside the Capacitor shell.
-// Chrome matches the SWMS/SOP viewers (views/worker/safety/swms-view.ejs).
-const pdfUrl = '/w/forms/history/' + meta.id + '/pdf';
-const fileName = 'TSTC_' + (meta.form_type || 'checklist') + '_' + String(meta.submitted_at || '').slice(0, 10) + '.pdf';
+// Shared in-app PDF viewer for the worker portal. Renders a PDF through the
+// pdf.js viewer (public/js/worker-pdf-viewer.js) rather than navigating to the
+// raw byte stream — an inline PDF in iOS WKWebView has no chrome and no back
+// button, which strands crew inside the Capacitor shell (no hardware back, no
+// swipe-back, no @capacitor/browser escape). Chrome matches the SWMS/SOP
+// viewers (views/worker/safety/swms-view.ejs).
+//
+// Locals: title, back (server-sanitised /w/ path), pdfUrl, fileName.
 %>
 <style>
   body { background: #020817; }

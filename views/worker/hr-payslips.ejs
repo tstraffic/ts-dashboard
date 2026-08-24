@@ -55,7 +55,10 @@
       <% payslips.forEach(function (p) {
         const isNew = !p.viewed_at;
       %>
-        <a href="/w/hr/payslips/<%= p.id %>" target="_blank" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; text-decoration: none; background: <%= isNew ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.02)' %>; border: 1px solid <%= isNew ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.04)' %>;">
+        <%# Opens the in-app viewer, not the raw PDF stream — target="_blank"
+            onto an inline PDF leaves the crew member with no way back inside
+            the iOS shell. %>
+        <a href="/w/hr/payslips/<%= p.id %>/view?back=<%= encodeURIComponent('/w/hr/payslips') %>" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; text-decoration: none; background: <%= isNew ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.02)' %>; border: 1px solid <%= isNew ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.04)' %>;">
           <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: <%= isNew ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.15)' %>; color: <%= isNew ? '#34D399' : '#60A5FA' %>; flex-shrink: 0;">
             <span style="font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; line-height: 1;"><%= new Date(p.pay_date + 'T00:00:00').toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', month: 'short' }).toUpperCase() %></span>
             <span style="font-size: 1.1rem; font-weight: 800; line-height: 1.1;"><%= new Date(p.pay_date + 'T00:00:00').getDate() %></span>

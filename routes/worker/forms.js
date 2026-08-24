@@ -8,6 +8,7 @@ const { getDb } = require('../../db/database');
 const { notifySubmission } = require('../../services/jobPackNotify');
 const { sydneyToday } = require('../../lib/sydney');
 const { resolveShift, getCurrentDocket } = require('../../lib/shiftDocket');
+const { safeWorkerBack } = require('../../lib/workerBack');
 
 // Fire-and-forget email-the-PDF-to-ops on every Job-Pack submission.
 // The email send happens off the request path so a slow / failed Resend
@@ -1460,17 +1461,13 @@ router.get('/forms/history/:id/view', (req, res) => {
   const db = getDb();
   if (!canViewSubmission(db, req.session.worker, req.params.id)) return res.status(404).send('Not found');
   const meta = db.prepare('SELECT id, form_type, submitted_at FROM safety_forms WHERE id = ?').get(req.params.id);
-  // Only ever bounce back to an internal worker path (same rule as the
-  // job/booking doc viewer in routes/worker/jobs.js).
-  const back = (typeof req.query.back === 'string' && req.query.back.startsWith('/w/'))
-    ? req.query.back
-    : '/w/forms/history';
   const { FORM_HEADING } = require('../../services/jobPackPdf');
-  res.render('worker/forms/pdf-view', {
+  res.render('worker/pdf-view', {
     layout: 'worker/layout-bare',
     title: FORM_HEADING[meta.form_type] || 'Checklist',
-    meta, back,
-    worker: req.session.worker,
+    back: safeWorkerBack(req.query.back, '/w/forms/history'),
+    pdfUrl: '/w/forms/history/' + meta.id + '/pdf',
+    fileName: 'TSTC_' + (meta.form_type || 'checklist') + '_' + String(meta.submitted_at || '').slice(0, 10) + '.pdf',
   });
 });
 

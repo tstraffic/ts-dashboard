@@ -11,6 +11,7 @@ const { getDb } = require('../../db/database');
 const { encrypt, maskLast } = require('../../services/encryption');
 const { logActivity } = require('../../middleware/audit');
 const { requirePinConfirm } = require('../../middleware/pinRateLimit');
+const { safeWorkerBack } = require('../../lib/workerBack');
 const { generateTfnPdf } = require('../../services/tfnPdf');
 const { notifyUsers } = (() => { try { return require('../../middleware/notifications'); } catch (e) { return { notifyUsers: () => {} }; } })();
 
@@ -178,6 +179,30 @@ router.get('/hr/super', (req, res) => {
     employee,
     current,
     defaultFund: getDefaultSuper(),
+  });
+});
+
+// GET /w/hr/super/choice-form — In-app viewer for the Super Choice PDF the
+// worker uploaded. The row's choice_form_url is a static /data/uploads path;
+// linking straight to it strands the crew member, because iOS WKWebView (and
+// the installed PWA) render an inline PDF with no chrome and no back button —
+// no hardware back, no swipe-back, no system-browser escape. Same viewer the
+// checklist/payslip/VOC pages use.
+router.get('/hr/super/choice-form', (req, res) => {
+  const employee = loadEmployee(req.session.worker);
+  if (!employee) return res.redirect('/w/hr');
+  const db = getDb();
+  // Scoped to this worker's own latest super row — the src is read from the DB,
+  // never from the query string, so there's no path to traverse.
+  const current = db.prepare('SELECT choice_form_url FROM super_funds WHERE employee_id = ? ORDER BY id DESC LIMIT 1').get(employee.id);
+  if (!current || !current.choice_form_url) return res.status(404).send('Not found');
+
+  res.render('worker/pdf-view', {
+    layout: 'worker/layout-bare',
+    title: 'Super Choice form',
+    back: safeWorkerBack(req.query.back, '/w/hr/super'),
+    pdfUrl: current.choice_form_url,
+    fileName: 'Super_Choice_Form.pdf',
   });
 });
 

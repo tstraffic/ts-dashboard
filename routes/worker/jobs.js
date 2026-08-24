@@ -4,6 +4,7 @@ const { getDb } = require('../../db/database');
 const { sydneyToday, TZ: SYD_TZ } = require('../../lib/sydney');
 const { resolveShift, getCurrentDocket } = require('../../lib/shiftDocket');
 const { maybePromoteToGreenToGo, WORKER_VISIBLE_STATUSES, reconcileWorkerAllocations } = require('../../lib/bookingLifecycle');
+const { safeWorkerBack } = require('../../lib/workerBack');
 const bookingNotify = require('../../services/bookingNotify');
 const { syncBookingReturnTasks, syncBookingTaskGroups, createTeamTask } = require('../../services/returnTasks');
 const { logActivity } = require('../../middleware/audit');
@@ -712,7 +713,7 @@ router.get('/doc/:source/:id', (req, res) => {
     : ['png','jpg','jpeg','gif','webp','heic'].includes(ext) ? 'image'
     : 'other';
   // Sanitise the back target — only allow internal worker paths.
-  let back = typeof req.query.back === 'string' && req.query.back.startsWith('/w/') ? req.query.back : '/w/jobs';
+  const back = safeWorkerBack(req.query.back, '/w/jobs');
 
   res.render('worker/doc-view', {
     title: doc.title || name,

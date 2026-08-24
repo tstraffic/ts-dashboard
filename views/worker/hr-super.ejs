@@ -27,7 +27,9 @@
       <div class="sf-readrow"><span class="sf-k">Member #</span><span class="sf-v"><%= current.member_number || '—' %></span></div>
       <% if (current.fund_abn) { %><div class="sf-readrow"><span class="sf-k">Fund ABN</span><span class="sf-v"><%= current.fund_abn %></span></div><% } %>
       <% if (current.choice_form_url) { %>
-        <div class="sf-readrow"><span class="sf-k">Choice form</span><span class="sf-v"><a class="text-brand-400 underline" href="<%= current.choice_form_url %>" target="_blank">View PDF</a></span></div>
+        <%# In-app viewer, not the static /data/uploads URL — an inline PDF in the
+            iOS shell has no chrome and no back button. %>
+        <div class="sf-readrow"><span class="sf-k">Choice form</span><span class="sf-v"><a class="text-brand-400 underline" href="/w/hr/super/choice-form?back=<%= encodeURIComponent('/w/hr/super') %>">View PDF</a></span></div>
       <% } %>
       <p class="sf-meta">Submitted <%= new Date(current.updated_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }) %></p>
     </div>
