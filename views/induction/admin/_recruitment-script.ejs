@@ -511,9 +511,15 @@
         body: '_csrf=' + encodeURIComponent(csrf),
       });
       var data = await r.json().catch(function () { return {}; });
-      if (data.status === 'sent') { toast(data.reEmail ? 'Confirmation re-emailed' : 'Confirmation sent'); markEmailedBadge(id); }
+      // data.sms mirrors data.status for the SMS channel ('sent' | 'failed' |
+      // 'no_phone' | 'no_date' | 'not_configured') — only mention it when it
+      // actually delivered, so nothing changes for installs without SMS.
+      var texted = data.sms === 'sent';
+      if (data.status === 'sent') { toast((data.reEmail ? 'Confirmation re-emailed' : 'Confirmation emailed') + (texted ? ' + texted' : '')); markEmailedBadge(id); }
+      else if (data.status === 'no_email' && texted) { toast('Confirmation texted (no email on file)'); }
       else if (data.status === 'no_email') { toast('No email on file for this candidate', true); }
       else if (data.status === 'no_date') { toast('Set an induction date first', true); }
+      else if (texted) { toast('Confirmation texted, but the email failed', true); }
       else { toast("Couldn't send — try again", true); }
     } catch (e) {
       toast("Couldn't send — try again", true);

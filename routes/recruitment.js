@@ -10,6 +10,7 @@ const { getDb } = require('../db/database');
 const { sydneyToday } = require('../lib/sydney');
 const { sendEmail } = require('../services/email');
 const { inductionConfirmationEmail } = require('../services/emailTemplates');
+const sms = require('../services/sms');
 
 // Public induction form the confirmation email points applicants to.
 const INDUCTION_FORM_URL = (process.env.APP_BASE_URL || 'https://tstc.up.railway.app').replace(/\/$/, '') + '/induction';
@@ -48,6 +49,27 @@ async function sendInductionConfirmation(db, applicant, replyTo) {
     return 'failed';
   }
 }
+// SMS twin of sendInductionConfirmation. Sends the same booking confirmation
+// as a short text to the applicant's mobile via ClickSend (services/sms.js —
+// the channel no-ops until CLICKSEND_* env vars are set, so calling this
+// unconditionally is safe). Returns one of:
+// 'sent' | 'failed' | 'no_phone' | 'no_date' | 'not_configured'.
+async function sendInductionSms(db, applicant) {
+  if (!sms.isConfigured()) return 'not_configured';
+  if (!applicant.induction_date) return 'no_date';
+  if (!sms.normalizeAuMobile(applicant.phone)) return 'no_phone';
+  const when = inductionWhenText(applicant.induction_date, applicant.induction_time);
+  const body = 'T&S Traffic Control: your induction is booked for ' + when + '. ' +
+    'Please complete your induction form before you arrive: ' + INDUCTION_FORM_URL;
+  const result = await sms.sendSms(applicant.phone, body);
+  if (result) {
+    try { db.prepare('UPDATE seek_applicants SET induction_sms_sent_at = CURRENT_TIMESTAMP WHERE id = ?').run(applicant.id); } catch (e) { /* column missing on stale deploy */ }
+    return 'sent';
+  }
+  console.warn('[recruitment] induction confirmation SMS not sent for applicant', applicant.id);
+  return 'failed';
+}
+
 // Human "on <date> at <time>" for notifications/flash. Mirrors the email's
 // wording so what the admin is told matches what the applicant received.
 function inductionWhenText(isoDateRaw, timeRaw) {
@@ -66,20 +88,32 @@ function inductionWhenText(isoDateRaw, timeRaw) {
 // just went out (or didn't), so a re-email is never silent. `outcome` is the
 // sendInductionConfirmation return; `reEmail` distinguishes a resend from the
 // first confirmation.
-function notifyInductionEmail(db, userId, applicant, outcome, reEmail) {
+function notifyInductionEmail(db, userId, applicant, outcome, reEmail, smsOutcome) {
   if (!userId) return;
   const when = inductionWhenText(applicant.induction_date, applicant.induction_time);
   const name = applicant.applicant_name || 'Applicant';
+  // SMS is a secondary channel appended to the email-centric message. When SMS
+  // isn't configured ('not_configured'/null/undefined) nothing is appended and
+  // the wording is exactly what it was before the channel existed.
+  const smsNote = smsOutcome === 'sent' ? ' · SMS sent'
+    : smsOutcome === 'failed' ? ' · SMS failed'
+    : smsOutcome === 'no_phone' ? ' · no mobile for SMS'
+    : '';
   let title, message;
   if (outcome === 'sent') {
     title = reEmail ? 'Induction re-emailed' : 'Induction confirmation emailed';
-    message = `${name} — ${when}${reEmail ? ' (re-sent)' : ''}`;
+    message = `${name} — ${when}${reEmail ? ' (re-sent)' : ''}${smsNote}`;
   } else if (outcome === 'failed') {
     title = 'Induction email failed';
-    message = `${name} — ${when}. The confirmation didn't send; try Re-send.`;
+    message = `${name} — ${when}. The confirmation didn't send; try Re-send.${smsNote}`;
   } else if (outcome === 'no_email') {
-    title = 'Induction time changed — no email on file';
-    message = `${name} — ${when}. No email address, so nothing was sent.`;
+    // With a delivered SMS the applicant WAS told — don't say nothing was sent.
+    title = smsOutcome === 'sent'
+      ? 'Induction confirmation texted (no email on file)'
+      : 'Induction time changed — no email on file';
+    message = smsNote
+      ? `${name} — ${when}. No email address on file.${smsNote}`
+      : `${name} — ${when}. No email address, so nothing was sent.`;
   } else { return; }
   const iso = String(applicant.induction_date || '').slice(0, 10);
   const link = iso
@@ -492,25 +526,30 @@ router.post('/:id', async (req, res) => {
   // real outcome and stamp `induction_email_sent_at` for a durable record.
   //   inductionEmailed: 'sent' | 'failed' | 'no_email' | null (no booking change)
   let inductionEmailed = null;
+  let inductionTexted = null;
   const wasReEmail = !!(inductionDateChange && inductionDateChange.wasEmailed);
   if (inductionDateChange) {
     // Read back the freshly-persisted date/time so the email matches the row.
-    const fresh = db.prepare('SELECT id, applicant_name, email, induction_date, induction_time FROM seek_applicants WHERE id = ?').get(row.id);
+    const fresh = db.prepare('SELECT id, applicant_name, email, phone, induction_date, induction_time FROM seek_applicants WHERE id = ?').get(row.id);
     const replyTo = (req.session.user && req.session.user.email) || undefined;
     inductionEmailed = await sendInductionConfirmation(db, fresh, replyTo);
+    inductionTexted = await sendInductionSms(db, fresh);
 
     // Tell the acting user what happened — a bell notification (durable, shows
     // regardless of which edit surface was used) that reflects the ACTUAL
-    // email outcome and calls out a re-email vs the first confirmation. Also a
-    // flash so the plain list-form edit (a full-page POST) says it inline.
+    // email + SMS outcomes and calls out a re-email vs the first confirmation.
+    // Also a flash so the plain list-form edit (a full-page POST) says it inline.
     if (req.session && req.session.user) {
-      notifyInductionEmail(db, req.session.user.id, fresh, inductionEmailed, wasReEmail);
+      notifyInductionEmail(db, req.session.user.id, fresh, inductionEmailed, wasReEmail, inductionTexted);
     }
     if (!wantsJson(req)) {
       const when = inductionWhenText(fresh.induction_date, fresh.induction_time);
-      if (inductionEmailed === 'sent') req.flash('success', `${fresh.applicant_name} ${wasReEmail ? 're-emailed' : 'emailed'} their induction confirmation — ${when}.`);
+      const texted = inductionTexted === 'sent' ? ' and texted' : '';
+      if (inductionEmailed === 'sent') req.flash('success', `${fresh.applicant_name} ${wasReEmail ? 're-emailed' : 'emailed'}${texted} their induction confirmation — ${when}.`);
       else if (inductionEmailed === 'failed') req.flash('error', `Induction time saved, but the confirmation email to ${fresh.applicant_name} didn't send — use Re-send.`);
+      else if (inductionEmailed === 'no_email' && inductionTexted === 'sent') req.flash('success', `${fresh.applicant_name} texted their induction confirmation — ${when}. (No email on file.)`);
       else if (inductionEmailed === 'no_email') req.flash('warning', `Induction time saved for ${fresh.applicant_name}, but there's no email on file so nothing was sent.`);
+      if (inductionTexted === 'failed') req.flash('warning', `The confirmation text to ${fresh.applicant_name} didn't send — use Re-send.`);
     }
   }
 
@@ -520,7 +559,7 @@ router.post('/:id', async (req, res) => {
   // crew/employee profiles. Hired is just the final pipeline stage.
 
   if (wantsJson(req)) {
-    return res.json({ ok: true, stage: newStage, inductionEmailed, reEmail: wasReEmail });
+    return res.json({ ok: true, stage: newStage, inductionEmailed, inductionTexted, reEmail: wasReEmail });
   }
   req.session.save(() => res.redirect(backUrl(req)));
 });
@@ -530,15 +569,17 @@ router.post('/:id', async (req, res) => {
 // it, or the date changed). Uses the applicant's stored date/time.
 router.post('/:id/resend-confirmation', async (req, res) => {
   const db = getDb();
-  const a = db.prepare('SELECT id, applicant_name, email, induction_date, induction_time, induction_email_sent_at FROM seek_applicants WHERE id = ?').get(req.params.id);
+  const a = db.prepare('SELECT id, applicant_name, email, phone, induction_date, induction_time, induction_email_sent_at FROM seek_applicants WHERE id = ?').get(req.params.id);
   if (!a) return res.status(404).json({ ok: false, status: 'not_found', error: 'Applicant not found.' });
   const replyTo = (req.session.user && req.session.user.email) || undefined;
   const wasReEmail = !!a.induction_email_sent_at; // already emailed once → this is a re-send
   const status = await sendInductionConfirmation(db, a, replyTo);
+  const smsStatus = await sendInductionSms(db, a);
   // Log a bell notification so a manual re-send is surfaced the same way an
   // auto re-email on a time change is.
-  if (req.session && req.session.user) notifyInductionEmail(db, req.session.user.id, a, status, wasReEmail);
-  res.json({ ok: status === 'sent', status, reEmail: wasReEmail });
+  if (req.session && req.session.user) notifyInductionEmail(db, req.session.user.id, a, status, wasReEmail, smsStatus);
+  // ok = the applicant was reached on at least one channel.
+  res.json({ ok: status === 'sent' || smsStatus === 'sent', status, sms: smsStatus, reEmail: wasReEmail });
 });
 
 // POST /induction/admin/recruitment/:id/delete — remove a row. Deleting also

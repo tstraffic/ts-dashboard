@@ -15536,6 +15536,19 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 347 error:', e.message); }
   }
 
+  // Migration 348: seek_applicants.induction_sms_sent_at — induction booking
+  // confirmations now also go out by SMS (services/sms.js, ClickSend; the
+  // channel no-ops until CLICKSEND_* env vars are set). Same durable stamp
+  // the email channel keeps in induction_email_sent_at.
+  if (!isMigrationApplied.get(348)) {
+    try {
+      const cols = db.prepare('PRAGMA table_info(seek_applicants)').all().map(c => c.name);
+      if (!cols.includes('induction_sms_sent_at')) db.exec('ALTER TABLE seek_applicants ADD COLUMN induction_sms_sent_at DATETIME');
+      recordMigration.run(348, 'seek_applicants.induction_sms_sent_at (SMS booking confirmations)');
+      console.log('Migration 348 applied: induction_sms_sent_at');
+    } catch (e) { console.error('Migration 348 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

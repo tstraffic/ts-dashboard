@@ -60,6 +60,7 @@ Atomis is a multi-tenant operations platform. **T&S Traffic Control** (Sydney tr
 
 ## Key Services
 - `services/email.js` — Email sending (Resend HTTP API or SMTP fallback)
+- `services/sms.js` — SMS via ClickSend (AU mobiles only; no-ops until `CLICKSEND_*` env vars set — recruitment induction confirmations use it)
 - `services/emailTemplates.js` — Branded HTML email templates
 - `services/pushNotification.js` — Web Push (VAPID key management, subscription CRUD, sending)
 - `services/invitations.js` — Token-based invitations/password resets
@@ -232,6 +233,10 @@ SMTP_FROM_NAME=T&S Traffic Control
 # Optional: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL
 # Native iOS push (APNs) — channel no-ops until set. See docs/APP_STORE.md
 # APNS_TEAM_ID, APNS_KEY_ID, APNS_KEY_BASE64, APNS_BUNDLE_ID=au.com.atomis.crew, APNS_ENV=production
+# SMS (ClickSend) — channel no-ops until set. Used for recruitment induction booking texts.
+# CLICKSEND_USERNAME=<clicksend login email>
+# CLICKSEND_API_KEY=<from dashboard.clicksend.com → Developers → API Credentials>
+# CLICKSEND_SENDER_ID=TS Traffic   # optional, alphanumeric, max 11 chars, not replyable
 ```
 
 ## Native iOS app (Capacitor)
