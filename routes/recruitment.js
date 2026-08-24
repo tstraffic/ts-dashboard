@@ -70,13 +70,15 @@ async function sendInductionSms(db, applicant) {
   const tm = String(applicant.induction_time || '').match(/^(\d{1,2}):(\d{2})/);
   if (tm) { let h = parseInt(tm[1], 10); const min = tm[2]; const ap = h >= 12 ? 'pm' : 'am'; h = h % 12 || 12; timeStr = ' at ' + h + ':' + min + ' ' + ap; }
   const body =
-    'T&S Traffic Control: Hi, this is a confirmation for your induction at our depot, ' +
-    'located at 9 Epic Place, Villawood. It will take place on ' + weekday + ', ' + dmy + timeStr +
-    ', for the duration of approximately under an hour. Please bring hard copies of your licenses, ' +
-    'and keep your superannuation details ready if applicable. Casual attire is fine for the ' +
-    'duration of the induction. Please fill out the following form prior to your induction to ' +
-    'register your details within our system: ' + INDUCTION_FORM_URL +
-    ' For any questions, call 0410 170 194. Thank you';
+    'T&S Traffic Control: Hi,\n\n' +
+    'This is a confirmation for your induction at our depot, located at 9 Epic Place, Villawood.\n\n' +
+    'It will take place on ' + weekday + ', ' + dmy + timeStr + ', for the duration of approximately ' +
+    'under an hour. Please bring hard copies of your licenses, and keep your superannuation details ' +
+    'ready if applicable. Casual attire is fine for the duration of the induction.\n\n' +
+    'Additionally, please fill out the following form prior to your induction to register your ' +
+    'details within our system:\n' + INDUCTION_FORM_URL + '\n\n' +
+    'For any questions, call 0410 170 194.\n\n' +
+    'Thank you';
   const result = await sms.sendSms(applicant.phone, body);
   if (result) {
     try { db.prepare('UPDATE seek_applicants SET induction_sms_sent_at = CURRENT_TIMESTAMP WHERE id = ?').run(applicant.id); } catch (e) { /* column missing on stale deploy */ }
