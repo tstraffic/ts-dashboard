@@ -192,6 +192,7 @@ function inductionConfirmationEmail(whenText, inductionUrl) {
     <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 4px;">Please fill out our induction form before you arrive:</p>
     ${buttonHtml('Open Induction Form', inductionUrl)}
     <p style="color:#6B7280;font-size:13px;line-height:1.6;margin:0 0 16px;word-break:break-all;">Or paste this link into your browser: <a href="${inductionUrl}" style="color:#059669;">${inductionUrl}</a></p>
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">For any questions, call <a href="tel:+61410170194" style="color:#059669;font-weight:600;">0410 170 194</a>.</p>
     <p style="color:#374151;font-size:15px;line-height:1.6;margin:0;">Thank you</p>
   `);
 }
@@ -208,6 +209,7 @@ function inductionReminderEmail(whenText, inductionUrl, leadLabel) {
     <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 4px;">If you haven't yet, please fill out our induction form before you arrive:</p>
     ${buttonHtml('Open Induction Form', inductionUrl)}
     <p style="color:#6B7280;font-size:13px;line-height:1.6;margin:0 0 16px;word-break:break-all;">Or paste this link into your browser: <a href="${inductionUrl}" style="color:#059669;">${inductionUrl}</a></p>
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">For any questions, call <a href="tel:+61410170194" style="color:#059669;font-weight:600;">0410 170 194</a>.</p>
     <p style="color:#374151;font-size:15px;line-height:1.6;margin:0;">See you there — T&amp;S Traffic Control</p>
   `);
 }

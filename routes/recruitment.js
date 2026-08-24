@@ -75,7 +75,8 @@ async function sendInductionSms(db, applicant) {
     ', for the duration of approximately under an hour. Please bring hard copies of your licenses, ' +
     'and keep your superannuation details ready if applicable. Casual attire is fine for the ' +
     'duration of the induction. Please fill out the following form prior to your induction to ' +
-    'register your details within our system: ' + INDUCTION_FORM_URL + ' Thank you';
+    'register your details within our system: ' + INDUCTION_FORM_URL +
+    ' For any questions, call 0410 170 194. Thank you';
   const result = await sms.sendSms(applicant.phone, body);
   if (result) {
     try { db.prepare('UPDATE seek_applicants SET induction_sms_sent_at = CURRENT_TIMESTAMP WHERE id = ?').run(applicant.id); } catch (e) { /* column missing on stale deploy */ }
