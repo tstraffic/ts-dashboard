@@ -185,8 +185,15 @@
   });
 
   function timeAgo(dateStr) {
+    // SQLite CURRENT_TIMESTAMP is UTC with no zone marker — parse it as UTC
+    // ('Z'), otherwise the browser reads it as Sydney-local and a brand-new
+    // notification shows "10h ago" (same fix as worker/_feed_items.ejs).
+    var s = String(dateStr || '');
+    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s) && !/Z$|[+-]\d{2}:?\d{2}$/.test(s)) {
+      s = s.replace(' ', 'T') + 'Z';
+    }
     const now = new Date();
-    const d = new Date(dateStr);
+    const d = new Date(s);
     const diffMs = now - d;
     const mins = Math.floor(diffMs / 60000);
     if (mins < 1) return 'just now';
@@ -195,7 +202,7 @@
     if (hrs < 24) return hrs + 'h ago';
     const days = Math.floor(hrs / 24);
     if (days < 7) return days + 'd ago';
-    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+    return d.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short' });
   }
 
   function typeIcon(type) {
