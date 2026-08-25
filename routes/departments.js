@@ -81,6 +81,15 @@ router.get('/:key', (req, res) => {
   try { stats = dept.stats(db, today) || []; }
   catch (e) { console.error(`[departments] ${dept.key} stats failed:`, e.message); }
 
+  // Optional module summary under the stats strip — planning's Plans &
+  // Approvals tiles. Permission-checks itself and may return null. Same
+  // never-500 rule as stats.
+  let summaryPanel = null;
+  if (dept.summaryPanel) {
+    try { summaryPanel = dept.summaryPanel(db, req.session.user, today); }
+    catch (e) { console.error(`[departments] ${dept.key} summaryPanel failed:`, e.message); }
+  }
+
   // Needs-attention panel: registry rows scoped to this department's keys
   // plus the department's own extra rows. needsKeys [] = extras only; no
   // needsKeys at all = no panel (reports). Same never-500 rule as stats.
@@ -138,7 +147,7 @@ router.get('/:key', (req, res) => {
   res.render('departments/home', {
     title: dept.label + ' Home',
     user: req.session.user,
-    dept, stats, needs,
+    dept, stats, needs, summaryPanel,
     deptIcon: deptIcon(dept.key),
     modules: moduleLinks(req.session.user, dept),
     upcoming, past, openTodos, companyItems, companyTodos, today,

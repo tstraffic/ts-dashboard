@@ -407,30 +407,17 @@ router.get('/', (req, res) => {
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
   const users = db.prepare('SELECT id, full_name FROM users WHERE active = 1 ORDER BY full_name').all();
 
-  const allItems = db.prepare('SELECT status, due_date, expiry_date, ready_for_invoice, invoiced, invoiced_at, charge_amount, costs FROM compliance').all();
-  const todayStr = toDateStr(today);
-  const soonStr = toDateStr(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
-  const cutoff30Str = toDateStr(new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000));
-  const summary = {
-    total: allItems.length,
-    approved: allItems.filter(i => i.status === 'approved').length,
-    pending: allItems.filter(i => ['not_started', 'submitted'].includes(i.status)).length,
-    overdue: allItems.filter(i => i.due_date && i.due_date < todayStr && i.status !== 'approved' && i.status !== 'expired').length,
-    expiringSoon: allItems.filter(i => i.status === 'approved' && i.expiry_date && i.expiry_date >= todayStr && i.expiry_date <= soonStr).length,
-    // Invoice workflow stats
-    readyForInvoice: allItems.filter(i => i.ready_for_invoice && !i.invoiced).length,
-    readyForInvoiceValue: allItems.filter(i => i.ready_for_invoice && !i.invoiced)
-      .reduce((sum, i) => sum + (parseFloat(i.charge_amount) || parseFloat(i.costs) || 0), 0),
-    invoicedLast30: allItems.filter(i => i.invoiced && i.invoiced_at && i.invoiced_at >= cutoff30Str).length,
-    invoicedLast30Value: allItems.filter(i => i.invoiced && i.invoiced_at && i.invoiced_at >= cutoff30Str)
-      .reduce((sum, i) => sum + (parseFloat(i.charge_amount) || parseFloat(i.costs) || 0), 0),
-  };
+  // The summary tiles this page used to carry (total / approved / pending /
+  // overdue / expiring / invoice counts, plus the expiry distribution bar)
+  // moved to the Planning hub — lib/departments.js planSummary. The register
+  // opens straight onto the list; the whole-table scan they needed is gone
+  // with them.
 
   res.render('compliance/index', {
     title: 'Plans & Approvals',
     items, monthGroups, jobs, clients, users,
     filters: { status: status || '', job_id: job_id || '', client_id: client_id || '', item_type: item_type || '', view, ref: ref || '', date_from: date_from || '', date_to: date_to || '', invoice_state: invoice_state || '' },
-    view, periodLabel, prevRef, nextRef, summary,
+    view, periodLabel, prevRef, nextRef,
     subPlansByParent,
     user: req.session.user
   });

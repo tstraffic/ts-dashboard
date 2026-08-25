@@ -34,21 +34,13 @@
   const todayStr = new Date().toISOString().split('T')[0];
   const soonStr = new Date(Date.now() + 14*24*60*60*1000).toISOString().split('T')[0];
 
-  // Expiry band calculations
+  // Expiry bands, for row shading. The summary tiles and the expiry
+  // distribution bar that also read these now live on the Planning hub
+  // (/departments/planning — lib/departments.js planSummary), so this page
+  // opens straight onto the register.
   const day7Str = new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
   const day30Str = new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0];
   const day60Str = new Date(Date.now() + 60*24*60*60*1000).toISOString().split('T')[0];
-
-  let expiryExpired = 0, expiry7d = 0, expiry30d = 0, expiry60d = 0, expiryOk = 0;
-  items.forEach(function(item) {
-    if (!item.expiry_date) { expiryOk++; return; }
-    if (item.expiry_date < todayStr) { expiryExpired++; }
-    else if (item.expiry_date <= day7Str) { expiry7d++; }
-    else if (item.expiry_date <= day30Str) { expiry30d++; }
-    else if (item.expiry_date <= day60Str) { expiry60d++; }
-    else { expiryOk++; }
-  });
-  const expiryTotal = expiryExpired + expiry7d + expiry30d + expiry60d + expiryOk;
 
   function getExpiryRowClass(item) {
     if (!item.expiry_date) return '';
@@ -66,68 +58,6 @@
   subtitle: 'TGS plans, CTMPs, SPAs, ROLs and other approvals',
   actions: [{ label: 'New Item', href: '/compliance/new', style: 'primary', icon: 'M12 4v16m8-8H4' }]
 }) %>
-
-  <!-- Summary Cards -->
-  <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
-    <div class="stat-card">
-      <div class="stat-card-label">Total</div>
-      <div class="stat-card-value"><%= summary.total %></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card-label">Approved</div>
-      <div class="stat-card-value <%= summary.approved > 0 ? 'is-good' : 'is-muted' %>"><%= summary.approved %></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card-label">Pending</div>
-      <div class="stat-card-value <%= summary.pending > 0 ? 'is-info' : 'is-muted' %>"><%= summary.pending %></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card-label">Overdue</div>
-      <div class="stat-card-value <%= summary.overdue > 0 ? 'is-critical' : 'is-muted' %>"><%= summary.overdue %></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card-label">Expiring Soon</div>
-      <div class="stat-card-value <%= summary.expiringSoon > 0 ? 'is-warn' : 'is-muted' %>"><%= summary.expiringSoon %></div>
-    </div>
-    <a href="<%= buildUrl({ invoice_state: 'ready', view: filters.view, ref: filters.ref }) %>" class="stat-card accent-amber">
-      <div class="stat-card-label">Ready for Invoice</div>
-      <div class="stat-card-value <%= summary.readyForInvoice > 0 ? 'is-warn' : 'is-muted' %>"><%= summary.readyForInvoice %></div>
-      <% if (summary.readyForInvoiceValue > 0) { %>
-        <div class="stat-card-sub">$<%= summary.readyForInvoiceValue.toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) %></div>
-      <% } %>
-    </a>
-    <a href="<%= buildUrl({ invoice_state: 'invoiced', view: filters.view, ref: filters.ref }) %>" class="stat-card accent-emerald">
-      <div class="stat-card-label">Invoiced (30d)</div>
-      <div class="stat-card-value <%= summary.invoicedLast30 > 0 ? 'is-good' : 'is-muted' %>"><%= summary.invoicedLast30 %></div>
-      <% if (summary.invoicedLast30Value > 0) { %>
-        <div class="stat-card-sub">$<%= summary.invoicedLast30Value.toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) %></div>
-      <% } %>
-    </a>
-  </div>
-
-  <!-- Expiry Urgency Bar -->
-  <% if (expiryTotal > 0) { %>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-4">
-    <div class="flex items-center justify-between mb-2">
-      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Expiry Distribution</p>
-      <p class="text-[10px] text-gray-400"><%= expiryTotal %> items</p>
-    </div>
-    <div class="flex h-4 rounded-full overflow-hidden bg-gray-100">
-      <% if (expiryExpired > 0) { %><div class="bg-red-500 transition-all" style="width: <%= (expiryExpired / expiryTotal * 100) %>%" title="Expired: <%= expiryExpired %>"></div><% } %>
-      <% if (expiry7d > 0) { %><div class="bg-red-300 transition-all" style="width: <%= (expiry7d / expiryTotal * 100) %>%" title="Within 7 days: <%= expiry7d %>"></div><% } %>
-      <% if (expiry30d > 0) { %><div class="bg-amber-400 transition-all" style="width: <%= (expiry30d / expiryTotal * 100) %>%" title="7-30 days: <%= expiry30d %>"></div><% } %>
-      <% if (expiry60d > 0) { %><div class="bg-yellow-300 transition-all" style="width: <%= (expiry60d / expiryTotal * 100) %>%" title="30-60 days: <%= expiry60d %>"></div><% } %>
-      <% if (expiryOk > 0) { %><div class="bg-emerald-400 transition-all" style="width: <%= (expiryOk / expiryTotal * 100) %>%" title="OK: <%= expiryOk %>"></div><% } %>
-    </div>
-    <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span> Expired (<%= expiryExpired %>)</span>
-      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-red-300 inline-block"></span> &le; 7 days (<%= expiry7d %>)</span>
-      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span> 7-30 days (<%= expiry30d %>)</span>
-      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-yellow-300 inline-block"></span> 30-60 days (<%= expiry60d %>)</span>
-      <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span> OK (<%= expiryOk %>)</span>
-    </div>
-  </div>
-  <% } %>
 
   <!-- Filters Panel -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-4">

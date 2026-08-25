@@ -50,6 +50,55 @@ function fmtTime(hhmm) {
   </div>
 <% } %>
 
+<% if (summaryPanel) { %>
+  <!-- ── Module summary — the tiles that used to head the module's own page
+       (planning: Plans & Approvals). Cards carry an href only where a real
+       filter backs them, so the rest render as plain tiles. ── -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mb-6" data-summary-panel>
+    <div class="flex items-center justify-between gap-2 mb-3">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><%= summaryPanel.title %></p>
+      <a href="<%= summaryPanel.href %>" class="text-xs font-semibold text-brand-600 hover:text-brand-700"><%= summaryPanel.linkLabel %> &rarr;</a>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <% summaryPanel.cards.forEach(function (c) { %>
+        <% if (c.href) { %>
+          <a href="<%= c.href %>" class="stat-card <%= c.accent || '' %>">
+            <div class="stat-card-label"><%= c.label %></div>
+            <div class="stat-card-value <%= c.tone %>"><%= c.value %></div>
+            <% if (c.sub) { %><div class="stat-card-sub"><%= c.sub %></div><% } %>
+          </a>
+        <% } else { %>
+          <div class="stat-card <%= c.accent || '' %>">
+            <div class="stat-card-label"><%= c.label %></div>
+            <div class="stat-card-value <%= c.tone %>"><%= c.value %></div>
+            <% if (c.sub) { %><div class="stat-card-sub"><%= c.sub %></div><% } %>
+          </div>
+        <% } %>
+      <% }); %>
+    </div>
+
+    <% if (summaryPanel.expiry && summaryPanel.expiry.total > 0) { const ex = summaryPanel.expiry; %>
+      <div class="mt-4 pt-4 border-t border-gray-100">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Expiry distribution</p>
+          <p class="text-[10px] text-gray-400"><%= ex.total %> items</p>
+        </div>
+        <div class="flex h-4 rounded-full overflow-hidden bg-gray-100">
+          <% ex.bands.forEach(function (b) { if (b.count > 0) { %>
+            <div class="<%= b.color %>" style="width: <%= (b.count / ex.total * 100) %>%" title="<%= b.label %>: <%= b.count %>"></div>
+          <% } }); %>
+        </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+          <% ex.bands.forEach(function (b) { %>
+            <span class="flex items-center gap-1.5 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded-full <%= b.color %> inline-block"></span> <%= b.label %> (<%= b.count %>)</span>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+  </div>
+<% } %>
+
 <div class="grid lg:grid-cols-3 gap-6 items-start">
 <div class="lg:col-span-2 space-y-6 min-w-0">
 
