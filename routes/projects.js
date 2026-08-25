@@ -7,6 +7,7 @@ const { logActivity } = require('../middleware/audit');
 const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadForEntity } = require('../lib/chat');
 const { generateJobNumber } = require('../lib/jobNumbers');
 const { MONTH_NAMES, monthlyJobName, combinedMonthsJobName, firstOfMonth, parseSelectedMonths, createMonthlyJobs, takenMonthsFor } = require('../lib/recurringJobs');
+const { safeListPurchaseOrders } = require('../lib/purchaseOrders');
 
 // List all projects (top-level jobs only, parent_project_id IS NULL)
 router.get('/', (req, res) => {
@@ -469,6 +470,7 @@ router.get('/:id', (req, res) => {
     complianceTgsItems, allUsers, diaryAttachments, chatMembers, activities,
     finalPlans, finalPlanDocs, finalTrafficPlans, planFlags, planRevisions, viewMode,
     swmsForJob, riskAssessmentsForJob, auditsForJob, safetyRollup,
+    purchaseOrders: safeListPurchaseOrders(db, job.id),
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });

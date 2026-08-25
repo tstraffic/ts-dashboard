@@ -242,6 +242,10 @@
     incidents: 'ops_incidents',   equipment: 'job_equipment',
     contacts: 'job_contacts',     chat: 'planning_chat',
     budget: 'job_budget',         accounts: 'job_accounts',
+    // Purchase orders are ungated on purpose: they authorise the work, so the
+    // PM and ops need them, and the Overview already shows contract value to
+    // everyone who can open the job. Same reach as the edit form's PO tab.
+    'purchase-orders': null,
   };
   function showTab(t) { const p = TAB_PERMS[t]; return !p || canAccess(user, p); }
 %>
@@ -314,6 +318,11 @@
     <a href="#accounts" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
       text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
       focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Accounts</a>
+    <% } %>
+    <% if (showTab('purchase-orders')) { %>
+    <a href="#purchase-orders" class="px-4 py-3 text-sm font-medium border-b-2 transition-colors
+      text-gray-500 hover:text-gray-900 border-transparent hover:border-gray-300
+      focus:text-brand-700 focus:border-brand-500" onclick="activateTab(this)">Purchase Orders</a>
     <% } %>
   </nav>
 </div>
@@ -2031,6 +2040,20 @@
           <% }) %>
         </div>
       <% } %>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (showTab('purchase-orders')) { %>
+  <div id="purchase-orders" class="tab-content">
+    <div class="mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Purchase Orders</h2>
+      <p class="text-sm text-gray-500 mt-0.5">Client POs for this job — the document plus the amount it authorises.</p>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+      <%# Same partial the job edit form's Purchase Orders step uses, so both
+          places upload, list and open POs identically. %>
+      <%- include('_purchase_orders', { jobId: job.id, purchaseOrders: (typeof purchaseOrders !== 'undefined' ? purchaseOrders : []) }) %>
     </div>
   </div>
   <% } %>

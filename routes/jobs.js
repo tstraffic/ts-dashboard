@@ -11,6 +11,7 @@ const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadF
 const { generateJobNumber } = require('../lib/jobNumbers');
 const { hideAdminTasksSql } = require('../lib/taskVisibility');
 const { parseSelectedMonths, createMonthlyJobs, takenMonthsFor } = require('../lib/recurringJobs');
+const { listPurchaseOrders, safeListPurchaseOrders, parsePoAmount } = require('../lib/purchaseOrders');
 
 // Multer for diary attachments
 const diaryStorage = multer.diskStorage({
@@ -579,6 +580,7 @@ router.get('/:id', (req, res) => {
     complianceTgsItems, allUsers, diaryAttachments, chatMembers,
     finalPlans, finalPlanDocs, finalTrafficPlans, planFlags, planRevisions, viewMode,
     swmsForJob, riskAssessmentsForJob, auditsForJob, safetyRollup,
+    purchaseOrders: safeListPurchaseOrders(db, job.id),
     user: req.session.user,
     canViewAccounts: canViewAccounts(req.session.user)
   });
@@ -591,11 +593,7 @@ router.get('/:id/edit', (req, res) => {
   if (!job) { req.flash('error', 'Job not found.'); return req.session.save(() => res.redirect('/jobs')); }
   const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
-  // Purchase Orders tab. Never let a legacy DB missing the table (mig 349)
-  // take the whole edit form down — the tab just renders empty.
-  let purchaseOrders = [];
-  try { purchaseOrders = listPurchaseOrders(db, job.id); }
-  catch (e) { console.error('[jobs] purchase orders query failed:', e.message); }
+  const purchaseOrders = safeListPurchaseOrders(db, job.id);
   res.render('jobs/form', { title: 'Edit Job', job, users, clients, purchaseOrders, user: req.session.user });
 });
 
@@ -954,24 +952,6 @@ const poUpload = multer({
   limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, PO_ALLOWED.test(pathLib.extname(file.originalname || ''))),
 });
-
-function listPurchaseOrders(db, jobId) {
-  return db.prepare(`
-    SELECT po.id, po.title, po.description, po.amount, po.original_name, po.mime_type,
-           po.size_bytes, po.uploaded_at, u.full_name AS uploaded_by_name
-    FROM job_purchase_orders po
-    LEFT JOIN users u ON po.uploaded_by_id = u.id
-    WHERE po.job_id = ? AND po.archived_at IS NULL
-    ORDER BY po.uploaded_at DESC, po.id DESC
-  `).all(jobId);
-}
-
-// "$12,500.00" / "12500" → 12500. Anything unparseable is 0 rather than NaN,
-// which would land in the DB and render as blank.
-function parsePoAmount(raw) {
-  const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.]/g, ''));
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
 
 // POST /jobs/:id/purchase-orders — attach one PO (file + title/description/
 // amount). Multipart, so the CSRF middleware passes it through to multer; the
