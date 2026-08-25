@@ -214,29 +214,57 @@
     }
 
     _restoreDraft() {
+      // A saved draft is OFFERED, never silently applied — auto-restoring
+      // meant opening "New Job" quietly refilled whatever was last typed
+      // (often a different job) and jumped mid-wizard.
       try {
         const saved = sessionStorage.getItem(this.storageKey);
         if (!saved) return;
         const obj = JSON.parse(saved);
 
-        // Only restore if this is a "new" form (not edit)
+        // Only offer on a "new" form (not edit)
         if (this.form.querySelector('input[name="_method"]')) return;
 
-        Object.keys(obj).forEach(key => {
-          if (key === '_wizardStep') return;
-          const field = this.form.querySelector('[name="' + key + '"]');
-          if (!field) return;
-          if (field.type === 'checkbox') {
-            field.checked = obj[key] === 'on' || obj[key] === '1' || obj[key] === 'true';
-          } else {
-            field.value = obj[key];
-          }
-        });
+        const banner = document.createElement('div');
+        banner.className = 'flex flex-wrap items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4';
+        banner.innerHTML =
+          '<svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' +
+          '<span class="text-sm text-amber-800 flex-1 min-w-[180px]">You have an unfinished draft of this form from earlier.</span>' +
+          '<span class="flex items-center gap-2">' +
+            '<button type="button" data-draft-resume class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition">Resume draft</button>' +
+            '<button type="button" data-draft-fresh class="px-3 py-1.5 bg-white border border-amber-300 text-amber-700 hover:bg-amber-100 text-xs font-semibold rounded-lg transition">Start fresh</button>' +
+          '</span>';
+        this.indicator.parentNode.insertBefore(banner, this.indicator);
 
-        if (typeof obj._wizardStep === 'number') {
-          this._showStep(Math.min(obj._wizardStep, this.totalSteps - 1));
-        }
+        const dismiss = () => { if (banner.parentNode) banner.remove(); };
+        banner.querySelector('[data-draft-resume]').addEventListener('click', () => {
+          this._applyDraft(obj);
+          dismiss();
+        });
+        banner.querySelector('[data-draft-fresh]').addEventListener('click', () => {
+          try { sessionStorage.removeItem(this.storageKey); } catch (e) {}
+          dismiss();
+        });
+        // Typing into the blank form starts overwriting the stored draft, so
+        // the offer is no longer meaningful — take it away.
+        this.form.addEventListener('input', dismiss, { once: true });
       } catch(e) {}
+    }
+
+    _applyDraft(obj) {
+      Object.keys(obj).forEach(key => {
+        if (key === '_wizardStep') return;
+        const field = this.form.querySelector('[name="' + key + '"]');
+        if (!field) return;
+        if (field.type === 'checkbox') {
+          field.checked = obj[key] === 'on' || obj[key] === '1' || obj[key] === 'true';
+        } else {
+          field.value = obj[key];
+        }
+      });
+      if (typeof obj._wizardStep === 'number') {
+        this._showStep(Math.min(obj._wizardStep, this.totalSteps - 1));
+      }
     }
   }
 

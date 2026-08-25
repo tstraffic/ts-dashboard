@@ -75,15 +75,41 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div class="md:col-span-2">
-        <label for="title" class="block text-sm font-medium text-gray-700 mb-1.5">Plan Name <span class="text-rose-500">*</span></label>
-        <input type="text" id="title" name="title" required
-          value="<%= isEdit ? (item.title || '') : '' %>"
-          placeholder="e.g. Canterbury Road Project"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        <label for="title" class="block text-sm font-medium text-gray-700 mb-1.5">
+          Site address <span class="text-rose-500">*</span>
+          <span class="ml-1.5 text-xs font-normal text-gray-400">becomes the plan name</span>
+        </label>
+        <div class="relative">
+          <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          <input type="text" id="title" name="title" required autocomplete="off"
+            value="<%= isEdit ? (item.title || '') : '' %>"
+            placeholder="Start typing the site address…"
+            data-addr-autocomplete
+            class="w-full pl-10 pr-3 py-2.5 bg-white border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+        </div>
+        <%# Structured location filled by the picker; empty when the title was
+            typed free-hand. Persisted by createParentPlan / the parent-save
+            branch (migration 350 columns). %>
+        <input type="hidden" name="site_address" value="<%= isEdit ? (item.site_address || '') : '' %>">
+        <input type="hidden" name="suburb"       value="<%= isEdit ? (item.suburb || '') : '' %>">
+        <input type="hidden" name="state"        value="<%= isEdit ? (item.state || '') : '' %>">
+        <input type="hidden" name="postcode"     value="<%= isEdit ? (item.postcode || '') : '' %>">
+        <input type="hidden" name="latitude"     value="<%= isEdit && item.latitude != null ? item.latitude : '' %>">
+        <input type="hidden" name="longitude"    value="<%= isEdit && item.longitude != null ? item.longitude : '' %>">
+        <p id="addrStatus" class="mt-1.5 text-xs <%= isEdit && item.latitude != null ? 'text-emerald-600 font-medium' : 'text-gray-400' %>">
+          <% if (isEdit && item.latitude != null) { %>
+            ✓ Located · <%= [item.suburb, item.state, item.postcode].filter(Boolean).join(' ') %>
+          <% } else { %>
+            Pick a suggestion to pin the location — or just type any plan name.
+          <% } %>
+        </p>
       </div>
 
       <div>
-        <label for="job_id" class="block text-sm font-medium text-gray-700 mb-1.5">Project / Job</label>
+        <div class="flex items-center justify-between mb-1.5">
+          <label for="job_id" class="block text-sm font-medium text-gray-700">Project / Job</label>
+          <button type="button" data-qa-toggle="job" class="text-[11px] font-medium text-brand-600 hover:text-brand-700">+ New job</button>
+        </div>
         <select id="job_id" name="job_id"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
           <option value="">— None —</option>
@@ -93,12 +119,27 @@
             </option>
           <% }) %>
         </select>
+        <div data-qa-panel="job" class="hidden mt-2 p-3 bg-brand-50 border border-brand-200 rounded-lg space-y-2">
+          <input type="text" data-qa-field="project_name" placeholder="Project name" maxlength="200"
+            class="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <p class="text-[11px] text-brand-700/70">Uses the site address above and the selected client. Number auto-assigned (J-XXXX).</p>
+          <div class="flex items-center gap-2">
+            <button type="button" data-qa-save="job" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-md transition">Create job</button>
+            <button type="button" data-qa-cancel="job" class="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+            <span data-qa-msg="job" class="text-[11px] text-gray-500"></span>
+          </div>
+        </div>
       </div>
 
       <% var tendersList = (typeof tenders !== 'undefined' && Array.isArray(tenders)) ? tenders : [];
          var prefillTender = (typeof prefillTenderId !== 'undefined') ? prefillTenderId : ''; %>
       <div>
-        <label for="tender_id" class="block text-sm font-medium text-gray-700 mb-1.5">Tender <span class="text-gray-400 font-normal">(optional)</span></label>
+        <div class="flex items-center justify-between mb-1.5">
+          <label for="tender_id" class="block text-sm font-medium text-gray-700">Tender <span class="text-gray-400 font-normal">(optional)</span></label>
+          <% if (canAccess(user, 'tenders')) { %>
+            <button type="button" data-qa-toggle="tender" class="text-[11px] font-medium text-brand-600 hover:text-brand-700">+ New tender</button>
+          <% } %>
+        </div>
         <select id="tender_id" name="tender_id"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
           <option value="">— None —</option>
@@ -108,10 +149,25 @@
             </option>
           <% }) %>
         </select>
+        <% if (canAccess(user, 'tenders')) { %>
+          <div data-qa-panel="tender" class="hidden mt-2 p-3 bg-brand-50 border border-brand-200 rounded-lg space-y-2">
+            <input type="text" data-qa-field="tender_title" placeholder="Tender title" maxlength="200"
+              class="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <p class="text-[11px] text-brand-700/70">Carries the site address and selected client. Number auto-assigned (TND-YYYY-###).</p>
+            <div class="flex items-center gap-2">
+              <button type="button" data-qa-save="tender" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-md transition">Create tender</button>
+              <button type="button" data-qa-cancel="tender" class="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+              <span data-qa-msg="tender" class="text-[11px] text-gray-500"></span>
+            </div>
+          </div>
+        <% } %>
       </div>
 
       <div>
-        <label for="client_id" class="block text-sm font-medium text-gray-700 mb-1.5">Client</label>
+        <div class="flex items-center justify-between mb-1.5">
+          <label for="client_id" class="block text-sm font-medium text-gray-700">Client</label>
+          <button type="button" data-qa-toggle="client" class="text-[11px] font-medium text-brand-600 hover:text-brand-700">+ New client</button>
+        </div>
         <select id="client_id" name="client_id"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
           <option value="">— None —</option>
@@ -121,10 +177,25 @@
             </option>
           <% }) %>
         </select>
+        <div data-qa-panel="client" class="hidden mt-2 p-3 bg-brand-50 border border-brand-200 rounded-lg space-y-2">
+          <input type="text" data-qa-field="company_name" placeholder="Company name" maxlength="200"
+            class="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <div class="flex items-center gap-2">
+            <button type="button" data-qa-save="client" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-md transition">Create client</button>
+            <button type="button" data-qa-cancel="client" class="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+            <span data-qa-msg="client" class="text-[11px] text-gray-500"></span>
+          </div>
+        </div>
       </div>
 
+      <% const canInvitePm = ['admin', 'management'].includes(String(user.role || '').toLowerCase()); %>
       <div>
-        <label for="pm_id" class="block text-sm font-medium text-gray-700 mb-1.5">Project PM</label>
+        <div class="flex items-center justify-between mb-1.5">
+          <label for="pm_id" class="block text-sm font-medium text-gray-700">Project PM</label>
+          <% if (canInvitePm) { %>
+            <button type="button" data-qa-toggle="pm" class="text-[11px] font-medium text-brand-600 hover:text-brand-700">+ Invite user</button>
+          <% } %>
+        </div>
         <select id="pm_id" name="pm_id"
           class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
           <option value="">— Unassigned —</option>
@@ -132,6 +203,27 @@
             <option value="<%= u.id %>" <%= (isEdit && item.assigned_to_id == u.id) ? 'selected' : '' %>><%= u.full_name %></option>
           <% }) %>
         </select>
+        <% if (canInvitePm) { %>
+          <div data-qa-panel="pm" class="hidden mt-2 p-3 bg-brand-50 border border-brand-200 rounded-lg space-y-2">
+            <input type="text" data-qa-field="pm_name" placeholder="Full name" maxlength="120"
+              class="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <input type="email" data-qa-field="pm_email" placeholder="Email address" maxlength="200"
+              class="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <select data-qa-field="pm_role"
+              class="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="planning" selected>Planning</option>
+              <option value="operations">Operations</option>
+              <option value="management">Management</option>
+              <option value="finance">Finance</option>
+            </select>
+            <p class="text-[11px] text-brand-700/70">They're emailed an invitation to set a password, and are assignable right away.</p>
+            <div class="flex items-center gap-2">
+              <button type="button" data-qa-save="pm" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-md transition">Send invite</button>
+              <button type="button" data-qa-cancel="pm" class="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+              <span data-qa-msg="pm" class="text-[11px] text-gray-500"></span>
+            </div>
+          </div>
+        <% } %>
       </div>
 
       <div>
@@ -624,4 +716,234 @@
     })();
     </script>
   <% } %>
+
+  <!-- Address autocomplete + inline quick-creates (both modes). -->
+  <script>
+  (function () {
+    var form = document.getElementById('planForm');
+    if (!form) return;
+    var csrf = (form.querySelector('input[name="_csrf"]') || {}).value || '';
+    var titleInput = form.querySelector('input[name="title"]');
+    var addrStatus = document.getElementById('addrStatus');
+    var HIDDEN = ['site_address', 'suburb', 'state', 'postcode', 'latitude', 'longitude'];
+    function hidden(name) { return form.querySelector('input[type="hidden"][name="' + name + '"]'); }
+    function markDirty(el) { el.dispatchEvent(new Event('change', { bubbles: true })); }
+
+    // ── Geoapify autocomplete: body-portaled fixed popover (same device as the
+    //    bookings board — ancestor overflow can't clip it). Skips itself
+    //    silently when the server reports no API key.
+    if (titleInput) {
+      var box = document.createElement('div');
+      box.style.cssText = 'position:fixed;z-index:9999;background:#fff;border:1px solid #E5E7EB;border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.16);max-height:280px;overflow-y:auto;display:none;';
+      document.body.appendChild(box);
+      var results = [], timer2 = null, disabled = false;
+
+      function placeBox() {
+        var r = titleInput.getBoundingClientRect();
+        box.style.left = r.left + 'px';
+        box.style.top = (r.bottom + 4) + 'px';
+        box.style.width = r.width + 'px';
+      }
+      function hideBox() { box.style.display = 'none'; }
+      function renderBox() {
+        if (!results.length) { hideBox(); return; }
+        box.innerHTML = results.map(function (p, i) {
+          return '<button type="button" data-addr-idx="' + i + '" style="display:block;width:100%;text-align:left;padding:9px 13px;border:0;background:none;cursor:pointer;font-family:inherit;border-bottom:1px solid #F3F4F6;">' +
+            '<span style="display:block;font-size:13.5px;font-weight:500;color:#111827;">' + (p.site_address || p.label || '') + '</span>' +
+            '<span style="display:block;font-size:11.5px;color:#9CA3AF;margin-top:1px;">' + [p.suburb, p.state, p.postcode].filter(Boolean).join(' · ') + '</span>' +
+          '</button>';
+        }).join('');
+        placeBox();
+        box.style.display = 'block';
+      }
+      function commit(p) {
+        titleInput.value = p.formatted || [p.site_address, p.suburb, p.state, p.postcode].filter(Boolean).join(', ');
+        HIDDEN.forEach(function (n) {
+          var el = hidden(n);
+          if (el) el.value = (p[n] == null ? '' : p[n]);
+        });
+        if (addrStatus) {
+          addrStatus.textContent = '✓ Located · ' + [p.suburb, p.state, p.postcode].filter(Boolean).join(' ');
+          addrStatus.className = 'mt-1.5 text-xs text-emerald-600 font-medium';
+        }
+        hideBox();
+        markDirty(titleInput); // edit mode: pushes the hidden fields through autosave
+      }
+      // mousedown beats the input's blur; keep click as a fallback.
+      ['mousedown', 'click'].forEach(function (evt) {
+        box.addEventListener(evt, function (e) {
+          var btn = e.target.closest('[data-addr-idx]');
+          if (!btn) return;
+          e.preventDefault(); e.stopPropagation();
+          if (evt === 'mousedown') commit(results[parseInt(btn.dataset.addrIdx, 10)]);
+        });
+      });
+      titleInput.addEventListener('input', function () {
+        // Typing by hand invalidates a previously picked location.
+        HIDDEN.forEach(function (n) { var el = hidden(n); if (el) el.value = ''; });
+        if (addrStatus) {
+          addrStatus.textContent = 'Pick a suggestion to pin the location — or just type any plan name.';
+          addrStatus.className = 'mt-1.5 text-xs text-gray-400';
+        }
+        if (disabled) return;
+        clearTimeout(timer2);
+        var q = titleInput.value.trim();
+        if (q.length < 3) { hideBox(); return; }
+        timer2 = setTimeout(function () {
+          fetch('/compliance/api/places?q=' + encodeURIComponent(q) + '&cc=au', { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data && data.error) { disabled = true; hideBox(); return; } // no key configured — plain text field
+              results = (data && data.results) || [];
+              renderBox();
+            }).catch(function () { hideBox(); });
+        }, 220);
+      });
+      titleInput.addEventListener('blur', function () { setTimeout(hideBox, 150); });
+      window.addEventListener('scroll', hideBox, true);
+      window.addEventListener('resize', hideBox);
+    }
+
+    // ── Inline quick-creates: Job / Client / Tender / PM invite.
+    function panel(kind) { return form.querySelector('[data-qa-panel="' + kind + '"]'); }
+    function msg(kind, text, tone) {
+      var el = form.querySelector('[data-qa-msg="' + kind + '"]');
+      if (!el) return;
+      el.textContent = text || '';
+      el.className = 'text-[11px] ' + (tone === 'error' ? 'text-red-600 font-medium' : 'text-gray-500');
+    }
+    function fieldVal(kind, name) {
+      var p = panel(kind);
+      var el = p && p.querySelector('[data-qa-field="' + name + '"]');
+      return el ? el.value.trim() : '';
+    }
+    function addOption(selectId, value, label) {
+      var sel = document.getElementById(selectId);
+      if (!sel) return;
+      sel.add(new Option(label, value, true, true));
+      sel.value = String(value);
+      markDirty(sel);
+    }
+    form.querySelectorAll('[data-qa-toggle]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var p = panel(btn.dataset.qaToggle);
+        if (!p) return;
+        p.classList.toggle('hidden');
+        if (!p.classList.contains('hidden')) {
+          var first = p.querySelector('input');
+          // Pre-suggest from the address / title where it makes sense.
+          if (btn.dataset.qaToggle === 'job' && first && !first.value) {
+            first.value = (hidden('site_address') && hidden('site_address').value) || titleInput.value || '';
+          }
+          if (btn.dataset.qaToggle === 'tender' && first && !first.value) first.value = titleInput.value || '';
+          if (first) first.focus();
+        }
+      });
+    });
+    form.querySelectorAll('[data-qa-cancel]').forEach(function (btn) {
+      btn.addEventListener('click', function () { var p = panel(btn.dataset.qaCancel); if (p) p.classList.add('hidden'); });
+    });
+    function post(url, params) {
+      var body = new URLSearchParams(params);
+      body.append('_csrf', csrf);
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': csrf },
+        body: body.toString(),
+        credentials: 'same-origin',
+      }).then(function (r) { return r.json().catch(function () { return { ok: false, error: 'Request failed (' + r.status + ')' }; }); });
+    }
+    function busy(kind, on) {
+      var b = form.querySelector('[data-qa-save="' + kind + '"]');
+      if (b) { b.disabled = on; b.classList.toggle('opacity-60', on); }
+    }
+    var saveActions = {
+      job: function () {
+        var name = fieldVal('job', 'project_name');
+        if (!name) return msg('job', 'Project name is required.', 'error');
+        busy('job', true); msg('job', 'Creating…');
+        post('/compliance/api/quick-job', {
+          project_name: name,
+          client_id: (document.getElementById('client_id') || {}).value || '',
+          site_address: (hidden('site_address') || {}).value || '',
+          suburb: (hidden('suburb') || {}).value || '',
+          state: (hidden('state') || {}).value || '',
+        }).then(function (d) {
+          if (!d.ok) return msg('job', d.error || 'Failed.', 'error');
+          addOption('job_id', d.job.id, d.job.job_number + ' — ' + [d.job.project_name, d.job.client !== '—' ? d.job.client : ''].filter(Boolean).join(' · '));
+          panel('job').classList.add('hidden');
+          msg('job', '');
+        }).finally(function () { busy('job', false); });
+      },
+      client: function () {
+        var name = fieldVal('client', 'company_name');
+        if (!name) return msg('client', 'Company name is required.', 'error');
+        busy('client', true); msg('client', 'Creating…');
+        fetch('/clients', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'x-csrf-token': csrf },
+          body: JSON.stringify({ company_name: name, _csrf: csrf }),
+          credentials: 'same-origin',
+        }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (d) {
+          if (!d.success || !d.client) return msg('client', 'Failed to create client.', 'error');
+          addOption('client_id', d.client.id, d.client.company_name);
+          panel('client').classList.add('hidden');
+          msg('client', '');
+        }).catch(function (e) { msg('client', e.message, 'error'); }).finally(function () { busy('client', false); });
+      },
+      tender: function () {
+        var title = fieldVal('tender', 'tender_title');
+        if (!title) return msg('tender', 'Tender title is required.', 'error');
+        busy('tender', true); msg('tender', 'Creating…');
+        post('/tenders/api/quick-create', {
+          title: title,
+          client_id: (document.getElementById('client_id') || {}).value || '',
+          site_address: (hidden('site_address') || {}).value || '',
+        }).then(function (d) {
+          if (!d.ok) return msg('tender', d.error || 'Failed.', 'error');
+          addOption('tender_id', d.tender.id, d.tender.tender_number + ' — ' + d.tender.title);
+          panel('tender').classList.add('hidden');
+          msg('tender', '');
+        }).finally(function () { busy('tender', false); });
+      },
+      pm: function () {
+        var name = fieldVal('pm', 'pm_name');
+        var email = fieldVal('pm', 'pm_email');
+        if (!name || !email) return msg('pm', 'Name and email are required.', 'error');
+        busy('pm', true); msg('pm', 'Sending invite…');
+        post('/admin/users/api/quick-invite', {
+          full_name: name, email: email,
+          role: fieldVal('pm', 'pm_role') || 'planning',
+        }).then(function (d) {
+          if (!d.ok) return msg('pm', d.error || 'Failed.', 'error');
+          addOption('pm_id', d.user.id, d.user.full_name);
+          // Also make them pickable as a sub-plan owner everywhere.
+          ['defaultOwnerSelect'].forEach(function (id) {
+            var sel = document.getElementById(id);
+            if (sel) sel.add(new Option(d.user.full_name, d.user.id));
+          });
+          form.querySelectorAll('select[name^="owner_"]').forEach(function (sel) {
+            sel.add(new Option(d.user.full_name, d.user.id));
+          });
+          panel('pm').classList.add('hidden');
+          msg('pm', '');
+        }).finally(function () { busy('pm', false); });
+      },
+    };
+    form.querySelectorAll('[data-qa-save]').forEach(function (btn) {
+      btn.addEventListener('click', function () { var fn = saveActions[btn.dataset.qaSave]; if (fn) fn(); });
+    });
+    // Enter inside a quick-add panel triggers its save instead of submitting
+    // the whole plan form.
+    form.querySelectorAll('[data-qa-panel]').forEach(function (p) {
+      p.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        var kind = p.dataset.qaPanel;
+        var fn = saveActions[kind];
+        if (fn) fn();
+      });
+    });
+  })();
+  </script>
 </div>

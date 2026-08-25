@@ -8,6 +8,9 @@ const { autoLogDiary, logStatusChange } = require('../lib/diary');
 const { sydneyToday } = require('../lib/sydney');
 const planStatus = require('../lib/planStatus');
 const { notifyPlanSubmission, parseTaggedIds } = require('../lib/planNotify');
+const { placesHandler } = require('../lib/places');
+const { generateJobNumber } = require('../lib/jobNumbers');
+const { logActivity } = require('../middleware/audit');
 
 // Friendly labels for sub-plan item types (used in submission notifications).
 const ITEM_TYPE_LABELS = {
@@ -191,6 +194,19 @@ function createParentPlan(req, res, db, b) {
     });
     tx();
     planStatus.syncParentStatus(db, parentId);
+
+    // Site location (migration 350) — the title IS the address when it came
+    // from the autocomplete; the hidden structured fields ride along. A plain
+    // typed title posts them empty, which is fine. Guarded so a pre-350 DB
+    // degrades gracefully (same style as the hasTenderCol probe above).
+    try {
+      db.prepare('UPDATE compliance SET site_address=?, suburb=?, state=?, postcode=?, latitude=?, longitude=? WHERE id=?')
+        .run(String(b.site_address || '').trim(), String(b.suburb || '').trim(), String(b.state || '').trim(),
+          String(b.postcode || '').trim(),
+          b.latitude ? (parseFloat(b.latitude) || null) : null,
+          b.longitude ? (parseFloat(b.longitude) || null) : null,
+          parentId);
+    } catch (e) { /* pre-migration-350 DB */ }
 
     autoLogDiary(db, {
       jobId, complianceItemId: parentId,
@@ -464,6 +480,47 @@ router.get('/api/next-ref', (req, res) => {
   const next = max + 1;
 
   res.json({ reference_number: prefix + next });
+});
+
+// API: address autocomplete for the New Plan form. Same Geoapify proxy the
+// bookings board uses (lib/places.js) mounted under /compliance so planning /
+// finance roles — who can't open /bookings — still get suggestions.
+router.get('/api/places', placesHandler);
+
+// API: quick-create a job inline from the New Plan form, so linking a plan to
+// a job never means leaving the page. Modelled on the bookings board's
+// lazyCreateProject: minimal columns, everything else defaulted. The form
+// passes the plan's picked address through, so the new job lands with a real
+// site address instead of an empty one.
+router.post('/api/quick-job', (req, res) => {
+  const db = getDb();
+  const name = String(req.body.project_name || '').trim().slice(0, 200);
+  if (!name) return res.status(400).json({ ok: false, error: 'Project name is required.' });
+  try {
+    const clientId = req.body.client_id ? (parseInt(req.body.client_id, 10) || null) : null;
+    let clientName = '—'; // jobs.client is NOT NULL; em dash matches lazyCreateProject
+    if (clientId) {
+      const cl = db.prepare('SELECT company_name FROM clients WHERE id = ?').get(clientId);
+      if (cl) clientName = cl.company_name;
+    }
+    const startDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.start_date || '')) ? req.body.start_date : sydneyToday();
+    const jobNumber = generateJobNumber();
+    const info = db.prepare(`
+      INSERT INTO jobs (job_number, job_name, project_name, client, client_id, site_address, suburb, state, status, stage, start_date, created_by_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', 'delivery', ?, ?, CURRENT_TIMESTAMP)
+    `).run(
+      jobNumber, name, name, clientName, clientId,
+      String(req.body.site_address || '').trim().slice(0, 300),
+      String(req.body.suburb || '').trim().slice(0, 120),
+      String(req.body.state || '').trim().slice(0, 10) || 'NSW',
+      startDate, req.session.user.id
+    );
+    logActivity({ user: req.session.user, action: 'create', entityType: 'job', entityId: info.lastInsertRowid, entityLabel: `${jobNumber} — ${name}`, details: 'Quick-created from Plans & Approvals' });
+    res.json({ ok: true, job: { id: info.lastInsertRowid, job_number: jobNumber, project_name: name, client: clientName } });
+  } catch (e) {
+    console.error('[Compliance] quick-job failed:', e.message);
+    res.status(400).json({ ok: false, error: 'Could not create the job: ' + e.message });
+  }
 });
 
 // API: Check if a reference number already exists
@@ -1582,6 +1639,18 @@ router.post('/:id', (req, res) => {
           b.pm_id || null,
           req.params.id
         );
+      }
+      // Site location (migration 350) — only when the posting form carries the
+      // fields, so an old-shape autosave can't wipe a stored address.
+      if (typeof b.site_address !== 'undefined') {
+        try {
+          db.prepare('UPDATE compliance SET site_address=?, suburb=?, state=?, postcode=?, latitude=?, longitude=? WHERE id=?')
+            .run(String(b.site_address || '').trim(), String(b.suburb || '').trim(), String(b.state || '').trim(),
+              String(b.postcode || '').trim(),
+              b.latitude ? (parseFloat(b.latitude) || null) : null,
+              b.longitude ? (parseFloat(b.longitude) || null) : null,
+              req.params.id);
+        } catch (e) { /* pre-migration-350 DB */ }
       }
       if (wantsJson) return res.json({ ok: true, savedAt: new Date().toISOString() });
       req.flash('success', 'Plan updated.');

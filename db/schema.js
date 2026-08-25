@@ -15579,6 +15579,26 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 349 error:', e.message); }
   }
 
+  // Migration 350: parent-plan site location. The New Plan title IS the site
+  // address now — picking a Geoapify suggestion also stores the structured
+  // address + coordinates so every plan carries a real location instead of
+  // inheriting one indirectly through its job. Columns live on parent rows
+  // only by convention (sub-plans keep inheriting job/client/tender).
+  if (!isMigrationApplied.get(350)) {
+    try {
+      const cols = db.prepare('PRAGMA table_info(compliance)').all().map(c => c.name);
+      const addCol = (name, ddl) => { if (!cols.includes(name)) db.exec(`ALTER TABLE compliance ADD COLUMN ${ddl}`); };
+      addCol('site_address', "site_address TEXT DEFAULT ''");
+      addCol('suburb',       "suburb TEXT DEFAULT ''");
+      addCol('state',        "state TEXT DEFAULT ''");
+      addCol('postcode',     "postcode TEXT DEFAULT ''");
+      addCol('latitude',     'latitude REAL');
+      addCol('longitude',    'longitude REAL');
+      recordMigration.run(350, 'compliance: site_address/suburb/state/postcode/lat/lng (plan title = address)');
+      console.log('Migration 350 applied: compliance site location');
+    } catch (e) { console.error('Migration 350 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

@@ -55,7 +55,6 @@ function resolveJobId(db, b) {
   return lazyCreateProject(db, label, clientId, b);
 }
 
-const { getConfig } = require('../middleware/settings');
 const bookingNotify = require('../services/bookingNotify');
 const { syncEquipmentReturnTask, syncBookingReturnTasks, syncBookingTaskGroups, createTeamTask } = require('../services/returnTasks');
 
@@ -1947,73 +1946,10 @@ router.post('/:id/quick-update', (req, res) => {
   return req.session.save(() => res.redirect('/bookings/' + req.params.id));
 });
 
-// GET /api/places — address autocomplete via Geoapify.
-//
-// AU-biased, returns up to 8 suggestions shaped { label, lat, lng,
-// site_address, suburb, state, postcode, formatted } so the slide-over's
-// address picker can populate its hidden fields straight from the result.
-//
-// Key resolution chain (matches services/bookingGeocode.getGoogleKey):
-//   1. GEOAPIFY_API_KEY env var (preferred — easy to rotate per-env)
-//   2. system_config 'geoapify_api_key' row (settable from /settings)
-// The old hard-coded fallback key is gone — a live API key does not belong
-// in a public-ish git history. Set GEOAPIFY_API_KEY on Railway (or the
-// system_config row); without one, address autocomplete degrades gracefully
-// to manual typing.
-function getGeoapifyKey() {
-  return process.env.GEOAPIFY_API_KEY
-      || getConfig('geoapify_api_key', '');
-}
-router.get('/api/places', async (req, res) => {
-  const q = (req.query.q || '').trim();
-  if (q.length < 3) return res.json({ results: [] });
-  const key = getGeoapifyKey();
-  if (!key) return res.json({ results: [], error: 'No Geoapify key configured' });
-  // Optional country bias: client passes ?cc=au (derived from the browser's
-  // timezone / language). We use bias= (a preference) instead of filter= (a
-  // restriction) so workers can still find an interstate or overseas address
-  // when they need to — typing keeps working past the bias.
-  const cc = String(req.query.cc || '').trim().toLowerCase().replace(/[^a-z]/g, '').slice(0, 2);
-  const biasParam = cc ? ('&bias=countrycode:' + cc) : '';
-  try {
-    const url = 'https://api.geoapify.com/v1/geocode/autocomplete'
-      + '?text=' + encodeURIComponent(q)
-      + biasParam
-      + '&apiKey=' + encodeURIComponent(key);
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      console.error('[bookings/places] geoapify error', resp.status);
-      return res.json({ results: [], error: 'Geoapify HTTP ' + resp.status });
-    }
-    const json = await resp.json();
-    const features = Array.isArray(json.features) ? json.features : [];
-    const results = features.slice(0, 8).map(f => {
-      const p = f.properties || {};
-      const geom = f.geometry && Array.isArray(f.geometry.coordinates) ? f.geometry.coordinates : null;
-      // GeoJSON has [lon, lat]; properties.lon/.lat are also populated.
-      const lng = (typeof p.lon === 'number') ? p.lon : (geom ? geom[0] : null);
-      const lat = (typeof p.lat === 'number') ? p.lat : (geom ? geom[1] : null);
-      const street = [p.housenumber, p.street].filter(Boolean).join(' ').trim();
-      const stateRaw = String(p.state_code || p.state || '').trim();
-      const stateMatch = stateRaw.match(/\b(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\b/i);
-      const stateNorm = stateMatch ? stateMatch[1].toUpperCase() : stateRaw;
-      return {
-        label: p.formatted || p.address_line1 || p.name || '',
-        formatted: p.formatted || '',
-        lat: lat,
-        lng: lng,
-        site_address: street || p.address_line1 || p.name || '',
-        suburb: p.suburb || p.city || p.town || p.village || p.county || '',
-        state: stateNorm,
-        postcode: p.postcode || '',
-      };
-    });
-    res.json({ results });
-  } catch (e) {
-    console.error('[bookings/places] failed', e.message);
-    res.json({ results: [], error: e.message });
-  }
-});
+// GET /api/places — address autocomplete via Geoapify. The handler lives in
+// lib/places.js (extracted so /compliance can mount the same picker under its
+// own permission gate); URL and JSON shape here are unchanged.
+router.get('/api/places', require('../lib/places').placesHandler);
 
 // POST /quick — Quick Book create from the slide-over. Persists the
 // booking, the crew composition as `Nx TC Crew` requirement rows, and

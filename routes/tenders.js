@@ -120,6 +120,33 @@ router.post('/', requirePermission('tenders'), (req, res) => {
   }
 });
 
+// POST /tenders/api/quick-create — inline create from the New Plan form so
+// linking a plan to a tender never means leaving the page. Same insert as
+// the full-form POST above with everything defaulted; the plan's picked
+// address rides along as the tender's site_address.
+router.post('/api/quick-create', requirePermission('tenders'), (req, res) => {
+  try {
+    const db = getDb();
+    const title = String(req.body.title || '').trim().slice(0, 200);
+    if (!title) return res.status(400).json({ ok: false, error: 'Tender title is required.' });
+    const tenderNumber = nextTenderNumber(db);
+    const r = db.prepare(`
+      INSERT INTO tenders (tender_number, title, client_id, status, estimated_value, site_address, created_by_id)
+      VALUES (?, ?, ?, 'open', 0, ?, ?)
+    `).run(
+      tenderNumber, title,
+      req.body.client_id ? (parseInt(req.body.client_id, 10) || null) : null,
+      String(req.body.site_address || '').trim().slice(0, 300),
+      req.session.user ? req.session.user.id : null,
+    );
+    try { logActivity({ user: req.session.user, action: 'create', entityType: 'tender', entityId: r.lastInsertRowid, entityLabel: tenderNumber, details: title + ' (quick-created from Plans & Approvals)', ip: req.ip }); } catch (e) {}
+    res.json({ ok: true, tender: { id: r.lastInsertRowid, tender_number: tenderNumber, title } });
+  } catch (err) {
+    console.error('[tenders quick-create]', err);
+    res.status(400).json({ ok: false, error: (err && err.message) || 'Could not create tender.' });
+  }
+});
+
 // GET /tenders/:id — detail
 router.get('/:id', requirePermission('tenders'), (req, res) => {
   const db = getDb();

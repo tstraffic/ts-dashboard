@@ -117,6 +117,51 @@ router.post('/users', async (req, res) => {
   req.session.save(() => res.redirect('/admin/users'));
 });
 
+// POST /admin/users/api/quick-invite — inline "add a PM" from the New Plan
+// form (admin-gated by the router.use above). Same invitation machinery as
+// the full create, JSON in/out, with two deliberate differences:
+//   - username is derived from the email local part (collision → numeric
+//     suffix) so the caller only supplies name + email + role;
+//   - active = 1 (not 0): the invitee must be instantly selectable in every
+//     `WHERE active = 1` picker (the point of a quick-add), while login stays
+//     impossible until they accept — INVITE_PENDING never bcrypt-matches —
+//     and the Users list still shows them as pending via has_password.
+const QUICK_INVITE_ROLES = ['admin', 'operations', 'planning', 'finance', 'hr', 'management', 'marketing', 'accounts', 'safety'];
+router.post('/users/api/quick-invite', async (req, res) => {
+  const db = getDb();
+  const fullName = String(req.body.full_name || '').trim().slice(0, 120);
+  const email = String(req.body.email || '').trim().toLowerCase().slice(0, 200);
+  const role = QUICK_INVITE_ROLES.includes(req.body.role) ? req.body.role : 'planning';
+  if (!fullName) return res.status(400).json({ ok: false, error: 'Full name is required.' });
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ ok: false, error: 'A valid email is required.' });
+  if (!isConfigured()) return res.status(400).json({ ok: false, error: 'Email is not configured — add the user from Admin → Users instead.' });
+  try {
+    const base = (email.split('@')[0] || 'user').toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 40) || 'user';
+    let username = base;
+    let userId = null;
+    for (let i = 0; i < 20; i++) {
+      try {
+        userId = db.prepare('INSERT INTO users (username, password_hash, full_name, email, role, active) VALUES (?, ?, ?, ?, ?, 1)')
+          .run(username, 'INVITE_PENDING', fullName, email, role).lastInsertRowid;
+        break;
+      } catch (e) {
+        if (!String(e.message).includes('UNIQUE')) throw e;
+        username = base + (i + 2); // taken → user2, user3, …
+      }
+    }
+    if (!userId) return res.status(400).json({ ok: false, error: 'Could not find a free username for that email.' });
+    const { token } = createInvitation({ type: 'admin_user', targetId: userId, email, createdById: req.session.user.id });
+    const inviteUrl = (process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`) + '/invite/' + token;
+    const emailResult = await sendEmail(email, 'You\'ve been invited to Atomis', adminInviteEmail(fullName, inviteUrl, TOKEN_EXPIRY_HOURS));
+    logActivity({ user: req.session.user, action: 'create', entityType: 'user', entityId: userId, entityLabel: fullName, details: 'Quick-invited from Plans & Approvals', ip: req.ip });
+    autoAddUserToChannels(Number(userId), role);
+    res.json({ ok: true, user: { id: userId, full_name: fullName }, emailSent: !!emailResult });
+  } catch (err) {
+    console.error('[admin quick-invite]', err.message);
+    res.status(400).json({ ok: false, error: 'Failed to invite: ' + err.message });
+  }
+});
+
 router.get('/users/:id/edit', (req, res) => {
   const db = getDb();
   const editUser = db.prepare('SELECT id, username, full_name, email, role, active FROM users WHERE id = ?').get(req.params.id);
