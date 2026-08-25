@@ -1,7 +1,18 @@
 <%
+  // Sub-plan card — slimmed to the essentials per type (Aug 2026 redesign):
+  //   every card:  ref + status header, owner, Task button, approve/reject/
+  //                delete, supporting documents
+  //   TGS:         RA row, linked-ROL chips, submit form
+  //   TMP/CTMP:    QA select, submit form, revisions (+ button)
+  //   ROL:         licence number beside the TS ref, approved banner,
+  //                condition alerts, Covers chips, one-drop auto-approve
+  //                (parse → approved in one step), extensions (+ button,
+  //                auto-moves the effective end), collapsed manual entry
+  //   Council:     two-stage apply/approve + itemised fees + application ref
+  //   other types: submit form
+  // Client charging moved to the plan-level Quote tab; per-card charge, P&L
+  // and the everywhere-Fees disclosure are gone.
   const isROL = sub.item_type === 'rol' || sub.item_type === 'road_occupancy';
-  // ROL application lifecycle: valid 14 days from the applied-for date; chase
-  // from day 10 if still unapproved. Computed for the card badge + banner.
   const rolApplied = sub.rol_applied_date || '';
   const rolApproved = sub.status === 'approved' || sub.rol_stage === 'approved';
   const rolExpiryStr = rolApplied ? new Date(Date.parse(rolApplied + 'T00:00:00Z') + 14 * 86400000).toISOString().slice(0, 10) : '';
@@ -11,7 +22,6 @@
   const rolInChase = rolApplied && !rolApproved && !rolExpired && rolTodayStr >= rolChaseFrom;
   const rolLinkList = (typeof rolSubs !== 'undefined' && rolSubs) ? rolSubs : [];
   const rolLinkLabel = (r) => (r.rol_actual_number || r.reference_number || ('ROL #' + r.id));
-  // TGS ↔ ROL links are many-to-many (compliance_tgs_rol_links, mig 332).
   const myRolLinks = (typeof rolLinks !== 'undefined' && rolLinks) ? rolLinks.map(Number) : [];
   const myTgsBacklinks = (typeof tgsBacklinks !== 'undefined' && tgsBacklinks) ? tgsBacklinks.map(Number) : [];
   const tgsLinkList = (typeof tgsSubs !== 'undefined' && tgsSubs) ? tgsSubs : [];
@@ -19,7 +29,6 @@
   const isApproved = sub.status === 'approved';
   const isRejected = sub.status === 'rejected';
   const docCount = (docs || []).length;
-  // Risk Assessment context (passed in from _parent_form.ejs when migration 199 has run).
   const linkedRa = (typeof ra !== 'undefined' && ra) ? ra : null;
   const isTgs = sub.item_type === 'traffic_guidance';
   const raActive = linkedRa && linkedRa.status === 'active';
@@ -28,67 +37,44 @@
        : linkedRa.status === 'archived' ? 'bg-gray-100 text-gray-600 ring-gray-200'
        : 'bg-amber-50 text-amber-700 ring-amber-200')
     : '';
-
-  // Per-sub-plan cost/profit (admin + finance only). Only show the chip
-  // line if there's some money or hours data — otherwise it'd just say $0
-  // on every empty card.
-  const subHourlyRate = parseFloat((systemConfig && systemConfig.internal_hourly_rate) || 40) || 40;
-  const subHours = parseFloat(sub.hours_spent) || 0;
-  const subCharge = sub.charge_client ? (parseFloat(sub.charge_amount) || 0) : 0;
-  // Council cost now comes from the itemised Fees (compliance_fees); fall back
-  // to the legacy single council_fee_amount for rows created before fees existed.
   const cFees = (typeof fees !== 'undefined' && fees) ? fees : [];
   const feesTotal = cFees.reduce((s, f) => s + (parseFloat(f.amount) || 0), 0);
-  const subCouncil = feesTotal > 0 ? feesTotal : (sub.council_fee_paid ? (parseFloat(sub.council_fee_amount) || 0) : 0);
-  const subLabour = subHours * subHourlyRate;
-  const subCost = subLabour + subCouncil;
-  const subProfit = subCharge - subCost;
-  const showSubCost = canSeeCost && (subHours > 0 || subCharge > 0 || subCouncil > 0);
-  const fmtMoneySub = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
-
-  // ── Plans Module enhancements (council/ROL/CTMP) — hoisted so sections
-  //    can render in any order without ReferenceErrors. ──
   const cExt = (typeof extensions !== 'undefined' && extensions) ? extensions : [];
   const cShifts = (typeof rolShifts !== 'undefined' && rolShifts) ? rolShifts : [];
   const cConds = (typeof rolConditions !== 'undefined' && rolConditions) ? rolConditions : [];
   const isCouncilType = sub.item_type === 'council_permit';
   const isCtmpType = sub.item_type === 'tmp_approval';
-  const isRolType = sub.item_type === 'rol' || sub.item_type === 'road_occupancy';
+  const isRolType = isROL;
   const condAlerts = cConds.filter(c => c.is_alert);
   const qaCol = { pending: 'bg-gray-100 text-gray-600', in_qa: 'bg-amber-100 text-amber-700', approved: 'bg-emerald-100 text-emerald-700' };
+  const subRevs = (typeof subPlanRevisions !== 'undefined' && subPlanRevisions) ? (subPlanRevisions[sub.id] || []) : [];
+  const openTaskCount = (typeof subPlanOpenTasks !== 'undefined' && subPlanOpenTasks) ? (subPlanOpenTasks[sub.id] || 0) : 0;
 %>
 
-<div id="sub-<%= sub.id %>" class="border border-gray-200 rounded-lg p-4 <%= isApproved ? 'bg-emerald-50/30' : isRejected ? 'bg-rose-50/30' : 'bg-white' %>">
+<div id="sub-<%= sub.id %>" data-sub-card="<%= sub.id %>" class="border border-gray-200 rounded-lg p-4 transition-shadow <%= isApproved ? 'bg-emerald-50/30' : isRejected ? 'bg-rose-50/30' : 'bg-white' %>">
   <div class="flex items-start justify-between gap-3 mb-3">
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2 flex-wrap">
         <code class="text-sm font-semibold text-gray-900"><%= sub.reference_number %></code>
+        <% if (isRolType && sub.rol_actual_number) { %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-teal-50 text-teal-800 ring-1 ring-teal-200">ROL <%= sub.rol_actual_number %></span>
+        <% } %>
         <% if (sub.item_type === 'other' && sub.other_description) { %>
-          <%/* The free-text label the user typed when generating this Other slot — shows what
-               the row is actually for (e.g. "Methodologies", "Staging") so it isn't anonymous. */%>
           <span class="text-sm font-medium text-gray-700">— <%= sub.other_description %></span>
         <% } %>
         <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset <%= statusBadge[sub.status] || statusBadge.not_started %>">
           <%= (sub.status || 'not_started').replace(/_/g, ' ') %>
         </span>
         <% if (sub.expiry_date) { %>
-          <span class="text-xs text-gray-500">expires <%= sub.expiry_date %></span>
+          <span class="text-xs text-gray-500"><%= isRolType && cExt.length ? 'effective to' : 'expires' %> <%= sub.expiry_date %></span>
         <% } %>
         <% if (isROL && sub.extension_required) { %>
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200">extension required</span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200"><%= cExt.length %> extension<%= cExt.length === 1 ? '' : 's' %></span>
         <% } %>
       </div>
-      <!-- Inline owner picker. Auto-saves on change via AJAX so it doesn't
-           reload the page and wipe a half-typed comment or selected upload
-           below. Description used to sit alongside this; it now lives
-           inside the upload-submit form itself (PR #459), so having two
-           separate inputs was redundant and the outer one's onblur save
-           was the source of the "Description is required before submitting"
-           false positives. -->
-      <div class="mt-2 max-w-[220px]">
-        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/owner"
-          onsubmit="return window.__subPlanAjaxSave(event, this);"
-          data-ajax-save>
+      <div class="mt-2 flex items-center gap-2 flex-wrap">
+        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/owner" class="max-w-[220px]"
+          onsubmit="return window.__subPlanAjaxSave(event, this);" data-ajax-save>
           <%- include('../partials/csrf') %>
           <select name="assigned_to_id" onchange="window.__subPlanAjaxSave(null, this.form);"
             class="w-full px-2.5 py-1.5 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
@@ -98,61 +84,24 @@
             <% }) %>
           </select>
         </form>
-      </div>
-      <!-- Charge client — always available, independent of submission/approval.
-           Auto-saves via AJAX to /charge so the amount can be set or changed at
-           any status (before it's put in, after, even once approved). The
-           amount input is disabled-not-in-FormData when unchecked, so checking
-           the box enables it first, then saves. -->
-      <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/charge" class="mt-2 flex items-center gap-2 flex-wrap"
-        id="charge-<%= sub.id %>"
-        onsubmit="return window.__subPlanAjaxSave(event, this);" data-ajax-save>
-        <%- include('../partials/csrf') %>
-        <label class="inline-flex items-center text-xs font-medium text-gray-700 cursor-pointer">
-          <input type="checkbox" name="charge_client" value="1" <%= sub.charge_client ? 'checked' : '' %>
-            onchange="var a=document.getElementById('charge_amount_<%= sub.id %>'); a.disabled=!this.checked; if(this.checked)a.focus(); window.__subPlanAjaxSave(null, this.form);"
-            class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 mr-2">
-          Charge client
-        </label>
-        <input type="number" name="charge_amount" id="charge_amount_<%= sub.id %>" min="0" step="0.01"
-          value="<%= sub.charge_amount || '' %>" placeholder="Amount ($)"
-          <%= sub.charge_client ? '' : 'disabled' %>
-          onchange="window.__subPlanAjaxSave(null, this.form);"
-          class="w-32 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:bg-gray-50 disabled:text-gray-400">
-        <% if (sub.item_type === 'council_permit') { %>
-          <label class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 ml-1">
-            Application ref
-            <input type="text" name="application_ref_no" form="appref-<%= sub.id %>" id="appref-input-<%= sub.id %>"
-              value="<%= sub.application_ref_no || '' %>" placeholder="council ref no."
-              onchange="window.__subPlanAjaxSave(null, document.getElementById('appref-<%= sub.id %>'));"
-              class="w-40 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
-          </label>
+        <button type="button" data-task-btn="<%= sub.id %>" data-task-ref="<%= sub.reference_number || '' %>"
+          class="px-2.5 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 ring-1 ring-brand-200 rounded-md">
+          Task ↗<% if (openTaskCount > 0) { %> <span class="font-bold"><%= openTaskCount %></span><% } %>
+        </button>
+        <% if (isCouncilType) { %>
+          <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/app-ref" id="appref-<%= sub.id %>"
+            onsubmit="return window.__subPlanAjaxSave(event, this);" data-ajax-save class="inline-flex items-center gap-1.5">
+            <%- include('../partials/csrf') %>
+            <label class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700">
+              Application ref
+              <input type="text" name="application_ref_no" id="appref-input-<%= sub.id %>"
+                value="<%= sub.application_ref_no || '' %>" placeholder="council ref no."
+                onchange="window.__subPlanAjaxSave(null, this.form);"
+                class="w-36 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+            </label>
+          </form>
         <% } %>
-      </form>
-      <% if (sub.item_type === 'council_permit') { %>
-        <!-- Separate form so the ref auto-saves on its own to /app-ref without
-             dragging the charge fields along (the input above is form-associated
-             to this via form="appref-<id>"). -->
-        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/app-ref" id="appref-<%= sub.id %>"
-          onsubmit="return window.__subPlanAjaxSave(event, this);" data-ajax-save class="hidden">
-          <%- include('../partials/csrf') %>
-        </form>
-      <% } %>
-      <% if (isROL) { %>
-        <!-- ROL extension flag: always togglable, including post-approval -->
-        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extension" class="mt-2" id="ext-<%= sub.id %>"
-          onsubmit="return window.__subPlanAjaxSave(event, this);"
-          data-ajax-save>
-          <%- include('../partials/csrf') %>
-          <input type="hidden" name="extension_required" value="<%= sub.extension_required ? '0' : '1' %>">
-          <label class="inline-flex items-center text-xs text-gray-700 cursor-pointer">
-            <input type="checkbox" <%= sub.extension_required ? 'checked' : '' %>
-              onchange="window.__subPlanAjaxSave(null, document.getElementById('ext-<%= sub.id %>'));"
-              class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 mr-2">
-            ROL extension required
-          </label>
-        </form>
-      <% } %>
+      </div>
     </div>
     <div class="shrink-0 flex items-center gap-1">
       <% if (isSubmitted && !isApproved) { %>
@@ -176,23 +125,7 @@
     </div>
   </div>
 
-  <% if (showSubCost) { %>
-    <!-- T&S internal cost line — admin + finance only.
-         Hidden from planning/operations even when they're on the page. -->
-    <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs px-2.5 py-1.5 bg-slate-50 ring-1 ring-slate-200 rounded">
-      <span class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mr-1">T&amp;S P&amp;L</span>
-      <span class="text-slate-600">Labour <span class="font-medium text-slate-900"><%= fmtMoneySub(subLabour) %></span> <span class="text-slate-400">(<%= subHours %>h × $<%= subHourlyRate %>)</span></span>
-      <% if (subCouncil > 0) { %><span class="text-slate-600">+ Council <span class="font-medium text-amber-700"><%= fmtMoneySub(subCouncil) %></span></span><% } %>
-      <span class="text-slate-600">= Cost <span class="font-semibold text-slate-900"><%= fmtMoneySub(subCost) %></span></span>
-      <span class="text-slate-400">·</span>
-      <span class="text-slate-600">Charge <span class="font-medium text-emerald-700"><%= fmtMoneySub(subCharge) %></span></span>
-      <span class="ml-auto font-semibold <%= subProfit >= 0 ? 'text-emerald-700' : 'text-rose-700' %>">
-        <%= subProfit >= 0 ? 'Profit ' : 'Loss ' %><%= fmtMoneySub(Math.abs(subProfit)) %>
-      </span>
-    </div>
-  <% } %>
-
-  <!-- Risk Assessment link (TGS only, shown when an RA was auto-created on parent plan creation) -->
+  <!-- Risk Assessment link (TGS only) -->
   <% if (isTgs && linkedRa) { %>
     <div class="mb-3 flex flex-wrap items-center gap-2 px-3 py-2 bg-blue-50/60 ring-1 ring-blue-100 rounded text-xs">
       <span class="text-[10px] font-bold uppercase tracking-wide text-blue-700">Risk Assessment</span>
@@ -211,9 +144,7 @@
     </div>
   <% } %>
 
-  <!-- TGS → linked ROLs: a TGS can be covered by SEVERAL licences (staged /
-       long works), so each ROL on this plan is a toggle chip. Solid = linked
-       (click to unlink), outline = not linked (click to link). -->
+  <!-- TGS → linked ROLs -->
   <% if (isTgs) { %>
     <div class="mb-3 flex flex-wrap items-center gap-1.5 px-3 py-2 bg-teal-50/60 ring-1 ring-teal-100 rounded text-xs" data-rol-links>
       <span class="text-[10px] font-bold uppercase tracking-wide text-teal-700 mr-1">Linked ROLs</span>
@@ -231,7 +162,7 @@
               </button>
             </form>
             <% if (isLinked) { %>
-              <a href="#sub-<%= r.id %>" class="inline-flex items-center px-1.5 bg-teal-700 text-white/90 hover:text-white text-[11px]" title="Jump to <%= rolLinkLabel(r) %>">→</a>
+              <a href="#sub-<%= r.id %>" data-sub-jump="<%= r.id %>" class="inline-flex items-center px-1.5 bg-teal-700 text-white/90 hover:text-white text-[11px]" title="Jump to <%= rolLinkLabel(r) %>">→</a>
             <% } %>
           </span>
         <% }) %>
@@ -241,8 +172,15 @@
     </div>
   <% } %>
 
-  <!-- ROL: expiry banner (14 days from applied-for date) -->
-  <% if (isRolType && rolApplied && !rolApproved) { %>
+  <!-- ROL: approved banner / 14-day application clock -->
+  <% if (isRolType && rolApproved) { %>
+    <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 bg-emerald-50 ring-1 ring-emerald-200 rounded text-xs text-emerald-900">
+      <span class="text-[10px] font-bold uppercase tracking-wide text-emerald-700">ROL approved</span>
+      <span><%= sub.approved_date || sub.submitted_date || '' %></span>
+      <% if (sub.rol_summary_from) { %><span>valid <%= sub.rol_summary_from %> → <span class="font-semibold"><%= sub.expiry_date || sub.rol_summary_to || '' %></span><%= cExt.length ? ' (incl. extensions)' : '' %></span><% } %>
+      <% if (sub.rol_time_window) { %><span><%= sub.rol_time_window %></span><% } %>
+    </div>
+  <% } else if (isRolType && rolApplied) { %>
     <div class="mb-2 flex flex-wrap items-center gap-2 px-3 py-2 rounded text-xs ring-1 <%= rolExpired ? 'bg-rose-50 ring-rose-200 text-rose-800' : (rolInChase ? 'bg-amber-50 ring-amber-200 text-amber-800' : 'bg-blue-50/60 ring-blue-100 text-blue-800') %>">
       <span class="text-[10px] font-bold uppercase tracking-wide">ROL application</span>
       <span>Applied <%= rolApplied %> · <strong><%= rolExpired ? 'EXPIRED ' + rolExpiryStr : 'expires ' + rolExpiryStr %></strong></span>
@@ -275,25 +213,167 @@
     </div>
   <% } %>
 
-  <!-- ROL → covered TGS sheets (back side of the many-to-many link) -->
+  <!-- CTMP revisions — "+ Revision" (compliance_revisions on this sub row) -->
+  <% if (isCtmpType) { %>
+    <div class="mb-3 px-3 py-2 bg-purple-50/50 ring-1 ring-purple-100 rounded text-xs">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-[10px] font-bold uppercase tracking-wide text-purple-700">Revisions</span>
+        <% subRevs.forEach(r => { %>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white ring-1 ring-purple-200 text-purple-800 text-[11px] font-medium" title="<%= r.notes || '' %>">
+            Rev <%= r.revision_number %><%= r.revision_date ? ' · ' + r.revision_date : '' %><%= r.client_issued ? ' · issued' : '' %>
+          </span>
+        <% }) %>
+        <button type="button" class="px-2 py-0.5 text-[11px] font-semibold text-purple-700 bg-white hover:bg-purple-100 ring-1 ring-purple-300 rounded"
+          onclick="var f=document.getElementById('rev-form-<%= sub.id %>'); f.classList.toggle('hidden'); if(!f.classList.contains('hidden'))f.querySelector('input[type=date]').focus();">+ Revision</button>
+      </div>
+      <form method="POST" action="/compliance/<%= sub.id %>/revisions" id="rev-form-<%= sub.id %>" class="hidden mt-2 flex flex-wrap items-center gap-2">
+        <%- include('../partials/csrf') %>
+        <input type="hidden" name="return_to" value="/compliance/<%= parentId %>/edit#sub-<%= sub.id %>">
+        <input type="date" name="revision_date" class="px-2 py-1 text-xs border border-gray-300 rounded" value="<%= new Date().toISOString().slice(0,10) %>">
+        <input type="text" name="revision_notes" placeholder="What changed?" class="flex-1 min-w-[140px] px-2 py-1 text-xs border border-gray-300 rounded">
+        <label class="inline-flex items-center gap-1 text-[11px] text-gray-600"><input type="checkbox" name="client_issued" value="1" class="rounded border-gray-300"> Issued to client</label>
+        <button class="px-2.5 py-1 text-[11px] font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded">Add</button>
+      </form>
+    </div>
+  <% } %>
+
+  <!-- ROL → covered TGS sheets -->
   <% if (isRolType && myTgsBacklinks.length && tgsLinkList.length) { %>
     <div class="mb-3 flex flex-wrap items-center gap-1.5 px-3 py-2 bg-teal-50/60 ring-1 ring-teal-100 rounded text-xs" data-tgs-backlinks>
       <span class="text-[10px] font-bold uppercase tracking-wide text-teal-700 mr-1">Covers</span>
       <% tgsLinkList.filter(t => myTgsBacklinks.includes(Number(t.id))).forEach(t => { %>
-        <a href="#sub-<%= t.id %>" class="inline-flex items-center px-2 py-0.5 rounded bg-white ring-1 ring-teal-200 text-teal-700 hover:bg-teal-50 text-[11px] font-medium"><%= t.reference_number || ('TGS #' + t.id) %></a>
+        <a href="#sub-<%= t.id %>" data-sub-jump="<%= t.id %>" class="inline-flex items-center px-2 py-0.5 rounded bg-white ring-1 ring-teal-200 text-teal-700 hover:bg-teal-50 text-[11px] font-medium"><%= t.reference_number || ('TGS #' + t.id) %></a>
       <% }) %>
     </div>
   <% } %>
 
-  <!-- Council permit two-stage workflow: Applied → Approved.
-       Stage 1 lodges the application — Description + Submission date + Job start
-       are required first (files optional); stage 2 attaches the issued permit
-       via drag-drop/select and marks it approved. The lodged details stay
-       visible through both stages. The council application ref is captured
-       beside the Charge client control above and synced into whichever action
-       form the user submits (belt-and-suspenders against the beside-charge
-       input's onchange racing a full-page POST). -->
-  <% if (sub.item_type === 'council_permit') {
+  <!-- ROL: one-drop auto-approve + extensions + collapsed manual entry -->
+  <% if (isRolType) { %>
+    <% if (!rolApproved) { %>
+      <div class="mb-3 rounded-lg ring-1 ring-teal-200 bg-teal-50/50 p-3">
+        <p class="text-[10px] font-bold uppercase tracking-wide text-teal-700 mb-1.5">Issued ROL — automatic</p>
+        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/rol/auto" enctype="multipart/form-data" data-attach-form>
+          <%- include('../partials/csrf') %>
+          <div data-dropzone>
+            <input type="file" name="rol_file" accept=".pdf">
+            <div class="dropzone-label">
+              <svg class="w-7 h-7 mx-auto mb-1.5 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              <p class="text-xs text-gray-600">Drop the <span class="font-semibold">issued ROL PDF</span> here — licence number, dates, shifts and conditions are extracted and the ROL is <span class="font-semibold text-emerald-700">approved automatically</span>.</p>
+            </div>
+          </div>
+          <noscript><button type="submit" class="mt-1.5 px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md">Read &amp; approve</button></noscript>
+        </form>
+        <%
+          const rolDocPdfs = (docs || []).filter(d => /\.pdf$/i.test(d.original_name || d.filename || '') || String(d.mime_type || '').toLowerCase().includes('pdf'));
+        %>
+        <% if (rolDocPdfs.length) { %>
+          <div class="mt-2 space-y-1" data-rol-existing-docs>
+            <% rolDocPdfs.forEach(d => { %>
+              <div class="flex flex-wrap items-center gap-2 px-2 py-1.5 bg-white ring-1 ring-gray-200 rounded text-xs">
+                <span class="flex-1 min-w-0 truncate text-gray-700" title="<%= d.original_name %>"><%= d.original_name %></span>
+                <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/rol/auto" enctype="multipart/form-data" class="inline shrink-0">
+                  <%- include('../partials/csrf') %>
+                  <input type="hidden" name="existing_doc_id" value="<%= d.id %>">
+                  <button class="px-2 py-0.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 ring-1 ring-emerald-200 rounded">Read &amp; approve</button>
+                </form>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+    <% } %>
+
+    <!-- Extensions: chips + "+ Extension" -->
+    <div class="mb-3 px-3 py-2 bg-amber-50/50 ring-1 ring-amber-100 rounded text-xs">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-[10px] font-bold uppercase tracking-wide text-amber-700">Extensions</span>
+        <% cExt.forEach(e => { %>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white ring-1 ring-amber-200 text-amber-800 text-[11px] font-medium" title="<%= e.reason || '' %>">
+            <%= e.label || 'Extension' %><%= e.extended_to ? ' → ' + e.extended_to : '' %>
+            <% if (e.file_path) { %><a href="<%= e.file_path %>" target="_blank" class="text-brand-600 hover:underline">file</a><% } %>
+            <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extensions/<%= e.id %>/delete" class="inline" onsubmit="return confirm('Delete this extension? The effective end date recomputes.')"><%- include('../partials/csrf') %><button class="text-gray-400 hover:text-rose-600 leading-none">✕</button></form>
+          </span>
+        <% }) %>
+        <button type="button" class="px-2 py-0.5 text-[11px] font-semibold text-amber-700 bg-white hover:bg-amber-100 ring-1 ring-amber-300 rounded"
+          onclick="var f=document.getElementById('ext-form-<%= sub.id %>'); f.classList.toggle('hidden'); if(!f.classList.contains('hidden'))f.querySelector('input[type=date]').focus();">+ Extension</button>
+        <% if (!cExt.length) { %><span class="text-gray-400 italic">none — add one and the effective end date moves automatically</span><% } %>
+      </div>
+      <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extensions" enctype="multipart/form-data" id="ext-form-<%= sub.id %>" class="hidden mt-2 flex flex-wrap items-center gap-2">
+        <%- include('../partials/csrf') %>
+        <label class="text-[11px] text-gray-600">Extended to <input type="date" name="extended_to" required class="ml-1 px-2 py-1 text-xs border border-gray-300 rounded"></label>
+        <input type="text" name="reason" placeholder="Reason (optional)" class="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-300 rounded">
+        <input type="file" name="extension_file" accept=".pdf,.jpg,.jpeg,.png,.webp" class="text-[11px]">
+        <button class="px-2.5 py-1 text-[11px] font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded">Add</button>
+      </form>
+    </div>
+
+    <!-- Manual / application details, collapsed -->
+    <details class="mb-3 group">
+      <summary class="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-700 inline-flex items-center list-none">
+        <svg class="w-3.5 h-3.5 mr-1 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        Application &amp; manual entry<% if (sub.rola_application_number) { %> · ROLA <%= sub.rola_application_number %><% } %><% if (cShifts.length) { %> · <%= cShifts.length %> shifts<% } %>
+      </summary>
+      <div class="mt-2 p-3 bg-gray-50 rounded-md space-y-3">
+        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/rol-manual" class="bg-white ring-1 ring-gray-200 rounded p-2 space-y-2">
+          <%- include('../partials/csrf') %>
+          <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500">Enter ROL details manually</p>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="block">
+              <span class="block text-[10px] font-semibold text-gray-500 mb-0.5">Applied-for date</span>
+              <input type="date" name="rol_applied_date" value="<%= sub.rol_applied_date || '' %>" class="w-full px-2 py-1 text-xs border border-gray-300 rounded" title="Application valid 14 days from here">
+            </label>
+            <label class="block">
+              <span class="block text-[10px] font-semibold text-gray-500 mb-0.5">ROL licence no.</span>
+              <input type="text" name="rol_actual_number" value="<%= sub.rol_actual_number || '' %>" placeholder="e.g. 4412345" class="w-full px-2 py-1 text-xs border border-gray-300 rounded">
+            </label>
+            <label class="block">
+              <span class="block text-[10px] font-semibold text-gray-500 mb-0.5">Approved from</span>
+              <input type="date" name="rol_summary_from" value="<%= sub.rol_summary_from || '' %>" class="w-full px-2 py-1 text-xs border border-gray-300 rounded">
+            </label>
+            <label class="block">
+              <span class="block text-[10px] font-semibold text-gray-500 mb-0.5">Approved to</span>
+              <input type="date" name="rol_summary_to" value="<%= sub.rol_summary_to || '' %>" class="w-full px-2 py-1 text-xs border border-gray-300 rounded">
+            </label>
+            <label class="block col-span-2">
+              <span class="block text-[10px] font-semibold text-gray-500 mb-0.5">Daily time window</span>
+              <input type="text" name="rol_time_window" value="<%= sub.rol_time_window || '' %>" placeholder="e.g. 07:00–17:00" class="w-full px-2 py-1 text-xs border border-gray-300 rounded">
+            </label>
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <label class="inline-flex items-center gap-1.5 text-xs text-gray-700">
+              <input type="checkbox" name="mark_approved" value="1" <%= rolApproved ? 'checked' : '' %> class="rounded border-gray-300 text-emerald-600">
+              Mark approved
+            </label>
+            <button class="px-2.5 py-1 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-md">Save ROL</button>
+          </div>
+        </form>
+        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/rola/parse" enctype="multipart/form-data" class="flex items-center gap-1.5">
+          <%- include('../partials/csrf') %>
+          <span class="text-[11px] text-gray-500">ROLA application PDF:</span>
+          <input type="file" name="rola_file" accept=".pdf" required class="text-[11px]">
+          <button class="px-2.5 py-1 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-md whitespace-nowrap">Read ROLA</button>
+        </form>
+        <% if (sub.rola_application_number || sub.rol_actual_number || sub.rol_summary_from) { %>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+            <% if (sub.rola_application_number) { %><div><span class="text-gray-400">ROLA #</span> <%= sub.rola_application_number %></div><% } %>
+            <% if (sub.rol_actual_number) { %><div><span class="text-gray-400">ROL #</span> <%= sub.rol_actual_number %></div><% } %>
+            <% if (sub.rol_summary_from) { %><div><span class="text-gray-400">Range</span> <%= sub.rol_summary_from %> → <%= sub.rol_summary_to || '' %></div><% } %>
+            <% if (sub.rol_time_window) { %><div><span class="text-gray-400">Times</span> <%= sub.rol_time_window %></div><% } %>
+          </div>
+        <% } %>
+        <% if (cShifts.length) { %>
+          <div class="max-h-40 overflow-y-auto border border-gray-200 rounded bg-white">
+            <table class="w-full text-[11px]"><tbody>
+              <% cShifts.forEach(s => { %><tr class="border-b border-gray-50"><td class="px-2 py-0.5"><%= s.start_date %> <%= s.start_time %></td><td class="px-2 py-0.5 text-gray-400">→</td><td class="px-2 py-0.5"><%= s.end_date %> <%= s.end_time %></td></tr><% }) %>
+            </tbody></table>
+          </div>
+        <% } %>
+      </div>
+    </details>
+  <% } %>
+
+  <!-- Council permit two-stage workflow -->
+  <% if (isCouncilType) {
        const councilApplied = ['submitted', 'approved'].includes(sub.status);
        const councilApproved = sub.status === 'approved';
        const councilDesc = sub.description || '';
@@ -320,7 +400,6 @@
         </div>
       </div>
 
-      <!-- Lodged details — visible from the moment it's applied, through approval. -->
       <% if (councilApplied) { %>
         <div class="px-3 py-2.5 bg-white border-t border-gray-200 grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
           <div class="col-span-2"><span class="text-gray-400 uppercase tracking-wide text-[10px] font-semibold">Description</span><div class="font-medium text-gray-800 mt-0.5"><%= councilDesc || '—' %></div></div>
@@ -331,12 +410,10 @@
 
       <div class="p-3 bg-white border-t border-gray-200">
         <% if (!councilApplied) { %>
-          <!-- Stage 1: capture the lodging details (all required) — file optional. -->
           <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/council" enctype="multipart/form-data" class="space-y-2.5" onsubmit="<%= syncRef %>">
             <%- include('../partials/csrf') %>
             <input type="hidden" name="action" value="apply">
             <input type="hidden" name="application_ref_no" value="<%= sub.application_ref_no || '' %>">
-            <p class="text-[11px] text-gray-500">Fill in these details to lodge the application. The council <span class="font-medium">Application ref</span> is set beside <span class="font-medium">Charge client</span> above.</p>
             <div>
               <label class="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">Description <span class="text-rose-500">*</span></label>
               <input type="text" name="description" required value="<%= councilDesc %>" placeholder="e.g. Road opening — 2 lanes northbound"
@@ -357,9 +434,7 @@
             <div data-dropzone>
               <input type="file" name="documents" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.dwg,.dxf">
               <div class="dropzone-label">
-                <svg class="w-7 h-7 mx-auto mb-1.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                <p class="text-xs text-gray-500">Drag &amp; drop a file here or <span class="text-brand-600 font-medium">click to browse</span></p>
-                <p class="text-[11px] text-gray-400 mt-0.5">Optional — attach the application now, or the permit later.</p>
+                <p class="text-xs text-gray-500">Drag &amp; drop a file here or <span class="text-brand-600 font-medium">click to browse</span> <span class="text-gray-400">(optional)</span></p>
               </div>
             </div>
             <div class="flex items-center justify-end">
@@ -367,7 +442,6 @@
             </div>
           </form>
         <% } else if (!councilApproved) { %>
-          <!-- Stage 2: attach the issued permit (drag-drop / select) + approve -->
           <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/council" enctype="multipart/form-data" class="space-y-2" onsubmit="<%= syncRef %>">
             <%- include('../partials/csrf') %>
             <input type="hidden" name="action" value="approve">
@@ -375,9 +449,7 @@
             <div data-dropzone>
               <input type="file" name="documents" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.dwg,.dxf">
               <div class="dropzone-label">
-                <svg class="w-7 h-7 mx-auto mb-1.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                <p class="text-xs text-gray-500">Drag &amp; drop the approved permit here or <span class="text-brand-600 font-medium">click to browse</span></p>
-                <p class="text-[11px] text-gray-400 mt-0.5">Optional — you can approve without a file and add it later.</p>
+                <p class="text-xs text-gray-500">Drag &amp; drop the approved permit here or <span class="text-brand-600 font-medium">click to browse</span> <span class="text-gray-400">(optional)</span></p>
               </div>
             </div>
             <div class="flex items-center justify-end">
@@ -385,7 +457,6 @@
             </div>
           </form>
         <% } else { %>
-          <!-- Approved: allow attaching more documents after the fact -->
           <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/council" enctype="multipart/form-data" class="space-y-2" onsubmit="<%= syncRef %>">
             <%- include('../partials/csrf') %>
             <input type="hidden" name="action" value="approve">
@@ -400,16 +471,64 @@
         <% } %>
       </div>
     </div>
+
+    <!-- Council fees (itemised, with receipts) — council permits only -->
+    <details class="mb-3 group">
+      <summary class="cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center list-none">
+        <svg class="w-3.5 h-3.5 mr-1 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        Council fees<% if (cFees.length) { %> · <%= cFees.length %> ($<%= feesTotal.toFixed(2) %>)<% } %>
+      </summary>
+      <div class="mt-2 p-3 bg-gray-50 rounded-md space-y-2">
+        <% cFees.forEach(f => { %>
+          <div class="flex items-center justify-between gap-2 text-xs">
+            <span class="text-gray-800"><%= f.description || '—' %> · <span class="font-medium">$<%= (parseFloat(f.amount)||0).toFixed(2) %></span><% if (f.receipt_file_path) { %> · <a href="<%= f.receipt_file_path %>" target="_blank" class="text-brand-600 hover:underline"><%= f.receipt_original_name || 'receipt' %></a><% } %></span>
+            <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/fees/<%= f.id %>/delete" onsubmit="return confirm('Delete this fee?')"><%- include('../partials/csrf') %><button class="text-gray-400 hover:text-rose-600">✕</button></form>
+          </div>
+        <% }) %>
+        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/fees" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end pt-1">
+          <%- include('../partials/csrf') %>
+          <input type="text" name="description" placeholder="Description" class="sm:col-span-2 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md">
+          <input type="number" step="0.01" min="0" name="amount" placeholder="Amount ($)" class="px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md">
+          <input type="file" name="receipt" accept=".pdf,.jpg,.jpeg,.png,.webp" class="text-[11px]">
+          <div class="sm:col-span-4"><button class="px-3 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-md">Add fee</button></div>
+        </form>
+      </div>
+    </details>
+
+    <!-- Council extensions: chips + "+ Extension" -->
+    <div class="mb-3 px-3 py-2 bg-amber-50/50 ring-1 ring-amber-100 rounded text-xs">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-[10px] font-bold uppercase tracking-wide text-amber-700">Extensions</span>
+        <% cExt.forEach(e => { %>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white ring-1 ring-amber-200 text-amber-800 text-[11px] font-medium" title="<%= e.reason || '' %>">
+            <%= e.label || 'Extension' %><%= e.extended_to ? ' → ' + e.extended_to : '' %>
+            <% if (e.file_path) { %><a href="<%= e.file_path %>" target="_blank" class="text-brand-600 hover:underline">file</a><% } %>
+            <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extensions/<%= e.id %>/delete" class="inline" onsubmit="return confirm('Delete this extension?')"><%- include('../partials/csrf') %><button class="text-gray-400 hover:text-rose-600 leading-none">✕</button></form>
+          </span>
+        <% }) %>
+        <button type="button" class="px-2 py-0.5 text-[11px] font-semibold text-amber-700 bg-white hover:bg-amber-100 ring-1 ring-amber-300 rounded"
+          onclick="var f=document.getElementById('ext-form-<%= sub.id %>'); f.classList.toggle('hidden'); if(!f.classList.contains('hidden'))f.querySelector('input[type=date]').focus();">+ Extension</button>
+      </div>
+      <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extensions" enctype="multipart/form-data" id="ext-form-<%= sub.id %>" class="hidden mt-2 flex flex-wrap items-center gap-2">
+        <%- include('../partials/csrf') %>
+        <label class="text-[11px] text-gray-600">Extended to <input type="date" name="extended_to" required class="ml-1 px-2 py-1 text-xs border border-gray-300 rounded"></label>
+        <input type="text" name="reason" placeholder="Reason (optional)" class="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-300 rounded">
+        <input type="file" name="extension_file" accept=".pdf,.jpg,.jpeg,.png,.webp" class="text-[11px]">
+        <button class="px-2.5 py-1 text-[11px] font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded">Add</button>
+      </form>
+    </div>
   <% } %>
 
-  <!-- Upload + submit (combined) — FIRST in the action stack, and open by
-       default until the plan has actually been lodged. It used to sit
-       collapsed under a big Documents dropzone, so people dropped the TGS
-       into Documents (attach-only) and the plan never counted as
-       submitted. Council permits keep their own two-stage block above as
-       the primary flow, so the disclosure stays collapsed for them. -->
-  <% const submitOpen = !isSubmitted && sub.item_type !== 'council_permit'; %>
-  <% if (!isApproved && !isRejected) { %>
+  <!-- Legacy safety valve: fees recorded on a non-council sub-plan stay
+       visible (read-only) even though the Fees form is council-only now. -->
+  <% if (!isCouncilType && cFees.length) { %>
+    <p class="mb-3 text-[11px] text-gray-500">Fees recorded on this sub-plan · $<%= feesTotal.toFixed(2) %><% cFees.forEach(f => { %> · <%= f.description || 'fee' %> $<%= (parseFloat(f.amount)||0).toFixed(2) %><% }) %></p>
+  <% } %>
+
+  <!-- Upload + submit — NOT for ROL (the issued-PDF auto flow above replaces
+       it) and collapsed for council (the two-stage block is the primary). -->
+  <% const submitOpen = !isSubmitted && !isCouncilType && !isRolType; %>
+  <% if (!isApproved && !isRejected && !isRolType) { %>
     <details class="group" <%= submitOpen ? 'open' : '' %>>
       <summary class="cursor-pointer text-xs font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center list-none px-2.5 py-1.5 -ml-1 rounded-md bg-brand-50 ring-1 ring-brand-100">
         <svg class="w-3.5 h-3.5 mr-1 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -419,12 +538,6 @@
       <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/upload-submit" enctype="multipart/form-data" class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-md">
         <%- include('../partials/csrf') %>
 
-        <!-- Description is required server-side. It used to ride along as a
-             hidden input pre-rendered with sub.description, which made it
-             impossible to set on first submission unless the user blurred
-             the outer auto-save description input first. Surfacing it inside
-             the form removes the foot-gun: whatever's typed here is what
-             posts. -->
         <div class="sm:col-span-2">
           <label class="block text-xs font-medium text-gray-700 mb-1">Description <span class="text-rose-500">*</span></label>
           <input type="text" name="description" required
@@ -446,7 +559,7 @@
           <p class="mt-1 text-[11px] text-gray-500">PDF, Word, Excel, images, DWG/DXF — max 25MB / 10 files<% if (!fileRequired && docCount > 0) { %> · optional, <%= docCount %> file<%= docCount > 1 ? 's' : '' %> already attached<% } else if (sub.item_type === 'council_permit') { %> · optional for council<% } %></p>
         </div>
 
-        <% const jobMandatory = (sub.item_type === 'council_permit' || sub.item_type === 'rol' || sub.item_type === 'road_occupancy'); %>
+        <% const jobMandatory = (sub.item_type === 'council_permit'); %>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Client request date</label>
           <input type="date" name="client_request_date" value="<%= sub.client_request_date || '' %>"
@@ -465,13 +578,6 @@
             class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
         </div>
         <% } %>
-        <% if (isROL) { %>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Expiry date</label>
-          <input type="date" name="expiry_date" value="<%= sub.expiry_date || '' %>"
-            class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
-        </div>
-        <% } %>
         <% if (sub.item_type === 'council_permit') { %>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Type of Council Plan</label>
@@ -487,15 +593,12 @@
             class="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"><%= sub.notes || '' %></textarea>
         </div>
 
-        <!-- Effort + cost capture, all part of the same submission action. -->
         <div class="sm:col-span-2 pt-3 border-t border-gray-200">
           <label class="block text-xs font-medium text-gray-700 mb-1">Hours spent <span class="text-rose-500">*</span></label>
           <input type="number" name="hours_spent" required min="0.25" step="0.25" value="<%= sub.hours_spent || '' %>"
             placeholder="0.5"
             class="w-32 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
         </div>
-
-        <p class="sm:col-span-2 text-[11px] text-gray-500">Charging the client is set in the <span class="font-medium">Charge client</span> control on this card (editable any time). Council costs / fees are recorded in the <span class="font-medium">Fees</span> section below (with receipts).</p>
 
         <%- include('../partials/notify-picker') %>
 
@@ -508,11 +611,8 @@
     </details>
   <% } %>
 
-  <!-- Supporting documents — attach-only, deliberately BELOW Submit plan.
-       This zone is for extras (site photos, correspondence, markups); it
-       never changes the sub-plan's status. The actual plan goes through
-       "Submit plan" above. -->
-  <div class="mt-3 mb-3">
+  <!-- Supporting documents — attach-only; never changes status. -->
+  <div class="mt-3">
     <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Supporting documents<% if (docCount > 0) { %> · <%= docCount %><% } %></p>
     <% if (docCount > 0) { %>
     <div class="mb-2 space-y-1">
@@ -524,7 +624,7 @@
           <span class="text-gray-400 shrink-0"><%= Math.round((d.file_size || 0) / 1024) %> KB</span>
           <form method="POST" action="/compliance/<%= sub.id %>/documents/<%= d.id %>/delete" class="inline shrink-0" onsubmit="return confirm('Delete this file?')">
             <%- include('../partials/csrf') %>
-            <input type="hidden" name="return_to" value="/compliance/<%= parentId %>/edit">
+            <input type="hidden" name="return_to" value="/compliance/<%= parentId %>/edit#sub-<%= sub.id %>">
             <button type="submit" class="text-gray-400 hover:text-rose-600 p-0.5">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
@@ -538,162 +638,11 @@
       <div data-dropzone>
         <input type="file" name="documents" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.dwg,.dxf">
         <div class="dropzone-label">
-          <svg class="w-6 h-6 mx-auto mb-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
           <p class="text-xs text-gray-500">Drag &amp; drop supporting files — or <span class="text-brand-600 font-medium">click to browse</span></p>
-          <p class="text-[11px] text-gray-400 mt-0.5">Extras only — this does <span class="font-semibold">not</span> submit the plan. Use <span class="font-medium">Submit plan</span> above for that. Max 25MB / 10 files.</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">Extras only — this does <span class="font-semibold">not</span> <%= isRolType ? 'approve the ROL (use the issued-ROL zone above)' : 'submit the plan' %>. Max 25MB / 10 files.</p>
         </div>
       </div>
       <noscript><button type="submit" class="mt-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">Attach</button></noscript>
     </form>
   </div>
-
-  <!-- Fees (itemised, with receipts) -->
-  <details class="mt-3 group">
-    <summary class="cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center list-none">
-      <svg class="w-3.5 h-3.5 mr-1 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-      Fees<% if (cFees.length) { %> · <%= cFees.length %> ($<%= feesTotal.toFixed(2) %>)<% } %>
-    </summary>
-    <div class="mt-2 p-3 bg-gray-50 rounded-md space-y-2">
-      <% cFees.forEach(f => { %>
-        <div class="flex items-center justify-between gap-2 text-xs">
-          <span class="text-gray-800"><%= f.description || '—' %> · <span class="font-medium">$<%= (parseFloat(f.amount)||0).toFixed(2) %></span><% if (f.receipt_file_path) { %> · <a href="<%= f.receipt_file_path %>" target="_blank" class="text-brand-600 hover:underline"><%= f.receipt_original_name || 'receipt' %></a><% } %></span>
-          <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/fees/<%= f.id %>/delete" onsubmit="return confirm('Delete this fee?')"><%- include('../partials/csrf') %><button class="text-gray-400 hover:text-rose-600">✕</button></form>
-        </div>
-      <% }) %>
-      <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/fees" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end pt-1">
-        <%- include('../partials/csrf') %>
-        <input type="text" name="description" placeholder="Description" class="sm:col-span-2 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md">
-        <input type="number" step="0.01" min="0" name="amount" placeholder="Amount ($)" class="px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md">
-        <input type="file" name="receipt" accept=".pdf,.jpg,.jpeg,.png,.webp" class="text-[11px]">
-        <div class="sm:col-span-4"><button class="px-3 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-md">Add fee</button></div>
-      </form>
-    </div>
-  </details>
-
-  <!-- Extensions (ROL / Council) -->
-  <% if (isRolType || isCouncilType) { %>
-  <details class="mt-2 group">
-    <summary class="cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center list-none">
-      <svg class="w-3.5 h-3.5 mr-1 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-      Extensions<% if (cExt.length) { %> · <%= cExt.length %><% } %>
-    </summary>
-    <div class="mt-2 p-3 bg-gray-50 rounded-md space-y-2">
-      <% cExt.forEach(e => { %>
-        <div class="flex items-center justify-between gap-2 text-xs">
-          <span class="text-gray-800"><%= e.label || 'Extension' %><%= e.extended_to ? ' → ' + e.extended_to : '' %><% if (e.reason) { %> <span class="text-gray-500">(<%= e.reason %>)</span><% } %><% if (e.file_path) { %> · <a href="<%= e.file_path %>" target="_blank" class="text-brand-600 hover:underline"><%= e.file_original_name || 'file' %></a><% } %></span>
-          <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extensions/<%= e.id %>/delete" onsubmit="return confirm('Delete this extension?')"><%- include('../partials/csrf') %><button class="text-gray-400 hover:text-rose-600">✕</button></form>
-        </div>
-      <% }) %>
-      <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extensions" enctype="multipart/form-data" class="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end pt-1">
-        <%- include('../partials/csrf') %>
-        <input type="text" name="label" placeholder="Label (e.g. Extension 1)" class="px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md">
-        <input type="date" name="extended_to" class="px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md">
-        <input type="text" name="reason" placeholder="Reason" class="px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md">
-        <input type="file" name="extension_file" accept=".pdf,.jpg,.jpeg,.png,.webp" class="text-[11px]">
-        <div class="sm:col-span-4"><button class="px-3 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-md">Add extension</button></div>
-      </form>
-    </div>
-  </details>
-  <% } %>
-
-  <!-- ROL two-stage + PDF auto-extraction + manual entry -->
-  <% if (isRolType) { %>
-  <details class="mt-2 group"<%= (rolApplied && !rolApproved) ? ' open' : '' %>>
-    <summary class="cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center list-none">
-      <svg class="w-3.5 h-3.5 mr-1 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-      ROL workflow<% if (sub.rol_stage && sub.rol_stage !== 'none') { %> · <%= sub.rol_stage %><% } %><% if (cShifts.length) { %> · <%= cShifts.length %> shifts<% } %>
-    </summary>
-    <div class="mt-2 p-3 bg-gray-50 rounded-md space-y-3">
-      <!-- Manual entry: applied-for date, licence number, approved dates -->
-      <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/rol-manual" class="bg-white ring-1 ring-gray-200 rounded p-2 space-y-2">
-        <%- include('../partials/csrf') %>
-        <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500">Enter ROL details</p>
-        <div class="grid grid-cols-2 gap-2">
-          <label class="block">
-            <span class="block text-[10px] font-semibold text-gray-500 mb-0.5">Applied-for date</span>
-            <input type="date" name="rol_applied_date" value="<%= sub.rol_applied_date || '' %>" class="w-full px-2 py-1 text-xs border border-gray-300 rounded" title="Application valid 14 days from here">
-          </label>
-          <label class="block">
-            <span class="block text-[10px] font-semibold text-gray-500 mb-0.5">ROL licence no.</span>
-            <input type="text" name="rol_actual_number" value="<%= sub.rol_actual_number || '' %>" placeholder="e.g. ROL-2026-0421" class="w-full px-2 py-1 text-xs border border-gray-300 rounded">
-          </label>
-          <label class="block">
-            <span class="block text-[10px] font-semibold text-gray-500 mb-0.5">Approved from</span>
-            <input type="date" name="rol_summary_from" value="<%= sub.rol_summary_from || '' %>" class="w-full px-2 py-1 text-xs border border-gray-300 rounded">
-          </label>
-          <label class="block">
-            <span class="block text-[10px] font-semibold text-gray-500 mb-0.5">Approved to</span>
-            <input type="date" name="rol_summary_to" value="<%= sub.rol_summary_to || '' %>" class="w-full px-2 py-1 text-xs border border-gray-300 rounded">
-          </label>
-          <label class="block col-span-2">
-            <span class="block text-[10px] font-semibold text-gray-500 mb-0.5">Daily time window</span>
-            <input type="text" name="rol_time_window" value="<%= sub.rol_time_window || '' %>" placeholder="e.g. 07:00–17:00" class="w-full px-2 py-1 text-xs border border-gray-300 rounded">
-          </label>
-        </div>
-        <div class="flex items-center justify-between gap-2">
-          <label class="inline-flex items-center gap-1.5 text-xs text-gray-700">
-            <input type="checkbox" name="mark_approved" value="1" <%= rolApproved ? 'checked' : '' %> class="rounded border-gray-300 text-emerald-600">
-            Mark approved
-          </label>
-          <button class="px-2.5 py-1 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-md">Save ROL</button>
-        </div>
-      </form>
-      <div class="bg-brand-50 ring-1 ring-brand-100 rounded p-2">
-        <p class="text-[10px] font-bold uppercase tracking-wide text-brand-700 mb-1.5">Or auto-extract from PDF</p>
-        <%
-          // PDFs already attached via the Documents zone — no re-upload
-          // needed: pick one and read it as the ROLA or the issued ROL.
-          const rolDocPdfs = (docs || []).filter(d => /\.pdf$/i.test(d.original_name || d.filename || '') || String(d.mime_type || '').toLowerCase().includes('pdf'));
-        %>
-        <% if (rolDocPdfs.length) { %>
-          <div class="mb-2 space-y-1" data-rol-existing-docs>
-            <% rolDocPdfs.forEach(d => { %>
-              <div class="flex flex-wrap items-center gap-2 px-2 py-1.5 bg-white ring-1 ring-gray-200 rounded text-xs">
-                <span class="flex-1 min-w-0 truncate text-gray-700" title="<%= d.original_name %>"><%= d.original_name %></span>
-                <span class="text-[10px] text-gray-400 shrink-0"><%= (d.created_at || '').slice(0, 10) %></span>
-                <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/rola/parse" enctype="multipart/form-data" class="inline shrink-0">
-                  <%- include('../partials/csrf') %>
-                  <input type="hidden" name="existing_doc_id" value="<%= d.id %>">
-                  <button class="px-2 py-0.5 text-[11px] font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 ring-1 ring-brand-200 rounded">Read as ROLA</button>
-                </form>
-                <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/rol/parse" enctype="multipart/form-data" class="inline shrink-0">
-                  <%- include('../partials/csrf') %>
-                  <input type="hidden" name="existing_doc_id" value="<%= d.id %>">
-                  <button class="px-2 py-0.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 ring-1 ring-emerald-200 rounded">Read as issued ROL</button>
-                </form>
-              </div>
-            <% }) %>
-          </div>
-        <% } %>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/rola/parse" enctype="multipart/form-data" class="flex items-center gap-1.5">
-            <%- include('../partials/csrf') %>
-            <input type="file" name="rola_file" accept=".pdf" required class="text-[11px]">
-            <button class="px-2.5 py-1 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-md whitespace-nowrap">Read ROLA</button>
-          </form>
-          <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/rol/parse" enctype="multipart/form-data" class="flex items-center gap-1.5">
-            <%- include('../partials/csrf') %>
-            <input type="file" name="rol_file" accept=".pdf" required class="text-[11px]">
-            <button class="px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md whitespace-nowrap">Read issued ROL</button>
-          </form>
-        </div>
-      </div>
-      <% if (sub.rola_application_number || sub.rol_actual_number || sub.rol_summary_from) { %>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-          <% if (sub.rola_application_number) { %><div><span class="text-gray-400">ROLA #</span> <%= sub.rola_application_number %></div><% } %>
-          <% if (sub.rol_actual_number) { %><div><span class="text-gray-400">ROL #</span> <%= sub.rol_actual_number %></div><% } %>
-          <% if (sub.rol_summary_from) { %><div><span class="text-gray-400">Range</span> <%= sub.rol_summary_from %> → <%= sub.rol_summary_to || '' %></div><% } %>
-          <% if (sub.rol_time_window) { %><div><span class="text-gray-400">Times</span> <%= sub.rol_time_window %></div><% } %>
-        </div>
-      <% } %>
-      <% if (cShifts.length) { %>
-        <div class="max-h-40 overflow-y-auto border border-gray-200 rounded bg-white">
-          <table class="w-full text-[11px]"><tbody>
-            <% cShifts.forEach(s => { %><tr class="border-b border-gray-50"><td class="px-2 py-0.5"><%= s.start_date %> <%= s.start_time %></td><td class="px-2 py-0.5 text-gray-400">→</td><td class="px-2 py-0.5"><%= s.end_date %> <%= s.end_time %></td></tr><% }) %>
-          </tbody></table>
-        </div>
-      <% } %>
-    </div>
-  </details>
-  <% } %>
 </div>

@@ -410,12 +410,14 @@
                 <%
                   const subList = subPlansByParent[item.id] || [];
                   const subBadge = { not_started:'bg-gray-100 text-gray-700', started:'bg-amber-50 text-amber-700', submitted:'bg-blue-50 text-blue-700', approved:'bg-emerald-50 text-emerald-700', rejected:'bg-rose-50 text-rose-700', expired:'bg-orange-50 text-orange-700' };
-                  let planHours = 0, planCharge = 0, planFee = 0;
+                  let planHours = 0, planFee = 0;
                   subList.forEach(s => {
                     planHours += parseFloat(s.hours_spent) || 0;
-                    if (s.charge_client) planCharge += parseFloat(s.charge_amount) || 0;
                     if (s.council_fee_paid) planFee += parseFloat(s.council_fee_amount) || 0;
                   });
+                  // Client charge lives on the PARENT now (plan-level quote,
+                  // denormalised into item.charge_amount by rollupQuoteTotal).
+                  const planCharge = item.charge_client ? (parseFloat(item.charge_amount) || 0) : 0;
                   const fmt$ = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
                 %>
                 <tr id="exp-<%= item.id %>" class="hidden bg-gray-50/50 month-row" data-month-row="<%= group.key %>" data-sub-expansion="1">
@@ -433,7 +435,6 @@
                             <th class="font-medium pb-1.5 pr-3">Status</th>
                             <th class="font-medium pb-1.5 pr-3">Files</th>
                             <th class="font-medium pb-1.5 pr-3">Hours</th>
-                            <th class="font-medium pb-1.5 pr-3">Charge</th>
                             <th class="font-medium pb-1.5 pr-3">Council fee</th>
                             <th class="font-medium pb-1.5 pr-3">Expires</th>
                             <th class="font-medium pb-1.5 pr-3">Flags</th>
@@ -442,7 +443,12 @@
                         <tbody>
                           <% subList.forEach(s => { %>
                             <tr class="border-t border-gray-200">
-                              <td class="py-1.5 pr-3 font-mono text-gray-700"><%= s.reference_number %></td>
+                              <td class="py-1.5 pr-3 font-mono text-gray-700">
+                                <%= s.reference_number %>
+                                <% if ((s.item_type === 'rol' || s.item_type === 'road_occupancy') && s.rol_actual_number) { %>
+                                  <span class="block text-[10px] text-teal-700">ROL <%= s.rol_actual_number %></span>
+                                <% } %>
+                              </td>
                               <td class="py-1.5 pr-3 text-gray-700"><%= s.description || '—' %></td>
                               <td class="py-1.5 pr-3 text-gray-600"><%= s.owner_name || '—' %></td>
                               <td class="py-1.5 pr-3">
@@ -450,7 +456,6 @@
                               </td>
                               <td class="py-1.5 pr-3 text-gray-600"><%= s.doc_count || 0 %></td>
                               <td class="py-1.5 pr-3 text-gray-600"><%= parseFloat(s.hours_spent) ? (Math.round(s.hours_spent * 100) / 100) + 'h' : '—' %></td>
-                              <td class="py-1.5 pr-3 text-gray-700"><%= s.charge_client ? fmt$(parseFloat(s.charge_amount) || 0) : '—' %></td>
                               <td class="py-1.5 pr-3 text-gray-700"><%= s.council_fee_paid ? fmt$(parseFloat(s.council_fee_amount) || 0) : '—' %></td>
                               <td class="py-1.5 pr-3 text-gray-600"><%= s.expiry_date || '—' %></td>
                               <td class="py-1.5 pr-3">
@@ -461,9 +466,8 @@
                             </tr>
                           <% }) %>
                           <tr class="border-t-2 border-gray-300 bg-brand-50/40">
-                            <td class="py-2 pr-3 font-semibold text-gray-700" colspan="5">Plan totals</td>
+                            <td class="py-2 pr-3 font-semibold text-gray-700" colspan="5">Plan totals · <span class="text-emerald-700">quote <%= fmt$(planCharge) %></span></td>
                             <td class="py-2 pr-3 font-semibold text-gray-900"><%= (Math.round(planHours * 100) / 100) %>h</td>
-                            <td class="py-2 pr-3 font-semibold text-emerald-700"><%= fmt$(planCharge) %></td>
                             <td class="py-2 pr-3 font-semibold text-amber-700"><%= fmt$(planFee) %></td>
                             <td class="py-2 pr-3" colspan="2"></td>
                           </tr>

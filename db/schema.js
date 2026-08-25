@@ -15599,6 +15599,89 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 350 error:', e.message); }
   }
 
+  // Migration 351: plan-level quote. A simple line-item table (description +
+  // amount) on the PARENT plan replaces the per-sub-plan "charge client"
+  // checkbox+amount, with revision snapshots (Rev 1, 2, …). Only the highest
+  // revision is editable; "New revision" copies the current lines forward.
+  if (!isMigrationApplied.get(351)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS compliance_quote_revisions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          compliance_id INTEGER NOT NULL REFERENCES compliance(id) ON DELETE CASCADE,
+          revision_number INTEGER NOT NULL,
+          note TEXT DEFAULT '',
+          created_by INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(compliance_id, revision_number)
+        );
+        CREATE TABLE IF NOT EXISTS compliance_quote_lines (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          revision_id INTEGER NOT NULL REFERENCES compliance_quote_revisions(id) ON DELETE CASCADE,
+          description TEXT NOT NULL,
+          amount REAL DEFAULT 0,
+          sort_order INTEGER DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_cq_revisions_cid ON compliance_quote_revisions(compliance_id);
+        CREATE INDEX IF NOT EXISTS idx_cq_lines_rev ON compliance_quote_lines(revision_id);
+      `);
+      recordMigration.run(351, 'compliance_quote_revisions + compliance_quote_lines (plan-level quote table)');
+      console.log('Migration 351 applied: plan quote tables');
+    } catch (e) { console.error('Migration 351 error:', e.message); }
+  }
+
+  // Migration 352: move sub-plan charges into the plan quote. For every
+  // parent plan without a quote yet: seed Rev 1 from its charged sub-plans,
+  // then ZERO those sub-plans' charge fields (lib/departments.js and the job
+  // rollup scan every compliance row, so leaving them would double-count),
+  // and denormalise the total onto the parent's charge_amount/charge_client —
+  // which is exactly what the invoice workflow, register and hub already
+  // read. Invoiced parents keep their stamped amount (frozen). Legacy flat
+  // rows (no plan_number) are untouched.
+  if (!isMigrationApplied.get(352)) {
+    try {
+      const LABELS = {
+        tmp_approval: 'CTMP', council_permit: 'Council Permit', traffic_guidance: 'TGS',
+        rol: 'ROL', road_occupancy: 'ROL', spa: 'SPA', sza: 'SZA', bus_approval: 'Bus Approval',
+        police_notification: 'Police Notification', letter_drop: 'Letter Drop', other: 'Other',
+        insurance: 'Insurance', swms_review: 'SWMS Review', induction: 'Induction',
+        utility_clearance: 'Utility Clearance', environmental: 'Environmental',
+      };
+      const parents = db.prepare('SELECT id, invoiced, charge_amount FROM compliance WHERE parent_id IS NULL AND plan_number IS NOT NULL').all();
+      const hasRev = db.prepare('SELECT 1 FROM compliance_quote_revisions WHERE compliance_id = ? LIMIT 1');
+      const chargedSubs = db.prepare("SELECT id, reference_number, item_type, charge_amount FROM compliance WHERE parent_id = ? AND COALESCE(charge_client,0) = 1 AND COALESCE(charge_amount,0) > 0");
+      const insRev = db.prepare("INSERT INTO compliance_quote_revisions (compliance_id, revision_number, note) VALUES (?, 1, 'Migrated from sub-plan charges')");
+      const insLine = db.prepare('INSERT INTO compliance_quote_lines (revision_id, description, amount, sort_order) VALUES (?, ?, ?, ?)');
+      const zeroSub = db.prepare('UPDATE compliance SET charge_client = 0, charge_amount = 0 WHERE id = ?');
+      const stampParent = db.prepare('UPDATE compliance SET charge_amount = ?, charge_client = ? WHERE id = ?');
+      let seeded = 0;
+      db.transaction(() => {
+        for (const p of parents) {
+          if (hasRev.get(p.id)) continue;
+          const subs = chargedSubs.all(p.id);
+          let lines = subs.map(s => ({
+            d: (s.reference_number || 'Sub-plan') + ' — ' + (LABELS[s.item_type] || s.item_type),
+            a: parseFloat(s.charge_amount) || 0,
+          }));
+          // A parent-only stamp (mark-invoiced era) with no charged subs still
+          // deserves a line so the quote tab shows where the number came from.
+          if (!lines.length && (parseFloat(p.charge_amount) || 0) > 0) {
+            lines = [{ d: 'Plan charge (migrated)', a: parseFloat(p.charge_amount) }];
+          }
+          if (!lines.length) continue;
+          const revId = insRev.run(p.id).lastInsertRowid;
+          lines.forEach((l, i) => insLine.run(revId, l.d, l.a, i));
+          subs.forEach(s => zeroSub.run(s.id));
+          const total = Math.round(lines.reduce((t, l) => t + l.a, 0) * 100) / 100;
+          if (!p.invoiced) stampParent.run(total, total > 0 ? 1 : 0, p.id);
+          seeded += 1;
+        }
+      })();
+      recordMigration.run(352, 'Seed plan quotes from sub-plan charges; zero migrated sub charges; stamp parent totals');
+      console.log(`Migration 352 applied: ${seeded} plan quote(s) seeded from sub-plan charges`);
+    } catch (e) { console.error('Migration 352 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

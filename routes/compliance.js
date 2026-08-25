@@ -354,7 +354,7 @@ router.get('/', (req, res) => {
   if (parentIds.length > 0) {
     const placeholders = parentIds.map(() => '?').join(',');
     const subs = db.prepare(`SELECT c.id, c.parent_id, c.item_type, c.reference_number, c.description, c.status, c.submitted_date, c.expiry_date, c.extension_required,
-      c.hours_spent, c.charge_client, c.charge_amount, c.council_fee_paid, c.council_fee_amount,
+      c.hours_spent, c.charge_client, c.charge_amount, c.council_fee_paid, c.council_fee_amount, c.rol_actual_number,
       c.assigned_to_id, u.full_name AS owner_name
       FROM compliance c LEFT JOIN users u ON c.assigned_to_id = u.id
       WHERE c.parent_id IN (${placeholders}) ORDER BY c.item_type, c.reference_number`).all(...parentIds);
@@ -601,7 +601,7 @@ router.post('/sub-plans/:subId/description', (req, res) => {
   const desc = (req.body.description || '').trim();
   db.prepare("UPDATE compliance SET description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(desc, sub.id);
   if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true, description: desc });
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
 // Inline owner update for a sub-plan.
@@ -616,23 +616,11 @@ router.post('/sub-plans/:subId/owner', (req, res) => {
   const ownerId = req.body.assigned_to_id || null;
   db.prepare("UPDATE compliance SET assigned_to_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(ownerId, sub.id);
   if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true, assigned_to_id: ownerId });
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
-// Toggle the ROL extension flag on a sub-plan.
-router.post('/sub-plans/:subId/extension', (req, res) => {
-  const db = getDb();
-  const sub = getSubPlan(db, req.params.subId);
-  if (!sub) {
-    if (req.headers.accept && req.headers.accept.includes('json')) return res.status(404).json({ error: 'Sub-plan not found' });
-    req.flash('error', 'Sub-plan not found.');
-    return req.session.save(() => res.redirect('/compliance'));
-  }
-  const flag = (req.body.extension_required === '1' || req.body.extension_required === 1 || req.body.extension_required === true) ? 1 : 0;
-  db.prepare("UPDATE compliance SET extension_required = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(flag, sub.id);
-  if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true, extension_required: flag });
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
-});
+// (The manual "ROL extension required" toggle route is gone — the flag is now
+// DERIVED from extension records by recomputeRolEffectiveEnd below.)
 
 // Combined upload + submit. Files are required (≥1); submitted_date
 // is required (validated server-side); expiry_date is optional.
@@ -686,23 +674,23 @@ router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 
   const desc = (req.body.description || sub.description || '').trim();
   if (!desc) {
     req.flash('error', 'Description is required before submitting.');
-    return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+    return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
   }
   const submittedDateRaw = (req.body.submitted_date || '').trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(submittedDateRaw)) {
     req.flash('error', 'Submission date is required.');
-    return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+    return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
   }
   const hoursSpentParsed = parseFloat(req.body.hours_spent);
   if (!Number.isFinite(hoursSpentParsed) || hoursSpentParsed <= 0) {
     req.flash('error', 'Hours spent is required and must be greater than zero.');
-    return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+    return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
   }
   // Job start is mandatory for ROL and Council Application sub-plans.
   const jobMandatory = ['council_permit', 'rol', 'road_occupancy'].includes(sub.item_type);
   if (jobMandatory && !/^\d{4}-\d{2}-\d{2}$/.test((req.body.job_date || '').trim())) {
     req.flash('error', 'Job start date is required for ' + (sub.item_type === 'council_permit' ? 'Council' : 'ROL') + ' plans.');
-    return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+    return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
   }
   // Council permit applications are lodged before any document exists (the
   // permit/approval file only arrives once the council issues it), so a file
@@ -713,7 +701,7 @@ router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 
     const existingDocs = db.prepare('SELECT COUNT(*) as c FROM compliance_documents WHERE compliance_id = ?').get(sub.id).c;
     if (existingDocs === 0) {
       req.flash('error', 'At least one file is required to submit.');
-      return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+      return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
     }
   }
   try {
@@ -783,7 +771,7 @@ router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 
         ref: sub.reference_number,
         label: ITEM_TYPE_LABELS[sub.item_type] || 'Plan / Approval',
         jobNumber,
-        link: '/compliance/' + sub.parent_id + '/edit',
+        link: '/compliance/' + sub.parent_id + '/edit#sub-' + sub.id,
         jobId: sub.job_id || null,
       });
     } catch (notifyErr) {
@@ -795,7 +783,7 @@ router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 
     console.error('[Compliance] Sub-plan upload-submit error:', err.message);
     req.flash('error', 'Submission failed: ' + err.message);
   }
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
 // Mark a sub-plan approved. Gated: must be 'submitted' first.
@@ -810,7 +798,7 @@ router.post('/sub-plans/:subId/approve', (req, res) => {
   if (sub.status !== 'submitted') {
     if (req.headers.accept && req.headers.accept.includes('json')) return res.status(400).json({ error: 'Sub-plan must be submitted before approval' });
     req.flash('error', 'Sub-plan must be submitted before it can be approved.');
-    return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+    return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
   }
   const today = new Date().toISOString().split('T')[0];
   db.prepare("UPDATE compliance SET status = 'approved', approved_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(today, sub.id);
@@ -821,7 +809,7 @@ router.post('/sub-plans/:subId/approve', (req, res) => {
   }
   if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true });
   req.flash('success', `${sub.reference_number} approved.`);
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
 // Mark a sub-plan rejected. Allowed from any status.
@@ -841,7 +829,7 @@ router.post('/sub-plans/:subId/reject', (req, res) => {
   }
   if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true });
   req.flash('success', `${sub.reference_number} marked rejected.`);
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
 // Delete a sub-plan and its documents. Parent status re-synced after.
@@ -893,7 +881,7 @@ router.post('/sub-plans/:subId/details', (req, res) => {
     .run(req.body.job_date || null, req.body.council_plan_type || '', req.body.client_request_date || null, sub.id);
   if (wantsJson(req)) return res.json({ success: true });
   req.flash('success', 'Details saved.');
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
 // Manual ROL entry — the counterpart to the PDF auto-extract. Captures the
@@ -907,7 +895,7 @@ router.post('/sub-plans/:subId/rol-manual', (req, res) => {
   if (!sub) { if (wantsJson(req)) return res.status(404).json({ error: 'Sub-plan not found' }); req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance')); }
   if (sub.item_type !== 'rol' && sub.item_type !== 'road_occupancy') {
     if (wantsJson(req)) return res.status(400).json({ error: 'Not a ROL sub-plan' });
-    req.flash('error', 'Not a ROL sub-plan.'); return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+    req.flash('error', 'Not a ROL sub-plan.'); return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
   }
   const b = req.body;
   const appliedDate = /^\d{4}-\d{2}-\d{2}$/.test(b.rol_applied_date || '') ? b.rol_applied_date : null;
@@ -937,9 +925,13 @@ router.post('/sub-plans/:subId/rol-manual', (req, res) => {
     approved ? 1 : 0,
     sub.id
   );
+  // Keep the derived effective-end + parent rollup in step with manual edits
+  // (a typed "Approved to" flows into expiry_date the same way a parse does).
+  recomputeRolEffectiveEnd(db, sub.id);
+  planStatus.syncParentStatus(db, sub.parent_id);
   if (wantsJson(req)) return res.json({ success: true });
   req.flash('success', 'ROL details saved.');
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
 // Link a TGS sub-plan to a ROL sub-plan of the SAME plan (or clear the link).
@@ -982,24 +974,8 @@ router.post('/sub-plans/:subId/link-rol', (req, res) => {
   req.session.save(() => res.redirect(backTo));
 });
 
-// Charge the client — set/clear the charge flag + amount independently of the
-// upload/submit flow, so it can be edited at ANY status (before submitting,
-// after submitting, even once approved). This is its own dedicated form, so an
-// unchecked box (charge_client absent from the body) correctly means "don't
-// charge". Body arrives urlencoded (see __subPlanAjaxSave), so the global
-// express.urlencoded parser handles it — no per-route body middleware needed.
-router.post('/sub-plans/:subId/charge', (req, res) => {
-  const db = getDb();
-  const sub = getSubPlan(db, req.params.subId);
-  if (!sub) { if (wantsJson(req)) return res.status(404).json({ error: 'Sub-plan not found' }); req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance')); }
-  const chargeClient = (req.body.charge_client === '1' || req.body.charge_client === 1 || req.body.charge_client === true || req.body.charge_client === 'on') ? 1 : 0;
-  const chargeAmount = chargeClient ? (parseFloat(req.body.charge_amount) || 0) : 0;
-  db.prepare("UPDATE compliance SET charge_client = ?, charge_amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-    .run(chargeClient, chargeAmount, sub.id);
-  if (wantsJson(req)) return res.json({ success: true, charge_client: chargeClient, charge_amount: chargeAmount });
-  req.flash('success', 'Charge updated.');
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
-});
+// (The per-sub-plan /charge route is retired — client charging lives on the
+// plan-level Quote tab now; see the /:id/quote/* routes.)
 
 // Council permit application reference number — the council-issued reference
 // for a lodged application, captured beside the Charge client control and
@@ -1012,7 +988,7 @@ router.post('/sub-plans/:subId/app-ref', (req, res) => {
   db.prepare("UPDATE compliance SET application_ref_no = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(ref, sub.id);
   if (wantsJson(req)) return res.json({ success: true, application_ref_no: ref });
   req.flash('success', 'Application ref saved.');
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
 // Council permit two-stage workflow (spec: "first stage is applied, then mark
@@ -1029,12 +1005,12 @@ router.post('/sub-plans/:subId/council', subPlanUpload.array('documents', 10), (
   if (!sub) { if (wantsJson(req)) return res.status(404).json({ error: 'Sub-plan not found' }); req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance')); }
   if (sub.item_type !== 'council_permit') {
     if (wantsJson(req)) return res.status(400).json({ error: 'Not a council permit sub-plan' });
-    req.flash('error', 'Not a council permit sub-plan.'); return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+    req.flash('error', 'Not a council permit sub-plan.'); return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
   }
   const action = req.body.action === 'approve' ? 'approve' : 'apply';
   const files = req.files || [];
   const today = new Date().toISOString().split('T')[0];
-  const parentEdit = '/compliance/' + sub.parent_id + '/edit';
+  const parentEdit = '/compliance/' + sub.parent_id + '/edit#sub-' + sub.id;
 
   // Applying lodges the application, so the core details must be in first:
   // Description, Submission date, Job start. (Files stay optional.)
@@ -1083,7 +1059,7 @@ router.post('/sub-plans/:subId/council', subPlanUpload.array('documents', 10), (
   }
   if (wantsJson(req)) return res.json({ success: true });
   req.flash('success', action === 'approve' ? `${sub.reference_number} approved.` : `${sub.reference_number} marked applied.`);
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
 // Roll the itemised fees up into the legacy council_fee_amount/_paid columns
@@ -1095,6 +1071,164 @@ function rollupCouncilFee(db, complianceId) {
     .run(total, total > 0 ? 1 : 0, complianceId);
 }
 
+// ============================================================
+// Plan-level quote (migration 351) — a simple line-item table with revision
+// snapshots that replaces the per-sub-plan "charge client" controls. The
+// CURRENT revision (highest number) is the live one; every mutation
+// denormalises its total onto the parent's charge_amount/charge_client so the
+// invoice workflow, register, hub and P&L keep reading the columns they
+// always have. An invoiced plan's stamped amount is FROZEN (rollup skips it).
+// ============================================================
+
+function getParentPlan(db, id) {
+  return db.prepare('SELECT * FROM compliance WHERE id = ? AND parent_id IS NULL AND plan_number IS NOT NULL').get(id);
+}
+
+function currentQuoteRevision(db, planId, createIfMissing, userId) {
+  let rev = db.prepare('SELECT * FROM compliance_quote_revisions WHERE compliance_id = ? ORDER BY revision_number DESC LIMIT 1').get(planId);
+  if (!rev && createIfMissing) {
+    const id = db.prepare('INSERT INTO compliance_quote_revisions (compliance_id, revision_number, created_by) VALUES (?, 1, ?)').run(planId, userId || null).lastInsertRowid;
+    rev = db.prepare('SELECT * FROM compliance_quote_revisions WHERE id = ?').get(id);
+  }
+  return rev;
+}
+
+function quoteState(db, planId) {
+  const revisions = db.prepare('SELECT r.*, u.full_name AS created_by_name FROM compliance_quote_revisions r LEFT JOIN users u ON u.id = r.created_by WHERE r.compliance_id = ? ORDER BY r.revision_number DESC').all(planId);
+  const linesByRev = {};
+  if (revisions.length) {
+    const ids = revisions.map(r => r.id);
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(`SELECT * FROM compliance_quote_lines WHERE revision_id IN (${placeholders}) ORDER BY sort_order, id`).all(...ids)
+      .forEach(l => { (linesByRev[l.revision_id] = linesByRev[l.revision_id] || []).push(l); });
+  }
+  const current = revisions[0] || null;
+  const currentLines = current ? (linesByRev[current.id] || []) : [];
+  const total = Math.round(currentLines.reduce((t, l) => t + (parseFloat(l.amount) || 0), 0) * 100) / 100;
+  return { revisions, linesByRev, current, currentLines, total };
+}
+
+function rollupQuoteTotal(db, planId) {
+  const plan = db.prepare('SELECT invoiced FROM compliance WHERE id = ?').get(planId);
+  if (plan && plan.invoiced) return; // invoiced amount is frozen
+  const { total } = quoteState(db, planId);
+  db.prepare('UPDATE compliance SET charge_amount = ?, charge_client = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(total, total > 0 ? 1 : 0, planId);
+}
+
+function quoteJson(db, planId) {
+  const { current, currentLines, total } = quoteState(db, planId);
+  return { ok: true, revision: current ? current.revision_number : 1, lines: currentLines, total };
+}
+
+// Add a line to the current revision (auto-creates Rev 1).
+router.post('/:id/quote/lines', (req, res) => {
+  const db = getDb();
+  const plan = getParentPlan(db, req.params.id);
+  if (!plan) return res.status(404).json({ ok: false, error: 'Plan not found.' });
+  const description = String(req.body.description || '').trim().slice(0, 300);
+  if (!description) return res.status(400).json({ ok: false, error: 'Description is required.' });
+  const rev = currentQuoteRevision(db, plan.id, true, req.session.user.id);
+  const maxSort = db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM compliance_quote_lines WHERE revision_id = ?').get(rev.id).m;
+  db.prepare('INSERT INTO compliance_quote_lines (revision_id, description, amount, sort_order) VALUES (?,?,?,?)')
+    .run(rev.id, description, parseFloat(String(req.body.amount || '').replace(/[^0-9.-]/g, '')) || 0, maxSort + 1);
+  rollupQuoteTotal(db, plan.id);
+  res.json(quoteJson(db, plan.id));
+});
+
+// Edit a line on the CURRENT revision only.
+router.post('/:id/quote/lines/:lineId', (req, res) => {
+  const db = getDb();
+  const plan = getParentPlan(db, req.params.id);
+  if (!plan) return res.status(404).json({ ok: false, error: 'Plan not found.' });
+  const rev = currentQuoteRevision(db, plan.id, false);
+  const line = rev && db.prepare('SELECT * FROM compliance_quote_lines WHERE id = ? AND revision_id = ?').get(req.params.lineId, rev.id);
+  if (!line) return res.status(404).json({ ok: false, error: 'Line not found on the current revision.' });
+  const description = String(req.body.description || '').trim().slice(0, 300) || line.description;
+  const amount = typeof req.body.amount !== 'undefined' ? (parseFloat(String(req.body.amount || '').replace(/[^0-9.-]/g, '')) || 0) : line.amount;
+  db.prepare('UPDATE compliance_quote_lines SET description = ?, amount = ? WHERE id = ?').run(description, amount, line.id);
+  rollupQuoteTotal(db, plan.id);
+  res.json(quoteJson(db, plan.id));
+});
+
+router.post('/:id/quote/lines/:lineId/delete', (req, res) => {
+  const db = getDb();
+  const plan = getParentPlan(db, req.params.id);
+  if (!plan) return res.status(404).json({ ok: false, error: 'Plan not found.' });
+  const rev = currentQuoteRevision(db, plan.id, false);
+  if (rev) db.prepare('DELETE FROM compliance_quote_lines WHERE id = ? AND revision_id = ?').run(req.params.lineId, rev.id);
+  rollupQuoteTotal(db, plan.id);
+  res.json(quoteJson(db, plan.id));
+});
+
+// Snapshot the current lines into Rev N+1; older revisions become read-only
+// history in the UI.
+router.post('/:id/quote/new-revision', (req, res) => {
+  const db = getDb();
+  const plan = getParentPlan(db, req.params.id);
+  if (!plan) return res.status(404).json({ ok: false, error: 'Plan not found.' });
+  const state = quoteState(db, plan.id);
+  const nextNo = state.current ? state.current.revision_number + 1 : 1;
+  const note = String(req.body.note || '').trim().slice(0, 300);
+  const tx = db.transaction(() => {
+    const revId = db.prepare('INSERT INTO compliance_quote_revisions (compliance_id, revision_number, note, created_by) VALUES (?,?,?,?)')
+      .run(plan.id, nextNo, note, req.session.user.id).lastInsertRowid;
+    const ins = db.prepare('INSERT INTO compliance_quote_lines (revision_id, description, amount, sort_order) VALUES (?,?,?,?)');
+    state.currentLines.forEach((l, i) => ins.run(revId, l.description, l.amount, i));
+  });
+  tx();
+  autoLogDiary(db, { jobId: plan.job_id, complianceItemId: plan.id, summary: `[${req.session.user.full_name}] Quote revision ${nextNo} created on Plan #${plan.plan_number}${note ? ' — ' + note : ''}.`, userId: req.session.user.id });
+  res.json(quoteJson(db, plan.id));
+});
+
+// ============================================================
+// Task a sub-plan off to another dashboard user. Creates a normal task
+// (linked via tasks.compliance_id) so it lands in their /tasks list with the
+// standard bell + push notification.
+// ============================================================
+router.post('/sub-plans/:subId/task', (req, res) => {
+  const db = getDb();
+  const sub = getSubPlan(db, req.params.subId);
+  if (!sub) return res.status(404).json({ ok: false, error: 'Sub-plan not found.' });
+  const ownerId = parseInt(req.body.owner_id, 10);
+  if (!ownerId) return res.status(400).json({ ok: false, error: 'Pick who to task it to.' });
+  const owner = db.prepare('SELECT id, full_name FROM users WHERE id = ? AND active = 1').get(ownerId);
+  if (!owner) return res.status(400).json({ ok: false, error: 'That user is not active.' });
+  const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.due_date || '')) ? req.body.due_date : sydneyToday();
+  const priority = ['high', 'medium', 'low'].includes(req.body.priority) ? req.body.priority : 'medium';
+  const note = String(req.body.note || '').trim().slice(0, 1000);
+  const label = ITEM_TYPE_LABELS[sub.item_type] || sub.item_type;
+  try {
+    const taskId = db.prepare(`
+      INSERT INTO tasks (job_id, division, title, description, owner_id, due_date, status, priority, task_type, created_by, compliance_id)
+      VALUES (?, 'planning', ?, ?, ?, ?, 'not_started', ?, 'one_off', ?, ?)
+    `).run(
+      sub.job_id || null,
+      `${sub.reference_number || label} — follow up`,
+      (note ? note + '\n\n' : '') + `Tasked from Plans & Approvals (${label} ${sub.reference_number || ''}).`,
+      owner.id, dueDate, priority, req.session.user.id, sub.id
+    ).lastInsertRowid;
+    try { db.prepare('INSERT OR IGNORE INTO task_owners (task_id, user_id) VALUES (?, ?)').run(taskId, owner.id); } catch (e) {}
+    // Bell + push in one call — 'task_assigned' is in the notifications CHECK.
+    try {
+      const { notifyUsers } = require('../middleware/notifications');
+      notifyUsers(db, [owner.id], {
+        type: 'task_assigned',
+        title: 'Task from Plans & Approvals',
+        message: `${sub.reference_number || label} — assigned by ${req.session.user.full_name}${dueDate ? ' · due ' + dueDate : ''}`,
+        link: '/tasks/' + taskId + '/edit',
+        jobId: sub.job_id || null,
+      });
+    } catch (e) { console.error('[Compliance] task notify failed:', e.message); }
+    autoLogDiary(db, { jobId: sub.job_id, complianceItemId: sub.id, summary: `[${req.session.user.full_name}] Tasked ${sub.reference_number} to ${owner.full_name}.`, userId: req.session.user.id });
+    const openCount = db.prepare("SELECT COUNT(*) AS c FROM tasks WHERE compliance_id = ? AND deleted_at IS NULL AND status != 'complete'").get(sub.id).c;
+    res.json({ ok: true, taskId, owner: owner.full_name, openCount });
+  } catch (e) {
+    console.error('[Compliance] sub-plan task failed:', e.message);
+    res.status(400).json({ ok: false, error: 'Could not create the task: ' + e.message });
+  }
+});
+
 // Itemised fees with receipts (spec §5).
 router.post('/sub-plans/:subId/fees', subPlanUpload.single('receipt'), (req, res) => {
   const db = getDb();
@@ -1104,7 +1238,7 @@ router.post('/sub-plans/:subId/fees', subPlanUpload.single('receipt'), (req, res
     .run(sub.id, req.body.description || '', parseFloat(req.body.amount) || 0, req.file ? subRel(sub, req.file) : '', req.file ? req.file.originalname : '', req.session.user.id);
   rollupCouncilFee(db, sub.id);
   req.flash('success', 'Fee added.');
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 router.post('/sub-plans/:subId/fees/:feeId/delete', (req, res) => {
   const db = getDb();
@@ -1113,20 +1247,41 @@ router.post('/sub-plans/:subId/fees/:feeId/delete', (req, res) => {
   const fee = db.prepare('SELECT * FROM compliance_fees WHERE id = ? AND compliance_id = ?').get(req.params.feeId, sub.id);
   if (fee) { unlinkRel(fee.receipt_file_path); db.prepare('DELETE FROM compliance_fees WHERE id = ?').run(fee.id); }
   rollupCouncilFee(db, sub.id);
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
-// Extension records (spec §4) — ROL / Council.
+// Extension auto-workflow: the effective end date is DERIVED, never hand-set.
+// expiry_date = the latest of the licence's printed end (rol_summary_to) and
+// every extension's extended_to; extension_required = "has extensions".
+// rol_summary_to itself is never overwritten, so deleting an extension
+// recomputes cleanly back to the printed licence end.
+function recomputeRolEffectiveEnd(db, subId) {
+  try {
+    const row = db.prepare('SELECT rol_summary_to, expiry_date, item_type FROM compliance WHERE id = ?').get(subId);
+    if (!row) return;
+    const agg = db.prepare("SELECT MAX(extended_to) AS maxTo, COUNT(*) AS c FROM compliance_extensions WHERE compliance_id = ? AND extended_to IS NOT NULL AND extended_to != ''").get(subId);
+    const candidates = [row.rol_summary_to, agg && agg.maxTo].filter(d => d && /^\d{4}-\d{2}-\d{2}/.test(d)).map(d => String(d).slice(0, 10));
+    const effectiveEnd = candidates.length ? candidates.sort().pop() : null;
+    const extCount = db.prepare('SELECT COUNT(*) AS c FROM compliance_extensions WHERE compliance_id = ?').get(subId).c || 0;
+    db.prepare('UPDATE compliance SET expiry_date = COALESCE(?, expiry_date), extension_required = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(effectiveEnd, extCount > 0 ? 1 : 0, subId);
+  } catch (e) { console.error('[Compliance] recomputeRolEffectiveEnd failed:', e.message); }
+}
+
+// Extension records (spec §4) — ROL / Council. Adding one automatically moves
+// the sub-plan's effective end date; no manual flag-flipping needed.
 router.post('/sub-plans/:subId/extensions', subPlanUpload.single('extension_file'), (req, res) => {
   const db = getDb();
   const sub = getSubPlan(db, req.params.subId);
   if (!sub) { req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance')); }
+  const extCount = db.prepare('SELECT COUNT(*) AS c FROM compliance_extensions WHERE compliance_id = ?').get(sub.id).c || 0;
   db.prepare("INSERT INTO compliance_extensions (compliance_id, label, extended_to, reason, file_path, file_original_name, created_by) VALUES (?,?,?,?,?,?,?)")
-    .run(sub.id, req.body.label || '', req.body.extended_to || null, req.body.reason || '', req.file ? subRel(sub, req.file) : '', req.file ? req.file.originalname : '', req.session.user.id);
-  if (sub.item_type === 'rol' || sub.item_type === 'road_occupancy') { try { db.prepare("UPDATE compliance SET extension_required = 1 WHERE id = ?").run(sub.id); } catch (e) {} }
+    .run(sub.id, req.body.label || ('Extension ' + (extCount + 1)), req.body.extended_to || null, req.body.reason || '', req.file ? subRel(sub, req.file) : '', req.file ? req.file.originalname : '', req.session.user.id);
+  recomputeRolEffectiveEnd(db, sub.id);
+  planStatus.syncParentStatus(db, sub.parent_id);
   autoLogDiary(db, { jobId: sub.job_id, complianceItemId: sub.id, summary: `[${req.session.user.full_name}] Extension added to ${sub.reference_number}${req.body.extended_to ? ' (to ' + req.body.extended_to + ')' : ''}.`, userId: req.session.user.id });
-  req.flash('success', 'Extension added.');
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.flash('success', 'Extension added' + (req.body.extended_to ? ' — effective end moved to ' + req.body.extended_to + '.' : '.'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 router.post('/sub-plans/:subId/extensions/:extId/delete', (req, res) => {
   const db = getDb();
@@ -1134,7 +1289,9 @@ router.post('/sub-plans/:subId/extensions/:extId/delete', (req, res) => {
   if (!sub) { req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance')); }
   const ext = db.prepare('SELECT * FROM compliance_extensions WHERE id = ? AND compliance_id = ?').get(req.params.extId, sub.id);
   if (ext) { unlinkRel(ext.file_path); db.prepare('DELETE FROM compliance_extensions WHERE id = ?').run(ext.id); }
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  recomputeRolEffectiveEnd(db, sub.id);
+  planStatus.syncParentStatus(db, sub.parent_id);
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
 // CTMP QA status (spec §6) — set on the (tmp_approval) sub-plan.
@@ -1146,7 +1303,7 @@ router.post('/sub-plans/:subId/qa', (req, res) => {
   db.prepare("UPDATE compliance SET qa_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(qa, sub.id);
   if (wantsJson(req)) return res.json({ success: true });
   req.flash('success', 'QA status updated.');
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
 // Replace this sub-plan's ROL conditions (one per line; leading "!" = alert).
@@ -1189,7 +1346,7 @@ function parseComplianceRol(stage) {
       fileOriginalName = doc.original_name || doc.filename;
     } else {
       req.flash('error', 'Choose a PDF to extract.');
-      return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+      return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
     }
     try {
       const { parseRolPdf } = require('../services/rolParser');
@@ -1198,7 +1355,7 @@ function parseComplianceRol(stage) {
     } catch (err) {
       console.error('[Compliance] ' + stage + ' parse failed:', err.message);
       req.flash('error', 'Could not read that PDF automatically — enter details manually. (' + err.message + ')');
-      req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+      req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
     }
   };
 }
@@ -1220,10 +1377,112 @@ router.post('/sub-plans/:subId/rola', subPlanUpload.single('rola_file'), (req, r
     .run(b.rola_application_number || '', filePath, fileName, b.rol_summary_from || null, b.rol_summary_to || null, b.rol_time_window || '', stage, sub.id);
   if (typeof b.shifts_json !== 'undefined') saveComplianceShifts(db, sub.id, 'rola', b.shifts_json);
   req.flash('success', 'ROLA application saved.');
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
-// ROL Stage 2 — issued ROL
+// Persist an issued ROL onto a sub-plan and approve it in the same breath —
+// the licence in hand IS the approval, so rol_stage AND status move together
+// (they used to diverge: /rol set the stage but never the status, leaving a
+// "stage-approved" ROL invisible to the register/rollup/P&L). Shared by the
+// review-screen save and the one-shot auto route.
+function applyIssuedRol(db, req, sub, opts) {
+  const today = sydneyToday();
+  db.prepare(`UPDATE compliance SET rol_actual_number=?, rol_file_path=?, rol_file_original_name=?,
+      rol_summary_from=?, rol_summary_to=?, rol_time_window=?, rol_stage='approved',
+      status='approved',
+      approved_date=COALESCE(approved_date, ?),
+      submitted_date=COALESCE(submitted_date, ?),
+      expiry_date=COALESCE(?, expiry_date),
+      updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    .run(opts.licenceNumber || '', opts.filePath || '', opts.fileName || '',
+      opts.summaryFrom || null, opts.summaryTo || null, opts.timeWindow || '',
+      today, today, opts.summaryTo || null, sub.id);
+  if (typeof opts.conditionsRaw !== 'undefined') replaceComplianceConditions(db, sub.id, opts.conditionsRaw);
+  if (Array.isArray(opts.conditions)) {
+    db.prepare('DELETE FROM compliance_rol_conditions WHERE compliance_id = ?').run(sub.id);
+    const ins = db.prepare('INSERT INTO compliance_rol_conditions (compliance_id, condition_no, text, is_alert) VALUES (?,?,?,?)');
+    opts.conditions.forEach((c, i) => ins.run(sub.id, c.condition_no || i + 1, c.text || '', c.is_alert ? 1 : 0));
+  }
+  if (typeof opts.shiftsJson !== 'undefined') saveComplianceShifts(db, sub.id, 'rol', opts.shiftsJson);
+  recomputeRolEffectiveEnd(db, sub.id);
+  planStatus.syncParentStatus(db, sub.parent_id);
+  autoLogDiary(db, {
+    jobId: sub.job_id, complianceItemId: sub.id,
+    summary: `[${req.session.user.full_name}] Issued ROL ${opts.licenceNumber || ''} recorded on ${sub.reference_number} — approved.`,
+    userId: req.session.user.id,
+  });
+  try {
+    const jobNumber = sub.job_id ? (db.prepare('SELECT job_number FROM jobs WHERE id = ?').get(sub.job_id) || {}).job_number : null;
+    notifyPlanSubmission(db, {
+      submitterId: req.session.user.id, submitterName: req.session.user.full_name,
+      taggedIds: [],
+      ref: sub.reference_number, label: 'Road Occupancy Licence' + (opts.licenceNumber ? ' (ROL ' + opts.licenceNumber + ')' : ''),
+      jobNumber, link: '/compliance/' + sub.parent_id + '/edit#sub-' + sub.id,
+      jobId: sub.job_id || null, verb: 'approved',
+    });
+  } catch (e) { console.error('[Compliance] ROL approve notify failed:', e.message); }
+}
+
+// One-shot ROL workflow: drop the issued ROL PDF → parse → save → approved,
+// no review step. Falls back to the parse-then-confirm review screen when
+// the parser can't find a licence number in the PDF.
+router.post('/sub-plans/:subId/rol/auto', subPlanUpload.single('rol_file'), async (req, res) => {
+  const db = getDb();
+  const sub = getSubPlan(db, req.params.subId);
+  if (!sub) { req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance')); }
+  const back = '/compliance/' + sub.parent_id + '/edit#sub-' + sub.id;
+  let filePath, fileOriginalName;
+  if (req.file) {
+    filePath = subRel(sub, req.file);
+    fileOriginalName = req.file.originalname;
+  } else if (req.body && req.body.existing_doc_id) {
+    const doc = db.prepare('SELECT * FROM compliance_documents WHERE id = ? AND compliance_id = ?').get(req.body.existing_doc_id, sub.id);
+    const isPdf = doc && (/\.pdf$/i.test(doc.original_name || doc.filename || '') || String(doc.mime_type || '').toLowerCase().includes('pdf'));
+    if (!isPdf) { req.flash('error', doc ? 'That attachment is not a PDF.' : 'Attachment not found on this sub-plan.'); return req.session.save(() => res.redirect(back)); }
+    filePath = doc.file_path;
+    fileOriginalName = doc.original_name || doc.filename;
+  } else {
+    req.flash('error', 'Choose the issued ROL PDF first.');
+    return req.session.save(() => res.redirect(back));
+  }
+  let parsed = null;
+  try {
+    const { parseRolPdf } = require('../services/rolParser');
+    parsed = await parseRolPdf(path.join(__dirname, '..', filePath.replace(/^\//, '')), 'rol');
+  } catch (err) {
+    console.error('[Compliance] rol/auto parse failed:', err.message);
+  }
+  if (!parsed || !parsed.licenceNumber) {
+    // Couldn't read it confidently — hand over to the review screen so the
+    // human fills the gaps (fresh uploads are already attached via filePath).
+    if (parsed) {
+      return res.render('compliance/rol-review', { title: 'Review extracted ROL', sub, stage: 'rol', parsed, filePath, fileOriginalName, user: req.session.user });
+    }
+    req.flash('error', 'Could not read that PDF automatically — review and enter the details manually.');
+    return req.session.save(() => res.redirect(back));
+  }
+  // Keep the source PDF visible in the sub-plan's documents (fresh uploads
+  // only; existing_doc_id is already a document row).
+  if (req.file) {
+    try {
+      db.prepare('INSERT INTO compliance_documents (compliance_id, filename, original_name, file_path, file_size, mime_type, uploaded_by_id) VALUES (?,?,?,?,?,?,?)')
+        .run(sub.id, req.file.filename, req.file.originalname, filePath, req.file.size, req.file.mimetype || '', req.session.user.id);
+    } catch (e) {}
+  }
+  applyIssuedRol(db, req, sub, {
+    licenceNumber: parsed.licenceNumber,
+    filePath, fileName: fileOriginalName,
+    summaryFrom: parsed.summaryFrom || parsed.from || null,
+    summaryTo: parsed.summaryTo || parsed.to || null,
+    timeWindow: parsed.timeWindow || '',
+    conditions: parsed.conditions || [],
+    shiftsJson: JSON.stringify(parsed.shifts || []),
+  });
+  req.flash('success', `${sub.reference_number} approved — ROL ${parsed.licenceNumber} extracted and saved.`);
+  req.session.save(() => res.redirect(back));
+});
+
+// ROL Stage 2 — issued ROL (review-screen confirm save)
 router.post('/sub-plans/:subId/rol', subPlanUpload.single('rol_file'), (req, res) => {
   const db = getDb();
   const sub = getSubPlan(db, req.params.subId);
@@ -1231,14 +1490,17 @@ router.post('/sub-plans/:subId/rol', subPlanUpload.single('rol_file'), (req, res
   const b = req.body;
   const filePath = req.file ? subRel(sub, req.file) : (b.existing_rol_file_path || sub.rol_file_path || '');
   const fileName = req.file ? req.file.originalname : (b.existing_rol_file_original_name || sub.rol_file_original_name || '');
-  db.prepare(`UPDATE compliance SET rol_actual_number=?, rol_file_path=?, rol_file_original_name=?,
-      rol_summary_from=?, rol_summary_to=?, rol_time_window=?, rol_stage='approved', updated_at=CURRENT_TIMESTAMP WHERE id=?`)
-    .run(b.rol_actual_number || '', filePath, fileName, b.rol_summary_from || null, b.rol_summary_to || null, b.rol_time_window || '', sub.id);
-  if (typeof b.conditions !== 'undefined') replaceComplianceConditions(db, sub.id, b.conditions);
-  if (typeof b.shifts_json !== 'undefined') saveComplianceShifts(db, sub.id, 'rol', b.shifts_json);
-  autoLogDiary(db, { jobId: sub.job_id, complianceItemId: sub.id, summary: `[${req.session.user.full_name}] Issued ROL ${b.rol_actual_number || ''} recorded on ${sub.reference_number}.`, userId: req.session.user.id });
-  req.flash('success', 'Issued ROL saved.');
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit'));
+  applyIssuedRol(db, req, sub, {
+    licenceNumber: b.rol_actual_number || '',
+    filePath, fileName,
+    summaryFrom: b.rol_summary_from || null,
+    summaryTo: b.rol_summary_to || null,
+    timeWindow: b.rol_time_window || '',
+    conditionsRaw: typeof b.conditions !== 'undefined' ? b.conditions : undefined,
+    shiftsJson: typeof b.shifts_json !== 'undefined' ? b.shifts_json : undefined,
+  });
+  req.flash('success', 'Issued ROL saved — ' + sub.reference_number + ' approved.');
+  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
 router.get('/new', (req, res) => {
@@ -1581,6 +1843,27 @@ router.get('/:id/edit', (req, res) => {
   let tenders = [];
   try { tenders = db.prepare("SELECT id, tender_number, title, status FROM tenders ORDER BY id DESC").all(); } catch (e) {}
 
+  // Quote tab (mig 351) — revisions + lines + current total. Guarded so a
+  // pre-351 DB just renders an empty quote.
+  let quote = { revisions: [], linesByRev: {}, current: null, currentLines: [], total: 0 };
+  if (isParent) { try { quote = quoteState(db, item.id); } catch (e) {} }
+
+  // Open follow-up tasks per sub-plan (the summary table's chip) + per-sub
+  // TMP revisions ("+ Revision" reuses compliance_revisions on the sub row).
+  let subPlanOpenTasks = {}, subPlanRevisions = {};
+  if (isParent && subPlans.length > 0) {
+    const subIds = subPlans.map(s => s.id);
+    const ph = subIds.map(() => '?').join(',');
+    try {
+      db.prepare(`SELECT compliance_id, COUNT(*) AS c FROM tasks WHERE compliance_id IN (${ph}) AND deleted_at IS NULL AND status != 'complete' GROUP BY compliance_id`)
+        .all(...subIds).forEach(r => { subPlanOpenTasks[r.compliance_id] = r.c; });
+    } catch (e) {}
+    try {
+      db.prepare(`SELECT * FROM compliance_revisions WHERE compliance_id IN (${ph}) ORDER BY revision_number ASC`)
+        .all(...subIds).forEach(r => (subPlanRevisions[r.compliance_id] = subPlanRevisions[r.compliance_id] || []).push(r));
+    } catch (e) {}
+  }
+
   res.render('compliance/form', {
     title: isParent ? 'Edit Plan' : 'Edit Plan / Approval',
     item, jobs, clients, users, tenders, user: req.session.user,
@@ -1589,6 +1872,7 @@ router.get('/:id/edit', (req, res) => {
     isParent, subPlans, subPlanDocs, subPlanTypes: SUB_PLAN_TYPES,
     raBySubPlan, subPlanFees, subPlanExtensions, subPlanRolShifts, subPlanRolConditions,
     subPlanRolLinks, subPlanTgsBacklinks,
+    quote, subPlanOpenTasks, subPlanRevisions,
   });
 });
 

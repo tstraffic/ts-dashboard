@@ -40,7 +40,10 @@ router.get('/', (req, res) => {
       t.tender_number, t.title AS tender_title, t.status AS tender_status,
       cl.company_name AS client_name,
       COALESCE(SUM(s.hours_spent), 0) AS total_hours,
-      COALESCE(SUM(CASE WHEN s.charge_client = 1 THEN s.charge_amount ELSE 0 END), 0) AS total_charge,
+      -- Charge lives on the PARENT now: the plan-level quote's current total
+      -- is denormalised into p.charge_amount (rollupQuoteTotal, mig 351/352).
+      -- MAX() collapses the per-sub-plan join duplication of a parent column.
+      COALESCE(MAX(CASE WHEN p.charge_client = 1 THEN p.charge_amount ELSE 0 END), 0) AS total_charge,
       COALESCE(SUM(CASE WHEN s.council_fee_paid = 1 THEN s.council_fee_amount ELSE 0 END), 0) AS total_council,
       COUNT(s.id) AS sub_count,
       SUM(CASE WHEN s.status IN ('submitted','approved') THEN 1 ELSE 0 END) AS submitted_count

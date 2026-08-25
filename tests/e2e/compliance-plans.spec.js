@@ -127,11 +127,11 @@ test('upload-submit still validates (missing hours blocks it)', async ({ page })
   await expect(page.locator('body')).toContainText(/hours/i);
 });
 
-test('the ROL workflow reads an already-attached PDF — no re-upload', async ({ page }) => {
+test('an attached issued-ROL PDF auto-approves in one click', async ({ page }) => {
   const seed = seedPlan();
   // Attach a parseable PDF to the ROL sub-plan on disk + in the DB, the
   // exact shape the attach route produces.
-  const docId = withDb(db => {
+  withDb(db => {
     const dir = path.join(__dirname, '..', '..', 'data', 'uploads', 'compliance', String(seed.rol1));
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'e2e-rol.pdf'), MINI_PDF);
@@ -139,32 +139,27 @@ test('the ROL workflow reads an already-attached PDF — no re-upload', async ({
       INSERT INTO compliance_documents (compliance_id, filename, original_name, file_path, file_size, mime_type)
       VALUES (?, 'e2e-rol.pdf', 'e2e-rol.pdf', '/data/uploads/compliance/${seed.rol1}/e2e-rol.pdf', ${MINI_PDF.length}, 'application/pdf')
     `).run(seed.rol1);
-    return db.prepare('SELECT last_insert_rowid() AS id').get().id;
   });
 
   await loginAs(page);
   await page.goto(editUrl(seed));
   const card = page.locator(`#sub-${seed.rol1}`);
-  await card.locator('summary', { hasText: 'ROL workflow' }).click();
 
+  // The attached PDF is offered in the auto-approve zone — one click parses
+  // it AND approves the ROL, no review step, no re-upload.
   const docRow = card.locator('[data-rol-existing-docs]');
   await expect(docRow).toContainText('e2e-rol.pdf');
-  await docRow.locator('button', { hasText: 'Read as issued ROL' }).click();
+  await docRow.locator('button', { hasText: 'Read & approve' }).click();
   await page.waitForLoadState('networkidle');
 
-  // The review page rendered from the ATTACHED file (no upload happened),
-  // with the parser's output prefilled and the path carried forward.
-  await expect(page.locator('body')).toContainText('Review extracted');
-  await expect(page.locator('input[name="existing_rol_file_path"]'))
-    .toHaveValue(`/data/uploads/compliance/${seed.rol1}/e2e-rol.pdf`);
-  await expect(page.locator('input[name="rol_actual_number"]')).toHaveValue('98765');
-
-  // Confirm → the reused path lands in the dedicated ROL columns.
-  await page.locator('button', { hasText: /Confirm/ }).click();
-  await page.waitForLoadState('networkidle');
-  const row = withDb(db => db.prepare('SELECT rol_file_path, rol_stage FROM compliance WHERE id = ?').get(seed.rol1));
+  const row = withDb(db => db.prepare('SELECT rol_file_path, rol_stage, status, rol_actual_number FROM compliance WHERE id = ?').get(seed.rol1));
   expect(row.rol_file_path).toBe(`/data/uploads/compliance/${seed.rol1}/e2e-rol.pdf`);
   expect(row.rol_stage).toBe('approved');
+  expect(row.status).toBe('approved');       // stage and status move together now
+  expect(row.rol_actual_number).toBe('98765');
+
+  // The captured licence number shows beside the TS reference.
+  await expect(page.locator(`#sub-${seed.rol1}`)).toContainText('ROL 98765');
 });
 
 test('a TGS links to MULTIPLE ROLs, with back-links, and unlinks cleanly', async ({ page }) => {

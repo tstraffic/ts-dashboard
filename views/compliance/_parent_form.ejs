@@ -67,6 +67,21 @@
     </div>
   </div>
 
+  <% if (isEdit) { %>
+    <!-- Tab nav — Sub-plans is the working tab, so it comes first and is the
+         default. app.js initTabs drives [data-tab]/[data-tab-panel] + #hash. -->
+    <div class="border-b border-gray-200 mb-6">
+      <nav class="flex gap-0 -mb-px overflow-x-auto">
+        <a href="#subplans" data-tab="subplans" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap">
+          Sub-plans <span class="ml-1 text-xs text-gray-400">(<%= (subPlans || []).length %>)</span>
+        </a>
+        <a href="#quote" data-tab="quote" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap">Quote</a>
+        <a href="#details" data-tab="details" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap">Details</a>
+      </nav>
+    </div>
+  <% } %>
+
+  <% if (isEdit) { %><div data-tab-panel="details" class="hidden"><% } %>
   <!-- Parent fields form -->
   <form method="POST" action="<%= formAction %>" id="planForm" class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
     <%- include('../partials/csrf') %>
@@ -403,82 +418,307 @@
     <% } %>
   </form>
 
+  <% if (isEdit) { %>
+    <!-- Details tab: plan documents + danger zone -->
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
+      <h2 class="text-sm font-semibold text-gray-900 mb-1">Plan documents</h2>
+      <p class="text-sm text-gray-500 mb-4">Files that belong to the plan as a whole — sub-plan files live on their cards.</p>
+      <% if (documents && documents.length) { %>
+        <ul class="space-y-1.5 mb-4">
+          <% documents.forEach(d => { %>
+            <li class="flex items-center gap-2 text-sm">
+              <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <a href="/compliance/<%= item.id %>/documents/<%= d.filename %>" target="_blank" class="text-brand-600 hover:text-brand-700 hover:underline truncate"><%= d.original_name || d.filename %></a>
+              <span class="text-xs text-gray-400 shrink-0"><%= d.uploaded_by_name || '' %></span>
+            </li>
+          <% }) %>
+        </ul>
+      <% } else { %>
+        <p class="text-sm text-gray-400 italic mb-4">No plan-level documents yet.</p>
+      <% } %>
+      <form method="POST" action="/compliance/<%= item.id %>/upload" enctype="multipart/form-data" class="flex items-center gap-2">
+        <%- include('../partials/csrf') %>
+        <input type="file" name="documents" multiple class="text-sm text-gray-600 flex-1">
+        <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shrink-0">Upload</button>
+      </form>
+    </div>
+
+    <div class="bg-white border border-rose-200 rounded-xl shadow-sm p-6 mb-6">
+      <h2 class="text-sm font-semibold text-rose-700 mb-1">Delete plan</h2>
+      <p class="text-sm text-gray-500 mb-3">Removes the plan and its sub-plans. This can't be undone.</p>
+      <form method="POST" action="/compliance/<%= item.id %>/delete" onsubmit="return confirm('Delete Plan #<%= planNumber %> and all of its sub-plans?');">
+        <%- include('../partials/csrf') %>
+        <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 ring-1 ring-rose-200 rounded-lg">Delete this plan</button>
+      </form>
+    </div>
+  </div><%# /details panel %>
+  <% } %>
+
   <% if (isEdit) {
-    // Plan-wide tallies — sums across every sub-plan, regardless of
-    // status, so the totals stay visible even before submission.
-    let totalHours = 0, totalCharge = 0, totalCouncilFee = 0, submittedCount = 0;
+    // Plan-wide tallies. Hours + council fees still roll up from the
+    // sub-plans; the CLIENT CHARGE now comes from the plan-level quote
+    // (quote.total — mig 351), which is also denormalised onto the parent.
+    let totalHours = 0, totalCouncilFee = 0, submittedCount = 0;
     (subPlans || []).forEach(s => {
       totalHours += parseFloat(s.hours_spent) || 0;
-      if (s.charge_client) totalCharge += parseFloat(s.charge_amount) || 0;
       if (s.council_fee_paid) totalCouncilFee += parseFloat(s.council_fee_amount) || 0;
       if (['submitted','approved'].includes(s.status)) submittedCount += 1;
     });
+    const quoteData = (typeof quote !== 'undefined' && quote) ? quote : { revisions: [], linesByRev: {}, current: null, currentLines: [], total: 0 };
+    const totalCharge = quoteData.total || 0;
     const fmtMoney = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
     const fmtHours = n => (Math.round(n * 100) / 100) + ' hr' + (n === 1 ? '' : 's');
-    // Internal cost / profit — admin + finance only. Cost = hours×rate +
-    // council fees; profit = client charge − cost. Council fees are a
-    // pass-through expense to T&S, so they belong in cost.
     const hourlyRate = parseFloat((systemConfig && systemConfig.internal_hourly_rate) || 40) || 40;
     const totalLabourCost = totalHours * hourlyRate;
     const totalCost = totalLabourCost + totalCouncilFee;
     const totalProfit = totalCharge - totalCost;
+    const openTasksMap = (typeof subPlanOpenTasks !== 'undefined' && subPlanOpenTasks) ? subPlanOpenTasks : {};
   %>
+
+    <!-- ── Quote tab ─────────────────────────────────────────────── -->
+    <div data-tab-panel="quote" class="hidden">
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-1">
+          <h2 class="text-lg font-semibold text-gray-900">Quote</h2>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-400">Rev <%= quoteData.current ? quoteData.current.revision_number : 1 %></span>
+            <button type="button" id="quoteNewRev" class="px-2.5 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 ring-1 ring-brand-200 rounded-md" <%= quoteData.currentLines.length ? '' : 'disabled' %>>+ New revision</button>
+          </div>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">What the client is charged for this plan — one line per item. <%= item.invoiced ? 'This plan is invoiced, so the billed amount is locked.' : '' %></p>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200">
+                <th class="py-2 pr-3">Description</th>
+                <th class="py-2 pr-3 text-right w-36">Amount</th>
+                <th class="py-2 w-10"></th>
+              </tr>
+            </thead>
+            <tbody id="quoteLines"></tbody>
+            <tfoot>
+              <tr class="border-t border-gray-200">
+                <td class="py-2.5 pr-3 text-sm font-semibold text-gray-900 text-right">Total</td>
+                <td class="py-2.5 pr-3 text-right text-base font-bold text-emerald-700" id="quoteTotal"></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <input type="text" id="quoteNewDesc" placeholder="e.g. TGS design & drafting" maxlength="300"
+            class="flex-1 min-w-[200px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
+            <input type="text" id="quoteNewAmount" inputmode="decimal" placeholder="0.00"
+              class="w-32 pl-7 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <button type="button" id="quoteAddLine" class="px-3.5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg">Add line</button>
+          <span id="quoteMsg" class="text-xs text-gray-500"></span>
+        </div>
+
+        <% if (quoteData.revisions.length > 1) { %>
+          <details class="mt-5 pt-4 border-t border-gray-100">
+            <summary class="cursor-pointer text-xs font-semibold text-gray-500 hover:text-gray-700 select-none">Previous revisions (<%= quoteData.revisions.length - 1 %>)</summary>
+            <div class="mt-3 space-y-4">
+              <% quoteData.revisions.slice(1).forEach(rev => {
+                   const revLines = quoteData.linesByRev[rev.id] || [];
+                   const revTotal = revLines.reduce((t, l) => t + (parseFloat(l.amount) || 0), 0); %>
+                <div>
+                  <p class="text-xs font-semibold text-gray-600 mb-1.5">Rev <%= rev.revision_number %><%= rev.note ? ' — ' + rev.note : '' %> <span class="font-normal text-gray-400">· <%= rev.created_by_name || '' %></span></p>
+                  <table class="w-full text-xs text-gray-500">
+                    <% revLines.forEach(l => { %>
+                      <tr><td class="py-0.5 pr-3"><%= l.description %></td><td class="py-0.5 text-right w-32"><%= fmtMoney(l.amount || 0) %></td></tr>
+                    <% }) %>
+                    <tr class="border-t border-gray-100 font-semibold text-gray-600"><td class="py-1 pr-3 text-right">Total</td><td class="py-1 text-right"><%= fmtMoney(revTotal) %></td></tr>
+                  </table>
+                </div>
+              <% }) %>
+            </div>
+          </details>
+        <% } %>
+      </div>
+
+      <!-- Money tiles (moved here from the old totals strip) -->
+      <div class="grid grid-cols-2 <%= canSeeCost ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-3' %> gap-3 p-4 bg-gradient-to-br from-brand-50 to-blue-50 border border-brand-100 rounded-lg">
+        <div>
+          <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Quote total</div>
+          <div class="text-lg font-bold text-emerald-700 mt-0.5" data-quote-total-tile><%= fmtMoney(totalCharge) %></div>
+        </div>
+        <div>
+          <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Total hours</div>
+          <div class="text-lg font-bold text-gray-900 mt-0.5"><%= fmtHours(totalHours) %></div>
+        </div>
+        <div>
+          <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Council fees</div>
+          <div class="text-lg font-bold text-amber-700 mt-0.5"><%= fmtMoney(totalCouncilFee) %></div>
+        </div>
+        <% if (canSeeCost) { %>
+          <div title="Hours × $<%= hourlyRate %>/hr + council fees">
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">T&amp;S cost</div>
+            <div class="text-lg font-bold text-gray-900 mt-0.5"><%= fmtMoney(totalCost) %></div>
+            <div class="text-[10px] text-gray-500 leading-tight">labour <%= fmtMoney(totalLabourCost) %></div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Profit / Loss</div>
+            <div class="text-lg font-bold mt-0.5 <%= totalProfit >= 0 ? 'text-emerald-700' : 'text-rose-700' %>">
+              <%= (totalProfit >= 0 ? '' : '-') + fmtMoney(Math.abs(totalProfit)) %>
+            </div>
+            <div class="text-[10px] text-gray-500 leading-tight"><%= totalCharge > 0 ? ('margin ' + ((totalProfit / totalCharge) * 100).toFixed(1) + '%') : 'no quote yet' %></div>
+          </div>
+        <% } %>
+      </div>
+      <% if (canSeeCost) { %>
+        <div class="mt-2 px-1 text-[11px] text-gray-500 italic">Cost + profit visible to admin &amp; finance only · internal rate $<%= hourlyRate %>/hr</div>
+      <% } %>
+
+      <script type="application/json" id="quoteData"><%- JSON.stringify({ lines: quoteData.currentLines, total: quoteData.total, editable: true }).replace(/</g, '\\u003c') %></script>
+      <script>
+      (function () {
+        var planId = <%= item.id %>;
+        var csrf = ((document.getElementById('planForm') || {}).querySelector ? (document.getElementById('planForm').querySelector('input[name="_csrf"]') || {}).value : '') || '';
+        var tbody = document.getElementById('quoteLines');
+        var totalEl = document.getElementById('quoteTotal');
+        var tileEl = document.querySelector('[data-quote-total-tile]');
+        var msgEl = document.getElementById('quoteMsg');
+        var newRevBtn = document.getElementById('quoteNewRev');
+        function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+        function money(n) { return '$' + (Number(n) || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function setMsg(t, tone) { if (msgEl) { msgEl.textContent = t || ''; msgEl.className = 'text-xs ' + (tone === 'error' ? 'text-red-600 font-medium' : 'text-gray-500'); } }
+        function post(url, params) {
+          var body = new URLSearchParams(params || {});
+          body.append('_csrf', csrf);
+          return fetch(url, { method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': csrf }, body: body.toString(), credentials: 'same-origin' })
+            .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'Request failed (' + r.status + ')' }; }); });
+        }
+        function render(state) {
+          var lines = state.lines || [];
+          if (!lines.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="py-4 text-sm text-gray-400 italic">No quote lines yet — add the first one below.</td></tr>';
+          } else {
+            tbody.innerHTML = lines.map(function (l) {
+              return '<tr class="border-b border-gray-100" data-line="' + l.id + '">' +
+                '<td class="py-1.5 pr-3"><input type="text" value="' + esc(l.description) + '" data-line-desc maxlength="300" class="w-full px-2 py-1 bg-transparent border border-transparent hover:border-gray-200 focus:border-brand-400 focus:bg-white rounded-md text-sm focus:outline-none"></td>' +
+                '<td class="py-1.5 pr-3"><input type="text" value="' + (Number(l.amount) || 0).toFixed(2) + '" data-line-amount inputmode="decimal" class="w-full px-2 py-1 bg-transparent border border-transparent hover:border-gray-200 focus:border-brand-400 focus:bg-white rounded-md text-sm text-right focus:outline-none"></td>' +
+                '<td class="py-1.5 text-center"><button type="button" data-line-delete title="Remove line" class="text-gray-300 hover:text-red-500 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button></td>' +
+              '</tr>';
+            }).join('');
+          }
+          if (totalEl) totalEl.textContent = money(state.total || 0);
+          if (tileEl) tileEl.textContent = money(state.total || 0);
+          if (newRevBtn) newRevBtn.disabled = !lines.length;
+        }
+        function saveLine(tr) {
+          var id = tr.dataset.line;
+          post('/compliance/' + planId + '/quote/lines/' + id, {
+            description: tr.querySelector('[data-line-desc]').value.trim(),
+            amount: tr.querySelector('[data-line-amount]').value.trim(),
+          }).then(function (d) { if (d.ok) render(d); else setMsg(d.error || 'Save failed.', 'error'); });
+        }
+        tbody.addEventListener('change', function (e) {
+          var tr = e.target.closest('[data-line]');
+          if (tr && (e.target.matches('[data-line-desc]') || e.target.matches('[data-line-amount]'))) saveLine(tr);
+        });
+        tbody.addEventListener('click', function (e) {
+          var btn = e.target.closest('[data-line-delete]');
+          if (!btn) return;
+          var tr = btn.closest('[data-line]');
+          if (!confirm('Remove this quote line?')) return;
+          post('/compliance/' + planId + '/quote/lines/' + tr.dataset.line + '/delete', {})
+            .then(function (d) { if (d.ok) { render(d); setMsg('Line removed.'); } else setMsg(d.error || 'Failed.', 'error'); });
+        });
+        document.getElementById('quoteAddLine').addEventListener('click', function () {
+          var desc = document.getElementById('quoteNewDesc').value.trim();
+          var amount = document.getElementById('quoteNewAmount').value.trim();
+          if (!desc) return setMsg('Description is required.', 'error');
+          post('/compliance/' + planId + '/quote/lines', { description: desc, amount: amount })
+            .then(function (d) {
+              if (!d.ok) return setMsg(d.error || 'Failed.', 'error');
+              render(d);
+              document.getElementById('quoteNewDesc').value = '';
+              document.getElementById('quoteNewAmount').value = '';
+              setMsg('Line added.');
+            });
+        });
+        ['quoteNewDesc', 'quoteNewAmount'].forEach(function (id) {
+          document.getElementById(id).addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); document.getElementById('quoteAddLine').click(); }
+          });
+        });
+        if (newRevBtn) newRevBtn.addEventListener('click', function () {
+          var note = prompt('Note for the new revision (optional):') || '';
+          post('/compliance/' + planId + '/quote/new-revision', { note: note })
+            .then(function (d) {
+              if (!d.ok) return setMsg(d.error || 'Failed.', 'error');
+              setMsg('Revision ' + d.revision + ' created.');
+              // Reload so the previous-revisions history re-renders server-side.
+              window.location.href = '/compliance/' + planId + '/edit#quote';
+              window.location.reload();
+            });
+        });
+        try { render(JSON.parse(document.getElementById('quoteData').textContent || '{}')); } catch (e) { render({ lines: [], total: 0 }); }
+      })();
+      </script>
+    </div>
+
+    <!-- ── Sub-plans tab ─────────────────────────────────────────── -->
+    <div data-tab-panel="subplans">
     <!-- Sub-plan grid (edit only) -->
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
       <div class="flex items-center justify-between mb-4">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">Sub-plans</h2>
+          <h2 class="text-lg font-semibold text-gray-900">Sub-plans <span class="text-sm font-normal text-gray-400 ml-1"><%= submittedCount %> / <%= (subPlans || []).length %> submitted</span></h2>
           <p class="text-sm text-gray-500">Each sub-plan becomes "submitted" the moment you upload its files. Use the buttons after that to approve or reject.</p>
         </div>
       </div>
 
       <% if (subPlans && subPlans.length > 0) { %>
-        <!-- Plan totals strip — rolls up hours and money across all sub-plans.
-             Cost + profit tiles only render for admin/finance (canSeeCost). -->
-        <div class="grid grid-cols-2 <%= canSeeCost ? 'sm:grid-cols-3 lg:grid-cols-6' : 'sm:grid-cols-4' %> gap-3 mb-5 p-4 bg-gradient-to-br from-brand-50 to-blue-50 border border-brand-100 rounded-lg">
-          <div>
-            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Sub-plans</div>
-            <div class="text-lg font-bold text-gray-900 mt-0.5"><%= submittedCount %> / <%= subPlans.length %> <span class="text-xs font-normal text-gray-500">submitted</span></div>
-          </div>
-          <div>
-            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Total hours</div>
-            <div class="text-lg font-bold text-gray-900 mt-0.5"><%= fmtHours(totalHours) %></div>
-          </div>
-          <div>
-            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">To charge client</div>
-            <div class="text-lg font-bold text-emerald-700 mt-0.5"><%= fmtMoney(totalCharge) %></div>
-          </div>
-          <div>
-            <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Council fees</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5"><%= fmtMoney(totalCouncilFee) %></div>
-          </div>
-          <% if (canSeeCost) { %>
-            <div title="Hours × $<%= hourlyRate %>/hr + council fees">
-              <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold flex items-center gap-1">
-                T&amp;S cost
-                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v.01M12 12a3 3 0 100-6 3 3 0 000 6z"/></svg>
-              </div>
-              <div class="text-lg font-bold text-gray-900 mt-0.5"><%= fmtMoney(totalCost) %></div>
-              <div class="text-[10px] text-gray-500 leading-tight">labour <%= fmtMoney(totalLabourCost) %></div>
-            </div>
-            <div>
-              <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Profit / Loss</div>
-              <div class="text-lg font-bold mt-0.5 <%= totalProfit >= 0 ? 'text-emerald-700' : 'text-rose-700' %>">
-                <%= (totalProfit >= 0 ? '' : '-') + fmtMoney(Math.abs(totalProfit)) %>
-              </div>
-              <div class="text-[10px] text-gray-500 leading-tight">
-                <% if (totalCharge > 0) { %>
-                  margin <%= ((totalProfit / totalCharge) * 100).toFixed(1) %>%
-                <% } else { %>
-                  no client charge yet
-                <% } %>
-              </div>
-            </div>
-          <% } %>
+        <!-- Summary table — one row per sub-plan, jump links to the cards. -->
+        <div class="overflow-x-auto mb-6 border border-gray-200 rounded-lg">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 border-b border-gray-200">
+                <th class="px-3 py-2">Ref</th>
+                <th class="px-3 py-2">Type</th>
+                <th class="px-3 py-2">Owner</th>
+                <th class="px-3 py-2">Status</th>
+                <th class="px-3 py-2">Key date</th>
+                <th class="px-3 py-2 text-center">Docs</th>
+                <th class="px-3 py-2 text-center">Tasks</th>
+                <th class="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <% (subPlans || []).forEach(s => {
+                   const sDocs = (subPlanDocs && subPlanDocs[s.id]) || [];
+                   const sOpenTasks = openTasksMap[s.id] || 0;
+                   const isRolRow = s.item_type === 'rol' || s.item_type === 'road_occupancy';
+                   const keyDate = s.status === 'approved' ? (s.approved_date || s.submitted_date) : (s.submitted_date || s.job_date || s.expiry_date);
+                   const ownerName = (users.find(u => u.id == s.assigned_to_id) || {}).full_name || '—';
+              %>
+                <tr class="hover:bg-gray-50">
+                  <td class="px-3 py-2 font-mono text-xs font-semibold text-gray-900">
+                    <a href="#sub-<%= s.id %>" data-sub-jump="<%= s.id %>" class="hover:text-brand-700"><%= s.reference_number || ('#' + s.id) %></a>
+                    <% if (isRolRow && s.rol_actual_number) { %><span class="block text-[10px] font-normal text-teal-700">ROL <%= s.rol_actual_number %></span><% } %>
+                  </td>
+                  <td class="px-3 py-2 text-xs text-gray-600"><%= (TYPE_LABELS[s.item_type] || s.item_type).split(' (')[0] %><%= s.item_type === 'other' && s.other_description ? ' · ' + s.other_description : '' %></td>
+                  <td class="px-3 py-2 text-xs text-gray-600"><%= ownerName %></td>
+                  <td class="px-3 py-2"><span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset <%= STATUS_BADGE[s.status] || STATUS_BADGE.not_started %>"><%= (s.status || 'not_started').replace(/_/g, ' ') %></span></td>
+                  <td class="px-3 py-2 text-xs text-gray-500"><%= keyDate || '—' %></td>
+                  <td class="px-3 py-2 text-center text-xs text-gray-500"><%= sDocs.length || '—' %></td>
+                  <td class="px-3 py-2 text-center">
+                    <% if (sOpenTasks > 0) { %><span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700" data-task-chip="<%= s.id %>"><%= sOpenTasks %> open</span><% } else { %><span class="text-xs text-gray-300" data-task-chip="<%= s.id %>">—</span><% } %>
+                  </td>
+                  <td class="px-3 py-2 text-right whitespace-nowrap">
+                    <button type="button" data-task-btn="<%= s.id %>" data-task-ref="<%= s.reference_number || '' %>" class="text-[11px] font-medium text-brand-600 hover:text-brand-700">Task ↗</button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
         </div>
-        <% if (canSeeCost) { %>
-          <div class="mb-5 -mt-3 px-1 text-[11px] text-gray-500 italic">Cost + profit visible to admin &amp; finance only · internal rate $<%= hourlyRate %>/hr</div>
-        <% } %>
       <% } %>
 
       <% if (!subPlans || subPlans.length === 0) { %>
@@ -506,17 +746,6 @@
       <% }) %>
 
       <script>
-        // "Charge client" / "Council fee" toggles enable their matching
-        // amount input — same pattern as the create-page count grid.
-        document.querySelectorAll('.charge-toggle').forEach(cb => {
-          cb.addEventListener('change', e => {
-            const target = document.getElementById(cb.dataset.target);
-            if (!target) return;
-            target.disabled = !cb.checked;
-            if (cb.checked) target.focus();
-          });
-        });
-
         // Inline auto-save for sub-plan description / owner / ROL extension.
         // Previously these forms used native submit() on blur/change which
         // caused a full page reload — wiping any half-typed comment or
@@ -631,11 +860,113 @@
         </script>
       </details>
     </div>
+    </div><%# /subplans panel %>
 
-    <!-- Bottom-of-page submit row. Buttons sit outside #planForm but
-         submit it via the HTML5 form attribute, so the parent fields at
-         the top get saved together with whatever the user touched in
-         the sub-plan grid. -->
+    <!-- Task-off modal: assign a sub-plan to a dashboard user as a task. -->
+    <div id="taskModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/40" data-task-close></div>
+      <div class="relative bg-white border border-gray-200 rounded-xl shadow-xl w-full max-w-sm p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-1">Task <span id="taskModalRef" class="font-mono"></span> to someone</h3>
+        <p class="text-xs text-gray-500 mb-3">Creates a task in their list with a notification.</p>
+        <div class="space-y-2.5">
+          <select id="taskOwner" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="">— Who? —</option>
+            <% users.forEach(u => { %><option value="<%= u.id %>"><%= u.full_name %></option><% }) %>
+          </select>
+          <div class="grid grid-cols-2 gap-2">
+            <input type="date" id="taskDue" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <select id="taskPriority" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+          <textarea id="taskNote" rows="2" placeholder="What needs doing? (optional)" maxlength="1000"
+            class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+        </div>
+        <p id="taskMsg" class="text-xs text-gray-500 mt-2"></p>
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button type="button" data-task-close class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
+          <button type="button" id="taskCreate" class="px-3.5 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 rounded-lg">Create task</button>
+        </div>
+      </div>
+    </div>
+    <script>
+    (function () {
+      var modal = document.getElementById('taskModal');
+      if (!modal) return;
+      var csrf = (document.querySelector('#planForm input[name="_csrf"]') || {}).value || '';
+      var currentSub = null;
+      function open(subId, ref) {
+        currentSub = subId;
+        document.getElementById('taskModalRef').textContent = ref || ('#' + subId);
+        document.getElementById('taskMsg').textContent = '';
+        modal.classList.remove('hidden');
+        document.getElementById('taskOwner').focus();
+      }
+      function close() { modal.classList.add('hidden'); currentSub = null; }
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-task-btn]');
+        if (btn) { open(btn.dataset.taskBtn, btn.dataset.taskRef); return; }
+        if (e.target.closest('[data-task-close]')) close();
+      });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) close(); });
+      document.getElementById('taskCreate').addEventListener('click', function () {
+        if (!currentSub) return;
+        var ownerId = document.getElementById('taskOwner').value;
+        var msgEl = document.getElementById('taskMsg');
+        if (!ownerId) { msgEl.textContent = 'Pick who to task it to.'; msgEl.className = 'text-xs text-red-600 font-medium mt-2'; return; }
+        msgEl.textContent = 'Creating…'; msgEl.className = 'text-xs text-gray-500 mt-2';
+        var body = new URLSearchParams({
+          owner_id: ownerId,
+          due_date: document.getElementById('taskDue').value,
+          priority: document.getElementById('taskPriority').value,
+          note: document.getElementById('taskNote').value.trim(),
+          _csrf: csrf,
+        });
+        fetch('/compliance/sub-plans/' + currentSub + '/task', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': csrf },
+          body: body.toString(), credentials: 'same-origin',
+        }).then(function (r) { return r.json().catch(function () { return { ok: false, error: 'Request failed' }; }); })
+          .then(function (d) {
+            if (!d.ok) { msgEl.textContent = d.error || 'Failed.'; msgEl.className = 'text-xs text-red-600 font-medium mt-2'; return; }
+            var chip = document.querySelector('[data-task-chip="' + currentSub + '"]');
+            if (chip) { chip.textContent = d.openCount + ' open'; chip.className = 'inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700'; }
+            msgEl.textContent = 'Tasked to ' + d.owner + '.'; msgEl.className = 'text-xs text-emerald-600 font-medium mt-2';
+            setTimeout(close, 900);
+            document.getElementById('taskNote').value = '';
+          }).catch(function (e2) { msgEl.textContent = e2.message; msgEl.className = 'text-xs text-red-600 font-medium mt-2'; });
+      });
+    })();
+
+    // Deep links: #sub-<id> lands on the Sub-plans tab (it's the default tab —
+    // initTabs falls back to the first tab for unknown hashes) and scrolls to
+    // the card with a brief highlight. Jump links in the summary table do the
+    // same without changing tabs.
+    (function () {
+      function jumpTo(id) {
+        var el = document.getElementById('sub-' + id) || document.querySelector('[data-sub-card="' + id + '"]');
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.classList.add('ring-2', 'ring-brand-400');
+        setTimeout(function () { el.classList.remove('ring-2', 'ring-brand-400'); }, 2200);
+      }
+      var m = (window.location.hash || '').match(/^#sub-(\d+)$/);
+      if (m) setTimeout(function () { jumpTo(m[1]); }, 60);
+      document.addEventListener('click', function (e) {
+        var a = e.target.closest('[data-sub-jump]');
+        if (!a) return;
+        e.preventDefault();
+        history.replaceState(null, '', '#sub-' + a.dataset.subJump);
+        jumpTo(a.dataset.subJump);
+      });
+    })();
+    </script>
+
+    <!-- Bottom-of-page submit row. Buttons sit outside #planForm (and outside
+         every tab panel, so they're visible on all tabs) but submit it via
+         the HTML5 form attribute. -->
     <div class="mt-6 flex items-center justify-end gap-3">
       <a href="<%= cancelHref %>" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Done</a>
       <button type="submit" form="planForm" class="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg">Save &amp; close</button>

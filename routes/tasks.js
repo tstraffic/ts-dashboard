@@ -605,7 +605,14 @@ router.get('/:id/edit', (req, res) => {
   let linkedCompliance = null;
   try {
     if (task.compliance_id) {
-      linkedCompliance = db.prepare('SELECT id, title, reference_number, status, item_types FROM compliance WHERE id = ?').get(task.compliance_id);
+      linkedCompliance = db.prepare('SELECT id, parent_id, title, reference_number, status, item_types FROM compliance WHERE id = ?').get(task.compliance_id);
+      // A sub-plan's edit URL renders the legacy flat form — the working page
+      // is the PARENT plan, deep-linked to this sub-plan's card.
+      if (linkedCompliance) {
+        linkedCompliance.edit_url = linkedCompliance.parent_id
+          ? '/compliance/' + linkedCompliance.parent_id + '/edit#sub-' + linkedCompliance.id
+          : '/compliance/' + linkedCompliance.id + '/edit';
+      }
     }
   } catch (e) { /* compliance_id column may not exist yet */ }
 
