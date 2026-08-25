@@ -961,6 +961,17 @@
         history.replaceState(null, '', '#sub-' + a.dataset.subJump);
         jumpTo(a.dataset.subJump);
       });
+      // In-page hash changes (back button, address-bar edits): a #sub-<id>
+      // hash must also flip to the Sub-plans tab — initTabs only reads the
+      // hash on load.
+      window.addEventListener('hashchange', function () {
+        var hm = (window.location.hash || '').match(/^#sub-(\d+)$/);
+        if (!hm) return;
+        var tab = document.querySelector('[data-tab="subplans"]');
+        if (tab) tab.click();
+        history.replaceState(null, '', '#sub-' + hm[1]);
+        jumpTo(hm[1]);
+      });
     })();
     </script>
 

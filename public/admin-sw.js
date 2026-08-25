@@ -1,5 +1,5 @@
 // Atomis Admin Service Worker — Network-first with offline fallback
-const CACHE_NAME = 'atomis-admin-v25-ts-ground';
+const CACHE_NAME = 'atomis-admin-v26-plans-redesign';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to pre-cache
