@@ -15549,6 +15549,36 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 348 error:', e.message); }
   }
 
+  // Migration 349: job_purchase_orders — client POs attached to a job, managed
+  // from the Purchase Orders tab on the job edit form. One row = one uploaded
+  // document (PDF / Word / Excel) plus the money it authorises. Modelled on
+  // job_documents (mig 139): ON DELETE CASCADE so deleting a job takes its POs
+  // with it, and archived_at for soft removal rather than losing the record of
+  // a PO that was raised.
+  if (!isMigrationApplied.get(349)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS job_purchase_orders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          description TEXT DEFAULT '',
+          amount REAL DEFAULT 0,
+          file_path TEXT NOT NULL,
+          original_name TEXT,
+          mime_type TEXT,
+          size_bytes INTEGER DEFAULT 0,
+          uploaded_by_id INTEGER REFERENCES users(id),
+          uploaded_at DATETIME DEFAULT (datetime('now')),
+          archived_at DATETIME
+        );
+        CREATE INDEX IF NOT EXISTS idx_job_pos_job ON job_purchase_orders(job_id, archived_at);
+      `);
+      recordMigration.run(349, 'job_purchase_orders (PO documents + amounts on a job)');
+      console.log('Migration 349 applied: job_purchase_orders');
+    } catch (e) { console.error('Migration 349 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

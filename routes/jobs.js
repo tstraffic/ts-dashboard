@@ -5,6 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 const { getDb } = require('../db/database');
 const { canViewAccounts } = require('../middleware/auth');
+const { logActivity } = require('../middleware/audit');
 const { recalculateJobHealth, HEALTH_CALC_SQL } = require('../middleware/jobHealth');
 const { ensureThreadForEntity, addMembersToThread, postSystemMessage, getThreadForEntity } = require('../lib/chat');
 const { generateJobNumber } = require('../lib/jobNumbers');
@@ -590,7 +591,12 @@ router.get('/:id/edit', (req, res) => {
   if (!job) { req.flash('error', 'Job not found.'); return req.session.save(() => res.redirect('/jobs')); }
   const users = db.prepare('SELECT id, full_name, role FROM users WHERE active = 1 ORDER BY full_name').all();
   const clients = db.prepare('SELECT id, company_name FROM clients WHERE active = 1 ORDER BY company_name').all();
-  res.render('jobs/form', { title: 'Edit Job', job, users, clients, user: req.session.user });
+  // Purchase Orders tab. Never let a legacy DB missing the table (mig 349)
+  // take the whole edit form down — the tab just renders empty.
+  let purchaseOrders = [];
+  try { purchaseOrders = listPurchaseOrders(db, job.id); }
+  catch (e) { console.error('[jobs] purchase orders query failed:', e.message); }
+  res.render('jobs/form', { title: 'Edit Job', job, users, clients, purchaseOrders, user: req.session.user });
 });
 
 // Update job
@@ -918,6 +924,109 @@ router.get('/:id/documents/:docId/download', (req, res) => {
   res.setHeader('Content-Type', doc.mime_type || 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${(doc.original_name || doc.title || 'document').replace(/[^\w. -]/g, '_')}"`);
   fs.createReadStream(abs).pipe(res);
+});
+
+// =============================================
+// Purchase Orders — client POs attached to a job, managed from the Purchase
+// Orders tab on the job edit form (views/jobs/form.ejs, step 8). One row =
+// one document plus the money it authorises. That tab uploads through
+// fetch() rather than the job form (which posts urlencoded and would drop
+// the file), so these handlers answer JSON.
+// =============================================
+
+const PO_DIR = pathLib.join(__dirname, '..', 'data', 'uploads', 'purchase-orders');
+// Extensions the PO tab accepts — the paperwork clients actually send.
+const PO_ALLOWED = /\.(pdf|doc|docx|xls|xlsx|xlsm|csv)$/i;
+const poUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dir = pathLib.join(PO_DIR, String(req.params.id));
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      // Stored under a generated name; original_name carries what to show and
+      // what to send back on download.
+      const ext = (pathLib.extname(file.originalname || '') || '.pdf').toLowerCase();
+      cb(null, `po_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, PO_ALLOWED.test(pathLib.extname(file.originalname || ''))),
+});
+
+function listPurchaseOrders(db, jobId) {
+  return db.prepare(`
+    SELECT po.id, po.title, po.description, po.amount, po.original_name, po.mime_type,
+           po.size_bytes, po.uploaded_at, u.full_name AS uploaded_by_name
+    FROM job_purchase_orders po
+    LEFT JOIN users u ON po.uploaded_by_id = u.id
+    WHERE po.job_id = ? AND po.archived_at IS NULL
+    ORDER BY po.uploaded_at DESC, po.id DESC
+  `).all(jobId);
+}
+
+// "$12,500.00" / "12500" → 12500. Anything unparseable is 0 rather than NaN,
+// which would land in the DB and render as blank.
+function parsePoAmount(raw) {
+  const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.]/g, ''));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+// POST /jobs/:id/purchase-orders — attach one PO (file + title/description/
+// amount). Multipart, so the CSRF middleware passes it through to multer; the
+// session cookie is the auth, same as every other upload here.
+router.post('/:id/purchase-orders', poUpload.single('file'), (req, res) => {
+  const db = getDb();
+  const job = db.prepare('SELECT id FROM jobs WHERE id = ?').get(req.params.id);
+  if (!job) return res.status(404).json({ ok: false, error: 'Job not found.' });
+  if (!req.file) {
+    // Either nothing was picked or fileFilter rejected the extension.
+    return res.status(400).json({ ok: false, error: 'Attach a PDF, Word or Excel file.' });
+  }
+  const title = (req.body.title || '').toString().trim().slice(0, 200)
+    || (req.file.originalname || 'Purchase order');
+  const description = (req.body.description || '').toString().trim().slice(0, 2000);
+  const relPath = pathLib.relative(pathLib.join(__dirname, '..'), req.file.path);
+  const info = db.prepare(`
+    INSERT INTO job_purchase_orders (job_id, title, description, amount, file_path, original_name, mime_type, size_bytes, uploaded_by_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(job.id, title, description, parsePoAmount(req.body.amount), relPath,
+    req.file.originalname || null, req.file.mimetype || null, req.file.size || 0,
+    req.session.user.id);
+  logActivity({
+    user: req.session.user, action: 'create', entityType: 'job_purchase_order',
+    entityId: info.lastInsertRowid, entityLabel: title, details: 'Purchase order attached',
+  });
+  res.json({ ok: true, purchaseOrders: listPurchaseOrders(db, job.id) });
+});
+
+// GET /jobs/:id/purchase-orders/:poId/download — open the document. PDFs
+// render in the browser; Word/Excel download, which is all a browser can do
+// with them.
+router.get('/:id/purchase-orders/:poId/download', (req, res) => {
+  const db = getDb();
+  const po = db.prepare('SELECT * FROM job_purchase_orders WHERE id = ? AND job_id = ?').get(req.params.poId, req.params.id);
+  if (!po) return res.status(404).send('Not found');
+  const abs = pathLib.isAbsolute(po.file_path) ? po.file_path : pathLib.join(__dirname, '..', po.file_path);
+  if (!fs.existsSync(abs)) return res.status(404).send('File missing');
+  res.setHeader('Content-Type', po.mime_type || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `inline; filename="${(po.original_name || po.title || 'purchase-order').replace(/[^\w. -]/g, '_')}"`);
+  fs.createReadStream(abs).pipe(res);
+});
+
+// POST /jobs/:id/purchase-orders/:poId/delete — soft remove. The row stays so
+// a PO that was genuinely raised isn't erased from the record.
+router.post('/:id/purchase-orders/:poId/delete', (req, res) => {
+  const db = getDb();
+  const po = db.prepare('SELECT id, title FROM job_purchase_orders WHERE id = ? AND job_id = ?').get(req.params.poId, req.params.id);
+  if (!po) return res.status(404).json({ ok: false, error: 'Purchase order not found.' });
+  db.prepare("UPDATE job_purchase_orders SET archived_at = datetime('now') WHERE id = ?").run(po.id);
+  logActivity({
+    user: req.session.user, action: 'delete', entityType: 'job_purchase_order',
+    entityId: po.id, entityLabel: po.title, details: 'Purchase order removed',
+  });
+  res.json({ ok: true, purchaseOrders: listPurchaseOrders(db, req.params.id) });
 });
 
 module.exports = router;
