@@ -1089,9 +1089,12 @@
       }
       function commit(p) {
         titleInput.value = p.formatted || [p.site_address, p.suburb, p.state, p.postcode].filter(Boolean).join(', ');
+        // The API speaks lat/lng; the form fields are latitude/longitude.
+        var KEY = { latitude: 'lat', longitude: 'lng' };
         HIDDEN.forEach(function (n) {
           var el = hidden(n);
-          if (el) el.value = (p[n] == null ? '' : p[n]);
+          var v = p[KEY[n] || n];
+          if (el) el.value = (v == null ? '' : v);
         });
         if (addrStatus) {
           addrStatus.textContent = '✓ Located · ' + [p.suburb, p.state, p.postcode].filter(Boolean).join(' ');
