@@ -59,12 +59,22 @@ function seedPlan() {
 
 const editUrl = (seed) => `/compliance/${seed.parentId}/edit`;
 
+// Sub-plan cards are collapsed <details> rows (the row IS the summary);
+// interacting with a card's body needs it open first.
+async function openCard(page, subId) {
+  await page.evaluate((id) => {
+    const el = document.getElementById('sub-' + id);
+    if (el && 'open' in el) el.open = true;
+  }, subId);
+}
+
 test('dropping files on a sub-plan attaches them WITHOUT submitting', async ({ page }) => {
   const seed = seedPlan();
   await loginAs(page);
   await page.goto(editUrl(seed));
 
   const card = page.locator(`#sub-${seed.tgsId}`);
+  await openCard(page, seed.tgsId);
   await expect(card).toBeVisible();
   // setInputFiles fires `change` — the same event the dropzone dispatches
   // on drop — which auto-submits the attach-only form.
@@ -89,6 +99,7 @@ test('the plan can then be SUBMITTED without re-picking files', async ({ page })
   await page.goto(editUrl(seed));
 
   const card = page.locator(`#sub-${seed.tgsId}`);
+  await openCard(page, seed.tgsId);
   // The Submit plan disclosure is OPEN by default on an un-lodged plan
   // (Aug 2026 — it leads the card now); a blind summary click would close
   // it. Ensure open whichever state it starts in.
@@ -111,6 +122,7 @@ test('upload-submit still validates (missing hours blocks it)', async ({ page })
   await loginAs(page);
   await page.goto(editUrl(seed));
   const card = page.locator(`#sub-${seed.tgsId}`);
+  await openCard(page, seed.tgsId);
   await card.locator('details', { has: page.locator('form[action*="upload-submit"]') })
     .evaluate(el => { el.open = true; });
   await card.locator('form[action*="upload-submit"] input[name="description"]').fill('Missing hours');
@@ -144,6 +156,7 @@ test('an attached issued-ROL PDF auto-approves in one click', async ({ page }) =
   await loginAs(page);
   await page.goto(editUrl(seed));
   const card = page.locator(`#sub-${seed.rol1}`);
+  await openCard(page, seed.rol1);
 
   // The attached PDF is offered in the auto-approve zone — one click parses
   // it AND approves the ROL, no review step, no re-upload.
@@ -168,8 +181,10 @@ test('a TGS links to MULTIPLE ROLs, with back-links, and unlinks cleanly', async
   await page.goto(editUrl(seed));
 
   const tgsCard = page.locator(`#sub-${seed.tgsId}`);
+  await openCard(page, seed.tgsId);
   await tgsCard.locator('[data-rol-links] button', { hasText: 'TSROL-E2E-1' }).click();
   await page.waitForLoadState('networkidle');
+  await openCard(page, seed.tgsId);
   await page.locator(`#sub-${seed.tgsId} [data-rol-links] button`, { hasText: 'TSROL-E2E-2' }).click();
   await page.waitForLoadState('networkidle');
 
@@ -177,10 +192,13 @@ test('a TGS links to MULTIPLE ROLs, with back-links, and unlinks cleanly', async
   expect(links.map(l => l.rol_id)).toEqual([seed.rol1, seed.rol2]);
 
   // Both ROL cards carry the back-link.
+  await openCard(page, seed.rol1);
+  await openCard(page, seed.rol2);
   await expect(page.locator(`#sub-${seed.rol1} [data-tgs-backlinks]`)).toContainText('TSTGS-E2E');
   await expect(page.locator(`#sub-${seed.rol2} [data-tgs-backlinks]`)).toContainText('TSTGS-E2E');
 
   // Unlink one — the other survives.
+  await openCard(page, seed.tgsId);
   await page.locator(`#sub-${seed.tgsId} [data-rol-links] button`, { hasText: 'TSROL-E2E-1' }).click();
   await page.waitForLoadState('networkidle');
   links = withDb(db => db.prepare('SELECT rol_id FROM compliance_tgs_rol_links WHERE tgs_id = ?').all(seed.tgsId));

@@ -49,59 +49,101 @@
   const qaCol = { pending: 'bg-gray-100 text-gray-600', in_qa: 'bg-amber-100 text-amber-700', approved: 'bg-emerald-100 text-emerald-700' };
   const subRevs = (typeof subPlanRevisions !== 'undefined' && subPlanRevisions) ? (subPlanRevisions[sub.id] || []) : [];
   const openTaskCount = (typeof subPlanOpenTasks !== 'undefined' && subPlanOpenTasks) ? (subPlanOpenTasks[sub.id] || 0) : 0;
+
+  // Accordion: collapsed = one scannable row (the old summary-table info);
+  // open = the full card. The parent decides the default (accOpen) — a lone
+  // sub-plan opens, a stack stays collapsed for a clean overview.
+  const accOpen = (typeof cardOpen !== 'undefined') ? !!cardOpen : false;
+  const TYPE_CHIP = {
+    traffic_guidance: ['TGS', 'bg-blue-50 text-blue-700 ring-blue-200'],
+    tmp_approval: ['CTMP', 'bg-purple-50 text-purple-700 ring-purple-200'],
+    rol: ['ROL', 'bg-teal-50 text-teal-700 ring-teal-200'],
+    road_occupancy: ['ROL', 'bg-teal-50 text-teal-700 ring-teal-200'],
+    council_permit: ['Council', 'bg-amber-50 text-amber-700 ring-amber-200'],
+    spa: ['SPA', 'bg-orange-50 text-orange-700 ring-orange-200'],
+    sza: ['SZA', 'bg-violet-50 text-violet-700 ring-violet-200'],
+    bus_approval: ['Bus', 'bg-pink-50 text-pink-700 ring-pink-200'],
+    police_notification: ['Police', 'bg-slate-100 text-slate-700 ring-slate-300'],
+    letter_drop: ['Letter', 'bg-cyan-50 text-cyan-700 ring-cyan-200'],
+    other: ['Other', 'bg-gray-100 text-gray-600 ring-gray-200'],
+  };
+  const typeChip = TYPE_CHIP[sub.item_type] || TYPE_CHIP.other;
+  const keyDate = isApproved ? (sub.approved_date || sub.submitted_date) : (sub.submitted_date || sub.job_date || '');
+  const ownerName = ((typeof users !== 'undefined' ? users : []).find(u => u.id == sub.assigned_to_id) || {}).full_name || '';
 %>
 
-<div id="sub-<%= sub.id %>" data-sub-card="<%= sub.id %>" class="border border-gray-200 rounded-lg p-4 transition-shadow <%= isApproved ? 'bg-emerald-50/30' : isRejected ? 'bg-rose-50/30' : 'bg-white' %>">
-  <div class="flex items-start justify-between gap-3 mb-3">
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-2 flex-wrap">
-        <code class="text-sm font-semibold text-gray-900"><%= sub.reference_number %></code>
-        <% if (isRolType && sub.rol_actual_number) { %>
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-teal-50 text-teal-800 ring-1 ring-teal-200">ROL <%= sub.rol_actual_number %></span>
-        <% } %>
-        <% if (sub.item_type === 'other' && sub.other_description) { %>
-          <span class="text-sm font-medium text-gray-700">— <%= sub.other_description %></span>
-        <% } %>
-        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset <%= statusBadge[sub.status] || statusBadge.not_started %>">
-          <%= (sub.status || 'not_started').replace(/_/g, ' ') %>
+<details id="sub-<%= sub.id %>" data-sub-card="<%= sub.id %>" <%= accOpen ? 'open' : '' %>
+  class="group/acc border border-gray-200 rounded-lg transition-shadow open:shadow-sm <%= isApproved ? 'bg-emerald-50/30' : isRejected ? 'bg-rose-50/30' : 'bg-white' %>">
+  <summary class="list-none cursor-pointer select-none px-3.5 py-2.5 flex items-center gap-2.5 flex-wrap rounded-lg hover:bg-gray-50/70 [&::-webkit-details-marker]:hidden">
+    <svg class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform group-open/acc:rotate-90" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ring-1 ring-inset shrink-0 <%= typeChip[1] %>"><%= typeChip[0] %></span>
+    <code class="text-sm font-semibold text-gray-900 shrink-0"><%= sub.reference_number %></code>
+    <% if (isRolType && sub.rol_actual_number) { %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-teal-50 text-teal-800 ring-1 ring-teal-200 shrink-0">ROL <%= sub.rol_actual_number %></span>
+    <% } %>
+    <% if (sub.item_type === 'other' && sub.other_description) { %>
+      <span class="text-sm text-gray-700 truncate max-w-[180px]"><%= sub.other_description %></span>
+    <% } %>
+    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset shrink-0 <%= statusBadge[sub.status] || statusBadge.not_started %>">
+      <%= (sub.status || 'not_started').replace(/_/g, ' ') %>
+    </span>
+
+    <span class="ml-auto flex items-center gap-2.5 text-xs text-gray-500 min-w-0">
+      <% if (sub.expiry_date) { %>
+        <span class="hidden sm:inline shrink-0"><%= isRolType && cExt.length ? 'to' : 'exp' %> <%= sub.expiry_date %></span>
+      <% } else if (keyDate) { %>
+        <span class="hidden sm:inline shrink-0"><%= keyDate %></span>
+      <% } %>
+      <% if (isROL && sub.extension_required) { %>
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 ring-1 ring-amber-200 shrink-0"><%= cExt.length %> ext</span>
+      <% } %>
+      <% if (ownerName) { %><span class="hidden md:inline truncate max-w-[110px]" title="Owner"><%= ownerName %></span><% } %>
+      <% if (docCount > 0) { %>
+        <span class="inline-flex items-center gap-0.5 shrink-0" title="<%= docCount %> file<%= docCount === 1 ? '' : 's' %>">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656L5.586 10.758a6 6 0 108.486 8.486L20.5 12"/></svg><%= docCount %>
         </span>
-        <% if (sub.expiry_date) { %>
-          <span class="text-xs text-gray-500"><%= isRolType && cExt.length ? 'effective to' : 'expires' %> <%= sub.expiry_date %></span>
-        <% } %>
-        <% if (isROL && sub.extension_required) { %>
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200"><%= cExt.length %> extension<%= cExt.length === 1 ? '' : 's' %></span>
-        <% } %>
-      </div>
-      <div class="mt-2 flex items-center gap-2 flex-wrap">
-        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/owner" class="max-w-[220px]"
-          onsubmit="return window.__subPlanAjaxSave(event, this);" data-ajax-save>
+      <% } %>
+      <% if (openTaskCount > 0) { %>
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 shrink-0" data-task-chip="<%= sub.id %>"><%= openTaskCount %> task<%= openTaskCount === 1 ? '' : 's' %></span>
+      <% } else { %>
+        <span class="hidden" data-task-chip="<%= sub.id %>"></span>
+      <% } %>
+      <%# preventDefault stops the row toggling; the modal opens via the
+          document-level [data-task-btn] listener, which still receives the
+          click because propagation continues. %>
+      <button type="button" data-task-btn="<%= sub.id %>" data-task-ref="<%= sub.reference_number || '' %>"
+        onclick="event.preventDefault()"
+        class="px-2 py-1 text-[11px] font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 ring-1 ring-brand-200 rounded-md shrink-0">Task ↗</button>
+    </span>
+  </summary>
+
+  <div class="px-4 pb-4 pt-3 border-t border-gray-100">
+  <div class="flex items-start justify-between gap-3 mb-3 flex-wrap">
+    <div class="flex items-center gap-2 flex-wrap">
+      <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/owner" class="w-[200px]"
+        onsubmit="return window.__subPlanAjaxSave(event, this);" data-ajax-save>
+        <%- include('../partials/csrf') %>
+        <select name="assigned_to_id" onchange="window.__subPlanAjaxSave(null, this.form);"
+          class="w-full px-2.5 py-1.5 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <option value="">— Owner —</option>
+          <% (typeof users !== 'undefined' ? users : []).forEach(u => { %>
+            <option value="<%= u.id %>" <%= sub.assigned_to_id == u.id ? 'selected' : '' %>><%= u.full_name %></option>
+          <% }) %>
+        </select>
+      </form>
+      <% if (isCouncilType) { %>
+        <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/app-ref" id="appref-<%= sub.id %>"
+          onsubmit="return window.__subPlanAjaxSave(event, this);" data-ajax-save class="inline-flex items-center gap-1.5">
           <%- include('../partials/csrf') %>
-          <select name="assigned_to_id" onchange="window.__subPlanAjaxSave(null, this.form);"
-            class="w-full px-2.5 py-1.5 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
-            <option value="">— Owner —</option>
-            <% (typeof users !== 'undefined' ? users : []).forEach(u => { %>
-              <option value="<%= u.id %>" <%= sub.assigned_to_id == u.id ? 'selected' : '' %>><%= u.full_name %></option>
-            <% }) %>
-          </select>
+          <label class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700">
+            Application ref
+            <input type="text" name="application_ref_no" id="appref-input-<%= sub.id %>"
+              value="<%= sub.application_ref_no || '' %>" placeholder="council ref no."
+              onchange="window.__subPlanAjaxSave(null, this.form);"
+              class="w-36 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          </label>
         </form>
-        <button type="button" data-task-btn="<%= sub.id %>" data-task-ref="<%= sub.reference_number || '' %>"
-          class="px-2.5 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 ring-1 ring-brand-200 rounded-md">
-          Task ↗<% if (openTaskCount > 0) { %> <span class="font-bold"><%= openTaskCount %></span><% } %>
-        </button>
-        <% if (isCouncilType) { %>
-          <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/app-ref" id="appref-<%= sub.id %>"
-            onsubmit="return window.__subPlanAjaxSave(event, this);" data-ajax-save class="inline-flex items-center gap-1.5">
-            <%- include('../partials/csrf') %>
-            <label class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700">
-              Application ref
-              <input type="text" name="application_ref_no" id="appref-input-<%= sub.id %>"
-                value="<%= sub.application_ref_no || '' %>" placeholder="council ref no."
-                onchange="window.__subPlanAjaxSave(null, this.form);"
-                class="w-36 px-2.5 py-1.5 text-xs bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
-            </label>
-          </form>
-        <% } %>
-      </div>
+      <% } %>
     </div>
     <div class="shrink-0 flex items-center gap-1">
       <% if (isSubmitted && !isApproved) { %>
@@ -645,4 +687,5 @@
       <noscript><button type="submit" class="mt-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">Attach</button></noscript>
     </form>
   </div>
-</div>
+  </div><%# /accordion body %>
+</details>
