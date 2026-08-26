@@ -101,6 +101,13 @@ router.post('/', uploadPlanFile(false), (req, res) => {
   const db = getDb();
   const b = req.body;
 
+  // traffic_plans.job_id is NOT NULL, so a blank job used to fall through to
+  // the driver and surface a raw "NOT NULL constraint failed" at the user.
+  if (!b.job_id) {
+    req.flash('error', 'Select a job — every traffic plan belongs to one.');
+    return req.session.save(() => res.redirect(b.return_to && b.return_to !== '/plans' ? b.return_to : '/plans/new'));
+  }
+
   // Auto-generate document code: TSTGS-XXXX-XX or TSTMP-XXXX-XX
   // Extract job sequence number from job code (J-XXXX → XXXX). Job codes
   // were normalised to the J- prefix by migration 106; the previous
@@ -393,6 +400,13 @@ router.post('/:id', upload.single('plan_file'), (req, res) => {
   const db = getDb();
   const b = req.body;
   const oldPlan = db.prepare('SELECT * FROM traffic_plans WHERE id = ?').get(req.params.id);
+
+  // Same NOT NULL guard as create — clearing the job on an existing plan
+  // would otherwise fail with a raw constraint error.
+  if (!b.job_id) {
+    req.flash('error', 'Select a job — every traffic plan belongs to one.');
+    return req.session.save(() => res.redirect(`/plans/${req.params.id}/edit`));
+  }
 
   // Handle multi-select plan types
   const { planTypes, planType } = normalisePlanTypes(b);

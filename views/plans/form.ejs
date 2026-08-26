@@ -63,13 +63,14 @@
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label for="job_id" class="<%= labelCls %>">Job</label>
+          <label for="job_id" class="<%= labelCls %>">Job <span class="text-red-500">*</span></label>
           <select id="job_id" name="job_id" class="<%= inputCls %>">
             <option value="">Select a job...</option>
             <% jobs.forEach(function(job) { %>
               <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.project_name ? job.project_name + ' (' + job.client + ')' : job.client %></option>
             <% }) %>
           </select>
+          <p id="job_error" class="hidden mt-1 text-xs font-medium text-red-600">Select a job — every traffic plan belongs to one.</p>
         </div>
         <div>
           <label class="<%= labelCls %>">Job Address</label>
@@ -273,4 +274,24 @@
   }
   typeBoxes.forEach(b => b.addEventListener('change', syncTypeUI));
   syncTypeUI();
+
+  // A traffic plan must belong to a job (traffic_plans.job_id is NOT NULL).
+  const jobErr = document.getElementById('job_error');
+  const invalidCls = ['border-red-400', 'ring-1', 'ring-red-300'];
+  if (jobSelect) {
+    jobSelect.form.addEventListener('submit', function (e) {
+      if (jobSelect.value) return;
+      e.preventDefault();
+      const detailsTab = document.querySelector('[data-tab="details"]');
+      if (detailsTab) detailsTab.click();          // the field may be on a hidden tab
+      if (jobErr) jobErr.classList.remove('hidden');
+      jobSelect.classList.add(...invalidCls);
+      jobSelect.focus();
+    });
+    jobSelect.addEventListener('change', function () {
+      if (!jobSelect.value) return;
+      if (jobErr) jobErr.classList.add('hidden');
+      jobSelect.classList.remove(...invalidCls);
+    });
+  }
 </script>
