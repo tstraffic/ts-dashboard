@@ -655,9 +655,17 @@
     var chips = [].slice.call(box.querySelectorAll('.tdb-ev'));
     if (!chips.length) return;
     chips.sort(function (a, b) { return a.getBoundingClientRect().left - b.getBoundingClientRect().left; });
+    var boxRight = box.getBoundingClientRect().right;
     var laneRight = [];
     chips.forEach(function (ch) {
       var r = ch.getBoundingClientRect();
+      // Late-day chips that would spill past the window pin to the right
+      // edge instead — the mirror of the "◂ earlier" clamp on the left.
+      if (r.right > boxRight) {
+        ch.style.left = 'auto';
+        ch.style.right = '0';
+        r = ch.getBoundingClientRect();
+      }
       var lane = 0;
       while (laneRight[lane] != null && r.left < laneRight[lane] + 8) lane++;
       laneRight[lane] = r.right;
