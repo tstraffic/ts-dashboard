@@ -631,6 +631,19 @@ router.post('/sub-plans/:subId/owner', (req, res) => {
 // force the full submission ritual (description / dates / hours / status
 // flip) — that stays the explicit "Submit plan" action (upload-submit
 // below). Attach-only writes compliance_documents rows and nothing else.
+// A file's own name is usually the best description a sub-plan will get
+// ("224-230 Falcon St TGS Rev B.pdf") — strip the extension, tidy the
+// separators, and use it wherever a description is missing. Users can
+// still edit the description afterwards as normal.
+function fileNameToDescription(name) {
+  return String(name || '')
+    .replace(/\.[A-Za-z0-9]{1,5}$/, '')
+    .replace(/_+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
+}
+
 router.post('/sub-plans/:subId/documents', subPlanUpload.array('documents', 10), (req, res) => {
   const db = getDb();
   const sub = getSubPlan(db, req.params.subId);
@@ -650,6 +663,12 @@ router.post('/sub-plans/:subId/documents', subPlanUpload.array('documents', 10),
     const relPath = '/data/uploads/compliance/' + sub.id + '/' + f.filename;
     insDoc.run(sub.id, f.filename, f.originalname, relPath, f.size, f.mimetype || '', req.session.user.id);
   });
+
+  // No description yet? The first file's name becomes it (still editable).
+  if (!String(sub.description || '').trim()) {
+    const autoDesc = fileNameToDescription(files[0].originalname);
+    if (autoDesc) db.prepare('UPDATE compliance SET description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(autoDesc, sub.id);
+  }
 
   if (sub.job_id || req.session.user) {
     autoLogDiary(db, {
@@ -671,7 +690,10 @@ router.post('/sub-plans/:subId/upload-submit', subPlanUpload.array('documents', 
     return req.session.save(() => res.redirect('/compliance'));
   }
   const files = req.files || [];
-  const desc = (req.body.description || sub.description || '').trim();
+  // Description falls back to the first uploaded file's name — the card's
+  // form auto-fills it the same way client-side, and it stays editable.
+  const desc = (req.body.description || sub.description || '').trim()
+    || (files.length ? fileNameToDescription(files[0].originalname) : '');
   if (!desc) {
     req.flash('error', 'Description is required before submitting.');
     return req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
@@ -1503,6 +1525,12 @@ router.post('/sub-plans/:subId/rol/auto', subPlanUpload.single('rol_file'), asyn
   if (req.file) {
     filePath = subRel(sub, req.file);
     fileOriginalName = req.file.originalname;
+    // Same convention as the other upload paths: an issued-ROL upload names
+    // a description-less sub-plan after its file.
+    if (!String(sub.description || '').trim()) {
+      const autoDesc = fileNameToDescription(fileOriginalName);
+      if (autoDesc) db.prepare('UPDATE compliance SET description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(autoDesc, sub.id);
+    }
   } else if (req.body && req.body.existing_doc_id) {
     const doc = db.prepare('SELECT * FROM compliance_documents WHERE id = ? AND compliance_id = ?').get(req.body.existing_doc_id, sub.id);
     const isPdf = doc && (/\.pdf$/i.test(doc.original_name || doc.filename || '') || String(doc.mime_type || '').toLowerCase().includes('pdf'));

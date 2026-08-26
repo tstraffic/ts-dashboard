@@ -1341,5 +1341,24 @@
       });
     });
   })();
+
+  // Picking a file names the sub-plan: an empty Description field auto-fills
+  // from the first chosen file's name (extension stripped, underscores
+  // tidied). Only when empty — anything already typed is never overwritten,
+  // and the field stays editable. The upload routes apply the same rule
+  // server-side for the attach-only drop zone, which has no description field.
+  document.addEventListener('change', function (e) {
+    var f = e.target;
+    if (!f.matches || !f.matches('form[action*="/upload-submit"] input[type="file"][name="documents"]')) return;
+    if (!f.files || !f.files.length || !f.form) return;
+    var d = f.form.querySelector('input[name="description"]');
+    if (!d || d.value.trim()) return;
+    d.value = f.files[0].name
+      .replace(/\.[A-Za-z0-9]{1,5}$/, '')
+      .replace(/_+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200);
+  });
   </script>
 </div>

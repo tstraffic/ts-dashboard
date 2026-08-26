@@ -354,13 +354,28 @@ function getDayMarkers(db, user, today) {
       const endsToday = r.end_date === today && r.end_time;
       if (startsToday && endsToday) {
         const allDay = r.start_time === '00:00' && (r.end_time === '00:00' || r.end_time >= '23:30');
-        agenda.push({ kind: 'rol', hm: r.start_time, hmEnd: r.end_time, allDay, title: r.title, tone: 'warn', href });
+        agenda.push({ kind: 'rol', hm: r.start_time, hmEnd: r.end_time, allDay, title: r.title, tone: 'warn', href, subId: r.sub_id });
       } else if (endsToday) {
-        agenda.push({ kind: 'rol_expiry', hm: r.end_time, title: r.title, tone: 'critical', href });
+        agenda.push({ kind: 'rol_expiry', hm: r.end_time, title: r.title, tone: 'critical', href, subId: r.sub_id });
       } else if (startsToday) {
-        agenda.push({ kind: 'rol_open', hm: r.start_time, title: r.title, tone: 'warn', href });
+        agenda.push({ kind: 'rol_open', hm: r.start_time, title: r.title, tone: 'warn', href, subId: r.sub_id });
       }
     }
+    // A window that ends and re-opens at the same moment is one CONTINUOUS
+    // window — a multi-day licence stored as back-to-back shift rows. Fold
+    // the contradictory-looking expires/opens pair into a single all-day row.
+    const merged = new Set();
+    for (const exp of agenda) {
+      if (exp.kind !== 'rol_expiry' || exp._drop) continue;
+      const open = agenda.find(a => a.kind === 'rol_open' && !a._drop && a.subId === exp.subId && a.hm === exp.hm);
+      if (!open) continue;
+      exp._drop = open._drop = true;
+      if (!merged.has(exp.subId)) {
+        merged.add(exp.subId);
+        agenda.push({ kind: 'rol', hm: '00:00', hmEnd: '00:00', allDay: true, title: exp.title, tone: 'warn', href: exp.href, subId: exp.subId });
+      }
+    }
+    for (let i = agenda.length - 1; i >= 0; i--) if (agenda[i]._drop) agenda.splice(i, 1);
   } catch (e) { /* rol shifts absent on legacy DBs */ }
 
   try {
