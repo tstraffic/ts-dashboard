@@ -157,15 +157,15 @@
       <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Dates</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
-          <label for="client_required_date" class="<%= labelCls %>">Client Requested Date <span class="text-red-500">*</span></label>
+          <label for="client_required_date" class="<%= labelCls %>">Client Requested Date <% if (!isEdit) { %><span class="text-red-500">*</span><% } %></label>
           <input type="date" id="client_required_date" name="client_required_date" value="<%= dateVal(isEdit && plan.client_required_date) %>" class="<%= inputCls %>">
         </div>
         <div>
-          <label for="submitted_date" class="<%= labelCls %>">Submission Date <span class="text-red-500">*</span></label>
+          <label for="submitted_date" class="<%= labelCls %>">Submission Date <% if (!isEdit) { %><span class="text-red-500">*</span><% } %></label>
           <input type="date" id="submitted_date" name="submitted_date" value="<%= dateVal(isEdit && plan.submitted_date) %>" class="<%= inputCls %>">
         </div>
         <div>
-          <label for="job_date" class="<%= labelCls %>">Job Date <span id="job_date_req" class="text-red-500" style="display:none;">*</span></label>
+          <label for="job_date" class="<%= labelCls %>">Job Date <% if (!isEdit) { %><span id="job_date_req" class="text-red-500" style="display:none;">*</span><% } %></label>
           <input type="date" id="job_date" name="job_date" value="<%= dateVal(isEdit && plan.job_date) %>" class="<%= inputCls %>">
         </div>
         <div>

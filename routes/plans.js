@@ -397,12 +397,13 @@ router.post('/:id', upload.single('plan_file'), (req, res) => {
   // Handle multi-select plan types
   const { planTypes, planType } = normalisePlanTypes(b);
 
-  // Conditional date validation (spec §3).
-  const dateErrors = missingRequiredDates(planTypes, b);
-  if (dateErrors.length) {
-    req.flash('error', 'Missing required date(s): ' + dateErrors.join(', ') + '.');
-    return req.session.save(() => res.redirect(`/plans/${req.params.id}/edit`));
-  }
+  // Dates are blocking on create (above) but ADVISORY on edit. The drag-drop
+  // quick-upload deliberately skips the check, so plans exist with no dates
+  // at all — 19 of them in prod — and refusing the save left those records
+  // permanently uneditable. Clearing a date is a legitimate edit too; the
+  // diary logging below already reports one as "cleared". Missing dates are
+  // reported back on the success flash instead of rejecting the write.
+  const dateWarnings = missingRequiredDates(planTypes, b);
 
   // Handle file upload (keep existing file if no new upload). Store the
   // public URL form uploads/<filename> — not multer's absolute disk path
@@ -453,7 +454,8 @@ router.post('/:id', upload.single('plan_file'), (req, res) => {
       beforeValue: oldPlan ? (oldPlan.status || '') : '', afterValue: b.status || '', ip: req.ip
     });
 
-    req.flash('success', 'Traffic plan updated successfully.');
+    req.flash('success', 'Traffic plan updated successfully.'
+      + (dateWarnings.length ? ' Still unset: ' + dateWarnings.join(', ') + '.' : ''));
     const returnTo = b.return_to && b.return_to !== '/plans' ? b.return_to : `/plans/${req.params.id}`;
     req.session.save(() => res.redirect(returnTo));
   } catch (err) {
