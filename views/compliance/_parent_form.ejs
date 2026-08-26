@@ -593,17 +593,51 @@
           return fetch(url, { method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'x-csrf-token': csrf }, body: body.toString(), credentials: 'same-origin' })
             .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'Request failed (' + r.status + ')' }; }); });
         }
+        function fmtDate(ts) {
+          if (!ts) return '';
+          var s = String(ts);
+          if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s) && !/Z$|[+-]\d{2}:?\d{2}$/.test(s)) s = s.replace(' ', 'T') + 'Z';
+          var d = new Date(s);
+          return isNaN(d) ? '' : d.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', year: 'numeric' });
+        }
+        var openThreads = {};   // lineId -> true, so re-renders keep threads open
         function render(state) {
           var lines = state.lines || [];
           if (!lines.length) {
-            tbody.innerHTML = '<tr><td colspan="3" class="py-4 text-sm text-gray-400 italic">No quote lines yet — add the first one below.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" class="py-4 text-sm text-gray-400 italic">Lines appear here automatically as sub-plans are added — or add one below.</td></tr>';
           } else {
             tbody.innerHTML = lines.map(function (l) {
+              var comments = l.comments || [];
+              var open = !!openThreads[l.id];
+              var thread =
+                '<tr data-comments-row="' + l.id + '" class="' + (open ? '' : 'hidden ') + 'bg-gray-50/70">' +
+                  '<td colspan="3" class="px-3 py-2">' +
+                    '<div class="space-y-1.5">' +
+                    comments.map(function (c) {
+                      return '<div class="flex items-start gap-2 text-xs">' +
+                        '<svg class="w-3.5 h-3.5 text-gray-300 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l1.3-3.9A7.96 7.96 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>' +
+                        '<span class="flex-1 min-w-0 text-gray-700">' + esc(c.comment) +
+                          ' <span class="text-gray-400">— ' + esc(c.created_by_name || '') + ' · ' + fmtDate(c.created_at) + '</span></span>' +
+                        '<button type="button" data-comment-delete="' + c.id + '" class="text-gray-300 hover:text-red-500 shrink-0" title="Delete comment">✕</button>' +
+                      '</div>';
+                    }).join('') +
+                    '</div>' +
+                    '<div class="flex items-center gap-2 ' + (comments.length ? 'mt-2' : '') + '">' +
+                      '<input type="text" data-comment-input maxlength="1000" placeholder="Add a comment…" class="flex-1 px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">' +
+                      '<button type="button" data-comment-add class="px-2.5 py-1.5 text-[11px] font-semibold text-white bg-brand-600 hover:bg-brand-500 rounded-md shrink-0">Comment</button>' +
+                    '</div>' +
+                  '</td>' +
+                '</tr>';
               return '<tr class="border-b border-gray-100" data-line="' + l.id + '">' +
                 '<td class="py-1.5 pr-3"><input type="text" value="' + esc(l.description) + '" data-line-desc maxlength="300" class="w-full px-2 py-1 bg-transparent border border-transparent hover:border-gray-200 focus:border-brand-400 focus:bg-white rounded-md text-sm focus:outline-none"></td>' +
                 '<td class="py-1.5 pr-3"><input type="text" value="' + (Number(l.amount) || 0).toFixed(2) + '" data-line-amount inputmode="decimal" class="w-full px-2 py-1 bg-transparent border border-transparent hover:border-gray-200 focus:border-brand-400 focus:bg-white rounded-md text-sm text-right focus:outline-none"></td>' +
-                '<td class="py-1.5 text-center"><button type="button" data-line-delete title="Remove line" class="text-gray-300 hover:text-red-500 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button></td>' +
-              '</tr>';
+                '<td class="py-1.5 text-center whitespace-nowrap">' +
+                  '<button type="button" data-comment-toggle="' + l.id + '" title="Comments" class="align-middle mr-1 ' + (comments.length ? 'text-brand-600 hover:text-brand-700' : 'text-gray-300 hover:text-gray-500') + ' transition text-[11px] font-semibold">' +
+                    '💬' + (comments.length ? '<span class="ml-0.5">' + comments.length + '</span>' : '') +
+                  '</button>' +
+                  '<button type="button" data-line-delete title="Remove line" class="align-middle text-gray-300 hover:text-red-500 transition"><svg class="w-4 h-4 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>' +
+                '</td>' +
+              '</tr>' + thread;
             }).join('');
           }
           if (totalEl) totalEl.textContent = money(state.total || 0);
@@ -621,13 +655,65 @@
           var tr = e.target.closest('[data-line]');
           if (tr && (e.target.matches('[data-line-desc]') || e.target.matches('[data-line-amount]'))) saveLine(tr);
         });
+        function threadLineId(el) {
+          var row = el.closest('[data-comments-row]');
+          return row ? row.dataset.commentsRow : null;
+        }
+        function addComment(lineId, input) {
+          var text = (input.value || '').trim();
+          if (!text) return;
+          openThreads[lineId] = true;
+          post('/compliance/' + planId + '/quote/lines/' + lineId + '/comments', { comment: text })
+            .then(function (d) { if (d.ok) { render(d); focusThread(lineId); } else setMsg(d.error || 'Failed.', 'error'); });
+        }
+        function focusThread(lineId) {
+          var row = tbody.querySelector('[data-comments-row="' + lineId + '"]');
+          var input = row && row.querySelector('[data-comment-input]');
+          if (input) input.focus();
+        }
         tbody.addEventListener('click', function (e) {
-          var btn = e.target.closest('[data-line-delete]');
-          if (!btn) return;
-          var tr = btn.closest('[data-line]');
-          if (!confirm('Remove this quote line?')) return;
-          post('/compliance/' + planId + '/quote/lines/' + tr.dataset.line + '/delete', {})
-            .then(function (d) { if (d.ok) { render(d); setMsg('Line removed.'); } else setMsg(d.error || 'Failed.', 'error'); });
+          var del = e.target.closest('[data-line-delete]');
+          if (del) {
+            var tr = del.closest('[data-line]');
+            if (!confirm('Remove this quote line?')) return;
+            post('/compliance/' + planId + '/quote/lines/' + tr.dataset.line + '/delete', {})
+              .then(function (d) { if (d.ok) { render(d); setMsg('Line removed.'); } else setMsg(d.error || 'Failed.', 'error'); });
+            return;
+          }
+          var tog = e.target.closest('[data-comment-toggle]');
+          if (tog) {
+            var id = tog.dataset.commentToggle;
+            var row = tbody.querySelector('[data-comments-row="' + id + '"]');
+            if (!row) return;
+            var opening = row.classList.contains('hidden');
+            row.classList.toggle('hidden', !opening);
+            openThreads[id] = opening;
+            if (opening) focusThread(id);
+            return;
+          }
+          var add = e.target.closest('[data-comment-add]');
+          if (add) {
+            var lid = threadLineId(add);
+            var input = add.closest('[data-comments-row]').querySelector('[data-comment-input]');
+            if (lid && input) addComment(lid, input);
+            return;
+          }
+          var cdel = e.target.closest('[data-comment-delete]');
+          if (cdel) {
+            var lid2 = threadLineId(cdel);
+            if (!lid2 || !confirm('Delete this comment?')) return;
+            openThreads[lid2] = true;
+            post('/compliance/' + planId + '/quote/lines/' + lid2 + '/comments/' + cdel.dataset.commentDelete + '/delete', {})
+              .then(function (d) { if (d.ok) render(d); else setMsg(d.error || 'Failed.', 'error'); });
+          }
+        });
+        tbody.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter') return;
+          var input = e.target.closest('[data-comment-input]');
+          if (!input) return;
+          e.preventDefault();
+          var lid = threadLineId(input);
+          if (lid) addComment(lid, input);
         });
         document.getElementById('quoteAddLine').addEventListener('click', function () {
           var desc = document.getElementById('quoteNewDesc').value.trim();

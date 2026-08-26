@@ -15682,6 +15682,51 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 352 error:', e.message); }
   }
 
+  // Migration 353: quote lines follow the sub-plans. Lines gain a sub_plan_id
+  // link so the edit page can auto-seed one line per sub-plan (price starts
+  // at 0, set on the Quote tab) without ever duplicating; plus dated comments
+  // per line. Backfill links the mig-352 lines ("<ref> — <label>") to their
+  // sub-plans by reference so existing plans don't grow duplicate auto-lines.
+  if (!isMigrationApplied.get(353)) {
+    try {
+      const cols = db.prepare('PRAGMA table_info(compliance_quote_lines)').all().map(c => c.name);
+      if (!cols.includes('sub_plan_id')) {
+        db.exec('ALTER TABLE compliance_quote_lines ADD COLUMN sub_plan_id INTEGER REFERENCES compliance(id) ON DELETE SET NULL');
+      }
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS compliance_quote_line_comments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          line_id INTEGER NOT NULL REFERENCES compliance_quote_lines(id) ON DELETE CASCADE,
+          comment TEXT NOT NULL,
+          created_by INTEGER REFERENCES users(id),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_cq_line_comments ON compliance_quote_line_comments(line_id);
+      `);
+      // Backfill: a line whose description starts "<sub ref> — " links to that
+      // sub-plan of the same parent plan.
+      let linked = 0;
+      const lines = db.prepare(`
+        SELECT l.id, l.description, r.compliance_id AS plan_id
+        FROM compliance_quote_lines l
+        JOIN compliance_quote_revisions r ON r.id = l.revision_id
+        WHERE l.sub_plan_id IS NULL
+      `).all();
+      const findSub = db.prepare('SELECT id FROM compliance WHERE parent_id = ? AND reference_number = ?');
+      const setLink = db.prepare('UPDATE compliance_quote_lines SET sub_plan_id = ? WHERE id = ?');
+      db.transaction(() => {
+        for (const l of lines) {
+          const m = String(l.description || '').match(/^(TS[A-Z]+\d+(?:-\d+)?) — /);
+          if (!m) continue;
+          const sub = findSub.get(l.plan_id, m[1]);
+          if (sub) { setLink.run(sub.id, l.id); linked += 1; }
+        }
+      })();
+      recordMigration.run(353, 'Quote lines: sub_plan_id link + dated per-line comments; backfill links by ref');
+      console.log(`Migration 353 applied: quote line links (${linked} backfilled) + comments`);
+    } catch (e) { console.error('Migration 353 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

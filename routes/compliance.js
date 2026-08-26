@@ -1104,8 +1104,48 @@ function quoteState(db, planId) {
   }
   const current = revisions[0] || null;
   const currentLines = current ? (linesByRev[current.id] || []) : [];
+  // Dated comments per line (current revision only — the UI's comment
+  // threads live on the editable lines).
+  if (currentLines.length) {
+    try {
+      const lids = currentLines.map(l => l.id);
+      const ph = lids.map(() => '?').join(',');
+      const byLine = {};
+      db.prepare(`SELECT c.*, u.full_name AS created_by_name FROM compliance_quote_line_comments c LEFT JOIN users u ON u.id = c.created_by WHERE c.line_id IN (${ph}) ORDER BY c.created_at, c.id`).all(...lids)
+        .forEach(c => { (byLine[c.line_id] = byLine[c.line_id] || []).push(c); });
+      currentLines.forEach(l => { l.comments = byLine[l.id] || []; });
+    } catch (e) { currentLines.forEach(l => { l.comments = []; }); }
+  }
   const total = Math.round(currentLines.reduce((t, l) => t + (parseFloat(l.amount) || 0), 0) * 100) / 100;
   return { revisions, linesByRev, current, currentLines, total };
+}
+
+// The quote follows the sub-plans: every sub-plan gets one line on the
+// CURRENT revision (price starts at 0 — set it on the Quote tab). Runs on
+// every edit-page load, so newly added sub-plans appear as unpriced lines
+// automatically and never duplicate (matched by sub_plan_id). Deleted
+// sub-plans leave their line behind as a plain manual line (FK SET NULL) so a
+// priced item never silently vanishes from a quote. Invoiced plans frozen.
+function syncQuoteLinesFromSubPlans(db, plan, userId) {
+  try {
+    if (plan.invoiced) return;
+    const subs = db.prepare('SELECT id, reference_number, item_type, other_description FROM compliance WHERE parent_id = ? ORDER BY item_type, reference_number').all(plan.id);
+    if (!subs.length) return;
+    const rev = currentQuoteRevision(db, plan.id, true, userId);
+    const covered = new Set(db.prepare('SELECT sub_plan_id FROM compliance_quote_lines WHERE revision_id = ? AND sub_plan_id IS NOT NULL').all(rev.id).map(r => r.sub_plan_id));
+    const missing = subs.filter(s => !covered.has(s.id));
+    if (!missing.length) return;
+    const maxSort = db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM compliance_quote_lines WHERE revision_id = ?').get(rev.id).m;
+    const ins = db.prepare('INSERT INTO compliance_quote_lines (revision_id, description, amount, sort_order, sub_plan_id) VALUES (?, ?, 0, ?, ?)');
+    db.transaction(() => {
+      missing.forEach((s, i) => {
+        const label = ITEM_TYPE_LABELS[s.item_type] || s.item_type;
+        const desc = (s.reference_number || 'Sub-plan') + ' — ' + (s.item_type === 'other' && s.other_description ? s.other_description : label);
+        ins.run(rev.id, desc.slice(0, 300), maxSort + 1 + i, s.id);
+      });
+    })();
+    rollupQuoteTotal(db, plan.id);
+  } catch (e) { console.error('[Compliance] syncQuoteLinesFromSubPlans failed:', e.message); }
 }
 
 function rollupQuoteTotal(db, planId) {
@@ -1173,11 +1213,39 @@ router.post('/:id/quote/new-revision', (req, res) => {
   const tx = db.transaction(() => {
     const revId = db.prepare('INSERT INTO compliance_quote_revisions (compliance_id, revision_number, note, created_by) VALUES (?,?,?,?)')
       .run(plan.id, nextNo, note, req.session.user.id).lastInsertRowid;
-    const ins = db.prepare('INSERT INTO compliance_quote_lines (revision_id, description, amount, sort_order) VALUES (?,?,?,?)');
-    state.currentLines.forEach((l, i) => ins.run(revId, l.description, l.amount, i));
+    const ins = db.prepare('INSERT INTO compliance_quote_lines (revision_id, description, amount, sort_order, sub_plan_id) VALUES (?,?,?,?,?)');
+    const copyComment = db.prepare('INSERT INTO compliance_quote_line_comments (line_id, comment, created_by, created_at) VALUES (?,?,?,?)');
+    state.currentLines.forEach((l, i) => {
+      const newLineId = ins.run(revId, l.description, l.amount, i, l.sub_plan_id || null).lastInsertRowid;
+      // The comment thread follows the line into the new revision.
+      (l.comments || []).forEach(c => { try { copyComment.run(newLineId, c.comment, c.created_by, c.created_at); } catch (e) {} });
+    });
   });
   tx();
   autoLogDiary(db, { jobId: plan.job_id, complianceItemId: plan.id, summary: `[${req.session.user.full_name}] Quote revision ${nextNo} created on Plan #${plan.plan_number}${note ? ' — ' + note : ''}.`, userId: req.session.user.id });
+  res.json(quoteJson(db, plan.id));
+});
+
+// Dated comments on a quote line (current revision only).
+router.post('/:id/quote/lines/:lineId/comments', (req, res) => {
+  const db = getDb();
+  const plan = getParentPlan(db, req.params.id);
+  if (!plan) return res.status(404).json({ ok: false, error: 'Plan not found.' });
+  const rev = currentQuoteRevision(db, plan.id, false);
+  const line = rev && db.prepare('SELECT id FROM compliance_quote_lines WHERE id = ? AND revision_id = ?').get(req.params.lineId, rev.id);
+  if (!line) return res.status(404).json({ ok: false, error: 'Line not found on the current revision.' });
+  const comment = String(req.body.comment || '').trim().slice(0, 1000);
+  if (!comment) return res.status(400).json({ ok: false, error: 'Comment is empty.' });
+  db.prepare('INSERT INTO compliance_quote_line_comments (line_id, comment, created_by) VALUES (?,?,?)')
+    .run(line.id, comment, req.session.user.id);
+  res.json(quoteJson(db, plan.id));
+});
+
+router.post('/:id/quote/lines/:lineId/comments/:commentId/delete', (req, res) => {
+  const db = getDb();
+  const plan = getParentPlan(db, req.params.id);
+  if (!plan) return res.status(404).json({ ok: false, error: 'Plan not found.' });
+  db.prepare('DELETE FROM compliance_quote_line_comments WHERE id = ? AND line_id = ?').run(req.params.commentId, req.params.lineId);
   res.json(quoteJson(db, plan.id));
 });
 
@@ -1843,10 +1911,14 @@ router.get('/:id/edit', (req, res) => {
   let tenders = [];
   try { tenders = db.prepare("SELECT id, tender_number, title, status FROM tenders ORDER BY id DESC").all(); } catch (e) {}
 
-  // Quote tab (mig 351) — revisions + lines + current total. Guarded so a
-  // pre-351 DB just renders an empty quote.
+  // Quote tab (mig 351/353) — the quote follows the sub-plans: seed any
+  // missing lines first, then load. Guarded so a pre-migration DB just
+  // renders an empty quote.
   let quote = { revisions: [], linesByRev: {}, current: null, currentLines: [], total: 0 };
-  if (isParent) { try { quote = quoteState(db, item.id); } catch (e) {} }
+  if (isParent) {
+    try { syncQuoteLinesFromSubPlans(db, item, req.session.user.id); } catch (e) {}
+    try { quote = quoteState(db, item.id); } catch (e) {}
+  }
 
   // Open follow-up tasks per sub-plan (the summary table's chip) + per-sub
   // TMP revisions ("+ Revision" reuses compliance_revisions on the sub row).
