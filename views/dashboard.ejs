@@ -148,6 +148,7 @@
     --tb-ok-t: #8FD0A8;  --tb-ok-bg: #182620;  --tb-ok-bd: #2F5C43;
     --tb-info-t: #8FB8EC; --tb-info-bg: #182230; --tb-info-bd: #2E4C6B;
     --tb-night-t: #9AA3B8; --tb-night-bg: #232937; --tb-night-bd: #3A4359;
+    --tb-link: #8B93F8;
   }
   :root[data-theme="light"] {
     --tb-ink: #0F1728; --tb-dim: #94A0B4; --tb-tick: #EEF0F4; --tb-soft: #F5F6F8;
@@ -156,6 +157,7 @@
     --tb-ok-t: #1B6E45;  --tb-ok-bg: #EEF8F1;  --tb-ok-bd: #C4E5D0;
     --tb-info-t: #1D5FBF; --tb-info-bg: #EFF5FD; --tb-info-bd: #C6DBF5;
     --tb-night-t: #4A5568; --tb-night-bg: #EEF0F4; --tb-night-bd: #E2E6EC;
+    --tb-link: #4F46E5;
   }
   /* Hazard tape — the page's single brand moment (review 6.2). */
   .tdb-ribbon { height: 4px; background: repeating-linear-gradient(-45deg, #0F1728 0 10px, #F2B93B 10px 20px); }
@@ -253,7 +255,7 @@
   .tdb-meta { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 12px; color: var(--tb-dim); }
   .tdb-chev { margin-left: auto; color: var(--tb-dim); flex-shrink: 0; }
   .tdb-show-more summary { list-style: none; cursor: pointer; padding: 11px 20px; font-size: 12.5px;
-    font-weight: 600; color: var(--brand-600, #4F46E5); transition: background-color .12s ease-out; }
+    font-weight: 600; color: var(--tb-link); transition: background-color .12s ease-out; }
   .tdb-show-more summary::-webkit-details-marker { display: none; }
   .tdb-show-more summary:hover { background: var(--tb-soft); }
   .tdb-show-more[open] summary { display: none; }
