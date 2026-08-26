@@ -601,6 +601,12 @@
           return isNaN(d) ? '' : d.toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', day: 'numeric', month: 'short', year: 'numeric' });
         }
         var openThreads = {};   // lineId -> true, so re-renders keep threads open
+        // Solid bubble once a line has notes, hollow outline while it has none.
+        function bubbleIcon(filled) {
+          return filled
+            ? '<svg class="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7z"/></svg>'
+            : '<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l1.3-3.9A7.96 7.96 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>';
+        }
         function render(state) {
           var lines = state.lines || [];
           if (!lines.length) {
@@ -615,7 +621,7 @@
                     '<div class="space-y-1.5">' +
                     comments.map(function (c) {
                       return '<div class="flex items-start gap-2 text-xs">' +
-                        '<svg class="w-3.5 h-3.5 text-gray-300 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l1.3-3.9A7.96 7.96 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>' +
+                        '<svg class="w-3.5 h-3.5 text-brand-500/70 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7z"/></svg>' +
                         '<span class="flex-1 min-w-0 text-gray-700">' + esc(c.comment) +
                           ' <span class="text-gray-400">— ' + esc(c.created_by_name || '') + ' · ' + fmtDate(c.created_at) + '</span></span>' +
                         '<button type="button" data-comment-delete="' + c.id + '" class="text-gray-300 hover:text-red-500 shrink-0" title="Delete comment">✕</button>' +
@@ -632,8 +638,14 @@
                 '<td class="py-1.5 pr-3"><input type="text" value="' + esc(l.description) + '" data-line-desc maxlength="300" class="w-full px-2 py-1 bg-transparent border border-transparent hover:border-gray-200 focus:border-brand-400 focus:bg-white rounded-md text-sm focus:outline-none"></td>' +
                 '<td class="py-1.5 pr-3"><input type="text" value="' + (Number(l.amount) || 0).toFixed(2) + '" data-line-amount inputmode="decimal" class="w-full px-2 py-1 bg-transparent border border-transparent hover:border-gray-200 focus:border-brand-400 focus:bg-white rounded-md text-sm text-right focus:outline-none"></td>' +
                 '<td class="py-1.5 text-center whitespace-nowrap">' +
-                  '<button type="button" data-comment-toggle="' + l.id + '" title="Comments" class="align-middle mr-1 ' + (comments.length ? 'text-brand-600 hover:text-brand-700' : 'text-gray-300 hover:text-gray-500') + ' transition text-[11px] font-semibold">' +
-                    '💬' + (comments.length ? '<span class="ml-0.5">' + comments.length + '</span>' : '') +
+                  '<button type="button" data-comment-toggle="' + l.id + '" aria-expanded="' + (open ? 'true' : 'false') + '"' +
+                    ' title="' + (comments.length ? comments.length + ' comment' + (comments.length === 1 ? '' : 's') + ' — click to ' + (open ? 'hide' : 'read') : 'Add a comment') + '"' +
+                    ' class="inline-flex items-center gap-1 align-middle mr-1 px-1.5 py-1 rounded-md transition ' +
+                    (comments.length
+                      ? 'text-brand-700 bg-brand-50 ring-1 ring-brand-200 hover:bg-brand-100'
+                      : 'text-gray-400 ring-1 ring-transparent hover:text-brand-700 hover:bg-brand-50 hover:ring-brand-200') + '">' +
+                    bubbleIcon(comments.length > 0) +
+                    (comments.length ? '<span class="text-[11px] font-semibold leading-none">' + comments.length + '</span>' : '') +
                   '</button>' +
                   '<button type="button" data-line-delete title="Remove line" class="align-middle text-gray-300 hover:text-red-500 transition"><svg class="w-4 h-4 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>' +
                 '</td>' +
