@@ -252,6 +252,19 @@
       navigator.serviceWorker.addEventListener('message', function(e) {
         if (!e.data || e.data.type !== 'SW_UPDATED') return;
         try {
+          // Never reload out from under someone who is mid-interaction — it
+          // throws away whatever they were typing (the "one letter and the
+          // page refreshed" report). Light up the header's version dot
+          // instead and let them pick the new build up when they're ready.
+          var focused = document.activeElement;
+          if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA' ||
+                          focused.tagName === 'SELECT' || focused.isContentEditable)) {
+            var rdot = document.getElementById('app-refresh-dot');
+            var rbtn = document.getElementById('app-refresh');
+            if (rdot) rdot.classList.remove('hidden');
+            if (rbtn) { rbtn.classList.add('text-emerald-600'); rbtn.title = 'A new version has been deployed — click to reload'; }
+            return;
+          }
           var now = Date.now();
           var log = (sessionStorage.getItem('__sw_reloads') || '').split(',')
             .filter(Boolean).map(Number).filter(function (t) { return now - t < 120000; });

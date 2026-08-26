@@ -15,7 +15,7 @@
 
   <!-- Filter Bar -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-4">
-    <form method="GET" action="/projects" class="flex flex-wrap items-end gap-4">
+    <form method="GET" action="/projects" id="jobFilters" class="flex flex-wrap items-end gap-4">
       <%- include('../partials/csrf') %>
       <input type="hidden" name="_tab" value="register">
       <!-- Search -->
@@ -46,8 +46,8 @@
       </div>
       <!-- Buttons -->
       <div class="flex gap-2">
-        <a href="/projects" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Clear</a>
-        <a href="/exports/projects.csv?status=<%= filters.status || '' %>&search=<%= encodeURIComponent(filters.search || '') %>&suburb=<%= encodeURIComponent(filters.suburb || '') %>"
+        <a href="/projects" id="jobsClear" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition-colors">Clear</a>
+        <a id="jobsExport" href="/exports/projects.csv?status=<%= filters.status || '' %>&search=<%= encodeURIComponent(filters.search || '') %>&suburb=<%= encodeURIComponent(filters.suburb || '') %>"
           class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
           Export CSV
@@ -74,14 +74,14 @@
   <!-- Client Grouped Accordion -->
   <div class="space-y-3">
     <% clientGroups.forEach(function(group, gi) { %>
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden" data-client-group>
       <!-- Client Header (accordion toggle) -->
       <button type="button" onclick="var el=document.getElementById('cg-<%= gi %>');el.classList.toggle('hidden');this.querySelector('.chevron').classList.toggle('rotate-90')" class="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left">
         <div class="flex items-center gap-3">
           <svg class="w-4 h-4 text-gray-400 chevron transition-transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
           <span class="text-sm font-semibold text-gray-900"><%= group.name %></span>
           <% if (group.hasHighPriority) { %><span class="inline-block w-2 h-2 rounded-full bg-red-500 flex-shrink-0" title="Contains high priority job"></span><% } %>
-          <span class="text-xs text-gray-400"><%= group.totalCount %> job<%= group.totalCount !== 1 ? 's' : '' %></span>
+          <span class="text-xs text-gray-400" data-group-count><%= group.totalCount %> job<%= group.totalCount !== 1 ? 's' : '' %></span>
         </div>
         <div class="flex items-center gap-2">
           <% if (group.hasHighPriority) { %>
@@ -105,7 +105,7 @@
         </div>
       </button>
       <!-- Jobs Table (expanded by default) -->
-      <div id="cg-<%= gi %>" class="">
+      <div id="cg-<%= gi %>" class="" data-group-panel>
         <div class="border-t border-gray-100 overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
@@ -131,8 +131,13 @@
                 const barColor = isClosed ? 'bg-gray-400' : pct >= 100 ? 'bg-emerald-500' : pct >= 60 ? 'bg-blue-500' : pct >= 30 ? 'bg-amber-400' : 'bg-red-400';
                 const rowBorder = isClosed ? '#9ca3af' : (job.priority === 'high' ? '#ef4444' : healthColor);
                 const rowBg = isClosed ? 'bg-gray-50' : (job.priority === 'high' ? 'bg-red-50/30' : '');
+                // Everything the search box should match on, pre-flattened so
+                // filtering stays a cheap substring test per row.
+                const searchBlob = [job.job_number, job.project_name, job.client, job.suburb, job.site_address, group.name]
+                  .filter(Boolean).join(' ').toLowerCase();
               %>
-              <tr class="hover:bg-gray-50 <%= rowBg %> <%= isClosed ? 'text-gray-400' : '' %>" style="border-left: 3px solid <%= rowBorder %>">
+              <tr class="hover:bg-gray-50 <%= rowBg %> <%= isClosed ? 'text-gray-400' : '' %>" style="border-left: 3px solid <%= rowBorder %>"
+                data-job-row data-search="<%= searchBlob %>" data-status="<%= job.status || '' %>" data-suburb="<%= job.suburb || '' %>">
                 <td class="px-3 py-2 font-medium">
                   <div class="flex items-center gap-1">
                     <a href="/projects/<%= job.id %>" class="<%= isClosed ? 'text-gray-500 line-through hover:text-gray-700' : 'text-brand-600 hover:text-brand-700' %> hover:underline"><%= job.job_number %></a>
@@ -238,7 +243,92 @@
     </div>
     <% }) %>
   </div>
-  <div class="mt-3 text-xs text-gray-400"><%= jobs.length %> job<%= jobs.length !== 1 ? 's' : '' %> across <%= clientGroups.length %> client<%= clientGroups.length !== 1 ? 's' : '' %></div>
+  <div id="jobsEmpty" class="hidden bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center">
+    <p class="text-sm text-gray-500">No jobs match those filters.</p>
+    <button type="button" id="jobsEmptyClear" class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700">Clear filters</button>
+  </div>
+  <div id="jobsCount" class="mt-3 text-xs text-gray-400"><%= jobs.length %> job<%= jobs.length !== 1 ? 's' : '' %> across <%= clientGroups.length %> client<%= clientGroups.length !== 1 ? 's' : '' %></div>
   <% } %>
 
 </div>
+
+<script>
+(function () {
+  // Filtering runs locally. The register renders every job (the route has no
+  // LIMIT), so a substring test per row gives the same result the server
+  // would — without a round trip that throws away what you're typing.
+  var form = document.getElementById('jobFilters');
+  if (!form) return;
+  var search = form.querySelector('[name="search"]');
+  var status = form.querySelector('[name="status"]');
+  var suburb = form.querySelector('[name="suburb"]');
+  var exportLink = document.getElementById('jobsExport');
+  var empty = document.getElementById('jobsEmpty');
+  var countEl = document.getElementById('jobsCount');
+  var groups = [].slice.call(document.querySelectorAll('[data-client-group]'));
+  if (!search || !groups.length) return;
+
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  function apply() {
+    var q = (search.value || '').trim().toLowerCase();
+    var st = status ? status.value : '';
+    var sb = suburb ? suburb.value : '';
+    var filtering = !!(q || st || sb);
+    var totalShown = 0, groupsShown = 0;
+
+    groups.forEach(function (g) {
+      var shown = 0;
+      [].forEach.call(g.querySelectorAll('[data-job-row]'), function (tr) {
+        var ok = (!q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1)
+              && (!st || tr.getAttribute('data-status') === st)
+              && (!sb || tr.getAttribute('data-suburb') === sb);
+        tr.classList.toggle('hidden', !ok);
+        if (ok) shown++;
+      });
+      g.classList.toggle('hidden', shown === 0);
+      if (shown === 0) return;
+      groupsShown++;
+      totalShown += shown;
+      // A match inside a collapsed client should reveal itself.
+      if (filtering) {
+        var panel = g.querySelector('[data-group-panel]');
+        if (panel) panel.classList.remove('hidden');
+        var chev = g.querySelector('.chevron');
+        if (chev) chev.classList.add('rotate-90');
+      }
+      var c = g.querySelector('[data-group-count]');
+      if (c) c.textContent = plural(shown, 'job');
+    });
+
+    if (empty) empty.classList.toggle('hidden', totalShown > 0);
+    if (countEl) countEl.textContent = plural(totalShown, 'job') + ' across ' + plural(groupsShown, 'client');
+    if (exportLink) {
+      exportLink.href = '/exports/projects.csv?status=' + encodeURIComponent(st)
+        + '&search=' + encodeURIComponent(search.value || '')
+        + '&suburb=' + encodeURIComponent(sb);
+    }
+  }
+
+  function clearAll(e) {
+    if (e) e.preventDefault();
+    search.value = '';
+    if (status) status.value = '';
+    if (suburb) suburb.value = '';
+    apply();
+    search.focus();
+  }
+
+  // Enter must not reload the page — it already shows live results.
+  form.addEventListener('submit', function (e) { e.preventDefault(); apply(); });
+  search.addEventListener('input', apply);
+  if (status) status.addEventListener('change', apply);
+  if (suburb) suburb.addEventListener('change', apply);
+  var clearBtn = document.getElementById('jobsClear');
+  if (clearBtn) clearBtn.addEventListener('click', clearAll);
+  var emptyClear = document.getElementById('jobsEmptyClear');
+  if (emptyClear) emptyClear.addEventListener('click', clearAll);
+
+  apply();   // reflect any filter the server already applied via the URL
+})();
+</script>
