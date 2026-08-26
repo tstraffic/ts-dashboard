@@ -17,13 +17,21 @@ if (typeof Chart !== 'undefined') {
 
 // ===== Auto-submit filter forms on change =====
 (function() {
+  // Opt-out: a form marked data-live-filter does its own client-side
+  // filtering and must not be reloaded underneath the user. It cannot
+  // cancel this itself — form.submit() never fires a submit event, so
+  // preventDefault has nothing to hook — hence the check here.
+  function optedOut(el) { return !!(el.closest && el.closest('form[data-live-filter]')); }
+
   // Auto-submit GET forms when selects, checkboxes, or date inputs change
   document.querySelectorAll('form[method="GET"] select, form[method="GET"] input[type="checkbox"], form[method="GET"] input[type="date"]').forEach(function(el) {
+    if (optedOut(el)) return;
     el.addEventListener('change', function() { this.form.submit(); });
   });
   // For text search inputs in GET forms, submit on Enter (default) and after typing stops (500ms debounce)
   var debounceTimer;
   document.querySelectorAll('form[method="GET"] input[type="text"]').forEach(function(el) {
+    if (optedOut(el)) return;
     el.addEventListener('input', function() {
       var form = this.form;
       clearTimeout(debounceTimer);

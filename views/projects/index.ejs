@@ -15,7 +15,7 @@
 
   <!-- Filter Bar -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mb-4">
-    <form method="GET" action="/projects" id="jobFilters" class="flex flex-wrap items-end gap-4">
+    <form method="GET" action="/projects" id="jobFilters" data-live-filter class="flex flex-wrap items-end gap-4">
       <%- include('../partials/csrf') %>
       <input type="hidden" name="_tab" value="register">
       <!-- Search -->
