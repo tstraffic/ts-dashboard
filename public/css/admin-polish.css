@@ -42,16 +42,8 @@
 :root[data-theme="light"] body.dark-glass main .text-brand-400,
 :root[data-theme="light"] body.dark-glass main .text-brand-500 { color: #2517A6 !important; }
 
-/* Sidebar "Customise menu" (text-brand-200 + white/5 bg — invisible
-   on the light sidebar). Quiet slate ghost button instead. */
-:root[data-theme="light"] #sidebar #sb-edit-toggle {
-  color: #555A63 !important;
-  background: rgba(15, 17, 21, 0.05) !important;
-}
-:root[data-theme="light"] #sidebar #sb-edit-toggle:hover {
-  color: #0F1115 !important;
-  background: rgba(15, 17, 21, 0.09) !important;
-}
+/* (Customise-menu button now styled via .sb-editbtn + --sb-* vars in
+   custom.css — no per-theme override needed.) */
 
 /* Sidebar "New" feature badge (bg-brand-500/30 + text-brand-100 —
    mint on mint in light). */

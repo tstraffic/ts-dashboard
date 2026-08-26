@@ -59,14 +59,24 @@
        then snap back" flash on every navigation. -->
   <nav style="visibility:hidden" class="flex-1 overflow-y-auto overscroll-contain py-3 px-3 space-y-0.5 sidebar-nav">
 
-    <% if (canAccess(user, 'admin')) { %>
-    <div class="sb-edit-bar flex items-center gap-2 mb-1" data-sb-editbar>
-      <button type="button" id="sb-edit-toggle" class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-brand-200 hover:text-white rounded-lg transition" style="background:rgba(255,255,255,0.05)">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-        <span id="sb-edit-label">Customise menu</span>
-      </button>
+    <!-- Toolbar: nav filter (everyone) + compact customise button (admin).
+         The filter is client-side only — see the tools script at the bottom
+         of this aside. -->
+    <div class="sb-toolbar flex items-center gap-1.5 mb-2">
+      <div class="sb-filter relative flex-1 min-w-0">
+        <svg class="sb-filter-ico" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/></svg>
+        <input id="sb-filter" type="text" inputmode="search" enterkeyhint="go" placeholder="Filter menu"
+               autocomplete="off" spellcheck="false" aria-label="Filter navigation">
+      </div>
+      <% if (canAccess(user, 'admin')) { %>
+      <div class="sb-edit-bar flex items-center flex-shrink-0" data-sb-editbar>
+        <button type="button" id="sb-edit-toggle" class="sb-editbtn" title="Customise menu">
+          <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          <span id="sb-edit-label" class="sb-editbtn-label">Customise menu</span>
+        </button>
+      </div>
+      <% } %>
     </div>
-    <% } %>
 
     <%
       // Registry-driven nav (lib/sidebarNav.js — the single source of truth).
@@ -77,16 +87,31 @@
       const ctx = nav.makeCtx(user);
       const cp = typeof currentPage !== 'undefined' ? currentPage : '';
       const ttl = typeof title !== 'undefined' ? title : '';
-      const ACTIVE = 'bg-white/15 text-white shadow-sm ring-1 ring-white/10';
-      const IDLE = 'text-brand-200 hover:bg-white/10 hover:text-white active:bg-white/15';
+      // ACTIVE keeps the literal `bg-white/15` token — the customiser's
+      // auto-open, the e2e assertions and the CSS hooks all key on it. The
+      // visual treatment itself lives in CSS (var-driven fill + text).
+      // IDLE deliberately no longer contains that token as a variant —
+      // `active:bg-white/15` was what painted the "rail on every row" bug.
+      const ACTIVE = 'bg-white/15';
+      const IDLE = 'active:opacity-80';
       const isActive = (l) => (l.active || []).includes(cp) || (l.activeWhen && l.activeWhen({ currentPage: cp, title: ttl }));
-      const badgeCls = (t) => t === 'danger' ? 'bg-red-500 text-white' : t === 'brand' ? 'bg-brand-500 text-white' : 'sidebar-badge-muted';
-      const renderLink = (l) => { %>
-    <a href="<%= l.href %>"<%- l.title && l.title(b) ? ' title="' + l.title(b).replace(/"/g, '&quot;') + '"' : '' %> class="sidebar-link flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= isActive(l) ? ACTIVE : IDLE %> transition-all">
-      <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><%- l.icon %></svg>
+      // One badge per link (design review §3.5): the danger queue wins; a
+      // muted count only shows when nothing is on fire. Display caps at 99+.
+      const badgeFor = (l) => {
+        const list = l.badges || [];
+        const val = (bd) => bd.value ? bd.value(b) : (b[bd.key] || 0);
+        const danger = list.filter(bd => bd.tone === 'danger').map(val).find(v => v > 0);
+        if (danger) return { v: danger, cls: 'sidebar-badge-crit' };
+        const muted = list.filter(bd => bd.tone !== 'danger').map(val).find(v => v > 0);
+        return muted ? { v: muted, cls: 'sidebar-badge-muted' } : null;
+      };
+      const fmtBadge = (v) => v > 99 ? '99+' : v;
+      const renderLink = (l) => { const bd = badgeFor(l); %>
+    <a href="<%= l.href %>"<%- l.title && l.title(b) ? ' title="' + l.title(b).replace(/"/g, '&quot;') + '"' : '' %> class="sidebar-link flex items-center gap-2.5 px-2.5 py-[7px] text-[13.5px] font-medium rounded-lg <%= isActive(l) ? ACTIVE : IDLE %>">
+      <svg class="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><%- l.icon %></svg>
       <span class="flex-1"><%= l.label %></span>
-      <% if (l.pill) { %><span class="text-[9px] font-bold uppercase tracking-wide bg-brand-500/30 text-brand-100 px-1.5 py-0.5 rounded"><%= l.pill %></span><% } %>
-      <% (l.badges || []).forEach(bd => { const v = bd.value ? bd.value(b) : (b[bd.key] || 0); if (v) { %><span class="sidebar-badge <%= badgeCls(bd.tone) %> ml-1"><%= v %></span><% } }) %>
+      <% if (l.pill) { %><span class="sidebar-pill"><%= l.pill %></span><% } %>
+      <% if (bd) { %><span class="sidebar-badge <%= bd.cls %>"><%= fmtBadge(bd.v) %></span><% } %>
     </a>
     <% }; %>
 
@@ -101,14 +126,14 @@
             is the section's own (nav registry) — the dept hub page shows the
             same one in its title. %>
         <% if (s.hubHref) { %>
-        <a href="<%= s.hubHref %>" class="sidebar-link sb-section-head flex items-center px-3 py-2.5 text-sm font-medium rounded-xl <%= cp === s.hubActive ? ACTIVE : IDLE %> transition-all" title="Open <%= s.label %> home">
-          <% if (s.icon) { %><svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><%- s.icon %></svg><% } %>
+        <a href="<%= s.hubHref %>" class="sidebar-link sb-section-head flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg <%= cp === s.hubActive ? ACTIVE : IDLE %>" title="Open <%= s.label %> home">
+          <% if (s.icon) { %><svg class="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><%- s.icon %></svg><% } %>
           <span class="flex-1"><%= s.label %></span>
           <svg class="sb-hub-arrow w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M17 7H8m9 0v9"/></svg>
         </a>
         <% } else { %>
-        <p class="flex items-center px-3 text-[10px] font-bold text-brand-400/45 uppercase tracking-widest mb-1.5">
-          <% if (s.icon) { %><svg class="w-5 h-5 mr-3 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><%- s.icon %></svg><% } %>
+        <p class="sb-plain-head flex items-center gap-2.5 px-2.5 mb-1.5">
+          <% if (s.icon) { %><svg class="w-[18px] h-[18px] flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><%- s.icon %></svg><% } %>
           <span><%= s.label %></span>
         </p>
         <% } %>
@@ -117,7 +142,7 @@
          links.forEach(l => {
            const sub = l.sub || null;
            if (sub !== lastSub) { lastSub = sub; if (sub) { %>
-      <div class="sidebar-section" data-sb-sub><p class="px-3 pt-2 text-[9px] font-bold text-brand-400/35 uppercase tracking-widest mb-1"><%= sub %></p></div>
+      <div class="sidebar-section" data-sb-sub><p class="sb-sub-head px-2.5 pt-2 mb-1"><%= sub %></p></div>
       <%   } }
            renderLink(l);
          }); %>
@@ -152,6 +177,82 @@
     window.__SIDEBAR_CAN_EDIT__ = <%= canAccess(user, 'admin') ? 'true' : 'false' %>;
   </script>
   <%- include('sidebar-customise') %>
+
+  <!-- Sidebar tools: first-load scroll-to-active, collapsed-folder alert
+       rollups, and the nav filter. Runs synchronously AFTER the customiser's
+       initial render() so it always sees the final DOM (folders included),
+       and before app.js. Classes only — it never touches is-collapsed /
+       sb-collapsed or the sbCollapsed store. -->
+  <script>(function () { try {
+    var sidebar = document.getElementById('sidebar'); if (!sidebar) return;
+    var nav = sidebar.querySelector('.sidebar-nav'); if (!nav) return;
+
+    // First load with no saved scroll: centre the active link.
+    if (!sessionStorage.getItem('sidebar-scroll')) {
+      var act = nav.querySelector('a.sidebar-link[class~="bg-white/15"]');
+      if (act) {
+        var t = act.getBoundingClientRect().top - nav.getBoundingClientRect().top
+                + nav.scrollTop - nav.clientHeight / 2 + act.offsetHeight / 2;
+        if (t > 0) nav.scrollTop = t;
+      }
+    }
+
+    // Collapsed-folder alert rollup: a collapsed folder hiding red counts
+    // shows their sum on its head, so collapsing never hides urgency.
+    function updateCounts() {
+      nav.querySelectorAll('.sb-folder').forEach(function (f) {
+        var chip = f.querySelector(':scope > .sb-folder-head .sb-folder-count'); if (!chip) return;
+        var n = 0;
+        f.querySelectorAll('.sidebar-badge-crit').forEach(function (bd) { n += parseInt(bd.textContent, 10) || 0; });
+        chip.textContent = n > 99 ? '99+' : n;
+        chip.hidden = !(n > 0 && f.classList.contains('is-collapsed'));
+      });
+    }
+    updateCounts();
+    // Registered after the customiser's own toggle listener, so the
+    // collapse state has already flipped by the time this runs.
+    nav.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('.sb-folder-head')) updateCounts();
+    });
+
+    // Nav filter. Hide/show via classes; sb-filtering force-opens collapsed
+    // folder panels in CSS without touching their stored state.
+    var input = document.getElementById('sb-filter');
+    function applyFilter() {
+      if (!input) return;
+      var q = input.value.trim().toLowerCase();
+      nav.classList.toggle('sb-filtering', !!q);
+      nav.querySelectorAll('a.sidebar-link').forEach(function (a) {
+        var lb = a.querySelector('.sb-label') || a.querySelector('span.flex-1');
+        var txt = (lb ? lb.textContent : a.textContent).trim().toLowerCase();
+        a.classList.toggle('sb-hidden', !!q && txt.indexOf(q) === -1);
+      });
+      nav.querySelectorAll('.sb-folder').forEach(function (f) {
+        f.classList.toggle('sb-nomatch', !!q && !f.querySelector('a.sidebar-link:not(.sb-hidden)'));
+      });
+      nav.querySelectorAll('.sidebar-section').forEach(function (s) {
+        var hub = s.querySelector('a.sidebar-link');
+        s.classList.toggle('sb-nomatch', !!q && (!hub || hub.classList.contains('sb-hidden')));
+      });
+    }
+    function clearFilter() { if (input && input.value) { input.value = ''; applyFilter(); } }
+    if (input) {
+      input.addEventListener('input', applyFilter);
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { e.preventDefault(); clearFilter(); input.blur(); }
+        else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (!nav.classList.contains('sb-filtering')) return;
+          var first = nav.querySelector('a.sidebar-link:not(.sb-hidden)');
+          if (first) first.click(); // fires app.js's mobile close handler too
+        }
+      });
+      var et = document.getElementById('sb-edit-toggle');
+      if (et) et.addEventListener('click', clearFilter); // no sb-hidden residue in edit mode
+    }
+    // The customiser re-renders on Done — re-run both passes on its event.
+    nav.addEventListener('sb:rendered', function () { updateCounts(); applyFilter(); });
+  } catch (e) { if (window.console) console.error('[sidebar-tools]', e); } })();</script>
 
   <!-- Mobile sign out — pinned at bottom -->
   <div class="lg:hidden px-4 py-3 border-t border-white/10 bg-brand-950/80 backdrop-blur-sm">

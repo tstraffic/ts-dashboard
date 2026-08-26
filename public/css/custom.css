@@ -125,6 +125,34 @@ body, body.dark-glass {
   flex-shrink: 0;
 }
 
+/* ===== Sidebar design tokens (Control Room design review) =====
+   Dark defaults on :root; light overrides below; the ts / ts-dark skins
+   re-point them in themes.css. Every sidebar colour reads these vars. */
+:root {
+  --sb-ink: rgba(232,235,244,0.72);
+  --sb-ink-strong: #FFFFFF;
+  --sb-muted: #6C7691;
+  --sb-hover-bg: rgba(255,255,255,0.06);
+  --sb-active-bg: #232A48;
+  --sb-active-text: #A5ABFA;
+  --sb-line: rgba(255,255,255,0.07);
+  --sb-badge-bg: #232937;
+  --sb-badge-text: #9AA3B8;
+  --sb-crit-t: #E29B9B; --sb-crit-bg: #2A1D1F; --sb-crit-bd: #6B3A3E;
+}
+:root[data-theme="light"] {
+  --sb-ink: #4A5568;
+  --sb-ink-strong: #0F1728;
+  --sb-muted: #94A0B4;
+  --sb-hover-bg: #EEF0F4;
+  --sb-active-bg: #EEF2FF;
+  --sb-active-text: #4338CA;
+  --sb-line: #E3E7F0;
+  --sb-badge-bg: #EEF0F4;
+  --sb-badge-text: #4A5568;
+  --sb-crit-t: #B42323; --sb-crit-bg: #FDF1F1; --sb-crit-bd: #F3CDCD;
+}
+
 /* ===== Sidebar — light theme overrides ===== */
 :root[data-theme="light"] #sidebar {
   background: #FFFFFF !important;
@@ -147,32 +175,12 @@ body, body.dark-glass {
   background: rgba(15, 17, 21, 0.06) !important;
   color: #0F1115 !important;
 }
-/* Nav links */
-:root[data-theme="light"] #sidebar .sidebar-link {
-  color: #374151 !important;
-}
-:root[data-theme="light"] #sidebar .sidebar-link:hover {
-  background: rgba(15, 17, 21, 0.05) !important;
-  color: #0F1115 !important;
-}
-/* Active link — Tailwind compiled `bg-white/15 text-white ring-white/10`.
-   Use ~= so `active:bg-white/15` (the hover/active variant on inactive
-   links) doesn't accidentally match. */
-:root[data-theme="light"] #sidebar a.sidebar-link[class~="bg-white/15"] {
-  background: rgba(61,49,192, 0.12) !important;
-  color: #13008E !important;
-  box-shadow: inset 0 0 0 1px rgba(61,49,192, 0.22) !important;
-}
-
-/* Section headings ("PLANNING", "SAFETY" etc.) — text-brand-400/45 */
-:root[data-theme="light"] #sidebar .text-brand-400\/45,
-:root[data-theme="light"] #sidebar p[class*="text-brand-400"] {
-  color: rgba(15, 17, 21, 0.42) !important;
-}
+/* Nav link + section colours are var-driven in the base block below —
+   no per-theme colour overrides needed here any more. */
 /* Section dividers — border-white/10 */
 :root[data-theme="light"] #sidebar .border-white\/10,
 :root[data-theme="light"] #sidebar [class*="border-white/10"] {
-  border-color: rgba(15, 17, 21, 0.08) !important;
+  border-color: var(--sb-line) !important;
 }
 
 /* Mobile sidebar user/profile chips */
@@ -190,11 +198,7 @@ body, body.dark-glass {
   color: #555A63 !important;
 }
 
-/* Muted badges (counts next to nav items) */
-:root[data-theme="light"] #sidebar .sidebar-badge-muted {
-  background: rgba(15, 17, 21, 0.08) !important;
-  color: #374151 !important;
-}
+/* Badges are var-driven in the base block below. */
 
 /* =================================================================
    LIGHT THEME RESETS
@@ -774,9 +778,10 @@ table {
 }
 
 /* Sidebar nav scrollbar */
-.sidebar-nav::-webkit-scrollbar { width: 2px; }
+.sidebar-nav::-webkit-scrollbar { width: 4px; }
 .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
-.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 100px; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: transparent; border-radius: 100px; }
+.sidebar-nav:hover::-webkit-scrollbar-thumb { background: var(--sb-line); }
 
 /* Sidebar nav icons — uniform 1.5px stroke, outlined. Overrides inline
    stroke-width on every <svg> inside .sidebar-link so the mixed-weight
@@ -787,84 +792,124 @@ table {
 .sidebar-link svg line,
 .sidebar-link svg polyline,
 .sidebar-link svg polygon {
-  stroke-width: 1.5 !important;
+  stroke-width: 1.75 !important;
 }
 .sidebar-link svg { stroke-linecap: round; stroke-linejoin: round; }
 
-/* Sidebar link â€” smooth interactions */
+/* Sidebar link — one quiet interaction system (review 8.1): background
+   hover, var-driven colours, visible keyboard focus. The old ::before rail
+   is gone — [class*="bg-white/15"] substring-matched `active:bg-white/15`
+   on idle links and painted a bar on every row. Active is a fill, not a rail. */
 .sidebar-link {
   position: relative;
-  transform: translateX(0);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  min-height: 34px;
+  color: var(--sb-ink);
+  transition: background-color .12s ease-out, color .12s ease-out, transform .12s ease-out;
 }
-.sidebar-link::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%) scaleY(0);
-  width: 3px;
-  height: 60%;
-  border-radius: 0 3px 3px 0;
-  /* Brand rail, not white: white disappears on the light sidebar and the
-     active item should read as Atomis in both themes. */
-  background: #6259D2;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+#sidebar .sidebar-link:hover { background: var(--sb-hover-bg); color: var(--sb-ink-strong); }
+#sidebar a.sidebar-link[class~="bg-white/15"] {
+  background: var(--sb-active-bg) !important;
+  color: var(--sb-active-text) !important;
+  font-weight: 600;
 }
-:root[data-theme="light"] .sidebar-link::before { background: #2517A6; }
+.sidebar-link:focus-visible {
+  outline: 2px solid var(--sb-active-text);
+  outline-offset: -2px;
+}
 
 /* Section headers ARE the dept-hub links (Phase 4). They keep the
    .sidebar-link class so the customiser can pool them by pathname; this
    block re-voices them as small-caps headers in the default render. The
    hover-revealed arrow signals "this heading goes somewhere". */
 #sidebar .sidebar-section .sb-section-head {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(98,89,210, 0.45);
-  padding-top: 0.35rem;
-  padding-bottom: 0.35rem;
-  min-height: 36px;
+  color: var(--sb-muted);
+  min-height: 32px;
 }
-#sidebar .sidebar-section .sb-section-head:hover { color: #fff; }
+#sidebar .sidebar-section .sb-section-head:hover { color: var(--sb-ink-strong); }
 #sidebar .sb-hub-arrow { opacity: 0; transition: opacity 0.15s; }
 #sidebar .sb-section-head:hover .sb-hub-arrow,
 #sidebar .sb-section-head:focus-visible .sb-hub-arrow { opacity: 0.8; }
-#sidebar .sidebar-section .sb-section-head[class~="bg-white/15"] { color: #fff; }
-:root[data-theme="light"] #sidebar .sidebar-section .sb-section-head { color: rgba(15, 17, 21, 0.45) !important; }
-:root[data-theme="light"] #sidebar .sidebar-section .sb-section-head:hover { color: #0F1115 !important; }
-.sidebar-link.bg-white\/15::before,
-.sidebar-link[class*="bg-white/15"]::before {
-  transform: translateY(-50%) scaleY(1);
+#sidebar .sidebar-section .sb-section-head[class~="bg-white/15"] { color: var(--sb-active-text); }
+/* Non-hub headers + sub-group labels share the same voice. */
+#sidebar .sb-plain-head {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--sb-muted);
+}
+#sidebar .sb-sub-head {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--sb-muted); opacity: 0.8;
+}
+/* NEW-style pills on nav rows */
+#sidebar .sidebar-pill {
+  font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  background: var(--sb-active-bg); color: var(--sb-active-text);
+  padding: 1px 6px; border-radius: 999px; flex-shrink: 0;
 }
 @media (max-width: 1023px) {
+  #sidebar .sidebar-link { min-height: 44px; font-size: 14px; }
   .sidebar-link:active { transform: scale(0.97); }
 }
+/* Toolbar: filter input + compact customise button */
+#sidebar .sb-toolbar { min-height: 30px; }
+#sidebar .sb-filter input {
+  width: 100%; height: 30px; padding: 0 8px 0 27px; border-radius: 8px;
+  background: var(--sb-hover-bg); border: 1px solid transparent;
+  color: var(--sb-ink-strong); font-size: 12.5px;
+  transition: border-color .12s ease-out;
+}
+#sidebar .sb-filter input::placeholder { color: var(--sb-muted); }
+#sidebar .sb-filter input:hover { border-color: var(--sb-line); }
+#sidebar .sb-filter input:focus { outline: 2px solid var(--sb-active-text); outline-offset: -1px; }
+#sidebar .sb-filter-ico {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+  width: 13px; height: 13px; color: var(--sb-muted); pointer-events: none;
+}
+#sidebar .sb-editbtn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 30px; height: 30px; padding: 0 8px; border-radius: 8px; border: 0;
+  cursor: pointer; color: var(--sb-muted); background: var(--sb-hover-bg);
+  transition: color .12s ease-out, background-color .12s ease-out;
+}
+#sidebar .sb-editbtn:hover { color: var(--sb-ink-strong); }
+#sidebar .sb-editbtn-label { display: none; font-size: 11px; font-weight: 600; white-space: nowrap; }
+#sidebar.sb-editing .sb-filter { display: none; }
+#sidebar.sb-editing .sb-edit-bar { flex: 1; }
+#sidebar.sb-editing .sb-editbtn { width: 100%; }
+#sidebar.sb-editing .sb-editbtn-label { display: inline; }
+@media (max-width: 1023px) {
+  #sidebar .sb-filter input, #sidebar .sb-editbtn { height: 40px; font-size: 16px; }
+}
 
-/* Sidebar badges — single neutral style by default. Colour (red) is
-   reserved for the Incidents badge which represents a genuine action. */
+/* Sidebar badges — one anatomy (review 3.5): mono numerals in a quiet
+   pill; the crit triad is reserved for queues that block work. Values are
+   capped at 99+ in the template. */
 .sidebar-badge {
-  min-width: 1.25rem;
-  height: 1.1rem;
+  min-width: 17px;
+  height: 15px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.625rem;
-  font-weight: 600;
-  border-radius: 6px;
-  padding: 0 0.4rem;
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 0 6px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 .sidebar-badge.sidebar-badge-muted {
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.55);
+  background: var(--sb-badge-bg);
+  color: var(--sb-badge-text);
 }
-.sidebar-badge.bg-red-500 {
-  background: rgba(239,68,68,0.18) !important;
-  color: #fca5a5 !important;
-  box-shadow: none;
+.sidebar-badge.sidebar-badge-crit {
+  background: var(--sb-crit-bg);
+  color: var(--sb-crit-t);
+  border: 1px solid var(--sb-crit-bd);
 }
 
 /* ===== Mobile Touch Targets ===== */
@@ -1136,22 +1181,8 @@ tbody tr:active {
   animation-delay: 0.3s;
 }
 
-/* ===== Sidebar Section Reveal ===== */
-.sidebar-section {
-  animation: fade-in-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.sidebar-section:nth-child(1) { animation-delay: 0ms; }
-.sidebar-section:nth-child(2) { animation-delay: 40ms; }
-.sidebar-section:nth-child(3) { animation-delay: 80ms; }
-.sidebar-section:nth-child(4) { animation-delay: 120ms; }
-.sidebar-section:nth-child(5) { animation-delay: 160ms; }
-.sidebar-section:nth-child(6) { animation-delay: 200ms; }
-.sidebar-section:nth-child(7) { animation-delay: 240ms; }
-
-/* Sidebar link hover â€” subtle slide right */
-.sidebar-link:hover {
-  transform: translateX(3px);
-}
+/* (Sidebar entrance stagger + hover slide removed — the nav is chrome,
+   not content; it should be instantly stable on every load.) */
 
 /* ===== Action Items â€” Attention Pulse ===== */
 .attention-dot {

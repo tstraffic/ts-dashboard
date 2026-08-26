@@ -1,5 +1,5 @@
 // Atomis Admin Service Worker — Network-first with offline fallback
-const CACHE_NAME = 'atomis-admin-v28-filter-refocus';
+const CACHE_NAME = 'atomis-admin-v29-sidebar-redesign';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to pre-cache

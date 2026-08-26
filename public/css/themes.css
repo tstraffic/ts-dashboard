@@ -180,6 +180,17 @@
   --ink:         #1B1A24;
   --ink-2:       #555264;
   --ink-3:       #8B889E;
+  /* Sidebar tokens (custom.css defines the base set) — the ts skin keeps
+     its indigo family but adopts the review's active anatomy. */
+  --sb-ink: #4A5568;
+  --sb-ink-strong: #1B1A24;
+  --sb-muted: #8B889E;
+  --sb-hover-bg: #EEF0F4;
+  --sb-active-bg: #EEF2FF;
+  --sb-active-text: #4338CA;
+  --sb-line: #E3E7F0;
+  --sb-badge-bg: #EEEDF6;
+  --sb-badge-text: #555264;
 }
 /* Ambient brand lighting — a soft indigo glow washing down from the
    top of the page. Subtle on light paper; the cards stay pure white
@@ -228,23 +239,9 @@
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .shadow-sm,
 :root[data-skin="ts"][data-theme="light"] body.dark-glass .shadow-card { box-shadow: none !important; }
 
-/* Sidebar — brand-tinted paper, active row marked by an indigo edge. */
-:root[data-skin="ts"][data-theme="light"] #sidebar { background: #FAFAFD !important; border-right-color: #E4E2F0 !important; }
-:root[data-skin="ts"][data-theme="light"] #sidebar .sidebar-link { color: #423F52 !important; }
-:root[data-skin="ts"][data-theme="light"] #sidebar .sidebar-link:hover {
-  background: rgba(61,49,192,0.06) !important;
-  color: #1B1A24 !important;
-}
-:root[data-skin="ts"][data-theme="light"] #sidebar a.sidebar-link[class~="bg-white/15"] {
-  background: #EFEEFC !important;
-  color: #13008E !important;
-  font-weight: 600 !important;
-  box-shadow: inset 2px 0 0 #13008E !important;
-}
-:root[data-skin="ts"][data-theme="light"] #sidebar .sidebar-badge-muted {
-  background: #EAE9F3 !important;
-  color: #555264 !important;
-}
+/* Sidebar — white surface; row/active/badge colours come from the --sb-*
+   vars set in this skin's token block (one active device: fill + text). */
+:root[data-skin="ts"][data-theme="light"] #sidebar { background: #FFFFFF !important; border-right-color: var(--sb-line) !important; }
 
 /* Scrollbar picks up the tint too. */
 :root[data-skin="ts"][data-theme="light"] ::-webkit-scrollbar-thumb { background: #D0CDE4; }
@@ -264,6 +261,16 @@
   --dark-surface-hover: #232032;
   --dark-border: rgba(160,153,235,0.13);
   --dark-border-strong: rgba(160,153,235,0.22);
+  /* Sidebar tokens — indigo-tinted dark. */
+  --sb-ink: rgba(214,211,240,0.75);
+  --sb-ink-strong: #E8EBF4;
+  --sb-muted: #6C7691;
+  --sb-hover-bg: rgba(139,133,226,0.10);
+  --sb-active-bg: rgba(61,49,192,0.28);
+  --sb-active-text: #BAB6EF;
+  --sb-line: rgba(160,153,235,0.12);
+  --sb-badge-bg: #232030;
+  --sb-badge-text: #9AA3B8;
 }
 :root[data-skin="ts-dark"] body, :root[data-skin="ts-dark"] body.dark-glass {
   background-color: var(--atomis-base);
@@ -278,11 +285,7 @@
   background: #141220 !important;
   border-right-color: rgba(160,153,235,0.10) !important;
 }
-:root[data-skin="ts-dark"] #sidebar a.sidebar-link[class~="bg-white/15"] {
-  background: rgba(61,49,192,0.28) !important;
-  color: #BAB6EF !important;
-  box-shadow: inset 2px 0 0 #8B85E2 !important;
-}
+/* Active anatomy comes from the base var-driven rule in custom.css. */
 
 /* Warm Paper — soft warm off-white instead of cool grey-white. */
 :root[data-skin="warm-paper"][data-theme="light"] {

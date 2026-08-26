@@ -1,13 +1,16 @@
 <style>
   /* ── Custom sidebar layout: nested folders + edit mode ── */
-  #sidebar .sb-folder { margin-top: 1px; }
+  #sidebar .sb-folder { margin-top: 2px; }
+  /* Group-label voice (design review §5.1): sans 11px/600 uppercase — mono
+     stays reserved for machine data (badge numerals, refs). */
   #sidebar .sb-folder-head {
-    display: flex; align-items: center; gap: 5px; width: 100%;
-    padding: 7px 10px 5px; background: none; border: 0; cursor: pointer;
-    color: rgba(148,163,184,0.7); font-size: 10px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.09em; text-align: left;
+    display: flex; align-items: center; gap: 6px; width: 100%;
+    padding: 8px 10px 4px 8px; background: none; border: 0; cursor: pointer;
+    color: var(--sb-muted); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em; text-align: left;
+    transition: color .12s ease-out;
   }
-  #sidebar .sb-folder-head:hover { color: rgba(226,232,240,0.95); }
+  #sidebar .sb-folder-head:hover { color: var(--sb-ink-strong); }
   #sidebar .sb-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Caret: points DOWN when the folder is open, RIGHT when collapsed. The base
      icon is a right-chevron, so open = rotate 90° (down), collapsed = 0° (right). */
@@ -15,7 +18,24 @@
   #sidebar .sb-folder-ico { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.7; }
   #sidebar .sb-folder.is-collapsed .sb-caret { transform: rotate(0deg); }
   #sidebar .sb-folder-items.sb-collapsed { display: none; }
-  #sidebar .sb-folder-items { padding-left: 6px; margin-left: 6px; border-left: 1px solid rgba(255,255,255,0.06); }
+  #sidebar .sb-folder-items { padding-left: 7px; margin-left: 9px; border-left: 1px solid var(--sb-line); }
+  /* Collapsed-folder alert rollup — crit triad, counts what the fold hides. */
+  #sidebar .sb-folder-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 17px; height: 15px; padding: 0 5px; border-radius: 999px;
+    font-family: 'Geist Mono', ui-monospace, monospace; font-size: 9.5px; font-weight: 500;
+    letter-spacing: 0; font-variant-numeric: tabular-nums; text-transform: none;
+    background: var(--sb-crit-bg); color: var(--sb-crit-t); border: 1px solid var(--sb-crit-bd);
+  }
+  #sidebar .sb-folder-count[hidden] { display: none; }
+  #sidebar.sb-editing .sb-folder-count { display: none !important; }
+  /* Nav filter states. Classes only — the stored collapse state is never
+     touched; sb-filtering just out-specifies the display:none above. */
+  #sidebar .sidebar-nav a.sidebar-link.sb-hidden { display: none; }
+  #sidebar .sidebar-nav .sb-folder.sb-nomatch,
+  #sidebar .sidebar-nav .sidebar-section.sb-nomatch { display: none; }
+  #sidebar .sidebar-nav.sb-filtering .sb-folder-items.sb-collapsed { display: block; }
+  #sidebar .sidebar-nav.sb-filtering .sb-caret { transform: rotate(90deg); }
 
   /* ── Edit mode ── */
   #sidebar.sb-editing .sidebar-link {
@@ -154,7 +174,11 @@
       f.setAttribute('data-folder', '');
       var head = document.createElement('div');
       head.className = 'sb-folder-head';
-      head.innerHTML = (edit ? ICON_HANDLE : '') + ICON_CARET + ICON_FOLDER + '<span class="sb-folder-name"></span>';
+      // Folder glyph is edit-mode furniture; display mode is caret + name +
+      // (hidden until needed) alert-count chip, filled by the tools script.
+      head.innerHTML = (edit ? ICON_HANDLE : '') + ICON_CARET + (edit ? ICON_FOLDER : '')
+        + '<span class="sb-folder-name"></span>'
+        + (edit ? '' : '<span class="sb-folder-count" hidden></span>');
       head.querySelector('.sb-folder-name').textContent = name;
       if (edit) {
         head.appendChild(actBtn('sb-act--addsub', 'Add sub-folder', ICON_PLUS));
@@ -216,6 +240,9 @@
           var it = f.querySelector(':scope > .sb-folder-items'); if (it) it.classList.remove('sb-collapsed');
         }
       });
+      // Tell the tools script (sidebar.ejs) the DOM was rebuilt so it can
+      // re-run the alert rollups and any active nav filter.
+      try { nav.dispatchEvent(new CustomEvent('sb:rendered', { detail: { edit: !!edit } })); } catch (e) {}
       return root;
     }
 
