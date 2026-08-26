@@ -178,6 +178,11 @@ app.get('/__build', (req, res) => {
 // Flash messages + permission helper available in all templates
 app.use((req, res, next) => {
   res.locals.appBuild = APP_BUILD;
+  // Sidebar active-state fallback. Views that set `locals.currentPage = …`
+  // in the template never reach the layout (express-ejs-layouts re-renders
+  // the layout from the original locals, so in-view mutations are lost) —
+  // the sidebar matches the request path instead when currentPage is absent.
+  res.locals.currentPath = req.path || '';
   res.locals.flash_success = req.flash('success');
   res.locals.flash_error = req.flash('error');
   res.locals.user = req.session.user || null;

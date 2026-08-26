@@ -29,6 +29,23 @@
   }
   #sidebar .sb-folder-count[hidden] { display: none; }
   #sidebar.sb-editing .sb-folder-count { display: none !important; }
+  /* Section home rows — the pooled dept-hub links keep .sb-section-head, so
+     inside a folder they can read as the section's front door instead of a
+     random bold sibling: stronger ink, a ghosted "opens a page" arrow, and a
+     hairline separating them from the folder's tools. */
+  #sidebar .sb-folder-items > a.sb-section-head,
+  #sidebar .sb-root > a.sb-section-head {
+    font-weight: 600;
+    color: var(--sb-ink-strong);
+    border-bottom: 1px solid var(--sb-line);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    margin-bottom: 3px;
+  }
+  #sidebar .sb-folder-items > a.sb-section-head .sb-hub-arrow,
+  #sidebar .sb-root > a.sb-section-head .sb-hub-arrow { opacity: 0.4; }
+  #sidebar .sb-folder-items > a.sb-section-head:hover .sb-hub-arrow,
+  #sidebar .sb-root > a.sb-section-head:hover .sb-hub-arrow { opacity: 0.9; }
   /* Nav filter states. Classes only — the stored collapse state is never
      touched; sb-filtering just out-specifies the display:none above. */
   #sidebar .sidebar-nav a.sidebar-link.sb-hidden { display: none; }

@@ -87,6 +87,12 @@
       const ctx = nav.makeCtx(user);
       const cp = typeof currentPage !== 'undefined' ? currentPage : '';
       const ttl = typeof title !== 'undefined' ? title : '';
+      // Path fallback: many views set locals.currentPage in the template,
+      // which never survives into the layout render — on those pages cp is
+      // empty, so match the request path against link hrefs instead. Only
+      // consulted when cp is empty, so route-passed pages keep exact rules.
+      const cpath = typeof currentPath !== 'undefined' ? currentPath : '';
+      const pathHit = (href) => !cp && !!cpath && !!href && (cpath === href || cpath.indexOf(href + '/') === 0);
       // ACTIVE keeps the literal `bg-white/15` token — the customiser's
       // auto-open, the e2e assertions and the CSS hooks all key on it. The
       // visual treatment itself lives in CSS (var-driven fill + text).
@@ -94,7 +100,7 @@
       // `active:bg-white/15` was what painted the "rail on every row" bug.
       const ACTIVE = 'bg-white/15';
       const IDLE = 'active:opacity-80';
-      const isActive = (l) => (l.active || []).includes(cp) || (l.activeWhen && l.activeWhen({ currentPage: cp, title: ttl }));
+      const isActive = (l) => (l.active || []).includes(cp) || (l.activeWhen && l.activeWhen({ currentPage: cp, title: ttl })) || pathHit(l.href);
       // One badge per link (design review §3.5): the danger queue wins; a
       // muted count only shows when nothing is on fire. Display caps at 99+.
       const badgeFor = (l) => {
@@ -126,7 +132,7 @@
             is the section's own (nav registry) — the dept hub page shows the
             same one in its title. %>
         <% if (s.hubHref) { %>
-        <a href="<%= s.hubHref %>" class="sidebar-link sb-section-head flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg <%= cp === s.hubActive ? ACTIVE : IDLE %>" title="Open <%= s.label %> home">
+        <a href="<%= s.hubHref %>" class="sidebar-link sb-section-head flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg <%= (cp === s.hubActive || pathHit(s.hubHref)) ? ACTIVE : IDLE %>" title="Open <%= s.label %> home">
           <% if (s.icon) { %><svg class="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><%- s.icon %></svg><% } %>
           <span class="flex-1"><%= s.label %></span>
           <svg class="sb-hub-arrow w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M17 7H8m9 0v9"/></svg>
