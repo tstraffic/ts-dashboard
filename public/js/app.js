@@ -28,15 +28,43 @@ if (typeof Chart !== 'undefined') {
     if (optedOut(el)) return;
     el.addEventListener('change', function() { this.form.submit(); });
   });
-  // For text search inputs in GET forms, submit on Enter (default) and after typing stops (500ms debounce)
+  // The debounced submit below reloads the page, which drops focus and eats
+  // the next keystrokes — mid-search this reads as "the page refreshed on
+  // me". Remember which field the user was in (per-tab, keyed to the path)
+  // and put the caret straight back after the reload so typing flows on.
+  function rememberFocus(el) {
+    try {
+      sessionStorage.setItem('__filter_refocus', JSON.stringify({
+        n: el.name, p: location.pathname,
+        s: el.selectionStart == null ? el.value.length : el.selectionStart,
+      }));
+    } catch (e) { /* storage blocked — reload still works, focus is lost */ }
+  }
+  try {
+    var saved = JSON.parse(sessionStorage.getItem('__filter_refocus') || 'null');
+    if (saved && saved.p === location.pathname) {
+      sessionStorage.removeItem('__filter_refocus');
+      var refocus = document.querySelector('form[method="GET"] input[type="text"][name="' + saved.n + '"]');
+      if (refocus && (!document.activeElement || document.activeElement === document.body)) {
+        refocus.focus();
+        var pos = Math.min(refocus.value.length, saved.s);
+        try { refocus.setSelectionRange(pos, pos); } catch (e) { /* non-text-ish input */ }
+      }
+    }
+  } catch (e) { /* corrupt/blocked storage — never break page init */ }
+
+  // For text search inputs in GET forms, submit on Enter (default) and after typing stops (900ms debounce)
   var debounceTimer;
   document.querySelectorAll('form[method="GET"] input[type="text"]').forEach(function(el) {
     if (optedOut(el)) return;
     el.addEventListener('input', function() {
-      var form = this.form;
+      var self = this, form = this.form;
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(function() { form.submit(); }, 600);
+      debounceTimer = setTimeout(function() { rememberFocus(self); form.submit(); }, 900);
     });
+    // Enter submits natively (no submit event to hook for form.submit(), but
+    // native submit works here) — remember focus for that path too.
+    el.addEventListener('keydown', function(e) { if (e.key === 'Enter') rememberFocus(this); });
   });
 })();
 
