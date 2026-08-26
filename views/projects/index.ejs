@@ -94,7 +94,10 @@
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 ring-1 ring-blue-600/20"><%= group.pendingTasks %> task<%= group.pendingTasks !== 1 ? 's' : '' %></span>
           <% } %>
           <% if (group.pendingPlans > 0) { %>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 ring-1 ring-amber-600/20"><%= group.pendingPlans %> plan<%= group.pendingPlans !== 1 ? 's' : '' %></span>
+            <span role="link" tabindex="0" title="Open this client's plans in Plans &amp; Approvals"
+              onclick="event.stopPropagation();window.location='/compliance<%= group.clientId ? '?client_id=' + group.clientId : '' %>'"
+              onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();window.location='/compliance<%= group.clientId ? '?client_id=' + group.clientId : '' %>'}"
+              class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 ring-1 ring-amber-600/20 cursor-pointer hover:bg-amber-200 transition-colors"><%= group.pendingPlans %> plan<%= group.pendingPlans !== 1 ? 's' : '' %></span>
           <% } %>
           <% if (group.activeCount > 0) { %>
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 ring-1 ring-gray-400/20"><%= group.activeCount %> active</span>
@@ -154,9 +157,9 @@
                         <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-600/20"><%= job.pending_tasks %> task<%= job.pending_tasks !== 1 ? 's' : '' %></span>
                       <% } %>
                       <% if (job.overdue_compliance > 0) { %>
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20"><%= job.overdue_compliance %> plan<%= job.overdue_compliance !== 1 ? 's' : '' %> overdue</span>
+                        <a href="/compliance?job_id=<%= job.id %>" title="Open this job's plans in Plans &amp; Approvals" class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 ring-1 ring-red-600/20 hover:bg-red-100 transition-colors"><%= job.overdue_compliance %> plan<%= job.overdue_compliance !== 1 ? 's' : '' %> overdue</a>
                       <% } else if (job.pending_plans > 0) { %>
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-600/20"><%= job.pending_plans %> plan<%= job.pending_plans !== 1 ? 's' : '' %></span>
+                        <a href="/compliance?job_id=<%= job.id %>" title="Open this job's plans in Plans &amp; Approvals" class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-600/20 hover:bg-amber-100 transition-colors"><%= job.pending_plans %> plan<%= job.pending_plans !== 1 ? 's' : '' %></a>
                       <% } %>
                     </div>
                   <% } %>
