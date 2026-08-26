@@ -310,7 +310,13 @@ function getTodayOps(db, today) {
 // marker (meetings, ROL shift windows); date-only deadlines (compliance due,
 // quotes expiring, tasks due) cluster at an end-of-day pin — no fake times.
 function getDayMarkers(db, user, today) {
-  const timed = [];
+  // Structured agenda rows for the dashboard's "Deadlines & windows" list —
+  // NOT floating chips on a time axis. Shapes:
+  //   { kind: 'meeting',    hm, title, tone, href }
+  //   { kind: 'rol',        hm, hmEnd, allDay, title, tone, href }  (window opens AND ends today)
+  //   { kind: 'rol_open',   hm, title, tone, href }                 (opens today, runs on)
+  //   { kind: 'rol_expiry', hm, title, tone, href }                 (ends today)
+  const agenda = [];
   const eod = [];
 
   try {
@@ -320,9 +326,10 @@ function getDayMarkers(db, user, today) {
       ORDER BY meeting_time ASC
     `).all(today);
     for (const m of meetings) {
-      timed.push({
+      agenda.push({
+        kind: 'meeting',
         hm: m.meeting_time,
-        label: `${m.meeting_time} ${m.title}`,
+        title: m.title,
         tone: 'info',
         href: `/departments/${m.dept_key}/meetings/${m.id}`,
       });
@@ -330,23 +337,29 @@ function getDayMarkers(db, user, today) {
   } catch (e) { /* dept_meetings absent on legacy DBs */ }
 
   try {
-    const rolStarts = db.prepare(`
-      SELECT rs.start_time, c.title FROM compliance_rol_shifts rs
+    // One query per shift, not one per endpoint — a window that opens AND
+    // ends today is ONE fact ("runs 00:00–00:00 all day"), not the two
+    // contradictory-looking markers the old start/end split produced.
+    const shifts = db.prepare(`
+      SELECT rs.start_date, rs.start_time, rs.end_date, rs.end_time,
+             c.id AS sub_id, c.parent_id, c.title
+      FROM compliance_rol_shifts rs
       JOIN compliance c ON c.id = rs.compliance_id
-      WHERE rs.start_date = ? AND rs.start_time IS NOT NULL AND rs.start_time != ''
-      ORDER BY rs.start_time ASC
-    `).all(today);
-    for (const r of rolStarts) {
-      timed.push({ hm: r.start_time, label: `${r.start_time} ROL window opens — ${r.title}`, tone: 'warn', href: '/compliance' });
-    }
-    const rolEnds = db.prepare(`
-      SELECT rs.end_time, c.title FROM compliance_rol_shifts rs
-      JOIN compliance c ON c.id = rs.compliance_id
-      WHERE rs.end_date = ? AND rs.end_time IS NOT NULL AND rs.end_time != ''
-      ORDER BY rs.end_time ASC
-    `).all(today);
-    for (const r of rolEnds) {
-      timed.push({ hm: r.end_time, label: `${r.end_time} ROL expires — ${r.title}`, tone: 'critical', href: '/compliance' });
+      WHERE rs.start_date = ? OR rs.end_date = ?
+      ORDER BY COALESCE(NULLIF(rs.start_time, ''), rs.end_time)
+    `).all(today, today);
+    for (const r of shifts) {
+      const href = r.parent_id ? `/compliance/${r.parent_id}/edit#sub-${r.sub_id}` : '/compliance';
+      const startsToday = r.start_date === today && r.start_time;
+      const endsToday = r.end_date === today && r.end_time;
+      if (startsToday && endsToday) {
+        const allDay = r.start_time === '00:00' && (r.end_time === '00:00' || r.end_time >= '23:30');
+        agenda.push({ kind: 'rol', hm: r.start_time, hmEnd: r.end_time, allDay, title: r.title, tone: 'warn', href });
+      } else if (endsToday) {
+        agenda.push({ kind: 'rol_expiry', hm: r.end_time, title: r.title, tone: 'critical', href });
+      } else if (startsToday) {
+        agenda.push({ kind: 'rol_open', hm: r.start_time, title: r.title, tone: 'warn', href });
+      }
     }
   } catch (e) { /* rol shifts absent on legacy DBs */ }
 
@@ -364,8 +377,13 @@ function getDayMarkers(db, user, today) {
     if (c) eod.push({ count: c, label: c === 1 ? 'task due today' : 'tasks due today', href: '/tasks' });
   } catch (e) { /* ignore */ }
 
-  timed.sort((a, b) => a.hm.localeCompare(b.hm));
-  return { timed, eod };
+  // All-day windows lead (they frame the whole day), then chronological.
+  agenda.sort((a, b) => {
+    const ka = a.allDay ? '!' : (a.hm || '');
+    const kb = b.allDay ? '!' : (b.hm || '');
+    return ka.localeCompare(kb);
+  });
+  return { agenda, eod };
 }
 
 // Band 3 — the one trend chart (job pipeline). Job health and crew hours were

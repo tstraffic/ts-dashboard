@@ -119,9 +119,8 @@
       crewInitials: crew.slice(0, 3).map(c => initials(c.full_name)) };
   });
 
-  const timedMarkers = (markers.timed || []).filter(m => /^\d{2}:\d{2}$/.test(m.hm));
-  const eodTotal = (markers.eod || []).reduce((a, m) => a + m.count, 0);
-  const eodTitle = (markers.eod || []).map(m => `${m.count} ${m.label}`).join(' · ');
+  const agenda = (markers.agenda || []).filter(m => m.allDay || /^\d{2}:\d{2}$/.test(m.hm || ''));
+  const eodRows = markers.eod || [];
 
   // Attention totals for the instrument cluster.
   const _attnAll = needs.top.concat(needs.overflow);
@@ -231,16 +230,20 @@
   .tdb-more { display: inline-block; margin: 4px 0 2px; font-family: 'Geist Mono', ui-monospace, monospace;
     font-size: 11px; color: var(--tb-dim); text-decoration: none; }
   .tdb-more:hover { color: var(--tb-ink); }
-  /* Deadline chips — lane-stacked by the script below (review 4.3). */
-  .tdb-marks { position: relative; height: 28px; margin-top: 4px; }
-  .tdb-ev { position: absolute; top: 0; height: 24px; display: inline-flex; align-items: center;
-    font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500;
-    padding: 0 9px; border-radius: 6px; border: 1px solid; white-space: nowrap; overflow: hidden;
-    text-overflow: ellipsis; max-width: 250px; text-decoration: none; transition: box-shadow .12s ease-out; }
-  .tdb-ev:hover { box-shadow: 0 8px 30px rgba(15,23,40,0.12); z-index: 3; }
-  .tdb-ev.is-crit { background: var(--tb-crit-bg); border-color: var(--tb-crit-bd); color: var(--tb-crit-t); }
-  .tdb-ev.is-warn { background: var(--tb-warn-bg); border-color: var(--tb-warn-bd); color: var(--tb-warn-t); }
-  .tdb-ev.is-info { background: var(--tb-info-bg); border-color: var(--tb-info-bd); color: var(--tb-info-t); }
+  /* Deadlines & windows — a plain agenda list, not floating chips. */
+  .tdb-ag-row { display: flex; align-items: center; gap: 12px; padding: 9px 20px; font-size: 13.5px;
+    color: var(--tb-ink); text-decoration: none; transition: background-color .12s ease-out; }
+  .tdb-ag-row + .tdb-ag-row { border-top: 1px solid var(--tb-tick); }
+  .tdb-ag-row:hover { background: var(--tb-soft); }
+  .tdb-ag-time { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500;
+    font-variant-numeric: tabular-nums; color: var(--tb-dim); min-width: 84px; letter-spacing: 0.02em; }
+  .tdb-ag-text { font-weight: 500; }
+  .tdb-ag-ref { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; color: var(--tb-dim);
+    background: var(--tb-soft); border-radius: 5px; padding: 1px 6px; }
+  .tdb-ag-done { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--tb-dim); margin-left: auto; }
+  .tdb-ag-done + .tdb-chev { margin-left: 0; }
+  .tdb-ag-row.is-past { opacity: 0.55; }
   .tdb-now { position: absolute; top: 14px; bottom: 0; width: 2px; background: var(--tb-ink); z-index: 2; pointer-events: none; }
   .tdb-now b { position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
     font-family: 'Geist Mono', ui-monospace, monospace; font-size: 10px; font-weight: 600;
@@ -327,19 +330,24 @@
   </div>
 </section>
 
-<% if (laneData.length || timedMarkers.length || eodTotal) { %>
-<!-- ── Today on the ground ── -->
+<% if (laneData.length || agenda.length || eodRows.length) { %>
+<!-- ── Today on the ground ──
+     Two zones: the proportional strip carries only things with DURATION
+     (booking bars, the rain band, the NOW line) and only renders when there
+     are bookings to draw; point-in-time deadlines read as a plain agenda
+     list underneath — no floating chips, no clamp arrows. -->
 <section class="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-5" id="day-bar">
   <div class="tdb-tl-head">
     <span class="tdb-sec">Today on the ground</span>
+    <% if (laneData.length) { %>
     <span class="tdb-legend">
       <% if (laneData.some(l => l.tone === 'is-live')) { %><span><i style="background:var(--tb-ok-t)"></i>On site</span><% } %>
-      <% if (outlook && outlook.wetWindows.length) { %><span><i style="background:var(--tb-info-t)"></i>Wet risk</span><% } %>
+      <% if (laneData.some(l => l.tone === 'is-wet')) { %><span><i style="background:var(--tb-info-t)"></i>Wet risk</span><% } %>
       <% if (laneData.some(l => l.tone === 'is-night')) { %><span><i style="background:var(--tb-night-t)"></i>Night</span><% } %>
-      <% if (timedMarkers.some(m => m.tone === 'warn')) { %><span><i style="background:var(--tb-warn-t)"></i>ROL window</span><% } %>
-      <% if (eodTotal || timedMarkers.some(m => m.tone === 'critical')) { %><span><i style="background:var(--tb-crit-t)"></i>Due</span><% } %>
     </span>
+    <% } %>
   </div>
+  <% if (laneData.length) { %>
   <div class="tdb-tl-scroll">
     <div class="tdb-tl" id="tdb-tl">
       <div class="tdb-hours" aria-hidden="true">
@@ -364,27 +372,45 @@
       <% if (laneOverflow > 0) { %>
         <a href="/bookings" class="tdb-more">+<%= laneOverflow %> more booking<%= laneOverflow === 1 ? '' : 's' %> today →</a>
       <% } %>
-      <% if (timedMarkers.length || eodTotal) { %>
-      <div class="tdb-marks" id="tdb-marks">
-        <%
-          // Deadline chips. Events clamped to the window's left edge get a
-          // "◂ earlier" affordance instead of stacking on the boundary; the
-          // script below lane-stacks whatever would overlap (review 4.3).
-          timedMarkers.forEach(m => {
-            const raw = hmToMin(m.hm);
-            const clamped = raw < DAY_FROM;
-            const mm = Math.max(DAY_FROM, Math.min(raw, DAY_TO)); %>
-          <a href="<%= m.href %>" class="tdb-ev <%= m.tone === 'critical' ? 'is-crit' : (m.tone === 'info' ? 'is-info' : 'is-warn') %>"
-             style="left:<%= pct(mm) %>%" title="<%= m.label %>"><%= clamped ? '◂ ' : '' %><%= m.label %></a>
-        <% }) %>
-        <% if (eodTotal > 0) { %>
-          <a href="<%= markers.eod[0].href %>" class="tdb-ev is-crit" style="left:<%= pct(17 * 60) %>%" title="<%= eodTitle %>"><%= eodTotal %> due EOD</a>
-        <% } %>
-      </div>
-      <% } %>
       <div id="now-line" class="tdb-now" data-from="300" data-to="1260" hidden><b>NOW</b></div>
     </div>
   </div>
+  <% } %>
+  <% if (agenda.length || eodRows.length) { %>
+  <div<% if (laneData.length) { %> style="border-top:1px solid var(--tb-tick)"<% } %>>
+    <%
+      // A row is "done" once its moment has passed; it dims but stays — the
+      // day should still read as a whole at 4pm.
+      const agRow = (m) => {
+        let time, text, over = false;
+        if (m.kind === 'rol' && m.allDay) { time = 'ALL DAY'; text = 'ROL window'; }
+        else if (m.kind === 'rol') { time = m.hm + '–' + m.hmEnd; text = 'ROL window'; over = m.hmEnd <= nowHm; }
+        else if (m.kind === 'rol_open') { time = m.hm; text = 'ROL window opens'; over = m.hm <= nowHm; }
+        else if (m.kind === 'rol_expiry') { time = m.hm; text = 'ROL expires'; over = m.hm <= nowHm; }
+        else { time = m.hm; text = m.title; over = m.hm <= nowHm; }
+        const ref = m.kind === 'meeting' ? '' : m.title;
+        const dot = m.tone === 'critical' ? 'is-crit' : (m.tone === 'info' ? 'is-info' : 'is-warn'); %>
+        <a href="<%= m.href %>" class="tdb-ag-row <%= over ? 'is-past' : '' %>">
+          <span class="tdb-ag-time"><%= time %></span>
+          <span class="tdb-dot <%= dot %>" aria-hidden="true"></span>
+          <span class="tdb-ag-text"><%= text %></span>
+          <% if (ref) { %><span class="tdb-ag-ref"><%= ref %></span><% } %>
+          <% if (over) { %><span class="tdb-ag-done">done</span><% } %>
+          <svg class="tdb-chev w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6"/></svg>
+        </a>
+      <% };
+    %>
+    <% agenda.forEach(m => { agRow(m); }) %>
+    <% eodRows.forEach(m => { %>
+      <a href="<%= m.href %>" class="tdb-ag-row">
+        <span class="tdb-ag-time">BY EOD</span>
+        <span class="tdb-dot is-warn" aria-hidden="true"></span>
+        <span class="tdb-ag-text"><%= m.count %> <%= m.label %></span>
+        <svg class="tdb-chev w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6"/></svg>
+      </a>
+    <% }) %>
+  </div>
+  <% } %>
 </section>
 <% } %>
 
@@ -648,33 +674,6 @@
     setInterval(tick, 20000);
   })();
 
-  // Deadline-chip lane stacking (review 4.3): chips that would overlap drop
-  // into the next 28px lane instead of overprinting; the container grows to
-  // fit. Runs once — positions are static for the page's life.
-  (function () {
-    var box = document.getElementById('tdb-marks');
-    if (!box) return;
-    var chips = [].slice.call(box.querySelectorAll('.tdb-ev'));
-    if (!chips.length) return;
-    chips.sort(function (a, b) { return a.getBoundingClientRect().left - b.getBoundingClientRect().left; });
-    var boxRight = box.getBoundingClientRect().right;
-    var laneRight = [];
-    chips.forEach(function (ch) {
-      var r = ch.getBoundingClientRect();
-      // Late-day chips that would spill past the window pin to the right
-      // edge instead — the mirror of the "◂ earlier" clamp on the left.
-      if (r.right > boxRight) {
-        ch.style.left = 'auto';
-        ch.style.right = '0';
-        r = ch.getBoundingClientRect();
-      }
-      var lane = 0;
-      while (laneRight[lane] != null && r.left < laneRight[lane] + 8) lane++;
-      laneRight[lane] = r.right;
-      ch.style.top = (lane * 28) + 'px';
-    });
-    box.style.height = (laneRight.length * 28 - 4) + 'px';
-  })();
 </script>
 
 <% if (jobStatusDist.length > 0) { %>
