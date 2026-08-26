@@ -136,168 +136,296 @@
   }
 %>
 
-<!-- ══ CONSOLE — the instrument panel. Always dark, both themes. ══ -->
-<section id="console" class="console-band rounded-2xl overflow-hidden mb-5">
-  <div class="console-rail">
-    <span class="console-clock font-mono"><span class="cr-dim"><%= new Date(today + 'T00:00:00Z').toLocaleDateString('en-AU', { weekday: 'short', timeZone: 'UTC' }).toUpperCase() %></span> <%= new Date(today + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }).toUpperCase() %> <span class="cr-dim">·</span> <b id="console-clk"><%= nowHm %></b></span>
-    <span class="console-rail-sep"></span>
-    <span class="console-live"><span class="console-live-dot" aria-hidden="true"></span>Board live</span>
-    <span class="flex-1"></span>
-    <span class="console-greet">Good <span id="console-daypart">day</span>, <%= user.full_name.split(' ')[0] %></span>
+<!-- ══ TODAY BOARD — rebuilt to the Control Room design review + mockup.
+     One hazard ribbon (the brand moment), weather demoted to a status line,
+     nominal zeros muted, severity carried by dots + one left border, mono
+     reserved for machine data. Tokens below; triads per review §02. ══ -->
+<style>
+  :root {
+    --tb-ink: #E8EBF4; --tb-dim: #6C7691; --tb-tick: rgba(255,255,255,0.07); --tb-soft: rgba(255,255,255,0.05);
+    --tb-crit-t: #E29B9B; --tb-crit-bg: #2A1D1F; --tb-crit-bd: #6B3A3E;
+    --tb-warn-t: #E2BE7B; --tb-warn-bg: #2A2318; --tb-warn-bd: #6B572E;
+    --tb-ok-t: #8FD0A8;  --tb-ok-bg: #182620;  --tb-ok-bd: #2F5C43;
+    --tb-info-t: #8FB8EC; --tb-info-bg: #182230; --tb-info-bd: #2E4C6B;
+    --tb-night-t: #9AA3B8; --tb-night-bg: #232937; --tb-night-bd: #3A4359;
+  }
+  :root[data-theme="light"] {
+    --tb-ink: #0F1728; --tb-dim: #94A0B4; --tb-tick: #EEF0F4; --tb-soft: #F5F6F8;
+    --tb-crit-t: #B42323; --tb-crit-bg: #FDF1F1; --tb-crit-bd: #F3CDCD;
+    --tb-warn-t: #96570E; --tb-warn-bg: #FDF6EC; --tb-warn-bd: #F0DAB8;
+    --tb-ok-t: #1B6E45;  --tb-ok-bg: #EEF8F1;  --tb-ok-bd: #C4E5D0;
+    --tb-info-t: #1D5FBF; --tb-info-bg: #EFF5FD; --tb-info-bd: #C6DBF5;
+    --tb-night-t: #4A5568; --tb-night-bg: #EEF0F4; --tb-night-bd: #E2E6EC;
+  }
+  /* Hazard tape — the page's single brand moment (review 6.2). */
+  .tdb-ribbon { height: 4px; background: repeating-linear-gradient(-45deg, #0F1728 0 10px, #F2B93B 10px 20px); }
+  /* Status pills — one anatomy (review 7.2). */
+  .tdb-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
+    padding: 2px 9px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+  .tdb-pill i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .tdb-pill.is-crit { color: var(--tb-crit-t); background: var(--tb-crit-bg); border-color: var(--tb-crit-bd); }
+  .tdb-pill.is-warn { color: var(--tb-warn-t); background: var(--tb-warn-bg); border-color: var(--tb-warn-bd); }
+  .tdb-pill.is-ok   { color: var(--tb-ok-t);   background: var(--tb-ok-bg);   border-color: var(--tb-ok-bd); }
+  .tdb-pill.is-info { color: var(--tb-info-t); background: var(--tb-info-bg); border-color: var(--tb-info-bd); }
+  .tdb-pill.is-night{ color: var(--tb-night-t);background: var(--tb-night-bg);border-color: var(--tb-night-bd); }
+  .tdb-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .tdb-dot.is-crit { background: var(--tb-crit-t); } .tdb-dot.is-warn { background: var(--tb-warn-t); }
+  .tdb-dot.is-info { background: var(--tb-info-t); } .tdb-dot.is-ok { background: var(--tb-ok-t); }
+  /* Board header */
+  .tdb-top { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; padding: 14px 20px 0; }
+  .tdb-date { font-size: 12px; font-weight: 500; letter-spacing: 0.04em; color: var(--tb-dim); }
+  .tdb-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.08em; color: var(--tb-ok-t); text-transform: uppercase; }
+  .tdb-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--tb-ok-t); animation: tdb-pulse 2s infinite; }
+  @keyframes tdb-pulse { 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .tdb-live i { animation: none; } }
+  .tdb-greet { margin-left: auto; font-size: 13px; color: var(--tb-dim); }
+  .tdb-main { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; padding: 10px 20px 18px; }
+  .tdb-status { display: flex; align-items: flex-start; gap: 10px; font-size: 18px; font-weight: 600;
+    line-height: 1.35; min-width: 240px; flex: 1; color: var(--tb-ink); }
+  .tdb-status svg { width: 22px; height: 22px; color: var(--tb-info-t); flex-shrink: 0; margin-top: 2px; }
+  .tdb-status em { font-style: normal; font-weight: 700; }
+  .tdb-status .sub { display: block; font-size: 13px; font-weight: 400; color: var(--tb-dim); margin-top: 2px; }
+  .tdb-kpis { display: flex; margin-left: auto; }
+  .tdb-kpi { padding: 2px 22px; border-left: 1px solid var(--tb-tick); min-width: 112px; text-decoration: none; }
+  .tdb-kpi:first-child { border-left: none; padding-left: 0; }
+  .tdb-kpi .k-label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--tb-dim); }
+  .tdb-kpi .k-value { display: flex; align-items: center; gap: 8px; font-size: 28px; font-weight: 700;
+    letter-spacing: -0.01em; line-height: 1.25; font-variant-numeric: tabular-nums; color: var(--tb-ink); }
+  .tdb-kpi .k-den { font-size: 14px; font-weight: 500; color: var(--tb-dim); }
+  .tdb-kpi.is-nominal .k-value { font-size: 24px; font-weight: 600; color: var(--tb-dim); }
+  .tdb-kpi .k-sub { display: block; font-size: 12px; color: var(--tb-dim); }
+  @media (max-width: 760px) { .tdb-kpis { margin-left: 0; } .tdb-kpi { padding: 2px 14px; min-width: 92px; } }
+  /* Section labels (review 5.1: sans, not mono) + count pills */
+  .tdb-sec { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tb-dim); }
+  .tdb-count { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500;
+    font-variant-numeric: tabular-nums; background: var(--tb-soft); color: var(--tb-dim);
+    border-radius: 999px; padding: 1px 8px; }
+  .tdb-count.is-crit { background: var(--tb-crit-bg); color: var(--tb-crit-t); border: 1px solid var(--tb-crit-bd); }
+  /* Timeline */
+  .tdb-tl-head { display: flex; align-items: center; gap: 12px; padding: 14px 20px 6px; flex-wrap: wrap; }
+  .tdb-legend { margin-left: auto; display: flex; gap: 14px; font-size: 11.5px; color: var(--tb-dim); flex-wrap: wrap; }
+  .tdb-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .tdb-tl-scroll { overflow-x: auto; }
+  .tdb-tl { position: relative; margin: 2px 20px 16px; min-width: 640px;
+    background-image: repeating-linear-gradient(to right, var(--tb-tick) 0 1px, transparent 1px calc(100% / 16)); }
+  .tdb-hours { position: relative; height: 18px; }
+  .tdb-hr { position: absolute; top: 0; font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 10.5px; font-weight: 500; color: var(--tb-dim); padding-left: 5px; }
+  .tdb-band { position: absolute; top: 20px; bottom: 0; border: 1px solid var(--tb-info-bd); border-radius: 8px;
+    background: repeating-linear-gradient(-55deg, var(--tb-info-bg) 0 6px, transparent 6px 12px); }
+  .tdb-band label { position: absolute; top: 4px; left: 8px; font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 10.5px; font-weight: 500; letter-spacing: 0.04em; color: var(--tb-info-t); white-space: nowrap; }
+  .tdb-lane { position: relative; height: 30px; }
+  .tdb-blk { position: absolute; top: 2px; height: 26px; display: flex; align-items: center; gap: 7px;
+    padding: 0 9px; border-radius: 6px; border: 1px solid; overflow: hidden; white-space: nowrap; text-decoration: none; }
+  .tdb-blk b { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+  .tdb-blk small { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 10px; opacity: 0.85; }
+  .tdb-blk.is-live { background: var(--tb-ok-bg); border-color: var(--tb-ok-bd); color: var(--tb-ok-t); }
+  .tdb-blk.is-wet { border-color: var(--tb-info-bd); color: var(--tb-info-t);
+    background: repeating-linear-gradient(-55deg, var(--tb-info-bg) 0 6px, transparent 6px 12px); }
+  .tdb-blk.is-night { background: var(--tb-night-bg); border-color: var(--tb-night-bd); color: var(--tb-night-t); }
+  .tdb-more { display: inline-block; margin: 4px 0 2px; font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 11px; color: var(--tb-dim); text-decoration: none; }
+  .tdb-more:hover { color: var(--tb-ink); }
+  /* Deadline chips — lane-stacked by the script below (review 4.3). */
+  .tdb-marks { position: relative; height: 28px; margin-top: 4px; }
+  .tdb-ev { position: absolute; top: 0; height: 24px; display: inline-flex; align-items: center;
+    font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500;
+    padding: 0 9px; border-radius: 6px; border: 1px solid; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; max-width: 250px; text-decoration: none; transition: box-shadow .12s ease-out; }
+  .tdb-ev:hover { box-shadow: 0 8px 30px rgba(15,23,40,0.12); z-index: 3; }
+  .tdb-ev.is-crit { background: var(--tb-crit-bg); border-color: var(--tb-crit-bd); color: var(--tb-crit-t); }
+  .tdb-ev.is-warn { background: var(--tb-warn-bg); border-color: var(--tb-warn-bd); color: var(--tb-warn-t); }
+  .tdb-ev.is-info { background: var(--tb-info-bg); border-color: var(--tb-info-bd); color: var(--tb-info-t); }
+  .tdb-now { position: absolute; top: 14px; bottom: 0; width: 2px; background: var(--tb-ink); z-index: 2; pointer-events: none; }
+  .tdb-now b { position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+    font-family: 'Geist Mono', ui-monospace, monospace; font-size: 10px; font-weight: 600;
+    background: var(--tb-ink); color: var(--tb-soft); padding: 1px 6px; border-radius: 5px; letter-spacing: 0.04em; }
+  :root[data-theme="light"] .tdb-now b { color: #FFFFFF; }
+  /* Triage rows (review 3.1: ink numerals, dots carry severity). */
+  .tdb-triage-row { display: flex; align-items: center; gap: 14px; padding: 12px 20px; font-size: 14px;
+    color: var(--tb-ink); text-decoration: none; transition: background-color .12s ease-out; }
+  .tdb-triage-row:hover { background: var(--tb-soft); }
+  .tdb-num { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 34px;
+    text-align: right; color: var(--tb-ink); }
+  .tdb-meta { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 12px; color: var(--tb-dim); }
+  .tdb-chev { margin-left: auto; color: var(--tb-dim); flex-shrink: 0; }
+  .tdb-show-more summary { list-style: none; cursor: pointer; padding: 11px 20px; font-size: 12.5px;
+    font-weight: 600; color: var(--brand-600, #4F46E5); transition: background-color .12s ease-out; }
+  .tdb-show-more summary::-webkit-details-marker { display: none; }
+  .tdb-show-more summary:hover { background: var(--tb-soft); }
+  .tdb-show-more[open] summary { display: none; }
+  /* Empty state (review 8.2) */
+  .tdb-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 20px 24px; text-align: center; }
+  .tdb-empty svg { width: 26px; height: 26px; color: var(--tb-dim); }
+  .tdb-empty b { font-size: 14px; font-weight: 600; color: var(--tb-ink); }
+  .tdb-empty span { font-size: 12.5px; color: var(--tb-dim); }
+  .tdb-btn2 { display: inline-flex; align-items: center; gap: 6px; height: 29px; padding: 0 11px;
+    border-radius: 8px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--tb-tick);
+    color: var(--tb-ink); background: transparent; text-decoration: none; transition: border-color .12s ease-out; }
+  .tdb-btn2:hover { border-color: var(--tb-dim); }
+  :root[data-theme="light"] .tdb-btn2 { border-color: #E2E6EC; }
+  :root[data-theme="light"] .tdb-btn2:hover { border-color: #94A0B4; }
+  .tdb-monoid { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500; color: var(--tb-dim); }
+  /* Weather hour strip */
+  .tdb-wx-hours { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 0 16px 14px; }
+  .tdb-wx-h { text-align: center; border-radius: 8px; padding: 7px 0 6px; }
+  .tdb-wx-h.is-wet { background: var(--tb-info-bg); }
+  .tdb-wx-h time { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 10px; color: var(--tb-dim); display: block; }
+  .tdb-wx-h b { font-size: 12.5px; font-weight: 600; display: block; margin: 2px 0; color: var(--tb-ink); }
+  .tdb-wx-h span { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 10px; color: var(--tb-info-t); }
+  .tdb-wx-call { display: flex; gap: 10px; align-items: flex-start; margin: 0 16px 14px; padding: 10px 12px;
+    border-radius: 10px; background: var(--tb-warn-bg); border: 1px solid var(--tb-warn-bd);
+    color: var(--tb-warn-t); text-decoration: none; font-size: 12.5px; line-height: 1.45; }
+  .tdb-wx-call b { font-weight: 700; }
+</style>
+
+<!-- ── Board header ── -->
+<section class="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-5" id="console">
+  <div class="tdb-ribbon" aria-hidden="true"></div>
+  <div class="tdb-top">
+    <span class="tdb-date font-mono"><span><%= new Date(today + 'T00:00:00Z').toLocaleDateString('en-AU', { weekday: 'short', timeZone: 'UTC' }).toUpperCase() %> <%= new Date(today + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }).toUpperCase() %></span> · <b id="console-clk"><%= nowHm %></b></span>
+    <span class="tdb-live"><i aria-hidden="true"></i>Board live</span>
+    <span class="tdb-greet">Good <span id="console-daypart">day</span>, <%= user.full_name.split(' ')[0] %></span>
   </div>
-
-  <div class="console-brief">
-    <div class="console-thesis-wrap">
-      <p class="console-eyebrow font-mono">Shape of the day</p>
-      <h1 class="console-thesis"><% thesis.headline.forEach(seg => { %><% if (seg.em) { %><em><%= seg.text %></em><% } else { %><%= seg.text %><% } %><% }) %></h1>
-      <p class="console-sub"><%= thesis.sub %></p>
-    </div>
-
-    <div class="console-inst" role="group" aria-label="Today at a glance">
-      <% if (todayOps) { %>
-      <%# "of N active" reads the roster headcount (crew_members stays in
-          sync with /hr/roster via migration 333 + lib/employeeSync) %>
-      <a class="i-cell" href="/bookings">
-        <span class="i-k font-mono">Crews out</span>
-        <span class="i-v font-mono"><%= todayOps.crewAssignedToday %></span>
-        <span class="i-note"><%= wetSet.size > 0 ? wetSet.size + ' in wet window' : 'of ' + todayOps.totalActiveCrew + ' active' %></span>
-      </a>
-      <a class="i-cell" href="/bookings">
-        <span class="i-k font-mono">Bookings today</span>
-        <span class="i-v font-mono"><%= todayOps.todaysBookings.length %></span>
-        <span class="i-note"><%= todayOps.jobsRunningToday %> job<%= todayOps.jobsRunningToday === 1 ? '' : 's' %> running</span>
-      </a>
+  <div class="tdb-main">
+    <div class="tdb-status">
+      <% if (outlook && outlook.wetWindows.length) { %>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M17.5 15a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.7 1.7A4 4 0 0 0 6.5 15z"/><path stroke-linecap="round" d="M8 18.5v2M12 18v2.5M16 18.5v2"/></svg>
+      <% } else { %>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M17.5 18a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.7 1.7A4 4 0 0 0 6.5 18z"/></svg>
       <% } %>
-      <a class="i-cell" href="#needs-you-now">
-        <span class="i-k font-mono">Needs you</span>
-        <span class="i-v font-mono <%= _hasCritical ? 'is-bad' : (_attnAll.length ? 'is-warn' : '') %>"><%= _attnAll.length %></span>
-        <span class="i-note"><%= _attnAll.length ? (_hasCritical ? 'has critical items' : 'none critical') : 'board’s clear' %></span>
-      </a>
-      <% if (outlook) { %>
-      <div class="i-cell i-wx">
-        <span class="i-wx-emoji" aria-hidden="true"><%= outlook.current.emoji %></span>
-        <span>
-          <span class="i-v font-mono"><%= outlook.current.temp %>°</span>
-          <span class="i-note"><%= outlook.current.desc %></span>
-          <% if (outlook.wetWindows.length) { %>
-            <span class="i-wx-rain font-mono">RAIN <%= outlook.wetWindows[0].from %> · <%= outlook.wetWindows[0].maxProb %>%</span>
-          <% } %>
-        </span>
-      </div>
-      <% } %>
-    </div>
-  </div>
-
-  <% if (laneData.length || timedMarkers.length || eodTotal) { %>
-  <!-- ── DAY BAR — today on the ground ── -->
-  <div id="day-bar" class="daybar">
-    <div class="db-head">
-      <span class="db-title font-mono">Today on the ground</span>
-      <span class="db-legend font-mono">
-        <span class="lg"><span class="sw sw-live"></span>On site</span>
-        <% if (outlook && outlook.wetWindows.length) { %><span class="lg"><span class="sw sw-wet"></span>Wet risk</span><% } %>
-        <span class="lg"><span class="sw sw-night"></span>Night</span>
-        <span class="lg"><span class="sw sw-due"></span>Due</span>
+      <span>
+        <% thesis.headline.forEach(seg => { %><% if (seg.em) { %><em><%= seg.text %></em><% } else { %><%= seg.text %><% } %><% }) %>
+        <span class="sub"><%= thesis.sub %></span>
       </span>
     </div>
-    <div class="db-scroll">
-      <div class="db-body">
-        <div class="db-hours font-mono" aria-hidden="true">
-          <% for (let h = 5; h <= 21; h += 2) { %>
-            <span class="db-hr" style="left:<%= pct(h * 60) %>%"><%= String(h).padStart(2, '0') %></span>
-          <% } %>
-        </div>
-        <div class="db-overlay" aria-hidden="true">
-          <% if (outlook) { outlook.wetWindows.forEach(w => { %>
-            <div class="db-wxband" style="left:<%= pct(w.fromHour * 60) %>%;width:<%= Math.max(2, pct(Math.min(w.toHour, 21) * 60) - pct(w.fromHour * 60)) %>%">
-              <span class="db-wxband-l font-mono">Rain <%= w.from %>–<%= w.to %></span>
-            </div>
-          <% }) } %>
-          <div id="now-line" class="db-now" data-from="300" data-to="1260" hidden><span class="db-now-tag font-mono">NOW</span></div>
-        </div>
-
-        <% laneData.forEach(l => { %>
-        <div class="db-lane">
-          <a href="/bookings/<%= l.b.id %>" class="db-blk <%= l.tone %>" style="left:<%= l.left %>%;width:<%= l.width %>%"
-             title="<%= (l.b.title || l.b.booking_number) %> · <%= l.window %><%= l.b.client_name ? ' · ' + l.b.client_name : '' %>">
-            <b><%= l.b.suburb || l.b.title || l.b.booking_number %></b>
-            <small class="font-mono"><%= l.window %><%= l.crossesOut ? ' →' : '' %><%= l.crewInitials.length ? ' · ' + l.crewInitials.join(' ') : '' %></small>
-          </a>
-        </div>
-        <% }) %>
-        <% if (laneOverflow > 0) { %>
-          <a href="/bookings" class="db-more font-mono">+<%= laneOverflow %> more booking<%= laneOverflow === 1 ? '' : 's' %> today →</a>
-        <% } %>
-
-        <% if (timedMarkers.length || eodTotal) { %>
-        <div class="db-lane db-lane-due">
-          <% timedMarkers.forEach(m => {
-               const mm = Math.max(DAY_FROM, Math.min(hmToMin(m.hm), DAY_TO)); %>
-            <a href="<%= m.href %>" class="db-mk <%= m.tone === 'critical' ? 'is-crit' : (m.tone === 'info' ? 'is-info' : '') %>"
-               style="left:<%= pct(mm) %>%" data-l="<%= m.label %>" title="<%= m.label %>"></a>
-          <% }) %>
-          <% if (eodTotal > 0) { %>
-            <a href="<%= markers.eod[0].href %>" class="db-mk db-mk-eod" style="left:<%= pct(17 * 60) %>%"
-               data-l="<%= eodTotal %> due EOD" title="<%= eodTitle %>"></a>
-          <% } %>
-        </div>
-        <% } %>
-      </div>
+    <div class="tdb-kpis" role="group" aria-label="Today at a glance">
+      <% if (todayOps) { const crews = todayOps.crewAssignedToday; %>
+      <a class="tdb-kpi <%= crews === 0 ? 'is-nominal' : '' %>" href="/bookings">
+        <span class="k-label">Crews out</span>
+        <span class="k-value font-mono"><%= crews %><span class="k-den">/<%= todayOps.totalActiveCrew %></span></span>
+        <span class="k-sub"><%= crews === 0 ? 'nominal' : (wetSet.size > 0 ? wetSet.size + ' in wet window' : todayOps.jobsRunningToday + ' job' + (todayOps.jobsRunningToday === 1 ? '' : 's') + ' running') %></span>
+      </a>
+      <a class="tdb-kpi <%= todayOps.todaysBookings.length === 0 ? 'is-nominal' : '' %>" href="/bookings">
+        <span class="k-label">Bookings today</span>
+        <span class="k-value font-mono"><%= todayOps.todaysBookings.length %></span>
+        <span class="k-sub"><%= todayOps.todaysBookings.length === 0 ? 'none scheduled' : todayOps.jobsRunningToday + ' job' + (todayOps.jobsRunningToday === 1 ? '' : 's') + ' running' %></span>
+      </a>
+      <% } %>
+      <% const _critCount = _attnAll.filter(r => r.tone === 'critical').length; %>
+      <a class="tdb-kpi <%= _attnAll.length === 0 ? 'is-nominal' : '' %>" href="#needs-you-now">
+        <span class="k-label">Needs you</span>
+        <span class="k-value font-mono"><% if (_attnAll.length) { %><i class="tdb-dot <%= _hasCritical ? 'is-crit' : 'is-warn' %>" aria-hidden="true"></i><% } %><%= _attnAll.length %></span>
+        <span class="k-sub"><%= _attnAll.length === 0 ? "board's clear" : (_hasCritical ? _critCount + ' critical item' + (_critCount === 1 ? '' : 's') : 'none critical') %></span>
+      </a>
     </div>
   </div>
-  <% } %>
 </section>
 
+<% if (laneData.length || timedMarkers.length || eodTotal) { %>
+<!-- ── Today on the ground ── -->
+<section class="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-5" id="day-bar">
+  <div class="tdb-tl-head">
+    <span class="tdb-sec">Today on the ground</span>
+    <span class="tdb-legend">
+      <% if (laneData.some(l => l.tone === 'is-live')) { %><span><i style="background:var(--tb-ok-t)"></i>On site</span><% } %>
+      <% if (outlook && outlook.wetWindows.length) { %><span><i style="background:var(--tb-info-t)"></i>Wet risk</span><% } %>
+      <% if (laneData.some(l => l.tone === 'is-night')) { %><span><i style="background:var(--tb-night-t)"></i>Night</span><% } %>
+      <% if (timedMarkers.some(m => m.tone === 'warn')) { %><span><i style="background:var(--tb-warn-t)"></i>ROL window</span><% } %>
+      <% if (eodTotal || timedMarkers.some(m => m.tone === 'critical')) { %><span><i style="background:var(--tb-crit-t)"></i>Due</span><% } %>
+    </span>
+  </div>
+  <div class="tdb-tl-scroll">
+    <div class="tdb-tl" id="tdb-tl">
+      <div class="tdb-hours" aria-hidden="true">
+        <% for (let h = 5; h <= 21; h += 2) { %>
+          <span class="tdb-hr" style="left:<%= pct(h * 60) %>%"><%= String(h).padStart(2, '0') %></span>
+        <% } %>
+      </div>
+      <% if (outlook) { outlook.wetWindows.forEach(w => { %>
+        <div class="tdb-band" aria-hidden="true" style="left:<%= pct(w.fromHour * 60) %>%;width:<%= Math.max(2, pct(Math.min(w.toHour, 21) * 60) - pct(w.fromHour * 60)) %>%">
+          <label>RAIN <%= w.from %>–<%= w.to %></label>
+        </div>
+      <% }) } %>
+      <% laneData.forEach(l => { %>
+      <div class="tdb-lane">
+        <a href="/bookings/<%= l.b.id %>" class="tdb-blk <%= l.tone %>" style="left:<%= l.left %>%;width:<%= l.width %>%"
+           title="<%= (l.b.title || l.b.booking_number) %> · <%= l.window %><%= l.b.client_name ? ' · ' + l.b.client_name : '' %>">
+          <b><%= l.b.suburb || l.b.title || l.b.booking_number %></b>
+          <small><%= l.window %><%= l.crossesOut ? ' →' : '' %><%= l.crewInitials.length ? ' · ' + l.crewInitials.join(' ') : '' %></small>
+        </a>
+      </div>
+      <% }) %>
+      <% if (laneOverflow > 0) { %>
+        <a href="/bookings" class="tdb-more">+<%= laneOverflow %> more booking<%= laneOverflow === 1 ? '' : 's' %> today →</a>
+      <% } %>
+      <% if (timedMarkers.length || eodTotal) { %>
+      <div class="tdb-marks" id="tdb-marks">
+        <%
+          // Deadline chips. Events clamped to the window's left edge get a
+          // "◂ earlier" affordance instead of stacking on the boundary; the
+          // script below lane-stacks whatever would overlap (review 4.3).
+          timedMarkers.forEach(m => {
+            const raw = hmToMin(m.hm);
+            const clamped = raw < DAY_FROM;
+            const mm = Math.max(DAY_FROM, Math.min(raw, DAY_TO)); %>
+          <a href="<%= m.href %>" class="tdb-ev <%= m.tone === 'critical' ? 'is-crit' : (m.tone === 'info' ? 'is-info' : 'is-warn') %>"
+             style="left:<%= pct(mm) %>%" title="<%= m.label %>"><%= clamped ? '◂ ' : '' %><%= m.label %></a>
+        <% }) %>
+        <% if (eodTotal > 0) { %>
+          <a href="<%= markers.eod[0].href %>" class="tdb-ev is-crit" style="left:<%= pct(17 * 60) %>%" title="<%= eodTitle %>"><%= eodTotal %> due EOD</a>
+        <% } %>
+      </div>
+      <% } %>
+      <div id="now-line" class="tdb-now" data-from="300" data-to="1260" hidden><b>NOW</b></div>
+    </div>
+  </div>
+</section>
+<% } %>
+
 <!-- ══ WORK AREA ══ -->
-<div class="grid grid-cols-1 xl:grid-cols-[1fr_330px] gap-5 items-start mb-5">
+<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_348px] gap-5 items-start mb-5">
 
   <!-- LEFT column -->
   <div class="min-w-0 space-y-5">
 
-    <%
-      const _railClass = _hasCritical ? 'chevron-rail-left' : (_attnAll.some(r => r.tone === 'warn') ? 'chevron-rail-left is-warn' : '');
-    %>
-    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden <%= _railClass %>" id="needs-you-now">
-      <div class="panel-header">
-        <svg class="w-4 h-4 <%= needs.allClear ? 'text-emerald-500' : (_hasCritical ? 'text-red-500' : 'text-amber-500') %>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-        <h2 class="panel-header-title">Needs you now</h2>
-        <% if (!needs.allClear) { %>
-          <span class="panel-header-count <%= _hasCritical ? 'is-critical' : '' %>"><%= _attnAll.length %></span>
-        <% } %>
+    <!-- Needs you now — the focal panel: the page's one strong border. -->
+    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden" id="needs-you-now"
+         <% if (!needs.allClear) { %>style="border-left:3px solid var(<%= _hasCritical ? '--tb-crit-t' : '--tb-warn-t' %>)"<% } %>>
+      <div class="flex items-center gap-2.5" style="padding:14px 20px 6px">
+        <span class="tdb-sec">Needs you now</span>
+        <% if (!needs.allClear) { %><span class="tdb-count <%= _hasCritical ? 'is-crit' : '' %>"><%= _attnAll.length %></span><% } %>
       </div>
       <% if (needs.allClear) { %>
-        <div class="attn-clear" data-attn="all-clear">
-          <span class="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
-            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-          </span>
-          <div>
-            <p class="attn-clear-title">Board&rsquo;s clear.</p>
-            <p class="attn-clear-sub">Nothing needs your attention right now.</p>
-          </div>
+        <div class="tdb-empty" data-attn="all-clear" style="padding-top:16px">
+          <svg fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" style="color:var(--tb-ok-t)"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <b>All clear.</b>
+          <span>Nothing needs you right now.</span>
         </div>
       <% } else { %>
         <%
-          const attnRow = (r) => { %>
-            <a href="<%= r.href %>" data-attn="<%= r.key %>" class="attn-row is-<%= r.tone %> group">
-              <span class="attn-count"><%= r.count %></span>
-              <span class="flex-1 min-w-0 truncate">
-                <span class="attn-label"><%= r.label %></span>
-                <% if (r.detail) { %><span class="attn-detail ml-1.5"><%= r.detail %></span><% } %>
+          const attnRow = (r) => {
+            const dot = r.tone === 'critical' ? 'is-crit' : (r.tone === 'info' ? 'is-info' : 'is-warn'); %>
+            <a href="<%= r.href %>" data-attn="<%= r.key %>" class="tdb-triage-row group" style="border-top:1px solid var(--tb-tick)">
+              <span class="tdb-num"><%= r.count %></span>
+              <span class="tdb-dot <%= dot %>" aria-hidden="true"></span>
+              <span class="flex-1 min-w-0 truncate"><%= r.label %>
+                <% if (r.detail) { %><% if (r.tone === 'critical') { %><span class="tdb-pill is-crit" style="margin-left:8px"><%= r.detail %></span><% } else { %><span class="tdb-meta" style="margin-left:8px"><%= r.detail %></span><% } %><% } %>
               </span>
-              <span class="attn-open">Open</span>
-              <svg class="w-4 h-4 text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+              <svg class="tdb-chev w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6"/></svg>
             </a>
           <% };
         %>
-        <div class="divide-y divide-gray-100 stagger-children">
+        <div>
           <% needs.top.forEach(r => { attnRow(r); }) %>
         </div>
         <% if (needs.overflow.length > 0) { %>
-          <details class="border-t border-gray-100">
-            <summary class="px-4 py-2.5 text-xs font-medium text-gray-500 hover:text-gray-700 cursor-pointer select-none font-mono uppercase tracking-widest" style="font-size:10.5px">
-              +<%= needs.overflow.length %> more
-            </summary>
-            <div class="divide-y divide-gray-100 border-t border-gray-100">
+          <details class="tdb-show-more" style="border-top:1px solid var(--tb-tick)">
+            <summary>Show <%= needs.overflow.length %> more</summary>
+            <div>
               <% needs.overflow.forEach(r => { attnRow(r); }) %>
             </div>
           </details>
@@ -308,14 +436,18 @@
     <!-- Jobs in flight -->
     <% if (todayOps) { %>
     <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden" id="today-ops">
-      <div class="panel-header">
-        <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <h2 class="panel-header-title">Jobs in flight</h2>
-        <span class="panel-header-count"><%= todayOps.todaysBookings.length %></span>
-        <a href="/bookings" class="panel-header-link">Bookings &rarr;</a>
+      <div class="flex items-center gap-2.5" style="padding:14px 20px 6px">
+        <span class="tdb-sec">Jobs in flight</span>
+        <span class="tdb-count"><%= todayOps.todaysBookings.length %></span>
+        <a href="/bookings" class="ml-auto text-xs font-semibold text-brand-600 hover:text-brand-700">Bookings →</a>
       </div>
       <% if (todayOps.todaysBookings.length === 0) { %>
-        <p class="px-4 py-5 text-sm text-gray-400">No bookings scheduled today. <span class="text-gray-300">·</span> <a href="/hr/roster" class="hover:text-gray-600 underline decoration-gray-300 underline-offset-2"><%= todayOps.availableCrew %> of <%= todayOps.totalActiveCrew %> crew available</a>.</p>
+        <div class="tdb-empty">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          <b>No bookings scheduled today</b>
+          <span><a href="/hr/roster" class="hover:underline"><%= todayOps.availableCrew %> of <%= todayOps.totalActiveCrew %> crew available</a></span>
+          <a href="/bookings/new" class="tdb-btn2" style="margin-top:8px">Create booking</a>
+        </div>
       <% } else { %>
       <div class="overflow-x-auto">
         <table class="w-full text-sm flight-table">
@@ -331,27 +463,27 @@
           <tbody class="divide-y divide-gray-100">
             <%
               const statusTag = (b) => {
-                if (wetSet.has(b.id)) return { cls: 'is-hold', label: 'Wet window' };
+                if (wetSet.has(b.id)) return { cls: 'is-info', label: 'Wet window' };
                 const map = {
-                  in_progress: { cls: 'is-live', label: 'On site' },
-                  green_to_go: { cls: 'is-live', label: 'Green to go' },
-                  complete: { cls: 'is-done', label: 'Complete' },
-                  finalised: { cls: 'is-done', label: 'Finalised' },
-                  conflict: { cls: 'is-hold', label: 'Conflict' },
-                  on_hold: { cls: 'is-hold', label: 'On hold' },
-                  unconfirmed: { cls: 'is-plan', label: 'Unconfirmed' },
-                  client_booking: { cls: 'is-plan', label: 'Client booking' },
-                  confirmed: { cls: 'is-plan', label: 'Confirmed' },
-                  locked: { cls: 'is-plan', label: 'Locked' },
+                  in_progress: { cls: 'is-ok', label: 'On site' },
+                  green_to_go: { cls: 'is-ok', label: 'Green to go' },
+                  complete: { cls: 'is-night', label: 'Complete' },
+                  finalised: { cls: 'is-night', label: 'Finalised' },
+                  conflict: { cls: 'is-warn', label: 'Conflict' },
+                  on_hold: { cls: 'is-warn', label: 'On hold' },
+                  unconfirmed: { cls: 'is-info', label: 'Unconfirmed' },
+                  client_booking: { cls: 'is-info', label: 'Client booking' },
+                  confirmed: { cls: 'is-info', label: 'Confirmed' },
+                  locked: { cls: 'is-info', label: 'Locked' },
                 };
-                return map[b.status] || { cls: 'is-plan', label: (b.status || '').replace(/_/g, ' ') };
+                return map[b.status] || { cls: 'is-info', label: (b.status || '').replace(/_/g, ' ') };
               };
             %>
             <% todayOps.todaysBookings.forEach(b => { const t = statusTag(b); const endsToday = (b.end_datetime || '').slice(0, 10) === today; %>
             <tr>
               <td>
                 <a href="/bookings/<%= b.id %>" class="font-medium text-gray-900 hover:text-brand-600"><%= b.title || b.suburb || b.booking_number %></a>
-                <div class="font-mono text-[11px] text-gray-400"><%= b.booking_number %><%= b.job_number ? ' · ' + b.job_number : '' %></div>
+                <div class="tdb-monoid"><%= b.booking_number %><%= b.job_number ? ' · ' + b.job_number : '' %></div>
               </td>
               <td class="hidden md:table-cell text-gray-600 text-xs"><%= b.client_name || '—' %></td>
               <td class="hidden sm:table-cell">
@@ -363,7 +495,7 @@
                 <% } else { %><span class="text-xs text-gray-300">—</span><% } %>
               </td>
               <td class="font-mono text-[11.5px] text-gray-500 whitespace-nowrap"><%= b.start_datetime.slice(11, 16) %>–<%= b.end_datetime ? b.end_datetime.slice(11, 16) : '' %><%= endsToday ? '' : ' +1' %></td>
-              <td><span class="flight-tag <%= t.cls %>"><%= t.label %></span></td>
+              <td><span class="tdb-pill <%= t.cls %>"><i aria-hidden="true"></i><%= t.label %></span></td>
             </tr>
             <% }) %>
           </tbody>
@@ -378,30 +510,28 @@
   <div class="space-y-5 min-w-0">
 
     <% if (outlook) { %>
-    <div class="wx-card rounded-2xl overflow-hidden" id="wx-card">
-      <div class="wx-head">
-        <span class="wx-emoji" aria-hidden="true"><%= outlook.current.emoji %></span>
-        <span class="wx-meta">
-          <span class="wx-place">Sydney</span>
-          <span class="wx-desc"><%= outlook.current.desc %></span>
-          <span class="wx-hilo font-mono"><% if (outlook.hi != null) { %>H <%= outlook.hi %>° · L <%= outlook.lo %>°<% } %><%= outlook.current.windKmh ? ' · ' + outlook.current.windKmh + ' km/h' : '' %></span>
+    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden" id="wx-card">
+      <div class="flex items-center gap-3" style="padding:16px 16px 12px">
+        <span class="min-w-0">
+          <span class="block text-sm font-semibold text-gray-900">Sydney</span>
+          <span class="block text-xs text-gray-500"><%= outlook.current.desc %><% if (outlook.hi != null) { %> · H <%= outlook.hi %>° L <%= outlook.lo %>°<% } %><%= outlook.current.windKmh ? ' · ' + outlook.current.windKmh + ' km/h' : '' %></span>
         </span>
-        <span class="wx-big font-mono"><%= outlook.current.temp %>°</span>
+        <span class="ml-auto font-mono" style="font-size:28px;font-weight:700;color:var(--tb-ink)"><%= outlook.current.temp %>°</span>
       </div>
       <% if (wxCells.length) { %>
-      <div class="wx-hourly">
+      <div class="tdb-wx-hours">
         <% wxCells.forEach(h => { %>
-        <div class="wx-hcell <%= h.precipProb >= outlook.wetProb ? 'is-wet' : '' %>">
-          <span class="wx-ht font-mono"><%= h.hm %></span>
-          <span class="wx-hd font-mono"><%= h.temp %>°</span>
-          <span class="wx-hp font-mono"><%= h.precipProb > 0 ? h.precipProb + '%' : '—' %></span>
+        <div class="tdb-wx-h <%= h.precipProb >= outlook.wetProb ? 'is-wet' : '' %>">
+          <time><%= h.hm %></time>
+          <b><%= h.temp %>°</b>
+          <span><%= h.precipProb > 0 ? h.precipProb + '%' : '–' %></span>
         </div>
         <% }) %>
       </div>
       <% } %>
       <% if (wetSet.size > 0) { %>
-      <a href="/bookings" class="wx-call">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class="w-4 h-4 flex-shrink-0 mt-0.5"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></svg>
+      <a href="/bookings" class="tdb-wx-call">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class="w-4 h-4 flex-shrink-0" style="margin-top:2px"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></svg>
         <p><b><%= wetSet.size %> booking<%= wetSet.size === 1 ? '' : 's' %> in the wet window.</b> Check the crews and log a stand-down decision before the rain arrives.</p>
       </a>
       <% } %>
@@ -410,39 +540,37 @@
 
     <!-- My tasks -->
     <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-      <div class="panel-header">
-        <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-        <h2 class="panel-header-title">My tasks</h2>
-        <% if (myTasks.length) { %><span class="panel-header-count"><%= myTasks.length %></span><% } %>
-        <a href="/tasks" class="panel-header-link">All &rarr;</a>
+      <div class="flex items-center gap-2.5" style="padding:14px 16px 6px">
+        <span class="tdb-sec">My tasks</span>
+        <% if (myTasks.length) { %><span class="tdb-count"><%= myTasks.length %></span><% } %>
+        <a href="/tasks" class="ml-auto text-xs font-semibold text-brand-600 hover:text-brand-700">All →</a>
       </div>
       <% if (myTasks.length === 0) { %>
-        <div class="px-4 py-5 text-center">
-          <p class="text-sm text-gray-400">No open tasks assigned to you.</p>
+        <div class="tdb-empty" style="padding-top:12px;padding-bottom:18px">
+          <b>Nothing assigned to you</b>
           <% if (unassignedTasks > 0) { %>
-            <a href="/tasks" class="inline-block mt-2 text-xs font-medium text-brand-600 hover:text-brand-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition">Pick up an unassigned one (<%= unassignedTasks %>)</a>
+            <a href="/tasks" class="tdb-btn2" style="margin-top:6px">Pick up an unassigned task (<%= unassignedTasks %>)</a>
+          <% } else { %>
+            <span>Enjoy the quiet.</span>
           <% } %>
         </div>
       <% } else { %>
-      <div class="divide-y divide-gray-100">
+      <div>
         <% myTasks.slice(0, 5).forEach(t => {
-          const isOverdue = t.due_date < today;
-          const priorityTag = t.priority === 'high' ? 'task-tag-high' : t.priority === 'medium' ? 'task-tag-medium' : 'task-tag-low';
+          const isOverdue = t.due_date && t.due_date < today;
+          const overdueDays = isOverdue ? Math.round((new Date(today) - new Date(t.due_date)) / 86400000) : 0;
         %>
-        <a href="/tasks/<%= t.id %>/edit" class="flex items-start gap-2.5 px-4 py-3 hover:bg-gray-50 transition">
-          <span class="mini-chk" aria-hidden="true"></span>
-          <span class="min-w-0 flex-1">
-            <span class="block text-sm font-medium text-gray-900 truncate"><%= t.title %></span>
-            <span class="flex items-center gap-1.5 mt-1 flex-wrap">
-              <span class="task-tag <%= priorityTag %>"><%= t.priority %></span>
-              <% if (isOverdue) { %><span class="font-mono text-[10px] text-red-600 font-semibold"><%= Math.round((new Date(today) - new Date(t.due_date)) / 86400000) %> days overdue</span>
-              <% } else if (t.due_date) { %><span class="font-mono text-[10px] text-gray-400"><%= new Date(t.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }) %></span><% } %>
-            </span>
+        <a href="/tasks/<%= t.id %>/edit" class="block px-4 py-3 hover:bg-gray-50 transition" style="border-top:1px solid var(--tb-tick)">
+          <span class="block text-[13.5px] font-semibold text-gray-900 truncate"><%= t.title %></span>
+          <span class="flex items-center gap-2 mt-1.5 flex-wrap">
+            <% if (isOverdue) { %><span class="tdb-pill is-warn"><i aria-hidden="true"></i><%= overdueDays %> day<%= overdueDays === 1 ? '' : 's' %> overdue</span>
+            <% } else if (t.due_date) { %><span class="tdb-monoid"><%= new Date(t.due_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }) %></span><% } %>
+            <span class="tdb-monoid" style="text-transform:uppercase"><%= t.priority %></span>
           </span>
         </a>
         <% }) %>
         <% if (unassignedTasks > 0) { %>
-          <a href="/tasks" class="block px-4 py-2.5 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 font-mono uppercase tracking-widest" style="font-size:10px">+ pick up an unassigned task (<%= unassignedTasks %>)</a>
+          <a href="/tasks" class="block px-4 py-2.5 text-xs font-semibold text-brand-600 hover:text-brand-700 hover:bg-gray-50" style="border-top:1px solid var(--tb-tick)">+ Pick up an unassigned task (<%= unassignedTasks %>)</a>
         <% } %>
       </div>
       <% } %>
@@ -451,26 +579,25 @@
     <!-- Waiting on me -->
     <% if (myPlans && myPlans.length > 0) { %>
     <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-      <div class="panel-header">
-        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        <h2 class="panel-header-title">Waiting on me</h2>
-        <span class="panel-header-count"><%= myPlans.length %></span>
-        <a href="/compliance" class="panel-header-link">All &rarr;</a>
+      <div class="flex items-center gap-2.5" style="padding:14px 16px 6px">
+        <span class="tdb-sec">Waiting on me</span>
+        <span class="tdb-count"><%= myPlans.length %></span>
+        <a href="/compliance" class="ml-auto text-xs font-semibold text-brand-600 hover:text-brand-700">All →</a>
       </div>
-      <div class="divide-y divide-gray-100">
+      <div>
         <% myPlans.slice(0, 5).forEach(p => {
           const isOverdue = p.due_date && p.due_date < today;
         %>
-        <div class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition group">
+        <div class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition" style="border-top:1px solid var(--tb-tick)">
           <span class="min-w-0 flex-1">
-            <span class="block text-sm font-medium text-gray-900 truncate"><%= p.title %></span>
-            <span class="flex items-center gap-1.5 mt-1">
-              <% if (p.job_number) { %><span class="font-mono text-[10px] text-gray-400 bg-gray-50 border border-gray-100 rounded px-1"><%= p.job_number %></span><% } %>
-              <span class="text-[10px] text-gray-400"><%= (p.status || '').replace(/_/g, ' ') %></span>
-              <% if (isOverdue) { %><span class="font-mono text-[10px] text-red-600 font-semibold">overdue</span><% } %>
+            <span class="block text-[13.5px] font-semibold text-gray-900 truncate"><%= p.title %></span>
+            <span class="flex items-center gap-2 mt-1.5 flex-wrap">
+              <% if (p.job_number) { %><span class="tdb-monoid"><%= p.job_number %></span><% } %>
+              <% if (isOverdue) { %><span class="tdb-pill is-warn"><i aria-hidden="true"></i>overdue</span>
+              <% } else { %><span class="tdb-pill is-info"><i aria-hidden="true"></i><%= (p.status || '').replace(/_/g, ' ') %></span><% } %>
             </span>
           </span>
-          <a href="/compliance/<%= p.id %>/edit" class="waiting-review">Review</a>
+          <a href="/compliance/<%= p.id %>/edit" class="tdb-btn2 flex-shrink-0">Review</a>
         </div>
         <% }) %>
       </div>
@@ -481,10 +608,9 @@
 
 <!-- ══ TREND ══ -->
 <div class="bg-white border border-gray-200 rounded-2xl p-4" id="trend">
-  <div class="panel-header" style="padding-left:0;padding-right:0;padding-top:0">
-    <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-    <h2 class="panel-header-title">Job pipeline</h2>
-    <a href="/reports" class="panel-header-link">More in Reports &rarr;</a>
+  <div class="flex items-center gap-2.5 mb-3">
+    <span class="tdb-sec">Job pipeline</span>
+    <a href="/reports" class="ml-auto text-xs font-semibold text-brand-600 hover:text-brand-700">More in Reports →</a>
   </div>
   <% if (jobStatusDist.length > 0) { %>
   <div class="relative" style="height: 200px;">
@@ -496,9 +622,7 @@
 </div>
 
 <script>
-  // Console clock + daypart greeting + NOW line — the console should feel
-  // like it's running. Admin staff are Sydney-local, so client time is the
-  // operational time.
+  // Clock + daypart + NOW line — client time is Sydney-local for admin staff.
   (function () {
     var clk = document.getElementById('console-clk');
     var daypart = document.getElementById('console-daypart');
@@ -520,6 +644,26 @@
     }
     tick();
     setInterval(tick, 20000);
+  })();
+
+  // Deadline-chip lane stacking (review 4.3): chips that would overlap drop
+  // into the next 28px lane instead of overprinting; the container grows to
+  // fit. Runs once — positions are static for the page's life.
+  (function () {
+    var box = document.getElementById('tdb-marks');
+    if (!box) return;
+    var chips = [].slice.call(box.querySelectorAll('.tdb-ev'));
+    if (!chips.length) return;
+    chips.sort(function (a, b) { return a.getBoundingClientRect().left - b.getBoundingClientRect().left; });
+    var laneRight = [];
+    chips.forEach(function (ch) {
+      var r = ch.getBoundingClientRect();
+      var lane = 0;
+      while (laneRight[lane] != null && r.left < laneRight[lane] + 8) lane++;
+      laneRight[lane] = r.right;
+      ch.style.top = (lane * 28) + 'px';
+    });
+    box.style.height = (laneRight.length * 28 - 4) + 'px';
   })();
 </script>
 
