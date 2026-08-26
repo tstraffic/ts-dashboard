@@ -1070,6 +1070,30 @@
       window.__indGetSignatureDataUrl = function () { return window.__indHasInk ? c.toDataURL('image/png') : ''; };
     })();
 
+    /* ───── Name fields: capitalise the first letter ─────
+       Runs on blur so it never fights someone mid-type, and only ever
+       upper-cases a leading lower-case letter — anything already
+       capitalised (McDonald, O'Brien, ALL CAPS) is left exactly as typed.
+       Repeated on submit so browser-autofilled values get the same pass. */
+    var NAME_FIELDS = ['first_name', 'middle_name', 'last_name', 'emergency_contact_name', 'consent_full_name'];
+    function capitaliseName(v) {
+      return String(v).replace(/(^|\s)([a-z])/g, function (m, pre, ch) { return pre + ch.toUpperCase(); });
+    }
+    function tidyNameField(el) {
+      if (!el || !el.name || NAME_FIELDS.indexOf(el.name) === -1) return;
+      var next = capitaliseName(el.value);
+      if (next !== el.value) el.value = next;   // untouched when already correct
+    }
+    // 'blur' doesn't bubble, so listen in the capture phase.
+    document.getElementById('inductionForm').addEventListener('blur', function (e) {
+      tidyNameField(e.target);
+    }, true);
+    document.getElementById('inductionForm').addEventListener('submit', function () {
+      NAME_FIELDS.forEach(function (n) {
+        Array.prototype.forEach.call(this.querySelectorAll('[name="' + n + '"]'), tidyNameField);
+      }, this);
+    });
+
     /* ───── Form submit via fetch with image compression ───── */
     document.getElementById('inductionForm').addEventListener('submit', function(e) {
       e.preventDefault();
