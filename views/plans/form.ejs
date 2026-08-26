@@ -7,6 +7,16 @@
   const statusOptions = (settingsOptions.plan_status || []).map(opt => ({ value: opt.key, label: opt.label }));
   const selectedTypes = isEdit && plan.plan_types ? plan.plan_types.split(',') : [];
   const returnTo = (typeof query !== 'undefined' && query.return_to) ? query.return_to : (isEdit && plan.job_id ? '/jobs/' + plan.job_id + '#plans' : '/plans');
+  const dateVal = (v) => v ? new Date(v).toISOString().split('T')[0] : '';
+  // Status pill tone — mirrors the register + the job page's plan rows.
+  const statusTone = {
+    draft: 'bg-gray-100 text-gray-600', not_started: 'bg-gray-100 text-gray-600',
+    in_progress: 'bg-purple-50 text-purple-700', started: 'bg-purple-50 text-purple-700',
+    submitted: 'bg-blue-50 text-blue-700', approved: 'bg-emerald-50 text-emerald-700',
+    rejected: 'bg-red-50 text-red-700', expired: 'bg-amber-50 text-amber-700',
+  };
+  const inputCls = 'w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent';
+  const labelCls = 'block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1';
 %>
 
 <!-- Breadcrumb -->
@@ -16,14 +26,31 @@
   <span class="text-gray-900"><%= isEdit ? 'Edit Plan' : 'New Plan' %></span>
 </div>
 
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-  <div>
-    <h1 class="text-2xl font-bold text-gray-900"><%= isEdit ? 'Edit Traffic Plan' : 'New Traffic Plan' %></h1>
-    <p class="text-gray-500 text-sm mt-0.5"><%= isEdit ? 'Update plan details' : 'Create a new traffic plan submission' %></p>
-  </div>
+<div class="flex flex-wrap items-center justify-between gap-3 mb-1">
+  <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
+    <%= isEdit ? 'Edit Traffic Plan' : 'New Traffic Plan' %>
+    <% if (isEdit && plan.plan_number) { %>
+      <span class="font-mono text-base font-semibold text-gray-400"><%= plan.plan_number %></span>
+    <% } %>
+  </h1>
+  <% if (isEdit && plan.status) { %>
+    <span class="inline-flex px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wide <%= statusTone[plan.status] || 'bg-gray-100 text-gray-600' %>"><%= String(plan.status).replace(/_/g, ' ') %></span>
+  <% } %>
+</div>
+<p class="text-gray-500 text-sm mb-5"><%= isEdit ? 'Update plan details' : 'Create a new traffic plan submission' %></p>
+
+<!-- Tabs — app.js initTabs drives [data-tab]/[data-tab-panel] + #hash, the same
+     device the Plans & Approvals editor uses. Every panel stays inside the one
+     form, so a single Save writes the whole record from any tab. -->
+<div class="border-b border-gray-200 mb-5">
+  <nav class="flex gap-1 -mb-px overflow-x-auto">
+    <a href="#details" data-tab="details" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap">Details</a>
+    <a href="#rol" data-tab="rol" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap">ROL</a>
+    <a href="#docs" data-tab="docs" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap">Dates &amp; Docs</a>
+  </nav>
 </div>
 
-<form method="POST" action="<%= formAction %>" class="space-y-5" data-wizard enctype="multipart/form-data">
+<form method="POST" action="<%= formAction %>" class="space-y-5" enctype="multipart/form-data">
   <%- include('../partials/csrf') %>
   <input type="hidden" name="return_to" value="<%= returnTo %>">
   <% if (isEdit && plan.file_path) { %>
@@ -31,192 +58,195 @@
     <input type="hidden" name="existing_file_original_name" value="<%= plan.file_original_name || '' %>">
   <% } %>
 
-  <!-- Step 1: Plan Details -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="0" data-wizard-title="Plan Details">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Plan Details</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
-        <label for="job_id" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job</label>
-        <select id="job_id" name="job_id" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-          <option value="">Select a job...</option>
-          <% jobs.forEach(function(job) { %>
-            <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.project_name ? job.project_name + ' (' + job.client + ')' : job.client %></option>
-          <% }) %>
-        </select>
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job Address</label>
-        <p id="job_address_display" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 text-sm min-h-[38px] flex items-center">
-          <%
-            let initialAddress = 'Select a job above';
-            if (selectedJobId) {
-              const selectedJob = jobs.find(j => String(j.id) === String(selectedJobId));
-              if (selectedJob) initialAddress = [selectedJob.site_address, selectedJob.suburb].filter(Boolean).join(', ') || 'No address';
-            }
-          %>
-          <%= initialAddress %>
-        </p>
-      </div>
-      <div class="sm:col-span-2">
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Plan Type(s)</label>
-        <div class="flex flex-wrap gap-x-5 gap-y-2">
-          <% ['TGS','TCP','TMP','ROL','Council Application','CTMP','Permit'].forEach(function(type) { %>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="plan_types" value="<%= type %>" data-plan-type
-                <%= selectedTypes.includes(type) ? 'checked' : '' %>
-                class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
-              <span class="text-sm font-medium text-gray-600"><%= type %></span>
-            </label>
-          <% }) %>
+  <!-- ───── Details ───── -->
+  <div data-tab-panel="details">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="job_id" class="<%= labelCls %>">Job</label>
+          <select id="job_id" name="job_id" class="<%= inputCls %>">
+            <option value="">Select a job...</option>
+            <% jobs.forEach(function(job) { %>
+              <option value="<%= job.id %>" <%= String(selectedJobId) === String(job.id) ? 'selected' : '' %>><%= job.job_number %> - <%= job.project_name ? job.project_name + ' (' + job.client + ')' : job.client %></option>
+            <% }) %>
+          </select>
         </div>
-      </div>
-      <div class="sm:col-span-2" id="council_plan_type_wrap" style="display:none;">
-        <label for="council_plan_type" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Type of Council Plan</label>
-        <input type="text" id="council_plan_type" name="council_plan_type" value="<%= isEdit && plan.council_plan_type ? plan.council_plan_type : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="Free text — e.g. Works Zone, Road Opening Permit...">
-      </div>
-      <div>
-        <label for="designer" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Designer</label>
-        <input type="text" id="designer" name="designer" value="<%= isEdit && plan.designer ? plan.designer : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="Designer name...">
-      </div>
-      <div>
-        <label for="status" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Status</label>
-        <select id="status" name="status" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-          <% statusOptions.forEach(function(opt) { %>
-            <option value="<%= opt.value %>" <%= isEdit && plan.status === opt.value ? 'selected' : '' %>><%= opt.label %></option>
-          <% }) %>
-        </select>
-      </div>
-    </div>
-  </div>
+        <div>
+          <label class="<%= labelCls %>">Job Address</label>
+          <p id="job_address_display" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 text-sm min-h-[38px] flex items-center">
+            <%
+              let initialAddress = 'Select a job above';
+              if (selectedJobId) {
+                const selectedJob = jobs.find(j => String(j.id) === String(selectedJobId));
+                if (selectedJob) initialAddress = [selectedJob.site_address, selectedJob.suburb].filter(Boolean).join(', ') || 'No address';
+              }
+            %>
+            <%= initialAddress %>
+          </p>
+        </div>
 
-  <!-- Step 2: ROL -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="1" data-wizard-title="ROL">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">ROL</h2>
-    <div class="flex flex-wrap items-center gap-6 mb-4">
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" name="rol_required" value="1" <%= isEdit && plan.rol_required ? 'checked' : '' %>
-          class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
-        <span class="text-sm font-medium text-gray-600">ROL Required</span>
-      </label>
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" name="rol_submitted" value="1" <%= isEdit && plan.rol_submitted ? 'checked' : '' %>
-          class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
-        <span class="text-sm font-medium text-gray-600">ROL Submitted</span>
-      </label>
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" name="rol_approved" value="1" <%= isEdit && plan.rol_approved ? 'checked' : '' %>
-          class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
-        <span class="text-sm font-medium text-gray-600">ROL Approved</span>
-      </label>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
-        <label for="council" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Council</label>
-        <input type="text" id="council" name="council" value="<%= isEdit && plan.council ? plan.council : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="Council name...">
-      </div>
-      <div>
-        <label for="tfnsw" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">TfNSW</label>
-        <input type="text" id="tfnsw" name="tfnsw" value="<%= isEdit && plan.tfnsw ? plan.tfnsw : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="TfNSW reference...">
-      </div>
-    </div>
-  </div>
-
-  <!-- Step 3: Dates, Documents & Notes -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5" data-wizard-step="2" data-wizard-title="Dates & Docs">
-    <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Dates, Documents & Notes</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div>
-        <label for="client_required_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Client Requested Date <span class="text-red-500">*</span></label>
-        <input type="date" id="client_required_date" name="client_required_date" value="<%= isEdit && plan.client_required_date ? new Date(plan.client_required_date).toISOString().split('T')[0] : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-      </div>
-      <div>
-        <label for="submitted_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Submission Date <span class="text-red-500">*</span></label>
-        <input type="date" id="submitted_date" name="submitted_date" value="<%= isEdit && plan.submitted_date ? new Date(plan.submitted_date).toISOString().split('T')[0] : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-      </div>
-      <div>
-        <label for="job_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Job Date <span id="job_date_req" class="text-red-500" style="display:none;">*</span></label>
-        <input type="date" id="job_date" name="job_date" value="<%= isEdit && plan.job_date ? new Date(plan.job_date).toISOString().split('T')[0] : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-      </div>
-      <div>
-        <label for="works_expected_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Works Expected Date</label>
-        <input type="date" id="works_expected_date" name="works_expected_date" value="<%= isEdit && plan.works_expected_date ? new Date(plan.works_expected_date).toISOString().split('T')[0] : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-      </div>
-      <div>
-        <label for="approval_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Approval Date</label>
-        <input type="date" id="approval_date" name="approval_date" value="<%= isEdit && plan.approval_date ? new Date(plan.approval_date).toISOString().split('T')[0] : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-      </div>
-      <div>
-        <label for="approved_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Approved Date</label>
-        <input type="date" id="approved_date" name="approved_date" value="<%= isEdit && plan.approved_date ? new Date(plan.approved_date).toISOString().split('T')[0] : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-      </div>
-      <div>
-        <label for="expiry_date" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Expiry Date</label>
-        <input type="date" id="expiry_date" name="expiry_date" value="<%= isEdit && plan.expiry_date ? new Date(plan.expiry_date).toISOString().split('T')[0] : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-      </div>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-      <div>
-        <label for="file_link" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">File Link (URL)</label>
-        <input type="url" id="file_link" name="file_link" value="<%= isEdit && plan.file_link ? plan.file_link : '' %>"
-          class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" placeholder="https://...">
-      </div>
-      <div>
-        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Upload Document</label>
-        <div data-dropzone>
-          <input type="file" name="plan_file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp">
-          <div class="dropzone-label">
-            <svg class="w-6 h-6 mx-auto mb-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-            <p class="text-xs text-gray-500">Drop file or <span class="text-brand-600 font-medium">browse</span></p>
+        <!-- Plan types as selectable chips — the same device as the Plans &
+             Approvals type picker. has-[:checked] does the highlighting, so
+             the state is right on first paint with no JS. -->
+        <div class="sm:col-span-2">
+          <label class="<%= labelCls %> mb-2">Plan Type(s)</label>
+          <div class="flex flex-wrap gap-2">
+            <% ['TGS','TCP','TMP','ROL','Council Application','CTMP','Permit'].forEach(function(type) { %>
+              <label class="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg border border-gray-200 bg-white transition-colors hover:bg-gray-50 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                <input type="checkbox" name="plan_types" value="<%= type %>" data-plan-type
+                  <%= selectedTypes.includes(type) ? 'checked' : '' %>
+                  class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+                <span class="text-sm font-medium text-gray-700"><%= type %></span>
+              </label>
+            <% }) %>
           </div>
         </div>
-        <% if (isEdit && plan.file_path) { %>
-          <p class="text-xs text-gray-500 mt-1 flex items-center gap-2">
-            Current: <a href="/<%= plan.file_path %>" target="_blank" class="text-brand-600 hover:underline"><%= plan.file_original_name || 'Download' %></a>
-            <form method="POST" action="/plans/<%= plan.id %>/delete-file" class="inline" onsubmit="return confirm('Delete this file? The plan record will remain.')">
-              <%- include('../partials/csrf') %>
-              <input type="hidden" name="return_to" value="/plans/<%= plan.id %>/edit">
-              <button type="submit" class="text-red-400 hover:text-red-600 transition" title="Delete file">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              </button>
-            </form>
-          </p>
-        <% } else { %>
-          <p class="text-xs text-gray-400 mt-1">PDF, JPEG, PNG, GIF, WebP. Max 10MB.</p>
-        <% } %>
+
+        <div class="sm:col-span-2" id="council_plan_type_wrap" style="display:none;">
+          <label for="council_plan_type" class="<%= labelCls %>">Type of Council Plan</label>
+          <input type="text" id="council_plan_type" name="council_plan_type" value="<%= isEdit && plan.council_plan_type ? plan.council_plan_type : '' %>"
+            class="<%= inputCls %>" placeholder="Free text — e.g. Works Zone, Road Opening Permit...">
+        </div>
+        <div>
+          <label for="designer" class="<%= labelCls %>">Designer</label>
+          <input type="text" id="designer" name="designer" value="<%= isEdit && plan.designer ? plan.designer : '' %>"
+            class="<%= inputCls %>" placeholder="Designer name...">
+        </div>
+        <div>
+          <label for="status" class="<%= labelCls %>">Status</label>
+          <select id="status" name="status" class="<%= inputCls %>">
+            <% statusOptions.forEach(function(opt) { %>
+              <option value="<%= opt.value %>" <%= isEdit && plan.status === opt.value ? 'selected' : '' %>><%= opt.label %></option>
+            <% }) %>
+          </select>
+        </div>
       </div>
     </div>
-    <div class="mt-4">
-      <label for="notes" class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Notes</label>
-      <textarea id="notes" name="notes" rows="2"
-        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" placeholder="Additional notes..."><%= isEdit && plan.notes ? plan.notes : '' %></textarea>
-    </div>
-    <% if (!isEdit) { %>
-      <div class="mt-4">
-        <%- include('../partials/notify-picker') %>
-      </div>
-    <% } %>
   </div>
 
-  <noscript>
-    <div class="flex items-center gap-3">
-      <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition">
-        <%= isEdit ? 'Update Plan' : 'Create Plan' %>
-      </button>
-      <a href="/plans" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition">Cancel</a>
+  <!-- ───── ROL ───── -->
+  <div data-tab-panel="rol" class="hidden">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+      <div class="flex flex-wrap gap-2 mb-4">
+        <% [['rol_required','ROL Required'],['rol_submitted','ROL Submitted'],['rol_approved','ROL Approved']].forEach(function(f) { %>
+          <label class="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg border border-gray-200 bg-white transition-colors hover:bg-gray-50 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+            <input type="checkbox" name="<%= f[0] %>" value="1" <%= isEdit && plan[f[0]] ? 'checked' : '' %>
+              class="w-4 h-4 rounded border-gray-300 bg-white text-brand-500 focus:ring-brand-500 focus:ring-offset-0">
+            <span class="text-sm font-medium text-gray-700"><%= f[1] %></span>
+          </label>
+        <% }) %>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="council" class="<%= labelCls %>">Council</label>
+          <input type="text" id="council" name="council" value="<%= isEdit && plan.council ? plan.council : '' %>"
+            class="<%= inputCls %>" placeholder="Council name...">
+        </div>
+        <div>
+          <label for="tfnsw" class="<%= labelCls %>">TfNSW</label>
+          <input type="text" id="tfnsw" name="tfnsw" value="<%= isEdit && plan.tfnsw ? plan.tfnsw : '' %>"
+            class="<%= inputCls %>" placeholder="TfNSW reference...">
+        </div>
+      </div>
     </div>
-  </noscript>
+  </div>
+
+  <!-- ───── Dates & Docs ───── -->
+  <div data-tab-panel="docs" class="hidden">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Dates</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div>
+          <label for="client_required_date" class="<%= labelCls %>">Client Requested Date <span class="text-red-500">*</span></label>
+          <input type="date" id="client_required_date" name="client_required_date" value="<%= dateVal(isEdit && plan.client_required_date) %>" class="<%= inputCls %>">
+        </div>
+        <div>
+          <label for="submitted_date" class="<%= labelCls %>">Submission Date <span class="text-red-500">*</span></label>
+          <input type="date" id="submitted_date" name="submitted_date" value="<%= dateVal(isEdit && plan.submitted_date) %>" class="<%= inputCls %>">
+        </div>
+        <div>
+          <label for="job_date" class="<%= labelCls %>">Job Date <span id="job_date_req" class="text-red-500" style="display:none;">*</span></label>
+          <input type="date" id="job_date" name="job_date" value="<%= dateVal(isEdit && plan.job_date) %>" class="<%= inputCls %>">
+        </div>
+        <div>
+          <label for="works_expected_date" class="<%= labelCls %>">Works Expected Date</label>
+          <input type="date" id="works_expected_date" name="works_expected_date" value="<%= dateVal(isEdit && plan.works_expected_date) %>" class="<%= inputCls %>">
+        </div>
+        <div>
+          <label for="approval_date" class="<%= labelCls %>">Approval Date</label>
+          <input type="date" id="approval_date" name="approval_date" value="<%= dateVal(isEdit && plan.approval_date) %>" class="<%= inputCls %>">
+        </div>
+        <div>
+          <label for="approved_date" class="<%= labelCls %>">Approved Date</label>
+          <input type="date" id="approved_date" name="approved_date" value="<%= dateVal(isEdit && plan.approved_date) %>" class="<%= inputCls %>">
+        </div>
+        <div>
+          <label for="expiry_date" class="<%= labelCls %>">Expiry Date</label>
+          <input type="date" id="expiry_date" name="expiry_date" value="<%= dateVal(isEdit && plan.expiry_date) %>" class="<%= inputCls %>">
+        </div>
+      </div>
+
+      <div class="lane-divider my-5"></div>
+
+      <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-4">Documents &amp; Notes</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="file_link" class="<%= labelCls %>">File Link (URL)</label>
+          <input type="url" id="file_link" name="file_link" value="<%= isEdit && plan.file_link ? plan.file_link : '' %>"
+            class="<%= inputCls %>" placeholder="https://...">
+        </div>
+        <div>
+          <label class="<%= labelCls %>">Upload Document</label>
+          <div data-dropzone>
+            <input type="file" name="plan_file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp">
+            <div class="dropzone-label">
+              <svg class="w-6 h-6 mx-auto mb-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+              <p class="text-xs text-gray-500">Drop file or <span class="text-brand-600 font-medium">browse</span></p>
+            </div>
+          </div>
+          <% if (isEdit && plan.file_path) { %>
+            <p class="text-xs text-gray-500 mt-1 flex items-center gap-2">
+              Current: <a href="/<%= plan.file_path %>" target="_blank" class="text-brand-600 hover:underline"><%= plan.file_original_name || 'Download' %></a>
+            </p>
+          <% } else { %>
+            <p class="text-xs text-gray-400 mt-1">PDF, JPEG, PNG, GIF, WebP. Max 10MB.</p>
+          <% } %>
+        </div>
+      </div>
+      <div class="mt-4">
+        <label for="notes" class="<%= labelCls %>">Notes</label>
+        <textarea id="notes" name="notes" rows="2"
+          class="<%= inputCls %> resize-y" placeholder="Additional notes..."><%= isEdit && plan.notes ? plan.notes : '' %></textarea>
+      </div>
+      <% if (!isEdit) { %>
+        <div class="mt-4">
+          <%- include('../partials/notify-picker') %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Save is reachable from every tab — no more clicking Next to reach it. -->
+  <div class="sticky bottom-0 -mx-3 sm:-mx-4 lg:-mx-8 px-3 sm:px-4 lg:px-8 py-3 bg-white/85 backdrop-blur border-t border-gray-200 flex items-center justify-end gap-3">
+    <a href="<%= returnTo %>" class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium rounded-lg transition">Cancel</a>
+    <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition">
+      <%= isEdit ? 'Save changes' : 'Create Plan' %>
+    </button>
+  </div>
 </form>
+
+<!-- Deleting the attached file is its own POST, so it lives outside the main
+     form — nested forms aren't allowed and the button would be dropped. -->
+<% if (isEdit && plan.file_path) { %>
+  <form method="POST" action="/plans/<%= plan.id %>/delete-file" class="mt-3" onsubmit="return confirm('Delete this file? The plan record will remain.')">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="return_to" value="/plans/<%= plan.id %>/edit">
+    <button type="submit" class="inline-flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-700 transition">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      Delete attached file
+    </button>
+  </form>
+<% } %>
 
 <script>
   // Auto-populate job address when job is selected
