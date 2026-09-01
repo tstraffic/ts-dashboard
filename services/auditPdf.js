@@ -80,12 +80,74 @@ function refFromContext(ck) {
   return '';
 }
 
+/* ── Evidence photo preparation ──
+   Straight off a phone, an audit photo is a 4032x3024 (or 5712x4284) JPEG
+   carrying an EXIF orientation flag, and it gets drawn into a tile ~157pt
+   wide. Handing those files to pdfkit directly caused both halves of the
+   "weird photos" bug: the file ballooned to tens of MB, and pdfkit's EXIF
+   handling swapped the width/height it fed into its `cover` maths, so rotated
+   shots were drawn sideways and twice the tile height.
+
+   So normalise once, up front: bake the rotation in, strip the EXIF flag,
+   downscale to print resolution, and record the true upright pixel size for
+   the layout. Keyed by filename; the same photo can appear in several
+   contexts and is only processed once. */
+const IMG_MAX_PX = 1200;   // ample for the widest tile (493pt full-width)
+const IMG_QUALITY = 78;
+const IMG_CONCURRENCY = 4; // a 5712x4284 decode is not small — don't run 60 at once
+
+async function prepareAuditImages(audit, ctxMap) {
+  const sharp = require('sharp');
+  const dir = path.join(__dirname, '..', 'data', 'uploads', 'audits', String(audit.id));
+  const prepared = new Map();
+  const queue = [];
+
+  Object.keys(ctxMap || {}).forEach(function (key) {
+    (ctxMap[key] || []).forEach(function (att) {
+      if (!(att.mime_type || '').startsWith('image/')) return;
+      if (prepared.has(att.filename)) return;
+      prepared.set(att.filename, null);
+      queue.push(att.filename);
+    });
+  });
+
+  async function one(filename) {
+    const fp = path.join(dir, filename);
+    try {
+      if (!fs.existsSync(fp)) return;
+      const res = await sharp(fp, { failOn: 'none' })
+        .rotate()                       // EXIF orientation baked in + dropped
+        .resize({ width: IMG_MAX_PX, height: IMG_MAX_PX, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: IMG_QUALITY, mozjpeg: true })
+        .toBuffer({ resolveWithObject: true });
+      // info.* is the post-rotation size, so no orientation guesswork.
+      prepared.set(filename, { buf: res.data, width: res.info.width, height: res.info.height });
+    } catch (e) {
+      // A photo we can't read is dropped from the grid, not fatal to the report.
+      console.error('[auditPdf] image prepare failed for', filename, ':', e.message);
+    }
+  }
+
+  // Fixed pool rather than Promise.all: a big site audit can carry 50+ photos,
+  // and the peak memory of the export shouldn't scale with that.
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(IMG_CONCURRENCY, queue.length) }, async function () {
+    while (next < queue.length) await one(queue[next++]);
+  }));
+
+  return prepared;
+}
+
 /* ════════════════════════════════════════════════════════ */
 
-function generateAuditPdf(opts, out) {
+async function generateAuditPdf(opts, out) {
   const { audit: a, responses, sectionComments, nonconformances,
     score, attachmentsByContext, sections, tagsByKey } = opts;
   const ctxMap = attachmentsByContext || {};
+
+  // Do this before piping anything to `out` — a failure here can still be
+  // turned into a redirect by the route.
+  const prepared = await prepareAuditImages(a, ctxMap);
 
   // Render from the audit's (template) section list when provided, else fall
   // back to the legacy AUDIT_SECTIONS catalogue. Normalised to { key, title,
@@ -333,7 +395,7 @@ function generateAuditPdf(opts, out) {
   gap(4);
 
   // ── Site Overview Evidence ──
-  embedImages(doc, a, ctxMap['overview'], 'Site Overview Photos', pw, pageBot, ML, MT);
+  embedImages(doc, ctxMap['overview'], 'Site Overview Photos', pw, pageBot, ML, prepared);
 
   /* ═══════════════════════════════════════════════════════════
      CHECKLIST SECTIONS
@@ -524,7 +586,7 @@ function generateAuditPdf(opts, out) {
           setY(bY3 + bH3 + 2);
         }
         // Item-specific photos for this NO finding
-        embedImages(doc, a, ctxMap['item_' + it.key], null, pw, pageBot, ML, MT);
+        embedImages(doc, ctxMap['item_' + it.key], null, pw, pageBot, ML, prepared);
         ii++; continue;
       }
 
@@ -574,7 +636,7 @@ function generateAuditPdf(opts, out) {
     }
 
     // Section evidence images
-    embedImages(doc, a, ctxMap['section_' + section.key], null, pw, pageBot, ML, MT);
+    embedImages(doc, ctxMap['section_' + section.key], null, pw, pageBot, ML, prepared);
     gap(6);
   });
 
@@ -637,7 +699,7 @@ function generateAuditPdf(opts, out) {
       setY(ry + 12);
 
       // NC evidence images
-      embedImages(doc, a, ctxMap['nc_' + (i + 1)], null, pw, pageBot, ML, MT);
+      embedImages(doc, ctxMap['nc_' + (i + 1)], null, pw, pageBot, ML, prepared);
     });
     gap(6);
   }
@@ -732,7 +794,7 @@ function generateAuditPdf(opts, out) {
   }
 
   // ── Annotated TGS ──
-  embedImages(doc, a, ctxMap['annotated_tgs'], 'Annotated TGS / Close-out Sketch', pw, pageBot, ML, MT);
+  embedImages(doc, ctxMap['annotated_tgs'], 'Annotated TGS / Close-out Sketch', pw, pageBot, ML, prepared);
 
   /* ═══════════════════════════════════════════════════════════
      FOOTER — Created by + Internal Sign-off
@@ -798,23 +860,74 @@ function generateAuditPdf(opts, out) {
 
 
 /* ════════════════════════════════════════════════════════
-   Image grid — compact evidence thumbnails, 3 per row
+   Image grid — compact evidence thumbnails, up to 3 per row
    Bigger than tiny postage stamps, but not page-eating monsters.
    ════════════════════════════════════════════════════════ */
-function embedImages(doc, audit, items, label, pw, pageBot, ml, mt) {
+
+// One evidence tile: the whole photo letterboxed inside a fixed frame.
+// Deliberately NOT a cover-crop — this is audit evidence, and a crop can cut
+// the hazard out of shot. The frame is a hard boundary: the draw size is
+// worked out here and the tile is clipped, because pdfkit's own `cover`/`fit`
+// options only scale, they never clip, and `cover` used to let a portrait
+// photo run 3x the tile height straight over the rows beneath it.
+function drawThumb(doc, entry, x, y, tw, th) {
+  var iw = tw - 2, ih = th - 2;
+  var img = entry.img;
+  var scale = Math.min(iw / img.width, ih / img.height);
+  var dw = img.width * scale, dh = img.height * scale;
+
+  doc.save().roundedRect(x, y, tw, th, 2).fill(GRAY_BG).restore();
+
+  doc.save();
+  doc.rect(x + 1, y + 1, iw, ih).clip();
+  try {
+    doc.image(img.buf, x + 1 + (iw - dw) / 2, y + 1 + (ih - dh) / 2,
+      { width: dw, height: dh, ignoreOrientation: true });
+  } catch (e) { /* skip corrupt image */ }
+  doc.restore();
+
+  doc.save().roundedRect(x, y, tw, th, 2).strokeColor(GRAY_LINE).lineWidth(0.5).stroke().restore();
+
+  // Caption — prefixed with the item ref it evidences (e.g. "S5.Q2 — ...")
+  var ref = refFromContext(entry.att.context_key);
+  var cap = entry.att.caption || '';
+  var capText = ref ? (cap ? ref + ' — ' + cap : ref) : cap;
+  if (capText) {
+    doc.font('Helvetica').fontSize(5).fillColor(GRAY);
+    doc.text(capText, x, y + th + 1, { width: tw, lineBreak: false, height: 7, ellipsis: true });
+  }
+}
+
+function embedImages(doc, items, label, pw, pageBot, ml, prepared) {
   if (!items || !items.length) return;
 
   var images = [];
   items.forEach(function (att) {
     if (!(att.mime_type || '').startsWith('image/')) return;
-    var fp = path.join(__dirname, '..', 'data', 'uploads', 'audits', String(audit.id), att.filename);
-    if (fs.existsSync(fp)) images.push({ att: att, fp: fp });
+    var img = prepared && prepared.get(att.filename);
+    if (img && img.buf) images.push({ att: att, img: img });
   });
   if (!images.length) return;
 
-  // Section label
+  var gutter = 6;
+  var cols = images.length <= 2 ? images.length : 3;
+  var tw = Math.floor((pw - gutter * (cols - 1)) / cols);
+
+  // Frame aspect follows the photos themselves. Site evidence is almost always
+  // portrait phone shots, and a fixed landscape frame letterboxed them down to
+  // a sliver. Median, so one odd screenshot doesn't skew the whole row. The
+  // cap keeps a lone photo from swallowing a page.
+  var ratios = images.map(function (e) { return e.img.width / e.img.height; })
+    .sort(function (x, y) { return x - y; });
+  var aspect = Math.max(0.62, Math.min(1.6, ratios[Math.floor(ratios.length / 2)]));
+  var maxTileH = cols === 1 ? 400 : cols === 2 ? 300 : 230;
+  var th = Math.min(Math.round(tw / aspect), maxTileH);
+  var captionH = 9;
+  var rowH = th + captionH;
+
+  // Keep the label with its first row instead of stranding it at the page foot.
   if (label) {
-    if (doc.y + 18 > pageBot) doc.addPage();
+    if (doc.y + 18 + rowH > pageBot) doc.addPage();
     doc.y += 4;
     doc.font('Helvetica-Bold').fontSize(7).fillColor(GRAY);
     doc.text(label, ml, doc.y, { lineBreak: false });
@@ -822,37 +935,20 @@ function embedImages(doc, audit, items, label, pw, pageBot, ml, mt) {
     doc.y += 10;
   }
 
-  // 3 per row, reasonable size (~155x105), with captions
-  var gutter = 6;
-  var cols = images.length <= 2 ? images.length : 3;
-  var tw = Math.floor((pw - gutter * (cols - 1)) / cols);
-  var th = Math.floor(tw * 0.68);
-  var captionH = 9;
   var col = 0, rowY = doc.y;
+  if (rowY + rowH > pageBot) { doc.addPage(); rowY = doc.y; }
 
-  images.forEach(function (img) {
-    if (col >= cols) { col = 0; rowY += th + captionH + gutter; }
-    if (col === 0 && rowY + th + captionH > pageBot) { doc.addPage(); rowY = doc.y; }
-    var ix = ml + col * (tw + gutter);
-
-    // Light border
-    doc.save().roundedRect(ix, rowY, tw, th, 2).strokeColor('#E5E7EB').lineWidth(0.5).stroke().restore();
-
-    try {
-      doc.image(img.fp, ix + 1, rowY + 1, { cover: [tw - 2, th - 2], align: 'center', valign: 'center' });
-    } catch (e) { /* skip corrupt image */ }
-
-    // Caption — prefixed with the item ref it evidences (e.g. "S5.Q2 — ...")
-    var ref = refFromContext(img.att.context_key);
-    var cap = img.att.caption || '';
-    var capText = ref ? (cap ? ref + ' — ' + cap : ref) : cap;
-    if (capText) {
-      doc.font('Helvetica').fontSize(5).fillColor(GRAY);
-      doc.text(capText, ix, rowY + th + 1, { width: tw, lineBreak: false, height: 7, ellipsis: true });
+  images.forEach(function (entry) {
+    if (col >= cols) {
+      col = 0;
+      rowY += rowH + gutter;
+      if (rowY + rowH > pageBot) { doc.addPage(); rowY = doc.y; }
     }
+    drawThumb(doc, entry, ml + col * (tw + gutter), rowY, tw, th);
     col++;
   });
-  doc.y = rowY + th + captionH + gutter;
+
+  doc.y = rowY + rowH + gutter;
   doc.x = ml;
 }
 
