@@ -488,7 +488,7 @@ function loadAuditView(db, audit) {
 }
 
 // GET /:id/pdf — export branded PDF
-router.get('/:id/pdf', (req, res) => {
+router.get('/:id/pdf', async (req, res) => {
   try {
     const db = getDb();
     const audit = db.prepare(`
@@ -503,9 +503,12 @@ router.get('/:id/pdf', (req, res) => {
     const safeName = (audit.project_site || 'audit').replace(/[^a-z0-9_-]/gi, '_').slice(0, 40);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="Audit_${audit.id}_${safeName}.pdf"`);
-    generateAuditPdf({ audit, responses: v.responses, sectionComments: v.sectionComments, nonconformances: v.nonconformances, score: v.score, attachments: v.attachments, attachmentsByContext: v.attachmentsByContext, sections: v.tpl.sections, tagsByKey: v.tagsByKey, auditCrew: v.auditCrew }, res);
+    await generateAuditPdf({ audit, responses: v.responses, sectionComments: v.sectionComments, nonconformances: v.nonconformances, score: v.score, attachments: v.attachments, attachmentsByContext: v.attachmentsByContext, sections: v.tpl.sections, tagsByKey: v.tagsByKey, auditCrew: v.auditCrew }, res);
   } catch (err) {
     console.error('[Audits] PDF export error:', err.message, err.stack);
+    // Photo prep runs before the first byte is piped, so a failure there can
+    // still be turned into a redirect. Once bytes are out, just close.
+    if (res.headersSent || res.writableEnded) return res.end();
     req.flash('error', 'PDF export failed: ' + err.message);
     req.session.save(() => res.redirect('/audits/' + req.params.id));
   }
