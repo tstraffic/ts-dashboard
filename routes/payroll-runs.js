@@ -459,27 +459,35 @@ router.post('/runs', requirePermission('payroll'), (req, res) => {
     const label = (req.body.label || '').trim() || periodLabel(period_start, period_end);
     const notes = (req.body.notes || '').trim();
 
-    // Only shifts that START inside the pay week are paid on this run. Traffio's
-    // export ranges by booking end, so last week's Sunday-night shifts ride
-    // along — they were (or will be) paid on their own week's run.
+    // Every shift in the file is paid ONCE on this run, on the weekday it
+    // STARTED — a Sunday-night shift that finishes Monday morning is one
+    // Sunday shift (Saadat: "any shift starting Sunday, doesn't matter if they
+    // finish 8 days later, it's one shift"). Traffio's export ranges by
+    // booking end, so a file can carry shifts dated before the pay week; they
+    // are included by default and listed on the run so the office can check
+    // they weren't already paid. Tick "skip" on the import form to drop them.
     const { inside, outside } = partitionShiftsByPeriod(shifts, period_start, period_end);
-    if (inside.length === 0) {
+    const skipOutside = String(req.body.skip_outside_period || '') === '1';
+    const paidShifts = skipOutside ? inside : shifts;
+    if (paidShifts.length === 0) {
       req.flash('error', `No shifts fall inside ${period_start} → ${period_end}. Check the period dates.`);
       try { fs.unlinkSync(req.file.path); } catch (e) {}
       return req.session.save(() => res.redirect('/payroll/runs/new'));
     }
+    const describe = (s) => ({
+      full_name: s.full_name, date: s.date, time_on: s.time_on, time_off: s.time_off,
+      hours: s.hours, travel_hours: s.travel_hours || 0, job_number: s.job_number, client_name: s.client_name,
+    });
     const importSummary = {
       csv_rows: rows.length,
       shifts_total: shifts.length,
-      shifts_paid: inside.length,
-      skipped_outside_period: outside.map(s => ({
-        full_name: s.full_name, date: s.date, time_on: s.time_on, time_off: s.time_off,
-        hours: s.hours, travel_hours: s.travel_hours || 0, job_number: s.job_number, client_name: s.client_name,
-      })),
-      travel_hours_total: round2(inside.reduce((a, s) => a + toNum(s.travel_hours), 0)),
+      shifts_paid: paidShifts.length,
+      skipped_outside_period: skipOutside ? outside.map(describe) : [],
+      included_outside_period: skipOutside ? [] : outside.map(describe),
+      travel_hours_total: round2(paidShifts.reduce((a, s) => a + toNum(s.travel_hours), 0)),
     };
 
-    const workers = aggregateByWorker(inside);
+    const workers = aggregateByWorker(paidShifts);
     const db = getDb();
     const isPH = makeIsPH(loadPHSet(db));
 
@@ -533,11 +541,14 @@ router.post('/runs', requirePermission('payroll'), (req, res) => {
     logActivity({
       user: req.session.user, action: 'create', entityType: 'pay_run',
       entityId: runId, entityLabel: label,
-      details: `Imported pay run ${label} — ${workers.length} workers, ${inside.length} shifts` + (outside.length ? `, ${outside.length} skipped (outside period)` : ''),
+      details: `Imported pay run ${label} — ${workers.length} workers, ${paidShifts.length} shifts` + (outside.length ? `, ${outside.length} dated outside the pay week (${skipOutside ? 'skipped' : 'included'})` : ''),
       ip: req.ip,
     });
 
-    req.flash('success', `Imported ${workers.length} workers from ${inside.length} shifts.` + (outside.length ? ` ${outside.length} shift${outside.length === 1 ? '' : 's'} outside ${period_start} → ${period_end} skipped — see the note on the run.` : ''));
+    const outsideNote = outside.length
+      ? ` ${outside.length} shift${outside.length === 1 ? '' : 's'} dated outside ${period_start} → ${period_end} ${skipOutside ? 'skipped' : 'included'} — see the note on the run.`
+      : '';
+    req.flash('success', `Imported ${workers.length} workers from ${paidShifts.length} shifts.` + outsideNote);
     req.session.save(() => res.redirect('/payroll/runs/' + runId));
   });
 });
