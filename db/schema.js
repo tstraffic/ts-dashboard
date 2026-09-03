@@ -15767,6 +15767,29 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 354 error:', e.message); }
   }
 
+  // Migration 355: TFN night overtime. Night OT / Night DT rates now sit on
+  // the TFN Worker Rates grid and tier presets stamp them (base × 1.5 / × 2,
+  // same as day OT — overtime substitutes for the shift penalty). Backfill
+  // existing TFN workers who already carry day OT/DT so their night hours
+  // past 8 stop falling back to the flat Night rate. Workers whose rates
+  // were hand-overridden keep their override flag; the office reviews them.
+  if (!isMigrationApplied.get(355)) {
+    try {
+      const r1 = db.prepare(`
+        UPDATE employees SET rate_night_ot = rate_ot
+        WHERE LOWER(COALESCE(payment_type, '')) = 'tfn'
+          AND COALESCE(rate_night_ot, 0) = 0 AND COALESCE(rate_ot, 0) > 0
+      `).run();
+      const r2 = db.prepare(`
+        UPDATE employees SET rate_night_dt = rate_dt
+        WHERE LOWER(COALESCE(payment_type, '')) = 'tfn'
+          AND COALESCE(rate_night_dt, 0) = 0 AND COALESCE(rate_dt, 0) > 0
+      `).run();
+      recordMigration.run(355, 'TFN night OT/DT rates: backfill from day OT/DT');
+      console.log(`Migration 355 applied: TFN night OT backfilled on ${r1.changes} workers, night DT on ${r2.changes}`);
+    } catch (e) { console.error('Migration 355 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
