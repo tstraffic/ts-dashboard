@@ -26,7 +26,7 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
           Add worker
         </button>
-        <form method="POST" action="/payroll/runs/<%= run.id %>/refresh" onsubmit="return confirm('Re-run categorization for ALL workers? Manual hour edits will be lost. Allowances + rates re-applied from current employee + classification.')">
+        <form method="POST" action="/payroll/runs/<%= run.id %>/refresh" onsubmit="return confirm('Re-run categorization for ALL workers from their Traffio shifts? Manual hour edits will be lost. Rates re-applied from Worker Rates. Allowances set to Custom or Off are kept.')">
           <%- include('../partials/csrf') %>
           <button type="submit" class="px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg transition" title="Re-run bucket categorization from shifts using current employee rates + classifications">
             ⟳ Refresh from rates
@@ -91,12 +91,41 @@
     </div>
   <% } %>
 
+  <%
+    const skipped = (importSummary && Array.isArray(importSummary.skipped_outside_period)) ? importSummary.skipped_outside_period : [];
+    function fmtShiftDate(iso) { if (!iso) return ''; const d = new Date(iso + 'T00:00:00'); return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }); }
+  %>
+  <% if (skipped.length > 0) { %>
+    <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-3">
+      <svg class="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-gray-900"><%= skipped.length %> shift<%= skipped.length !== 1 ? 's' : '' %> in the CSV fell outside <%= fmtDate(run.period_start) %> → <%= fmtDate(run.period_end) %> and <span class="font-bold">were not paid on this run</span></p>
+        <p class="text-xs text-gray-500 mt-0.5">Traffio's export includes bookings that end inside the range, so the previous week's Sunday-night shifts ride along. They belong to that week's pay run.</p>
+        <ul class="mt-2 text-xs text-gray-700 space-y-0.5">
+          <% skipped.forEach(s => { %>
+            <li class="tabular-nums"><span class="font-semibold"><%= s.full_name %></span> · <%= fmtShiftDate(s.date) %> <%= String(s.time_on || '').slice(0,5) %>–<%= String(s.time_off || '').slice(0,5) %> · <%= s.hours %>h<% if (s.travel_hours > 0) { %> + <%= s.travel_hours %>h travel<% } %><% if (s.job_number) { %> · job <%= s.job_number %><% } %><% if (s.client_name) { %> · <%= s.client_name %><% } %></li>
+          <% }) %>
+        </ul>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (warningCount > 0) { %>
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+      <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <div class="flex-1">
+        <p class="text-sm font-semibold text-amber-900"><%= warningCount %> worker<%= warningCount !== 1 ? 's' : '' %> have overtime hours but no overtime rate set</p>
+        <p class="text-xs text-amber-800 mt-0.5">Those hours are shown in the OT / DT row and paid at the rate below them (marked ⚠ under the worker's name). Set the missing rate on <a href="/payroll/rates" class="font-semibold underline">Worker Rates</a>, then click <span class="font-semibold">Refresh from rates</span> — or type the rate straight into the worker's Edit form.</p>
+      </div>
+    </div>
+  <% } %>
+
   <% sections.forEach(section => {
     const lns = buckets[section.key];
     const sectTotals = totals[section.key];
     if (!lns || lns.length === 0) return;
   %>
-    <%- include('partials/_section', { section, lines: lns, sectTotals, accent: section.accent, dowLabels, bucketLabels, fmtMoney, runLocked }) %>
+    <%- include('partials/_section', { section, lines: lns, sectTotals, accent: section.accent, dowLabels, weekDates, bucketLabels, bucketKeys, fmtMoney, runLocked }) %>
   <% }) %>
 
   <% if (buckets.unclassified.length > 0) { %>
@@ -105,7 +134,7 @@
       lines: buckets.unclassified,
       sectTotals: totals.unclassified,
       accent: 'gray',
-      dowLabels, bucketLabels, fmtMoney, runLocked,
+      dowLabels, weekDates, bucketLabels, bucketKeys, fmtMoney, runLocked,
     }) %>
   <% } %>
 </div>
@@ -173,55 +202,52 @@
             </div>
           </div>
 
-          <!-- Travel & Meal as rate × quantity -->
+          <!-- Travel & Meal as rate × quantity, each with a persisted mode:
+               Auto (rate × count), Custom (typed amount) or Off ($0 and stays $0). -->
           <div class="space-y-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Travel & Meal allowances</p>
-            <!-- Travel row -->
-            <div class="grid grid-cols-12 gap-2 items-end">
+            <div class="flex items-center justify-between">
+              <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Travel & Meal allowances</p>
+              <p class="text-[10px] text-gray-400">Auto = rate × count · Custom = type an amount · Off = removed, stays removed</p>
+            </div>
+            <% [
+              { key: 'travel', label: 'Travel', hint: 'days × fare', countLabel: 'Days' },
+              { key: 'meal',   label: 'Meal',   hint: '9.5h+ shifts × meal', countLabel: 'Shifts' },
+            ].forEach(al => { %>
+            <div class="grid grid-cols-12 gap-2 items-end" data-allowance="<%= al.key %>">
               <div class="col-span-2">
-                <label class="block text-[10px] font-semibold text-gray-500 mb-0.5">Travel</label>
-                <p class="text-[10px] text-gray-400">days × fare</p>
+                <label class="block text-[10px] font-semibold text-gray-500 mb-0.5"><%= al.label %></label>
+                <p class="text-[10px] text-gray-400"><%= al.hint %></p>
               </div>
-              <div class="col-span-3">
+              <div class="col-span-2">
                 <label class="block text-[10px] text-gray-500 mb-0.5">Rate ($)</label>
-                <input type="number" step="0.01" min="0" name="travel_rate" id="travelRate" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm tabular-nums">
+                <input type="number" step="0.01" min="0" name="<%= al.key %>_rate" id="<%= al.key %>Rate" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm tabular-nums">
               </div>
               <div class="col-span-2">
-                <label class="block text-[10px] text-gray-500 mb-0.5">Days</label>
-                <input type="number" step="1" min="0" name="travel_count" id="travelCount" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm tabular-nums">
+                <label class="block text-[10px] text-gray-500 mb-0.5"><%= al.countLabel %></label>
+                <input type="number" step="1" min="0" name="<%= al.key %>_count" id="<%= al.key %>Count" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm tabular-nums">
               </div>
-              <div class="col-span-3">
+              <div class="col-span-2">
                 <label class="block text-[10px] text-gray-500 mb-0.5">Total ($)</label>
-                <input type="number" step="0.01" min="0" name="travel_allowance" id="travelAllowance" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm tabular-nums" readonly>
+                <input type="number" step="0.01" min="0" name="<%= al.key %>_allowance" id="<%= al.key %>Allowance" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm tabular-nums font-semibold">
               </div>
-              <div class="col-span-2 flex items-center gap-1.5 pb-1.5">
-                <input type="checkbox" id="travelOverride" name="travel_override" value="1" class="rounded border-gray-300">
-                <label for="travelOverride" class="text-[10px] text-gray-600">Override</label>
+              <div class="col-span-4 pb-0.5">
+                <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden text-[11px] font-semibold w-full" role="group">
+                  <label class="flex-1 text-center cursor-pointer">
+                    <input type="radio" name="<%= al.key %>_mode" value="auto" class="peer sr-only allowance-mode">
+                    <span class="block px-2 py-1.5 text-gray-600 hover:bg-gray-100 peer-checked:bg-brand-600 peer-checked:text-white">Auto</span>
+                  </label>
+                  <label class="flex-1 text-center cursor-pointer border-l border-gray-300">
+                    <input type="radio" name="<%= al.key %>_mode" value="custom" class="peer sr-only allowance-mode">
+                    <span class="block px-2 py-1.5 text-gray-600 hover:bg-gray-100 peer-checked:bg-brand-600 peer-checked:text-white">Custom</span>
+                  </label>
+                  <label class="flex-1 text-center cursor-pointer border-l border-gray-300">
+                    <input type="radio" name="<%= al.key %>_mode" value="off" class="peer sr-only allowance-mode">
+                    <span class="block px-2 py-1.5 text-gray-600 hover:bg-gray-100 peer-checked:bg-rose-600 peer-checked:text-white">Off</span>
+                  </label>
+                </div>
               </div>
             </div>
-            <!-- Meal row -->
-            <div class="grid grid-cols-12 gap-2 items-end">
-              <div class="col-span-2">
-                <label class="block text-[10px] font-semibold text-gray-500 mb-0.5">Meal</label>
-                <p class="text-[10px] text-gray-400">9.5h+ × meal</p>
-              </div>
-              <div class="col-span-3">
-                <label class="block text-[10px] text-gray-500 mb-0.5">Rate ($)</label>
-                <input type="number" step="0.01" min="0" name="meal_rate" id="mealRate" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm tabular-nums">
-              </div>
-              <div class="col-span-2">
-                <label class="block text-[10px] text-gray-500 mb-0.5">Shifts</label>
-                <input type="number" step="1" min="0" name="meal_count" id="mealCount" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm tabular-nums">
-              </div>
-              <div class="col-span-3">
-                <label class="block text-[10px] text-gray-500 mb-0.5">Total ($)</label>
-                <input type="number" step="0.01" min="0" name="meal_allowance" id="mealAllowance" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm tabular-nums" readonly>
-              </div>
-              <div class="col-span-2 flex items-center gap-1.5 pb-1.5">
-                <input type="checkbox" id="mealOverride" name="meal_override" value="1" class="rounded border-gray-300">
-                <label for="mealOverride" class="text-[10px] text-gray-600">Override</label>
-              </div>
-            </div>
+            <% }) %>
           </div>
 
           <!-- Expenses & receipts -->
@@ -302,9 +328,12 @@
           </div>
         </div>
 
-        <div class="p-5 border-t border-gray-200 flex items-center justify-end gap-2">
-          <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Cancel</button>
-          <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg">Save</button>
+        <div class="p-5 border-t border-gray-200 flex items-center justify-between gap-2">
+          <p id="editSaveError" class="hidden text-xs text-rose-600 font-semibold"></p>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Cancel</button>
+            <button type="submit" id="editSaveBtn" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg disabled:opacity-60">Save</button>
+          </div>
         </div>
       </form>
     </div>
@@ -375,15 +404,34 @@
           <h2 class="text-lg font-bold text-gray-900">Link to employee</h2>
           <p class="text-xs text-gray-500 mt-0.5" id="matchSubtitle"></p>
         </div>
-        <div class="p-5">
-          <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Pick employee</label>
-          <select name="employee_id" required class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm">
-            <option value="">— Select —</option>
-            <% employees.forEach(e => { %>
-              <option value="<%= e.id %>"><%= e.full_name %><%= e.employee_code ? ' — ' + e.employee_code : '' %><%= e.payment_type ? ' (' + e.payment_type.toUpperCase() + ')' : '' %></option>
-            <% }) %>
-          </select>
-          <p class="text-xs text-gray-500 mt-2">Employee's section + classification + rates pull onto this line. Hours re-categorize.</p>
+        <div class="p-5 space-y-4">
+          <div>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Pick employee</label>
+            <select name="employee_id" id="matchEmployeeSelect" required class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm">
+              <option value="">— Select —</option>
+              <% employees.forEach(e => { %>
+                <option value="<%= e.id %>" data-pt="<%= e.payment_type || '' %>"><%= e.full_name %><%= e.employee_code ? ' — ' + e.employee_code : '' %><%= e.payment_type ? ' (' + e.payment_type.toUpperCase() + ')' : '' %></option>
+              <% }) %>
+            </select>
+            <p class="text-xs text-gray-500 mt-2">Their section, classification and rates pull onto this line and the hours re-categorise. The link is remembered — this Traffio worker matches automatically on every future import.</p>
+          </div>
+          <div id="matchSectionWrap" class="hidden">
+            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Section <span class="text-gray-400 font-normal lowercase tracking-normal">(this employee has none yet — saved to their record)</span></label>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="relative cursor-pointer">
+                <input type="radio" name="payment_type" value="cash" class="peer sr-only">
+                <div class="border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50 peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-800">Cash</div>
+              </label>
+              <label class="relative cursor-pointer">
+                <input type="radio" name="payment_type" value="tfn" class="peer sr-only">
+                <div class="border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-800">TFN</div>
+              </label>
+              <label class="relative cursor-pointer">
+                <input type="radio" name="payment_type" value="abn" class="peer sr-only">
+                <div class="border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50 peer-checked:border-sky-500 peer-checked:bg-sky-50 peer-checked:text-sky-800">ABN</div>
+              </label>
+            </div>
+          </div>
         </div>
         <div class="p-5 border-t border-gray-200 flex items-center justify-end gap-2">
           <button type="button" onclick="closeMatchModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Cancel</button>
@@ -458,11 +506,11 @@
   const BUCKET_KEYS = <%- JSON.stringify(bucketKeys) %>;
   const BUCKET_LABELS = <%- JSON.stringify(bucketLabels) %>;
   const SECTION_BUCKETS = {
-    cash:         ['day_normal', 'night_normal'],
+    cash:         ['day_normal', 'night_normal', 'travel'],
     tfn:          BUCKET_KEYS,
     // ABN sits between cash and TFN — single Sat rate (no ≤2h split),
     // no DT, no PH penalty. Order matches the PDF columns.
-    abn:          ['day_normal', 'day_ot', 'night_normal', 'night_ot', 'weekend'],
+    abn:          ['day_normal', 'day_ot', 'night_normal', 'night_ot', 'weekend', 'travel'],
     '':           BUCKET_KEYS, // unclassified shows all
   };
 
@@ -482,6 +530,8 @@
       meal_rate: <%= l.meal_rate || 0 %>,
       meal_count: <%= l.meal_count || 0 %>,
       meal_allowance: <%= l.meal_allowance || 0 %>,
+      travel_mode: <%- JSON.stringify(l.travel_mode || 'auto') %>,
+      meal_mode: <%- JSON.stringify(l.meal_mode || 'auto') %>,
       // Worker Rates page values — the modal falls back to these whenever
       // the line's own travel_rate / meal_rate is 0 (i.e. line was
       // imported before the worker rate was configured).
@@ -581,43 +631,38 @@
       return n;
     }
 
+    // Each allowance opens in its SAVED mode. Auto shows rate × count from
+    // the line (falling back to Worker Rates values for lines imported
+    // before the rate existed); Custom shows the typed amount; Off shows $0
+    // and stays $0 until the office switches it back.
+    function initAllowance(prefix, effectiveRate, count, mode) {
+      const rateEl  = document.getElementById(prefix + 'Rate');
+      const countEl = document.getElementById(prefix + 'Count');
+      const totEl   = document.getElementById(prefix + 'Allowance');
+      rateEl.value  = effectiveRate.toFixed(2);
+      countEl.value = count;
+      const saved = parseFloat(l[prefix + '_allowance']) || 0;
+      if (mode === 'custom')      totEl.value = saved.toFixed(2);
+      else if (mode === 'off')    totEl.value = '0.00';
+      else                        totEl.value = (effectiveRate * count).toFixed(2);
+      const radio = document.querySelector('input[name="' + prefix + '_mode"][value="' + mode + '"]');
+      if (radio) radio.checked = true;
+      applyAllowanceMode(prefix);
+    }
+
     const lineTravelRate = parseFloat(l.travel_rate) || 0;
     const empTravelRate  = parseFloat(l.emp_travel_rate) || 0;
     const effectiveTravelRate = lineTravelRate > 0 ? lineTravelRate : empTravelRate;
     let travelCount = parseInt(l.travel_count, 10) || 0;
     if (travelCount === 0 && effectiveTravelRate > 0) travelCount = deriveTravelDays(l);
-    const travelAllowance = (parseFloat(l.travel_allowance) > 0)
-      ? parseFloat(l.travel_allowance)
-      : (effectiveTravelRate * travelCount);
-
-    // All three travel fields (rate, count, total) are locked by default
-    // and only become editable when the Override checkbox is ticked. The
-    // numbers shown reflect the worker rates × auto-derived counts so the
-    // line is correct even when the line was imported before rates were set.
-    document.getElementById('travelRate').value = effectiveTravelRate.toFixed(2);
-    document.getElementById('travelCount').value = travelCount;
-    document.getElementById('travelAllowance').value = travelAllowance.toFixed(2);
-    document.getElementById('travelOverride').checked = false;
-    document.getElementById('travelRate').readOnly = true;
-    document.getElementById('travelCount').readOnly = true;
-    document.getElementById('travelAllowance').readOnly = true;
+    initAllowance('travel', effectiveTravelRate, travelCount, l.travel_mode || 'auto');
 
     const lineMealRate = parseFloat(l.meal_rate) || 0;
     const empMealRate  = parseFloat(l.emp_meal_rate) || 0;
     const effectiveMealRate = lineMealRate > 0 ? lineMealRate : empMealRate;
     let mealCount = parseInt(l.meal_count, 10) || 0;
     if (mealCount === 0 && effectiveMealRate > 0) mealCount = deriveMealShifts(l);
-    const mealAllowance = (parseFloat(l.meal_allowance) > 0)
-      ? parseFloat(l.meal_allowance)
-      : (effectiveMealRate * mealCount);
-
-    document.getElementById('mealRate').value = effectiveMealRate.toFixed(2);
-    document.getElementById('mealCount').value = mealCount;
-    document.getElementById('mealAllowance').value = mealAllowance.toFixed(2);
-    document.getElementById('mealOverride').checked = false;
-    document.getElementById('mealRate').readOnly = true;
-    document.getElementById('mealCount').readOnly = true;
-    document.getElementById('mealAllowance').readOnly = true;
+    initAllowance('meal', effectiveMealRate, mealCount, l.meal_mode || 'auto');
 
     // Other allowance is now driven by the expenses list — keep hidden mirror in sync
     document.getElementById('otherAllowanceHidden').value = (parseFloat(l.other_allowance) || 0).toFixed(2);
@@ -640,37 +685,121 @@
     activeLineId = null;
   }
 
-  // ---- Travel / meal recompute on input ----
-  // All three inputs (rate, count, total) are locked by default. Ticking
-  // Override unlocks all of them so the user can set any custom value.
-  // Unticking re-locks everything and snaps the total back to rate×count.
+  // ---- Travel / meal: Auto | Custom | Off ----
+  // Auto: rate + count editable, total follows rate × count.
+  // Custom: total editable directly (rate/count kept for reference).
+  // Off: everything greyed, total forced to 0 — and the server stores the
+  // mode so a later save (or Refresh from rates) can't bring it back.
+  function currentMode(prefix) {
+    const r = document.querySelector('input[name="' + prefix + '_mode"]:checked');
+    return r ? r.value : 'auto';
+  }
+  function applyAllowanceMode(prefix) {
+    const mode = currentMode(prefix);
+    const r = document.getElementById(prefix + 'Rate');
+    const c = document.getElementById(prefix + 'Count');
+    const t = document.getElementById(prefix + 'Allowance');
+    const row = document.querySelector('[data-allowance="' + prefix + '"]');
+    r.readOnly = mode !== 'auto';
+    c.readOnly = mode !== 'auto';
+    t.readOnly = mode !== 'custom';
+    [r, c, t].forEach(el => el.classList.toggle('opacity-50', mode === 'off'));
+    if (row) row.classList.toggle('opacity-75', mode === 'off');
+    if (mode === 'auto') t.value = ((parseFloat(r.value) || 0) * (parseInt(c.value, 10) || 0)).toFixed(2);
+    if (mode === 'off')  t.value = '0.00';
+    recomputeGrandTotalPreview();
+  }
   function wireTravelMeal() {
-    function bind(rateId, countId, totalId, overrideId) {
-      const r = document.getElementById(rateId);
-      const c = document.getElementById(countId);
-      const t = document.getElementById(totalId);
-      const o = document.getElementById(overrideId);
-      function update() {
-        if (o.checked) return;
-        const val = (parseFloat(r.value) || 0) * (parseInt(c.value, 10) || 0);
-        t.value = val.toFixed(2);
-        recomputeGrandTotalPreview();
-      }
-      r.addEventListener('input', update);
-      c.addEventListener('input', update);
-      o.addEventListener('change', () => {
-        const editable = o.checked;
-        r.readOnly = !editable;
-        c.readOnly = !editable;
-        t.readOnly = !editable;
-        if (!editable) update();
-      });
+    ['travel', 'meal'].forEach(prefix => {
+      const r = document.getElementById(prefix + 'Rate');
+      const c = document.getElementById(prefix + 'Count');
+      const t = document.getElementById(prefix + 'Allowance');
+      r.addEventListener('input', () => applyAllowanceMode(prefix));
+      c.addEventListener('input', () => applyAllowanceMode(prefix));
       t.addEventListener('input', recomputeGrandTotalPreview);
-    }
-    bind('travelRate', 'travelCount', 'travelAllowance', 'travelOverride');
-    bind('mealRate', 'mealCount', 'mealAllowance', 'mealOverride');
+      document.querySelectorAll('input[name="' + prefix + '_mode"]').forEach(radio => {
+        radio.addEventListener('change', () => applyAllowanceMode(prefix));
+      });
+    });
   }
   wireTravelMeal();
+
+  // ---- Save without losing your place ----
+  // Every form on this page used to full-post and redirect, which dumps you
+  // back at the top of a 40-worker table. Remember the scroll position on
+  // any submit and restore it after the reload; the edit modal saves over
+  // fetch and reloads the same way.
+  const SCROLL_KEY = 'payrun:' + RUN_ID + ':scrollY';
+  // The admin layout scrolls <main class="overflow-auto">, not the window —
+  // find whichever ancestor actually scrolls the table.
+  function scrollContainer() {
+    let el = document.querySelector('[data-line-id]') || document.body;
+    while (el && el !== document.documentElement) {
+      const cs = getComputedStyle(el);
+      if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 5) return el;
+      el = el.parentElement;
+    }
+    return document.scrollingElement || document.documentElement;
+  }
+  function rememberScroll() {
+    try { sessionStorage.setItem(SCROLL_KEY, String(scrollContainer().scrollTop || window.scrollY || 0)); } catch (e) {}
+  }
+  document.addEventListener('submit', rememberScroll, true);
+  (function restoreScroll() {
+    let y = null;
+    try { y = sessionStorage.getItem(SCROLL_KEY); sessionStorage.removeItem(SCROLL_KEY); } catch (e) {}
+    const hashLine = (location.hash || '').match(/^#line-(\d+)$/);
+    const row = hashLine ? document.getElementById('line-' + hashLine[1]) : null;
+    if (row) {
+      row.querySelectorAll('td').forEach(td => td.classList.add('bg-brand-50'));
+      setTimeout(() => row.querySelectorAll('td').forEach(td => td.classList.remove('bg-brand-50')), 2500);
+    }
+    if (y != null && !isNaN(parseFloat(y))) {
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+      const target = parseFloat(y);
+      const apply = () => { const c = scrollContainer(); c.scrollTop = target; if (c === document.scrollingElement || c === document.documentElement) window.scrollTo(0, target); };
+      requestAnimationFrame(apply);
+      setTimeout(apply, 60); // once fonts/images settle the heights
+    } else if (row) {
+      requestAnimationFrame(() => row.scrollIntoView({ block: 'center' }));
+    }
+  })();
+
+  document.getElementById('editForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    const form = ev.target;
+    const btn = document.getElementById('editSaveBtn');
+    const err = document.getElementById('editSaveError');
+    err.classList.add('hidden');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    rememberScroll();
+    fetch(form.action, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      body: new URLSearchParams(new FormData(form)),
+    }).then(r => r.ok ? r.json() : r.json().then(j => Promise.reject(j.error || r.statusText)))
+      .then(() => {
+        // Reload in place; restoreScroll() puts the table back where it was
+        // and the #line- hash flashes the row that changed.
+        location.replace(location.pathname + '#line-' + activeLineId);
+        location.reload();
+      })
+      .catch(e => {
+        btn.disabled = false; btn.textContent = 'Save';
+        err.textContent = 'Save failed: ' + (typeof e === 'string' ? e : 'unknown error');
+        err.classList.remove('hidden');
+      });
+  });
+
+  // ---- Per-worker Traffio shift detail ----
+  function toggleShifts(lineId) {
+    const row = document.querySelector('tr[data-shift-detail="' + lineId + '"]');
+    if (!row) return;
+    row.hidden = !row.hidden;
+    document.querySelectorAll('[data-shifts-toggle="' + lineId + '"] .shifts-caret').forEach(c => {
+      c.style.transform = row.hidden ? '' : 'rotate(90deg)';
+    });
+  }
 
   // ---- PAYG weekly tax (TFT-claimed) — mirrors lib/payroll.js payAsYouGoWeekly ----
   function paygWeekly(grossWeekly) {
@@ -956,9 +1085,17 @@
     form.action = '/payroll/runs/' + RUN_ID + '/lines/' + lineId + '/match';
     document.getElementById('matchSubtitle').textContent = 'CSV name: ' + l.full_name;
     form.querySelector('select[name="employee_id"]').value = '';
+    form.querySelectorAll('input[name="payment_type"]').forEach(r => { r.checked = false; });
+    document.getElementById('matchSectionWrap').classList.add('hidden');
     document.getElementById('matchModal').classList.remove('hidden');
   }
   function closeMatchModal() { document.getElementById('matchModal').classList.add('hidden'); }
+  // Only ask for a section when the chosen employee has none on record.
+  document.getElementById('matchEmployeeSelect').addEventListener('change', function () {
+    const opt = this.options[this.selectedIndex];
+    const hasPT = !!(opt && opt.dataset && opt.dataset.pt);
+    document.getElementById('matchSectionWrap').classList.toggle('hidden', !this.value || hasPT);
+  });
 
   function openAddOneOff() {
     const m = document.getElementById('addOneOffModal');

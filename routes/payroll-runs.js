@@ -20,7 +20,7 @@ const { sendEmail } = require('../services/email');
 const { notificationEmail } = require('../services/emailTemplates');
 const { sendPushForNotifications } = require('../services/pushNotification');
 const {
-  parseCsv, normalizeShift, aggregateByWorker, inferPeriod,
+  parseCsv, normalizeShift, aggregateByWorker, inferPeriod, partitionShiftsByPeriod,
   matchEmployee, fetchClassification,
   buildLine, recomputeLine, recategorizeFromShifts, computeAutoAllowances,
   resolveRates, totalsFromBuckets, emptyBuckets,
@@ -53,11 +53,31 @@ const upload = multer({
 });
 
 const SECTIONS = [
-  { key: 'cash', label: 'Cash', accent: 'amber',   buckets: ['day_normal', 'night_normal'] },
+  { key: 'cash', label: 'Cash', accent: 'amber',   buckets: ['day_normal', 'night_normal', 'travel'] },
   { key: 'tfn',  label: 'TFN',  accent: 'emerald', buckets: BUCKETS },
-  { key: 'abn',  label: 'ABN',  accent: 'sky',     buckets: ['day_normal', 'day_ot', 'night_normal', 'night_ot', 'weekend'] },
+  { key: 'abn',  label: 'ABN',  accent: 'sky',     buckets: ['day_normal', 'day_ot', 'night_normal', 'night_ot', 'weekend', 'travel'] },
 ];
 const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// ISO dates for Mon..Sun of a run, so column headers can read "Mon 24".
+function weekDatesFor(run) {
+  const out = [];
+  if (!run || !run.period_start) return out;
+  const d = new Date(run.period_start + 'T00:00:00');
+  if (isNaN(d.getTime())) return out;
+  for (let i = 0; i < 7; i++) {
+    out.push(formatLocalDate(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
+// Human label for a missing-rate warning stored in buckets_json._warnings.
+function describeWarning(w) {
+  const to = BUCKET_LABELS[w.bucket] || w.bucket;
+  const from = BUCKET_LABELS[w.from] || w.from;
+  return `${to} hours paid at the ${from} rate — no ${to} rate set on Worker Rates`;
+}
 
 // ----------------------------------------------------------------------------
 // Helpers
@@ -200,7 +220,16 @@ function hydrateLine(line) {
     line.buckets.night_normal.total_wages = line.total_night_wages || 0;
   }
   line.shifts = safeParseJson(line.shifts_json, []);
+  const warns = Array.isArray(line.buckets._warnings) ? line.buckets._warnings : [];
+  line.warnings = warns.map(describeWarning);
   return line;
+}
+
+// Allowance mode for the edit modal: 'auto' (rate × count), 'custom' (manual
+// amount) or 'off' ($0 and stays $0).
+function allowanceMode(overrideFlag, amount) {
+  if (!overrideFlag) return 'auto';
+  return toNum(amount) > 0 ? 'custom' : 'off';
 }
 
 // Creates a Management pay run + auto-seeds one Salary line per employee
@@ -430,15 +459,35 @@ router.post('/runs', requirePermission('payroll'), (req, res) => {
     const label = (req.body.label || '').trim() || periodLabel(period_start, period_end);
     const notes = (req.body.notes || '').trim();
 
-    const workers = aggregateByWorker(shifts);
+    // Only shifts that START inside the pay week are paid on this run. Traffio's
+    // export ranges by booking end, so last week's Sunday-night shifts ride
+    // along — they were (or will be) paid on their own week's run.
+    const { inside, outside } = partitionShiftsByPeriod(shifts, period_start, period_end);
+    if (inside.length === 0) {
+      req.flash('error', `No shifts fall inside ${period_start} → ${period_end}. Check the period dates.`);
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      return req.session.save(() => res.redirect('/payroll/runs/new'));
+    }
+    const importSummary = {
+      csv_rows: rows.length,
+      shifts_total: shifts.length,
+      shifts_paid: inside.length,
+      skipped_outside_period: outside.map(s => ({
+        full_name: s.full_name, date: s.date, time_on: s.time_on, time_off: s.time_off,
+        hours: s.hours, travel_hours: s.travel_hours || 0, job_number: s.job_number, client_name: s.client_name,
+      })),
+      travel_hours_total: round2(inside.reduce((a, s) => a + toNum(s.travel_hours), 0)),
+    };
+
+    const workers = aggregateByWorker(inside);
     const db = getDb();
     const isPH = makeIsPH(loadPHSet(db));
 
     let runId;
     try {
       const insertRun = db.prepare(`
-        INSERT INTO pay_runs (period_start, period_end, label, csv_filename, status, created_by_id, notes, pay_run_type)
-        VALUES (?, ?, ?, ?, 'draft', ?, ?, 'traffic_control')
+        INSERT INTO pay_runs (period_start, period_end, label, csv_filename, status, created_by_id, notes, pay_run_type, import_summary_json)
+        VALUES (?, ?, ?, ?, 'draft', ?, ?, 'traffic_control', ?)
       `);
       const insertLine = db.prepare(`
         INSERT INTO pay_run_lines (
@@ -461,7 +510,7 @@ router.post('/runs', requirePermission('payroll'), (req, res) => {
       `);
 
       const tx = db.transaction(() => {
-        const r = insertRun.run(period_start, period_end, label, req.file.filename, req.session.user.id, notes);
+        const r = insertRun.run(period_start, period_end, label, req.file.filename, req.session.user.id, notes, JSON.stringify(importSummary));
         runId = r.lastInsertRowid;
         let order = 0;
         for (const agg of workers) {
@@ -484,11 +533,11 @@ router.post('/runs', requirePermission('payroll'), (req, res) => {
     logActivity({
       user: req.session.user, action: 'create', entityType: 'pay_run',
       entityId: runId, entityLabel: label,
-      details: `Imported pay run ${label} — ${workers.length} workers, ${shifts.length} shifts`,
+      details: `Imported pay run ${label} — ${workers.length} workers, ${inside.length} shifts` + (outside.length ? `, ${outside.length} skipped (outside period)` : ''),
       ip: req.ip,
     });
 
-    req.flash('success', `Imported ${workers.length} workers from ${shifts.length} shifts.`);
+    req.flash('success', `Imported ${workers.length} workers from ${inside.length} shifts.` + (outside.length ? ` ${outside.length} shift${outside.length === 1 ? '' : 's'} outside ${period_start} → ${period_end} skipped — see the note on the run.` : ''));
     req.session.save(() => res.redirect('/payroll/runs/' + runId));
   });
 });
@@ -678,6 +727,9 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
     hydrateLine(l);
     l.expenses = expensesByLine[l.id] || [];
     l.deductions = deductionsByLine[l.id] || [];
+    l.travel_mode = allowanceMode(l.travel_override, l.travel_allowance);
+    l.meal_mode   = allowanceMode(l.meal_override, l.meal_allowance);
+    l.travel_hours_total = round2((l.buckets.travel && l.buckets.travel.total_hours) || 0);
     const t = (l.payment_type || '').toLowerCase();
     if (t === 'tfn') {
       const wages = toNum(l.total_wages);
@@ -713,14 +765,19 @@ router.get('/runs/:id', requirePermission('payroll'), (req, res) => {
     FROM employees WHERE active = 1 ORDER BY LOWER(full_name) ASC
   `).all();
 
+  const importSummary = safeParseJson(run.import_summary_json, null);
+  const warningCount = lines.reduce((n, l) => n + ((l.warnings && l.warnings.length) ? 1 : 0), 0);
+
   res.render('payroll-runs/show', {
     title: run.label || periodLabel(run.period_start, run.period_end),
     currentPage: 'pay-runs',
     run,
     sections: SECTIONS,
     dowLabels: DOW_LABELS,
+    weekDates: weekDatesFor(run),
     bucketLabels: BUCKET_LABELS,
     bucketKeys: BUCKETS,
+    importSummary, warningCount,
     buckets, totals, grand, employees,
     fmtMoney, periodLabel, statusLabel,
     runLocked: isRunLocked(run),
@@ -844,35 +901,45 @@ router.post('/runs/:id/lines/:lineId', requirePermission('payroll'), (req, res) 
   if (b.bsb !== undefined)        updates.bsb = String(b.bsb || '').trim();
   if (b.acc_number !== undefined) updates.acc_number = String(b.acc_number || '').trim();
 
-  // Allowances — Travel and Meal accept rate × count breakdown.
-  // If `*_override = 1` is sent, the explicit `*_allowance` value wins.
-  // Otherwise the allowance is recomputed from rate × count.
+  // Allowances — Travel and Meal each carry a rate × count breakdown plus a
+  // MODE that is persisted on the line (travel_override / meal_override):
+  //   auto   → amount = rate × count, override = 0 (refresh may recompute)
+  //   custom → amount = whatever was typed, override = 1 (never recomputed)
+  //   off    → amount = 0, override = 1 (stays removed on every later save)
+  // Legacy clients that still send `*_override=1` + an amount are treated
+  // as 'custom'. A save that sends none of the allowance fields leaves the
+  // stored amount AND its mode untouched — ticking Paid can't resurrect an
+  // allowance the office removed.
   if (b.travel_rate !== undefined)  updates.travel_rate  = toNum(b.travel_rate);
   if (b.travel_count !== undefined) updates.travel_count = Math.max(0, parseInt(b.travel_count, 10) || 0);
   if (b.meal_rate !== undefined)    updates.meal_rate    = toNum(b.meal_rate);
   if (b.meal_count !== undefined)   updates.meal_count   = Math.max(0, parseInt(b.meal_count, 10) || 0);
 
-  const travelOverride = String(b.travel_override || '') === '1';
-  if (travelOverride && b.travel_allowance !== undefined) {
-    updates.travel_allowance = toNum(b.travel_allowance);
-  } else if (b.travel_rate !== undefined || b.travel_count !== undefined) {
-    const r = updates.travel_rate  != null ? updates.travel_rate  : toNum(line.travel_rate);
-    const c = updates.travel_count != null ? updates.travel_count : (parseInt(line.travel_count, 10) || 0);
-    updates.travel_allowance = round2(r * c);
-  } else if (b.travel_allowance !== undefined) {
-    updates.travel_allowance = toNum(b.travel_allowance);
+  function applyAllowance(prefix) {
+    const modeRaw = String(b[prefix + '_mode'] || '').toLowerCase();
+    const legacyOverride = String(b[prefix + '_override'] || '') === '1';
+    const mode = ['auto', 'custom', 'off'].includes(modeRaw) ? modeRaw
+      : (legacyOverride ? 'custom' : (line[prefix + '_override'] ? (toNum(line[prefix + '_allowance']) > 0 ? 'custom' : 'off') : 'auto'));
+    const rateSent  = b[prefix + '_rate'] !== undefined;
+    const countSent = b[prefix + '_count'] !== undefined;
+    const amtSent   = b[prefix + '_allowance'] !== undefined;
+    const anySent   = modeRaw || legacyOverride || rateSent || countSent || amtSent;
+    if (!anySent) return;
+    if (mode === 'off') {
+      updates[prefix + '_allowance'] = 0;
+      updates[prefix + '_override'] = 1;
+    } else if (mode === 'custom') {
+      updates[prefix + '_allowance'] = amtSent ? toNum(b[prefix + '_allowance']) : toNum(line[prefix + '_allowance']);
+      updates[prefix + '_override'] = 1;
+    } else {
+      const r = updates[prefix + '_rate']  != null ? updates[prefix + '_rate']  : toNum(line[prefix + '_rate']);
+      const c = updates[prefix + '_count'] != null ? updates[prefix + '_count'] : (parseInt(line[prefix + '_count'], 10) || 0);
+      updates[prefix + '_allowance'] = round2(r * c);
+      updates[prefix + '_override'] = 0;
+    }
   }
-
-  const mealOverride = String(b.meal_override || '') === '1';
-  if (mealOverride && b.meal_allowance !== undefined) {
-    updates.meal_allowance = toNum(b.meal_allowance);
-  } else if (b.meal_rate !== undefined || b.meal_count !== undefined) {
-    const r = updates.meal_rate  != null ? updates.meal_rate  : toNum(line.meal_rate);
-    const c = updates.meal_count != null ? updates.meal_count : (parseInt(line.meal_count, 10) || 0);
-    updates.meal_allowance = round2(r * c);
-  } else if (b.meal_allowance !== undefined) {
-    updates.meal_allowance = toNum(b.meal_allowance);
-  }
+  applyAllowance('travel');
+  applyAllowance('meal');
 
   if (b.other_allowance !== undefined) updates.other_allowance = toNum(b.other_allowance);
 
@@ -897,11 +964,15 @@ router.post('/runs/:id/lines/:lineId', requirePermission('payroll'), (req, res) 
       ? fetchClassification(db, employee.award_classification_id) : null;
     const { buckets, auto } = recategorizeFromShifts(line, { paymentType: newPT, employee, classification, isPH });
     bucketsState = buckets;
-    if (b.travel_allowance === undefined) updates.travel_allowance = auto.travel;
-    if (b.meal_allowance   === undefined) updates.meal_allowance   = auto.meal;
+    // New section → new auto allowances, unless the office pinned them.
+    const travelPinned = updates.travel_override != null ? updates.travel_override : line.travel_override;
+    const mealPinned   = updates.meal_override   != null ? updates.meal_override   : line.meal_override;
+    if (!travelPinned && b.travel_allowance === undefined) { updates.travel_allowance = auto.travel; updates.travel_rate = auto.travelRate; updates.travel_count = auto.travelCount; }
+    if (!mealPinned   && b.meal_allowance   === undefined) { updates.meal_allowance   = auto.meal;   updates.meal_rate   = auto.mealRate;   updates.meal_count   = auto.mealCount; }
   } else if (b.buckets && typeof b.buckets === 'object') {
     // Manual bucket edits — accept hours[7] + rate per bucket
     bucketsState = safeParseJson(line.buckets_json, null) || emptyBuckets({});
+    let rateEdited = false;
     for (const k of BUCKETS) {
       if (!bucketsState[k]) bucketsState[k] = { hours: [0,0,0,0,0,0,0], total_hours: 0, rate: 0, total_wages: 0 };
       const bk = b.buckets[k];
@@ -909,8 +980,13 @@ router.post('/runs/:id/lines/:lineId', requirePermission('payroll'), (req, res) 
       if (Array.isArray(bk.hours) && bk.hours.length === 7) {
         bucketsState[k].hours = bk.hours.map(toNum).map(round2);
       }
-      if (bk.rate !== undefined) bucketsState[k].rate = toNum(bk.rate);
+      if (bk.rate !== undefined && round2(toNum(bk.rate)) !== round2(toNum(bucketsState[k].rate))) {
+        bucketsState[k].rate = toNum(bk.rate);
+        rateEdited = true;
+      }
     }
+    // The office typed a rate → the "paid at borrowed rate" flags are stale.
+    if (rateEdited && bucketsState._warnings) delete bucketsState._warnings;
   } else {
     // No bucket changes, no section change — keep existing
     bucketsState = safeParseJson(line.buckets_json, null);
@@ -955,7 +1031,7 @@ router.post('/runs/:id/lines/:lineId', requirePermission('payroll'), (req, res) 
     const fresh = db.prepare('SELECT * FROM pay_run_lines WHERE id = ?').get(req.params.lineId);
     return res.json({ ok: true, line: hydrateLine(fresh) });
   }
-  return res.redirect('/payroll/runs/' + run.id);
+  return res.redirect('/payroll/runs/' + run.id + '#line-' + req.params.lineId);
 });
 
 // ============================================================================
@@ -974,8 +1050,14 @@ router.post('/runs/:id/lines/:lineId/match', requirePermission('payroll'), (req,
   const emp = db.prepare('SELECT * FROM employees WHERE id = ?').get(empId);
   if (!emp) { req.flash('error', 'Employee not found'); return req.session.save(() => res.redirect('/payroll/runs/' + req.params.id)); }
 
-  const newPT = (emp.payment_type && ['cash', 'tfn', 'abn'].includes(String(emp.payment_type).toLowerCase()))
-    ? String(emp.payment_type).toLowerCase() : (line.payment_type || '');
+  // Section: the employee's own payment_type wins; if they have none, the
+  // modal's "Section" pick fills it in (and is saved to the employee so the
+  // worker is classified on every later import too).
+  const empPT = (emp.payment_type && ['cash', 'tfn', 'abn'].includes(String(emp.payment_type).toLowerCase()))
+    ? String(emp.payment_type).toLowerCase() : '';
+  const pickedPT = ['cash', 'tfn', 'abn'].includes(String(req.body.payment_type || '').toLowerCase())
+    ? String(req.body.payment_type).toLowerCase() : '';
+  const newPT = empPT || pickedPT || (line.payment_type || '');
   const classification = emp.award_classification_id ? fetchClassification(db, emp.award_classification_id) : null;
   const isPH = makeIsPH(loadPHSet(db));
   const { buckets, auto } = recategorizeFromShifts(line, { paymentType: newPT, employee: emp, classification, isPH });
@@ -986,10 +1068,10 @@ router.post('/runs/:id/lines/:lineId/match', requirePermission('payroll'), (req,
     bsb: line.bsb || (emp.payroll_bsb || ''),
     acc_number: line.acc_number || (emp.payroll_account || ''),
     buckets_json: JSON.stringify(buckets),
-    travel_allowance: auto.travel,
-    meal_allowance: auto.meal,
     updated_at: new Date().toISOString(),
   };
+  if (!line.travel_override) { updates.travel_allowance = auto.travel; updates.travel_rate = auto.travelRate; updates.travel_count = auto.travelCount; }
+  if (!line.meal_override)   { updates.meal_allowance   = auto.meal;   updates.meal_rate   = auto.mealRate;   updates.meal_count   = auto.mealCount; }
   const merged = Object.assign({}, line, updates);
   const recomputed = recomputeLine(merged, { isPH });
   Object.assign(updates, recomputed);
@@ -998,10 +1080,43 @@ router.post('/runs/:id/lines/:lineId/match', requirePermission('payroll'), (req,
   const setSql = cols.map(c => `${c} = ?`).join(', ');
   const params = cols.map(c => updates[c]);
   params.push(line.id);
-  db.prepare(`UPDATE pay_run_lines SET ${setSql} WHERE id = ?`).run(...params);
 
-  req.flash('success', `Linked ${line.full_name} → ${emp.full_name}.`);
-  req.session.save(() => res.redirect('/payroll/runs/' + req.params.id));
+  // Remember the link on the EMPLOYEE so next week's import matches straight
+  // away: Traffio person id (stable, survives name spelling changes) plus the
+  // section when the employee had none.
+  const empSets = [];
+  const empParams = [];
+  if (line.person_id) { empSets.push('traffio_person_id = ?'); empParams.push(String(line.person_id)); }
+  if (!empPT && pickedPT) { empSets.push('payment_type = ?'); empParams.push(pickedPT); }
+
+  db.transaction(() => {
+    db.prepare(`UPDATE pay_run_lines SET ${setSql} WHERE id = ?`).run(...params);
+    if (empSets.length) {
+      try {
+        // Only one employee can own a Traffio id — clear it off anyone else first.
+        if (line.person_id) db.prepare('UPDATE employees SET traffio_person_id = NULL WHERE traffio_person_id = ? AND id <> ?').run(String(line.person_id), emp.id);
+        db.prepare(`UPDATE employees SET ${empSets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(...empParams, emp.id);
+      } catch (e) { console.error('[payroll/match] employee link stamp failed:', e.message); }
+    }
+    // Same person elsewhere on this run (duplicate CSV name rows) → link too.
+    if (line.person_id) {
+      try {
+        db.prepare('UPDATE pay_run_lines SET employee_id = ? WHERE pay_run_id = ? AND person_id = ? AND employee_id IS NULL').run(emp.id, run.id, String(line.person_id));
+      } catch (e) { /* non-fatal */ }
+    }
+  })();
+
+  try {
+    logActivity({
+      user: req.session.user, action: 'update', entityType: 'pay_run_line',
+      entityId: line.id, entityLabel: line.full_name,
+      details: `Linked pay-run worker "${line.full_name}" (Traffio #${line.person_id || '?'}) → ${emp.full_name}${(!empPT && pickedPT) ? ` as ${pickedPT.toUpperCase()}` : ''}; remembered for future imports`,
+      ip: req.ip,
+    });
+  } catch (e) { /* audit shouldn't block */ }
+
+  req.flash('success', `Linked ${line.full_name} → ${emp.full_name}. Future imports will match automatically.` + (!newPT ? ' Set a section for them on Worker Rates.' : ''));
+  req.session.save(() => res.redirect('/payroll/runs/' + req.params.id + '#line-' + line.id));
 });
 
 // ============================================================================
@@ -1028,12 +1143,14 @@ router.post('/runs/:id/refresh', requirePermission('payroll'), (req, res) => {
       });
       const updates = {
         buckets_json: JSON.stringify(buckets),
-        travel_allowance: auto.travel,
-        meal_allowance:   auto.meal,
         bsb: employee ? (employee.payroll_bsb || line.bsb || '') : line.bsb,
         acc_number: employee ? (employee.payroll_account || line.acc_number || '') : line.acc_number,
         updated_at: new Date().toISOString(),
       };
+      // Refresh re-applies AUTO allowances only — anything the office set to
+      // custom or removed stays exactly as it was.
+      if (!line.travel_override) { updates.travel_allowance = auto.travel; updates.travel_rate = auto.travelRate; updates.travel_count = auto.travelCount; }
+      if (!line.meal_override)   { updates.meal_allowance   = auto.meal;   updates.meal_rate   = auto.mealRate;   updates.meal_count   = auto.mealCount; }
       const merged = Object.assign({}, line, updates);
       const recomputed = recomputeLine(merged, { isPH });
       Object.assign(updates, recomputed);

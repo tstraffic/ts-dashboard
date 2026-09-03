@@ -730,9 +730,9 @@ const { BUCKETS: PR_BUCKETS, BUCKET_LABELS: PR_BUCKET_LABELS, safeParseJson: prS
 
 // Section → bucket whitelist. Mirrors routes/payroll-runs.js SECTIONS.
 const SECTION_BUCKETS_WHITELIST = {
-  cash: ['day_normal', 'night_normal'],
+  cash: ['day_normal', 'night_normal', 'travel'],
   tfn:  PR_BUCKETS,
-  abn:  ['day_normal', 'day_ot', 'night_normal', 'night_ot', 'weekend'],
+  abn:  ['day_normal', 'day_ot', 'night_normal', 'night_ot', 'weekend', 'travel'],
   '':   PR_BUCKETS,
 };
 
