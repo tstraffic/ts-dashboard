@@ -15727,6 +15727,69 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 353 error:', e.message); }
   }
 
+  // Migration 354: Pay run usability fixes.
+  //   - employees.traffio_person_id: the Traffio person id stamped when the
+  //     office links an unclassified pay-run line to an employee, so the
+  //     link survives into every later import (name matching alone kept
+  //     failing for "Subcontractor 1"-style names and spelling variants).
+  //   - pay_run_lines.travel_override / meal_override: 1 = the allowance
+  //     amount is manual (including "removed" = $0) and must NOT be
+  //     recomputed from rate × count on later saves / refreshes.
+  //   - pay_runs.import_summary_json: what the CSV import skipped (shifts
+  //     dated outside the pay week) so the run page can show it.
+  if (!isMigrationApplied.get(354)) {
+    try {
+      const empCols = db.prepare("PRAGMA table_info(employees)").all().map(c => c.name);
+      if (!empCols.includes('traffio_person_id')) {
+        db.exec("ALTER TABLE employees ADD COLUMN traffio_person_id TEXT");
+      }
+      db.exec("CREATE INDEX IF NOT EXISTS idx_employees_traffio_person ON employees(traffio_person_id)");
+      const lineCols = db.prepare("PRAGMA table_info(pay_run_lines)").all().map(c => c.name);
+      if (!lineCols.includes('travel_override')) db.exec("ALTER TABLE pay_run_lines ADD COLUMN travel_override INTEGER NOT NULL DEFAULT 0");
+      if (!lineCols.includes('meal_override'))   db.exec("ALTER TABLE pay_run_lines ADD COLUMN meal_override INTEGER NOT NULL DEFAULT 0");
+      const runCols = db.prepare("PRAGMA table_info(pay_runs)").all().map(c => c.name);
+      if (!runCols.includes('import_summary_json')) db.exec("ALTER TABLE pay_runs ADD COLUMN import_summary_json TEXT");
+      // Backfill: a line whose employee has no Traffio id yet, but which was
+      // linked on a past run, teaches the employee its person id now.
+      try {
+        db.exec(`
+          UPDATE employees SET traffio_person_id = (
+            SELECT prl.person_id FROM pay_run_lines prl
+            WHERE prl.employee_id = employees.id AND COALESCE(prl.person_id, '') <> ''
+            ORDER BY prl.id DESC LIMIT 1
+          )
+          WHERE COALESCE(traffio_person_id, '') = ''
+            AND EXISTS (SELECT 1 FROM pay_run_lines p2 WHERE p2.employee_id = employees.id AND COALESCE(p2.person_id, '') <> '')
+        `);
+      } catch (e) { console.error('Migration 354 backfill:', e.message); }
+      recordMigration.run(354, 'Pay runs: employees.traffio_person_id, line travel/meal override flags, run import summary');
+      console.log('Migration 354 applied: pay run link persistence + allowance overrides');
+    } catch (e) { console.error('Migration 354 error:', e.message); }
+  }
+
+  // Migration 355: TFN night overtime. Night OT / Night DT rates now sit on
+  // the TFN Worker Rates grid and tier presets stamp them (base × 1.5 / × 2,
+  // same as day OT — overtime substitutes for the shift penalty). Backfill
+  // existing TFN workers who already carry day OT/DT so their night hours
+  // past 8 stop falling back to the flat Night rate. Workers whose rates
+  // were hand-overridden keep their override flag; the office reviews them.
+  if (!isMigrationApplied.get(355)) {
+    try {
+      const r1 = db.prepare(`
+        UPDATE employees SET rate_night_ot = rate_ot
+        WHERE LOWER(COALESCE(payment_type, '')) = 'tfn'
+          AND COALESCE(rate_night_ot, 0) = 0 AND COALESCE(rate_ot, 0) > 0
+      `).run();
+      const r2 = db.prepare(`
+        UPDATE employees SET rate_night_dt = rate_dt
+        WHERE LOWER(COALESCE(payment_type, '')) = 'tfn'
+          AND COALESCE(rate_night_dt, 0) = 0 AND COALESCE(rate_dt, 0) > 0
+      `).run();
+      recordMigration.run(355, 'TFN night OT/DT rates: backfill from day OT/DT');
+      console.log(`Migration 355 applied: TFN night OT backfilled on ${r1.changes} workers, night DT on ${r2.changes}`);
+    } catch (e) { console.error('Migration 355 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

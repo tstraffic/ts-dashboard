@@ -8,6 +8,10 @@
   const a = ACCENT[accent] || ACCENT.gray;
   const showGst = accent === 'amber'; // Cash only
   const showTfnExtras = section.key === 'tfn'; // Super, Tax, Net columns
+  const wd = Array.isArray(locals.weekDates) ? locals.weekDates : [];
+  // Column count for full-width detail rows: Worker, BSB, Bucket, 7 days, Hrs,
+  // Rate, Sub, Wages, Allow, Total (+ Tax/Net/Super for TFN) + Paid + Edit.
+  const colCount = 16 + (showTfnExtras ? 3 : 0) + 2;
 
   // The line stores its own bsb/acc_number snapshot, but for older lines
   // imported before the employee had bank details set, fall back to the
@@ -19,6 +23,15 @@
       acc: l.acc_number || l.emp_payroll_account || '',
     };
   }
+  function dayNum(iso) { return iso ? String(parseInt(iso.slice(8, 10), 10)) : ''; }
+  function shiftDateLabel(iso) {
+    if (!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+  function hhmm(t) { return t ? String(t).slice(0, 5) : ''; }
+  function fmtH(n) { const v = parseFloat(n) || 0; return (Math.round(v * 100) / 100).toString(); }
 
   // Bucket UI flair
   const BUCKET_BADGE = {
@@ -28,13 +41,15 @@
     night_normal:  'text-indigo-700',
     night_ot:      'text-orange-700',
     night_dt:      'text-red-700',
+    night_5plus:   'text-indigo-700',
     weekend_short: 'text-fuchsia-700',
     weekend:       'text-purple-700',
     public_holiday:'text-rose-700',
+    travel:        'text-teal-700',
   };
 %>
 
-<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ring-1 <%= a.ring %>">
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ring-1 <%= a.ring %>" id="section-<%= section.key %>">
   <div class="<%= a.headBg %> px-4 py-3 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
     <div class="flex items-center gap-2">
       <h2 class="text-base font-bold <%= a.headText %> uppercase tracking-wider"><%= section.label %> Workers</h2>
@@ -68,8 +83,10 @@
           <th class="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest sticky left-0 bg-gray-50 z-10">Worker</th>
           <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">BSB / Acc</th>
           <th class="px-2 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Bucket</th>
-          <% dowLabels.forEach(d => { %>
-            <th class="px-1 py-2 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest"><%= d %></th>
+          <% dowLabels.forEach((d, i) => { %>
+            <th class="px-1 py-2 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-tight <%= i >= 5 ? 'text-purple-500' : '' %>">
+              <%= d %><% if (wd[i]) { %><span class="block text-[9px] font-mono font-normal text-gray-400 normal-case tracking-normal"><%= dayNum(wd[i]) %></span><% } %>
+            </th>
           <% }) %>
           <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Hrs</th>
           <th class="px-2 py-2 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Rate</th>
@@ -89,12 +106,16 @@
       <tbody class="divide-y divide-gray-100">
         <% lines.forEach(l => { %>
           <%
-            const sectionBucketKeys = section.buckets || ['day_normal', 'day_ot', 'day_dt', 'night_normal', 'night_ot', 'night_dt', 'weekend_short', 'weekend', 'public_holiday'];
+            const sectionBucketKeys = section.buckets || bucketKeys;
             const activeKeys = sectionBucketKeys.filter(k => (l.buckets[k] && l.buckets[k].total_hours > 0));
             const rowSpan = Math.max(activeKeys.length, 1);
+            const shifts = Array.isArray(l.shifts) ? l.shifts : [];
+            const warnings = Array.isArray(l.warnings) ? l.warnings : [];
+            const travelOff = l.travel_override && !(parseFloat(l.travel_allowance) > 0);
+            const mealOff   = l.meal_override   && !(parseFloat(l.meal_allowance) > 0);
           %>
           <% if (activeKeys.length === 0) { %>
-            <tr data-line-id="<%= l.id %>" class="<%= l.paid ? 'opacity-60' : '' %>">
+            <tr data-line-id="<%= l.id %>" id="line-<%= l.id %>" class="<%= l.paid ? 'opacity-60' : '' %>">
               <td class="px-3 py-2 sticky left-0 bg-white z-[5] <%= l.paid ? 'opacity-100' : '' %>">
                 <% if (l.employee_id) { %>
                   <button type="button" onclick="openPayrollDetails(<%= l.employee_id %>)" class="font-semibold text-brand-700 hover:underline text-sm leading-tight text-left" title="View full payroll details"><%= l.full_name %></button>
@@ -109,12 +130,19 @@
                   <span class="text-[10px] font-semibold text-gray-400 mt-0.5">⚠ Unlinked</span>
                 <% } %>
                 <% if (l.classification_name) { %><p class="text-[10px] text-emerald-600 mt-0.5"><%= l.classification_name %></p><% } %>
+                <% if (shifts.length) { %>
+                  <button type="button" onclick="toggleShifts(<%= l.id %>)" class="text-[10px] font-semibold text-gray-500 hover:text-brand-700 mt-0.5 inline-flex items-center gap-1" data-shifts-toggle="<%= l.id %>"><span class="shifts-caret inline-block transition-transform">▸</span> <%= shifts.length %> shift<%= shifts.length === 1 ? '' : 's' %></button>
+                <% } %>
               </td>
               <td class="px-2 py-2 text-[11px] font-mono text-gray-600 leading-tight">
                 <% const _bd = bsbAccFor(l); %>
                 <% if (_bd.bsb || _bd.acc) { %><%= _bd.bsb || '—' %><br><%= _bd.acc || '—' %><% } else if (l.employee_id) { %><span class="text-amber-600 font-semibold" title="No bank details on file — collect from worker">⚠ collect</span><% } else { %><span class="text-gray-300">—</span><% } %>
               </td>
-              <td colspan="10" class="px-2 py-2 text-xs text-gray-400 italic">No hours</td>
+              <td colspan="12" class="px-2 py-2 text-xs text-gray-400 italic">No hours</td>
+              <td class="px-2 py-2 text-right text-xs tabular-nums text-gray-700">
+                <% if (l.total_allowance > 0) { %>$<%= fmtMoney(l.total_allowance) %><% } else { %><span class="text-gray-300">—</span><% } %>
+              </td>
+              <td class="px-2 py-2 text-right text-sm font-bold tabular-nums text-gray-900">$<%= fmtMoney(l.grand_total) %></td>
               <% if (showTfnExtras) { %>
                 <td class="px-2 py-2 text-right text-xs text-gray-300">—</td>
                 <td class="px-2 py-2 text-right text-xs text-gray-300">—</td>
@@ -128,8 +156,8 @@
               </td>
             </tr>
           <% } else { %>
-            <% activeKeys.forEach((bk, idx) => { const b = l.buckets[bk]; const isFirst = idx === 0; const isLast = idx === activeKeys.length - 1; %>
-              <tr data-line-id="<%= l.id %>" class="<%= l.paid ? 'opacity-60' : '' %>">
+            <% activeKeys.forEach((bk, idx) => { const b = l.buckets[bk]; const isFirst = idx === 0; %>
+              <tr data-line-id="<%= l.id %>" <% if (isFirst) { %>id="line-<%= l.id %>"<% } %> class="<%= l.paid ? 'opacity-60' : '' %>">
                 <% if (isFirst) { %>
                   <td rowspan="<%= rowSpan %>" class="px-3 py-2 align-top sticky left-0 bg-white z-[5] <%= l.paid ? 'opacity-100' : '' %>">
                     <% if (l.employee_id) { %>
@@ -150,6 +178,12 @@
                     <% if (l.paid_ref) { %>
                       <p class="text-[10px] text-emerald-600 font-mono mt-0.5"><%= l.paid_ref %></p>
                     <% } %>
+                    <% if (warnings.length) { %>
+                      <p class="text-[10px] text-amber-700 mt-0.5 leading-tight max-w-[11rem]" title="<%= warnings.join('\n') %>">⚠ No rate set: <%= warnings.map(w => w.split(' hours paid')[0]).join(', ') %></p>
+                    <% } %>
+                    <% if (shifts.length) { %>
+                      <button type="button" onclick="toggleShifts(<%= l.id %>)" class="text-[10px] font-semibold text-gray-500 hover:text-brand-700 mt-1 inline-flex items-center gap-1" data-shifts-toggle="<%= l.id %>"><span class="shifts-caret inline-block transition-transform">▸</span> <%= shifts.length %> shift<%= shifts.length === 1 ? '' : 's' %><% if (l.travel_hours_total > 0) { %> · <%= fmtH(l.travel_hours_total) %>h travel<% } %></button>
+                    <% } %>
                   </td>
                   <td rowspan="<%= rowSpan %>" class="px-2 py-2 align-top text-[11px] font-mono text-gray-600 leading-tight">
                     <% const _bd = bsbAccFor(l); %>
@@ -162,9 +196,9 @@
                     <% } %>
                   </td>
                 <% } %>
-                <td class="px-2 py-1.5 text-xs font-semibold <%= BUCKET_BADGE[bk] || 'text-gray-700' %>"><%= bucketLabels[bk] || bk %></td>
+                <td class="px-2 py-1.5 text-xs font-semibold whitespace-nowrap <%= BUCKET_BADGE[bk] || 'text-gray-700' %>"><%= bucketLabels[bk] || bk %></td>
                 <% for (let i=0;i<7;i++) { const h = b.hours && b.hours[i]; %>
-                  <td class="px-1 py-1.5 text-center text-xs tabular-nums <%= h ? 'text-gray-900' : 'text-gray-300' %>"><%= h || '·' %></td>
+                  <td class="px-1 py-1.5 text-center text-xs tabular-nums <%= h ? 'text-gray-900' : 'text-gray-300' %> <%= i >= 5 && h ? 'bg-purple-50/60' : '' %>"><%= h || '·' %></td>
                 <% } %>
                 <td class="px-2 py-1.5 text-right text-xs font-semibold tabular-nums text-gray-900"><%= b.total_hours.toFixed(2) %></td>
                 <td class="px-2 py-1.5 text-right text-xs tabular-nums text-gray-700">$<%= fmtMoney(b.rate) %></td>
@@ -172,12 +206,12 @@
                 <% if (isFirst) { %>
                   <td rowspan="<%= rowSpan %>" class="px-2 py-2 text-right text-xs font-semibold tabular-nums text-gray-900 align-middle">$<%= fmtMoney(l.total_wages) %></td>
                   <td rowspan="<%= rowSpan %>" class="px-2 py-2 text-right text-xs tabular-nums text-gray-700 align-middle">
-                    <% if (l.total_allowance > 0) { %>
-                      $<%= fmtMoney(l.total_allowance) %>
-                      <p class="text-[9px] text-gray-400 font-normal mt-0.5">
-                        <% if (l.travel_allowance) { %>T $<%= l.travel_allowance %><% } %>
-                        <% if (l.meal_allowance) { %> M $<%= l.meal_allowance %><% } %>
-                        <% if (l.other_allowance) { %> O $<%= l.other_allowance %><% } %>
+                    <% if (l.total_allowance > 0 || travelOff || mealOff) { %>
+                      <% if (l.total_allowance > 0) { %>$<%= fmtMoney(l.total_allowance) %><% } else { %><span class="text-gray-300">—</span><% } %>
+                      <p class="text-[9px] text-gray-400 font-normal mt-0.5 whitespace-nowrap">
+                        <% if (travelOff) { %><span class="line-through" title="Travel allowance removed">T</span><% } else if (l.travel_allowance) { %>T $<%= fmtMoney(l.travel_allowance) %><% if (l.travel_override) { %><span title="Custom amount">*</span><% } %><% } %>
+                        <% if (mealOff) { %> <span class="line-through" title="Meal allowance removed">M</span><% } else if (l.meal_allowance) { %> M $<%= fmtMoney(l.meal_allowance) %><% if (l.meal_override) { %><span title="Custom amount">*</span><% } %><% } %>
+                        <% if (l.other_allowance) { %> O $<%= fmtMoney(l.other_allowance) %><% } %>
                       </p>
                     <% } else { %>
                       <span class="text-gray-300">—</span>
@@ -200,6 +234,39 @@
                 <% } %>
               </tr>
             <% }) %>
+          <% } %>
+          <% if (shifts.length) { %>
+            <!-- Traffio dockets behind this worker's pay — the source data a bookkeeper checks against -->
+            <tr class="shift-detail bg-gray-50/80" data-shift-detail="<%= l.id %>" hidden>
+              <td colspan="<%= colCount %>" class="px-4 py-2">
+                <table class="text-[11px] w-full max-w-4xl">
+                  <thead>
+                    <tr class="text-[9px] uppercase tracking-widest text-gray-400">
+                      <th class="text-left py-1 pr-3 font-bold">Date</th>
+                      <th class="text-left py-1 pr-3 font-bold">On – Off</th>
+                      <th class="text-right py-1 pr-3 font-bold">Hrs</th>
+                      <th class="text-right py-1 pr-3 font-bold">Travel</th>
+                      <th class="text-left py-1 pr-3 font-bold">Job</th>
+                      <th class="text-left py-1 pr-3 font-bold">Client / Project</th>
+                      <th class="text-left py-1 font-bold">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-200/70">
+                    <% shifts.slice().sort((x, y) => ((x.date || '') + (x.time_on || '')) < ((y.date || '') + (y.time_on || '')) ? -1 : 1).forEach(s => { %>
+                      <tr class="<%= (s.dow >= 5) ? 'text-purple-800' : 'text-gray-700' %>">
+                        <td class="py-1 pr-3 whitespace-nowrap font-medium"><%= shiftDateLabel(s.date) %></td>
+                        <td class="py-1 pr-3 whitespace-nowrap font-mono"><%= hhmm(s.time_on) %>–<%= hhmm(s.time_off) %><% if (s.night) { %> <span class="text-indigo-500" title="Night shift">☾</span><% } %><% if (s.time_off_date && s.time_off_date !== s.date) { %> <span class="text-gray-400" title="Finishes next day">+1</span><% } %></td>
+                        <td class="py-1 pr-3 text-right tabular-nums font-semibold"><%= fmtH(s.hours) %><% if (s.break_hours > 0) { %> <span class="text-gray-400 font-normal" title="Unpaid break already deducted">(−<%= fmtH(s.break_hours) %> brk)</span><% } %></td>
+                        <td class="py-1 pr-3 text-right tabular-nums <%= s.travel_hours > 0 ? 'text-teal-700 font-semibold' : 'text-gray-300' %>"><%= s.travel_hours > 0 ? fmtH(s.travel_hours) : '·' %></td>
+                        <td class="py-1 pr-3 whitespace-nowrap font-mono"><%= s.job_number || '—' %><% if (s.is_team_leader) { %> <span class="inline-flex px-1 rounded bg-amber-100 text-amber-800 text-[9px] font-bold" title="Team leader on this booking">TL</span><% } %></td>
+                        <td class="py-1 pr-3"><%= s.client_name || '' %><% if (s.project_name) { %> <span class="text-gray-400">· <%= s.project_name %></span><% } %></td>
+                        <td class="py-1 text-gray-500 max-w-xs truncate" title="<%= s.notes || '' %>"><%= s.notes || '' %></td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
           <% } %>
         <% }) %>
       </tbody>

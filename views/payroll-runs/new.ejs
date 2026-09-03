@@ -33,7 +33,7 @@
         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Traffio CSV file <span class="text-red-500">*</span></label>
         <input type="file" name="csv" accept=".csv,text/csv" required
           class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 cursor-pointer">
-        <p class="text-xs text-gray-400 mt-1.5">Up to 10 MB. Period is auto-detected from the file (you can override below).</p>
+        <p class="text-xs text-gray-400 mt-1.5">Up to 10 MB. The pay week (Mon–Sun) is the one holding most of the shifts — override below if needed. Shifts dated outside it are listed on the run and not paid.</p>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
@@ -63,11 +63,11 @@
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">
         <p class="font-semibold mb-1">How matching works</p>
         <ol class="list-decimal list-inside space-y-0.5 text-blue-800">
-          <li>Match on <span class="font-mono">employee_reference → employee_code</span></li>
-          <li>Otherwise exact name match (case-insensitive)</li>
-          <li>Otherwise the worker lands in the <strong>Unclassified</strong> bucket — you can match them on the next page</li>
+          <li>Traffio person ID remembered from a previous "Link to employee" — links stick week to week</li>
+          <li>Otherwise <span class="font-mono">employee_reference → employee_code</span>, then exact name match</li>
+          <li>Otherwise the worker lands in <strong>Unclassified</strong> — link them once on the next page</li>
         </ol>
-        <p class="mt-2">Rates are pulled from each employee's <span class="font-mono">rate_day</span> / <span class="font-mono">rate_night</span> at import time and snapshotted onto the line.</p>
+        <p class="mt-2">Rates snapshot from Worker Rates at import. Hours split Day / Night by clock time with OT / DT per day; Traffio <span class="font-mono">travel_time</span> is paid as a separate Travel time row.</p>
       </div>
 
       <div class="flex items-center justify-end gap-2 pt-2">
