@@ -33,7 +33,11 @@
         <label class="block text-sm font-semibold text-gray-700 mb-1.5">Traffio CSV file <span class="text-red-500">*</span></label>
         <input type="file" name="csv" accept=".csv,text/csv" required
           class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 cursor-pointer">
-        <p class="text-xs text-gray-400 mt-1.5">Up to 10 MB. The pay week (Mon–Sun) is the one holding most of the shifts — override below if needed. Shifts dated outside it are listed on the run and not paid.</p>
+        <p class="text-xs text-gray-400 mt-1.5">Up to 10 MB. The pay week (Mon–Sun) is the one holding most of the shifts — override below if needed. Every shift in the file is paid once, on the day it started.</p>
+        <label class="mt-2 flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
+          <input type="checkbox" name="skip_outside_period" value="1" class="mt-0.5 rounded border-gray-300">
+          <span>Skip shifts that started outside the pay week <span class="text-gray-400">(off by default — Traffio's export can carry the previous Sunday's night shifts; they're normally paid here and listed on the run for checking)</span></span>
+        </label>
       </div>
 
       <div class="grid grid-cols-2 gap-4">

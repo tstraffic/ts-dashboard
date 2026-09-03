@@ -92,18 +92,33 @@
   <% } %>
 
   <%
-    const skipped = (importSummary && Array.isArray(importSummary.skipped_outside_period)) ? importSummary.skipped_outside_period : [];
+    const skipped  = (importSummary && Array.isArray(importSummary.skipped_outside_period))  ? importSummary.skipped_outside_period  : [];
+    const included = (importSummary && Array.isArray(importSummary.included_outside_period)) ? importSummary.included_outside_period : [];
     function fmtShiftDate(iso) { if (!iso) return ''; const d = new Date(iso + 'T00:00:00'); return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }); }
+    function shiftLine(s) { return `${fmtShiftDate(s.date)} ${String(s.time_on || '').slice(0,5)}–${String(s.time_off || '').slice(0,5)} · ${s.hours}h` + (s.travel_hours > 0 ? ` + ${s.travel_hours}h travel` : '') + (s.job_number ? ` · job ${s.job_number}` : '') + (s.client_name ? ` · ${s.client_name}` : ''); }
   %>
+  <% if (included.length > 0) { %>
+    <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-3">
+      <svg class="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-gray-900"><%= included.length %> shift<%= included.length !== 1 ? 's' : '' %> in the CSV started outside <%= fmtDate(run.period_start) %> → <%= fmtDate(run.period_end) %> — <span class="font-bold">included and paid on this run</span>, once, on the day they started</p>
+        <p class="text-xs text-gray-500 mt-0.5">They sit in that weekday's column (a Sunday-night shift is one Sunday shift even though it finishes Monday). Check they weren't already paid on last week's run.</p>
+        <ul class="mt-2 text-xs text-gray-700 space-y-0.5">
+          <% included.forEach(s => { %>
+            <li class="tabular-nums"><span class="font-semibold"><%= s.full_name %></span> · <%= shiftLine(s) %></li>
+          <% }) %>
+        </ul>
+      </div>
+    </div>
+  <% } %>
   <% if (skipped.length > 0) { %>
     <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-3">
       <svg class="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-semibold text-gray-900"><%= skipped.length %> shift<%= skipped.length !== 1 ? 's' : '' %> in the CSV fell outside <%= fmtDate(run.period_start) %> → <%= fmtDate(run.period_end) %> and <span class="font-bold">were not paid on this run</span></p>
-        <p class="text-xs text-gray-500 mt-0.5">Traffio's export includes bookings that end inside the range, so the previous week's Sunday-night shifts ride along. They belong to that week's pay run.</p>
+        <p class="text-sm font-semibold text-gray-900"><%= skipped.length %> shift<%= skipped.length !== 1 ? 's' : '' %> in the CSV started outside <%= fmtDate(run.period_start) %> → <%= fmtDate(run.period_end) %> and <span class="font-bold">were not paid on this run</span> (skip option ticked at import)</p>
         <ul class="mt-2 text-xs text-gray-700 space-y-0.5">
           <% skipped.forEach(s => { %>
-            <li class="tabular-nums"><span class="font-semibold"><%= s.full_name %></span> · <%= fmtShiftDate(s.date) %> <%= String(s.time_on || '').slice(0,5) %>–<%= String(s.time_off || '').slice(0,5) %> · <%= s.hours %>h<% if (s.travel_hours > 0) { %> + <%= s.travel_hours %>h travel<% } %><% if (s.job_number) { %> · job <%= s.job_number %><% } %><% if (s.client_name) { %> · <%= s.client_name %><% } %></li>
+            <li class="tabular-nums"><span class="font-semibold"><%= s.full_name %></span> · <%= shiftLine(s) %></li>
           <% }) %>
         </ul>
       </div>
