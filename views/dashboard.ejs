@@ -438,7 +438,7 @@
           const attnRow = (r) => {
             const dot = r.tone === 'critical' ? 'is-crit' : (r.tone === 'info' ? 'is-info' : 'is-warn'); %>
             <a href="<%= r.href %>" data-attn="<%= r.key %>" class="tdb-triage-row group" style="border-top:1px solid var(--tb-tick)">
-              <span class="tdb-num"><%= r.count %></span>
+              <span class="tdb-num attn-count"><%= r.count %></span>
               <span class="tdb-dot <%= dot %>" aria-hidden="true"></span>
               <span class="flex-1 min-w-0 truncate"><%= r.label %>
                 <% if (r.detail) { %><% if (r.tone === 'critical') { %><span class="tdb-pill is-crit" style="margin-left:8px"><%= r.detail %></span><% } else { %><span class="tdb-meta" style="margin-left:8px"><%= r.detail %></span><% } %><% } %>
@@ -447,7 +447,7 @@
             </a>
           <% };
         %>
-        <div>
+        <div data-attn-list="top">
           <% needs.top.forEach(r => { attnRow(r); }) %>
         </div>
         <% if (needs.overflow.length > 0) { %>

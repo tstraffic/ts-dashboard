@@ -128,11 +128,14 @@ test('overdue plans row uses the same definition as /compliance', async ({ page 
   expect(dashCount).toBeGreaterThanOrEqual(1);
   expect(await row.getAttribute('href')).toBe('/compliance');
 
-  // Same number on the /compliance summary — one definition, one truth.
-  await page.goto('/compliance');
-  const stat = page.locator('.stat-card', { hasText: /overdue/i }).first();
+  // Same number on the Plans & Approvals summary — one definition, one truth.
+  // The summary tiles moved from /compliance onto the Planning hub (Aug 2026).
+  await page.goto('/departments/planning');
+  const stat = page.locator('.stat-card').filter({
+    has: page.locator('.stat-card-label', { hasText: /^\s*Overdue\s*$/ }),
+  }).first();
   await expect(stat).toBeVisible();
-  const pageCount = parseInt((await stat.innerText()).match(/\d+/)[0], 10);
+  const pageCount = parseInt((await stat.locator('.stat-card-value').innerText()).trim(), 10);
   expect(pageCount).toBe(dashCount);
 });
 
@@ -183,18 +186,18 @@ test('six-plus triggers cap at five rows with a working overflow', async ({ page
   await loginAs(page);
 
   // Exactly 5 rows in the always-visible list...
-  await expect(page.locator('#needs-you-now > .divide-y > [data-attn]')).toHaveCount(5);
+  await expect(page.locator('#needs-you-now [data-attn-list="top"] > [data-attn]')).toHaveCount(5);
 
   // ...and the rest behind a native <details> disclosure.
   const details = page.locator('#needs-you-now details');
   await expect(details).toBeVisible();
-  await expect(details.locator('summary')).toHaveText(/\+\d+ more/);
+  await expect(details.locator('summary')).toHaveText(/Show \d+ more/);
   await details.locator('summary').click();
   expect(await details.locator('[data-attn]').count()).toBeGreaterThanOrEqual(1);
 
   // The seeded booking gives the console a day-bar lane + the NOW line.
   await expect(page.locator('#day-bar')).toBeVisible();
-  expect(await page.locator('#day-bar .db-blk').count()).toBeGreaterThanOrEqual(1);
+  expect(await page.locator('#day-bar .tdb-blk').count()).toBeGreaterThanOrEqual(1);
   await expect(page.locator('#now-line')).toBeAttached();
 
   // Jobs in flight lists the seeded booking with its window.

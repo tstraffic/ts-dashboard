@@ -5,7 +5,7 @@
   const cancelHref = (typeof returnTo !== 'undefined' && returnTo) ? returnTo : '/compliance';
 
   const TYPE_LABELS = {
-    traffic_guidance:    'TGS (Traffic Guidance Scheme)',
+    traffic_guidance:    'TGS package',
     tmp_approval:        'CTMP (Construction Traffic Mgmt Plan)',
     spa:                 'SPA (Swept Path Analysis)',
     sza:                 'SZA (Speed Zone Authorisation)',
@@ -77,6 +77,7 @@
         </a>
         <a href="#quote" data-tab="quote" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap">Quote</a>
         <a href="#details" data-tab="details" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap">Details</a>
+        <a href="#roltable" data-tab="roltable" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap">ROL table</a>
       </nav>
     </div>
   <% } %>
@@ -910,6 +911,103 @@
       </script>
     </div>
     </div><%# /subplans panel %>
+
+    <%# ── ROL TABLE — one-glance TGS↔ROL coverage. Rows are TGS sheets
+        (each file in a TGS package; a fileless package is its own row),
+        columns are the covering ROL and its extension chain. A sheet's
+        coverage = its own per-file links ∪ its package's links. ─────── %>
+    <div data-tab-panel="roltable" class="hidden">
+      <%
+        const rtDocLinks = (typeof docRolLinks !== 'undefined' && docRolLinks) ? docRolLinks : {};
+        const rtRolById = {};
+        rolSubs.forEach(r => { rtRolById[r.id] = r; });
+        const rtRolLabel = (r) => r.rol_actual_number || r.reference_number || ('ROL #' + r.id);
+        const rtRolApproved = (r) => r.status === 'approved' || r.rol_stage === 'approved';
+        const rtExtsFor = (r) => (typeof subPlanExtensions !== 'undefined' && subPlanExtensions[r.id]) || [];
+        let rtMaxExt = 0;
+        rolSubs.forEach(r => { rtMaxExt = Math.max(rtMaxExt, rtExtsFor(r).length); });
+
+        // Build the rows: sheet × covering-ROL (or a single uncovered row).
+        const rtRows = [];
+        tgsSubs.forEach(tgs => {
+          const pkgLinks = (typeof subPlanRolLinks !== 'undefined' && subPlanRolLinks[tgs.id]) || [];
+          const sheets = (subPlanDocs[tgs.id] || []);
+          const units = sheets.length ? sheets.map(d => ({ doc: d, tgs })) : [{ doc: null, tgs }];
+          units.forEach(u => {
+            const own = u.doc ? (rtDocLinks[u.doc.id] || []) : [];
+            const effective = Array.from(new Set([...own, ...pkgLinks])).filter(id => rtRolById[id]);
+            if (!effective.length) { rtRows.push({ ...u, rol: null, inherited: false }); return; }
+            effective.forEach(rid => rtRows.push({ ...u, rol: rtRolById[rid], inherited: !own.includes(rid) }));
+          });
+        });
+        const rtSheetName = (u) => u.doc
+          ? (u.doc.original_name || u.doc.filename || ('File #' + u.doc.id))
+          : ((u.tgs.description || u.tgs.reference_number || 'TGS package') + ' (no files yet)');
+      %>
+      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div class="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between gap-3">
+          <div>
+            <p class="text-sm font-semibold text-gray-900">TGS ↔ ROL coverage</p>
+            <p class="text-xs text-gray-400 mt-0.5">Every TGS sheet, the ROL that covers it, and that ROL's extensions. Empty box = no ROL linked yet — link sheets from the TGS package card, or the whole package with its Linked ROLs chips.</p>
+          </div>
+          <span class="shrink-0 text-[11px] text-gray-400"><%= tgsSubs.length %> package<%= tgsSubs.length === 1 ? '' : 's' %> · <%= rolSubs.length %> ROL<%= rolSubs.length === 1 ? '' : 's' %></span>
+        </div>
+        <% if (!tgsSubs.length) { %>
+          <p class="px-5 py-6 text-sm text-gray-400 italic">No TGS packages on this plan yet — add one from the Sub-plans tab.</p>
+        <% } else { %>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                <th class="px-4 py-2.5">TGS sheet</th>
+                <th class="px-4 py-2.5">Original ROL no.</th>
+                <% for (let k = 1; k <= Math.max(rtMaxExt, 1); k++) { %>
+                  <th class="px-4 py-2.5">Ext <%= k %></th>
+                <% } %>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <% rtRows.forEach(function (row) {
+                   const exts = row.rol ? rtExtsFor(row.rol) : []; %>
+                <tr class="hover:bg-gray-50 transition-colors">
+                  <td class="px-4 py-2.5">
+                    <a href="#sub-<%= row.tgs.id %>" class="text-gray-900 hover:text-brand-700 font-medium block truncate max-w-[22rem]" title="<%= rtSheetName(row) %>"><%= rtSheetName(row) %></a>
+                    <span class="text-[11px] font-mono text-gray-400"><%= row.tgs.reference_number || ('TGS #' + row.tgs.id) %><%= row.inherited && row.rol ? ' · package link' : '' %></span>
+                  </td>
+                  <td class="px-4 py-2.5">
+                    <% if (row.rol) { %>
+                      <span class="inline-flex items-center gap-1.5">
+                        <% if (rtRolApproved(row.rol)) { %>
+                          <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[10px] font-bold" title="ROL approved">✓</span>
+                        <% } else { %>
+                          <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-600 text-[10px] font-bold ring-1 ring-amber-300" title="ROL not approved yet">○</span>
+                        <% } %>
+                        <a href="#sub-<%= row.rol.id %>" class="font-mono text-brand-700 hover:underline"><%= rtRolLabel(row.rol) %></a>
+                      </span>
+                    <% } else { %>
+                      <span class="inline-block w-5 h-5 rounded border-2 border-dashed border-gray-300" title="No ROL linked to this sheet"></span>
+                    <% } %>
+                  </td>
+                  <% for (let k = 0; k < Math.max(rtMaxExt, 1); k++) { const ext = exts[k]; %>
+                    <td class="px-4 py-2.5">
+                      <% if (ext) { %>
+                        <span class="inline-flex items-center gap-1.5" title="<%= ext.label || ('Extension ' + (k+1)) %><%= ext.reason ? ' — ' + ext.reason : '' %>">
+                          <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[10px] font-bold">✓</span>
+                          <span class="text-xs text-gray-600"><%= ext.extended_to ? formatDateShort(ext.extended_to) : '' %></span>
+                        </span>
+                      <% } else if (row.rol) { %>
+                        <span class="inline-block w-5 h-5 rounded border-2 border-dashed border-gray-200" title="No extension <%= k + 1 %>"></span>
+                      <% } %>
+                    </td>
+                  <% } %>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+      </div>
+    </div><%# /roltable panel %>
 
     <!-- Task-off modal: assign a sub-plan to a dashboard user as a task. -->
     <div id="taskModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">

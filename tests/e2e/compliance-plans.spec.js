@@ -291,3 +291,116 @@ test('plan creation: one default owner covers every type, override wins per type
   expect(byType.traffic_guidance).toBe(users[0].id); // default owner
   expect(byType.rol).toBe(users[1].id);              // per-type override
 });
+
+// ── TGS packages, per-sheet ROL links, ROL matrix, extension auto-fill,
+//    register upgrades (Sep 2026 office asks) ────────────────────────────
+
+// A pdfkit-generated issued/extension ROL the parser reads end to end:
+// LICENCE NO + explicit From/To. Written to the sub-plan's upload dir so it
+// looks exactly like an attach.
+function writeRolPdf(subId, name, licenceNo, from, to) {
+  const PDFDocument = require('pdfkit');
+  const dir = path.join(__dirname, '..', '..', 'data', 'uploads', 'compliance', String(subId));
+  fs.mkdirSync(dir, { recursive: true });
+  const abs = path.join(dir, name);
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4' });
+    const ws = fs.createWriteStream(abs);
+    doc.pipe(ws);
+    doc.fontSize(12).text('ROAD OCCUPANCY LICENCE');
+    doc.text('LICENCE NO : ' + licenceNo);
+    doc.text('LICENCE DURATION');
+    doc.text('From: ' + from);
+    doc.text('To: ' + to);
+    doc.end();
+    ws.on('finish', () => resolve({ abs, rel: `/data/uploads/compliance/${subId}/${name}` }));
+    ws.on('error', reject);
+  });
+}
+
+test('a TGS package holds many sheets, each linkable to any ROL, and the ROL table oversees it', async ({ page }) => {
+  const seed = seedPlan();
+  // Two sheets in the TGS package; approve ROL 1 so it renders a tick.
+  const sheets = withDb(db => {
+    const ins = db.prepare(`INSERT INTO compliance_documents (compliance_id, filename, original_name, file_path, file_size, mime_type)
+      VALUES (?, ?, ?, ?, 10, 'application/pdf')`);
+    const a = ins.run(seed.tgsId, 'sheet-A.pdf', 'sheet-A.pdf', `/x/A.pdf`).lastInsertRowid;
+    const b = ins.run(seed.tgsId, 'sheet-B.pdf', 'sheet-B.pdf', `/x/B.pdf`).lastInsertRowid;
+    db.prepare("UPDATE compliance SET status='approved', rol_stage='approved', rol_actual_number='LIC-700' WHERE id=?").run(seed.rol1);
+    return { a, b };
+  });
+
+  await loginAs(page);
+  await page.goto(editUrl(seed));
+  await openCard(page, seed.tgsId);
+
+  // Each sheet carries its own ROL chip row; link sheet A → ROL 1 (doc-level).
+  const sheetA = page.locator(`[data-doc-rol-links="${sheets.a}"]`);
+  await expect(sheetA).toBeVisible();
+  await sheetA.locator('button', { hasText: 'LIC-700' }).click();
+  await page.waitForLoadState('networkidle');
+
+  const linkRow = withDb(db => db.prepare('SELECT rol_id FROM compliance_doc_rol_links WHERE document_id = ?').get(sheets.a));
+  expect(linkRow.rol_id).toBe(seed.rol1);
+
+  // Package-level link still works alongside (covers sheet B too).
+  await page.locator(`#sub-${seed.tgsId} [data-rol-links] button`, { hasText: 'TSROL-E2E-2' }).click();
+  await page.waitForLoadState('networkidle');
+
+  // ROL table tab: sheet A shows a tick under the approved ROL.
+  await page.locator('[data-tab="roltable"]').click();
+  const panel = page.locator('[data-tab-panel="roltable"]');
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText('sheet-A.pdf');
+  await expect(panel).toContainText('LIC-700');
+  // The header carries an Ext column even before any extension exists.
+  await expect(panel.locator('thead')).toContainText('Ext 1');
+});
+
+test('an extension auto-fills its end date from the re-issued ROL PDF', async ({ page }) => {
+  const seed = seedPlan();
+  // Give the ROL a licence number + printed end so the move is visible.
+  withDb(db => db.prepare("UPDATE compliance SET status='approved', rol_stage='approved', rol_actual_number='55501', rol_summary_to='2026-09-15', expiry_date='2026-09-15' WHERE id=?").run(seed.rol1));
+  const pdf = await writeRolPdf(seed.rol1, 'ext.pdf', '55501', '01-Sep-2026', '30-Sep-2026');
+
+  await loginAs(page);
+  // Post the extension with the PDF and NO extended_to — the parser fills it.
+  const res = await page.request.post(`/compliance/sub-plans/${seed.rol1}/extensions`, {
+    multipart: {
+      _csrf: await page.evaluate(() => document.querySelector('meta[name="csrf-token"]')?.content || ''),
+      extended_to: '',
+      reason: '',
+      extension_file: { name: 'ext.pdf', mimeType: 'application/pdf', buffer: fs.readFileSync(pdf.abs) },
+    },
+  });
+  expect([200, 302]).toContain(res.status());
+
+  const ext = withDb(db => db.prepare('SELECT extended_to, reason FROM compliance_extensions WHERE compliance_id = ?').get(seed.rol1));
+  expect(ext.extended_to).toBe('2026-09-30');                 // from the PDF's To: line
+  expect(ext.reason).toContain('55501');                       // auto reason names the licence
+  const rol = withDb(db => db.prepare('SELECT expiry_date, rol_summary_to FROM compliance WHERE id = ?').get(seed.rol1));
+  expect(rol.expiry_date).toBe('2026-09-30');                  // effective end moved
+  expect(rol.rol_summary_to).toBe('2026-09-15');               // printed end preserved
+});
+
+test('the register searches sub-plan refs and filters urgent rows', async ({ page }) => {
+  const seed = seedPlan();
+  // Make the parent findable by a sub-plan ref, and urgent (started).
+  withDb(db => {
+    db.prepare("UPDATE compliance SET title='JPPLAN searchable plan', status='started' WHERE id=?").run(seed.parentId);
+    db.prepare("UPDATE compliance SET rol_actual_number='FINDME-999' WHERE id=?").run(seed.rol1);
+  });
+  await loginAs(page);
+
+  // Search by the real ROL licence number (lives on a sub-plan).
+  await page.goto('/compliance?q=FINDME-999');
+  await expect(page.locator('tr.month-row', { hasText: 'JPPLAN searchable plan' })).toHaveCount(1);
+
+  // A miss returns nothing.
+  await page.goto('/compliance?q=zzz-no-such-ref');
+  await expect(page.locator('tr.month-row', { hasText: 'JPPLAN searchable plan' })).toHaveCount(0);
+
+  // Urgent keeps the started plan and never shows an approved-only one.
+  await page.goto('/compliance?urgent=1');
+  await expect(page.locator('tr.month-row', { hasText: 'JPPLAN searchable plan' })).toHaveCount(1);
+});

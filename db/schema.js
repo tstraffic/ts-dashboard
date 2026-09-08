@@ -15790,6 +15790,29 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 355 error:', e.message); }
   }
 
+  // Migration 356: per-SHEET TGS ↔ ROL links. A TGS sub-plan is now a
+  // "TGS package" — each uploaded file is one TGS sheet — and an individual
+  // sheet can be linked to any ROL on the same plan. Sub-plan-level links
+  // (compliance_tgs_rol_links, mig 332) keep working as package-wide
+  // coverage; a sheet's effective coverage = its own links ∪ its package's.
+  if (!isMigrationApplied.get(356)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS compliance_doc_rol_links (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          document_id INTEGER NOT NULL REFERENCES compliance_documents(id) ON DELETE CASCADE,
+          rol_id INTEGER NOT NULL REFERENCES compliance(id) ON DELETE CASCADE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(document_id, rol_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_doc_rol_links_doc ON compliance_doc_rol_links(document_id);
+        CREATE INDEX IF NOT EXISTS idx_doc_rol_links_rol ON compliance_doc_rol_links(rol_id);
+      `);
+      recordMigration.run(356, 'compliance_doc_rol_links: per-TGS-sheet ROL links');
+      console.log('Migration 356 applied: per-sheet TGS↔ROL links');
+    } catch (e) { console.error('Migration 356 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

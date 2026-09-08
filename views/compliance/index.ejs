@@ -109,6 +109,15 @@
         class="px-3 py-1 rounded-full text-sm font-medium transition <%= filters.invoice_state === 'invoiced' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' %>">
         Invoiced
       </a>
+      <span class="w-px h-5 bg-gray-200 self-center mx-1"></span>
+      <%# Urgent = the rows the register paints red: plans still at 'started'
+          plus anything expiring inside a week. Keep in step with the row
+          tint chain below and the SQL twin in routes/compliance.js. %>
+      <a href="<%= buildUrl({ urgent: filters.urgent === '1' ? '' : '1', view: filters.view, ref: filters.ref }) %>"
+        class="px-3 py-1 rounded-full text-sm font-semibold transition inline-flex items-center gap-1.5 <%= filters.urgent === '1' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100' %>">
+        <span class="w-1.5 h-1.5 rounded-full <%= filters.urgent === '1' ? 'bg-white' : 'bg-red-500' %>"></span>
+        Urgent
+      </a>
     </div>
 
     <!-- Second filter row -->
@@ -116,7 +125,16 @@
       <%- include('../partials/csrf') %>
       <input type="hidden" name="item_type" value="<%= filters.item_type %>">
       <input type="hidden" name="invoice_state" value="<%= filters.invoice_state %>">
+      <input type="hidden" name="urgent" value="<%= filters.urgent %>">
       <div class="flex flex-wrap gap-3 items-center">
+
+        <!-- Search — plan titles/numbers, job, client, plus sub-plan refs
+             (TSTGS…, the real ROL licence number) and sheet descriptions. -->
+        <div class="relative">
+          <svg class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="search" name="q" value="<%= filters.q %>" placeholder="Search plans, refs, ROL no…"
+            class="w-56 bg-white border border-gray-200 text-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
 
         <!-- View toggle -->
         <div class="flex rounded-lg overflow-hidden border border-gray-200 text-sm">
@@ -174,8 +192,8 @@
           <% }) %>
         </select>
 
-        <% if (filters.status || filters.job_id || filters.date_from || filters.date_to) { %>
-          <a href="<%= buildUrl({ status: '', job_id: '', date_from: '', date_to: '' }) %>" class="text-sm text-gray-400 hover:text-gray-600 transition">Clear filters</a>
+        <% if (filters.status || filters.job_id || filters.date_from || filters.date_to || filters.q || filters.urgent) { %>
+          <a href="<%= buildUrl({ status: '', job_id: '', date_from: '', date_to: '', q: '', urgent: '' }) %>" class="text-sm text-gray-400 hover:text-gray-600 transition">Clear filters</a>
         <% } %>
 
         <!-- Export -->
@@ -289,6 +307,13 @@
                       <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-700 mt-0.5">READY FOR INVOICE</span>
                     <% } else if (item.invoiced) { %>
                       <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-700 mt-0.5">INVOICED<%= item.invoice_number ? ' — ' + item.invoice_number : '' %></span>
+                      <%# Work landed AFTER the invoice went out — the exact
+                          "we went back and added something" signal the
+                          invoicing person needs. updated_at moves on every
+                          plan/sub-plan write (touchPlan). %>
+                      <% if (item.invoiced_at && item.updated_at && String(item.updated_at) > String(item.invoiced_at)) { %>
+                        <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-800 ring-1 ring-amber-300 mt-0.5">UPDATED AFTER INVOICING</span>
+                      <% } %>
                     <% } %>
                   </span>
                   <% if (item.item_type === 'council_permit' && item.council_fee_amount > 0) { %>
@@ -306,15 +331,24 @@
                       <%
                         // Parent row: show a per-sub-plan-type badge cluster derived
                         // from the actual children, not the placeholder item_type.
+                        // Each badge carries the FILE count for that type ("TGS · 10")
+                        // — a TGS package holds one file per sheet, so this is the
+                        // sheet volume whoever's invoicing needs at a glance.
                         const subTypes = (subPlansByParent[item.id] || []).map(s => s.item_type);
                         const counts = {};
                         subTypes.forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+                        const fileMap = {};
+                        (item.file_counts || []).forEach(fc => { fileMap[fc.kind] = fc.files; });
                       %>
                       <% Object.keys(counts).forEach(function(t) {
                         const ttc = TYPE_CONFIG[t] || { short: t, color: 'bg-gray-100 text-gray-600' };
+                        const files = fileMap[t === 'road_occupancy' ? 'rol' : t] || 0;
                       %>
-                        <span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full <%= ttc.color %>"><%= ttc.short %><% if (counts[t] > 1) { %> <span class="ml-1 opacity-70">×<%= counts[t] %></span><% } %></span>
+                        <span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full <%= ttc.color %>" title="<%= files %> file<%= files === 1 ? '' : 's' %> across <%= counts[t] %> <%= ttc.short %> sub-plan<%= counts[t] === 1 ? '' : 's' %>"><%= ttc.short %><% if (counts[t] > 1) { %> <span class="ml-1 opacity-70">×<%= counts[t] %></span><% } %><% if (files > 0) { %><span class="ml-1 opacity-80">· <%= files %></span><% } %></span>
                       <% }) %>
+                      <% if (fileMap.plan) { %>
+                        <span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600" title="Files attached to the plan itself">Plan · <%= fileMap.plan %></span>
+                      <% } %>
                       <% if (subTypes.length === 0) { %>
                         <span class="text-[11px] text-gray-400 italic">empty plan</span>
                       <% } %>

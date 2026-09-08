@@ -103,7 +103,10 @@
         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 ring-1 ring-amber-200 shrink-0"><%= cExt.length %> ext</span>
       <% } %>
       <% if (ownerName) { %><span class="hidden md:inline truncate max-w-[110px]" title="Owner"><%= ownerName %></span><% } %>
-      <% if (docCount > 0) { %>
+      <% if (isTgs && docCount > 0) { %>
+        <%# A TGS package's files ARE its sheets — say so, not just a paperclip. %>
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 ring-1 ring-blue-200 shrink-0" title="<%= docCount %> TGS sheet<%= docCount === 1 ? '' : 's' %> in this package"><%= docCount %> sheet<%= docCount === 1 ? '' : 's' %></span>
+      <% } else if (docCount > 0) { %>
         <span class="inline-flex items-center gap-0.5 shrink-0" title="<%= docCount %> file<%= docCount === 1 ? '' : 's' %>">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656L5.586 10.758a6 6 0 108.486 8.486L20.5 12"/></svg><%= docCount %>
         </span>
@@ -317,27 +320,30 @@
       </div>
     <% } %>
 
-    <!-- Extensions: chips + "+ Extension" -->
+    <!-- Extensions: chips + "+ Extension". Each chip names the ORIGINAL ROL
+         it extends, and dropping the re-issued licence PDF auto-fills the
+         new end date (routes/compliance.js runs it through parseRolPdf). -->
     <div class="mb-3 px-3 py-2 bg-amber-50/50 ring-1 ring-amber-100 rounded text-xs">
       <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-[10px] font-bold uppercase tracking-wide text-amber-700">Extensions</span>
+        <span class="text-[10px] font-bold uppercase tracking-wide text-amber-700">Extensions<% if (cExt.length) { %> · <%= rolLinkLabel(sub) %><% } %></span>
         <% cExt.forEach(e => { %>
-          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white ring-1 ring-amber-200 text-amber-800 text-[11px] font-medium" title="<%= e.reason || '' %>">
-            <%= e.label || 'Extension' %><%= e.extended_to ? ' → ' + e.extended_to : '' %>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white ring-1 ring-amber-200 text-amber-800 text-[11px] font-medium" title="Extends <%= rolLinkLabel(sub) %><%= e.reason ? ' — ' + e.reason : '' %>">
+            <%= e.label || 'Extension' %> <span class="font-mono text-amber-600">· <%= rolLinkLabel(sub) %></span><%= e.extended_to ? ' → ' + e.extended_to : '' %>
             <% if (e.file_path) { %><a href="<%= e.file_path %>" target="_blank" class="text-brand-600 hover:underline">file</a><% } %>
             <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extensions/<%= e.id %>/delete" class="inline" onsubmit="return confirm('Delete this extension? The effective end date recomputes.')"><%- include('../partials/csrf') %><button class="text-gray-400 hover:text-rose-600 leading-none">✕</button></form>
           </span>
         <% }) %>
         <button type="button" class="px-2 py-0.5 text-[11px] font-semibold text-amber-700 bg-white hover:bg-amber-100 ring-1 ring-amber-300 rounded"
-          onclick="var f=document.getElementById('ext-form-<%= sub.id %>'); f.classList.toggle('hidden'); if(!f.classList.contains('hidden'))f.querySelector('input[type=date]').focus();">+ Extension</button>
-        <% if (!cExt.length) { %><span class="text-gray-400 italic">none — add one and the effective end date moves automatically</span><% } %>
+          onclick="var f=document.getElementById('ext-form-<%= sub.id %>'); f.classList.toggle('hidden'); if(!f.classList.contains('hidden'))f.querySelector('input[type=file]').focus();">+ Extension</button>
+        <% if (!cExt.length) { %><span class="text-gray-400 italic">none — drop the re-issued ROL PDF and the new end date fills itself</span><% } %>
       </div>
       <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extensions" enctype="multipart/form-data" id="ext-form-<%= sub.id %>" class="hidden mt-2 flex flex-wrap items-center gap-2">
         <%- include('../partials/csrf') %>
-        <label class="text-[11px] text-gray-600">Extended to <input type="date" name="extended_to" required class="ml-1 px-2 py-1 text-xs border border-gray-300 rounded"></label>
-        <input type="text" name="reason" placeholder="Reason (optional)" class="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-300 rounded">
         <input type="file" name="extension_file" accept=".pdf,.jpg,.jpeg,.png,.webp" class="text-[11px]">
+        <label class="text-[11px] text-gray-600">Extended to <input type="date" name="extended_to" title="Leave blank with a PDF attached — the parsed licence end date is used" class="ml-1 px-2 py-1 text-xs border border-gray-300 rounded"></label>
+        <input type="text" name="reason" placeholder="Reason (auto from PDF if blank)" class="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-300 rounded">
         <button class="px-2.5 py-1 text-[11px] font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded">Add</button>
+        <span class="w-full text-[10px] text-gray-400">Drop the re-issued ROL PDF — end date, reason and the new shift table fill automatically; the date box overrides.</span>
       </form>
     </div>
 
@@ -529,9 +535,9 @@
     <!-- Council extensions: chips + "+ Extension" -->
     <div class="mb-3 px-3 py-2 bg-amber-50/50 ring-1 ring-amber-100 rounded text-xs">
       <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-[10px] font-bold uppercase tracking-wide text-amber-700">Extensions</span>
+        <span class="text-[10px] font-bold uppercase tracking-wide text-amber-700">Extensions<% if (cExt.length && (sub.application_ref_no || sub.reference_number)) { %> · <%= sub.application_ref_no || sub.reference_number %><% } %></span>
         <% cExt.forEach(e => { %>
-          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white ring-1 ring-amber-200 text-amber-800 text-[11px] font-medium" title="<%= e.reason || '' %>">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white ring-1 ring-amber-200 text-amber-800 text-[11px] font-medium" title="Extends <%= sub.application_ref_no || sub.reference_number || 'this permit' %><%= e.reason ? ' — ' + e.reason : '' %>">
             <%= e.label || 'Extension' %><%= e.extended_to ? ' → ' + e.extended_to : '' %>
             <% if (e.file_path) { %><a href="<%= e.file_path %>" target="_blank" class="text-brand-600 hover:underline">file</a><% } %>
             <form method="POST" action="/compliance/sub-plans/<%= sub.id %>/extensions/<%= e.id %>/delete" class="inline" onsubmit="return confirm('Delete this extension?')"><%- include('../partials/csrf') %><button class="text-gray-400 hover:text-rose-600 leading-none">✕</button></form>
@@ -643,24 +649,47 @@
     </details>
   <% } %>
 
-  <!-- Supporting documents — attach-only; never changes status. -->
+  <!-- Supporting documents — attach-only; never changes status. On a TGS
+       package every file IS one TGS sheet, and each sheet carries its own
+       ROL link chips (falls back to the package's Linked ROLs above). -->
+  <% const myDocRolLinks = (typeof docRolLinks !== 'undefined' && docRolLinks) ? docRolLinks : {}; %>
   <div class="mt-3">
-    <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Supporting documents<% if (docCount > 0) { %> · <%= docCount %><% } %></p>
+    <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1.5"><%= isTgs ? 'TGS sheets' : 'Supporting documents' %><% if (docCount > 0) { %> · <%= docCount %><% } %></p>
     <% if (docCount > 0) { %>
     <div class="mb-2 space-y-1">
       <% docs.forEach(d => { %>
-        <div class="flex items-center justify-between gap-2 px-2 py-1.5 bg-gray-50 rounded text-xs">
-          <a href="<%= d.file_path %>" target="_blank" class="flex-1 truncate text-brand-600 hover:text-brand-700">
-            <%= d.original_name %>
-          </a>
-          <span class="text-gray-400 shrink-0"><%= Math.round((d.file_size || 0) / 1024) %> KB</span>
-          <form method="POST" action="/compliance/<%= sub.id %>/documents/<%= d.id %>/delete" class="inline shrink-0" onsubmit="return confirm('Delete this file?')">
-            <%- include('../partials/csrf') %>
-            <input type="hidden" name="return_to" value="/compliance/<%= parentId %>/edit#sub-<%= sub.id %>">
-            <button type="submit" class="text-gray-400 hover:text-rose-600 p-0.5">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-          </form>
+        <div class="px-2 py-1.5 bg-gray-50 rounded text-xs">
+          <div class="flex items-center justify-between gap-2">
+            <a href="<%= d.file_path %>" target="_blank" class="flex-1 truncate text-brand-600 hover:text-brand-700">
+              <%= d.original_name %>
+            </a>
+            <span class="text-gray-400 shrink-0"><%= Math.round((d.file_size || 0) / 1024) %> KB</span>
+            <form method="POST" action="/compliance/<%= sub.id %>/documents/<%= d.id %>/delete" class="inline shrink-0" onsubmit="return confirm('Delete this file?')">
+              <%- include('../partials/csrf') %>
+              <input type="hidden" name="return_to" value="/compliance/<%= parentId %>/edit#sub-<%= sub.id %>">
+              <button type="submit" class="text-gray-400 hover:text-rose-600 p-0.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </form>
+          </div>
+          <% if (isTgs && rolLinkList.length) {
+               const sheetLinks = (myDocRolLinks[d.id] || []).map(Number); %>
+            <div class="mt-1 flex flex-wrap items-center gap-1" data-doc-rol-links="<%= d.id %>">
+              <span class="text-[10px] text-gray-400">ROL:</span>
+              <% rolLinkList.forEach(r => { const sheetLinked = sheetLinks.includes(Number(r.id)); const pkgLinked = myRolLinks.includes(Number(r.id)); %>
+                <form method="POST" action="/compliance/documents/<%= d.id %>/link-rol" class="inline-flex">
+                  <%- include('../partials/csrf') %>
+                  <input type="hidden" name="rol_id" value="<%= r.id %>">
+                  <input type="hidden" name="action" value="<%= sheetLinked ? 'remove' : 'add' %>">
+                  <button type="submit"
+                    class="px-1.5 py-0.5 rounded text-[10px] font-semibold ring-1 transition <%= sheetLinked ? 'bg-teal-600 text-white ring-teal-600' : (pkgLinked ? 'bg-teal-50 text-teal-700 ring-teal-200' : 'bg-white text-gray-500 ring-gray-200 hover:ring-teal-300 hover:text-teal-700') %>"
+                    title="<%= sheetLinked ? 'Unlink this sheet from ' + rolLinkLabel(r) : (pkgLinked ? 'Covered by the package link — click to pin this sheet to ' + rolLinkLabel(r) : 'Link this sheet to ' + rolLinkLabel(r)) %>">
+                    <%= sheetLinked ? '✓ ' : (pkgLinked ? '◦ ' : '+ ') %><%= rolLinkLabel(r) %>
+                  </button>
+                </form>
+              <% }) %>
+            </div>
+          <% } %>
         </div>
       <% }) %>
     </div>
@@ -670,8 +699,13 @@
       <div data-dropzone>
         <input type="file" name="documents" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.dwg,.dxf">
         <div class="dropzone-label">
-          <p class="text-xs text-gray-500">Drag &amp; drop supporting files — or <span class="text-brand-600 font-medium">click to browse</span></p>
-          <p class="text-[11px] text-gray-400 mt-0.5">Extras only — this does <span class="font-semibold">not</span> <%= isRolType ? 'approve the ROL (use the issued-ROL zone above)' : 'submit the plan' %>. Max 25MB / 10 files.</p>
+          <% if (isTgs) { %>
+            <p class="text-xs text-gray-500">Drag &amp; drop TGS sheets — or <span class="text-brand-600 font-medium">click to browse</span></p>
+            <p class="text-[11px] text-gray-400 mt-0.5">Each file is <span class="font-semibold">one TGS sheet</span> — drop 10 files and this package holds 10 TGS'. Link sheets to ROLs below. Max 25MB / 10 files per drop.</p>
+          <% } else { %>
+            <p class="text-xs text-gray-500">Drag &amp; drop supporting files — or <span class="text-brand-600 font-medium">click to browse</span></p>
+            <p class="text-[11px] text-gray-400 mt-0.5">Extras only — this does <span class="font-semibold">not</span> <%= isRolType ? 'approve the ROL (use the issued-ROL zone above)' : 'submit the plan' %>. Max 25MB / 10 files.</p>
+          <% } %>
         </div>
       </div>
       <noscript><button type="submit" class="mt-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md">Attach</button></noscript>

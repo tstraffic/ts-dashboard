@@ -86,6 +86,18 @@ function getSubPlan(db, subId) {
   return db.prepare("SELECT * FROM compliance WHERE id = ? AND parent_id IS NOT NULL").get(subId);
 }
 
+// Stamp "something happened on this plan" onto the PARENT row. The register
+// sorts and month-buckets by MAX(plan_date, updated_at), so any sub-plan
+// work — a file, a fee, an owner change — must bump the parent or the plan
+// stays buried in its original month. Accepts a sub OR parent id.
+function touchPlan(db, id) {
+  try {
+    const row = db.prepare('SELECT id, parent_id FROM compliance WHERE id = ?').get(id);
+    if (!row) return;
+    db.prepare('UPDATE compliance SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(row.parent_id || row.id);
+  } catch (e) { /* never block the write it rides on */ }
+}
+
 // Sub-plan types the count grid offers on the create form.
 const SUB_PLAN_TYPES = [
   'traffic_guidance', 'tmp_approval', 'spa', 'sza', 'rol',
@@ -271,9 +283,18 @@ const PLAN_DATE_SQL = "COALESCE(NULLIF(c.client_request_date, ''), NULLIF(c.due_
 
 router.get('/', (req, res) => {
   const db = getDb();
-  const { status, job_id, client_id, item_type, view = 'all', ref, date_from, date_to, invoice_state } = req.query;
+  const { status, job_id, client_id, item_type, view = 'all', ref, date_from, date_to, invoice_state, urgent } = req.query;
+  const q = String(req.query.q || '').trim();
 
-  let query = `SELECT c.*, ${PLAN_DATE_SQL} AS plan_date, j.job_number, j.client as job_client,
+  // "Last activity" for sorting/grouping: the plan's own date, pushed forward
+  // by the parent row's updated_at. Sub-plan writes bump the parent (see
+  // touchPlan), so going back into an old invoiced plan floats it to the top
+  // of the newest month instead of staying buried in the month it was
+  // requested. MAX() on ISO strings compares correctly; never earlier than
+  // plan_date, so untouched plans keep their historical month.
+  const ACTIVITY_DATE_SQL = `MAX(${PLAN_DATE_SQL}, DATE(COALESCE(NULLIF(c.updated_at, ''), c.created_at)))`;
+
+  let query = `SELECT c.*, ${PLAN_DATE_SQL} AS plan_date, ${ACTIVITY_DATE_SQL} AS activity_date, j.job_number, j.client as job_client,
     cl.company_name as client_name,
     u.full_name as approver_name, a.full_name as assigned_name,
     rfi.full_name as ready_for_invoice_by_name,
@@ -313,6 +334,24 @@ router.get('/', (req, res) => {
   if (invoice_state === 'ready')    query += ` AND COALESCE(c.ready_for_invoice, 0) = 1 AND COALESCE(c.invoiced, 0) = 0`;
   if (invoice_state === 'invoiced') query += ` AND COALESCE(c.invoiced, 0) = 1`;
 
+  // Search — parent fields plus anything the office actually quotes from a
+  // sub-plan (TS refs, the real ROL licence number, sheet descriptions).
+  if (q) {
+    const like = `%${q}%`;
+    query += ` AND (c.title LIKE ? OR c.plan_number LIKE ? OR c.invoice_number LIKE ?
+      OR j.job_name LIKE ? OR j.job_number LIKE ? OR cl.company_name LIKE ?
+      OR EXISTS (SELECT 1 FROM compliance sc WHERE sc.parent_id = c.id
+                   AND (sc.reference_number LIKE ? OR sc.rol_actual_number LIKE ? OR sc.description LIKE ?)))`;
+    params.push(like, like, like, like, like, like, like, like, like);
+  }
+
+  // Urgent — the SQL twin of the register's red row paint: a plan still at
+  // 'started' (opened, sub-plans not all submitted), or one expiring within
+  // a week. Keep in step with the tint chain in views/compliance/index.ejs.
+  if (urgent === '1') {
+    query += ` AND (c.status = 'started' OR (NULLIF(c.expiry_date, '') IS NOT NULL AND DATE(c.expiry_date) <= DATE('now', '+7 day')))`;
+  }
+
   // Anchor "this week"/"this month" to the Sydney calendar day, not the
   // server's (Railway runs UTC — before ~10am Sydney that's still yesterday).
   const today = new Date(sydneyToday() + 'T00:00:00');
@@ -344,7 +383,9 @@ router.get('/', (req, res) => {
     params.push(rangeStart, rangeEnd);
   }
 
-  query += ` ORDER BY c.id DESC`;
+  // Latest ACTIVITY first — a re-touched plan (new file, fee, extension…)
+  // floats to the top; c.id keeps same-day creations stable.
+  query += ` ORDER BY activity_date DESC, c.id DESC`;
   const items = db.prepare(query).all(...params);
 
   // Pull all sub-plans for visible parents in one shot, grouped by parent_id
@@ -358,12 +399,27 @@ router.get('/', (req, res) => {
       c.assigned_to_id, u.full_name AS owner_name
       FROM compliance c LEFT JOIN users u ON c.assigned_to_id = u.id
       WHERE c.parent_id IN (${placeholders}) ORDER BY c.item_type, c.reference_number`).all(...parentIds);
-    const docCounts = db.prepare(`SELECT compliance_id, COUNT(*) as c FROM compliance_documents WHERE compliance_id IN (SELECT id FROM compliance WHERE parent_id IN (${placeholders})) GROUP BY compliance_id`).all(...parentIds);
+    // Count files for subs AND for docs attached directly to the parent
+    // (POST /:id/upload) — both feed the register's per-type file chips.
+    const docCounts = db.prepare(`SELECT compliance_id, COUNT(*) as c FROM compliance_documents WHERE compliance_id IN (SELECT id FROM compliance WHERE parent_id IN (${placeholders})) OR compliance_id IN (${placeholders}) GROUP BY compliance_id`).all(...parentIds, ...parentIds);
     const dcMap = {};
     docCounts.forEach(r => { dcMap[r.compliance_id] = r.c; });
     subs.forEach(s => {
       s.doc_count = dcMap[s.id] || 0;
       (subPlansByParent[s.parent_id] = subPlansByParent[s.parent_id] || []).push(s);
+    });
+    // Per-type file totals per parent — "TGS · 10, ROL · 2" on the register
+    // row so whoever invoices can read volume without expanding. Keyed by
+    // item_type; parent-attached files count under 'plan'.
+    items.forEach(it => {
+      const totals = new Map();
+      for (const s of (subPlansByParent[it.id] || [])) {
+        if (!s.doc_count) continue;
+        const kind = (s.item_type === 'road_occupancy') ? 'rol' : s.item_type;
+        totals.set(kind, (totals.get(kind) || 0) + s.doc_count);
+      }
+      if (dcMap[it.id]) totals.set('plan', (totals.get('plan') || 0) + dcMap[it.id]);
+      it.file_counts = Array.from(totals, ([kind, files]) => ({ kind, files }));
     });
   }
 
@@ -375,11 +431,15 @@ router.get('/', (req, res) => {
   // Grouped by the SAME plan date the filters use (PLAN_DATE_SQL) — grouping
   // on client_request_date alone put every plan without one in "Undated",
   // including plans a month filter had just matched on another date.
+  // Buckets key off ACTIVITY (plan date pushed forward by the parent's
+  // updated_at) — an old invoiced plan someone just added a file to lands in
+  // the newest month instead of staying buried where it was requested.
   const monthBuckets = new Map();
   items.forEach(it => {
-    const planDate = it.plan_date && /^\d{4}-\d{2}/.test(it.plan_date)
-      ? it.plan_date.slice(0, 7) : null;
-    const key = planDate || '0000-00';
+    const actDate = it.activity_date && /^\d{4}-\d{2}/.test(it.activity_date)
+      ? it.activity_date.slice(0, 7)
+      : (it.plan_date && /^\d{4}-\d{2}/.test(it.plan_date) ? it.plan_date.slice(0, 7) : null);
+    const key = actDate || '0000-00';
     if (!monthBuckets.has(key)) monthBuckets.set(key, []);
     monthBuckets.get(key).push(it);
   });
@@ -390,7 +450,8 @@ router.get('/', (req, res) => {
   // group reads as "no results".
   const filterActive = view !== 'all' || !!date_from || !!date_to
     || (!!status && status !== 'all') || !!job_id || !!client_id
-    || (!!item_type && item_type !== 'all') || !!invoice_state;
+    || (!!item_type && item_type !== 'all') || !!invoice_state
+    || !!q || urgent === '1';
   // Newest group, used when neither the current month nor Undated is present
   // (e.g. every plan predates this month) so something is always expanded.
   const defaultOpenKey = sortedKeys.includes(currentMonthKey) || sortedKeys.includes('0000-00')
@@ -432,7 +493,7 @@ router.get('/', (req, res) => {
   res.render('compliance/index', {
     title: 'Plans & Approvals',
     items, monthGroups, jobs, clients, users,
-    filters: { status: status || '', job_id: job_id || '', client_id: client_id || '', item_type: item_type || '', view, ref: ref || '', date_from: date_from || '', date_to: date_to || '', invoice_state: invoice_state || '' },
+    filters: { status: status || '', job_id: job_id || '', client_id: client_id || '', item_type: item_type || '', view, ref: ref || '', date_from: date_from || '', date_to: date_to || '', invoice_state: invoice_state || '', q: q || '', urgent: urgent === '1' ? '1' : '' },
     view, periodLabel, prevRef, nextRef,
     subPlansByParent,
     user: req.session.user
@@ -600,6 +661,7 @@ router.post('/sub-plans/:subId/description', (req, res) => {
   }
   const desc = (req.body.description || '').trim();
   db.prepare("UPDATE compliance SET description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(desc, sub.id);
+  touchPlan(db, sub.id);
   if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true, description: desc });
   req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
@@ -615,6 +677,7 @@ router.post('/sub-plans/:subId/owner', (req, res) => {
   }
   const ownerId = req.body.assigned_to_id || null;
   db.prepare("UPDATE compliance SET assigned_to_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(ownerId, sub.id);
+  touchPlan(db, sub.id);
   if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true, assigned_to_id: ownerId });
   req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
@@ -678,6 +741,7 @@ router.post('/sub-plans/:subId/documents', subPlanUpload.array('documents', 10),
     });
   }
 
+  touchPlan(db, sub.id); // attach-only never bumped the parent — the register's activity sort needs it
   req.flash('success', files.length + ' file' + (files.length > 1 ? 's' : '') + ' attached.');
   req.session.save(() => res.redirect(backTo));
 });
@@ -990,9 +1054,50 @@ router.post('/sub-plans/:subId/link-rol', (req, res) => {
     db.prepare('INSERT OR IGNORE INTO compliance_tgs_rol_links (tgs_id, rol_id) VALUES (?, ?)').run(sub.id, rolId);
   }
   db.prepare('UPDATE compliance SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(sub.id);
+  touchPlan(db, sub.id);
 
   if (wantsJson(req)) return res.json({ success: true, action, rol_id: rolId });
   req.flash('success', action === 'remove' ? 'ROL unlinked.' : 'Linked to ROL.');
+  req.session.save(() => res.redirect(backTo));
+});
+
+// Per-SHEET ROL link: a TGS package's individual file linked to one of the
+// plan's ROLs. Same toggle contract as the sub-plan route above; the doc must
+// belong to a TGS-type sub and the ROL must live under the same parent plan.
+// Sub-plan-level links stay as package-wide coverage.
+router.post('/documents/:docId/link-rol', (req, res) => {
+  const db = getDb();
+  const doc = db.prepare(`
+    SELECT d.id, d.compliance_id, s.parent_id, s.item_type
+    FROM compliance_documents d JOIN compliance s ON s.id = d.compliance_id
+    WHERE d.id = ?`).get(req.params.docId);
+  if (!doc || !doc.parent_id || doc.item_type !== 'traffic_guidance') {
+    if (wantsJson(req)) return res.status(404).json({ error: 'Not a TGS sheet' });
+    req.flash('error', 'That file is not a TGS sheet.');
+    return req.session.save(() => res.redirect('/compliance'));
+  }
+  const backTo = '/compliance/' + doc.parent_id + '/edit#sub-' + doc.compliance_id;
+  const rolId = parseInt(req.body.rol_id, 10) || null;
+  const action = req.body.action === 'remove' ? 'remove' : 'add';
+  if (!rolId) {
+    if (wantsJson(req)) return res.status(400).json({ error: 'rol_id required' });
+    req.flash('error', 'Pick a ROL to link.');
+    return req.session.save(() => res.redirect(backTo));
+  }
+  const target = db.prepare("SELECT id FROM compliance WHERE id = ? AND parent_id = ? AND item_type IN ('rol','road_occupancy')").get(rolId, doc.parent_id);
+  if (!target) {
+    if (wantsJson(req)) return res.status(400).json({ error: 'Not a ROL on this plan' });
+    req.flash('error', 'That ROL is not on this plan.');
+    return req.session.save(() => res.redirect(backTo));
+  }
+  if (action === 'remove') {
+    db.prepare('DELETE FROM compliance_doc_rol_links WHERE document_id = ? AND rol_id = ?').run(doc.id, rolId);
+  } else {
+    db.prepare('INSERT OR IGNORE INTO compliance_doc_rol_links (document_id, rol_id) VALUES (?, ?)').run(doc.id, rolId);
+  }
+  touchPlan(db, doc.compliance_id);
+  if (wantsJson(req)) return res.json({ success: true, action, rol_id: rolId });
+  req.flash('success', action === 'remove' ? 'Sheet unlinked from ROL.' : 'Sheet linked to ROL.');
   req.session.save(() => res.redirect(backTo));
 });
 
@@ -1008,6 +1113,7 @@ router.post('/sub-plans/:subId/app-ref', (req, res) => {
   if (!sub) { if (wantsJson(req)) return res.status(404).json({ error: 'Sub-plan not found' }); req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance')); }
   const ref = String(req.body.application_ref_no || '').trim().slice(0, 120);
   db.prepare("UPDATE compliance SET application_ref_no = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(ref, sub.id);
+  touchPlan(db, sub.id);
   if (wantsJson(req)) return res.json({ success: true, application_ref_no: ref });
   req.flash('success', 'Application ref saved.');
   req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
@@ -1091,6 +1197,7 @@ function rollupCouncilFee(db, complianceId) {
   const total = db.prepare('SELECT COALESCE(SUM(amount),0) AS t FROM compliance_fees WHERE compliance_id = ?').get(complianceId).t || 0;
   db.prepare('UPDATE compliance SET council_fee_amount = ?, council_fee_paid = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
     .run(total, total > 0 ? 1 : 0, complianceId);
+  touchPlan(db, complianceId); // fee entry is plan activity too
 }
 
 // ============================================================
@@ -1360,27 +1467,80 @@ function recomputeRolEffectiveEnd(db, subId) {
 
 // Extension records (spec §4) — ROL / Council. Adding one automatically moves
 // the sub-plan's effective end date; no manual flag-flipping needed.
-router.post('/sub-plans/:subId/extensions', subPlanUpload.single('extension_file'), (req, res) => {
+//
+// AUTO-FILL: an extension is usually a re-issued TfNSW licence, which is
+// exactly the document parseRolPdf reads. When the uploaded file is a PDF we
+// parse it and fill what the office used to re-type: the new end date
+// (parsed.to — the explicit "To:" line, NOT the year-inferred summaryTo),
+// a reason, and the re-issue's approved shift table (stored under
+// source 'ext:<id>' — NEVER 'rol', which would wipe the original licence's
+// shifts; saveComplianceShifts deletes per source). Amended conditions are
+// deliberately not applied (conditions have no source column).
+router.post('/sub-plans/:subId/extensions', subPlanUpload.single('extension_file'), async (req, res) => {
   const db = getDb();
   const sub = getSubPlan(db, req.params.subId);
   if (!sub) { req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance')); }
+  const backTo = '/compliance/' + sub.parent_id + '/edit#sub-' + sub.id;
+
+  let extendedTo = String(req.body.extended_to || '').trim();
+  let reason = String(req.body.reason || '').trim();
+  let parsed = null;
+  const fileIsPdf = req.file && /\.pdf$/i.test(req.file.originalname || '');
+  if (fileIsPdf) {
+    try {
+      const { parseRolPdf } = require('../services/rolParser');
+      const rel = subRel(sub, req.file);
+      parsed = await parseRolPdf(path.join(__dirname, '..', rel.replace(/^\//, '')), 'rol');
+    } catch (e) { console.error('[Compliance] extension PDF parse failed:', e.message); parsed = null; }
+  }
+  // Parsed values fill the gaps; anything the user typed wins.
+  if (!extendedTo && parsed && parsed.to && /^\d{4}-\d{2}-\d{2}$/.test(parsed.to)) extendedTo = parsed.to;
+  if (!extendedTo) {
+    // Scanned/image-only PDFs parse "successfully empty" — a dated extension
+    // needs a date from somewhere.
+    req.flash('error', fileIsPdf
+      ? 'Could not read an end date from that PDF — enter the new end date and try again.'
+      : 'Enter the new end date (or drop the re-issued ROL PDF and it fills itself).');
+    if (req.file) { try { fs.unlinkSync(req.file.path); } catch (e) {} }
+    return req.session.save(() => res.redirect(backTo));
+  }
+  if (!reason && parsed && parsed.licenceNumber) reason = `Re-issued ROL ${parsed.licenceNumber} — extended to ${extendedTo}`;
+
   const extCount = db.prepare('SELECT COUNT(*) AS c FROM compliance_extensions WHERE compliance_id = ?').get(sub.id).c || 0;
-  db.prepare("INSERT INTO compliance_extensions (compliance_id, label, extended_to, reason, file_path, file_original_name, created_by) VALUES (?,?,?,?,?,?,?)")
-    .run(sub.id, req.body.label || ('Extension ' + (extCount + 1)), req.body.extended_to || null, req.body.reason || '', req.file ? subRel(sub, req.file) : '', req.file ? req.file.originalname : '', req.session.user.id);
+  const ins = db.prepare("INSERT INTO compliance_extensions (compliance_id, label, extended_to, reason, file_path, file_original_name, created_by) VALUES (?,?,?,?,?,?,?)")
+    .run(sub.id, req.body.label || ('Extension ' + (extCount + 1)), extendedTo, reason, req.file ? subRel(sub, req.file) : '', req.file ? req.file.originalname : '', req.session.user.id);
+
+  // The re-issue's own approved dates & times, kept per-extension so the
+  // original licence's rows survive and an extension delete cleans up.
+  if (parsed && Array.isArray(parsed.shifts) && parsed.shifts.length) {
+    try { saveComplianceShifts(db, sub.id, 'ext:' + ins.lastInsertRowid, JSON.stringify(parsed.shifts)); } catch (e) {}
+  }
+  let warn = '';
+  if (parsed && parsed.licenceNumber && sub.rol_actual_number && String(parsed.licenceNumber) !== String(sub.rol_actual_number)) {
+    warn = ` Note: the PDF reads licence ${parsed.licenceNumber}, but this ROL is ${sub.rol_actual_number} — check it's the right file.`;
+  }
+
   recomputeRolEffectiveEnd(db, sub.id);
   planStatus.syncParentStatus(db, sub.parent_id);
-  autoLogDiary(db, { jobId: sub.job_id, complianceItemId: sub.id, summary: `[${req.session.user.full_name}] Extension added to ${sub.reference_number}${req.body.extended_to ? ' (to ' + req.body.extended_to + ')' : ''}.`, userId: req.session.user.id });
-  req.flash('success', 'Extension added' + (req.body.extended_to ? ' — effective end moved to ' + req.body.extended_to + '.' : '.'));
-  req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
+  touchPlan(db, sub.id);
+  autoLogDiary(db, { jobId: sub.job_id, complianceItemId: sub.id, summary: `[${req.session.user.full_name}] Extension added to ${sub.reference_number} (to ${extendedTo}${parsed && parsed.licenceNumber ? ', ROL ' + parsed.licenceNumber : ''}).`, userId: req.session.user.id });
+  req.flash(warn ? 'error' : 'success', 'Extension added — effective end moved to ' + extendedTo + '.' + warn);
+  req.session.save(() => res.redirect(backTo));
 });
 router.post('/sub-plans/:subId/extensions/:extId/delete', (req, res) => {
   const db = getDb();
   const sub = getSubPlan(db, req.params.subId);
   if (!sub) { req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance')); }
   const ext = db.prepare('SELECT * FROM compliance_extensions WHERE id = ? AND compliance_id = ?').get(req.params.extId, sub.id);
-  if (ext) { unlinkRel(ext.file_path); db.prepare('DELETE FROM compliance_extensions WHERE id = ?').run(ext.id); }
+  if (ext) {
+    unlinkRel(ext.file_path);
+    db.prepare('DELETE FROM compliance_extensions WHERE id = ?').run(ext.id);
+    // Drop the shifts that re-issue brought with it.
+    try { db.prepare("DELETE FROM compliance_rol_shifts WHERE compliance_id = ? AND source = ?").run(sub.id, 'ext:' + ext.id); } catch (e) {}
+  }
   recomputeRolEffectiveEnd(db, sub.id);
   planStatus.syncParentStatus(db, sub.parent_id);
+  touchPlan(db, sub.id);
   req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
 
@@ -1391,6 +1551,7 @@ router.post('/sub-plans/:subId/qa', (req, res) => {
   if (!sub) { if (wantsJson(req)) return res.status(404).json({ error: 'Sub-plan not found' }); req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance')); }
   const qa = req.body.qa_status || 'pending';
   db.prepare("UPDATE compliance SET qa_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(qa, sub.id);
+  touchPlan(db, sub.id);
   if (wantsJson(req)) return res.json({ success: true });
   req.flash('success', 'QA status updated.');
   req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
@@ -1466,6 +1627,7 @@ router.post('/sub-plans/:subId/rola', subPlanUpload.single('rola_file'), (req, r
       rol_time_window=COALESCE(NULLIF(?, ''), rol_time_window), rol_stage=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
     .run(b.rola_application_number || '', filePath, fileName, b.rol_summary_from || null, b.rol_summary_to || null, b.rol_time_window || '', stage, sub.id);
   if (typeof b.shifts_json !== 'undefined') saveComplianceShifts(db, sub.id, 'rola', b.shifts_json);
+  touchPlan(db, sub.id);
   req.flash('success', 'ROLA application saved.');
   req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
 });
@@ -1930,6 +2092,21 @@ router.get('/:id/edit', (req, res) => {
     } catch (e) { /* pre-332 */ }
   }
 
+  // Per-SHEET ROL links (mig 356): docLinks[documentId] = [rolIds]. Feeds
+  // the per-file chips on TGS cards and the ROL-table tab.
+  let docRolLinks = {};
+  if (isParent && subPlans.length > 0) {
+    try {
+      const subIds = subPlans.map(s => s.id);
+      const ph = subIds.map(() => '?').join(',');
+      db.prepare(`SELECT l.document_id, l.rol_id FROM compliance_doc_rol_links l
+                  JOIN compliance_documents d ON d.id = l.document_id
+                  WHERE d.compliance_id IN (${ph})`)
+        .all(...subIds)
+        .forEach(l => { (docRolLinks[l.document_id] = docRolLinks[l.document_id] || []).push(l.rol_id); });
+    } catch (e) { /* pre-356 */ }
+  }
+
   // Tender link (if this plan is rolled up under a tender)
   let tender = null;
   if (item.tender_id) {
@@ -1971,7 +2148,7 @@ router.get('/:id/edit', (req, res) => {
     documents, linkedTask, revisions, tender,
     isParent, subPlans, subPlanDocs, subPlanTypes: SUB_PLAN_TYPES,
     raBySubPlan, subPlanFees, subPlanExtensions, subPlanRolShifts, subPlanRolConditions,
-    subPlanRolLinks, subPlanTgsBacklinks,
+    subPlanRolLinks, subPlanTgsBacklinks, docRolLinks,
     quote, subPlanOpenTasks, subPlanRevisions,
   });
 });
@@ -2208,6 +2385,7 @@ router.post('/:id/ready-for-invoice', (req, res) => {
 
   db.prepare('UPDATE compliance SET ready_for_invoice = 1, ready_for_invoice_at = CURRENT_TIMESTAMP, ready_for_invoice_by = ? WHERE id = ?')
     .run(req.session.user.id, req.params.id);
+  touchPlan(db, req.params.id);
 
   // Notify admin and accounts users
   try {
@@ -2246,6 +2424,7 @@ router.post('/:id/unmark-invoice', (req, res) => {
   const db = getDb();
   const wantsJson = req.xhr || (req.headers.accept || '').includes('application/json');
   db.prepare('UPDATE compliance SET ready_for_invoice = 0, ready_for_invoice_at = NULL, ready_for_invoice_by = NULL WHERE id = ?').run(req.params.id);
+  touchPlan(db, req.params.id);
   if (wantsJson) return res.json({ success: true });
   req.flash('success', 'Invoice mark removed.');
   req.session.save(() => res.redirect(req.body.return_to || '/compliance/' + req.params.id + '/edit'));
@@ -2321,6 +2500,7 @@ router.post('/:id/documents/:docId/delete', (req, res) => {
     const fullPath = path.join(__dirname, '..', 'data', doc.file_path);
     try { fs.unlinkSync(fullPath); } catch (e) { /* file may not exist */ }
     db.prepare('DELETE FROM compliance_documents WHERE id = ?').run(doc.id);
+    touchPlan(db, req.params.id);
     // Audit trail: log deletion to site diary
     const compItem = db.prepare('SELECT job_id, title, reference_number, item_type, item_types FROM compliance WHERE id = ?').get(req.params.id);
     if (compItem && compItem.job_id) {
