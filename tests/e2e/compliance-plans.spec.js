@@ -34,7 +34,7 @@ const MINI_PDF = Buffer.from(
 );
 
 // Parent plan + one TGS + two ROL sub-plans, fresh each run.
-function seedPlan() {
+function seedPlan(opts = {}) {
   return withDb(db => {
     db.prepare("DELETE FROM compliance WHERE title LIKE 'JPPLAN %'").run();
     db.prepare(`
@@ -50,8 +50,9 @@ function seedPlan() {
       return db.prepare('SELECT last_insert_rowid() AS id').get().id;
     };
     const tgsId = mkSub('traffic_guidance', 'TSTGS-E2E', 'JPPLAN tgs');
-    const rol1 = mkSub('rol', 'TSROL-E2E-1', 'JPPLAN rol one');
-    const rol2 = mkSub('rol', 'TSROL-E2E-2', 'JPPLAN rol two');
+    // opts.rols === false seeds a TGS-only plan (no ROL to cover it).
+    const rol1 = opts.rols === false ? null : mkSub('rol', 'TSROL-E2E-1', 'JPPLAN rol one');
+    const rol2 = opts.rols === false ? null : mkSub('rol', 'TSROL-E2E-2', 'JPPLAN rol two');
     try { db.prepare('DELETE FROM compliance_tgs_rol_links WHERE tgs_id = ?').run(tgsId); } catch (e) {}
     return { parentId, tgsId, rol1, rol2 };
   });
@@ -332,7 +333,25 @@ test('a TGS package holds many sheets, each linkable to any ROL, and the ROL tab
 
   await loginAs(page);
   await page.goto(editUrl(seed));
+
+  // Before anyone links anything, every ROL on the plan covers every sheet
+  // (the "plan-wide" default) — so the approved licence already ticks. This
+  // is what existing plans rely on: nobody goes back to click link chips.
+  const panel = page.locator('[data-tab-panel="roltable"]');
+  await page.locator('[data-tab="roltable"]').click();
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('tbody tr')).toHaveCount(4); // 2 sheets × 2 ROLs
+  await expect(panel).toContainText('plan-wide');
+  expect(await panel.locator('[title="ROL approved"]').count()).toBe(2);
+  expect(await panel.locator('[title="ROL not approved yet"]').count()).toBe(2);
+  // The ROL card says what it covers by default, and the package chips show it.
+  await openCard(page, seed.rol1);
+  await expect(page.locator(`#sub-${seed.rol1} [data-tgs-backlinks]`)).toContainText('TSTGS-E2E');
+  await expect(page.locator(`#sub-${seed.rol1} [data-tgs-backlinks]`)).toContainText('plan-wide');
+
+  await page.locator('[data-tab="subplans"]').click();
   await openCard(page, seed.tgsId);
+  await expect(page.locator(`#sub-${seed.tgsId} [data-rol-links] button`, { hasText: 'LIC-700' })).toContainText('◦');
 
   // Each sheet carries its own ROL chip row; link sheet A → ROL 1 (doc-level).
   const sheetA = page.locator(`[data-doc-rol-links="${sheets.a}"]`);
@@ -347,14 +366,33 @@ test('a TGS package holds many sheets, each linkable to any ROL, and the ROL tab
   await page.locator(`#sub-${seed.tgsId} [data-rol-links] button`, { hasText: 'TSROL-E2E-2' }).click();
   await page.waitForLoadState('networkidle');
 
-  // ROL table tab: sheet A shows a tick under the approved ROL.
+  // ROL table: explicit links NARROW the default — A → LIC-700 (own) + ROL 2
+  // (package), B → ROL 2 (package). Nothing is plan-wide any more.
+  await page.locator('[data-tab="roltable"]').click();
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('tbody tr')).toHaveCount(3);
+  await expect(panel).not.toContainText('plan-wide');
+  await expect(panel).toContainText('sheet-A.pdf');
+  await expect(panel).toContainText('LIC-700');
+  await expect(panel).toContainText('package link');
+  // The header carries an Ext column even before any extension exists.
+  await expect(panel.locator('thead')).toContainText('Ext 1');
+});
+
+test('a plan with no ROL shows the empty box in the ROL table', async ({ page }) => {
+  const seed = seedPlan({ rols: false });
+  withDb(db => db.prepare(`INSERT INTO compliance_documents (compliance_id, filename, original_name, file_path, file_size, mime_type)
+    VALUES (?, 'lone.pdf', 'lone.pdf', '/x/lone.pdf', 10, 'application/pdf')`).run(seed.tgsId));
+
+  await loginAs(page);
+  await page.goto(editUrl(seed));
   await page.locator('[data-tab="roltable"]').click();
   const panel = page.locator('[data-tab-panel="roltable"]');
   await expect(panel).toBeVisible();
-  await expect(panel).toContainText('sheet-A.pdf');
-  await expect(panel).toContainText('LIC-700');
-  // The header carries an Ext column even before any extension exists.
-  await expect(panel.locator('thead')).toContainText('Ext 1');
+  await expect(panel.locator('tbody tr')).toHaveCount(1);
+  await expect(panel.locator('[title="No ROL on this plan yet"]')).toBeVisible();
+  expect(await panel.locator('[title="ROL approved"]').count()).toBe(0);
+  await expect(panel).not.toContainText('plan-wide');
 });
 
 test('an extension auto-fills its end date from the re-issued ROL PDF', async ({ page }) => {

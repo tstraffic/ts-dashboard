@@ -914,11 +914,12 @@
 
     <%# ── ROL TABLE — one-glance TGS↔ROL coverage. Rows are TGS sheets
         (each file in a TGS package; a fileless package is its own row),
-        columns are the covering ROL and its extension chain. A sheet's
-        coverage = its own per-file links ∪ its package's links. ─────── %>
+        columns are the covering ROL and its extension chain. Coverage comes
+        from resolveRolCoverage (routes/compliance.js): own per-file links ∪
+        package links, else every ROL on the plan ("plan-wide"). ─────── %>
     <div data-tab-panel="roltable" class="hidden">
       <%
-        const rtDocLinks = (typeof docRolLinks !== 'undefined' && docRolLinks) ? docRolLinks : {};
+        const rtCov = (typeof rolCoverage !== 'undefined' && rolCoverage) ? rolCoverage : { pkg: {}, sheet: {}, covers: {}, planRolIds: [] };
         const rtRolById = {};
         rolSubs.forEach(r => { rtRolById[r.id] = r; });
         const rtRolLabel = (r) => r.rol_actual_number || r.reference_number || ('ROL #' + r.id);
@@ -928,16 +929,21 @@
         rolSubs.forEach(r => { rtMaxExt = Math.max(rtMaxExt, rtExtsFor(r).length); });
 
         // Build the rows: sheet × covering-ROL (or a single uncovered row).
+        // `note` says how the ROL got there: '' = this sheet's own link,
+        // 'package link' = inherited from the package, 'plan-wide' = default.
         const rtRows = [];
         tgsSubs.forEach(tgs => {
-          const pkgLinks = (typeof subPlanRolLinks !== 'undefined' && subPlanRolLinks[tgs.id]) || [];
           const sheets = (subPlanDocs[tgs.id] || []);
           const units = sheets.length ? sheets.map(d => ({ doc: d, tgs })) : [{ doc: null, tgs }];
           units.forEach(u => {
-            const own = u.doc ? (rtDocLinks[u.doc.id] || []) : [];
-            const effective = Array.from(new Set([...own, ...pkgLinks])).filter(id => rtRolById[id]);
-            if (!effective.length) { rtRows.push({ ...u, rol: null, inherited: false }); return; }
-            effective.forEach(rid => rtRows.push({ ...u, rol: rtRolById[rid], inherited: !own.includes(rid) }));
+            const cov = (u.doc ? rtCov.sheet[u.doc.id] : rtCov.pkg[tgs.id]) || { rolIds: [], ownIds: [], mode: 'none' };
+            const effective = (cov.rolIds || []).filter(id => rtRolById[id]);
+            if (!effective.length) { rtRows.push({ ...u, rol: null, note: '' }); return; }
+            effective.forEach(rid => {
+              const own = u.doc ? (cov.ownIds || []).includes(rid) : true;
+              const note = cov.mode === 'plan' ? 'plan-wide' : (own ? '' : 'package link');
+              rtRows.push({ ...u, rol: rtRolById[rid], note });
+            });
           });
         });
         const rtSheetName = (u) => u.doc
@@ -948,7 +954,7 @@
         <div class="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between gap-3">
           <div>
             <p class="text-sm font-semibold text-gray-900">TGS ↔ ROL coverage</p>
-            <p class="text-xs text-gray-400 mt-0.5">Every TGS sheet, the ROL that covers it, and that ROL's extensions. Empty box = no ROL linked yet — link sheets from the TGS package card, or the whole package with its Linked ROLs chips.</p>
+            <p class="text-xs text-gray-400 mt-0.5">Every TGS sheet, the ROL that covers it, and that ROL's extensions. A sheet with no specific link is covered by every ROL on the plan — link it from the TGS package card to narrow. Empty box = the plan has no ROL yet.</p>
           </div>
           <span class="shrink-0 text-[11px] text-gray-400"><%= tgsSubs.length %> package<%= tgsSubs.length === 1 ? '' : 's' %> · <%= rolSubs.length %> ROL<%= rolSubs.length === 1 ? '' : 's' %></span>
         </div>
@@ -972,7 +978,7 @@
                 <tr class="hover:bg-gray-50 transition-colors">
                   <td class="px-4 py-2.5">
                     <a href="#sub-<%= row.tgs.id %>" class="text-gray-900 hover:text-brand-700 font-medium block truncate max-w-[22rem]" title="<%= rtSheetName(row) %>"><%= rtSheetName(row) %></a>
-                    <span class="text-[11px] font-mono text-gray-400"><%= row.tgs.reference_number || ('TGS #' + row.tgs.id) %><%= row.inherited && row.rol ? ' · package link' : '' %></span>
+                    <span class="text-[11px] font-mono text-gray-400"><%= row.tgs.reference_number || ('TGS #' + row.tgs.id) %><%= row.note && row.rol ? ' · ' + row.note : '' %></span>
                   </td>
                   <td class="px-4 py-2.5">
                     <% if (row.rol) { %>
@@ -985,7 +991,7 @@
                         <a href="#sub-<%= row.rol.id %>" class="font-mono text-brand-700 hover:underline"><%= rtRolLabel(row.rol) %></a>
                       </span>
                     <% } else { %>
-                      <span class="inline-block w-5 h-5 rounded border-2 border-dashed border-gray-300" title="No ROL linked to this sheet"></span>
+                      <span class="inline-block w-5 h-5 rounded border-2 border-dashed border-gray-300" title="No ROL on this plan yet"></span>
                     <% } %>
                   </td>
                   <% for (let k = 0; k < Math.max(rtMaxExt, 1); k++) { const ext = exts[k]; %>

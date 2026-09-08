@@ -99,6 +99,43 @@ function touchPlan(db, id) {
 }
 
 // Sub-plan types the count grid offers on the create form.
+// TGS ↔ ROL coverage rule (display-side, no data written): a TGS sheet is
+// covered by its own per-file links ∪ its package's links; with neither, by
+// EVERY ROL on the plan ("plan-wide" default). Links only ever narrow — so
+// existing plans that nobody linked still show the tick for an approved ROL,
+// and the empty box means exactly "this plan has no ROL yet".
+function resolveRolCoverage({ subPlans, docsBySub, pkgLinks, docLinks }) {
+  const isRol = s => s.item_type === 'rol' || s.item_type === 'road_occupancy';
+  const rolIds = (subPlans || []).filter(isRol).map(s => Number(s.id));
+  const rolSet = new Set(rolIds);
+  const clean = ids => Array.from(new Set((ids || []).map(Number))).filter(id => rolSet.has(id));
+  const out = { planRolIds: rolIds, pkg: {}, sheet: {}, covers: {} };
+  rolIds.forEach(id => { out.covers[id] = {}; });
+  // covers[rolId][tgsId] = 'explicit' | 'plan' (explicit wins)
+  const cover = (rolId, tgsId, mode) => {
+    const c = out.covers[rolId];
+    if (!c) return;
+    if (mode === 'explicit' || !c[tgsId]) c[tgsId] = mode;
+  };
+  (subPlans || []).filter(s => s.item_type === 'traffic_guidance').forEach(tgs => {
+    const tgsId = Number(tgs.id);
+    const explicitPkg = clean((pkgLinks || {})[tgs.id]);
+    const pkgMode = explicitPkg.length ? 'explicit' : (rolIds.length ? 'plan' : 'none');
+    const pkgIds = pkgMode === 'explicit' ? explicitPkg : (pkgMode === 'plan' ? rolIds.slice() : []);
+    out.pkg[tgsId] = { rolIds: pkgIds, mode: pkgMode };
+    pkgIds.forEach(rid => cover(rid, tgsId, pkgMode));
+    ((docsBySub || {})[tgs.id] || []).forEach(d => {
+      const own = clean((docLinks || {})[d.id]);
+      const merged = Array.from(new Set([...own, ...explicitPkg]));
+      const mode = merged.length ? 'explicit' : (rolIds.length ? 'plan' : 'none');
+      const ids = mode === 'explicit' ? merged : (mode === 'plan' ? rolIds.slice() : []);
+      out.sheet[Number(d.id)] = { rolIds: ids, ownIds: own, mode };
+      ids.forEach(rid => cover(rid, tgsId, mode));
+    });
+  });
+  return out;
+}
+
 const SUB_PLAN_TYPES = [
   'traffic_guidance', 'tmp_approval', 'spa', 'sza', 'rol',
   'council_permit', 'bus_approval', 'police_notification',
@@ -2141,6 +2178,12 @@ router.get('/:id/edit', (req, res) => {
     } catch (e) {}
   }
 
+  // Effective TGS ↔ ROL coverage (own ∪ package links, else plan-wide) for
+  // the ROL-table tab, the link chips and the ROL cards' "Covers" row.
+  const rolCoverage = isParent
+    ? resolveRolCoverage({ subPlans, docsBySub: subPlanDocs, pkgLinks: subPlanRolLinks, docLinks: docRolLinks })
+    : { planRolIds: [], pkg: {}, sheet: {}, covers: {} };
+
   res.render('compliance/form', {
     title: isParent ? 'Edit Plan' : 'Edit Plan / Approval',
     item, jobs, clients, users, tenders, user: req.session.user,
@@ -2148,7 +2191,7 @@ router.get('/:id/edit', (req, res) => {
     documents, linkedTask, revisions, tender,
     isParent, subPlans, subPlanDocs, subPlanTypes: SUB_PLAN_TYPES,
     raBySubPlan, subPlanFees, subPlanExtensions, subPlanRolShifts, subPlanRolConditions,
-    subPlanRolLinks, subPlanTgsBacklinks, docRolLinks,
+    subPlanRolLinks, subPlanTgsBacklinks, docRolLinks, rolCoverage,
     quote, subPlanOpenTasks, subPlanRevisions,
   });
 });

@@ -25,6 +25,12 @@
   const myRolLinks = (typeof rolLinks !== 'undefined' && rolLinks) ? rolLinks.map(Number) : [];
   const myTgsBacklinks = (typeof tgsBacklinks !== 'undefined' && tgsBacklinks) ? tgsBacklinks.map(Number) : [];
   const tgsLinkList = (typeof tgsSubs !== 'undefined' && tgsSubs) ? tgsSubs : [];
+  // Resolved coverage (routes/compliance.js resolveRolCoverage): explicit
+  // links, else every ROL on the plan by default. Chips still toggle the
+  // explicit rows — the default is display-only.
+  const myCoverage = (typeof rolCoverage !== 'undefined' && rolCoverage) ? rolCoverage : { pkg: {}, sheet: {}, covers: {} };
+  const pkgCov = myCoverage.pkg[sub.id] || null;
+  const pkgDefault = !myRolLinks.length && !!(pkgCov && pkgCov.mode === 'plan');
   const isSubmitted = ['submitted', 'approved'].includes(sub.status);
   const isApproved = sub.status === 'approved';
   const isRejected = sub.status === 'rejected';
@@ -193,9 +199,9 @@
               <input type="hidden" name="rol_id" value="<%= r.id %>">
               <input type="hidden" name="action" value="<%= isLinked ? 'remove' : 'add' %>">
               <button type="submit"
-                class="px-2 py-0.5 text-[11px] font-medium <%= isLinked ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-white text-teal-700 hover:bg-teal-50' %>"
-                title="<%= isLinked ? 'Unlink ' + rolLinkLabel(r) : 'Link ' + rolLinkLabel(r) %>">
-                <%= isLinked ? '✓ ' : '+ ' %><%= rolLinkLabel(r) %>
+                class="px-2 py-0.5 text-[11px] font-medium <%= isLinked ? 'bg-teal-600 text-white hover:bg-teal-700' : (pkgDefault ? 'bg-teal-50 text-teal-700 hover:bg-teal-100' : 'bg-white text-teal-700 hover:bg-teal-50') %>"
+                title="<%= isLinked ? 'Unlink ' + rolLinkLabel(r) : (pkgDefault ? 'Covers this package by default — click to link only ' + rolLinkLabel(r) : 'Link ' + rolLinkLabel(r)) %>">
+                <%= isLinked ? '✓ ' : (pkgDefault ? '◦ ' : '+ ') %><%= rolLinkLabel(r) %>
               </button>
             </form>
             <% if (isLinked) { %>
@@ -203,6 +209,9 @@
             <% } %>
           </span>
         <% }) %>
+        <% if (pkgDefault) { %>
+          <span class="text-[11px] text-teal-700/70 italic ml-1">No specific links — every ROL on this plan applies.</span>
+        <% } %>
       <% } else { %>
         <span class="text-gray-500 italic">Add a ROL sub-plan to this plan to link it.</span>
       <% } %>
@@ -275,11 +284,13 @@
   <% } %>
 
   <!-- ROL → covered TGS sheets -->
-  <% if (isRolType && myTgsBacklinks.length && tgsLinkList.length) { %>
+  <% const coversMap = (isRolType && myCoverage.covers[sub.id]) || null;
+     const coversList = coversMap ? tgsLinkList.filter(t => coversMap[t.id]) : tgsLinkList.filter(t => myTgsBacklinks.includes(Number(t.id))); %>
+  <% if (isRolType && coversList.length) { %>
     <div class="mb-3 flex flex-wrap items-center gap-1.5 px-3 py-2 bg-teal-50/60 ring-1 ring-teal-100 rounded text-xs" data-tgs-backlinks>
       <span class="text-[10px] font-bold uppercase tracking-wide text-teal-700 mr-1">Covers</span>
-      <% tgsLinkList.filter(t => myTgsBacklinks.includes(Number(t.id))).forEach(t => { %>
-        <a href="#sub-<%= t.id %>" data-sub-jump="<%= t.id %>" class="inline-flex items-center px-2 py-0.5 rounded bg-white ring-1 ring-teal-200 text-teal-700 hover:bg-teal-50 text-[11px] font-medium"><%= t.reference_number || ('TGS #' + t.id) %></a>
+      <% coversList.forEach(t => { const byDefault = coversMap && coversMap[t.id] === 'plan'; %>
+        <a href="#sub-<%= t.id %>" data-sub-jump="<%= t.id %>" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white ring-1 ring-teal-200 text-teal-700 hover:bg-teal-50 text-[11px] font-medium" title="<%= byDefault ? 'Covered by default — no specific link on this plan yet' : 'Linked to this licence' %>"><%= t.reference_number || ('TGS #' + t.id) %><% if (byDefault) { %><span class="font-normal text-teal-500">· plan-wide</span><% } %></a>
       <% }) %>
     </div>
   <% } %>
@@ -676,15 +687,20 @@
                const sheetLinks = (myDocRolLinks[d.id] || []).map(Number); %>
             <div class="mt-1 flex flex-wrap items-center gap-1" data-doc-rol-links="<%= d.id %>">
               <span class="text-[10px] text-gray-400">ROL:</span>
-              <% rolLinkList.forEach(r => { const sheetLinked = sheetLinks.includes(Number(r.id)); const pkgLinked = myRolLinks.includes(Number(r.id)); %>
+              <% const sheetCov = myCoverage.sheet[d.id] || null;
+                 rolLinkList.forEach(r => {
+                   const sheetLinked = sheetLinks.includes(Number(r.id));
+                   const pkgLinked = myRolLinks.includes(Number(r.id));
+                   const planWide = !sheetLinked && !pkgLinked && !!(sheetCov && sheetCov.mode === 'plan');
+                   const inherited = pkgLinked || planWide; %>
                 <form method="POST" action="/compliance/documents/<%= d.id %>/link-rol" class="inline-flex">
                   <%- include('../partials/csrf') %>
                   <input type="hidden" name="rol_id" value="<%= r.id %>">
                   <input type="hidden" name="action" value="<%= sheetLinked ? 'remove' : 'add' %>">
                   <button type="submit"
-                    class="px-1.5 py-0.5 rounded text-[10px] font-semibold ring-1 transition <%= sheetLinked ? 'bg-teal-600 text-white ring-teal-600' : (pkgLinked ? 'bg-teal-50 text-teal-700 ring-teal-200' : 'bg-white text-gray-500 ring-gray-200 hover:ring-teal-300 hover:text-teal-700') %>"
-                    title="<%= sheetLinked ? 'Unlink this sheet from ' + rolLinkLabel(r) : (pkgLinked ? 'Covered by the package link — click to pin this sheet to ' + rolLinkLabel(r) : 'Link this sheet to ' + rolLinkLabel(r)) %>">
-                    <%= sheetLinked ? '✓ ' : (pkgLinked ? '◦ ' : '+ ') %><%= rolLinkLabel(r) %>
+                    class="px-1.5 py-0.5 rounded text-[10px] font-semibold ring-1 transition <%= sheetLinked ? 'bg-teal-600 text-white ring-teal-600' : (inherited ? 'bg-teal-50 text-teal-700 ring-teal-200' : 'bg-white text-gray-500 ring-gray-200 hover:ring-teal-300 hover:text-teal-700') %>"
+                    title="<%= sheetLinked ? 'Unlink this sheet from ' + rolLinkLabel(r) : (pkgLinked ? 'Covered by the package link — click to pin this sheet to ' + rolLinkLabel(r) : (planWide ? 'Covered by default (every ROL on this plan) — click to pin this sheet to ' + rolLinkLabel(r) : 'Link this sheet to ' + rolLinkLabel(r))) %>">
+                    <%= sheetLinked ? '✓ ' : (inherited ? '◦ ' : '+ ') %><%= rolLinkLabel(r) %>
                   </button>
                 </form>
               <% }) %>
