@@ -490,6 +490,8 @@
       <div class="stat-card"><p class="stat-card-label">Video-matched</p><p class="stat-card-value <%= T.kpi.video > 0 ? 'is-warn' : 'is-muted' %>"><%= T.kpi.video %></p><p class="stat-card-sub">trips billed to the plate, not the tag</p></div>
     </div>
 
+    <% const starts = T.groups.map(g => g.periodStart).filter(Boolean).sort(); const ends = T.groups.map(g => g.periodEnd).filter(Boolean).sort(); %>
+    <p class="text-xs text-gray-400 mb-3"><%= T.groups.length %> statement<%= T.groups.length === 1 ? '' : 's' %><% if (starts.length && ends.length) { %> · <%= formatDateShort(starts[0]) %> – <%= formatDateShort(ends[ends.length - 1]) %><% } %> · newest first</p>
     <% T.groups.forEach((g, gi) => { %>
       <details class="bg-white border border-gray-200 rounded-xl shadow-sm mb-3 overflow-hidden" <%= gi === 0 ? 'open' : '' %> data-toll-group="<%= g.invoiceId %>">
         <summary class="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer select-none">

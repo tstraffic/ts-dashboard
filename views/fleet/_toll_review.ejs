@@ -40,12 +40,12 @@
     <div class="px-4 sm:px-5 pt-4 pb-3 border-b border-gray-100 flex items-start gap-3">
       <div class="flex-1 min-w-0">
         <div class="flex flex-wrap items-center gap-2">
-          <h2 class="text-base font-bold text-gray-900">Statement <span class="font-mono"><%= inv.invoice_number %></span></h2>
+          <h2 class="text-base font-bold text-gray-900">Statement <%= range(inv.period_start, inv.period_end) %></h2>
           <% if (review.status === 'applied') { %><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Added to vehicles</span>
           <% } else if (review.status === 'partial') { %><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 ring-1 ring-blue-600/20">Partly added</span><% } %>
         </div>
         <p class="text-xs text-gray-500 mt-0.5">
-          <%= range(inv.period_start, inv.period_end) %><% if (inv.issue_date) { %> · issued <%= formatDateShort(inv.issue_date) %><% } %> · account <%= inv.account_number || '—' %>
+          Invoice <span class="font-mono"><%= inv.invoice_number %></span><% if (inv.issue_date) { %> · issued <%= formatDateShort(inv.issue_date) %><% } %> · account <%= inv.account_number || '—' %>
           · <a href="/fleet/tolls/<%= inv.id %>/file" target="_blank" class="text-brand-600 hover:underline">Open PDF</a>
         </p>
         <div class="flex flex-wrap gap-2 mt-2 text-[11px]">
@@ -222,6 +222,9 @@
         <span class="text-amber-700 hidden" data-sel-missing></span>
       </p>
       <div class="ml-auto flex items-center gap-2">
+        <% if (review.next) { %>
+          <a href="/fleet/tolls?review=<%= review.next.id %>" class="px-3 py-2 text-sm font-medium text-brand-600 hover:underline whitespace-nowrap" data-review-next title="Invoice <%= review.next.number %>">Next: <%= range(review.next.periodStart, review.next.periodEnd) %> →</a>
+        <% } %>
         <button type="button" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900" data-review-close>Close</button>
         <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg" data-review-submit>
           <%= isReopen ? 'Update vehicles' : 'Add to vehicles' %>

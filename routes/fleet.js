@@ -691,7 +691,14 @@ router.get('/tolls', (req, res) => {
     const applied = appliedBySection(db, inv.id);
     const match = matchSections(parsed.sections, vehicles);
     const summary = safeJson(inv.summary_json, []);
-    review = { invoice: inv, parsed, applied, match, vehicles, summary, status: tollStatus(summary, applied), warnings: safeJson(inv.warnings_json, []) };
+    // "Next statement" — the next one (by period, newest first) that still has
+    // sections to add, so a batch of back-invoices can be worked through in order.
+    const ordered = hub.invoices;
+    const idx = ordered.findIndex(i => i.id === inv.id);
+    const after = ordered.slice(idx + 1).concat(ordered.slice(0, Math.max(idx, 0)));
+    const nextInv = after.find(i => i.id !== inv.id && i.status !== 'applied' && i.counts.sections > 0) || null;
+    review = { invoice: inv, parsed, applied, match, vehicles, summary, status: tollStatus(summary, applied), warnings: safeJson(inv.warnings_json, []),
+      next: nextInv ? { id: nextInv.id, periodStart: nextInv.period_start, periodEnd: nextInv.period_end, number: nextInv.invoice_number } : null };
   }
   res.render('fleet/tolls', {
     title: 'Toll Invoices',
@@ -705,43 +712,74 @@ router.get('/tolls', (req, res) => {
 });
 
 router.post('/tolls/upload', (req, res) => {
-  tollUpload.single('invoice')(req, res, async (err) => {
-    const back = () => req.session.save(() => res.redirect('/fleet/tolls'));
+  // Several statements can be dropped at once (a year of back-invoices);
+  // each is parsed and filed on its own, then one summary says what was
+  // read, what was already here, and what couldn't be read.
+  tollUpload.array('invoice', 12)(req, res, async (err) => {
+    const back = (to) => req.session.save(() => res.redirect(to || '/fleet/tolls'));
     if (err) { req.flash('error', err.message || 'Upload failed.'); return back(); }
-    if (!req.file) { req.flash('error', 'Choose the E-Toll statement PDF to upload.'); return back(); }
+    const files = req.files || [];
+    if (!files.length) { req.flash('error', 'Choose the E-Toll statement PDF(s) to upload.'); return back(); }
     const db = getDb();
-    const rel = path.relative(path.join(__dirname, '..'), req.file.path);
-    let parsed;
-    try {
-      parsed = await parseTollInvoice(req.file.path);
-    } catch (e) {
-      unlinkTollQuiet(rel);
-      req.flash('error', e instanceof TollParseError ? e.message : 'Could not read that PDF: ' + e.message);
-      return back();
+    const fmtD = res.locals.formatDateShort || ((d) => d);
+    const range = (a, b) => (a ? fmtD(a) : '?') + ' – ' + (b ? fmtD(b) : '?');
+    const read = [], dups = [], failed = [];
+    for (const file of files) {
+      const rel = path.relative(path.join(__dirname, '..'), file.path);
+      let parsed;
+      try {
+        parsed = await parseTollInvoice(file.path);
+      } catch (e) {
+        unlinkTollQuiet(rel);
+        failed.push({ name: file.originalname, reason: e instanceof TollParseError ? e.message : 'Could not read the PDF: ' + e.message });
+        continue;
+      }
+      const existing = db.prepare('SELECT id, period_start, period_end FROM toll_invoices WHERE invoice_number = ?').get(parsed.invoice.number);
+      if (existing) {
+        unlinkTollQuiet(rel);
+        dups.push({ number: parsed.invoice.number, id: existing.id, periodStart: existing.period_start, periodEnd: existing.period_end });
+        continue;
+      }
+      const summary = summariseToll(parsed);
+      const ins = db.prepare(`
+        INSERT INTO toll_invoices (invoice_number, account_number, issue_date, period_start, period_end, total_tolls, total_fees,
+          total_charges, gst, page_count, file_path, file_name, parser_version, summary_json, parsed_json, warnings_json, uploaded_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        parsed.invoice.number, parsed.invoice.accountNumber, parsed.invoice.issueDate, parsed.invoice.periodStart, parsed.invoice.periodEnd,
+        parsed.invoice.totalTolls, parsed.invoice.totalFees, parsed.invoice.totalCharges, parsed.invoice.gst, parsed.invoice.pageCount,
+        rel, file.originalname, parsed.parserVersion, JSON.stringify(summary), JSON.stringify(parsed), JSON.stringify(parsed.warnings),
+        req.session.user ? req.session.user.id : null
+      );
+      const live = parsed.sections.filter(s => s.rows.length);
+      logActivity({ user: req.session.user, action: 'upload', entityType: 'toll_invoice', entityId: ins.lastInsertRowid, entityLabel: parsed.invoice.number, ip: req.ip });
+      read.push({
+        id: ins.lastInsertRowid, number: parsed.invoice.number, periodStart: parsed.invoice.periodStart, periodEnd: parsed.invoice.periodEnd,
+        vehicles: live.length, trips: live.reduce((n, s) => n + s.trips, 0), total: live.reduce((n, s) => n + s.total, 0),
+      });
     }
-    const existing = db.prepare('SELECT id, created_at FROM toll_invoices WHERE invoice_number = ?').get(parsed.invoice.number);
-    if (existing) {
-      unlinkTollQuiet(rel);
-      req.flash('success', `Statement ${parsed.invoice.number} was already uploaded on ${res.locals.formatDate ? res.locals.formatDate(existing.created_at) : existing.created_at} — opening it.`);
-      return req.session.save(() => res.redirect(`/fleet/tolls?review=${existing.id}`));
+
+    if (read.length === 1 && !dups.length && !failed.length) {
+      const r = read[0];
+      req.flash('success', `Statement ${range(r.periodStart, r.periodEnd)} read: ${r.vehicles} vehicle${r.vehicles === 1 ? '' : 's'}, ${r.trips} trips, ${fmtMoney(r.total)}. Check the matches, then add them to the vehicles.`);
+      return back(`/fleet/tolls?review=${r.id}`);
     }
-    const summary = summariseToll(parsed);
-    const ins = db.prepare(`
-      INSERT INTO toll_invoices (invoice_number, account_number, issue_date, period_start, period_end, total_tolls, total_fees,
-        total_charges, gst, page_count, file_path, file_name, parser_version, summary_json, parsed_json, warnings_json, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      parsed.invoice.number, parsed.invoice.accountNumber, parsed.invoice.issueDate, parsed.invoice.periodStart, parsed.invoice.periodEnd,
-      parsed.invoice.totalTolls, parsed.invoice.totalFees, parsed.invoice.totalCharges, parsed.invoice.gst, parsed.invoice.pageCount,
-      rel, req.file.originalname, parsed.parserVersion, JSON.stringify(summary), JSON.stringify(parsed), JSON.stringify(parsed.warnings),
-      req.session.user ? req.session.user.id : null
-    );
-    const live = parsed.sections.filter(s => s.rows.length);
-    const trips = live.reduce((n, s) => n + s.trips, 0);
-    const total = live.reduce((n, s) => n + s.total, 0);
-    logActivity({ user: req.session.user, action: 'upload', entityType: 'toll_invoice', entityId: ins.lastInsertRowid, entityLabel: parsed.invoice.number, ip: req.ip });
-    req.flash('success', `Statement ${parsed.invoice.number} read: ${live.length} vehicle${live.length === 1 ? '' : 's'}, ${trips} trips, ${fmtMoney(total)}. Check the matches, then add them to the vehicles.`);
-    req.session.save(() => res.redirect(`/fleet/tolls?review=${ins.lastInsertRowid}`));
+    if (read.length) {
+      read.sort((a, b) => String(a.periodEnd || '').localeCompare(String(b.periodEnd || '')));
+      req.flash('success', `Read ${read.length} statements, filed by period: ${read.map(r => `${range(r.periodStart, r.periodEnd)} (${r.trips} trips, ${fmtMoney(r.total)})`).join(' · ')}. Open each one to check the matches and add the trips.`);
+    }
+    if (!read.length && dups.length === 1 && !failed.length) {
+      const d = dups[0];
+      req.flash('success', `Statement ${range(d.periodStart, d.periodEnd)} (${d.number}) was already uploaded — opening it.`);
+      return back(`/fleet/tolls?review=${d.id}`);
+    }
+    if (dups.length) {
+      req.flash('success', `Already here, skipped: ${dups.map(d => `${range(d.periodStart, d.periodEnd)} (${d.number})`).join(' · ')}.`);
+    }
+    if (failed.length) {
+      req.flash('error', `Couldn't read ${failed.length === 1 ? 'one file' : failed.length + ' files'}: ${failed.map(f => `${f.name} — ${f.reason}`).join(' · ')}`);
+    }
+    return back('/fleet/tolls');
   });
 });
 

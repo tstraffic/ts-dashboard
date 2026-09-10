@@ -29,9 +29,10 @@ const INVOICE_NO = '100099000001';
 let fixturePdf;
 let invoiceId;
 
-function writeTollPdf() {
+function writeTollPdf(opts = {}) {
+  const { invoiceNo = INVOICE_NO, periodStyle = 'long', periodLong = '03 Mar 2026 - 02 Jun 2026', periodNumeric = '03/03/2026 - 02/06/2026', name = 'etoll-fixture.pdf' } = opts;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'toll-e2e-'));
-  const out = path.join(dir, 'etoll-fixture.pdf');
+  const out = path.join(dir, name);
   const doc = new PDFDocument({ size: 'A4', margin: 20 });
   const stream = fs.createWriteStream(out);
   doc.pipe(stream);
@@ -44,8 +45,8 @@ function writeTollPdf() {
   T('Statement/Tax Invoice', 43, 60);
   T('Account No', 300, 100); T('182905109', 300, 112);
   T('Issue Date', 300, 130); T('05 Jun 2026', 300, 142);
-  T('Statement Period', 300, 160); T('03 Mar 2026 - 02 Jun 2026', 300, 172);
-  T('Invoice No', 300, 190); T(INVOICE_NO, 300, 202);
+  if (periodStyle !== 'none') { T('Statement Period', 300, 160); T(periodStyle === 'numeric' ? periodNumeric : periodLong, 300, 172); }
+  T('Invoice No', 300, 190); T(invoiceNo, 300, 202);
   row(230, [['02/06/2026', 43], ['Total toll charges', 91], ['-$1,330.62', 525]]);
   row(242, [['02/06/2026', 43], ['Total fees, charges & adjustments', 91], ['$3.30', 525]]);
   T('Includes GST** of -$120.96', 43, 260);
@@ -323,4 +324,46 @@ test('un-ticking an added section removes its trips; the PDF is private; delete 
   expect(withDb(db => db.prepare('SELECT COUNT(*) AS n FROM toll_invoices').get().n)).toBe(0);
   expect(tripCount()).toBe(0);
   expect(fs.existsSync(path.join(__dirname, '..', '..', stored))).toBe(false);
+});
+
+test('several past statements dropped at once are read and filed by period', async ({ page }) => {
+  // Three different quarters in three different layouts + one duplicate.
+  const a = await writeTollPdf({ name: 'jun.pdf' });                                   // long-form period (the 2026 layout)
+  const b = await writeTollPdf({ name: 'mar.pdf', invoiceNo: '100099000002', periodStyle: 'numeric', periodNumeric: '03/12/2025 - 02/03/2026' });
+  const c = await writeTollPdf({ name: 'odd.pdf', invoiceNo: '100099000003', periodStyle: 'none' }); // no period printed → from the trips
+  const aAgain = await writeTollPdf({ name: 'jun-copy.pdf' });
+
+  // Parser fallbacks first, directly.
+  const pb = await parseTollInvoice(b);
+  expect(pb.invoice.periodStart).toBe('2025-12-03'); expect(pb.invoice.periodEnd).toBe('2026-03-02'); expect(pb.invoice.periodSource).toBe('statement');
+  const pc = await parseTollInvoice(c);
+  expect(pc.invoice.periodStart).toBe('2026-04-30'); expect(pc.invoice.periodEnd).toBe('2026-06-02'); expect(pc.invoice.periodSource).toBe('trips');
+  expect(pc.warnings[0]).toMatch(/earliest and latest trips/);
+
+  await loginAs(page);
+  await page.goto('/fleet/tolls');
+  await page.setInputFiles('#tollFile', [a, b, c, aAgain]);
+  await page.waitForURL(/\/fleet\/tolls$/);                       // several files → the list, not one review
+  const body = page.locator('body');
+  await expect(body).toContainText(/Read 3 statements, filed by period/);
+  await expect(body).toContainText(/Already here, skipped/);
+  expect(withDb(db => db.prepare('SELECT COUNT(*) AS n FROM toll_invoices').get().n)).toBe(3);
+
+  // Newest period first; the oldest quarter (numeric layout) sits last, and
+  // the statement with no printed period shows the range its trips cover.
+  const rows = page.locator('[data-toll-invoice]');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.last()).toContainText('03 Dec 2025 – 02 Mar 2026');
+  await expect(rows.last()).toContainText('100099000002');
+  await expect(page.locator('[data-toll-invoice]', { hasText: '100099000003' })).toContainText('30 Apr 2026 – 02 June 2026');
+
+  // The review leads with the period and offers the next statement to work through.
+  const first = await rows.first().getAttribute('data-toll-invoice');
+  await page.goto(`/fleet/tolls?review=${first}`);
+  const modal = page.locator('[data-toll-review]');
+  await expect(modal.locator('h2').first()).toContainText(/Statement .*2026/);
+  await expect(modal.locator('[data-review-next]')).toBeVisible();
+  await expect(modal.locator('[data-review-next]')).toContainText(/Next: /);
+
+  withDb(db => { db.prepare('DELETE FROM toll_trips').run(); db.prepare('DELETE FROM toll_invoices').run(); });
 });

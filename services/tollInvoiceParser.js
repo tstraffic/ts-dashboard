@@ -88,13 +88,21 @@ function parseFrontPage(lines) {
   const number = grab(/Invoice No[\s\S]{0,80}?(?<!\d)(\d{8,})(?!\d)/);
   // The period value shares a text line with the 'Balance' figure, so match the
   // only date range on the front page rather than anchoring on the label.
-  const period = /(\d{1,2} [A-Za-z]{3} \d{4})\s*[-\u2013\u2014]\s*(\d{1,2} [A-Za-z]{3} \d{4})/.exec(text);
+  // Long form first ("03 Mar 2026 - 02 Jun 2026"), then a numeric range
+  // ("03/03/2026 - 02/06/2026"); older layouts differ. With neither, the
+  // caller derives the period from the earliest and latest trip.
+  const periodLong = /(\d{1,2} [A-Za-z]{3} \d{4})\s*[-\u2013\u2014]\s*(\d{1,2} [A-Za-z]{3} \d{4})/.exec(text);
+  const periodNum = periodLong ? null : /(\d{2}\/\d{2}\/\d{4})\s*[-\u2013\u2014]\s*(\d{2}\/\d{2}\/\d{4})/.exec(text);
+  const period = periodLong
+    ? { start: isoFromLong(periodLong[1]), end: isoFromLong(periodLong[2]), source: 'statement' }
+    : (periodNum ? { start: isoFromDMY(periodNum[1]), end: isoFromDMY(periodNum[2]), source: 'statement' } : null);
   return {
     number,
     accountNumber: grab(/Account No[\s\S]{0,80}?(?<!\d)(\d{6,})(?!\d)/),
     issueDate: isoFromLong(grab(/Issue Date[\s\S]{0,80}?(?<!\d)(\d{1,2} [A-Za-z]{3} \d{4})/)),
-    periodStart: period ? isoFromLong(period[1]) : null,
-    periodEnd: period ? isoFromLong(period[2]) : null,
+    periodStart: period ? period.start : null,
+    periodEnd: period ? period.end : null,
+    periodSource: period ? period.source : null,
     // Statement-level figures, kept for display. They don't reconcile to the
     // per-vehicle listing even on genuine statements (E-Toll re-attributes
     // video-matched trips between its summary and its detail), so the
@@ -255,6 +263,16 @@ async function parseTollInvoice(absPath) {
     const s = summaryByKey[key];
     if (s.trips > 0 && !sectionsByKey[key]) warnings.push(`${s.kind === 'tag' ? 'Tag' : 'Plate'} ${s.ref} shows ${s.trips} trips in the summary but no detailed section was found.`);
   });
+
+  if (!invoice.periodStart || !invoice.periodEnd) {
+    const dates = sections.flatMap(sec => sec.rows.map(r => r.date)).filter(Boolean).sort();
+    if (dates.length) {
+      invoice.periodStart = invoice.periodStart || dates[0];
+      invoice.periodEnd = invoice.periodEnd || dates[dates.length - 1];
+      invoice.periodSource = 'trips';
+      warnings.unshift('The statement period wasn\'t printed where expected, so it was taken from the earliest and latest trips listed.');
+    }
+  }
 
   invoice.totalTolls = round2(sections.reduce((s, sec) => s + sec.tolls, 0));
   invoice.totalFees = round2(sections.reduce((s, sec) => s + sec.fees, 0));
