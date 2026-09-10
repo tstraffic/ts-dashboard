@@ -210,9 +210,12 @@ router.get('/jobs', (req, res) => {
     WHERE ca.crew_member_id = ?
       AND ca.status != 'cancelled'
       AND (ca.status IN ('completed', 'declined') OR ca.allocation_date < date(?, '-7 days'))
+      -- An unconfirmed booking must appear NOWHERE in the portal, past tab
+      -- included (same gate as the upcoming query and /w/dockets).
+      AND (ca.booking_id IS NULL OR (b.deleted_at IS NULL AND b.status IN (${VISIBLE_BOOKING_STATUSES.map(() => '?').join(',')})))
     ORDER BY ca.allocation_date DESC, ca.start_time DESC
     LIMIT 20
-  `).all(worker.id, today);
+  `).all(worker.id, today, ...VISIBLE_BOOKING_STATUSES);
 
   // Helper: group allocations by date
   function groupByDate(list) {
@@ -278,9 +281,12 @@ router.get('/jobs', (req, res) => {
     WHERE ca.crew_member_id = ?
       AND ca.status != 'cancelled'
       AND (ca.status IN ('completed','declined','confirmed') OR ca.allocation_date < date(?, '-7 days'))
+      -- An unconfirmed booking must appear NOWHERE in the portal, past tab
+      -- included (same gate as the upcoming query and /w/dockets).
+      AND (ca.booking_id IS NULL OR (b.deleted_at IS NULL AND b.status IN (${VISIBLE_BOOKING_STATUSES.map(() => '?').join(',')})))
       AND ca.allocation_date BETWEEN ? AND ?
     ORDER BY ca.allocation_date ASC, ca.start_time ASC
-  `).all(worker.id, today, weekStartIso, weekEndIso);
+  `).all(worker.id, today, ...VISIBLE_BOOKING_STATUSES, weekStartIso, weekEndIso);
 
   // Merge upcoming-confirmed + finished-this-week, dedup by allocation id.
   const seen = new Set();
