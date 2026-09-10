@@ -367,3 +367,51 @@ test('several past statements dropped at once are read and filed by period', asy
 
   withDb(db => { db.prepare('DELETE FROM toll_trips').run(); db.prepare('DELETE FROM toll_invoices').run(); });
 });
+
+test('an office staff car can be marked, stops being flagged, and can still be allocated', async ({ page }) => {
+  const pdf = await writeTollPdf({ name: 'office.pdf', invoiceNo: '100099000004' });
+  // The add-vehicle round trip above registered ZZZ99Z; make it unknown again.
+  withDb(db => db.prepare("DELETE FROM vehicles WHERE asset_id = 'E2E-ZZZ'").run());
+  await loginAs(page);
+  await page.goto('/fleet/tolls');
+  await page.setInputFiles('#tollFile', pdf);
+  await page.waitForURL(/\/fleet\/tolls\?review=\d+/);
+  const id = new URL(page.url()).searchParams.get('review');
+  const modal = page.locator('[data-toll-review]');
+  const zzz = () => modal.locator('[data-section="plate:ZZZ99Z"]');
+  await expect(zzz()).toHaveAttribute('data-state', 'unmatched');
+
+  // Mark it (with a name) — the row re-renders as an office staff car.
+  await zzz().locator('[data-mark-open]').click();
+  await zzz().locator('[data-mark-person]').fill('Sam');
+  await zzz().locator('[data-mark-toggle][data-action="add"]').click();
+  await expect(zzz()).toHaveAttribute('data-state', 'office');
+  await expect(zzz().locator('[data-office-pill]')).toContainText('Office staff · Sam');
+  await expect(zzz().locator('[data-include]')).not.toBeChecked();
+  // …but allocation stays one click away.
+  await expect(zzz().locator('[data-assign]')).toBeVisible();
+  await expect(zzz().locator('[data-add-vehicle]')).toBeVisible();
+  expect(withDb(db => db.prepare("SELECT person FROM toll_ref_marks WHERE source_kind = 'plate' AND source_ref = 'ZZZ99Z'").get()).person).toBe('Sam');
+
+  // Hub: no longer something to reconcile; listed under office staff cars.
+  await page.goto('/fleet/tolls');
+  await expect(page.locator('[data-unreconciled-item="plate:ZZZ99Z"]')).toHaveCount(0);
+  await expect(page.locator('[data-office-car="plate:ZZZ99Z"]')).toBeAttached();
+  await expect(page.locator('[data-office-car="plate:ZZZ99Z"]')).toContainText('Sam');
+
+  // Allocate it to a vehicle anyway — the mark doesn't get in the way.
+  await page.goto(`/fleet/tolls?review=${id}`);
+  await zzz().locator('[data-assign]').selectOption(String(vehicleId('TSTC002')));
+  await expect(zzz().locator('[data-include]')).toBeChecked();
+  await modal.locator('[data-review-submit]').click();
+  await page.waitForURL(/\/fleet\/tolls\?review=\d+/);
+  expect(withDb(db => db.prepare("SELECT COUNT(*) AS n FROM toll_trips WHERE source_ref = 'ZZZ99Z'").get().n)).toBe(2);
+  await expect(zzz()).toHaveAttribute('data-state', 'applied');
+
+  // Unmark from the row.
+  await zzz().locator('[data-mark-toggle][data-action="remove"]').click();
+  await expect(zzz().locator('[data-office-pill]')).toHaveCount(0);
+  expect(withDb(db => db.prepare("SELECT COUNT(*) AS n FROM toll_ref_marks").get().n)).toBe(0);
+
+  withDb(db => { db.prepare('DELETE FROM toll_trips').run(); db.prepare('DELETE FROM toll_invoices').run(); db.prepare('DELETE FROM toll_ref_marks').run(); });
+});

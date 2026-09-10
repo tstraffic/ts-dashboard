@@ -15870,6 +15870,29 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 357 error:', e.message); }
   }
 
+  // Migration 358: office staff cars on the toll statement. A tag or plate
+  // marked here is a personal car (Saadat's, Suhail's…) — it stops being
+  // flagged "Not in register" on every statement, but can still be allocated
+  // to a vehicle profile at any time (the mark is display-side only).
+  if (!isMigrationApplied.get(358)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS toll_ref_marks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source_kind TEXT NOT NULL CHECK(source_kind IN ('tag','plate')),
+          source_ref TEXT NOT NULL,
+          mark TEXT NOT NULL DEFAULT 'office_staff',
+          person TEXT,
+          created_by INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(source_kind, source_ref)
+        );
+      `);
+      recordMigration.run(358, 'toll_ref_marks: office staff cars on toll statements');
+      console.log('Migration 358 applied: toll ref marks');
+    } catch (e) { console.error('Migration 358 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

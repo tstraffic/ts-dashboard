@@ -607,9 +607,21 @@ function appliedBySection(db, invoiceId) {
   return out;
 }
 
-function tollStatus(sections, applied) {
+/** Office-staff marks keyed by section key — a personal car, not a fleet vehicle. */
+function tollMarks(db) {
+  const out = {};
+  try {
+    db.prepare('SELECT source_kind, source_ref, mark, person, created_at FROM toll_ref_marks').all()
+      .forEach(m => { out[m.source_kind + ':' + m.source_ref] = m; });
+  } catch (e) { /* pre-358 */ }
+  return out;
+}
+
+// A statement is done when every section with trips is either added to a
+// vehicle or marked as an office staff car.
+function tollStatus(sections, applied, marks = {}) {
   const live = sections.filter(s => (s.rowCount || 0) > 0);
-  const done = live.filter(s => applied[s.key]).length;
+  const done = live.filter(s => applied[s.key] || marks[s.key]).length;
   if (live.length && done === live.length) return 'applied';
   return done > 0 ? 'partial' : 'parsed';
 }
@@ -621,7 +633,7 @@ function tollStatus(sections, applied) {
  * the live register so a newly created vehicle clears the flag), and KPIs.
  */
 function tollHubData(db) {
-  const empty = { invoices: [], unreconciled: [], unreconciledDistinct: 0, kpi: { trips12: 0, tolls12: 0, fees12: 0, total12: 0, totalAll: 0, tripsAll: 0 } };
+  const empty = { invoices: [], unreconciled: [], unreconciledDistinct: 0, officeCars: [], marks: {}, kpi: { trips12: 0, tolls12: 0, fees12: 0, total12: 0, totalAll: 0, tripsAll: 0 } };
   let invoices;
   try {
     invoices = db.prepare(`SELECT id, invoice_number, account_number, issue_date, period_start, period_end, total_tolls, total_fees,
@@ -629,6 +641,8 @@ function tollHubData(db) {
                            FROM toll_invoices ORDER BY COALESCE(period_end, issue_date) DESC, id DESC`).all();
   } catch (e) { return empty; /* pre-357 */ }
   const vehicles = tollVehicles(db);
+  const marks = tollMarks(db);
+  const office = {};
   const byId = Object.fromEntries(vehicles.map(v => [v.id, v]));
   const appliedRows = db.prepare('SELECT invoice_id, source_kind, source_ref, vehicle_id, COUNT(*) AS n, SUM(amount) AS total FROM toll_trips GROUP BY invoice_id, source_kind, source_ref').all();
   const appliedByInvoice = {};
@@ -642,15 +656,20 @@ function tollHubData(db) {
     const match = matchSections(live, vehicles);
     inv.summary = summary;
     inv.warnings = safeJson(inv.warnings_json, []);
-    inv.status = tollStatus(summary, applied);
-    inv.counts = { sections: live.length, applied: 0, matched: 0, unmatched: 0, zeroTrip: summary.length - live.length };
+    inv.status = tollStatus(summary, applied, marks);
+    inv.counts = { sections: live.length, applied: 0, matched: 0, unmatched: 0, office: 0, zeroTrip: summary.length - live.length };
     inv.appliedTotal = 0; inv.appliedTrips = 0;
     live.forEach(s => {
       const a = applied[s.key];
       if (a) { inv.counts.applied++; inv.appliedTotal = round2(inv.appliedTotal + a.total); inv.appliedTrips += a.n; return; }
       const m = match[s.key];
       if (m && m.vehicleId) inv.counts.matched++;
-      else {
+      else if (marks[s.key]) {
+        inv.counts.office++;
+        const o = office[s.key] || (office[s.key] = { kind: s.kind, ref: s.ref, person: marks[s.key].person, statements: 0, trips: 0, total: 0, latestInvoiceId: inv.id, latestPeriodEnd: inv.period_end });
+        o.statements++; o.trips += s.trips; o.total = round2(o.total + s.total);
+        if (String(inv.period_end || '') > String(o.latestPeriodEnd || '')) { o.latestInvoiceId = inv.id; o.latestPeriodEnd = inv.period_end; }
+      } else {
         inv.counts.unmatched++;
         unreconciled.push({ invoiceId: inv.id, invoiceNumber: inv.invoice_number, periodStart: inv.period_start, periodEnd: inv.period_end,
           kind: s.kind, ref: s.ref, label: s.label, trips: s.trips, total: s.total, ambiguous: !!(m && m.ambiguous),
@@ -671,7 +690,7 @@ function tollHubData(db) {
   } catch (e) { /* pre-357 */ }
   // Distinct plates/tags still needing a vehicle (the hub groups them the same way).
   const unreconciledDistinct = new Set(unreconciled.map(u => u.kind + ':' + u.ref)).size;
-  return { invoices, unreconciled, unreconciledDistinct, kpi };
+  return { invoices, unreconciled, unreconciledDistinct, officeCars: Object.values(office), marks, kpi };
 }
 
 // Hub: upload box, every statement ever uploaded, what still needs a vehicle.
@@ -697,7 +716,7 @@ router.get('/tolls', (req, res) => {
     const idx = ordered.findIndex(i => i.id === inv.id);
     const after = ordered.slice(idx + 1).concat(ordered.slice(0, Math.max(idx, 0)));
     const nextInv = after.find(i => i.id !== inv.id && i.status !== 'applied' && i.counts.sections > 0) || null;
-    review = { invoice: inv, parsed, applied, match, vehicles, summary, status: tollStatus(summary, applied), warnings: safeJson(inv.warnings_json, []),
+    review = { invoice: inv, parsed, applied, match, vehicles, summary, marks: hub.marks, status: tollStatus(summary, applied, hub.marks), warnings: safeJson(inv.warnings_json, []),
       next: nextInv ? { id: nextInv.id, periodStart: nextInv.period_start, periodEnd: nextInv.period_end, number: nextInv.invoice_number } : null };
   }
   res.render('fleet/tolls', {
@@ -705,6 +724,7 @@ router.get('/tolls', (req, res) => {
     currentPage: 'fleet',
     invoices: hub.invoices,
     unreconciled: hub.unreconciled,
+    officeCars: hub.officeCars,
     kpi: hub.kpi,
     review,
     AUD: fmtMoney,
@@ -781,6 +801,33 @@ router.post('/tolls/upload', (req, res) => {
     }
     return back('/fleet/tolls');
   });
+});
+
+// Mark / unmark a tag or plate as an office staff car. Persists across
+// statements; never blocks allocating that ref to a vehicle later.
+router.post('/tolls/marks', (req, res) => {
+  const db = getDb();
+  const kind = req.body.kind === 'tag' ? 'tag' : (req.body.kind === 'plate' ? 'plate' : null);
+  const ref = kind === 'tag' ? String(req.body.ref || '').replace(/\D/g, '') : String(req.body.ref || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const wantsJson = !!(req.headers.accept && req.headers.accept.includes('json'));
+  const backTo = safeTollReturn(req.body.return_to) || '/fleet/tolls';
+  const fail = (msg) => { if (wantsJson) return res.status(400).json({ error: msg }); req.flash('error', msg); return req.session.save(() => res.redirect(backTo)); };
+  if (!kind || !ref) return fail('Which tag or plate?');
+  const label = (kind === 'tag' ? 'Tag ' : 'Plate ') + ref;
+  try {
+    if (req.body.action === 'remove') {
+      db.prepare('DELETE FROM toll_ref_marks WHERE source_kind = ? AND source_ref = ?').run(kind, ref);
+      req.flash('success', `${label} is no longer marked as an office staff car.`);
+    } else {
+      const person = String(req.body.person || '').trim().slice(0, 80) || null;
+      db.prepare(`INSERT INTO toll_ref_marks (source_kind, source_ref, mark, person, created_by) VALUES (?, ?, 'office_staff', ?, ?)
+                  ON CONFLICT(source_kind, source_ref) DO UPDATE SET person = excluded.person`).run(kind, ref, person, req.session.user ? req.session.user.id : null);
+      req.flash('success', `${label} marked as an office staff car${person ? ' (' + person + ')' : ''} — it won't be flagged again, and can still be allocated to a vehicle any time.`);
+    }
+  } catch (e) { return fail('Could not save: ' + e.message); }
+  logActivity({ user: req.session.user, action: 'update', entityType: 'toll_ref_mark', entityLabel: label, ip: req.ip });
+  if (wantsJson) return res.json({ success: true });
+  req.session.save(() => res.redirect(backTo));
 });
 
 // Row sub-keys are prefixed ("r12") on purpose: qs would turn bare numeric

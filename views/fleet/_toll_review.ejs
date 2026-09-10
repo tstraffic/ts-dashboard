@@ -102,15 +102,16 @@
              const a = review.applied[s.key];
              const m = review.match[s.key] || { vehicleId: null, ambiguous: false, candidates: [], hint: null };
              const selectedId = a ? a.vehicleId : m.vehicleId;
-             const included = !!(a || m.vehicleId);
-             const state = a ? 'applied' : (m.vehicleId ? 'matched' : (m.ambiguous ? 'ambiguous' : 'unmatched'));
+             const mark = (review.marks && review.marks[s.key]) || null;
+             const included = !!(a || m.vehicleId);            // a mark never suppresses a real match
+             const state = a ? 'applied' : (m.vehicleId ? 'matched' : (mark ? 'office' : (m.ambiguous ? 'ambiguous' : 'unmatched')));
              const keptSet = a ? new Set(a.rowIndexes) : null;
              const candIds = new Set(m.candidates.map(c => c.id));
-             const searchText = [s.ref, s.label, selectedId && vehiclesById[selectedId] ? vLabel(vehiclesById[selectedId]) : ''].join(' ').toLowerCase();
+             const searchText = [s.ref, s.label, mark && mark.person, mark ? 'office staff' : '', selectedId && vehiclesById[selectedId] ? vLabel(vehiclesById[selectedId]) : ''].filter(Boolean).join(' ').toLowerCase();
         %>
         <tbody class="border-t border-gray-100" data-section="<%= s.key %>" data-state="<%= state %>" data-search="<%= searchText %>"
                data-applied-vehicle="<%= a ? a.vehicleId : '' %>">
-          <tr class="<%= state === 'unmatched' || state === 'ambiguous' ? 'bg-amber-50/40' : '' %>">
+          <tr class="<%= state === 'unmatched' || state === 'ambiguous' ? 'bg-amber-50/40' : (state === 'office' ? 'bg-slate-50/60' : '') %>">
             <td class="pl-3 sm:pl-5 py-2.5 align-top">
               <input type="checkbox" name="include[<%= s.key %>]" value="1" <%= included ? 'checked' : '' %> data-include
                      class="mt-1 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
@@ -129,9 +130,22 @@
                   <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">Matched by <%= m.how === 'reference' ? 'label' : m.how %></span>
                 <% } else if (state === 'ambiguous') { %>
                   <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold"><%= m.candidates.length %> vehicles share this <%= s.kind %> — choose</span>
+                <% } else if (state === 'office') { %>
+                  <a href="<%= addHref(s, m) %>" class="text-brand-700 font-semibold hover:underline" data-add-vehicle>+ Add vehicle</a>
                 <% } else { %>
                   <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">Not in register</span>
                   <a href="<%= addHref(s, m) %>" class="text-brand-700 font-semibold hover:underline" data-add-vehicle>+ Add vehicle</a>
+                <% } %>
+                <% if (mark) { %>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold" data-office-pill>Office staff<%= mark.person ? ' · ' + mark.person : '' %></span>
+                  <% if (!a) { %><span class="text-gray-400">allocate to a vehicle any time</span><% } %>
+                  <button type="button" class="text-slate-500 hover:text-slate-800 underline" data-mark-toggle data-kind="<%= s.kind %>" data-ref="<%= s.ref %>" data-action="remove">Unmark</button>
+                <% } else if (!a) { %>
+                  <button type="button" class="text-slate-500 hover:text-slate-800 underline" data-mark-open title="A personal car, not a fleet vehicle — stops it being flagged on every statement">Office staff car?</button>
+                  <span class="hidden items-center gap-1" data-mark-form>
+                    <input type="text" value="<%= s.label || '' %>" placeholder="Whose car (optional)" class="px-1.5 py-0.5 border border-gray-300 rounded text-[10px] w-28" data-mark-person>
+                    <button type="button" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-800 text-white font-semibold" data-mark-toggle data-kind="<%= s.kind %>" data-ref="<%= s.ref %>" data-action="add">Mark</button>
+                  </span>
                 <% } %>
                 <% if (s.sumMatches === false) { %>
                   <span class="text-amber-700" title="The listed trips add to <%= AUD(s.total) %>; the statement's own total for this <%= s.kind %> is <%= AUD(s.totalForVehicle) %>. The listed trips are what gets added.">⚠ differs from statement</span>
@@ -336,6 +350,29 @@
       sec.hidden = !!q && (sec.getAttribute('data-search') + ' ' + chosen).indexOf(q) === -1;
     });
   });
+  // Office-staff marks post on their own (the row lives inside the big
+  // review form, so no nested <form>) and reload to re-render the state.
+  var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || (form.querySelector('input[name="_csrf"]') || {}).value || '';
+  modal.querySelectorAll('[data-mark-open]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var f = b.parentElement.querySelector('[data-mark-form]');
+      f.classList.remove('hidden'); f.classList.add('inline-flex'); b.classList.add('hidden');
+      var i = f.querySelector('[data-mark-person]'); if (i) i.focus();
+    });
+  });
+  modal.querySelectorAll('[data-mark-toggle]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var wrap = b.closest('[data-state-pill]');
+      var personEl = wrap ? wrap.querySelector('[data-mark-person]') : null;
+      var body = new URLSearchParams({ kind: b.getAttribute('data-kind'), ref: b.getAttribute('data-ref'), action: b.getAttribute('data-action'), person: personEl ? personEl.value : '' });
+      b.disabled = true;
+      fetch('/fleet/tolls/marks', { method: 'POST', credentials: 'same-origin', headers: { 'x-csrf-token': csrf, 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { if (j && j.success) window.location.reload(); else { alert((j && j.error) || 'Could not save.'); b.disabled = false; } })
+        .catch(function () { alert('Could not save.'); b.disabled = false; });
+    });
+  });
+
   form.addEventListener('submit', function (e) {
     refresh();
     if (submit.disabled) { e.preventDefault(); return; }
