@@ -15813,6 +15813,63 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 356 error:', e.message); }
   }
 
+  // Migration 357: Fleet toll invoices. The quarterly E-Toll statement PDF is
+  // stored (data/toll-invoices/, private — streamed by an authed route, NOT
+  // the public /data/uploads mount) with its full parse, and every trip the
+  // office attributes to a vehicle lands in toll_trips. Applied state is
+  // derived (trips exist for invoice+section), never stored, so a deleted
+  // vehicle can't leave a stale flag behind.
+  if (!isMigrationApplied.get(357)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS toll_invoices (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          invoice_number TEXT NOT NULL UNIQUE,
+          account_number TEXT,
+          issue_date DATE,
+          period_start DATE,
+          period_end DATE,
+          total_tolls NUMERIC,
+          total_fees NUMERIC,
+          total_charges NUMERIC,
+          gst NUMERIC,
+          page_count INTEGER,
+          file_path TEXT NOT NULL,
+          file_name TEXT,
+          parser_version INTEGER DEFAULT 1,
+          summary_json TEXT,
+          parsed_json TEXT,
+          warnings_json TEXT,
+          uploaded_by INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS toll_trips (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          invoice_id INTEGER NOT NULL REFERENCES toll_invoices(id) ON DELETE CASCADE,
+          vehicle_id INTEGER NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+          source_kind TEXT NOT NULL CHECK(source_kind IN ('tag','plate')),
+          source_ref TEXT NOT NULL,
+          source_label TEXT,
+          row_index INTEGER NOT NULL,
+          trip_date DATE,
+          trip_time TEXT,
+          description TEXT,
+          vehicle_class TEXT,
+          amount NUMERIC NOT NULL,
+          original_amount NUMERIC,
+          is_fee INTEGER DEFAULT 0,
+          applied_by INTEGER,
+          applied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(invoice_id, source_kind, source_ref, row_index)
+        );
+        CREATE INDEX IF NOT EXISTS idx_toll_trips_vehicle ON toll_trips(vehicle_id, trip_date);
+        CREATE INDEX IF NOT EXISTS idx_toll_trips_invoice ON toll_trips(invoice_id);
+      `);
+      recordMigration.run(357, 'toll_invoices + toll_trips: E-Toll statement import per vehicle');
+      console.log('Migration 357 applied: toll invoices + trips');
+    } catch (e) { console.error('Migration 357 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

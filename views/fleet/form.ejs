@@ -1,6 +1,8 @@
 <% locals.currentPage = 'fleet' %>
 <% const isEdit = vehicle !== null && typeof vehicle !== 'undefined' %>
-<% const val = k => isEdit && vehicle[k] != null ? vehicle[k] : '' %>
+<% const prefillVals = (typeof prefill !== 'undefined' && prefill) ? prefill : {}; %>
+<% const val = k => isEdit && vehicle[k] != null ? vehicle[k] : (prefillVals[k] || '') %>
+<% const returnToToll = (typeof returnTo !== 'undefined' && returnTo) ? returnTo : '' %>
 
 <div class="flex items-center gap-2 text-sm text-gray-400 mb-4">
   <a href="/fleet" class="hover:text-gray-900 transition">Fleet Register</a>
@@ -14,6 +16,10 @@
 
 <form method="POST" action="<%= isEdit ? '/fleet/' + vehicle.id : '/fleet' %>" class="space-y-5">
   <%- include('../partials/csrf') %>
+  <% if (returnToToll) { %>
+    <input type="hidden" name="return_to" value="<%= returnToToll %>">
+    <div class="bg-sky-50 border border-sky-200 rounded-xl px-4 py-3 text-sm text-sky-900">Adding this vehicle for a toll statement — its rego / tag is prefilled below, and you'll be taken straight back to the statement, already matched.</div>
+  <% } %>
 
   <!-- Identification -->
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">

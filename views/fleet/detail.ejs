@@ -77,7 +77,7 @@
 <% } %>
 
 <!-- ============================================================
-     TAB STRIP — Overview / Service / Incidents / Equipment
+     TAB STRIP — Overview / Service / Incidents / Equipment / Audits / Tolls
      ============================================================ -->
 <nav class="vehicle-tabs flex items-center gap-1 border-b border-gray-200 mb-5 overflow-x-auto" aria-label="Vehicle sections" id="vehicleTabs">
   <button type="button" class="v-tab" data-v-tab="overview">
@@ -103,6 +103,11 @@
     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     Audits
     <% if (typeof audits !== 'undefined' && audits.length) { %><span class="v-tab-count"><%= audits.length %></span><% } %>
+  </button>
+  <button type="button" class="v-tab" data-v-tab="tolls">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m6 10V7M4 20h16M5 4h14"/></svg>
+    Tolls
+    <% if (typeof tolls !== 'undefined' && tolls && tolls.kpi.trips) { %><span class="v-tab-count"><%= tolls.kpi.trips %></span><% } %>
   </button>
 </nav>
 
@@ -462,6 +467,62 @@
       </ul>
     <% } %>
   </div>
+</section>
+
+<!-- ============================================================
+     TAB: TOLLS — trips attributed from E-Toll statements (/fleet/tolls)
+     ============================================================ -->
+<section class="v-pane" data-v-pane="tolls" hidden>
+  <% const T = (typeof tolls !== 'undefined' && tolls) ? tolls : { rows: [], groups: [], kpi: { trips: 0, tolls: 0, fees: 0, total: 0, video: 0 } };
+     const money = (typeof AUD === 'function') ? AUD : (n => '$' + (Number(n) || 0).toFixed(2)); %>
+  <% if (!T.rows.length) { %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm px-6 py-10 text-center">
+      <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m6 10V7M4 20h16M5 4h14"/></svg>
+      <p class="text-sm font-medium text-gray-700">No tolls on this vehicle yet</p>
+      <p class="text-xs text-gray-400 mt-1 max-w-md mx-auto">Upload the quarterly E-Toll statement on the <a href="/fleet/tolls" class="text-brand-600 hover:underline">Toll Invoices</a> page. Trips for tag <span class="font-mono"><%= vehicle.toll_tag || '—' %></span> and plate <span class="font-mono"><%= vehicle.rego || '—' %></span> match this vehicle automatically.</p>
+    </div>
+  <% } else { %>
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+      <div class="stat-card"><p class="stat-card-label">Trips</p><p class="stat-card-value"><%= T.kpi.trips %></p></div>
+      <div class="stat-card"><p class="stat-card-label">Tolls</p><p class="stat-card-value is-money is-info"><%= money(T.kpi.tolls) %></p></div>
+      <div class="stat-card"><p class="stat-card-label">Fees</p><p class="stat-card-value is-money <%= T.kpi.fees > 0 ? 'is-warn' : 'is-muted' %>"><%= money(T.kpi.fees) %></p><p class="stat-card-sub">video matching · notices</p></div>
+      <div class="stat-card"><p class="stat-card-label">Total</p><p class="stat-card-value is-money"><%= money(T.kpi.total) %></p></div>
+      <div class="stat-card"><p class="stat-card-label">Video-matched</p><p class="stat-card-value <%= T.kpi.video > 0 ? 'is-warn' : 'is-muted' %>"><%= T.kpi.video %></p><p class="stat-card-sub">trips billed to the plate, not the tag</p></div>
+    </div>
+
+    <% T.groups.forEach((g, gi) => { %>
+      <details class="bg-white border border-gray-200 rounded-xl shadow-sm mb-3 overflow-hidden" <%= gi === 0 ? 'open' : '' %> data-toll-group="<%= g.invoiceId %>">
+        <summary class="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer select-none">
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-900"><%= g.periodStart ? formatDateShort(g.periodStart) : '?' %> – <%= g.periodEnd ? formatDateShort(g.periodEnd) : '?' %></p>
+            <p class="text-[11px] text-gray-400 mt-0.5">Statement <span class="font-mono"><%= g.invoiceNumber %></span> · <%= g.trips %> trip<%= g.trips === 1 ? '' : 's' %> · fees <%= money(g.fees) %> ·
+              <a href="/fleet/tolls?review=<%= g.invoiceId %>" class="text-brand-600 hover:underline" onclick="event.stopPropagation()">open statement</a></p>
+          </div>
+          <p class="text-sm font-bold text-gray-900 whitespace-nowrap"><%= money(g.total) %></p>
+        </summary>
+        <div class="border-t border-gray-100 overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead class="bg-gray-50 text-left text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+              <tr><th class="px-4 py-2">Date</th><th class="px-3 py-2 hidden sm:table-cell">Time</th><th class="px-3 py-2">Road</th><th class="px-3 py-2 hidden md:table-cell">Class</th><th class="px-3 py-2 hidden sm:table-cell">Billed to</th><th class="px-4 py-2 text-right">Amount</th></tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <% g.rows.forEach(t => { %>
+                <tr class="<%= t.is_fee ? 'bg-amber-50/50' : '' %>" data-toll-trip>
+                  <td class="px-4 py-1.5 whitespace-nowrap text-gray-700"><%= t.trip_date ? formatDateShort(t.trip_date) : '—' %></td>
+                  <td class="px-3 py-1.5 font-mono text-gray-500 hidden sm:table-cell"><%= t.trip_time || '' %></td>
+                  <td class="px-3 py-1.5 text-gray-800"><%= t.description %><% if (t.is_fee) { %> <span class="ml-1 inline-flex items-center px-1 rounded bg-amber-100 text-amber-800 text-[9px] font-bold uppercase">fee</span><% } %></td>
+                  <td class="px-3 py-1.5 text-gray-500 hidden md:table-cell"><%= t.vehicle_class || '' %></td>
+                  <td class="px-3 py-1.5 hidden sm:table-cell"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide <%= t.source_kind === 'tag' ? 'bg-sky-50 text-sky-700' : 'bg-violet-50 text-violet-700' %>" title="<%= t.source_kind === 'tag' ? 'Tag ' : 'Plate ' %><%= t.source_ref %>"><%= t.source_kind %></span></td>
+                  <td class="px-4 py-1.5 text-right font-mono <%= t.original_amount != null && Math.abs(t.original_amount - t.amount) > 0.001 ? 'text-amber-700' : 'text-gray-800' %>"
+                      <% if (t.original_amount != null && Math.abs(t.original_amount - t.amount) > 0.001) { %>title="Edited — statement amount <%= money(t.original_amount) %>"<% } %>><%= money(t.amount) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    <% }) %>
+  <% } %>
 </section>
 
 <style>

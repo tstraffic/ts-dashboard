@@ -1,0 +1,343 @@
+<%#
+  Toll statement review modal — the ONE screen for a statement, whether it
+  was uploaded a second ago or a year ago. One row per tag / plate section:
+  tick it, pick the vehicle (pre-matched where the register knows the tag or
+  plate), expand to see every trip (untick a trip, correct an amount), then
+  "Add to vehicles". The form is the truth: every section is rewritten from
+  what's submitted, so re-opening and saving unchanged is a no-op.
+
+  Expects `review` = { invoice, parsed, applied, match, vehicles, summary, status, warnings }.
+%>
+<%
+  const inv = review.invoice;
+  const sections = review.parsed.sections.filter(s => s.rows.length);
+  const zeroTrip = (review.summary || []).filter(s => !(s.rowCount > 0));
+  const vehiclesById = {}; review.vehicles.forEach(v => { vehiclesById[v.id] = v; });
+  const vLabel = (v) => v ? (v.asset_id + (v.rego ? ' · ' + v.rego : '') + (v.status && v.status !== 'Active' ? ' (' + v.status + ')' : '')) : '';
+  const range = (a, b) => (a ? formatDateShort(a) : '?') + ' – ' + (b ? formatDateShort(b) : '?');
+  const totalListed = sections.reduce((n, s) => n + s.total, 0);
+  const tripsListed = sections.reduce((n, s) => n + s.trips, 0);
+  const isReopen = review.status !== 'parsed';
+  const kindBadge = (kind) => kind === 'tag' ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-violet-50 text-violet-700 ring-violet-200';
+  const addHref = (s, m) => {
+    const q = [];
+    if (s.kind === 'tag') q.push('toll_tag=' + encodeURIComponent(s.ref)); else q.push('rego=' + encodeURIComponent(s.ref));
+    if (s.label && !(m && m.hint)) q.push('asset_id=' + encodeURIComponent(s.label));
+    q.push('return_to=' + encodeURIComponent('/fleet/tolls?review=' + inv.id));
+    return '/fleet/new?' + q.join('&');
+  };
+%>
+<style>
+  body.toll-review-open #fb-fab, body.toll-review-open #globalFab { display: none !important; }
+</style>
+<div id="tollReview" class="fixed inset-0 z-[70] flex items-stretch sm:items-center justify-center sm:p-4" data-toll-review="<%= inv.id %>">
+  <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" data-review-close></div>
+  <form method="POST" action="/fleet/tolls/<%= inv.id %>/apply" id="tollReviewForm"
+        class="relative bg-white sm:border sm:border-gray-200 sm:rounded-2xl shadow-2xl w-full sm:max-w-6xl flex flex-col h-full sm:h-auto sm:max-h-[92vh] overflow-hidden">
+    <%- include('../partials/csrf') %>
+
+    <!-- Header -->
+    <div class="px-4 sm:px-5 pt-4 pb-3 border-b border-gray-100 flex items-start gap-3">
+      <div class="flex-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="text-base font-bold text-gray-900">Statement <span class="font-mono"><%= inv.invoice_number %></span></h2>
+          <% if (review.status === 'applied') { %><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20">Added to vehicles</span>
+          <% } else if (review.status === 'partial') { %><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 ring-1 ring-blue-600/20">Partly added</span><% } %>
+        </div>
+        <p class="text-xs text-gray-500 mt-0.5">
+          <%= range(inv.period_start, inv.period_end) %><% if (inv.issue_date) { %> · issued <%= formatDateShort(inv.issue_date) %><% } %> · account <%= inv.account_number || '—' %>
+          · <a href="/fleet/tolls/<%= inv.id %>/file" target="_blank" class="text-brand-600 hover:underline">Open PDF</a>
+        </p>
+        <div class="flex flex-wrap gap-2 mt-2 text-[11px]">
+          <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-700"><b><%= tripsListed %></b> trips listed</span>
+          <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-700">Tolls <b><%= AUD(inv.total_tolls) %></b></span>
+          <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-700">Fees <b><%= AUD(inv.total_fees) %></b></span>
+          <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-700">Listed total <b><%= AUD(totalListed) %></b></span>
+          <% if (inv.total_charges) { %><span class="hidden sm:inline-flex px-2 py-0.5 rounded bg-gray-50 text-gray-500" title="The statement's own front-page figure. E-Toll's summary and detailed listing don't always agree; the listed trips are what gets added.">Statement says <%= AUD(inv.total_charges) %></span><% } %>
+          <% if (inv.gst) { %><span class="hidden sm:inline-flex px-2 py-0.5 rounded bg-gray-50 text-gray-500">incl. GST <%= AUD(inv.gst) %></span><% } %>
+        </div>
+      </div>
+      <button type="button" class="text-gray-400 hover:text-gray-700 p-1 -mr-1" data-review-close aria-label="Close">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <% if (review.warnings && review.warnings.length) { %>
+    <details class="mx-4 sm:mx-5 mt-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900" data-review-warnings>
+      <summary class="px-3 py-2 cursor-pointer font-medium select-none"><%= review.warnings.length %> note<%= review.warnings.length === 1 ? '' : 's' %> from reading this statement</summary>
+      <ul class="px-4 pb-2 list-disc space-y-0.5">
+        <% review.warnings.forEach(w => { %><li><%= w %></li><% }) %>
+      </ul>
+    </details>
+    <% } %>
+
+    <!-- Toolbar -->
+    <div class="px-4 sm:px-5 py-2.5 flex flex-wrap items-center gap-2 border-b border-gray-100">
+      <input type="search" placeholder="Filter plate, tag, vehicle…" data-review-filter
+             class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs w-full sm:w-56 focus:outline-none focus:ring-2 focus:ring-brand-500">
+      <button type="button" class="text-xs font-medium text-brand-600 hover:underline" data-review-select="matched">Tick all matched</button>
+      <span class="text-gray-300 text-xs">·</span>
+      <button type="button" class="text-xs font-medium text-gray-500 hover:underline" data-review-select="none">Untick all</button>
+      <label class="ml-auto inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+        <input type="checkbox" class="rounded border-gray-300 text-brand-600" data-review-nofees> Leave out fee rows
+      </label>
+    </div>
+
+    <!-- Sections -->
+    <div class="flex-1 min-h-0 overflow-y-auto">
+      <table class="w-full text-sm" data-review-table>
+        <thead class="sticky top-0 bg-gray-50 z-[1]">
+          <tr class="text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <th class="pl-3 sm:pl-5 py-2 w-8"></th>
+            <th class="px-2 py-2">Tag / plate</th>
+            <th class="px-2 py-2">Vehicle</th>
+            <th class="px-2 py-2 text-right hidden sm:table-cell">Trips</th>
+            <th class="px-2 py-2 text-right hidden md:table-cell">Tolls</th>
+            <th class="px-2 py-2 text-right hidden md:table-cell">Fees</th>
+            <th class="px-2 py-2 text-right">Total</th>
+            <th class="pr-4 sm:pr-5 py-2 w-10 sm:w-24"></th>
+          </tr>
+        </thead>
+        <% sections.forEach(s => {
+             const a = review.applied[s.key];
+             const m = review.match[s.key] || { vehicleId: null, ambiguous: false, candidates: [], hint: null };
+             const selectedId = a ? a.vehicleId : m.vehicleId;
+             const included = !!(a || m.vehicleId);
+             const state = a ? 'applied' : (m.vehicleId ? 'matched' : (m.ambiguous ? 'ambiguous' : 'unmatched'));
+             const keptSet = a ? new Set(a.rowIndexes) : null;
+             const candIds = new Set(m.candidates.map(c => c.id));
+             const searchText = [s.ref, s.label, selectedId && vehiclesById[selectedId] ? vLabel(vehiclesById[selectedId]) : ''].join(' ').toLowerCase();
+        %>
+        <tbody class="border-t border-gray-100" data-section="<%= s.key %>" data-state="<%= state %>" data-search="<%= searchText %>"
+               data-applied-vehicle="<%= a ? a.vehicleId : '' %>">
+          <tr class="<%= state === 'unmatched' || state === 'ambiguous' ? 'bg-amber-50/40' : '' %>">
+            <td class="pl-3 sm:pl-5 py-2.5 align-top">
+              <input type="checkbox" name="include[<%= s.key %>]" value="1" <%= included ? 'checked' : '' %> data-include
+                     class="mt-1 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+            </td>
+            <td class="px-1.5 sm:px-2 py-2.5 align-top">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded ring-1 text-[9px] font-bold uppercase tracking-wide <%= kindBadge(s.kind) %>"><%= s.kind %></span>
+                <span class="font-mono font-semibold text-gray-900"><%= s.ref %></span>
+                <% if (s.label) { %><span class="text-xs text-gray-500"><%= s.label %></span><% } %>
+                <span class="text-xs text-gray-400 sm:hidden"><%= s.trips %> trip<%= s.trips === 1 ? '' : 's' %></span>
+              </div>
+              <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]" data-state-pill>
+                <% if (state === 'applied') { %>
+                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold">✓ Added</span>
+                <% } else if (state === 'matched') { %>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">Matched by <%= m.how === 'reference' ? 'label' : m.how %></span>
+                <% } else if (state === 'ambiguous') { %>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold"><%= m.candidates.length %> vehicles share this <%= s.kind %> — choose</span>
+                <% } else { %>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">Not in register</span>
+                  <a href="<%= addHref(s, m) %>" class="text-brand-700 font-semibold hover:underline" data-add-vehicle>+ Add vehicle</a>
+                <% } %>
+                <% if (s.sumMatches === false) { %>
+                  <span class="text-amber-700" title="The listed trips add to <%= AUD(s.total) %>; the statement's own total for this <%= s.kind %> is <%= AUD(s.totalForVehicle) %>. The listed trips are what gets added.">⚠ differs from statement</span>
+                <% } %>
+              </div>
+            </td>
+            <td class="px-1.5 sm:px-2 py-2.5 align-top">
+              <select name="assign[<%= s.key %>]" data-assign
+                      class="w-full min-w-0 sm:min-w-[11rem] max-w-[7rem] sm:max-w-none px-1.5 sm:px-2 py-1.5 bg-white border <%= state === 'unmatched' || state === 'ambiguous' ? 'border-amber-300' : 'border-gray-300' %> rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="">— choose vehicle —</option>
+                <% if (m.candidates.length) { %>
+                  <optgroup label="Possible matches">
+                    <% m.candidates.forEach(c => { const v = vehiclesById[c.id] || c; %>
+                      <option value="<%= v.id %>" <%= Number(selectedId) === Number(v.id) ? 'selected' : '' %>><%= vLabel(v) %></option>
+                    <% }) %>
+                  </optgroup>
+                <% } %>
+                <optgroup label="<%= m.candidates.length ? 'All vehicles' : 'Vehicles' %>">
+                  <% review.vehicles.forEach(v => { if (candIds.has(v.id)) return; %>
+                    <option value="<%= v.id %>" <%= Number(selectedId) === Number(v.id) ? 'selected' : '' %>><%= vLabel(v) %></option>
+                  <% }) %>
+                </optgroup>
+              </select>
+            </td>
+            <td class="px-2 py-2.5 text-right text-xs text-gray-700 align-top hidden sm:table-cell" data-trips><%= s.trips %></td>
+            <td class="px-2 py-2.5 text-right text-xs text-gray-600 align-top hidden md:table-cell" data-tolls><%= AUD(s.tolls) %></td>
+            <td class="px-2 py-2.5 text-right text-xs text-gray-600 align-top hidden md:table-cell" data-fees><%= AUD(s.fees) %></td>
+            <td class="px-1.5 sm:px-2 py-2.5 text-right text-xs font-semibold text-gray-900 align-top whitespace-nowrap" data-total data-total-value="<%= s.total %>"><%= AUD(s.total) %></td>
+            <td class="pl-1 pr-3 sm:pr-5 py-2.5 text-right align-top">
+              <button type="button" class="text-xs font-medium text-gray-500 hover:text-gray-900 whitespace-nowrap" data-toggle-rows aria-expanded="false" title="Show the trips"><span class="hidden sm:inline"><%= s.rows.length %> rows </span>▸</button>
+            </td>
+          </tr>
+          <tr hidden data-rows>
+            <td colspan="8" class="px-4 sm:px-5 pb-3">
+              <div class="rounded-lg border border-gray-200 overflow-hidden">
+                <table class="w-full text-[11px]">
+                  <thead class="bg-gray-50 text-left text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                    <tr><th class="px-2 py-1.5 w-6"></th><th class="px-2 py-1.5 whitespace-nowrap">Date</th><th class="px-2 py-1.5 hidden sm:table-cell">Time</th><th class="px-2 py-1.5">Road</th><th class="px-2 py-1.5 hidden md:table-cell">Class</th><th class="px-2 py-1.5 text-right w-28">Amount</th></tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <% s.rows.forEach(r => {
+                         const kept = keptSet ? keptSet.has(r.i) : true;
+                         const amount = (a && a.edited && a.edited[r.i] != null) ? a.edited[r.i] : r.amount; %>
+                      <tr class="<%= r.isFee ? 'bg-amber-50/50' : '' %> <%= kept ? '' : 'opacity-50' %>" data-row data-fee="<%= r.isFee ? 1 : 0 %>">
+                        <td class="px-2 py-1"><input type="checkbox" name="keep[<%= s.key %>][r<%= r.i %>]" value="1" <%= kept ? 'checked' : '' %> data-keep class="rounded border-gray-300 text-brand-600"></td>
+                        <td class="px-2 py-1 whitespace-nowrap text-gray-700"><%= r.date ? formatDateShort(r.date) : '—' %></td>
+                        <td class="px-2 py-1 font-mono text-gray-500 hidden sm:table-cell"><%= r.time || '' %></td>
+                        <td class="px-2 py-1 text-gray-800 break-words">
+                          <%= r.description %>
+                          <% if (r.isFee) { %><span class="ml-1 inline-flex items-center px-1 rounded bg-amber-100 text-amber-800 text-[9px] font-bold uppercase">fee</span><% } %>
+                        </td>
+                        <td class="px-2 py-1 text-gray-500 hidden md:table-cell"><%= r.vehicleClass || '' %></td>
+                        <td class="px-2 py-1 text-right">
+                          <input type="number" step="0.01" name="amt[<%= s.key %>][r<%= r.i %>]" value="<%= amount %>" data-amt data-original="<%= r.amount %>"
+                                 class="w-20 sm:w-24 px-1.5 py-0.5 text-right bg-white border <%= Math.abs(amount - r.amount) > 0.001 ? 'border-amber-400' : 'border-gray-200' %> rounded text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                 title="Statement amount <%= AUD(r.amount) %>">
+                        </td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+        <% }) %>
+        <% if (!sections.length) { %>
+        <tbody><tr><td colspan="8" class="px-5 py-8 text-center text-sm text-gray-400 italic">No trips were found in this statement.</td></tr></tbody>
+        <% } %>
+        <% if (zeroTrip.length) { %>
+        <tbody class="border-t border-gray-100" data-zero-trip>
+          <tr>
+            <td colspan="8" class="px-4 sm:px-5 py-2.5 text-xs text-gray-400">
+              <details><summary class="cursor-pointer select-none"><%= zeroTrip.length %> tag<%= zeroTrip.length === 1 ? '' : 's' %> / plate<%= zeroTrip.length === 1 ? '' : 's' %> with no trips this period</summary>
+                <p class="mt-1 font-mono"><%= zeroTrip.map(z => z.ref + (z.label ? ' (' + z.label + ')' : '')).join(' · ') %></p>
+              </details>
+            </td>
+          </tr>
+        </tbody>
+        <% } %>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div class="px-4 sm:px-5 py-3 border-t border-gray-100 bg-white sm:rounded-b-2xl flex flex-wrap items-center gap-3">
+      <p class="text-xs text-gray-600" data-review-summary>
+        <b data-sel-count>0</b> of <%= sections.length %> ticked · <b data-sel-total>$0.00</b>
+        <span class="text-amber-700 hidden" data-sel-missing></span>
+      </p>
+      <div class="ml-auto flex items-center gap-2">
+        <button type="button" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900" data-review-close>Close</button>
+        <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg" data-review-submit>
+          <%= isReopen ? 'Update vehicles' : 'Add to vehicles' %>
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  var modal = document.getElementById('tollReview');
+  if (!modal) return;
+  var form = document.getElementById('tollReviewForm');
+  var sections = Array.prototype.slice.call(modal.querySelectorAll('[data-section]'));
+  var submit = modal.querySelector('[data-review-submit]');
+  var selCount = modal.querySelector('[data-sel-count]');
+  var selTotal = modal.querySelector('[data-sel-total]');
+  var selMissing = modal.querySelector('[data-sel-missing]');
+  document.body.style.overflow = 'hidden';
+  document.body.classList.add('toll-review-open');
+
+  function money(n) { return '$' + (Number(n) || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function close() {
+    document.body.style.overflow = '';
+    document.body.classList.remove('toll-review-open');
+    var url = new URL(window.location.href); url.searchParams.delete('review');
+    window.location.href = url.pathname + (url.search || '');
+  }
+  modal.querySelectorAll('[data-review-close]').forEach(function (el) { el.addEventListener('click', close); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+
+  function sectionTotal(sec) {
+    var total = 0;
+    sec.querySelectorAll('[data-row]').forEach(function (row) {
+      var keep = row.querySelector('[data-keep]');
+      var amt = row.querySelector('[data-amt]');
+      if (keep.checked) total += parseFloat(amt.value) || 0;
+      row.classList.toggle('opacity-50', !keep.checked);
+      amt.classList.toggle('border-amber-400', Math.abs((parseFloat(amt.value) || 0) - parseFloat(amt.getAttribute('data-original'))) > 0.001);
+      amt.classList.toggle('border-gray-200', !amt.classList.contains('border-amber-400'));
+    });
+    return Math.round(total * 100) / 100;
+  }
+  function refresh() {
+    var count = 0, total = 0, missing = 0;
+    sections.forEach(function (sec) {
+      var inc = sec.querySelector('[data-include]');
+      var sel = sec.querySelector('[data-assign]');
+      var t = sectionTotal(sec);
+      var cell = sec.querySelector('[data-total]');
+      cell.textContent = money(t);
+      cell.classList.toggle('text-amber-700', Math.abs(t - parseFloat(cell.getAttribute('data-total-value'))) > 0.001);
+      sel.classList.toggle('ring-2', inc.checked && !sel.value);
+      sel.classList.toggle('ring-amber-400', inc.checked && !sel.value);
+      if (inc.checked) { count++; total += t; if (!sel.value) missing++; }
+    });
+    selCount.textContent = count;
+    selTotal.textContent = money(total);
+    selMissing.classList.toggle('hidden', !missing);
+    selMissing.textContent = missing ? '· ' + missing + ' ticked without a vehicle' : '';
+    submit.disabled = missing > 0 || count === 0;
+  }
+
+  sections.forEach(function (sec) {
+    var inc = sec.querySelector('[data-include]');
+    var sel = sec.querySelector('[data-assign]');
+    var toggle = sec.querySelector('[data-toggle-rows]');
+    var rows = sec.querySelector('[data-rows]');
+    toggle.addEventListener('click', function () {
+      var open = rows.hidden; rows.hidden = !open;
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.innerHTML = toggle.innerHTML.replace(/[▸▾]/, open ? '▾' : '▸');
+    });
+    inc.addEventListener('change', function () {
+      if (!inc.checked && sec.getAttribute('data-applied-vehicle')) {
+        if (!confirm('Un-ticking removes the trips already added to this vehicle when you save. Continue?')) { inc.checked = true; return; }
+      }
+      if (inc.checked && !sel.value) sel.focus();
+      refresh();
+    });
+    sel.addEventListener('change', function () { if (sel.value && !inc.checked) inc.checked = true; refresh(); });
+    sec.addEventListener('change', function (e) { if (e.target.matches('[data-keep]')) refresh(); });
+    sec.addEventListener('input', function (e) { if (e.target.matches('[data-amt]')) refresh(); });
+  });
+
+  modal.querySelectorAll('[data-review-select]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var mode = btn.getAttribute('data-review-select');
+      sections.forEach(function (sec) {
+        var inc = sec.querySelector('[data-include]');
+        var sel = sec.querySelector('[data-assign]');
+        inc.checked = mode === 'matched' ? !!sel.value : false;
+      });
+      refresh();
+    });
+  });
+  var noFees = modal.querySelector('[data-review-nofees]');
+  noFees.addEventListener('change', function () {
+    modal.querySelectorAll('[data-row][data-fee="1"] [data-keep]').forEach(function (k) { k.checked = !noFees.checked; });
+    refresh();
+  });
+  var filter = modal.querySelector('[data-review-filter]');
+  filter.addEventListener('input', function () {
+    var q = filter.value.trim().toLowerCase();
+    sections.forEach(function (sec) {
+      var sel = sec.querySelector('[data-assign]');
+      var chosen = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text.toLowerCase() : '';
+      sec.hidden = !!q && (sec.getAttribute('data-search') + ' ' + chosen).indexOf(q) === -1;
+    });
+  });
+  form.addEventListener('submit', function (e) {
+    refresh();
+    if (submit.disabled) { e.preventDefault(); return; }
+    submit.disabled = true; submit.textContent = 'Saving…';
+  });
+  refresh();
+})();
+</script>

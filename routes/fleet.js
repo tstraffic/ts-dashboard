@@ -337,8 +337,12 @@ router.get('/', (req, res) => {
     ORDER BY total DESC
   `).all();
 
+  const tollHub = tollHubData(db);
+
   res.render('fleet/index', {
     title: 'Fleet Register',
+    tollKpi: tollHub.kpi,
+    tollUnreconciled: tollHub.unreconciledDistinct,
     currentPage: 'fleet',
     vehicles,
     filters: req.query,
@@ -540,11 +544,336 @@ router.get('/compliance', (req, res) => {
 });
 
 // ── NEW VEHICLE FORM ─────────────────────────────────────────────────
+// ── TOLL INVOICES ────────────────────────────────────────────────────
+// The quarterly NSW E-Toll statement: upload → parse (services/
+// tollInvoiceParser) → review modal that matches each tag / plate section
+// to a vehicle (lib/tollMatch) → "Add to vehicles" writes toll_trips.
+//
+// The PDF is kept under data/toll-invoices/ — on the persistent volume but
+// deliberately NOT under the public /data/uploads static mount; the only way
+// to read it is the authed /tolls/:id/file route. Every invoice stays listed
+// so a plate with no vehicle profile can be reconciled later. "Applied" is
+// derived from toll_trips (rows exist for invoice + section), never stored.
+const { parseTollInvoice, summarise: summariseToll, TollParseError } = require('../services/tollInvoiceParser');
+const { matchSections } = require('../lib/tollMatch');
+
+const TOLL_STORED_PREFIX = 'data/toll-invoices';
+const TOLL_DIR = path.join(__dirname, '..', TOLL_STORED_PREFIX);
+
+function resolveTollFile(stored) {
+  if (!stored) return null;
+  const abs = path.isAbsolute(stored) ? path.resolve(stored) : path.resolve(path.join(__dirname, '..', stored));
+  const base = path.resolve(TOLL_DIR);
+  if (!(abs === base || abs.startsWith(base + path.sep))) return null;
+  return fs.existsSync(abs) ? abs : null;
+}
+function unlinkTollQuiet(stored) {
+  try { const abs = resolveTollFile(stored); if (abs) fs.unlinkSync(abs); } catch (e) { /* best effort */ }
+}
+const tollUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => { fs.mkdirSync(TOLL_DIR, { recursive: true }); cb(null, TOLL_DIR); },
+    filename: (req, file, cb) => cb(null, Date.now() + '-' + Math.random().toString(36).substring(7) + '.pdf'),
+  }),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (/\.pdf$/i.test(file.originalname)) cb(null, true);
+    else cb(new Error('Toll statements must be PDF files.'), false);
+  },
+});
+
+const fmtMoney = (n) => '$' + (Number(n) || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const safeJson = (s, fallback) => { try { return s ? JSON.parse(s) : fallback; } catch (e) { return fallback; } };
+const safeTollReturn = (v) => (typeof v === 'string' && /^\/fleet\/tolls(\?|$)/.test(v)) ? v : '';
+
+function tollVehicles(db) {
+  return db.prepare(`SELECT id, asset_id, fleet_id, rego, toll_tag, status, make, model FROM vehicles
+                     ORDER BY (status = 'Active') DESC, asset_id COLLATE NOCASE`).all();
+}
+
+/** toll_trips already written for one invoice, grouped per section key. */
+function appliedBySection(db, invoiceId) {
+  const out = {};
+  db.prepare('SELECT source_kind, source_ref, vehicle_id, row_index, amount, original_amount FROM toll_trips WHERE invoice_id = ?')
+    .all(invoiceId)
+    .forEach(t => {
+      const key = t.source_kind + ':' + t.source_ref;
+      const a = out[key] || (out[key] = { vehicleId: t.vehicle_id, rowIndexes: [], edited: {}, count: 0, total: 0 });
+      a.rowIndexes.push(t.row_index);
+      a.count += 1; a.total = round2(a.total + t.amount);
+      if (t.original_amount != null && Math.abs(t.original_amount - t.amount) > 0.001) a.edited[t.row_index] = t.amount;
+    });
+  return out;
+}
+
+function tollStatus(sections, applied) {
+  const live = sections.filter(s => (s.rowCount || 0) > 0);
+  const done = live.filter(s => applied[s.key]).length;
+  if (live.length && done === live.length) return 'applied';
+  return done > 0 ? 'partial' : 'parsed';
+}
+
+/**
+ * Everything the hub and the Vehicles index need: invoices with per-section
+ * counts, the cross-invoice "unreconciled" list (sections with trips, no
+ * toll_trips yet, and no vehicle the matcher can name — re-matched against
+ * the live register so a newly created vehicle clears the flag), and KPIs.
+ */
+function tollHubData(db) {
+  const empty = { invoices: [], unreconciled: [], unreconciledDistinct: 0, kpi: { trips12: 0, tolls12: 0, fees12: 0, total12: 0, totalAll: 0, tripsAll: 0 } };
+  let invoices;
+  try {
+    invoices = db.prepare(`SELECT id, invoice_number, account_number, issue_date, period_start, period_end, total_tolls, total_fees,
+                                  total_charges, gst, page_count, file_name, summary_json, warnings_json, created_at
+                           FROM toll_invoices ORDER BY COALESCE(period_end, issue_date) DESC, id DESC`).all();
+  } catch (e) { return empty; /* pre-357 */ }
+  const vehicles = tollVehicles(db);
+  const byId = Object.fromEntries(vehicles.map(v => [v.id, v]));
+  const appliedRows = db.prepare('SELECT invoice_id, source_kind, source_ref, vehicle_id, COUNT(*) AS n, SUM(amount) AS total FROM toll_trips GROUP BY invoice_id, source_kind, source_ref').all();
+  const appliedByInvoice = {};
+  appliedRows.forEach(r => { (appliedByInvoice[r.invoice_id] = appliedByInvoice[r.invoice_id] || {})[r.source_kind + ':' + r.source_ref] = r; });
+
+  const unreconciled = [];
+  invoices.forEach(inv => {
+    const summary = safeJson(inv.summary_json, []);
+    const applied = appliedByInvoice[inv.id] || {};
+    const live = summary.filter(s => (s.rowCount || 0) > 0);
+    const match = matchSections(live, vehicles);
+    inv.summary = summary;
+    inv.warnings = safeJson(inv.warnings_json, []);
+    inv.status = tollStatus(summary, applied);
+    inv.counts = { sections: live.length, applied: 0, matched: 0, unmatched: 0, zeroTrip: summary.length - live.length };
+    inv.appliedTotal = 0; inv.appliedTrips = 0;
+    live.forEach(s => {
+      const a = applied[s.key];
+      if (a) { inv.counts.applied++; inv.appliedTotal = round2(inv.appliedTotal + a.total); inv.appliedTrips += a.n; return; }
+      const m = match[s.key];
+      if (m && m.vehicleId) inv.counts.matched++;
+      else {
+        inv.counts.unmatched++;
+        unreconciled.push({ invoiceId: inv.id, invoiceNumber: inv.invoice_number, periodStart: inv.period_start, periodEnd: inv.period_end,
+          kind: s.kind, ref: s.ref, label: s.label, trips: s.trips, total: s.total, ambiguous: !!(m && m.ambiguous),
+          candidates: m ? m.candidates : [], hint: m ? m.hint : null });
+      }
+    });
+    inv.appliedVehicles = [...new Set(Object.values(applied).map(a => a.vehicle_id))].map(id => byId[id]).filter(Boolean);
+  });
+
+  let kpi = empty.kpi;
+  try {
+    const k12 = db.prepare(`SELECT COUNT(CASE WHEN is_fee = 0 THEN 1 END) AS trips,
+                                   COALESCE(SUM(CASE WHEN is_fee = 0 THEN amount END), 0) AS tolls,
+                                   COALESCE(SUM(CASE WHEN is_fee = 1 THEN amount END), 0) AS fees
+                            FROM toll_trips WHERE trip_date >= date('now', '-12 months')`).get();
+    const kAll = db.prepare('SELECT COUNT(CASE WHEN is_fee = 0 THEN 1 END) AS trips, COALESCE(SUM(amount), 0) AS total FROM toll_trips').get();
+    kpi = { trips12: k12.trips, tolls12: round2(k12.tolls), fees12: round2(k12.fees), total12: round2(k12.tolls + k12.fees), totalAll: round2(kAll.total), tripsAll: kAll.trips };
+  } catch (e) { /* pre-357 */ }
+  // Distinct plates/tags still needing a vehicle (the hub groups them the same way).
+  const unreconciledDistinct = new Set(unreconciled.map(u => u.kind + ':' + u.ref)).size;
+  return { invoices, unreconciled, unreconciledDistinct, kpi };
+}
+
+// Hub: upload box, every statement ever uploaded, what still needs a vehicle.
+// ?review=<id> opens the review modal for that statement — the same screen
+// whether it was uploaded a second ago or a year ago.
+router.get('/tolls', (req, res) => {
+  const db = getDb();
+  const hub = tollHubData(db);
+  let review = null;
+  if (req.query.review) {
+    let inv = null;
+    try { inv = db.prepare('SELECT * FROM toll_invoices WHERE id = ?').get(req.query.review); } catch (e) {}
+    if (!inv) { req.flash('error', 'That toll statement is no longer here.'); return req.session.save(() => res.redirect('/fleet/tolls')); }
+    const parsed = safeJson(inv.parsed_json, null);
+    if (!parsed) { req.flash('error', 'That statement has no stored parse — delete it and upload the PDF again.'); return req.session.save(() => res.redirect('/fleet/tolls')); }
+    const vehicles = tollVehicles(db);
+    const applied = appliedBySection(db, inv.id);
+    const match = matchSections(parsed.sections, vehicles);
+    const summary = safeJson(inv.summary_json, []);
+    review = { invoice: inv, parsed, applied, match, vehicles, summary, status: tollStatus(summary, applied), warnings: safeJson(inv.warnings_json, []) };
+  }
+  res.render('fleet/tolls', {
+    title: 'Toll Invoices',
+    currentPage: 'fleet',
+    invoices: hub.invoices,
+    unreconciled: hub.unreconciled,
+    kpi: hub.kpi,
+    review,
+    AUD: fmtMoney,
+  });
+});
+
+router.post('/tolls/upload', (req, res) => {
+  tollUpload.single('invoice')(req, res, async (err) => {
+    const back = () => req.session.save(() => res.redirect('/fleet/tolls'));
+    if (err) { req.flash('error', err.message || 'Upload failed.'); return back(); }
+    if (!req.file) { req.flash('error', 'Choose the E-Toll statement PDF to upload.'); return back(); }
+    const db = getDb();
+    const rel = path.relative(path.join(__dirname, '..'), req.file.path);
+    let parsed;
+    try {
+      parsed = await parseTollInvoice(req.file.path);
+    } catch (e) {
+      unlinkTollQuiet(rel);
+      req.flash('error', e instanceof TollParseError ? e.message : 'Could not read that PDF: ' + e.message);
+      return back();
+    }
+    const existing = db.prepare('SELECT id, created_at FROM toll_invoices WHERE invoice_number = ?').get(parsed.invoice.number);
+    if (existing) {
+      unlinkTollQuiet(rel);
+      req.flash('success', `Statement ${parsed.invoice.number} was already uploaded on ${res.locals.formatDate ? res.locals.formatDate(existing.created_at) : existing.created_at} — opening it.`);
+      return req.session.save(() => res.redirect(`/fleet/tolls?review=${existing.id}`));
+    }
+    const summary = summariseToll(parsed);
+    const ins = db.prepare(`
+      INSERT INTO toll_invoices (invoice_number, account_number, issue_date, period_start, period_end, total_tolls, total_fees,
+        total_charges, gst, page_count, file_path, file_name, parser_version, summary_json, parsed_json, warnings_json, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      parsed.invoice.number, parsed.invoice.accountNumber, parsed.invoice.issueDate, parsed.invoice.periodStart, parsed.invoice.periodEnd,
+      parsed.invoice.totalTolls, parsed.invoice.totalFees, parsed.invoice.totalCharges, parsed.invoice.gst, parsed.invoice.pageCount,
+      rel, req.file.originalname, parsed.parserVersion, JSON.stringify(summary), JSON.stringify(parsed), JSON.stringify(parsed.warnings),
+      req.session.user ? req.session.user.id : null
+    );
+    const live = parsed.sections.filter(s => s.rows.length);
+    const trips = live.reduce((n, s) => n + s.trips, 0);
+    const total = live.reduce((n, s) => n + s.total, 0);
+    logActivity({ user: req.session.user, action: 'upload', entityType: 'toll_invoice', entityId: ins.lastInsertRowid, entityLabel: parsed.invoice.number, ip: req.ip });
+    req.flash('success', `Statement ${parsed.invoice.number} read: ${live.length} vehicle${live.length === 1 ? '' : 's'}, ${trips} trips, ${fmtMoney(total)}. Check the matches, then add them to the vehicles.`);
+    req.session.save(() => res.redirect(`/fleet/tolls?review=${ins.lastInsertRowid}`));
+  });
+});
+
+// Row sub-keys are prefixed ("r12") on purpose: qs would turn bare numeric
+// keys into an array and COMPACT it when a row is un-ticked, shifting every
+// later row's index. Object keys survive gaps.
+// The review form is the truth: every section with rows is either included
+// (assigned to a vehicle, minus un-ticked rows, with any edited amounts) or not.
+// Each submitted section is rewritten wholesale, so un-ticking removes trips
+// and re-assigning moves them.
+router.post('/tolls/:id/apply', (req, res) => {
+  const db = getDb();
+  const inv = db.prepare('SELECT * FROM toll_invoices WHERE id = ?').get(req.params.id);
+  if (!inv) { req.flash('error', 'Toll statement not found.'); return req.session.save(() => res.redirect('/fleet/tolls')); }
+  const parsed = safeJson(inv.parsed_json, null);
+  if (!parsed) { req.flash('error', 'That statement has no stored parse.'); return req.session.save(() => res.redirect('/fleet/tolls')); }
+  const backToReview = () => req.session.save(() => res.redirect(`/fleet/tolls?review=${inv.id}`));
+
+  const include = req.body.include || {};
+  const assign = req.body.assign || {};
+  const keep = req.body.keep || {};
+  const amt = req.body.amt || {};
+  const vehicleIds = new Set(db.prepare('SELECT id FROM vehicles').all().map(v => v.id));
+  const live = parsed.sections.filter(s => s.rows.length);
+
+  const missing = live.filter(s => include[s.key] === '1' && !vehicleIds.has(parseInt(assign[s.key], 10)))
+    .map(s => (s.kind === 'tag' ? 'Tag ' : 'Plate ') + s.ref);
+  if (missing.length) {
+    req.flash('error', `Choose a vehicle for ${missing.join(', ')} (or un-tick them) before adding.`);
+    return backToReview();
+  }
+
+  const del = db.prepare('DELETE FROM toll_trips WHERE invoice_id = ? AND source_kind = ? AND source_ref = ?');
+  const ins = db.prepare(`INSERT INTO toll_trips (invoice_id, vehicle_id, source_kind, source_ref, source_label, row_index, trip_date, trip_time,
+                             description, vehicle_class, amount, original_amount, is_fee, applied_by)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const learnTag = db.prepare("UPDATE vehicles SET toll_tag = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND (toll_tag IS NULL OR TRIM(toll_tag) = '')");
+  const tally = { trips: 0, amount: 0, vehicles: new Set(), skippedSections: 0, editedRows: 0, skippedRows: 0 };
+  const userId = req.session.user ? req.session.user.id : null;
+
+  db.transaction(() => {
+    live.forEach(s => {
+      del.run(inv.id, s.kind, s.ref);
+      if (include[s.key] !== '1') { tally.skippedSections++; return; }
+      const vehicleId = parseInt(assign[s.key], 10);
+      const keepSet = keep[s.key] && typeof keep[s.key] === 'object' ? new Set(Object.keys(keep[s.key]).map(k => String(k).replace(/^r/, ''))) : null;
+      const overrides = amt[s.key] || {};
+      s.rows.forEach(r => {
+        if (keepSet && !keepSet.has(String(r.i))) { tally.skippedRows++; return; }
+        const raw = overrides['r' + r.i];
+        const edited = raw !== undefined && raw !== '' && isFinite(parseFloat(raw)) && Math.abs(parseFloat(raw) - r.amount) > 0.001;
+        const amount = edited ? round2(parseFloat(raw)) : r.amount;
+        if (edited) tally.editedRows++;
+        ins.run(inv.id, vehicleId, s.kind, s.ref, s.label || null, r.i, r.date, r.time || null, r.description, r.vehicleClass || null,
+          amount, r.amount, r.isFee ? 1 : 0, userId);
+        if (!r.isFee) tally.trips++;
+        tally.amount = round2(tally.amount + amount);
+      });
+      tally.vehicles.add(vehicleId);
+      if (s.kind === 'tag') learnTag.run(s.ref, vehicleId);
+    });
+  })();
+
+  logActivity({ user: req.session.user, action: 'update', entityType: 'toll_invoice', entityId: inv.id, entityLabel: inv.invoice_number, ip: req.ip,
+    details: `${tally.trips} trips → ${tally.vehicles.size} vehicles` });
+  const bits = [`${tally.trips} trips (${fmtMoney(tally.amount)}) on ${tally.vehicles.size} vehicle${tally.vehicles.size === 1 ? '' : 's'}`];
+  if (tally.skippedSections) bits.push(`${tally.skippedSections} not assigned`);
+  if (tally.skippedRows) bits.push(`${tally.skippedRows} rows left out`);
+  if (tally.editedRows) bits.push(`${tally.editedRows} amounts edited`);
+  req.flash('success', `Saved: ${bits.join(' · ')}.`);
+  backToReview();
+});
+
+router.get('/tolls/:id/file', (req, res) => {
+  const db = getDb();
+  const inv = db.prepare('SELECT invoice_number, file_path FROM toll_invoices WHERE id = ?').get(req.params.id);
+  const abs = inv ? resolveTollFile(inv.file_path) : null;
+  if (!abs) { req.flash('error', 'The PDF for that statement is missing.'); return req.session.save(() => res.redirect('/fleet/tolls')); }
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="etoll-${inv.invoice_number}.pdf"`);
+  fs.createReadStream(abs).pipe(res);
+});
+
+router.post('/tolls/:id/delete', (req, res) => {
+  const db = getDb();
+  const inv = db.prepare('SELECT id, invoice_number, file_path FROM toll_invoices WHERE id = ?').get(req.params.id);
+  if (!inv) { req.flash('error', 'Toll statement not found.'); return req.session.save(() => res.redirect('/fleet/tolls')); }
+  db.transaction(() => {
+    db.prepare('DELETE FROM toll_trips WHERE invoice_id = ?').run(inv.id);
+    db.prepare('DELETE FROM toll_invoices WHERE id = ?').run(inv.id);
+  })();
+  unlinkTollQuiet(inv.file_path);
+  logActivity({ user: req.session.user, action: 'delete', entityType: 'toll_invoice', entityId: inv.id, entityLabel: inv.invoice_number, ip: req.ip });
+  req.flash('success', `Statement ${inv.invoice_number} and its trips were removed.`);
+  req.session.save(() => res.redirect('/fleet/tolls'));
+});
+
+/** Per-vehicle toll history for the detail page's Tolls tab. */
+function vehicleTolls(db, vehicleId) {
+  const out = { rows: [], groups: [], kpi: { trips: 0, tolls: 0, fees: 0, total: 0, video: 0 } };
+  try {
+    out.rows = db.prepare(`
+      SELECT t.*, i.invoice_number, i.period_start, i.period_end, i.issue_date
+      FROM toll_trips t JOIN toll_invoices i ON i.id = t.invoice_id
+      WHERE t.vehicle_id = ?
+      ORDER BY COALESCE(i.period_end, i.issue_date) DESC, t.trip_date DESC, t.trip_time DESC, t.id DESC
+    `).all(vehicleId);
+  } catch (e) { return out; /* pre-357 */ }
+  const groups = {};
+  out.rows.forEach(t => {
+    const g = groups[t.invoice_id] || (groups[t.invoice_id] = { invoiceId: t.invoice_id, invoiceNumber: t.invoice_number, periodStart: t.period_start, periodEnd: t.period_end, issueDate: t.issue_date, trips: 0, tolls: 0, fees: 0, total: 0, rows: [] });
+    g.rows.push(t);
+    if (t.is_fee) { g.fees = round2(g.fees + t.amount); out.kpi.fees = round2(out.kpi.fees + t.amount); }
+    else { g.trips++; g.tolls = round2(g.tolls + t.amount); out.kpi.trips++; out.kpi.tolls = round2(out.kpi.tolls + t.amount); if (t.source_kind === 'plate') out.kpi.video++; }
+    g.total = round2(g.tolls + g.fees);
+  });
+  out.groups = Object.values(groups);
+  out.kpi.total = round2(out.kpi.tolls + out.kpi.fees);
+  return out;
+}
+
 router.get('/new', (req, res) => {
+  // Prefill + return_to come from the toll review's "Add vehicle" link, so a
+  // plate the statement knows but the register doesn't is one click away.
+  const q = req.query;
+  const prefill = { asset_id: q.asset_id || '', fleet_id: q.fleet_id || '', rego: q.rego || '', toll_tag: q.toll_tag || '' };
   res.render('fleet/form', {
     title: 'Add Vehicle',
     currentPage: 'fleet',
     vehicle: null,
+    prefill,
+    returnTo: safeTollReturn(q.return_to),
     vehicleStatuses: VEHICLE_STATUSES,
     vehicleTypes: VEHICLE_TYPES,
     trafficClasses: TRAFFIC_CLASSES,
@@ -578,7 +907,8 @@ router.post('/', (req, res) => {
     );
     logActivity({ user: req.session.user, action: 'create', entityType: 'vehicle', entityId: result.lastInsertRowid, entityLabel: b.asset_id, ip: req.ip });
     req.flash('success', `Vehicle ${b.asset_id} added.`);
-    req.session.save(() => res.redirect(`/fleet/${result.lastInsertRowid}`));
+    const backTo = safeTollReturn(b.return_to);
+    req.session.save(() => res.redirect(backTo || `/fleet/${result.lastInsertRowid}`));
   } catch (e) {
     if (/UNIQUE/i.test(e.message)) {
       req.flash('error', `Asset ID "${b.asset_id}" is already in use.`);
@@ -603,7 +933,8 @@ router.get('/:id', (req, res) => {
   services.forEach(s => { s.invoices = invStmt.all(s.id); });
 
   const { incidents, equipmentChecks } = lookupRelatedReports(db, vehicle);
-  const initialTab = ['overview','service','incidents','equipment','audits'].includes(req.query.tab) ? req.query.tab : 'overview';
+  const initialTab = ['overview','service','incidents','equipment','audits','tolls'].includes(req.query.tab) ? req.query.tab : 'overview';
+  const tolls = vehicleTolls(db, vehicle.id);
 
   // Audit History — vehicle_audits keyed on this vehicle's PK, each with
   // its item-level results so the tab can expand an audit in place.
@@ -628,6 +959,8 @@ router.get('/:id', (req, res) => {
     incidents,
     equipmentChecks,
     audits,
+    tolls,
+    AUD: fmtMoney,
     initialTab,
     serviceTypes: SERVICE_TYPES,
     trafficClasses: TRAFFIC_CLASSES,
