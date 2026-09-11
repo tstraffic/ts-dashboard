@@ -187,11 +187,30 @@ function shortDate(d) {
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
 
+// An applicant sits on one monthly LIST: list_month, which starts as the
+// month they applied and moves when the office brings them forward. Rows
+// from before migration 359 fall back to their applied month.
+const LIST_MONTH_SQL = "COALESCE(list_month, substr(date_applied, 1, 7))";
+const monthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function monthKeyLabel(key) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(key || ''));
+  return m ? `${MONTH_NAMES[parseInt(m[2], 10) - 1]} ${m[1]}` : String(key || '');
+}
+function shiftMonthKey(key, delta) {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  const d = new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+// Stages that are finished with — never offered for bringing forward.
+const DONE_STAGES = ['INDUCTED', 'HIRED'].concat(TERMINAL_STAGES);
+
 // GET /induction/admin/recruitment — pipeline board, scoped to one month.
 //
 // Period filter: the board, summary cards, and applicant list are scoped by
-// `date_applied` falling in the selected month — that's the reproducible
-// "who applied this period" definition (spec §6). The Weekly Calls strip is
+// the applicant's LIST month (list_month — the month they applied, unless
+// they were brought forward), which keeps "who is on September's list"
+// reproducible (spec §6). The Weekly Calls strip is
 // deliberately NOT scoped this way: it counts every call logged in the month's
 // weeks (by date_called), regardless of when the person applied, so logging a
 // call always shows up against the weekly target.
@@ -204,14 +223,32 @@ router.get('/', (req, res) => {
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
+  const listKey = monthKey(year, month);
   const rows = db.prepare(`
     SELECT * FROM seek_applicants
-    WHERE date_applied BETWEEN ? AND ?
+    WHERE ${LIST_MONTH_SQL} = ?
     ORDER BY COALESCE(date_applied, date_called, induction_date) ASC, id ASC
-  `).all(monthStart, monthEnd);
+  `).all(listKey);
 
   // Attach derived flags so the view doesn't re-implement the stage logic.
   const applicants = rows.map(a => ({ ...a, ...derive(a) }));
+
+  // Bring forward: ?from=YYYY-MM opens a panel listing that month's
+  // still-open applicants so the office can move the ones it never got to.
+  let bringForward = null;
+  const fromKey = /^\d{4}-\d{2}$/.test(String(req.query.from || '')) ? String(req.query.from) : null;
+  if (fromKey && fromKey !== listKey) {
+    const src = db.prepare(`
+      SELECT * FROM seek_applicants
+      WHERE ${LIST_MONTH_SQL} = ?
+      ORDER BY COALESCE(date_applied, date_called, induction_date) ASC, id ASC
+    `).all(fromKey).map(a => ({ ...a, ...derive(a) }));
+    const open = src.filter(a => !DONE_STAGES.includes(normalizeStage(a.stage)));
+    bringForward = { from: fromKey, fromLabel: monthKeyLabel(fromKey), toLabel: monthKeyLabel(listKey),
+      applicants: open, doneCount: src.length - open.length, uncalled: open.filter(a => !a.wasCalled).length };
+  }
+  // Source months offered by the picker: the 12 before the one on screen.
+  const fromOptions = []; for (let i = 1; i <= 12; i++) { const k = shiftMonthKey(listKey, -i); fromOptions.push({ key: k, label: monthKeyLabel(k) }); }
 
   // Group by stage for the board. Terminal stages collapse into one "Closed"
   // bucket rendered as a single column.
@@ -259,6 +296,10 @@ router.get('/', (req, res) => {
     weeks,
     year,
     month,
+    listKey,
+    bringForward,
+    fromOptions,
+    monthKeyLabel,
     today: sydneyToday(),
     forwardStages: FORWARD_STAGES,
     terminalStages: TERMINAL_STAGES,
@@ -420,19 +461,49 @@ router.post('/', (req, res) => {
   const db = getDb();
   const name = (req.body.applicant_name || '').toString().trim().slice(0, 200);
   if (!name) { req.flash('error', 'Applicant name is required.'); return req.session.save(() => res.redirect(backUrl(req))); }
+  const dateApplied = (req.body.date_applied || '').toString().trim() || sydneyToday();
+  // Added while looking at a month → goes on that month's list (the form
+  // carries year/month); otherwise the month they applied.
+  const y = parseInt(req.body.year || req.query.year, 10), mo = parseInt(req.body.month || req.query.month, 10);
+  const listMonth = (y && mo >= 1 && mo <= 12) ? monthKey(y, mo) : dateApplied.slice(0, 7);
   db.prepare(`
-    INSERT INTO seek_applicants (applicant_name, phone, email, date_applied, stage, notes, created_by_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO seek_applicants (applicant_name, phone, email, date_applied, list_month, stage, notes, created_by_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     name,
     (req.body.phone || '').toString().trim().slice(0, 60),
     (req.body.email || '').toString().trim().slice(0, 200),
-    (req.body.date_applied || '').toString().trim() || sydneyToday(),
+    dateApplied,
+    listMonth,
     'NEW',
     (req.body.notes || '').toString().slice(0, 2000),
     req.session.user.id,
   );
   req.flash('success', `Added ${name}.`);
+  req.session.save(() => res.redirect(backUrl(req)));
+});
+
+// POST /induction/admin/recruitment/move — bring applicants forward onto
+// another month's list. Their applied date is untouched; the month they came
+// from is remembered (moved_from_month) for the badge, and moving someone
+// back to their original month clears it.
+router.post('/move', (req, res) => {
+  const db = getDb();
+  const to = /^\d{4}-\d{2}$/.test(String(req.body.to || '')) ? String(req.body.to) : null;
+  const from = /^\d{4}-\d{2}$/.test(String(req.body.from || '')) ? String(req.body.from) : null;
+  const ids = [].concat(req.body.ids || []).map(v => parseInt(v, 10)).filter(n => Number.isInteger(n) && n > 0);
+  if (!to) { req.flash('error', 'Which month should they move to?'); return req.session.save(() => res.redirect(backUrl(req))); }
+  if (!ids.length) { req.flash('error', 'Tick at least one applicant to bring forward.'); return req.session.save(() => res.redirect(backUrl(req))); }
+  const upd = db.prepare(`
+    UPDATE seek_applicants SET
+      moved_from_month = CASE WHEN COALESCE(moved_from_month, ${LIST_MONTH_SQL}) = ? THEN NULL ELSE COALESCE(moved_from_month, ${LIST_MONTH_SQL}) END,
+      list_month = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+  let moved = 0;
+  db.transaction(() => { ids.forEach(id => { moved += upd.run(to, to, id).changes; }); })();
+  req.flash('success', `Moved ${moved} applicant${moved === 1 ? '' : 's'}${from ? ' from ' + monthKeyLabel(from) : ''} to ${monthKeyLabel(to)}.`);
   req.session.save(() => res.redirect(backUrl(req)));
 });
 
@@ -490,6 +561,11 @@ router.post('/:id', async (req, res) => {
       sets.push(`${k} = ?`);
       params.push(req.body[k] || null);
     }
+  }
+  // Editing the applied date keeps moving them between months as it always
+  // did — unless they were deliberately brought forward, which sticks.
+  if (typeof req.body.date_applied !== 'undefined' && req.body.date_applied && !row.moved_from_month) {
+    sets.push('list_month = ?'); params.push(String(req.body.date_applied).slice(0, 7));
   }
   // induction_time: free-text HH:MM (24-hour), '' clears it.
   if (typeof req.body.induction_time !== 'undefined') {
@@ -623,11 +699,11 @@ router.get('/export.csv', (req, res) => {
 
   const rows = db.prepare(`
     SELECT * FROM seek_applicants
-    WHERE date_applied BETWEEN ? AND ?
+    WHERE ${LIST_MONTH_SQL} = ?
     ORDER BY COALESCE(date_applied, date_called, induction_date) ASC, id ASC
-  `).all(monthStart, monthEnd);
+  `).all(monthKey(year, month));
 
-  const headers = ['#','Applicant Name','Phone','Email','Date Applied','Date Called','Induction Date','Induction Time','Stage','Notes'];
+  const headers = ['#','Applicant Name','Phone','Email','Date Applied','Date Called','Induction Date','Induction Time','Stage','Notes','Brought Forward From'];
   const lines = [headers.join(',')];
   rows.forEach((r, i) => {
     const cells = [
@@ -636,6 +712,7 @@ router.get('/export.csv', (req, res) => {
       r.date_applied || '', r.date_called || '',
       r.induction_date || '', r.induction_time || '',
       STAGE_LABELS[normalizeStage(r.stage)] || r.stage || '', r.notes || '',
+      r.moved_from_month ? monthKeyLabel(r.moved_from_month) : '',
     ].map(csvCell);
     lines.push(cells.join(','));
   });

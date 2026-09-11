@@ -98,7 +98,7 @@
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">Recruitment</h1>
-      <p class="text-sm text-gray-500 mt-1">Hiring pipeline · scoped to applicants who applied in <%= monthLabel %> · call target <%= targetMin %>–<%= targetMax %>/week</p>
+      <p class="text-sm text-gray-500 mt-1">Hiring pipeline · the <%= monthLabel %> list — everyone who applied in <%= monthLabel %>, plus anyone brought forward · call target <%= targetMin %>–<%= targetMax %>/week</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <!-- Board / List toggle -->
@@ -124,6 +124,14 @@
           <% for (let m = 1; m <= 12; m++) { %>
             <option value="<%= m %>" <%= m === month ? 'selected' : '' %>><%= monthNames[m - 1] %></option>
           <% } %>
+        </select>
+      </form>
+      <form method="GET" action="/induction/admin/recruitment" class="inline-flex" title="Move applicants you didn't get to from an earlier month onto this month's list">
+        <input type="hidden" name="year" value="<%= year %>"><input type="hidden" name="month" value="<%= month %>">
+        <select name="from" onchange="this.form.submit()" aria-label="Bring forward from"
+          class="border border-violet-300 rounded-lg px-3 py-2 text-xs font-semibold bg-white text-violet-800 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <option value="" <%= !(typeof bringForward !== 'undefined' && bringForward) ? 'selected' : '' %>>Bring forward from…</option>
+          <% (typeof fromOptions !== 'undefined' ? fromOptions : []).forEach(function (o) { %><option value="<%= o.key %>" <%= (typeof bringForward !== 'undefined' && bringForward && bringForward.from === o.key) ? 'selected' : '' %>><%= o.label %></option><% }) %>
         </select>
       </form>
       <a href="/induction/admin/recruitment/export.csv?year=<%= year %>&month=<%= month %>"
@@ -172,6 +180,82 @@
       </div>
     </form>
   </div>
+
+
+  <%# Bring forward — ?from=YYYY-MM lists that month's still-open applicants;
+      ticking + Move puts them on this month's list (applied date untouched). %>
+  <% if (typeof bringForward !== 'undefined' && bringForward) { const bf = bringForward; const shortMonth = (k) => monthKeyLabel(k).replace(/^(\w{3})\w* /, '$1 '); %>
+  <div class="bg-white border border-violet-200 rounded-xl shadow-sm overflow-hidden" data-bring-forward>
+    <div class="px-4 py-3 border-b border-violet-100 bg-violet-50/60 flex flex-wrap items-start justify-between gap-2">
+      <div>
+        <p class="text-sm font-bold text-gray-900">Bring forward · <%= bf.fromLabel %> → <%= bf.toLabel %></p>
+        <p class="text-xs text-gray-500 mt-0.5">Tick who you still want to work on this month. Their applied date stays as it is — they just move onto the <%= bf.toLabel %> list.<% if (bf.doneCount) { %> <%= bf.doneCount %> already hired, inducted or closed <%= bf.doneCount === 1 ? "isn't" : "aren't" %> offered.<% } %></p>
+      </div>
+      <a href="/induction/admin/recruitment?year=<%= year %>&month=<%= month %>" class="text-xs font-semibold text-gray-500 hover:text-gray-900">Cancel</a>
+    </div>
+    <% if (!bf.applicants.length) { %>
+      <p class="px-4 py-6 text-sm text-gray-400 italic">Nothing still open on the <%= bf.fromLabel %> list.</p>
+    <% } else { %>
+    <form method="POST" action="/induction/admin/recruitment/move?year=<%= year %>&month=<%= month %>" data-bf-form>
+      <%- include('../../partials/csrf') %>
+      <input type="hidden" name="to" value="<%= listKey %>">
+      <input type="hidden" name="from" value="<%= bf.from %>">
+      <div class="px-4 py-2 flex flex-wrap items-center gap-3 text-xs border-b border-gray-100">
+        <button type="button" class="font-semibold text-brand-600 hover:underline" data-bf-select="uncalled">Tick uncalled (<%= bf.uncalled %>)</button>
+        <span class="text-gray-300">·</span>
+        <button type="button" class="font-semibold text-gray-600 hover:underline" data-bf-select="all">Tick all</button>
+        <span class="text-gray-300">·</span>
+        <button type="button" class="font-semibold text-gray-600 hover:underline" data-bf-select="none">None</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+            <tr><th class="px-3 py-2 w-8"></th><th class="text-left px-3 py-2">Name</th><th class="text-left px-3 py-2">Phone</th><th class="text-left px-3 py-2">Applied</th><th class="text-left px-3 py-2">Called</th><th class="text-left px-3 py-2">Stage</th><th class="text-left px-3 py-2">Notes</th></tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% bf.applicants.forEach(function (a) { %>
+              <tr data-bf-row="<%= a.id %>" data-called="<%= a.wasCalled ? 1 : 0 %>" class="hover:bg-gray-50/60">
+                <td class="px-3 py-2"><input type="checkbox" name="ids[]" value="<%= a.id %>" <%= a.wasCalled ? '' : 'checked' %> class="rounded border-gray-300 text-brand-600" data-bf-check></td>
+                <td class="px-3 py-2 font-semibold text-gray-900"><%= a.applicant_name %><% if (a.moved_from_month && a.moved_from_month !== bf.from) { %> <span class="rec-badge rec-badge--moved">From <%= shortMonth(a.moved_from_month) %></span><% } %></td>
+                <td class="px-3 py-2 text-gray-700 whitespace-nowrap tabular-nums"><%= a.phone || '—' %></td>
+                <td class="px-3 py-2 text-gray-600 whitespace-nowrap"><%= fmtShort(a.date_applied) || '—' %></td>
+                <td class="px-3 py-2 whitespace-nowrap"><% if (a.date_called) { %><span class="text-gray-600"><%= fmtShort(a.date_called) %></span><% } else { %><span class="text-amber-700 font-semibold">not yet</span><% } %></td>
+                <td class="px-3 py-2"><span class="status-pill rounded-full px-2.5 py-1 text-[11px] <%= stageChip(a.stage) %>"><%= stageLabels[(a.stage || '').toUpperCase()] || a.stage %></span></td>
+                <td class="px-3 py-2 text-gray-700"><p class="line-clamp-2 text-xs leading-snug"><%= a.notes || '—' %></p></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <div class="px-4 py-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2">
+        <p class="text-xs text-gray-500"><b data-bf-count>0</b> of <%= bf.applicants.length %> ticked</p>
+        <button type="submit" class="rec-btn rec-btn--primary" data-bf-submit>Move <span data-bf-count-btn>0</span> to <%= bf.toLabel.split(' ')[0] %></button>
+      </div>
+    </form>
+    <% } %>
+  </div>
+  <script>
+  (function () {
+    var root = document.querySelector('[data-bring-forward]'); if (!root) return;
+    var checks = Array.prototype.slice.call(root.querySelectorAll('[data-bf-check]'));
+    var submit = root.querySelector('[data-bf-submit]');
+    function refresh() {
+      var n = checks.filter(function (c) { return c.checked; }).length;
+      Array.prototype.forEach.call(root.querySelectorAll('[data-bf-count],[data-bf-count-btn]'), function (el) { el.textContent = n; });
+      if (submit) submit.disabled = n === 0;
+    }
+    checks.forEach(function (c) { c.addEventListener('change', refresh); });
+    Array.prototype.forEach.call(root.querySelectorAll('[data-bf-select]'), function (b) {
+      b.addEventListener('click', function () {
+        var mode = b.getAttribute('data-bf-select');
+        checks.forEach(function (c) { var row = c.closest('[data-bf-row]'); c.checked = mode === 'all' ? true : (mode === 'none' ? false : row.getAttribute('data-called') === '0'); });
+        refresh();
+      });
+    });
+    refresh();
+  })();
+  </script>
+  <% } %>
 
   <!-- Summary cards (clickable filters) -->
   <div>
@@ -337,6 +421,9 @@
                     <% } %>
                     <% if (a.induction_email_sent_at) { %>
                       <span class="rec-badge rec-badge--mail mt-1" title="Confirmation email sent <%= a.induction_email_sent_at %>">Emailed</span>
+                    <% } %>
+                    <% if (a.moved_from_month && typeof listKey !== 'undefined' && a.moved_from_month !== listKey) { %>
+                      <span class="rec-badge rec-badge--moved mt-1" data-moved-from="<%= a.moved_from_month %>" title="Brought forward from <%= monthKeyLabel(a.moved_from_month) %> — applied <%= fmtShort(a.date_applied) || a.date_applied || '?' %>">From <%= monthKeyLabel(a.moved_from_month).replace(/^(\w{3})\w* /, '$1 ') %></span>
                     <% } %>
                   </td>
                   <td class="px-3 py-2.5 text-gray-700 whitespace-nowrap tabular-nums">

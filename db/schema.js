@@ -15893,6 +15893,26 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 358 error:', e.message); }
   }
 
+  // Migration 359: recruitment applicants belong to a monthly LIST, not just
+  // to the month they applied. list_month ('YYYY-MM') is what the Recruitment
+  // page scopes by; it starts as the applied month and changes when the office
+  // brings someone forward ("didn't get to call everyone in August"). The
+  // original month is kept in moved_from_month for the badge.
+  if (!isMigrationApplied.get(359)) {
+    try {
+      const cols = db.prepare("PRAGMA table_info(seek_applicants)").all().map(c => c.name);
+      if (!cols.includes('list_month')) db.exec("ALTER TABLE seek_applicants ADD COLUMN list_month TEXT");
+      if (!cols.includes('moved_from_month')) db.exec("ALTER TABLE seek_applicants ADD COLUMN moved_from_month TEXT");
+      db.exec(`
+        UPDATE seek_applicants SET list_month = substr(date_applied, 1, 7)
+          WHERE list_month IS NULL AND date_applied IS NOT NULL AND length(date_applied) >= 7;
+        CREATE INDEX IF NOT EXISTS idx_seek_list_month ON seek_applicants(list_month);
+      `);
+      recordMigration.run(359, 'seek_applicants.list_month + moved_from_month: monthly lists, bring forward');
+      console.log('Migration 359 applied: recruitment monthly lists');
+    } catch (e) { console.error('Migration 359 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

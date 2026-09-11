@@ -74,6 +74,10 @@ Atomis is a multi-tenant operations platform. **T&S Traffic Control** (Sydney tr
 - Vehicle detail has a Tolls tab (`?tab=tolls`); the index shows a 12-month toll tile with the unreconciled count. No sidebar entry (nav.spec asserts the link count).
 - **Form gotcha (any per-row checkbox UI):** `express.urlencoded({extended:true})` uses `qs`, which turns bare numeric sub-keys (`keep[key][0]`, `[1]`, `[2]`) into an array and COMPACTS sparse ones — un-tick row 1 and rows 0+2 come back as indices 0+1. Prefix the sub-key (`keep[key][r2]`) so it stays an object key.
 
+## Hiring → Recruitment (`/induction/admin/recruitment`, routes/recruitment.js, `seek_applicants`)
+- Applicants sit on a monthly **list** — `list_month` ('YYYY-MM', mig 359), which starts as the month they applied (older rows fall back to `substr(date_applied,1,7)` via `LIST_MONTH_SQL`). The page, CSV export and summary cards scope by the list, not by `date_applied`; the Weekly Calls strip still counts `date_called`. Adding an applicant while viewing a month puts them on that month's list.
+- **Bring forward** (`?from=YYYY-MM` opens a panel; `POST /move` with `ids[]`/`to`/`from`): move applicants the office never got to onto a later month's list. `date_applied` is untouched; `moved_from_month` remembers the original month for the "From Aug 2026" badge, and moving them back home clears it. Editing `date_applied` still relocates an applicant unless they were brought forward. Finished stages (INDUCTED, HIRED, closed) are never offered.
+
 ## Key Middleware
 - `middleware/auth.js` — Admin auth (`requireLogin`, `requireRole`, `requirePermission`, `canAccess`)
 - `middleware/workerAuth.js` — Worker auth (`requireWorker`, `requireOwnData`, `blockWorkerFromAdmin`, `workerLocals`)

@@ -57,6 +57,9 @@
     <% if (a.induction_email_sent_at) { %>
       <span class="rec-badge rec-badge--mail" title="Confirmation email sent <%= a.induction_email_sent_at %>">Emailed</span>
     <% } %>
+    <% if (a.moved_from_month && typeof listKey !== 'undefined' && a.moved_from_month !== listKey) { %>
+      <span class="rec-badge rec-badge--moved" data-moved-from="<%= a.moved_from_month %>" title="Brought forward from <%= typeof monthKeyLabel === 'function' ? monthKeyLabel(a.moved_from_month) : a.moved_from_month %> — applied <%= fmtShort(a.date_applied) || a.date_applied || '?' %>">From <%= typeof monthKeyLabel === 'function' ? monthKeyLabel(a.moved_from_month).replace(/^(\w{3})\w* /, '$1 ') : a.moved_from_month %></span>
+    <% } %>
   </div>
 
   <% if (_notes) { %>
