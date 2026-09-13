@@ -15913,6 +15913,32 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 359 error:', e.message); }
   }
 
+  // =============================================
+  // Migration 360: induction_sms_reminder_log — dedup for the applicant-facing
+  // 2-hour induction reminder SMS (services/inductionSmsReminders.js). Mirrors
+  // induction_email_reminder_log (mig 326): keyed on applicant + window + date
+  // + TIME, so re-scheduling someone re-arms their reminder rather than the
+  // old row silently suppressing it.
+  // =============================================
+  if (!isMigrationApplied.get(360)) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS induction_sms_reminder_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          applicant_id INTEGER NOT NULL REFERENCES seek_applicants(id) ON DELETE CASCADE,
+          hours_out INTEGER NOT NULL,
+          induction_date DATE NOT NULL,
+          induction_time TEXT NOT NULL DEFAULT '',
+          sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(applicant_id, hours_out, induction_date, induction_time)
+        );
+        CREATE INDEX IF NOT EXISTS idx_induction_sms_rem_applicant ON induction_sms_reminder_log(applicant_id);
+      `);
+      recordMigration.run(360, 'induction_sms_reminder_log — applicant-facing 2h reminder SMS dedup');
+      console.log('Migration 360 applied');
+    } catch (e) { console.error('Migration 360 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

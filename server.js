@@ -21,6 +21,7 @@ const { sendCertExpiryReminders } = require('./services/certExpiryReminders');
 const { sendSwmsExpiryReminders } = require('./services/swmsExpiryReminders');
 const { sendInductionReminders } = require('./services/inductionReminders');
 const { sendInductionEmailReminders } = require('./services/inductionEmailReminders');
+const { sendInductionSmsReminders } = require('./services/inductionSmsReminders');
 const { csrfProtection } = require('./middleware/csrf');
 const { tenantMiddleware } = require('./middleware/tenant');
 
@@ -621,6 +622,19 @@ app.listen(PORT, () => {
       const { getDb } = require('./db/database');
       sendInductionEmailReminders(getDb()).catch(e => console.error('[cron] induction-email-reminder error:', e.message));
     } catch (e) { console.error('[cron] induction-email-reminder error:', e.message); }
+  }, 15 * 60 * 1000);
+
+  // Applicant-facing induction reminder SMS — ~2h before the booked time, to
+  // the same mobile that got the booking confirmation text. Same 15-min tick
+  // as the email reminders (the window opens at T-2h and the next tick fires,
+  // so it lands between 2h00 and 1h45 out). Dedup lives in
+  // induction_sms_reminder_log (mig 360); the channel no-ops until the
+  // CLICKSEND_* env vars are set, so this is safe to call unconditionally.
+  setInterval(() => {
+    try {
+      const { getDb } = require('./db/database');
+      sendInductionSmsReminders(getDb()).catch(e => console.error('[cron] induction-sms-reminder error:', e.message));
+    } catch (e) { console.error('[cron] induction-sms-reminder error:', e.message); }
   }, 15 * 60 * 1000);
 
   // Traffio booking sync — polls every 5 min when the integration is enabled
