@@ -132,6 +132,23 @@ function handleSubmission(req, res) {
       const db = getDb();
       const paymentType = b.payment_type || req.params?.type || 'tfn';
 
+      // Email is typed twice on the form and must match. This is the address
+      // the booking confirmation and every reminder go to, so one wrong letter
+      // means the applicant never hears from us. Case-insensitive, trimmed.
+      const emailRaw = String(b.email || '').trim();
+      const emailConfirm = String(b.confirm_email || '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
+        const msg = 'Please enter a valid email address.';
+        if (wantsJSON) return res.status(400).json({ ok: false, error: msg });
+        return res.status(400).send(msg);
+      }
+      if (emailRaw.toLowerCase() !== emailConfirm.toLowerCase()) {
+        const msg = "The two email addresses don't match — please go back and check for typos.";
+        if (wantsJSON) return res.status(400).json({ ok: false, error: msg });
+        return res.status(400).send(msg);
+      }
+
+
       // Compute full_name from split fields (or use legacy field)
       const fn = (b.first_name || '').trim();
       const mn = (b.middle_name || '').trim();
@@ -224,7 +241,7 @@ function handleSubmission(req, res) {
         first_name: fn,
         middle_name: mn,
         last_name: ln,
-        email: b.email || '',
+        email: emailRaw,
         phone: b.phone || '',
         date_of_birth: b.date_of_birth || '',
         address: b.address || '',

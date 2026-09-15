@@ -189,7 +189,13 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
-              <input type="email" name="email" required placeholder="you@example.com" class="input-base" />
+              <input type="email" name="email" id="emailInput" required placeholder="you@example.com" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" class="input-base" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Confirm email <span class="text-red-500">*</span></label>
+              <%# Typed again, and pasting is blocked, so a typo in the first box can't be copied into this one. Your booking confirmation and reminders go to this address. %>
+              <input type="email" name="confirm_email" id="confirmEmailInput" required placeholder="Type your email again" autocomplete="off" inputmode="email" autocapitalize="off" spellcheck="false" class="input-base" onpaste="return false" ondrop="return false" />
+              <p id="emailMatchError" class="hidden text-xs text-red-600 mt-1 font-medium">The two email addresses don't match — please check for typos.</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
@@ -963,6 +969,30 @@
         }
       });
 
+      // Step 2: the email is typed twice and must match — the booking
+      // confirmation and every reminder go to this address, so a single wrong
+      // letter means the applicant never hears from us.
+      if (step === 2) {
+        const e1 = document.getElementById('emailInput');
+        const e2 = document.getElementById('confirmEmailInput');
+        const err = document.getElementById('emailMatchError');
+        const a = (e1.value || '').trim(), b = (e2.value || '').trim();
+        const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a);
+        const mismatch = a.toLowerCase() !== b.toLowerCase();
+        if (!looksLikeEmail || mismatch) {
+          valid = false;
+          err.textContent = !looksLikeEmail ? 'Please enter a valid email address.' : "The two email addresses don't match — please check for typos.";
+          err.classList.remove('hidden');
+          e1.classList.add('ring-2', 'ring-red-300');
+          e2.classList.add('ring-2', 'ring-red-300');
+        } else {
+          err.classList.add('hidden');
+          e1.classList.remove('ring-2', 'ring-red-300');
+          e2.classList.remove('ring-2', 'ring-red-300');
+        }
+      }
+
+
       if (!valid) {
         const firstError = panel.querySelector('.ring-red-300');
         if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1088,6 +1118,13 @@
     document.getElementById('inductionForm').addEventListener('blur', function (e) {
       tidyNameField(e.target);
     }, true);
+    ['emailInput', 'confirmEmailInput'].forEach(function (id) {
+      document.getElementById(id).addEventListener('input', function () {
+        document.getElementById('emailMatchError').classList.add('hidden');
+        document.getElementById('emailInput').classList.remove('ring-2', 'ring-red-300');
+        document.getElementById('confirmEmailInput').classList.remove('ring-2', 'ring-red-300');
+      });
+    });
     document.getElementById('inductionForm').addEventListener('submit', function () {
       NAME_FIELDS.forEach(function (n) {
         Array.prototype.forEach.call(this.querySelectorAll('[name="' + n + '"]'), tidyNameField);
