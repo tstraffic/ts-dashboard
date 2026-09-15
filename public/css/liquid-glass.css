@@ -76,25 +76,31 @@
 @media (min-width: 640px) { :root { --lg-header-h: 64px; --lg-header-gap: 10px; } }
 
 :root[data-theme="light"] {
+  /* Light is the stronger glass: lower alphas so the ambient field shows
+     through, higher saturation so the colour behind pops, firmer edges. */
   --lg-tint-rgb: 255,255,255;
-  --lg-alpha: .64; --lg-alpha-strong: .84; --lg-alpha-chrome: .68; --lg-alpha-flat: .55;
+  --lg-alpha: .50; --lg-alpha-strong: .72; --lg-alpha-chrome: .56; --lg-alpha-flat: .42;
+  --lg-blur: 24px; --lg-blur-strong: 30px; --lg-blur-chrome: 26px;
+  --lg-sat: 185%; --lg-sat-chrome: 170%;
   --lg-bg-solid: #fff;
-  --lg-bg-menu: rgba(var(--lg-tint-rgb), .97);
+  --lg-bg-menu: rgba(var(--lg-tint-rgb), .96);
   --lg-rim-hi: rgba(255,255,255,1);
-  --lg-rim:    rgba(255,255,255,.65);
-  --lg-rim-lo: rgba(27,26,36,.08);
-  --lg-edge:   rgba(27,26,36,.10);
-  --lg-edge-strong: rgba(27,26,36,.17);
-  --lg-rim-grad: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(27,26,36,.10) 40%, rgba(27,26,36,.10) 60%, rgba(255,255,255,.85) 100%);
-  --lg-shadow:       0 1px 2px rgba(27,26,36,.04), 0 14px 34px -20px rgba(19,0,142,.20);
-  --lg-shadow-float: 0 2px 6px rgba(27,26,36,.06), 0 28px 60px -22px rgba(19,0,142,.28);
+  --lg-rim:    rgba(255,255,255,.75);
+  --lg-rim-lo: rgba(27,26,36,.12);
+  --lg-edge:   rgba(27,26,36,.14);
+  --lg-edge-strong: rgba(27,26,36,.22);
+  --lg-rim-grad: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(27,26,36,.14) 40%, rgba(27,26,36,.14) 60%, rgba(255,255,255,.95) 100%);
+  --lg-rim-shadow: inset 0 1px 0 var(--lg-rim-hi), inset 0 -1px 0 var(--lg-rim-lo),
+                   inset 0 0 0 1px var(--lg-rim), inset 0 0 32px -10px rgba(255,255,255,.95);
+  --lg-shadow:       0 1px 2px rgba(27,26,36,.06), 0 18px 40px -22px rgba(19,0,142,.30);
+  --lg-shadow-float: 0 2px 6px rgba(27,26,36,.08), 0 30px 64px -22px rgba(19,0,142,.36);
   --lg-tint-brand:  rgba(61,49,192,.10);
   --lg-tint-danger: rgba(239,68,68,.10);
   --lg-tint-warn:   rgba(245,158,11,.12);
   --lg-tint-ok:     rgba(16,185,129,.12);
   --lg-drop: rgba(37,23,166,.12);
   --lg-sb-active: rgba(61,49,192,.13);
-  --lg-blob-a-alpha: .18; --lg-blob-b-alpha: .13; --lg-blob-c-alpha: .10;
+  --lg-blob-a-alpha: .38; --lg-blob-b-alpha: .30; --lg-blob-c-alpha: .24;
 }
 
 /* Skins only re-point the material hue and how loud the ambient may be;
@@ -722,7 +728,7 @@ body.dark-glass :is(.subnav-tab.active, .modal-tab.active) { border-bottom-color
 /* Phones: blur only on chrome; in-flow cards go tint-only with raised alpha */
 @media (max-width: 767px) {
   :root { --lg-blur: 12px; --lg-blur-strong: 14px; --lg-blur-chrome: 12px; --lg-alpha: .68; }
-  :root[data-theme="light"] { --lg-alpha: .82; }
+  :root[data-theme="light"] { --lg-alpha: .70; }
   :root[data-theme] body.dark-glass .bg-white:is([class*="rounded-xl"],[class*="rounded-2xl"],[class*="rounded-3xl"]),
   :root[data-theme] body.dark-glass .stat-card,
   :root[data-theme] body.dark-glass .bk2-resourcepanel,
