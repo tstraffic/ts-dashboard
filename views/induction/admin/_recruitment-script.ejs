@@ -144,6 +144,19 @@
     });
   });
 
+  // The modals and the toast are position:fixed, but they were children of
+  // #rec-root, which ends up carrying a transform after the page-enter
+  // motion — and a transformed ancestor becomes the containing block for
+  // `fixed`. On a desktop the board fits without scrolling so nobody noticed;
+  // on a phone, once the board had been scrolled, "Booked" opened the
+  // induction-date modal ABOVE the screen (top ≈ -600px) and the move looked
+  // like it had silently failed. Re-parent them to <body>, exactly like the
+  // tap-to-move sheet already does — that is why the sheet never had the bug.
+  ['booking-modal', 'closed-modal', 'backward-modal', 'rec-toast'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el && el.parentNode !== document.body) document.body.appendChild(el);
+  });
+
   var bookingModal  = document.getElementById('booking-modal');
   var closedModal   = document.getElementById('closed-modal');
   var backwardModal = document.getElementById('backward-modal');

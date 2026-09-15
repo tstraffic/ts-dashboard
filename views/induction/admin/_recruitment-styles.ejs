@@ -194,11 +194,11 @@
     background: var(--rec-form-bg); border: 1px solid var(--rec-form-border);
     border-radius: var(--rec-radius);
   }
-  #rec-root .rec-flabel {
+  #rec-root .rec-flabel, .rec-modal .rec-flabel {
     display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em;
     text-transform: uppercase; color: var(--rec-ink-mute); margin-bottom: 5px;
   }
-  #rec-root .rec-input {
+  #rec-root .rec-input, .rec-modal .rec-input {
     width: 100%; border-radius: 9px !important;
     background: var(--rec-input-bg) !important;
     border: 1px solid var(--rec-input-border) !important;
@@ -206,12 +206,12 @@
     padding: 9px 12px; font-size: 13.5px; line-height: 1.3;
     transition: border-color .15s var(--rec-ease), box-shadow .15s var(--rec-ease);
   }
-  #rec-root .rec-input::placeholder { color: var(--rec-ink-faint) !important; opacity: 1; }
-  #rec-root .rec-input:focus, #rec-root .rec-input:focus-visible {
+  #rec-root .rec-input::placeholder, .rec-modal .rec-input::placeholder { color: var(--rec-ink-faint) !important; opacity: 1; }
+  #rec-root .rec-input:focus, #rec-root .rec-input:focus-visible, .rec-modal .rec-input:focus, .rec-modal .rec-input:focus-visible {
     border-color: #2B7FFF !important;
     box-shadow: 0 0 0 3px rgba(43,127,255,.22) !important; outline: none !important;
   }
-  :root[data-theme="dark"] #rec-root .rec-input { color-scheme: dark; }
+  :root[data-theme="dark"] #rec-root .rec-input, :root[data-theme="dark"] .rec-modal .rec-input { color-scheme: dark; }
 
   /* ── Modals ── */
   .rec-modal { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 16px; }
