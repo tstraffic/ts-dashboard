@@ -16,17 +16,14 @@
 const { getDb } = require('../db/database');
 const { sendPushToUser } = require('./pushNotification');
 const notifPrefs = require('../lib/notificationPrefs');
+const { sydneyToday, addDaysIso } = require('../lib/sydney');
 
 const WINDOWS = [7, 3, 1, 0];
 const NOTIFY_ROLES = ['admin', 'operations', 'hr'];
 
-function ymd(d) {
-  return d.toISOString().slice(0, 10);
-}
-
 function fmtFriendlyDate(iso) {
   if (!iso) return '';
-  const d = new Date(iso + 'T00:00:00');
+  const d = new Date(iso + 'T12:00:00Z');
   return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Australia/Sydney' });
 }
 
@@ -45,11 +42,11 @@ async function sendInductionReminders() {
     return { sent: 0, scanned: 0, recipients: 0 };
   }
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const targetDates = WINDOWS.map(n => {
-    const d = new Date(today); d.setDate(d.getDate() + n);
-    return { days: n, date: ymd(d) };
-  });
+  // Windows are counted from TODAY IN SYDNEY. The job runs in the Sydney
+  // morning, which is the previous day in UTC — deriving these from the
+  // container clock would aim every window a day into the past.
+  const today = sydneyToday();
+  const targetDates = WINDOWS.map(n => ({ days: n, date: addDaysIso(today, n) }));
 
   const recipients = db.prepare(
     `SELECT id, full_name, email, notification_prefs FROM users WHERE LOWER(role) IN (${NOTIFY_ROLES.map(() => '?').join(',')}) AND active = 1`

@@ -27,10 +27,7 @@ const ITEMS = [
 ];
 
 const WINDOWS = [30, 14, 7]; // days before expiry
-
-function ymd(d) {
-  return d.toISOString().slice(0, 10);
-}
+const { sydneyToday, addDaysIso } = require('../lib/sydney');
 
 // Pull the column list once so we don't query columns that don't exist on
 // older databases (the schema was added by migrations 14+).
@@ -47,11 +44,11 @@ async function sendCertExpiryReminders() {
   const items = ITEMS.filter(i => cols.has(i.col));
   if (!items.length) return { sent: 0, scanned: 0 };
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const targetDates = WINDOWS.map(n => {
-    const d = new Date(today); d.setDate(d.getDate() + n);
-    return { days: n, date: ymd(d) };
-  });
+  // Windows are counted from TODAY IN SYDNEY. The job runs in the Sydney
+  // morning, which is the previous day in UTC — deriving these from the
+  // container clock would aim every window a day into the past.
+  const today = sydneyToday();
+  const targetDates = WINDOWS.map(n => ({ days: n, date: addDaysIso(today, n) }));
 
   let sent = 0;
   let scanned = 0;

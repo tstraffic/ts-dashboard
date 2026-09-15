@@ -1,4 +1,5 @@
 const { getDb } = require('../db/database');
+const { sydneyToday, addDaysIso } = require('../lib/sydney');
 const { sendTeamsNotification } = require('./integrations');
 const { sendEmail } = require('../services/email');
 const { notificationEmail, dailyDigestEmail } = require('../services/emailTemplates');
@@ -72,11 +73,14 @@ function notifyUsers(db, userIds, opts = {}) {
 function generateNotifications() {
   try {
     const db = getDb();
-    const today = new Date().toISOString().split('T')[0];
-    const last7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
-    const next3 = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
-    const next14 = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
-    const next30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+    // Sydney calendar, not the container's: on a UTC box "today" lags a day
+    // for the first 10 hours of every Sydney morning, which drags every
+    // overdue / expiring boundary below with it.
+    const today = sydneyToday();
+    const last7 = addDaysIso(today, -7);
+    const next3 = addDaysIso(today, 3);
+    const next14 = addDaysIso(today, 14);
+    const next30 = addDaysIso(today, 30);
 
     // Helper: create notification if one with the same user+type+title does not already exist within 24hrs
     const insertIfNew = db.prepare(`
@@ -821,8 +825,9 @@ function sendDailyDigests() {
 function generateWeeklySummaries() {
   try {
     const db = getDb();
-    const today = new Date().toISOString().split('T')[0];
-    const last7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+    // Sydney calendar: this runs Monday morning Sydney = Sunday evening UTC.
+    const today = sydneyToday();
+    const last7 = addDaysIso(today, -7);
 
     // Check if we already ran this week (prevent duplicate runs)
     // system_config columns are config_key/config_value — the old key/value

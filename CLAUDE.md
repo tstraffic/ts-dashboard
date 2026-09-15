@@ -82,6 +82,11 @@ Atomis is a multi-tenant operations platform. **T&S Traffic Control** (Sydney tr
 - One `company_meetings` table with `meeting_type` 'company' | 'client' (mig 347). Company = discussion items (`company_meeting_items`, dept-tagged, each with its own to-dos); client = headings → dot points → captioned attachments (`company_meeting_sections`/`_points`/`_attachments`) + the PDF export.
 - **To-dos are never gated behind a discussion item**: `company_meeting_todos.item_id` is nullable and `POST /:id/todos` treats it as optional. The always-visible "To-dos" card (`#general-todos`, above the items, both meeting types) is where an unattached one goes; per-item to-dos render under their item. A deleted item's to-dos survive (`ON DELETE SET NULL`) and fall into that card. Client meetings render it too — `services/meetingPdf.js` prints them as "Action items".
 
+## Scheduled jobs — Sydney time, never the container clock
+- **Railway runs UTC.** Every daily job in server.js gates on `sydneyClock()` (lib/sydney.js) — `{ date, hour, minute, dow }` in Sydney. `new Date().getHours()` is 10–11 hours out: the jobs labelled 7:00/7:30/7:45/8:00 am were all firing at 5:00–6:00 pm Sydney, so the "induction today" reminder reached the office hours after the induction had finished (fixed Sep 2026).
+- **The two halves must move together.** 8am Sydney is ~22:00 UTC the *previous* day, so anything deriving "today" from `toISOString()` / `setHours(0,0,0,0)` aims its windows a day into the past once the gate is correct. Reminder windows use `sydneyToday()` + `addDaysIso()` (midday-UTC anchor, DST-safe) — see inductionReminders, certExpiryReminders, swmsExpiryReminders and `generateNotifications`. `tests/unit/sydney-schedule.test.js` pins both halves; run with `npm run test:unit` (in CI).
+- Applicant-facing induction email (36h/12h) and SMS (~2h) reminders were already correct: they build the induction instant with `sydneyOffsetForDate()` and compare absolute times on a 15-min tick, so they don't depend on the container's clock at all.
+
 ## Key Middleware
 - `middleware/auth.js` — Admin auth (`requireLogin`, `requireRole`, `requirePermission`, `canAccess`)
 - `middleware/workerAuth.js` — Worker auth (`requireWorker`, `requireOwnData`, `blockWorkerFromAdmin`, `workerLocals`)

@@ -154,7 +154,7 @@ app.use(flash());
 // All formatters delegate to lib/sydney.js so DST is handled automatically
 // (Australia/Sydney via Intl) and plain DATE columns aren't shifted across
 // midnight by tz conversion.
-const { formatDateAU, formatDateShortAU, formatDateTimeAU, formatTimeAU, parseAsSydney } = require('./lib/sydney');
+const { formatDateAU, formatDateShortAU, formatDateTimeAU, formatTimeAU, parseAsSydney, sydneyClock } = require('./lib/sydney');
 
 // Identifies THIS running instance. Railway sets these per deploy, so the
 // value changes the moment a new container takes over — which is what lets a
@@ -558,55 +558,59 @@ app.listen(PORT, () => {
   runShiftAdvance();
   setInterval(runShiftAdvance, 15 * 60 * 1000);
 
-  // Daily digest emails — check every 15 min, send at 7:00 AM
+  // Daily digest emails — check every 15 min, send at 7:00 AM SYDNEY.
+  // Every daily job below gates on sydneyClock(), never on the container
+  // clock: Railway runs UTC, so `new Date().getHours() === 7` actually fired
+  // at 5pm Sydney and the "8am" induction reminder landed at 6pm — after a
+  // morning induction had already happened.
   setInterval(() => {
-    const now = new Date();
-    if (now.getHours() === 7 && now.getMinutes() < 15) {
+    const now = sydneyClock();
+    if (now.hour === 7 && now.minute < 15) {
       console.log('Sending daily digest emails...');
       sendDailyDigests();
     }
   }, 15 * 60 * 1000);
 
-  // Weekly job summaries — Monday 7:15-7:29 AM, summarise diary entries and notify Taj + Saadat
+  // Weekly job summaries — Monday 7:15-7:29 AM Sydney, summarise diary entries and notify Taj + Saadat
   setInterval(() => {
-    const now = new Date();
-    if (now.getDay() === 1 && now.getHours() === 7 && now.getMinutes() >= 15 && now.getMinutes() < 30) {
+    const now = sydneyClock();
+    if (now.dow === 1 && now.hour === 7 && now.minute >= 15 && now.minute < 30) {
       console.log('Generating weekly job summaries...');
       generateWeeklySummaries();
     }
   }, 15 * 60 * 1000);
 
-  // Cert expiry reminders — daily at 7:30 AM. Fires for licence / white
+  // Cert expiry reminders — daily at 7:30 AM Sydney. Fires for licence / white
   // card / medical / TC / TI / first-aid items expiring in 30 / 14 / 7
   // days, deduped via cert_expiry_reminder_log. Each worker can mute
   // the 'cert_expiry' category in /w/profile/notifications.
   setInterval(() => {
-    const now = new Date();
-    if (now.getHours() === 7 && now.getMinutes() >= 30 && now.getMinutes() < 45) {
+    const now = sydneyClock();
+    if (now.hour === 7 && now.minute >= 30 && now.minute < 45) {
       sendCertExpiryReminders().catch(e => console.error('[cron] cert-expiry error:', e.message));
     }
   }, 15 * 60 * 1000);
 
-  // SWMS expiry reminders — daily at 7:45 AM, just after cert expiry. Fires
+  // SWMS expiry reminders — daily at 7:45 AM Sydney, just after cert expiry. Fires
   // for active SWMS docs expiring in 30 / 14 / 7 days, deduped via
   // swms_expiry_reminder_log (mig 219). Goes to admin / safety / operations
   // users via the notifications table + push, not to individual workers —
   // SWMS renewal is an office responsibility, not a worker action.
   setInterval(() => {
-    const now = new Date();
-    if (now.getHours() === 7 && now.getMinutes() >= 45 && now.getMinutes() < 60) {
+    const now = sydneyClock();
+    if (now.hour === 7 && now.minute >= 45 && now.minute < 60) {
       sendSwmsExpiryReminders().catch(e => console.error('[cron] swms-expiry error:', e.message));
     }
   }, 15 * 60 * 1000);
 
-  // Induction reminders — daily at 8:00 AM. Fires for upcoming recruitment
+  // Induction reminders — daily at 8:00 AM Sydney. Fires for upcoming recruitment
   // inductions at 7 / 3 / 1 / 0 days out, deduped via induction_reminder_log
   // (mig 222). Goes to admin / operations / hr roles via notifications + push.
   // Skips applicants already in a terminal status (Inducted / Hired / No Show /
   // Withdrew / Not Suitable).
   setInterval(() => {
-    const now = new Date();
-    if (now.getHours() === 8 && now.getMinutes() >= 0 && now.getMinutes() < 15) {
+    const now = sydneyClock();
+    if (now.hour === 8 && now.minute >= 0 && now.minute < 15) {
       sendInductionReminders().catch(e => console.error('[cron] induction-reminder error:', e.message));
     }
   }, 15 * 60 * 1000);

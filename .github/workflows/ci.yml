@@ -39,6 +39,9 @@ jobs:
       - name: Cross-tenant isolation tests
         run: npm run test:cross-tenant
 
+      - name: Unit tests
+        run: npm run test:unit
+
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium
 

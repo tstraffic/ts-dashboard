@@ -20,10 +20,7 @@ const { getDb } = require('../db/database');
 const { sendPushToUser } = require('./pushNotification');
 
 const WINDOWS = [30, 14, 7];
-
-function ymd(d) {
-  return d.toISOString().slice(0, 10);
-}
+const { sydneyToday, addDaysIso } = require('../lib/sydney');
 
 // Roles that should receive SWMS expiry notifications. Mirrors the SWMS
 // permission set from middleware/auth.js (admin/safety/operations/planning)
@@ -37,11 +34,11 @@ async function sendSwmsExpiryReminders() {
   const cols = db.prepare("PRAGMA table_info(swms)").all().map(c => c.name);
   if (!cols.includes('expiry_date')) return { sent: 0, scanned: 0 };
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const targetDates = WINDOWS.map(n => {
-    const d = new Date(today); d.setDate(d.getDate() + n);
-    return { days: n, date: ymd(d) };
-  });
+  // Windows are counted from TODAY IN SYDNEY. The job runs in the Sydney
+  // morning, which is the previous day in UTC — deriving these from the
+  // container clock would aim every window a day into the past.
+  const today = sydneyToday();
+  const targetDates = WINDOWS.map(n => ({ days: n, date: addDaysIso(today, n) }));
 
   const recipients = db.prepare(
     `SELECT id, full_name, email FROM users WHERE role IN (${NOTIFY_ROLES.map(() => '?').join(',')}) AND active = 1`
