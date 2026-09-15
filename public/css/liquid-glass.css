@@ -79,6 +79,7 @@
   --lg-tint-rgb: 255,255,255;
   --lg-alpha: .64; --lg-alpha-strong: .84; --lg-alpha-chrome: .68; --lg-alpha-flat: .55;
   --lg-bg-solid: #fff;
+  --lg-bg-menu: rgba(var(--lg-tint-rgb), .97);
   --lg-rim-hi: rgba(255,255,255,1);
   --lg-rim:    rgba(255,255,255,.65);
   --lg-rim-lo: rgba(27,26,36,.08);
@@ -296,7 +297,8 @@ body.dark-glass #app-header :is(button, a).rounded-xl { border-radius: 999px !im
 :root[data-theme] body.dark-glass #app-header :is(button, a).rounded-xl:hover { background: var(--lg-bg-flat) !important; }
 /* Desktop "content scrolls beneath the header" — flag-gated (--lg-overlap: 1) */
 @media (min-width: 1024px) {
-  body.dark-glass main { margin-top: calc(-1 * var(--lg-header-total) * var(--lg-overlap)); }
+  :root { --lg-overlap: 1; }   /* set to 0 to put the header back in flow */
+  body.dark-glass main { margin-top: calc(-1 * var(--lg-header-total) * var(--lg-overlap)); scroll-padding-top: calc((var(--lg-header-total) + 12px) * var(--lg-overlap)); }
   body.dark-glass main > div:first-child { padding-top: calc(var(--lg-header-total) * var(--lg-overlap) + 1.25rem) !important; }
   body.dark-glass main [id] { scroll-margin-top: calc((var(--lg-header-total) + 12px) * var(--lg-overlap)); }
   body.dark-glass main :is(div, nav, header, form, section).sticky:is(.top-0, .lg\:top-0),

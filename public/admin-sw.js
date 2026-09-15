@@ -1,5 +1,5 @@
 // Atomis Admin Service Worker — Network-first with offline fallback
-const CACHE_NAME = 'atomis-admin-v30-liquid-glass';
+const CACHE_NAME = 'atomis-admin-v31-liquid-glass-overlap';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to pre-cache
