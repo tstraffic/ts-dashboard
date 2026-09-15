@@ -1,0 +1,738 @@
+/* ============================================================================
+   Atomis — Liquid Glass layer (loaded LAST, after admin-polish.css)
+   ----------------------------------------------------------------------------
+   Apple Liquid Glass, translated for the web without SVG refraction (Safari
+   has no backdrop-filter:url()). One material, two times of day:
+     • material  — blurred + saturated backdrop, white-tinted in light,
+                   dark-tinted in dark (all via --lg-* tokens)
+     • lensed edge — inset rim (top catch-light, bottom shade, 1px hairline,
+                   inner edge glow) + a masked 135° gradient hairline on
+                   explicit .lg devices
+     • shapes    — capsules for controls, 16px cards, 20px overlays
+     • chrome    — header / sidebar / dropdowns / FAB float over an ambient
+                   field (#lg-ambient) that everything refracts
+   RULES FOR CONSUMERS
+     - never write backdrop-filter directly; use .lg / .lg-strong / .lg-chrome
+     - .lg-flat for anything nested inside glass; .lg-none to opt out
+     - never put .lg* on an element that already uses ::before
+     - never put transform/filter/backdrop-filter on body, main, .bk2-page,
+       #rec-root or any ancestor of a position:fixed overlay (containing-block
+       trap — see the recruitment modal fix, Sep 2026)
+     - .bk2-slot* colour rules are spec-pinned: no rule here may touch them
+   CASCADE
+     Every older !important that fights this file is <= (0,5,1). The auto-card
+     selector in §2 is higher; shell rules use `:root[data-theme]
+     body.dark-glass #id` = (1,3,1). Later + higher + !important wins.
+     The one edit outside this file: custom.css lost its (2,3,5) border rule.
+   ORDER (do not reshuffle — §F must stay last)
+     §0 tokens+skins  §1 material classes  §2 auto cards / stat-card
+     §3 ambient  §4 shell  §5 controls/tables/overlays/toasts
+     §D1 dashboard  §D2 bookings board  §D3 recruitment  §M motion  §F fallbacks
+   ========================================================================== */
+
+/* ============================== §0 TOKENS ================================= */
+:root {
+  /* dark is the base — body.dark-glass is always present */
+  --lg-tint-rgb: 22,22,32;
+  --lg-alpha: .50; --lg-alpha-strong: .74; --lg-alpha-chrome: .60; --lg-alpha-flat: .06;
+  --lg-bg:        rgba(var(--lg-tint-rgb), var(--lg-alpha));
+  --lg-bg-strong: rgba(var(--lg-tint-rgb), var(--lg-alpha-strong));
+  --lg-bg-chrome: rgba(var(--lg-tint-rgb), var(--lg-alpha-chrome));
+  --lg-bg-flat:   rgba(255,255,255, var(--lg-alpha-flat));
+  --lg-bg-menu:   rgba(var(--lg-tint-rgb), .95);   /* menus nested inside another blur root */
+  --lg-well:      var(--lg-bg-flat);
+  --lg-bg-solid:  var(--atomis-surface, #1A1D24);
+  --lg-blur: 20px; --lg-blur-strong: 28px; --lg-blur-chrome: 22px;
+  --lg-sat: 160%;  --lg-sat-chrome: 140%;
+  --lg-rim-hi: rgba(255,255,255,.34);
+  --lg-rim:    rgba(255,255,255,.12);
+  --lg-rim-lo: rgba(0,0,0,.28);
+  --lg-edge:   rgba(255,255,255,.09);
+  --lg-edge-strong: rgba(255,255,255,.17);
+  --lg-rim-grad: linear-gradient(135deg, rgba(255,255,255,.48) 0%, rgba(255,255,255,.09) 35%, rgba(255,255,255,.06) 65%, rgba(255,255,255,.26) 100%);
+  --lg-rim-shadow: inset 0 1px 0 var(--lg-rim-hi), inset 0 -1px 0 var(--lg-rim-lo),
+                   inset 0 0 0 1px var(--lg-rim), inset 0 0 24px -14px var(--lg-rim-hi);
+  --lg-shadow:       0 1px 2px rgba(0,0,0,.30), 0 14px 34px -18px rgba(0,0,0,.60);
+  --lg-shadow-float: 0 2px 6px rgba(0,0,0,.30), 0 28px 60px -20px rgba(0,0,0,.65);
+  --lg-shadow-hover: var(--lg-shadow-float);
+  --lg-brand-fill: linear-gradient(180deg, #4A3FCF 0%, #2517A6 100%);
+  --lg-brand-ink: #fff;
+  --lg-brand-glow: 0 10px 24px -12px rgba(19,0,142,.65);
+  --lg-tint-brand:  rgba(61,49,192,.26);
+  --lg-tint-danger: rgba(239,68,68,.18);
+  --lg-tint-warn:   rgba(245,158,11,.18);
+  --lg-tint-ok:     rgba(16,185,129,.18);
+  --lg-drop: rgba(98,89,210,.18);
+  --lg-sb-active: rgba(61,49,192,.34);
+  --lg-radius-card: 16px; --lg-radius-lg: 20px; --lg-radius-ctl: 10px; --lg-radius-btn: 999px;
+  --lg-ease: cubic-bezier(.2,.8,.2,1); --lg-dur: 200ms;
+  --lg-header-h: 56px; --lg-header-gap: 6px;
+  --lg-header-total: calc(var(--lg-header-h) + var(--lg-header-gap));
+  --lg-overlap: 0;
+  --lg-ambient-opacity: 1;
+  --lg-blob-a: 61,49,192;  --lg-blob-b: 139,92,246;  --lg-blob-c: 34,211,238;
+  --lg-blob-a-alpha: .30;  --lg-blob-b-alpha: .20;   --lg-blob-c-alpha: .10;
+}
+@media (min-width: 640px) { :root { --lg-header-h: 64px; --lg-header-gap: 10px; } }
+
+:root[data-theme="light"] {
+  --lg-tint-rgb: 255,255,255;
+  --lg-alpha: .64; --lg-alpha-strong: .84; --lg-alpha-chrome: .68; --lg-alpha-flat: .55;
+  --lg-bg-solid: #fff;
+  --lg-rim-hi: rgba(255,255,255,1);
+  --lg-rim:    rgba(255,255,255,.65);
+  --lg-rim-lo: rgba(27,26,36,.08);
+  --lg-edge:   rgba(27,26,36,.10);
+  --lg-edge-strong: rgba(27,26,36,.17);
+  --lg-rim-grad: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(27,26,36,.10) 40%, rgba(27,26,36,.10) 60%, rgba(255,255,255,.85) 100%);
+  --lg-shadow:       0 1px 2px rgba(27,26,36,.04), 0 14px 34px -20px rgba(19,0,142,.20);
+  --lg-shadow-float: 0 2px 6px rgba(27,26,36,.06), 0 28px 60px -22px rgba(19,0,142,.28);
+  --lg-tint-brand:  rgba(61,49,192,.10);
+  --lg-tint-danger: rgba(239,68,68,.10);
+  --lg-tint-warn:   rgba(245,158,11,.12);
+  --lg-tint-ok:     rgba(16,185,129,.12);
+  --lg-drop: rgba(37,23,166,.12);
+  --lg-sb-active: rgba(61,49,192,.13);
+  --lg-blob-a-alpha: .18; --lg-blob-b-alpha: .13; --lg-blob-c-alpha: .10;
+}
+
+/* Skins only re-point the material hue and how loud the ambient may be;
+   the ground itself still comes from themes.css. */
+:root[data-skin="carbon"]       { --lg-tint-rgb: 14,18,25; }
+:root[data-skin="navy"]         { --lg-tint-rgb: 20,29,51; }
+:root[data-skin="graphite"]     { --lg-tint-rgb: 44,50,60; --lg-alpha: .58; }
+:root[data-skin="atomis"]       { --lg-tint-rgb: 22,26,32; --lg-blob-a: 16,185,129; }
+:root[data-skin="ts-dark"]      { --lg-tint-rgb: 26,24,38; }
+:root[data-skin="aurora"]       { --lg-tint-rgb: 18,22,32; --lg-ambient-opacity: .45; }
+:root[data-skin="emerald-dusk"] { --lg-tint-rgb: 15,22,18; --lg-blob-a: 16,185,129; --lg-ambient-opacity: .45; }
+:root[data-skin="violet-haze"]  { --lg-tint-rgb: 24,21,33; --lg-ambient-opacity: .45; }
+:root[data-skin="twilight"]     { --lg-tint-rgb: 20,18,28; --lg-ambient-opacity: .45; }
+:root[data-skin="nebula"]       { --lg-tint-rgb: 14,14,22; --lg-ambient-opacity: .40; }
+:root[data-skin="warm-paper"]   { --lg-tint-rgb: 255,252,246; --lg-ambient-opacity: .6; }
+:root[data-skin="mint-glass"]   { --lg-blob-c: 16,185,129; --lg-ambient-opacity: .6; }
+
+/* ========================== §1 MATERIAL CLASSES ============================ */
+.lg, .lg-strong, .lg-chrome {
+  background: var(--lg-bg);
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  border: 1px solid var(--lg-edge);
+  border-radius: var(--lg-radius-card);
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow);
+}
+.lg-strong {
+  background: var(--lg-bg-strong);
+  border-radius: var(--lg-radius-lg);
+  -webkit-backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat));
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow-float);
+}
+.lg-chrome {
+  background: var(--lg-bg-chrome);
+  -webkit-backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome));
+  backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome));
+}
+/* A glass device that CONTAINS a fixed overlay would become its containing
+   block — fall back to tint-only there. */
+:is(.lg, .lg-strong, .lg-chrome):has(.fixed, .booking-modal-backdrop, .booking-modal, .rec-modal) {
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+/* zero-specificity default so component rules (sticky/fixed) keep their own position */
+:where(.lg, .lg-strong, .lg-chrome) { position: relative; }
+/* Directional specular rim — explicit devices only; needs a positioned host
+   and a free ::before. */
+:is(.lg, .lg-strong, .lg-chrome)::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: var(--lg-rim-grad);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none; z-index: 0;
+}
+.lg-flat, .lg-noblur {
+  background: var(--lg-bg-flat);
+  border: 1px solid var(--lg-edge);
+  box-shadow: inset 0 1px 0 var(--lg-rim-hi);
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+.lg-inset {
+  background: rgba(0,0,0,.14); border: 0;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.20), inset 0 0 0 1px var(--lg-edge);
+}
+:root[data-theme="light"] .lg-inset {
+  background: rgba(27,26,36,.06);
+  box-shadow: inset 0 1px 2px rgba(27,26,36,.08), inset 0 0 0 1px var(--lg-edge);
+}
+.lg-capsule { border-radius: var(--lg-radius-btn) !important; }
+.lg-tint-brand  { background-image: linear-gradient(var(--lg-tint-brand),  var(--lg-tint-brand)); }
+.lg-tint-danger { background-image: linear-gradient(var(--lg-tint-danger), var(--lg-tint-danger)); }
+.lg-tint-warn   { background-image: linear-gradient(var(--lg-tint-warn),   var(--lg-tint-warn)); }
+.lg-tint-ok     { background-image: linear-gradient(var(--lg-tint-ok),     var(--lg-tint-ok)); }
+.lg-none, .lg-none * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+.lg-none { background: var(--lg-bg-solid) !important; box-shadow: none !important; }
+/* Segmented control (CSS-only; add data-lg-segment for the sliding thumb) */
+.lg-seg {
+  display: inline-flex; align-items: center; padding: 3px; gap: 2px;
+  border-radius: 999px; border: 0;
+  background: rgba(0,0,0,.14);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.20), inset 0 0 0 1px var(--lg-edge);
+}
+:root[data-theme="light"] .lg-seg {
+  background: rgba(27,26,36,.06);
+  box-shadow: inset 0 1px 2px rgba(27,26,36,.08), inset 0 0 0 1px var(--lg-edge);
+}
+.lg-seg > :not(.lg-seg-thumb) { border-radius: 999px; background: transparent; border: 0; }
+.lg-seg > :is([aria-selected="true"], .is-active, .active):not(.lg-seg-thumb) {
+  background: var(--lg-bg-strong);
+  box-shadow: var(--lg-rim-shadow), 0 2px 6px -2px rgba(0,0,0,.30);
+}
+
+/* ==================== §2 AUTOMATIC MATERIAL + STAT-CARD ==================== */
+/* Top-level cards: the canonical `bg-white border border-gray-200 rounded-xl`
+   idiom (~1,000 uses) gets the full material with no template edits. */
+:root[data-theme] body.dark-glass .bg-white:is([class*="rounded-xl"],[class*="rounded-2xl"],[class*="rounded-3xl"]):not(.bg-white .bg-white):not(.fixed.inset-0 .bg-white):not(button):not(a.rounded-lg):not(td):not(th):not(tr):not(nav):not(iframe):not(.stat-card):not(.lg-none):not(:has(.fixed, .booking-modal-backdrop, .booking-modal, .rec-modal)) {
+  background: var(--lg-bg) !important;
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat)) !important;
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat)) !important;
+  border-color: var(--lg-edge) !important;
+  border-radius: var(--lg-radius-card) !important;
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow) !important;
+}
+:root[data-theme] body.dark-glass .bg-white:is([class*="rounded-xl"],[class*="rounded-2xl"],[class*="rounded-3xl"]):has(.fixed, .booking-modal-backdrop, .booking-modal, .rec-modal):not(.bg-white .bg-white):not(.fixed.inset-0 .bg-white):not(.stat-card):not(.lg-none) {
+  background: rgba(var(--lg-tint-rgb), var(--lg-alpha-strong)) !important;
+  border-color: var(--lg-edge) !important;
+  border-radius: var(--lg-radius-card) !important;
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow) !important;
+}
+/* Bare .bg-white (no card radius) — tint only, never blur. */
+:root[data-theme] body.dark-glass .bg-white:not([class*="rounded-xl"]):not([class*="rounded-2xl"]):not([class*="rounded-3xl"]):not(td):not(th):not(tr):not(nav):not(.lg-none) {
+  background: var(--lg-bg-flat) !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  border-color: var(--lg-edge) !important;
+}
+/* Nested cards — flat well, inner hairline, no rim, no blur. */
+:root[data-theme] body.dark-glass .bg-white .bg-white:not(input):not(select):not(textarea):not(button):not(.lg-none) {
+  background: var(--lg-bg-flat) !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  border-color: transparent !important;
+  box-shadow: inset 0 0 0 1px var(--lg-edge) !important;
+}
+/* .lg devices that still carry Tailwind radius classes must beat custom.css's 12px coercion */
+body.dark-glass .lg:is(.rounded-xl, .rounded-2xl, .rounded-3xl) { border-radius: var(--lg-radius-card) !important; }
+body.dark-glass .lg-strong:is(.rounded-xl, .rounded-2xl, .rounded-3xl) { border-radius: var(--lg-radius-lg) !important; }
+/* Card header strips */
+:root[data-theme] body.dark-glass .bg-white :is(.bg-gray-50, [class*="bg-gray-50/"]):not(input):not(select):not(textarea):not(.lg-none) {
+  background: var(--lg-well) !important;
+}
+/* Entrance: an ancestor animating opacity is a backdrop root, so blurred
+   cards would render un-blurred and then "pop". Transform-only rise. */
+@keyframes lg-rise { from { transform: translateY(6px); } to { transform: none; } }
+html:not(.vt-nav) body.dark-glass main > div > * { animation-name: lg-rise !important; }
+body.dark-glass [data-tab-panel] { animation-name: lg-rise !important; }
+
+/* KPI tiles — tint + rim, no blur (hubs show 20+); opt into blur with .lg */
+:root[data-theme] body.dark-glass .stat-card {
+  background: var(--lg-bg-flat);
+  border-color: var(--lg-edge);
+  border-radius: 14px;
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow);
+  transition: box-shadow var(--lg-dur) var(--lg-ease), border-color var(--lg-dur) var(--lg-ease), transform var(--lg-dur) var(--lg-ease);
+}
+:root[data-theme] body.dark-glass a.stat-card:hover { border-color: var(--lg-edge-strong); box-shadow: var(--lg-rim-shadow), var(--lg-shadow-float); }
+:root[data-theme] body.dark-glass .stat-card.lg {
+  background: var(--lg-bg);
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+}
+:root[data-theme] body.dark-glass .stat-card.accent-amber   { background-image: linear-gradient(var(--lg-tint-warn), var(--lg-tint-warn)); }
+:root[data-theme] body.dark-glass .stat-card.accent-emerald { background-image: linear-gradient(var(--lg-tint-ok),   var(--lg-tint-ok)); }
+
+/* ============================ §3 AMBIENT FIELD ============================= */
+/* First child of <body>. z-index:-1 on a fixed body child sits above the
+   canvas (the skin ground propagates there) and below every in-flow block.
+   PRECONDITION: body must never get transform / filter / opacity. */
+#lg-ambient {
+  position: fixed; inset: 0; z-index: -1;
+  pointer-events: none; overflow: hidden;
+  opacity: var(--lg-ambient-opacity);
+}
+#lg-ambient::before, #lg-ambient::after {
+  content: ''; position: absolute; inset: -20%; will-change: transform;
+}
+#lg-ambient::before {
+  background:
+    radial-gradient(38% 34% at 16% 10%,  rgba(var(--lg-blob-a), var(--lg-blob-a-alpha)), transparent 70%),
+    radial-gradient(34% 30% at 62% 104%, rgba(var(--lg-blob-c), var(--lg-blob-c-alpha)), transparent 70%);
+}
+#lg-ambient::after {
+  background:
+    radial-gradient(40% 36% at 88% 22%,  rgba(var(--lg-blob-b), var(--lg-blob-b-alpha)), transparent 70%);
+}
+@keyframes lg-drift-a { to { transform: translate3d(3%, 2%, 0) scale(1.04); } }
+@keyframes lg-drift-b { to { transform: translate3d(-2.5%, 3%, 0) scale(1.03); } }
+@media (prefers-reduced-motion: no-preference) {
+  #lg-ambient::before { animation: lg-drift-a 90s ease-in-out infinite alternate; }
+  #lg-ambient::after  { animation: lg-drift-b 120s ease-in-out infinite alternate; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #lg-ambient::before, #lg-ambient::after { animation: none !important; }
+}
+
+/* ================================ §4 SHELL ================================= */
+/* --- Header: a floating glass bar --- */
+:root[data-theme] body.dark-glass #app-header {
+  position: sticky; top: var(--lg-header-gap);
+  margin: var(--lg-header-gap) 8px 0;
+  border-radius: 16px;
+  background: var(--lg-bg-chrome) !important;
+  -webkit-backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome)) !important;
+  backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome)) !important;
+  border: 1px solid var(--lg-edge) !important;
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow) !important;
+}
+@media (min-width: 1024px) {
+  :root[data-theme] body.dark-glass #app-header { margin: var(--lg-header-gap) 16px 0; border-radius: 18px; }
+}
+body.dark-glass #app-header :is(button, a).rounded-xl { border-radius: 999px !important; }
+:root[data-theme] body.dark-glass #app-header :is(button, a).rounded-xl:hover { background: var(--lg-bg-flat) !important; }
+/* Desktop "content scrolls beneath the header" — flag-gated (--lg-overlap: 1) */
+@media (min-width: 1024px) {
+  body.dark-glass main { margin-top: calc(-1 * var(--lg-header-total) * var(--lg-overlap)); }
+  body.dark-glass main > div:first-child { padding-top: calc(var(--lg-header-total) * var(--lg-overlap) + 1.25rem) !important; }
+  body.dark-glass main [id] { scroll-margin-top: calc((var(--lg-header-total) + 12px) * var(--lg-overlap)); }
+  body.dark-glass main :is(div, nav, header, form, section).sticky:is(.top-0, .lg\:top-0),
+  body.dark-glass main .bk2-header { top: calc(var(--lg-header-total) * var(--lg-overlap)); }
+}
+
+/* --- Sidebar: translucent floating panel --- */
+:root[data-theme] body.dark-glass #sidebar {
+  background: var(--lg-bg-chrome) !important;
+  -webkit-backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome)) !important;
+  backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome)) !important;
+  border-right: 0 !important;
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow) !important;
+}
+@media (min-width: 1024px) {
+  :root[data-theme] body.dark-glass #sidebar {
+    top: 10px !important;
+    margin: 10px 0 10px 10px;
+    border-radius: 18px;
+    min-height: calc(100dvh - 20px) !important;
+    max-height: calc(100dvh - 20px) !important;
+  }
+}
+@media (max-width: 1023px) {
+  :root[data-theme] body.dark-glass #sidebar { border-radius: 0 20px 20px 0; --lg-alpha-chrome: .80; }
+  :root[data-theme="light"] body.dark-glass #sidebar { --lg-alpha-chrome: .88; }
+}
+:root[data-theme] body.dark-glass #sidebar > div.lg\:hidden { background: transparent !important; }
+:root[data-theme] body.dark-glass #sidebar > a[href="/dashboard"] { border-bottom-color: var(--lg-edge) !important; }
+body.dark-glass #sidebar a.sidebar-link { border-radius: 10px !important; }
+/* Active = brand glass pill. The `bg-white/15` literal stays untouched (nav.spec). */
+:root[data-theme] body.dark-glass #sidebar a.sidebar-link[class~="bg-white/15"] {
+  background: var(--lg-sb-active) !important;
+  box-shadow: inset 0 1px 0 var(--lg-rim-hi), inset 0 0 0 1px var(--lg-rim);
+}
+:root[data-theme] body.dark-glass #sidebar .sb-filter input { border-radius: 999px !important; }
+
+/* --- Header dropdowns / smart-select panels --- */
+:root[data-theme] body.dark-glass :is(#notif-dropdown, #quickadd-dropdown, #sv-dropdown, .ss-panel) {
+  background: var(--lg-bg-menu) !important;
+  -webkit-backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat)) !important;
+  backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat)) !important;
+  border-color: var(--lg-edge) !important;
+  border-radius: var(--lg-radius-lg) !important;
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow-float) !important;
+}
+:root[data-theme] body.dark-glass :is(#notif-dropdown, #quickadd-dropdown) :is(.notif-panel-header, .notif-panel-footer, [class*="bg-gray-50"]) {
+  background: var(--lg-bg-flat) !important;
+}
+
+/* --- Global FAB + feedback widget --- */
+:root[data-theme] body.dark-glass #globalFabToggle {
+  border-radius: 999px !important; border: 0 !important;
+  color: var(--lg-brand-ink) !important;
+  background: var(--lg-brand-fill) !important;
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 0 0 1px rgba(255,255,255,.12), 0 12px 28px -12px rgba(19,0,142,.65) !important;
+}
+:root[data-theme] body.dark-glass #globalFabMenu {
+  padding: 6px; gap: 4px; border-radius: 24px;
+  background: var(--lg-bg-strong);
+  -webkit-backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat));
+  border: 1px solid var(--lg-edge);
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow-float);
+}
+:root[data-theme] body.dark-glass #globalFabMenu .fab-item {
+  background: var(--lg-bg-flat) !important;
+  border: 1px solid var(--lg-edge);
+  box-shadow: inset 0 1px 0 var(--lg-rim-hi) !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  border-radius: 999px !important;
+}
+:root[data-theme] body.dark-glass #globalFabMenu .fab-item:hover { background: var(--lg-tint-brand) !important; }
+body.dark-glass .fb-fab--admin {
+  background: var(--lg-brand-fill) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.30), 0 10px 24px -12px rgba(19,0,142,.60) !important;
+}
+:root[data-theme] body.dark-glass .fb-modal {
+  background: var(--lg-bg-strong) !important;
+  -webkit-backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat));
+  border-color: var(--lg-edge) !important; border-radius: 20px !important;
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow-float) !important;
+}
+:root[data-theme] body.dark-glass .fb-modal-head { border-bottom-color: var(--lg-edge) !important; }
+
+/* --- Page header partial: title icon becomes a brand glass tile --- */
+body.dark-glass .page-title-icon {
+  background: var(--lg-brand-fill) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), var(--lg-brand-glow);
+  border-radius: 12px !important;
+}
+
+/* =================== §5 CONTROLS · TABLES · OVERLAYS · TOASTS ============== */
+/* Primary buttons */
+body.dark-glass :is(a, button, input[type="submit"]):is(.bg-brand-600, .bg-brand-700) {
+  background: var(--lg-brand-fill) !important;
+  color: var(--lg-brand-ink) !important;
+  border-radius: var(--lg-radius-btn) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 0 0 1px rgba(255,255,255,.08), 0 8px 18px -10px rgba(19,0,142,.60);
+  transition: transform var(--lg-dur) var(--lg-ease), box-shadow var(--lg-dur) var(--lg-ease), filter var(--lg-dur) var(--lg-ease);
+}
+body.dark-glass :is(a, button):is(.bg-brand-600, .bg-brand-700):hover {
+  filter: brightness(1.07);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 12px 24px -10px rgba(19,0,142,.65);
+}
+body.dark-glass :is(a, button).bg-red-600 {
+  background: linear-gradient(180deg, #F05252, #C81E1E) !important;
+  border-radius: var(--lg-radius-btn) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25);
+}
+/* Secondary = clear glass (no blur) */
+:root[data-theme] body.dark-glass :is(a, button).bg-white.border:not(.stat-card) {
+  background: var(--lg-bg-flat) !important;
+  border-color: var(--lg-edge-strong) !important;
+  border-radius: var(--lg-radius-btn) !important;
+  box-shadow: inset 0 1px 0 var(--lg-rim-hi) !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+:root[data-theme] body.dark-glass :is(a, button).bg-white.border:not(.stat-card):hover { background: var(--lg-tint-brand) !important; }
+/* Every button-shaped control in the content area is a capsule */
+body.dark-glass main :is(a, button):is(.rounded-lg, .rounded-md, .rounded-xl):not(.sidebar-link):not(.stat-card) { border-radius: var(--lg-radius-btn) !important; }
+
+/* Inputs — tinted, 10px, brand focus glow (recruitment's #rec-root rules still win there) */
+:root[data-theme] body.dark-glass :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]), select, textarea) {
+  background-color: var(--lg-bg-flat) !important;
+  border-color: var(--lg-edge-strong) !important;
+  border-radius: var(--lg-radius-ctl) !important;
+  box-shadow: inset 0 1px 0 var(--lg-rim-hi), inset 0 1px 2px rgba(0,0,0,.05);
+  transition: border-color var(--lg-dur) var(--lg-ease), box-shadow var(--lg-dur) var(--lg-ease);
+}
+:root[data-theme] body.dark-glass :is(input, select, textarea):focus {
+  border-color: rgba(61,49,192,.55) !important;
+  box-shadow: 0 0 0 4px rgba(61,49,192,.14), inset 0 1px 0 var(--lg-rim-hi) !important;
+}
+:root[data-theme] body.dark-glass :is(input[type="search"], #sb-filter, .bookings-search-input) { border-radius: 999px !important; }
+/* Inputs that live inside a pill container (bookings header search, resource
+   panel search, sidebar filter) stay bare — the container is the control. */
+:root[data-theme] body.dark-glass :is(.bk2-headersearch, .bk2-rp-search, .sb-filter) input {
+  background-color: transparent !important; border-color: transparent !important; box-shadow: none !important;
+}
+:root[data-theme] body.dark-glass :is(.bk2-headersearch, .bk2-rp-search, .sb-filter) input:focus { box-shadow: none !important; }
+
+/* Tables */
+:root[data-theme] body.dark-glass table :is(thead, thead th, thead.bg-gray-50, th.bg-gray-50, thead.bg-gray-100) {
+  background: rgba(255,255,255,.035) !important;
+  border-bottom-color: var(--lg-edge) !important;
+}
+:root[data-theme="light"] body.dark-glass table :is(thead, thead th, thead.bg-gray-50, th.bg-gray-50, thead.bg-gray-100) { background: rgba(27,26,36,.035) !important; }
+:root[data-theme] body.dark-glass table tbody tr:hover { background: rgba(255,255,255,.05) !important; }
+:root[data-theme="light"] body.dark-glass table tbody tr:hover { background: rgba(61,49,192,.045) !important; }
+/* Sticky cells / headers need an opaque fill to hide scrolled content. */
+:root[data-theme] body.dark-glass :is(td, th).bg-white,
+:root[data-theme] body.dark-glass :is(thead.sticky, th.sticky, thead .sticky, td.sticky) { background: var(--lg-bg-solid) !important; }
+
+/* Status pills — keep the ring colours, capsule + top catch-light */
+body.dark-glass :is([class*="ring-inset"], .status-red, .status-amber, .status-green, .status-blue, .status-grey, .flight-tag, .panel-header-count, .notif-item-tag) {
+  border-radius: 999px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+}
+:root:not([data-theme="light"]) body.dark-glass :is([class*="ring-inset"], .flight-tag) { box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+
+/* Overlays — scrim + panel (≈42 hand-rolled `fixed inset-0` modals) */
+body.dark-glass .fixed.inset-0:is([class*="bg-black"], [class*="bg-gray-900"], [class*="bg-gray-950"]),
+body.dark-glass :is(.booking-modal-backdrop, .fb-backdrop) {
+  background-color: rgba(10,9,20,.55) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(120%) !important;
+  backdrop-filter: blur(10px) saturate(120%) !important;
+}
+:root[data-theme="light"] body.dark-glass .fixed.inset-0:is([class*="bg-black"], [class*="bg-gray-900"], [class*="bg-gray-950"]) { background-color: rgba(15,14,26,.32) !important; }
+:root[data-theme] body.dark-glass .fixed.inset-0 .bg-white[class*="rounded"][class*="shadow"]:not(iframe):not(#lightbox-iframe),
+:root[data-theme] body.dark-glass .booking-modal {
+  background: var(--lg-bg-strong) !important;
+  -webkit-backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat)) !important;
+  backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat)) !important;
+  border-radius: var(--lg-radius-lg) !important;
+  border-color: var(--lg-edge) !important;
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow-float) !important;
+}
+body.dark-glass #lightbox-overlay { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+:root[data-theme] body.dark-glass .booking-modal-header { background: transparent !important; border-bottom: 1px solid var(--lg-edge); }
+
+/* Toasts — always dark glass (every toast system hardcodes white text) */
+body.dark-glass :is(.booking-toast, .undo-toast, .bk2-toast, #rec-toast, #bulk-bar) {
+  background: rgba(22,22,32,.80) !important; color: #fff;
+  -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 0 0 1px rgba(255,255,255,.06), 0 18px 40px -16px rgba(0,0,0,.6) !important;
+}
+body.dark-glass :is(.booking-toast, .bk2-toast, #bulk-bar, #rec-toast) { border-radius: 999px !important; }
+body.dark-glass .undo-toast { border-radius: 14px !important; }
+body.dark-glass #rec-toast.rec-toast--error { background: rgba(185,28,28,.86) !important; }
+:root[data-theme] body.dark-glass .bulk-action-bar {
+  background: var(--lg-bg-chrome) !important;
+  -webkit-backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome));
+  backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome));
+  border-top-color: var(--lg-edge) !important;
+}
+body.dark-glass .flash-msg {
+  border-radius: 14px !important;
+  box-shadow: var(--lg-rim-shadow) !important;
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+
+/* Tabs — capsule pills; app.js toggles border-brand-600 on the active one */
+body.dark-glass [data-tab] {
+  border-radius: 999px; padding: 6px 12px !important;
+  border-bottom-color: transparent !important;
+  transition: background var(--lg-dur) var(--lg-ease), color var(--lg-dur) var(--lg-ease);
+}
+body.dark-glass [data-tab]::after { display: none; }
+body.dark-glass [data-tab].border-brand-600 { background: var(--lg-tint-brand); box-shadow: inset 0 1px 0 var(--lg-rim-hi), inset 0 0 0 1px var(--lg-rim); }
+body.dark-glass :is(.subnav-tab.active, .modal-tab.active) { border-bottom-color: transparent !important; background: var(--lg-tint-brand) !important; border-radius: 999px; }
+
+/* ====================== §D1 DASHBOARD "TODAY" BOARD ======================== */
+/* Tokens (--tb-*) are remapped in the page's own inline <style> (it lives in
+   <body> and out-orders every stylesheet). Only cross-file bits live here. */
+:root[data-theme] body.dark-glass .crew-face { border-color: transparent; box-shadow: 0 0 0 2px var(--lg-bg-strong); }
+:root[data-theme] body.dark-glass .crew-face.is-lead { box-shadow: 0 0 0 2px var(--lg-bg-strong), 0 0 0 3.5px #10B981; }
+:root[data-theme="light"] body.dark-glass .flight-table th { border-bottom-color: var(--lg-rim); }
+:root[data-theme="light"] body.dark-glass .flight-table tbody tr:hover { background: var(--lg-well); }
+
+/* ========================== §D2 BOOKINGS BOARD ============================= */
+/* Chrome = glass. Cards = translucent tint + rim, NO blur (20–30 per board,
+   nothing scrolls beneath them). .bk2-slot* rules are spec-pinned: untouched. */
+:root[data-theme] body.dark-glass .bk2-header {
+  background: var(--lg-bg-chrome);
+  -webkit-backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome));
+  backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome));
+  border: 1px solid var(--lg-edge); border-top: 0;
+  border-radius: 0 0 16px 16px;
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow);
+  padding-left: 12px; padding-right: 12px;
+}
+:root[data-theme] body.dark-glass .bk2-header::before { display: none; }
+/* View switcher → capsule segment (thumb via data-lg-segment) */
+:root[data-theme] body.dark-glass .bk2-views {
+  border-radius: 999px; border: 0; padding: 3px;
+  background: rgba(0,0,0,.14);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.20), inset 0 0 0 1px var(--lg-edge);
+}
+:root[data-theme="light"] body.dark-glass .bk2-views { background: rgba(27,26,36,.06); box-shadow: inset 0 1px 2px rgba(27,26,36,.08), inset 0 0 0 1px var(--lg-edge); }
+:root[data-theme] body.dark-glass .bk2-view-tab { border-radius: 999px; }
+:root[data-theme] body.dark-glass .bk2-view-tab[aria-selected="true"] { background: var(--lg-bg-strong); box-shadow: var(--lg-rim-shadow), 0 2px 6px -2px rgba(0,0,0,.30); }
+:root[data-theme] body.dark-glass :is(.bk2-daynav, .bk2-headersearch, .bk2-sidetoggle) {
+  border-radius: 999px; background: var(--lg-bg-flat); border-color: var(--lg-edge-strong);
+  box-shadow: inset 0 1px 0 var(--lg-rim-hi);
+}
+:root[data-theme] body.dark-glass .bk2-daynav { overflow: hidden; }
+:root[data-theme] body.dark-glass .bk2-sidetoggle[aria-pressed="true"],
+:root[data-theme] body.dark-glass .bk2-newbtn,
+:root[data-theme] body.dark-glass .bk2-fs-tool.is-active,
+:root[data-theme] body.dark-glass .bk2-fs-tool--primary,
+:root[data-theme] body.dark-glass .bk2-empty-cta,
+:root[data-theme] body.dark-glass .bk2-fs-popover-foot .bk2-fs-popover-close {
+  background: var(--lg-brand-fill); color: var(--lg-brand-ink); border-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), var(--lg-brand-glow);
+}
+:root[data-theme] body.dark-glass .bk2-newbtn { border-radius: 999px; }
+:root[data-theme] body.dark-glass .bk2-newbtn:hover,
+:root[data-theme] body.dark-glass .bk2-empty-cta:hover { background: var(--lg-brand-fill); filter: brightness(1.07); }
+/* Filter strip — in-flow, tint only */
+:root[data-theme] body.dark-glass .bk2-filterstrip {
+  position: relative; background: var(--lg-bg); border-color: var(--lg-edge);
+  border-radius: 16px; box-shadow: var(--lg-rim-shadow), var(--lg-shadow);
+}
+:root[data-theme] body.dark-glass .bk2-fs-toolbar { background: var(--lg-well); border-top-color: var(--lg-edge); }
+:root[data-theme] body.dark-glass .bk2-fs-chip { background: var(--lg-well); border-color: var(--lg-edge); border-radius: 12px; color: inherit; }
+:root[data-theme] body.dark-glass .bk2-fs-chip:hover { background: var(--lg-tint-brand); border-color: var(--lg-edge-strong); }
+:root[data-theme] body.dark-glass .bk2-fs-chip.is-active { background: var(--lg-tint-brand); border-color: rgba(61,49,192,.45); }
+:root[data-theme] body.dark-glass .bk2-fs-tool { background: var(--lg-well); border-color: var(--lg-edge); border-radius: 999px; }
+:root[data-theme] body.dark-glass .bk2-fs-tool:hover { background: var(--lg-tint-brand); }
+:root[data-theme] body.dark-glass .bk2-fs-pill { border-radius: 999px; background: var(--lg-well); border-color: var(--lg-edge); }
+/* Popover / resource panel / slide-over / pop / clone menu / arm banner = glass */
+:root[data-theme] body.dark-glass :is(.bk2-fs-popover, .bk2-slideover, .bk2-pop, .bk2-clone-menu) {
+  background: var(--lg-bg-strong); color: inherit;
+  -webkit-backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat));
+  border: 1px solid var(--lg-edge);
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow-float);
+}
+:root[data-theme] body.dark-glass :is(.bk2-fs-popover, .bk2-pop, .bk2-clone-menu) { border-radius: 20px; }
+:root[data-theme] body.dark-glass .bk2-fs-popover-search { border-radius: 999px; background: var(--lg-bg-flat); border-color: var(--lg-edge-strong); }
+:root[data-theme] body.dark-glass .bk2-fs-popover-opt { border-radius: 10px; }
+:root[data-theme] body.dark-glass .bk2-fs-popover-opt.is-on { background: var(--lg-tint-brand); }
+:root[data-theme] body.dark-glass .bk2-resourcepanel {
+  background: var(--lg-bg); border-color: var(--lg-edge); border-radius: 18px;
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow);
+}
+:root[data-theme] body.dark-glass .bk2-rp-head { background: var(--lg-well); border-bottom-color: var(--lg-edge); }
+:root[data-theme] body.dark-glass .bk2-rp-search { border-radius: 999px; background: var(--lg-bg-flat); border-color: var(--lg-edge-strong); box-shadow: inset 0 1px 0 var(--lg-rim-hi); }
+:root[data-theme] body.dark-glass .bk2-rp-tabs { border-radius: 999px; background: rgba(0,0,0,.14); box-shadow: inset 0 1px 2px rgba(0,0,0,.20), inset 0 0 0 1px var(--lg-edge); padding: 3px; }
+:root[data-theme="light"] body.dark-glass .bk2-rp-tabs { background: rgba(27,26,36,.06); box-shadow: inset 0 1px 2px rgba(27,26,36,.08), inset 0 0 0 1px var(--lg-edge); }
+:root[data-theme] body.dark-glass .bk2-rp-tab { border-radius: 999px; }
+:root[data-theme] body.dark-glass .bk2-rp-tab[aria-selected="true"] { background: var(--lg-bg-strong); box-shadow: var(--lg-rim-shadow), 0 2px 6px -2px rgba(0,0,0,.30); }
+:root[data-theme] body.dark-glass .bk2-rp-iconbtn { border-radius: 999px; border-color: var(--lg-edge); }
+:root[data-theme] body.dark-glass .bk2-pop-btn { background: var(--lg-well); border-color: var(--lg-edge); border-radius: 14px; }
+:root[data-theme] body.dark-glass .bk2-pop-btn:hover { background: var(--lg-tint-brand); }
+:root[data-theme] body.dark-glass .bk2-pop-btn.is-on { background: var(--lg-brand-fill); color: var(--lg-brand-ink); }
+:root[data-theme] body.dark-glass .bk2-clone-menu button { border-radius: 10px; color: inherit; }
+:root[data-theme] body.dark-glass .bk2-clone-menu button:hover { background: var(--lg-tint-brand); }
+:root[data-theme] body.dark-glass .bk2-arm-banner {
+  background: var(--lg-brand-fill); border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.30), var(--lg-brand-glow), 0 10px 28px rgba(19,0,142,.35);
+}
+:root[data-theme] body.dark-glass .bk2-arm-banner-cancel { border-radius: 999px; }
+/* Editor: body stays solid (it's a full form); only its title bar + tabs go glass */
+:root[data-theme] body.dark-glass :is(.bk2-edit-titlebar, .bk2-edit-tabs) {
+  background: rgba(19,0,142,.62); border-bottom-color: rgba(255,255,255,.12);
+  -webkit-backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome));
+  backdrop-filter: blur(var(--lg-blur-chrome)) saturate(var(--lg-sat-chrome));
+}
+/* Cards — tint + rim, no blur; the status banner stays opaque */
+:root[data-theme] body.dark-glass .bk2-card {
+  position: relative;
+  background: var(--lg-bg); border-color: var(--lg-edge);
+  border-radius: 16px;
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow);
+  transition: box-shadow var(--lg-dur) var(--lg-ease), transform var(--lg-dur) var(--lg-ease), border-color var(--lg-dur) var(--lg-ease);
+}
+:root[data-theme="light"] body.dark-glass .bk2-card { border-left-color: var(--bk2-tone, #9CA3AF); }
+:root[data-theme] body.dark-glass .bk2-card::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: var(--lg-rim-grad);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none; opacity: .7;
+}
+:root[data-theme] body.dark-glass .bk2-card:hover { border-color: var(--lg-edge-strong); box-shadow: var(--lg-rim-shadow), var(--lg-shadow-hover); }
+:root[data-theme] body.dark-glass .bk2-card:hover::before { opacity: 1; }
+:root[data-theme] body.dark-glass .bk2-card.bk2-card--floating {
+  background: var(--lg-bg-strong);
+  -webkit-backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur-strong)) saturate(var(--lg-sat));
+}
+:root[data-theme] body.dark-glass :is(.bk2-empty, .bk2-list, .bk2-cal) {
+  background: var(--lg-bg); border-color: var(--lg-edge); border-radius: 16px;
+  box-shadow: var(--lg-rim-shadow), var(--lg-shadow);
+}
+:root[data-theme] body.dark-glass .bk2-list th { background: var(--lg-well); }
+:root[data-theme] body.dark-glass .bk2-list tr:hover { background: var(--lg-well); }
+:root[data-theme] body.dark-glass .bk2-lifecycle { background: var(--lg-well); border-radius: 16px; }
+/* Nested wells */
+:root[data-theme] body.dark-glass :is(.bk2-crew, .bk2-unassigned, .bk2-vehunit.has-gear) { background: var(--lg-well); border-color: var(--lg-edge); }
+:root[data-theme] body.dark-glass .bk2-card-footer { background: var(--lg-well); border-top-color: var(--lg-edge); }
+/* Drag */
+:root[data-theme] body.dark-glass .bk2-drag-ghost {
+  background: var(--lg-bg-strong);
+  box-shadow: 0 0 0 1px var(--lg-rim-hi), 0 12px 28px rgba(0,0,0,.42);
+}
+:root[data-theme] body.dark-glass .bk2-drop-live { background: var(--lg-drop) !important; outline-color: var(--lg-edge-strong) !important; }
+:root[data-theme] body.dark-glass .bk2-card.bk2-drop-live-card { outline-color: #6259D2; box-shadow: var(--lg-rim-shadow), 0 0 0 6px var(--lg-drop); }
+/* Toast (bookings) is covered by the §5 toast rule. */
+
+/* ====================== §D3 RECRUITMENT / INDUCTION ======================== */
+/* The recruitment surfaces are styled by the page's inline <style>
+   (views/induction/admin/_recruitment-styles.ejs) through a token bridge
+   onto --lg-*; nothing page-specific needs to live here. */
+
+/* ================================ §M MOTION ================================ */
+@media (prefers-reduced-motion: no-preference) {
+  .lg-press { transition: transform var(--lg-dur) var(--lg-ease), box-shadow var(--lg-dur) var(--lg-ease), border-color var(--lg-dur) var(--lg-ease), background-color var(--lg-dur) var(--lg-ease); }
+  .lg-press:active { transform: scale(.97); }
+  .lg-hover { transition: transform var(--lg-dur) var(--lg-ease), box-shadow var(--lg-dur) var(--lg-ease), border-color var(--lg-dur) var(--lg-ease); }
+  .lg-hover:hover { border-color: var(--lg-edge-strong); box-shadow: var(--lg-rim-shadow), var(--lg-shadow-hover); }
+  body.dark-glass :is(button, a.stat-card, .fab-item, .sidebar-link):not(:disabled):active { transform: scale(.97); }
+  body.dark-glass .bk2-card:hover { transform: translateY(-2px); }
+  body.dark-glass .bk2-card.bk2-card--docketed:hover { transform: scale(1.012) translateY(-2px); }
+  body.dark-glass #globalFabToggle { transition: transform var(--lg-dur) var(--lg-ease), box-shadow var(--lg-dur) var(--lg-ease); }
+  body.dark-glass #globalFabToggle:active { transform: scale(.96); }
+  /* Segmented control thumb (positioned by /js/lg-motion.js) */
+  [data-lg-segment] { position: relative; isolation: isolate; }
+  [data-lg-segment] > :not(.lg-seg-thumb) { position: relative; z-index: 1; }
+  .lg-seg-thumb {
+    position: absolute; top: var(--lg-seg-pad, 3px); left: 0;
+    height: calc(100% - 2 * var(--lg-seg-pad, 3px)); width: 0;
+    border-radius: 999px; background: var(--lg-bg-strong);
+    box-shadow: var(--lg-rim-shadow), 0 1px 2px rgba(0,0,0,.14);
+    pointer-events: none; z-index: 0; opacity: 0;
+    transition: transform 220ms var(--lg-ease), width 220ms var(--lg-ease), opacity 120ms;
+  }
+  .lg-seg-ready .lg-seg-thumb { opacity: 1; }
+  [data-lg-segment="underline"] .lg-seg-thumb { top: auto; bottom: 0; height: 2px; border-radius: 2px; background: var(--brand-500, #3D31C0); box-shadow: none; }
+  /* once the thumb carries the fill, the native active fills step aside */
+  :root[data-theme] body.dark-glass .lg-seg-ready > .bk2-view-tab[aria-selected="true"],
+  :root[data-theme] body.dark-glass .lg-seg-ready > .bk2-rp-tab[aria-selected="true"],
+  :root[data-theme] body.dark-glass .lg-seg-ready > .rec-viewbtn.is-active,
+  :root[data-theme] body.dark-glass .lg-seg.lg-seg-ready > :is([aria-selected="true"], .is-active, .active) { background: transparent !important; box-shadow: none !important; }
+  .lg-seg-ready > .v-tab.is-active { border-bottom-color: transparent !important; }
+  /* FAB bloom (overrides admin-fluid's fluid-pop by source order) */
+  #globalFabMenu:not(.hidden) { animation: lg-bloom 220ms var(--lg-ease) both; transform-origin: bottom right; }
+  #globalFabMenu:not(.hidden) > .fab-item { animation: lg-rise-in 200ms var(--lg-ease) both; }
+  #globalFabMenu:not(.hidden) > .fab-item:nth-last-child(2) { animation-delay: 25ms; }
+  #globalFabMenu:not(.hidden) > .fab-item:nth-last-child(3) { animation-delay: 50ms; }
+  #globalFabMenu:not(.hidden) > .fab-item:nth-last-child(4) { animation-delay: 75ms; }
+  #globalFabMenu:not(.hidden) > .fab-item:nth-last-child(5) { animation-delay: 100ms; }
+  #globalFab.is-open #globalFabToggle { border-radius: 22px 22px 10px 22px !important; }
+  @keyframes lg-bloom   { from { opacity: 0; transform: translateY(10px) scale(.86); } to { opacity: 1; transform: none; } }
+  @keyframes lg-rise-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lg-seg-thumb { display: none; }
+  #globalFabMenu:not(.hidden) { animation: none; }
+}
+
+/* ===================== §F FALLBACKS · PHONE · PRINT (LAST) ================== */
+/* No backdrop-filter → opaque material */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root, :root[data-theme="light"] { --lg-alpha: .97; --lg-alpha-strong: .98; --lg-alpha-chrome: .97; --lg-alpha-flat: .98; --lg-sat: 100%; --lg-sat-chrome: 100%; }
+}
+/* OS "reduce transparency" → opaque, and no blur anywhere (scrims included) */
+@media (prefers-reduced-transparency: reduce) {
+  :root, :root[data-theme="light"] { --lg-alpha: .97; --lg-alpha-strong: .98; --lg-alpha-chrome: .97; --lg-alpha-flat: .98; --lg-sat: 100%; --lg-sat-chrome: 100%; }
+  body.dark-glass *, body.dark-glass *::before { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  #lg-ambient { display: none; }
+}
+/* Phones: blur only on chrome; in-flow cards go tint-only with raised alpha */
+@media (max-width: 767px) {
+  :root { --lg-blur: 12px; --lg-blur-strong: 14px; --lg-blur-chrome: 12px; --lg-alpha: .68; }
+  :root[data-theme="light"] { --lg-alpha: .82; }
+  :root[data-theme] body.dark-glass .bg-white:is([class*="rounded-xl"],[class*="rounded-2xl"],[class*="rounded-3xl"]),
+  :root[data-theme] body.dark-glass .stat-card,
+  :root[data-theme] body.dark-glass .bk2-resourcepanel,
+  body.dark-glass .lg { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+}
+/* Print: opaque white, no blur, no ambient, no overlap */
+@media print {
+  #lg-ambient, #globalFab, .fb-fab, #bulk-bar { display: none !important; }
+  html, body { background: #fff !important; }
+  *, *::before, *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; box-shadow: none !important; animation: none !important; }
+  :is(.lg, .lg-strong, .lg-chrome)::before, .bk2-card::before { display: none !important; }
+  body.dark-glass :is(.bg-white, .stat-card, .lg, .lg-strong, .lg-chrome, .lg-flat, .bk2-card) { background: #fff !important; border-color: #D1D5DB !important; }
+  body.dark-glass main { margin-top: 0 !important; }
+  body.dark-glass main > div:first-child { padding-top: 0 !important; }
+}

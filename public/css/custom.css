@@ -662,9 +662,6 @@ body, body.dark-glass {
 .bg-white {
   box-shadow: var(--shadow-card);
 }
-.bg-white:not(nav):not(td):not(th):not(tr):not(.fab-menu a):not(#notif-dropdown):not(#quickadd-dropdown):not(.urgency-tile) {
-  border-color: rgba(0,0,0,0.06) !important;
-}
 /* ===== Radius system (Atomis): small UI = 6px, cards/containers = 12px,
    nothing else. The rebrand sprayed rounded-2xl/3xl everywhere, which made
    the radius vocabulary feel undecided. Coerce them globally. */

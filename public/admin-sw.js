@@ -1,10 +1,12 @@
 // Atomis Admin Service Worker — Network-first with offline fallback
-const CACHE_NAME = 'atomis-admin-v29-sidebar-redesign';
+const CACHE_NAME = 'atomis-admin-v30-liquid-glass';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to pre-cache
 const PRECACHE_URLS = [
   '/css/custom.css',
+  '/css/liquid-glass.css',
+  '/js/lg-motion.js',
   '/js/app.js',
   '/images/atomis-mark.svg?v=emerald',
   OFFLINE_URL

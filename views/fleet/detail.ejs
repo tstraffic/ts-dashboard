@@ -79,7 +79,7 @@
 <!-- ============================================================
      TAB STRIP — Overview / Service / Incidents / Equipment / Audits / Tolls
      ============================================================ -->
-<nav class="vehicle-tabs flex items-center gap-1 border-b border-gray-200 mb-5 overflow-x-auto" aria-label="Vehicle sections" id="vehicleTabs">
+<nav class="vehicle-tabs flex items-center gap-1 border-b border-gray-200 mb-5 overflow-x-auto" aria-label="Vehicle sections" id="vehicleTabs" data-lg-segment="underline">
   <button type="button" class="v-tab" data-v-tab="overview">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2"/></svg>
     Overview
@@ -538,7 +538,7 @@
     white-space: nowrap;
   }
   .v-tab:hover { color: #1F2937; background: #F9FAFB; }
-  .v-tab.is-active { color: #2B7FFF; border-bottom-color: #2B7FFF; }
+  .v-tab.is-active { color: var(--brand-500, #3D31C0); border-bottom-color: var(--brand-500, #3D31C0); }
   .v-tab svg { flex-shrink: 0; }
   .v-tab-count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; padding: 0 5px; height: 16px; border-radius: 9999px; font-size: 10px; font-weight: 700; background: #E5E7EB; color: #374151; }
   .v-tab-count--red { background: #FEE2E2; color: #B91C1C; }

@@ -51,7 +51,7 @@
   <!-- ============================================================
        HEADER  —  title · view tabs · day nav · + New booking
        ============================================================ -->
-  <header class="bk2-header">
+  <header class="bk2-header lg-chrome">
     <div class="bk2-header-left">
       <!-- Hide-sidebar button — only visible on the bookings page (CSS scoped
            to the .bk2-page wrapper). Toggles body.bk2-sidebar-hidden which
@@ -71,7 +71,7 @@
 
     <div class="bk2-header-right">
       <!-- View switcher (client-side tab toggle) -->
-      <div class="bk2-views" role="tablist" aria-label="View">
+      <div class="bk2-views" role="tablist" aria-label="View" data-lg-segment>
         <button type="button" class="bk2-view-tab" data-view-tab="board"    aria-selected="true" role="tab">Board</button>
         <button type="button" class="bk2-view-tab" data-view-tab="list"     role="tab">List</button>
         <button type="button" class="bk2-view-tab" data-view-tab="calendar" role="tab">Calendar</button>
@@ -191,7 +191,7 @@
   </section>
 
   <!-- Search popover — single element, repositioned under whichever chip is clicked. -->
-  <div class="bk2-fs-popover" id="bk2-fs-popover" hidden role="dialog" aria-modal="true">
+  <div class="bk2-fs-popover lg-strong" id="bk2-fs-popover" hidden role="dialog" aria-modal="true">
     <div class="bk2-fs-popover-head">
       <input type="search" class="bk2-fs-popover-search" placeholder="Search…" autocomplete="off">
     </div>
@@ -746,10 +746,10 @@
          Icon tabs, filter chips, sticky on the right. Pulls from one
          /api/resources call so flipping tabs is instant. Items are
          draggable so booking-card drop handlers can wire onto them. -->
-    <aside class="bk2-resourcepanel" id="bk2-resourcepanel" aria-label="Resources">
+    <aside class="bk2-resourcepanel lg" id="bk2-resourcepanel" aria-label="Resources">
       <header class="bk2-rp-head">
         <div class="bk2-rp-tabbar">
-          <div class="bk2-rp-tabs" role="tablist">
+          <div class="bk2-rp-tabs" role="tablist" data-lg-segment>
             <button type="button" class="bk2-rp-tab" data-rp-tab="people" aria-selected="true" role="tab" title="Roster">
               <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
               <span>People</span>
@@ -3339,7 +3339,7 @@
     cloneBtn.addEventListener('click', function () {
       if (cloneMenu) { closeCloneMenu(); return; }
       cloneMenu = document.createElement('div');
-      cloneMenu.className = 'bk2-clone-menu';
+      cloneMenu.className = 'bk2-clone-menu lg-strong';
       cloneMenu.innerHTML = '<button type="button" data-clone-crew="1">Clone with crew</button>'
         + '<button type="button" data-clone-crew="0">Clone setup only</button>';
       var r = cloneBtn.getBoundingClientRect();
@@ -6100,7 +6100,7 @@
     var backdrop = document.createElement('div');
     backdrop.className = 'bk2-pop-backdrop';
     var pop = document.createElement('div');
-    pop.className = 'bk2-pop bk2-pop--center';
+    pop.className = 'bk2-pop bk2-pop--center lg-strong';
     pop.setAttribute('role', 'dialog');
     pop.innerHTML =
       '<div class="bk2-pop-head"><span class="bk2-pop-title">Return to depot</span></div>' +
@@ -6276,7 +6276,7 @@
     backdrop.className = 'bk2-pop-backdrop';
 
     var pop = document.createElement('aside');
-    pop.className = 'bk2-pop';
+    pop.className = 'bk2-pop lg-strong';
     pop.setAttribute('role', 'dialog');
     pop.setAttribute('aria-label', 'Crew actions for ' + crewName);
     pop.innerHTML =

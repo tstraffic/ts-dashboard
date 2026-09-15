@@ -141,21 +141,23 @@
      reserved for machine data. Tokens below; triads per review §02. ══ -->
 <style>
   :root {
-    --tb-ink: #E8EBF4; --tb-dim: #6C7691; --tb-tick: rgba(255,255,255,0.07); --tb-soft: rgba(255,255,255,0.05);
-    --tb-crit-t: #E29B9B; --tb-crit-bg: #2A1D1F; --tb-crit-bd: #6B3A3E;
-    --tb-warn-t: #E2BE7B; --tb-warn-bg: #2A2318; --tb-warn-bd: #6B572E;
-    --tb-ok-t: #8FD0A8;  --tb-ok-bg: #182620;  --tb-ok-bd: #2F5C43;
-    --tb-info-t: #8FB8EC; --tb-info-bg: #182230; --tb-info-bd: #2E4C6B;
-    --tb-night-t: #9AA3B8; --tb-night-bg: #232937; --tb-night-bd: #3A4359;
+    /* Surfaces ride on the Liquid Glass tokens (--lg-*, liquid-glass.css);
+       ink tokens stay solid so text is crisp on a translucent card. */
+    --tb-ink: #E8EBF4; --tb-dim: #6C7691; --tb-tick: var(--lg-rim); --tb-soft: var(--lg-well);
+    --tb-crit-t: #E29B9B; --tb-crit-bg: rgba(226,155,155,.14); --tb-crit-bd: rgba(226,155,155,.35);
+    --tb-warn-t: #E2BE7B; --tb-warn-bg: rgba(226,190,123,.14); --tb-warn-bd: rgba(226,190,123,.35);
+    --tb-ok-t: #8FD0A8;  --tb-ok-bg: rgba(143,208,168,.14);  --tb-ok-bd: rgba(143,208,168,.35);
+    --tb-info-t: #8FB8EC; --tb-info-bg: rgba(143,184,236,.14); --tb-info-bd: rgba(143,184,236,.35);
+    --tb-night-t: #9AA3B8; --tb-night-bg: rgba(154,163,184,.14); --tb-night-bd: rgba(154,163,184,.35);
     --tb-link: #8B93F8;
   }
   :root[data-theme="light"] {
-    --tb-ink: #0F1728; --tb-dim: #94A0B4; --tb-tick: #EEF0F4; --tb-soft: #F5F6F8;
-    --tb-crit-t: #B42323; --tb-crit-bg: #FDF1F1; --tb-crit-bd: #F3CDCD;
-    --tb-warn-t: #96570E; --tb-warn-bg: #FDF6EC; --tb-warn-bd: #F0DAB8;
-    --tb-ok-t: #1B6E45;  --tb-ok-bg: #EEF8F1;  --tb-ok-bd: #C4E5D0;
-    --tb-info-t: #1D5FBF; --tb-info-bg: #EFF5FD; --tb-info-bd: #C6DBF5;
-    --tb-night-t: #4A5568; --tb-night-bg: #EEF0F4; --tb-night-bd: #E2E6EC;
+    --tb-ink: #0F1728; --tb-dim: #7C879C; --tb-tick: var(--lg-rim-lo); --tb-soft: var(--lg-well);
+    --tb-crit-t: #B42323; --tb-crit-bg: rgba(180,35,35,.08); --tb-crit-bd: rgba(180,35,35,.22);
+    --tb-warn-t: #96570E; --tb-warn-bg: rgba(150,87,14,.08); --tb-warn-bd: rgba(150,87,14,.22);
+    --tb-ok-t: #1B6E45;  --tb-ok-bg: rgba(27,110,69,.08);  --tb-ok-bd: rgba(27,110,69,.22);
+    --tb-info-t: #1D5FBF; --tb-info-bg: rgba(29,95,191,.08); --tb-info-bd: rgba(29,95,191,.22);
+    --tb-night-t: #4A5568; --tb-night-bg: rgba(74,85,104,.08); --tb-night-bd: rgba(74,85,104,.20);
     --tb-link: #4F46E5;
   }
   /* Hazard tape — the page's single brand moment (review 6.2). */
@@ -214,13 +216,15 @@
   .tdb-hours { position: relative; height: 18px; }
   .tdb-hr { position: absolute; top: 0; font-family: 'Geist Mono', ui-monospace, monospace;
     font-size: 10.5px; font-weight: 500; color: var(--tb-dim); padding-left: 5px; }
-  .tdb-band { position: absolute; top: 20px; bottom: 0; border: 1px solid var(--tb-info-bd); border-radius: 8px;
+  .tdb-band { position: absolute; top: 20px; bottom: 0; border: 1px solid var(--tb-info-bd); border-radius: 10px;
     background: repeating-linear-gradient(-55deg, var(--tb-info-bg) 0 6px, transparent 6px 12px); }
   .tdb-band label { position: absolute; top: 4px; left: 8px; font-family: 'Geist Mono', ui-monospace, monospace;
     font-size: 10.5px; font-weight: 500; letter-spacing: 0.04em; color: var(--tb-info-t); white-space: nowrap; }
   .tdb-lane { position: relative; height: 30px; }
   .tdb-blk { position: absolute; top: 2px; height: 26px; display: flex; align-items: center; gap: 7px;
-    padding: 0 9px; border-radius: 6px; border: 1px solid; overflow: hidden; white-space: nowrap; text-decoration: none; }
+    padding: 0 10px; border-radius: 13px; border: 1px solid; overflow: hidden; white-space: nowrap; text-decoration: none;
+    transition: transform .2s cubic-bezier(.2,.8,.2,1), border-color .2s; }
+  @media (prefers-reduced-motion: no-preference) { .tdb-blk:hover { transform: translateY(-1px); border-color: var(--lg-edge-strong); } }
   .tdb-blk b { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
   .tdb-blk small { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 10px; opacity: 0.85; }
   .tdb-blk.is-live { background: var(--tb-ok-bg); border-color: var(--tb-ok-bd); color: var(--tb-ok-t); }
@@ -239,7 +243,7 @@
     font-variant-numeric: tabular-nums; color: var(--tb-dim); min-width: 84px; letter-spacing: 0.02em; }
   .tdb-ag-text { font-weight: 500; }
   .tdb-ag-ref { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; color: var(--tb-dim);
-    background: var(--tb-soft); border-radius: 5px; padding: 1px 6px; }
+    background: var(--tb-soft); border-radius: 6px; padding: 1px 6px; }
   .tdb-ag-done { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 10px; text-transform: uppercase;
     letter-spacing: 0.06em; color: var(--tb-dim); margin-left: auto; }
   .tdb-ag-done + .tdb-chev { margin-left: 0; }
@@ -267,28 +271,28 @@
   .tdb-empty svg { width: 26px; height: 26px; color: var(--tb-dim); }
   .tdb-empty b { font-size: 14px; font-weight: 600; color: var(--tb-ink); }
   .tdb-empty span { font-size: 12.5px; color: var(--tb-dim); }
-  .tdb-btn2 { display: inline-flex; align-items: center; gap: 6px; height: 29px; padding: 0 11px;
-    border-radius: 8px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--tb-tick);
-    color: var(--tb-ink); background: transparent; text-decoration: none; transition: border-color .12s ease-out; }
-  .tdb-btn2:hover { border-color: var(--tb-dim); }
-  :root[data-theme="light"] .tdb-btn2 { border-color: #E2E6EC; }
-  :root[data-theme="light"] .tdb-btn2:hover { border-color: #94A0B4; }
+  .tdb-btn2 { display: inline-flex; align-items: center; gap: 6px; height: 29px; padding: 0 13px;
+    border-radius: 999px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--lg-edge-strong);
+    color: var(--tb-ink); background: var(--lg-well); box-shadow: inset 0 1px 0 var(--lg-rim-hi);
+    text-decoration: none; transition: border-color .2s cubic-bezier(.2,.8,.2,1), background .2s, transform .2s; }
+  .tdb-btn2:hover { border-color: var(--tb-dim); background: var(--lg-tint-brand); }
+  @media (prefers-reduced-motion: no-preference) { .tdb-btn2:active { transform: scale(.97); } }
   .tdb-monoid { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500; color: var(--tb-dim); }
   /* Weather hour strip */
   .tdb-wx-hours { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 0 16px 14px; }
-  .tdb-wx-h { text-align: center; border-radius: 8px; padding: 7px 0 6px; }
+  .tdb-wx-h { text-align: center; border-radius: 10px; padding: 7px 0 6px; }
   .tdb-wx-h.is-wet { background: var(--tb-info-bg); }
   .tdb-wx-h time { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 10px; color: var(--tb-dim); display: block; }
   .tdb-wx-h b { font-size: 12.5px; font-weight: 600; display: block; margin: 2px 0; color: var(--tb-ink); }
   .tdb-wx-h span { font-family: 'Geist Mono', ui-monospace, monospace; font-size: 10px; color: var(--tb-info-t); }
   .tdb-wx-call { display: flex; gap: 10px; align-items: flex-start; margin: 0 16px 14px; padding: 10px 12px;
-    border-radius: 10px; background: var(--tb-warn-bg); border: 1px solid var(--tb-warn-bd);
+    border-radius: 12px; background: var(--tb-warn-bg); border: 1px solid var(--tb-warn-bd);
     color: var(--tb-warn-t); text-decoration: none; font-size: 12.5px; line-height: 1.45; }
   .tdb-wx-call b { font-weight: 700; }
 </style>
 
 <!-- ── Board header ── -->
-<section class="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-5" id="console">
+<section class="lg lg-strong rounded-2xl overflow-hidden mb-5" id="console">
   <div class="tdb-ribbon" aria-hidden="true"></div>
   <div class="tdb-top">
     <span class="tdb-date font-mono"><span><%= new Date(today + 'T00:00:00Z').toLocaleDateString('en-AU', { weekday: 'short', timeZone: 'UTC' }).toUpperCase() %> <%= new Date(today + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }).toUpperCase() %></span> · <b id="console-clk"><%= nowHm %></b></span>
@@ -336,7 +340,7 @@
      (booking bars, the rain band, the NOW line) and only renders when there
      are bookings to draw; point-in-time deadlines read as a plain agenda
      list underneath — no floating chips, no clamp arrows. -->
-<section class="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-5" id="day-bar">
+<section class="lg rounded-2xl overflow-hidden mb-5" id="day-bar">
   <div class="tdb-tl-head">
     <span class="tdb-sec">Today on the ground</span>
     <% if (laneData.length) { %>
@@ -421,7 +425,7 @@
   <div class="min-w-0 space-y-5">
 
     <!-- Needs you now — the focal panel: the page's one strong border. -->
-    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden" id="needs-you-now"
+    <div class="lg lg-strong rounded-2xl overflow-hidden" id="needs-you-now"
          <% if (!needs.allClear) { %>style="border-left:3px solid var(<%= _hasCritical ? '--tb-crit-t' : '--tb-warn-t' %>)"<% } %>>
       <div class="flex items-center gap-2.5" style="padding:14px 20px 6px">
         <span class="tdb-sec">Needs you now</span>
@@ -463,7 +467,7 @@
 
     <!-- Jobs in flight -->
     <% if (todayOps) { %>
-    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden" id="today-ops">
+    <div class="lg rounded-2xl overflow-hidden" id="today-ops">
       <div class="flex items-center gap-2.5" style="padding:14px 20px 6px">
         <span class="tdb-sec">Jobs in flight</span>
         <span class="tdb-count"><%= todayOps.todaysBookings.length %></span>
@@ -538,7 +542,7 @@
   <div class="space-y-5 min-w-0">
 
     <% if (outlook) { %>
-    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden" id="wx-card">
+    <div class="lg rounded-2xl overflow-hidden" id="wx-card">
       <div class="flex items-center gap-3" style="padding:16px 16px 12px">
         <span class="min-w-0">
           <span class="block text-sm font-semibold text-gray-900">Sydney</span>
@@ -567,7 +571,7 @@
     <% } %>
 
     <!-- My tasks -->
-    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+    <div class="lg rounded-2xl overflow-hidden">
       <div class="flex items-center gap-2.5" style="padding:14px 16px 6px">
         <span class="tdb-sec">My tasks</span>
         <% if (myTasks.length) { %><span class="tdb-count"><%= myTasks.length %></span><% } %>
@@ -606,7 +610,7 @@
 
     <!-- Waiting on me -->
     <% if (myPlans && myPlans.length > 0) { %>
-    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+    <div class="lg rounded-2xl overflow-hidden">
       <div class="flex items-center gap-2.5" style="padding:14px 16px 6px">
         <span class="tdb-sec">Waiting on me</span>
         <span class="tdb-count"><%= myPlans.length %></span>
@@ -635,7 +639,7 @@
 </div>
 
 <!-- ══ TREND ══ -->
-<div class="bg-white border border-gray-200 rounded-2xl p-4" id="trend">
+<div class="lg rounded-2xl p-4" id="trend">
   <div class="flex items-center gap-2.5 mb-3">
     <span class="tdb-sec">Job pipeline</span>
     <a href="/reports" class="ml-auto text-xs font-semibold text-brand-600 hover:text-brand-700">More in Reports →</a>
