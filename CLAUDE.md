@@ -78,6 +78,10 @@ Atomis is a multi-tenant operations platform. **T&S Traffic Control** (Sydney tr
 - Applicants sit on a monthly **list** — `list_month` ('YYYY-MM', mig 359), which starts as the month they applied (older rows fall back to `substr(date_applied,1,7)` via `LIST_MONTH_SQL`). The page, CSV export and summary cards scope by the list, not by `date_applied`; the Weekly Calls strip still counts `date_called`. Adding an applicant while viewing a month puts them on that month's list.
 - **Bring forward** (`?from=YYYY-MM` opens a panel; `POST /move` with `ids[]`/`to`/`from`): move applicants the office never got to onto a later month's list. `date_applied` is untouched; `moved_from_month` remembers the original month for the "From Aug 2026" badge, and moving them back home clears it. Editing `date_applied` still relocates an applicant unless they were brought forward. Finished stages (INDUCTED, HIRED, closed) are never offered.
 
+## Meetings (`/meetings`, routes/meetings.js — company + client; dept notebook is separate, `/departments/:key/meetings`)
+- One `company_meetings` table with `meeting_type` 'company' | 'client' (mig 347). Company = discussion items (`company_meeting_items`, dept-tagged, each with its own to-dos); client = headings → dot points → captioned attachments (`company_meeting_sections`/`_points`/`_attachments`) + the PDF export.
+- **To-dos are never gated behind a discussion item**: `company_meeting_todos.item_id` is nullable and `POST /:id/todos` treats it as optional. The always-visible "To-dos" card (`#general-todos`, above the items, both meeting types) is where an unattached one goes; per-item to-dos render under their item. A deleted item's to-dos survive (`ON DELETE SET NULL`) and fall into that card. Client meetings render it too — `services/meetingPdf.js` prints them as "Action items".
+
 ## Key Middleware
 - `middleware/auth.js` — Admin auth (`requireLogin`, `requireRole`, `requirePermission`, `canAccess`)
 - `middleware/workerAuth.js` — Worker auth (`requireWorker`, `requireOwnData`, `blockWorkerFromAdmin`, `workerLocals`)

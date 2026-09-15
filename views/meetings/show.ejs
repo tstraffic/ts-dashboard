@@ -257,10 +257,32 @@ function attachForm(sectionId, pointId, label) { %>
     </form>
   </div>
 
+  <%# To-dos — first-class and always available, on BOTH meeting types and
+      with no discussion item needed: jot one the moment it comes up. On a
+      company meeting a to-do can also be attached to a discussion item
+      below, and those sit under their item; this card holds the rest
+      (including any left behind by a deleted item). The id is the redirect
+      target of POST /meetings/:id/todos. %>
+  <div id="general-todos" class="bg-white border border-gray-200 rounded-xl shadow-sm scroll-mt-20">
+    <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 px-5 pt-4 pb-3 border-b border-gray-100">
+      <p class="text-[11px] font-bold text-gray-700 uppercase tracking-widest">To-dos</p>
+      <span class="text-[11px] text-gray-400 normal-case"><%= isClientMeeting
+        ? 'Action items — they print on the exported PDF'
+        : 'Add one any time — no discussion item needed' %></span>
+    </div>
+    <div class="p-5 pt-4">
+      <div class="space-y-1">
+        <% if (!generalTodos.length) { %><p class="text-xs text-gray-300 italic py-0.5">None yet.</p><% } %>
+        <% generalTodos.forEach(function (t) { todoRow(t); }); %>
+      </div>
+      <% addTodoForm(null, null); %>
+    </div>
+  </div>
+
   <% if (!isClientMeeting) { %>
   <% if (!items.length) { %>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 text-center">
-      <p class="text-gray-400 text-sm">No discussion items yet — add the first one below.</p>
+      <p class="text-gray-400 text-sm">No discussion items yet — add the first one below. To-dos don't need one.</p>
     </div>
   <% } %>
 
@@ -319,20 +341,6 @@ function attachForm(sectionId, pointId, label) { %>
     </form>
   </div>
 
-  <!-- General to-dos: meeting-level adds + survivors of deleted items -->
-  <div id="general-todos" class="bg-white border border-gray-200 rounded-xl shadow-sm scroll-mt-20">
-    <div class="flex items-center gap-2.5 px-5 pt-4 pb-3 border-b border-gray-100">
-      <p class="text-[11px] font-bold text-gray-700 uppercase tracking-widest">General to-dos</p>
-      <span class="text-[11px] text-gray-400 normal-case">not tied to a discussion item</span>
-    </div>
-    <div class="p-5 pt-4">
-      <div class="space-y-1">
-        <% if (!generalTodos.length) { %><p class="text-xs text-gray-300 italic py-0.5">None yet.</p><% } %>
-        <% generalTodos.forEach(function (t) { todoRow(t); }); %>
-      </div>
-      <% addTodoForm(null, null); %>
-    </div>
-  </div>
   <% } %><%# end !isClientMeeting — dept-tagged items/to-dos are internal machinery %>
 
   <!-- Footer actions -->
