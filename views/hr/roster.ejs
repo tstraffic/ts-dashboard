@@ -376,8 +376,15 @@
   <% } %>
 
   <!-- Table -->
-  <form id="rosterDeleteForm" method="POST" action="<%= locals.showDeleted ? '/hr/roster/restore' : '/hr/roster/delete' %>">
+  <%# The bulk delete/restore form is deliberately EMPTY and sits beside the
+      table rather than around it. Nested <form>s are dropped by the browser,
+      so when this form wrapped the table every inline pill form inside it
+      (payment type, status, portal role…) vanished and the pill's change
+      handler posted to /hr/roster/delete instead — "Failed to save". Row
+      checkboxes still submit with this form through form="rosterDeleteForm". %>
+  <form id="rosterDeleteForm" method="POST" action="<%= locals.showDeleted ? '/hr/roster/restore' : '/hr/roster/delete' %>" class="hidden" aria-hidden="true">
     <%- include('../partials/csrf') %>
+  </form>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200" role="grid" aria-label="Employee roster">
@@ -407,7 +414,7 @@
             <% employees.forEach(function(emp) { %>
             <tr class="hover:bg-gray-50 transition <%= locals.showDeleted ? 'opacity-60' : '' %>">
               <td class="px-2 sm:px-3 py-3 text-center">
-                <input type="checkbox" name="ids" value="<%= emp.id %>" aria-label="Select <%= emp.full_name || emp.first_name + ' ' + emp.last_name %>" class="roster-chk w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+                <input type="checkbox" name="ids" form="rosterDeleteForm" value="<%= emp.id %>" aria-label="Select <%= emp.full_name || emp.first_name + ' ' + emp.last_name %>" class="roster-chk w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
               </td>
               <td class="px-3 sm:px-4 py-3">
                 <a href="/hr/employees/<%= emp.id %>" class="text-brand-600 hover:text-brand-700 font-medium text-sm"><%= emp.first_name %><% if (emp.middle_name) { %> <%= emp.middle_name %><% } %> <%= emp.last_name %></a>
@@ -573,7 +580,6 @@
         Showing <%= employees.length %> employee<%= employees.length !== 1 ? 's' : '' %>
       </div>
     </div>
-  </form>
 
   <% } else { %>
   <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
@@ -764,11 +770,16 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     sel.className = keep.concat(newCls.split(/\s+/)).join(' ');
   }
+  // Remember each pill's real starting value so a failed save reverts to it
+  // (not to a blank "—").
+  document.querySelectorAll('select[data-inline-pill]').forEach(function(s) { s.dataset.previousValue = s.value; });
   document.addEventListener('change', function(e) {
     var sel = e.target;
     if (!sel || !sel.matches || !sel.matches('select[data-inline-pill]')) return;
     var form = sel.closest('form');
-    if (!form) return;
+    // Every pill has its own form; if the closest one isn't ours something is
+    // nested wrongly again — refuse rather than post to the wrong route.
+    if (!form || !form.action || form.action.indexOf('/hr/employees/') === -1) { alert('This control is not wired to its save route — please refresh.'); return; }
     // urlencoded so Express's body parser sees the fields. FormData
     // would send multipart and the route doesn't have multer.
     var params = new URLSearchParams();
