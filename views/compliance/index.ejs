@@ -495,6 +495,10 @@
                               <td class="py-1.5 pr-3">
                                 <% if ((s.item_type === 'rol' || s.item_type === 'road_occupancy') && s.extension_required) { %>
                                   <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">extension</span>
+                                <% } else if (s.item_type === 'council_permit' && s.extension_of_id) { %>
+                                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 ring-1 ring-amber-300" title="Extension application">extension</span>
+                                <% } else if (s.item_type === 'council_permit' && s.extension_required) { %>
+                                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200" title="Has an extension application">extended</span>
                                 <% } %>
                               </td>
                             </tr>

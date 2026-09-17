@@ -80,6 +80,18 @@ function detachComplianceRefs(db, id) {
   try { db.prepare('UPDATE site_diary_entries SET compliance_item_id = NULL WHERE compliance_item_id = ?').run(id); } catch (e) {}
   try { db.prepare('UPDATE compliance SET linked_rol_id = NULL WHERE linked_rol_id = ?').run(id); } catch (e) {}
   try { db.prepare('DELETE FROM compliance_tgs_rol_links WHERE tgs_id = ? OR rol_id = ?').run(id, id); } catch (e) {}
+  try { db.prepare('UPDATE compliance SET extension_of_id = NULL WHERE extension_of_id = ?').run(id); } catch (e) {}
+}
+
+// A council application is "extended" while it has at least one extension
+// sub-plan (extension_of_id → it) or a legacy dated extension record.
+function recomputeExtensionFlag(db, id) {
+  try {
+    const plans = db.prepare('SELECT COUNT(*) AS c FROM compliance WHERE extension_of_id = ?').get(id).c || 0;
+    let recs = 0;
+    try { recs = db.prepare('SELECT COUNT(*) AS c FROM compliance_extensions WHERE compliance_id = ?').get(id).c || 0; } catch (e) {}
+    db.prepare('UPDATE compliance SET extension_required = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run((plans + recs) > 0 ? 1 : 0, id);
+  } catch (e) { /* never block the delete it rides on */ }
 }
 
 function getSubPlan(db, subId) {
@@ -431,7 +443,7 @@ router.get('/', (req, res) => {
   const subPlansByParent = {};
   if (parentIds.length > 0) {
     const placeholders = parentIds.map(() => '?').join(',');
-    const subs = db.prepare(`SELECT c.id, c.parent_id, c.item_type, c.reference_number, c.description, c.status, c.submitted_date, c.expiry_date, c.extension_required,
+    const subs = db.prepare(`SELECT c.id, c.parent_id, c.item_type, c.reference_number, c.description, c.status, c.submitted_date, c.expiry_date, c.extension_required, c.extension_of_id,
       c.hours_spent, c.charge_client, c.charge_amount, c.council_fee_paid, c.council_fee_amount, c.rol_actual_number,
       c.assigned_to_id, u.full_name AS owner_name
       FROM compliance c LEFT JOIN users u ON c.assigned_to_id = u.id
@@ -984,6 +996,7 @@ router.post('/sub-plans/:subId/delete', (req, res) => {
   docs.forEach(d => {
     try { fs.unlinkSync(path.join(__dirname, '..', 'data', d.file_path)); } catch (e) {}
   });
+  if (sub.extension_of_id) recomputeExtensionFlag(db, sub.extension_of_id);
   planStatus.syncParentStatus(db, parentId);
   if (req.headers.accept && req.headers.accept.includes('json')) return res.json({ success: true });
   req.flash('success', `Sub-plan ${sub.reference_number} removed.`);
@@ -1225,6 +1238,57 @@ router.post('/sub-plans/:subId/council', subPlanUpload.array('documents', 10), (
   if (wantsJson(req)) return res.json({ success: true });
   req.flash('success', action === 'approve' ? `${sub.reference_number} approved.` : `${sub.reference_number} marked applied.`);
   req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
+});
+
+// A council application that turns out to need an extension gets its OWN
+// sub-plan: same parent, next council sequence (TSCA<plan>-2, -3…), linked back
+// through extension_of_id, pre-named "<permit> — extension" and pre-typed so
+// the apply/approve flow on the new card is the same as any council permit.
+// The original is flagged extension_required so the register shows it; the
+// flag recomputes when an extension plan is deleted. Body: job_date? reason?
+router.post('/sub-plans/:subId/extension-plan', (req, res) => {
+  const db = getDb();
+  const sub = getSubPlan(db, req.params.subId);
+  if (!sub) { if (wantsJson(req)) return res.status(404).json({ error: 'Sub-plan not found' }); req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance')); }
+  const backTo = '/compliance/' + sub.parent_id + '/edit#sub-' + sub.id;
+  if (sub.item_type !== 'council_permit') {
+    if (wantsJson(req)) return res.status(400).json({ error: 'Only council applications get extension sub-plans' });
+    req.flash('error', 'Only council applications get extension sub-plans.'); return req.session.save(() => res.redirect(backTo));
+  }
+  const parent = db.prepare("SELECT id, plan_number, job_id, client_id FROM compliance WHERE id = ? AND parent_id IS NULL").get(sub.parent_id);
+  if (!parent || parent.plan_number == null) {
+    if (wantsJson(req)) return res.status(400).json({ error: 'Parent plan not found' });
+    req.flash('error', 'Parent plan not found.'); return req.session.save(() => res.redirect(backTo));
+  }
+  // Extensions always hang off the ORIGINAL application, so a second extension
+  // is "— extension 2" on the same original rather than a chain.
+  const original = sub.extension_of_id ? (db.prepare('SELECT * FROM compliance WHERE id = ?').get(sub.extension_of_id) || sub) : sub;
+  const seq = planStatus.nextSubPlanSeq(db, parent.id, 'council_permit');
+  const ref = planStatus.buildSubPlanRef(parent.plan_number, 'council_permit', seq);
+  const baseName = String(original.description || original.council_plan_type || 'Council permit').replace(/\s*[—-]\s*extension(\s+\d+)?\s*$/i, '').trim() || 'Council permit';
+  const existing = db.prepare('SELECT COUNT(*) AS c FROM compliance WHERE extension_of_id = ?').get(original.id).c || 0;
+  const description = baseName + ' — extension' + (existing ? ' ' + (existing + 1) : '');
+  const jobDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.job_date || '')) ? req.body.job_date : null;
+  const notes = String(req.body.reason || '').trim().slice(0, 500);
+  let newId;
+  db.transaction(() => {
+    const result = db.prepare(`
+      INSERT INTO compliance (parent_id, job_id, client_id, item_type, item_types, title, status, reference_number, description, other_description, council_plan_type, job_date, assigned_to_id, extension_of_id, notes)
+      VALUES (?, ?, ?, 'council_permit', 'council_permit', ?, 'not_started', ?, ?, '', ?, ?, ?, ?, ?)
+    `).run(parent.id, original.job_id || parent.job_id || null, original.client_id || parent.client_id || null, ref, ref, description, original.council_plan_type || '', jobDate, original.assigned_to_id || null, original.id, notes);
+    newId = result.lastInsertRowid;
+    db.prepare('UPDATE compliance SET extension_required = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(original.id);
+  })();
+  planStatus.syncParentStatus(db, parent.id);
+  touchPlan(db, original.id);
+  if (original.job_id) {
+    autoLogDiary(db, { jobId: original.job_id, complianceItemId: original.id,
+      summary: `[${req.session.user.full_name}] Extension application ${ref} created for council permit ${original.reference_number}${jobDate ? ' (job start ' + jobDate + ')' : ''}.`,
+      userId: req.session.user.id });
+  }
+  if (wantsJson(req)) return res.json({ success: true, id: newId, reference_number: ref, extension_of_id: original.id });
+  req.flash('success', `Extension application ${ref} created for ${original.reference_number} — lodge it from its own card below.`);
+  req.session.save(() => res.redirect('/compliance/' + parent.id + '/edit#sub-' + newId));
 });
 
 // Roll the itemised fees up into the legacy council_fee_amount/_paid columns
@@ -1473,6 +1537,41 @@ router.post('/sub-plans/:subId/fees', subPlanUpload.single('receipt'), (req, res
   rollupCouncilFee(db, sub.id);
   req.flash('success', 'Fee added.');
   req.session.save(() => res.redirect('/compliance/' + sub.parent_id + '/edit#sub-' + sub.id));
+});
+// Edit a fee after the fact — description, amount, and optionally a replacement
+// receipt (the previous receipt file is removed when a new one lands). Blank
+// fields keep their current value so a partial form can't zero a fee.
+router.post('/sub-plans/:subId/fees/:feeId', subPlanUpload.single('receipt'), (req, res) => {
+  const db = getDb();
+  const sub = getSubPlan(db, req.params.subId);
+  if (!sub) {
+    if (req.file) { try { fs.unlinkSync(req.file.path); } catch (e) {} }
+    if (wantsJson(req)) return res.status(404).json({ error: 'Sub-plan not found' });
+    req.flash('error', 'Sub-plan not found.'); return req.session.save(() => res.redirect('/compliance'));
+  }
+  const backTo = '/compliance/' + sub.parent_id + '/edit#sub-' + sub.id;
+  const fee = db.prepare('SELECT * FROM compliance_fees WHERE id = ? AND compliance_id = ?').get(req.params.feeId, sub.id);
+  if (!fee) {
+    if (req.file) { try { fs.unlinkSync(req.file.path); } catch (e) {} }
+    if (wantsJson(req)) return res.status(404).json({ error: 'Fee not found' });
+    req.flash('error', 'That fee no longer exists.'); return req.session.save(() => res.redirect(backTo));
+  }
+  const description = req.body.description !== undefined ? String(req.body.description).trim().slice(0, 200) : (fee.description || '');
+  const amountRaw = req.body.amount;
+  const amount = (amountRaw === undefined || String(amountRaw).trim() === '') ? (parseFloat(fee.amount) || 0) : parseFloat(amountRaw);
+  if (!Number.isFinite(amount) || amount < 0) {
+    if (req.file) { try { fs.unlinkSync(req.file.path); } catch (e) {} }
+    if (wantsJson(req)) return res.status(400).json({ error: 'Enter a valid amount.' });
+    req.flash('error', 'Enter a valid fee amount.'); return req.session.save(() => res.redirect(backTo));
+  }
+  let receiptPath = fee.receipt_file_path || '', receiptName = fee.receipt_original_name || '';
+  if (req.file) { unlinkRel(fee.receipt_file_path); receiptPath = subRel(sub, req.file); receiptName = req.file.originalname; }
+  db.prepare('UPDATE compliance_fees SET description = ?, amount = ?, receipt_file_path = ?, receipt_original_name = ? WHERE id = ?')
+    .run(description, amount, receiptPath, receiptName, fee.id);
+  rollupCouncilFee(db, sub.id);
+  if (wantsJson(req)) return res.json({ success: true, id: fee.id, description, amount });
+  req.flash('success', 'Fee updated.');
+  req.session.save(() => res.redirect(backTo));
 });
 router.post('/sub-plans/:subId/fees/:feeId/delete', (req, res) => {
   const db = getDb();

@@ -15939,6 +15939,26 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 360 error:', e.message); }
   }
 
+  // =============================================
+  // 361 — Council extension applications are their OWN sub-plans.
+  // A council application that turns out to need an extension used to get a
+  // chip (compliance_extensions) on the original card. Now
+  // POST /compliance/sub-plans/:id/extension-plan creates a new council_permit
+  // sub-plan under the same parent, linked back through extension_of_id, so
+  // the register reads "application → extension". The original keeps
+  // extension_required = 1 while at least one extension plan exists.
+  // (ROL extensions are unchanged — still dated records that move the end date.)
+  // =============================================
+  if (!isMigrationApplied.get(361)) {
+    try {
+      const cols = db.prepare("PRAGMA table_info(compliance)").all().map(c => c.name);
+      if (!cols.includes('extension_of_id')) db.exec("ALTER TABLE compliance ADD COLUMN extension_of_id INTEGER REFERENCES compliance(id) ON DELETE SET NULL");
+      db.exec("CREATE INDEX IF NOT EXISTS idx_compliance_extension_of ON compliance(extension_of_id)");
+      recordMigration.run(361, 'compliance: extension_of_id — council extension applications as linked sub-plans');
+      console.log('Migration 361 applied');
+    } catch (e) { console.error('Migration 361 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 
