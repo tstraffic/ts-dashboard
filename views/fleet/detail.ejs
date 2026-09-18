@@ -171,6 +171,57 @@
         <div class="flex items-baseline justify-between"><dt class="text-gray-500">Service count</dt><dd class="font-medium text-gray-900"><%= vehicle.service_count || 0 %></dd></div>
         <div class="flex items-baseline justify-between pt-2 border-t border-gray-100"><dt class="font-semibold text-gray-800">Total spend</dt><dd class="font-bold text-brand-600"><%= AUD(vehicle.total_maint_cost) %></dd></div>
       </dl>
+
+      <%# Fuel card — number + PIN are encrypted at rest; the page only ever
+          renders the last four digits. Reveal fetches the plaintext on demand
+          (audited) and re-masks after 30 seconds. %>
+      <% const fc = (typeof fuelCard !== 'undefined' && fuelCard) ? fuelCard : null; const hasCard = !!(fc && fc.has_number); %>
+      <div class="mt-5 pt-4 border-t border-gray-100" id="fuelCard" data-fuel-card data-last4="<%= hasCard ? fc.fuel_card_last4 : '' %>" data-has-pin="<%= hasCard && fc.has_pin ? '1' : '0' %>">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xs font-bold text-gray-800 uppercase tracking-widest">Fuel Card</h2>
+          <% if (hasCard) { %><button type="button" data-fuel-edit-toggle class="text-xs font-medium text-brand-600 hover:text-brand-700">Edit</button><% } %>
+        </div>
+        <% if (hasCard) { %>
+          <dl class="space-y-2 text-sm" data-fuel-summary>
+            <% if (fc.fuel_card_provider) { %><div class="flex items-baseline justify-between gap-3"><dt class="text-gray-500">Provider</dt><dd class="font-medium text-gray-900 text-right"><%= fc.fuel_card_provider %></dd></div><% } %>
+            <div class="flex items-baseline justify-between gap-3"><dt class="text-gray-500">Card number</dt><dd class="font-mono text-gray-900" data-fuel-number>•••• •••• •••• <%= fc.fuel_card_last4 %></dd></div>
+            <div class="flex items-baseline justify-between gap-3"><dt class="text-gray-500">PIN</dt><dd class="font-mono text-gray-900" data-fuel-pin><%= fc.has_pin ? '••••' : '—' %></dd></div>
+          </dl>
+          <div class="mt-3 flex items-center gap-2 flex-wrap">
+            <button type="button" data-fuel-reveal data-url="/fleet/<%= vehicle.id %>/fuel-card/reveal" class="px-3 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-md">Reveal</button>
+            <span class="text-[11px] text-gray-400" data-fuel-status>Every reveal is logged</span>
+          </div>
+          <% if (fc.fuel_card_updated_at) { %><p class="mt-2 text-[11px] text-gray-400">Updated <%= formatDate(fc.fuel_card_updated_at) %><%= fc.updated_by_name ? ' by ' + fc.updated_by_name : '' %></p><% } %>
+        <% } else { %>
+          <p class="text-sm text-gray-500" data-fuel-empty>No fuel card on file — add the card number and PIN below.</p>
+        <% } %>
+        <form method="POST" action="/fleet/<%= vehicle.id %>/fuel-card" class="<%= hasCard ? 'hidden' : '' %> mt-3 space-y-2" data-fuel-form autocomplete="off">
+          <%- include('../partials/csrf') %>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Provider</label>
+            <input type="text" name="fuel_card_provider" value="<%= fc ? (fc.fuel_card_provider || '') : '' %>" maxlength="60" placeholder="e.g. Shell Card, BP Plus, Ampol" class="w-full px-2.5 py-1.5 text-sm bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Card number<% if (!hasCard) { %> <span class="text-rose-500">*</span><% } %></label>
+            <input type="text" name="fuel_card_number" inputmode="numeric" autocomplete="off" <%= hasCard ? '' : 'required' %> maxlength="24"
+              placeholder="<%= hasCard ? 'Leave blank to keep •••• ' + fc.fuel_card_last4 : 'Digits only, spaces are fine' %>"
+              class="w-full px-2.5 py-1.5 text-sm font-mono bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">PIN</label>
+            <input type="password" name="fuel_card_pin" inputmode="numeric" autocomplete="new-password" maxlength="8"
+              placeholder="<%= hasCard && fc.has_pin ? 'Leave blank to keep the current PIN' : '4 digits' %>"
+              class="w-full px-2.5 py-1.5 text-sm font-mono bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <div class="flex items-center gap-3 pt-1">
+            <button type="submit" class="px-3 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-md"><%= hasCard ? 'Save changes' : 'Save fuel card' %></button>
+            <% if (hasCard) { %>
+              <button type="button" data-fuel-cancel class="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+              <button type="submit" name="action" value="clear" formnovalidate onclick="return confirm('Remove the fuel card from this vehicle?')" class="ml-auto text-xs text-rose-600 hover:text-rose-700">Remove card</button>
+            <% } %>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </section>
@@ -591,6 +642,57 @@
   }
   tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.getAttribute('data-v-tab')); }); });
   show('<%= typeof initialTab !== "undefined" ? initialTab : "overview" %>');
+
+  // Fuel card: reveal on demand (plaintext never sits in the HTML), re-mask
+  // after 30 s; Edit swaps the summary for the form.
+  var fuel = document.getElementById('fuelCard');
+  if (fuel) {
+    var revealBtn = fuel.querySelector('[data-fuel-reveal]');
+    var numEl = fuel.querySelector('[data-fuel-number]');
+    var pinEl = fuel.querySelector('[data-fuel-pin]');
+    var statusEl = fuel.querySelector('[data-fuel-status]');
+    var last4 = fuel.getAttribute('data-last4') || '';
+    var hasPin = fuel.getAttribute('data-has-pin') === '1';
+    var hideTimer = null;
+    function mask() {
+      if (numEl) numEl.textContent = '•••• •••• •••• ' + last4;
+      if (pinEl) pinEl.textContent = hasPin ? '••••' : '—';
+      if (revealBtn) revealBtn.textContent = 'Reveal';
+      if (statusEl) statusEl.textContent = 'Every reveal is logged';
+      fuel.removeAttribute('data-revealed');
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    }
+    if (revealBtn) {
+      revealBtn.addEventListener('click', function () {
+        if (fuel.hasAttribute('data-revealed')) { mask(); return; }
+        revealBtn.disabled = true;
+        fetch(revealBtn.getAttribute('data-url'), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+          .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); })
+          .then(function (j) {
+            if (numEl) numEl.textContent = String(j.number || '').replace(/(\d{4})(?=\d)/g, '$1 ');
+            if (pinEl) pinEl.textContent = j.pin || '—';
+            fuel.setAttribute('data-revealed', '1');
+            revealBtn.textContent = 'Hide';
+            if (statusEl) statusEl.textContent = 'Visible — hides again in 30 s';
+            hideTimer = setTimeout(mask, 30000);
+          })
+          .catch(function (e) { if (statusEl) statusEl.textContent = e.message || 'Could not reveal'; })
+          .finally(function () { revealBtn.disabled = false; });
+      });
+    }
+    var editBtn = fuel.querySelector('[data-fuel-edit-toggle]');
+    var form = fuel.querySelector('[data-fuel-form]');
+    var summary = fuel.querySelector('[data-fuel-summary]');
+    var cancel = fuel.querySelector('[data-fuel-cancel]');
+    function setEditing(on) {
+      if (form) form.classList.toggle('hidden', !on);
+      if (summary) summary.classList.toggle('hidden', on);
+      if (revealBtn && revealBtn.parentElement) revealBtn.parentElement.classList.toggle('hidden', on);
+      if (on) { mask(); var first = form && form.querySelector('input[name="fuel_card_provider"]'); if (first) first.focus(); }
+    }
+    if (editBtn) editBtn.addEventListener('click', function () { setEditing(form && form.classList.contains('hidden')); });
+    if (cancel) cancel.addEventListener('click', function () { setEditing(false); });
+  }
 
   // Drag-drop invoice file
   var drop = document.getElementById('invoiceDrop');

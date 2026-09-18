@@ -15959,6 +15959,27 @@ function runMigrations(db) {
     } catch (e) { console.error('Migration 361 error:', e.message); }
   }
 
+  // =============================================
+  // 362 — Fuel card per vehicle. Card number and PIN are stored AES-256-GCM
+  // encrypted (services/encryption.js, same key as TFN/bank), with only the
+  // last four digits in the clear for display. Plaintext is served on demand
+  // by GET /fleet/:id/fuel-card/reveal, which writes an audit row each time.
+  // =============================================
+  if (!isMigrationApplied.get(362)) {
+    try {
+      const cols = db.prepare("PRAGMA table_info(vehicles)").all().map(c => c.name);
+      const add = (name, ddl) => { if (!cols.includes(name)) db.exec(`ALTER TABLE vehicles ADD COLUMN ${ddl}`); };
+      add('fuel_card_provider',   "fuel_card_provider TEXT DEFAULT ''");
+      add('fuel_card_last4',      "fuel_card_last4 TEXT DEFAULT ''");
+      add('fuel_card_number_enc', 'fuel_card_number_enc TEXT');
+      add('fuel_card_pin_enc',    'fuel_card_pin_enc TEXT');
+      add('fuel_card_updated_at', 'fuel_card_updated_at DATETIME');
+      add('fuel_card_updated_by', 'fuel_card_updated_by INTEGER REFERENCES users(id)');
+      recordMigration.run(362, 'vehicles: fuel card — provider, encrypted number + PIN, last4');
+      console.log('Migration 362 applied');
+    } catch (e) { console.error('Migration 362 error:', e.message); }
+  }
+
   console.log('All migrations checked/applied.');
 }
 

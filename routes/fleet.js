@@ -5,6 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 const { getDb } = require('../db/database');
 const { logActivity } = require('../middleware/audit');
+const { encrypt, decrypt } = require('../services/encryption');
 const { badgesFor, needsAction, todayISO } = require('../lib/fleetStatus');
 
 // Service-record invoice uploads — drag-drop PDFs / images of the
@@ -1020,6 +1021,17 @@ router.get('/:id', (req, res) => {
   const { incidents, equipmentChecks } = lookupRelatedReports(db, vehicle);
   const initialTab = ['overview','service','incidents','equipment','audits','tolls'].includes(req.query.tab) ? req.query.tab : 'overview';
   const tolls = vehicleTolls(db, vehicle.id);
+  // Fuel card — only what the page needs to render masked (never the
+  // ciphertext, never the plaintext; the Reveal button fetches that on demand).
+  let fuelCard = null;
+  try {
+    fuelCard = db.prepare(`
+      SELECT v.fuel_card_provider, v.fuel_card_last4, v.fuel_card_updated_at,
+             (v.fuel_card_number_enc IS NOT NULL) AS has_number,
+             (v.fuel_card_pin_enc IS NOT NULL) AS has_pin,
+             (SELECT full_name FROM users u WHERE u.id = v.fuel_card_updated_by) AS updated_by_name
+      FROM vehicles v WHERE v.id = ?`).get(vehicle.id) || null;
+  } catch (e) { /* pre-migration-362 DB */ }
 
   // Audit History — vehicle_audits keyed on this vehicle's PK, each with
   // its item-level results so the tab can expand an audit in place.
@@ -1045,6 +1057,7 @@ router.get('/:id', (req, res) => {
     equipmentChecks,
     audits,
     tolls,
+    fuelCard,
     AUD: fmtMoney,
     initialTab,
     serviceTypes: SERVICE_TYPES,
@@ -1198,6 +1211,65 @@ router.post('/:id/traffic-class', (req, res) => {
   if (isJson) return res.json({ ok: true, traffic_class: req.body.traffic_class });
   req.flash('success', `${v.asset_id} classified.`);
   req.session.save(() => res.redirect('/fleet/' + req.params.id));
+});
+
+// ── FUEL CARD ────────────────────────────────────────────────────────
+// Card number + PIN live encrypted on the vehicle row (services/encryption,
+// AES-256-GCM, same key as TFN/bank). Only the last four digits are stored
+// in the clear. On an edit, a blank number or PIN keeps the current one, so
+// changing the provider never wipes the card. action=clear removes it all.
+const FUEL_NUMBER_RE = /^\d{6,20}$/;
+const FUEL_PIN_RE = /^\d{3,8}$/;
+router.post('/:id/fuel-card', (req, res) => {
+  const db = getDb();
+  const isJson = !!(req.headers.accept && req.headers.accept.includes('application/json'));
+  const v = db.prepare('SELECT id, asset_id, fuel_card_number_enc, fuel_card_pin_enc, fuel_card_last4, fuel_card_provider FROM vehicles WHERE id = ?').get(req.params.id);
+  if (!v) { if (isJson) return res.status(404).json({ error: 'Vehicle not found' }); req.flash('error', 'Vehicle not found.'); return req.session.save(() => res.redirect('/fleet')); }
+  const back = '/fleet/' + v.id;
+  const fail = (msg) => { if (isJson) return res.status(400).json({ error: msg }); req.flash('error', msg); return req.session.save(() => res.redirect(back)); };
+
+  if (req.body.action === 'clear') {
+    db.prepare("UPDATE vehicles SET fuel_card_provider = '', fuel_card_last4 = '', fuel_card_number_enc = NULL, fuel_card_pin_enc = NULL, fuel_card_updated_at = CURRENT_TIMESTAMP, fuel_card_updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(req.session.user.id, v.id);
+    logActivity({ user: req.session.user, action: 'update', entityType: 'vehicle', entityId: v.id, entityLabel: v.asset_id, details: 'Fuel card removed', ip: req.ip });
+    if (isJson) return res.json({ ok: true, cleared: true });
+    req.flash('success', `Fuel card removed from ${v.asset_id}.`);
+    return req.session.save(() => res.redirect(back));
+  }
+
+  const provider = String(req.body.fuel_card_provider || '').trim().slice(0, 60);
+  const numberRaw = String(req.body.fuel_card_number || '').replace(/[\s-]/g, '');
+  const pinRaw = String(req.body.fuel_card_pin || '').trim();
+  if (!numberRaw && !v.fuel_card_number_enc) return fail('Enter the fuel card number.');
+  if (numberRaw && !FUEL_NUMBER_RE.test(numberRaw)) return fail('Card number should be 6–20 digits (spaces are fine).');
+  if (pinRaw && !FUEL_PIN_RE.test(pinRaw)) return fail('PIN should be 3–8 digits.');
+
+  const numberEnc = numberRaw ? encrypt(numberRaw) : v.fuel_card_number_enc;
+  const last4 = numberRaw ? numberRaw.slice(-4) : (v.fuel_card_last4 || '');
+  const pinEnc = pinRaw ? encrypt(pinRaw) : (v.fuel_card_pin_enc || null);
+  db.prepare('UPDATE vehicles SET fuel_card_provider = ?, fuel_card_last4 = ?, fuel_card_number_enc = ?, fuel_card_pin_enc = ?, fuel_card_updated_at = CURRENT_TIMESTAMP, fuel_card_updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(provider, last4, numberEnc, pinEnc, req.session.user.id, v.id);
+  // Audit the fact, never the secret.
+  logActivity({ user: req.session.user, action: 'update', entityType: 'vehicle', entityId: v.id, entityLabel: v.asset_id,
+    details: `Fuel card ${v.fuel_card_number_enc ? 'updated' : 'added'} (•••• ${last4}${pinRaw ? ', PIN set' : ''})`, ip: req.ip });
+  if (isJson) return res.json({ ok: true, last4, provider, has_pin: !!pinEnc });
+  req.flash('success', `Fuel card saved for ${v.asset_id}.`);
+  req.session.save(() => res.redirect(back));
+});
+
+// Plaintext on demand only — never rendered into the page — and every
+// reveal leaves an audit row so a leaked PIN can be traced to a login.
+router.get('/:id/fuel-card/reveal', (req, res) => {
+  const db = getDb();
+  const v = db.prepare('SELECT id, asset_id, fuel_card_provider, fuel_card_number_enc, fuel_card_pin_enc FROM vehicles WHERE id = ?').get(req.params.id);
+  res.set('Cache-Control', 'no-store');
+  if (!v) return res.status(404).json({ error: 'Vehicle not found' });
+  if (!v.fuel_card_number_enc) return res.status(404).json({ error: 'No fuel card on this vehicle' });
+  const number = decrypt(v.fuel_card_number_enc);
+  const pin = v.fuel_card_pin_enc ? decrypt(v.fuel_card_pin_enc) : '';
+  if (number == null) return res.status(500).json({ error: 'Could not decrypt the card — the encryption key may have changed' });
+  logActivity({ user: req.session.user, action: 'download', entityType: 'vehicle', entityId: v.id, entityLabel: v.asset_id, details: 'Fuel card number and PIN revealed', ip: req.ip });
+  res.json({ ok: true, provider: v.fuel_card_provider || '', number, pin: pin || '' });
 });
 
 // ── DELETE VEHICLE ───────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 // Atomis Admin Service Worker — Network-first with offline fallback
-const CACHE_NAME = 'atomis-admin-v32-liquid-glass-light';
+const CACHE_NAME = 'atomis-admin-v33-api-passthrough';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to pre-cache
@@ -78,8 +78,12 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // API/other requests — network only
-  event.respondWith(fetch(request));
+  // API / other requests — leave them to the browser. Calling
+  // respondWith(fetch(request)) here made Chromium (147+) hit the server
+  // TWICE per JSON fetch: it races its own network request against the
+  // handler, and the handler's fetch() was a second, separate request
+  // (seen as doubled audit rows on GET /fleet/:id/fuel-card/reveal).
+  // Not responding = plain network, exactly once.
 });
 
 // ===== Push Notification Handler =====
